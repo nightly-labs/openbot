@@ -55,7 +55,7 @@ a standalone sheet with a native title is:
 ```tsx
 {
   presentation: "formSheet",
-  sheetAllowedDetents: "fitToContents",
+  sheetAllowedDetents: [0.85],
   sheetGrabberVisible: true,
   sheetExpandsWhenScrolledToEdge: false,
   contentStyle: { backgroundColor: sheetBackground },
@@ -80,8 +80,8 @@ opens an inner page and `router.back` returns to the previous page without dismi
 Include secondary flows such as joining a server in this stack. Do not register each settings page
 as another modal. Use `initialRouteName: "index"` so direct entry into a detail page has a back route.
 
-A nested navigator requires a stable viewport; do not combine it with `fitToContents`. The
-intrinsic-height rule applies to standalone forms, not multi-page settings. Preserve the active
+All sheets require a stable viewport. Use fixed detents for standalone forms and nested
+navigators; do not use `fitToContents` or measure content to set the sheet height. Preserve the active
 page and unsaved input when navigating forward and back; do not replace routing with conditional
 screen rendering or a custom back-button imitation.
 
@@ -116,11 +116,11 @@ on the right of the native header. Do not put a second Save/Create button in the
 
 Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. In particular:
 
-- Disable bounce and overscroll (`bounces={false}`, `alwaysBounceVertical={false}` and
-  `overScrollMode="never"`). Content that fits stays still; longer content keeps native scrolling.
-  Do not disable scrolling globally. Agent Info uses `scrollOnlyOnOverflow` to disable touch
-  scrolling on short pages. It compares native content and viewport sizes without changing layout,
-  and permits scrolling while the keyboard is visible. Keep this opt-in behavior in `SheetScrollView`.
+- Keep native bounce on iOS and `overScrollMode="auto"` on Android for content that overflows.
+  Use `alwaysBounceVertical={false}` so content that fits stays still. Do not force hard stops
+  at the edges by disabling bounce or overscroll globally.
+  Keep scrolling enabled. Do not use content measurements or keyboard visibility to decide
+  whether scrolling is available. The native scroll view handles content that fits.
 - With an iOS native header, it reads `HeaderHeightContext` and `HeaderShownContext` from
   `expo-router/react-navigation`, disables automatic content inset adjustment, and adds the
   measured header height inside scrollable content. This keeps the first item below the title at
@@ -129,20 +129,19 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
 - It suppresses `SheetScrollEdgeEffect` when a native header owns the edge. Do not combine custom
   masking, blur material and native scroll-edge effects; they can obscure content in overlapping
   bands. Headerless sheets retain their existing shared edge behavior.
-- Keep the scroll view reachable directly from the sheet. Avoid surrounding `flex: 1` containers
-  for standalone fit-to-content presentations. A nested settings stack has a bounded viewport. Keep the last action in the same scroll flow, with the existing
+- Keep the scroll view reachable directly from the sheet. `SheetScrollView` uses `flex: 1`
+  to fill the fixed viewport. Keep the last action in the same scroll flow, with the existing
   bottom safe-area utilities, so it remains reachable on small screens and with the keyboard open.
 - Use `keyboardDismissMode="interactive"` and `keyboardShouldPersistTaps="handled"` for forms,
   following existing screens. Reuse `SheetFormField` instead of rebuilding its platform inputs.
 - `SheetScrollView` uses `KeyboardAwareScrollView` to reveal the focused field and keep the last
-  action reachable above the keyboard. Keep `mode="insets"`: a layout spacer changes the intrinsic
-  sheet height and conflicts with native sheet sizing. Use `disableScrollOnKeyboardHide` to keep
-  the user's position. The keyboard-controller 1.21.9 patch shrinks insets during dismissal and
+  action reachable above the keyboard. Keep `mode="insets"` so keyboard clearance does not add a
+  layout spacer. Use `disableScrollOnKeyboardHide` to keep the user's position. The keyboard-controller 1.21.9 patch shrinks insets during dismissal and
   clamps only the current offset beyond the remaining content, instead of replaying a saved offset
   after a new drag. `scripts/mobile-keyboard-scroll.test.ts` covers that event sequence against the
   installed library. Leave `automaticallyAdjustKeyboardInsets` disabled and do not add another
   keyboard-avoiding wrapper. Verify tapping outside a field followed immediately by scrolling,
-  interactive keyboard dismissal, reaching the final action, and short fit-to-content sheets.
+  interactive keyboard dismissal, reaching the final action, and both short and long content.
 
 ### Palette, groups and text
 

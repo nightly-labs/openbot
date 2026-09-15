@@ -1,7 +1,7 @@
 import { HeaderHeightContext, HeaderShownContext } from "expo-router/react-navigation";
-import { type PropsWithChildren, type ReactNode, useContext, useState } from "react";
+import { type PropsWithChildren, type ReactNode, useContext } from "react";
 import { type ScrollViewProps, View } from "react-native";
-import { KeyboardAwareScrollView, useKeyboardState } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { withUniwind } from "uniwind";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { isIOS } from "@/shared/lib/platform";
@@ -18,7 +18,6 @@ interface SheetScrollViewProps extends PropsWithChildren {
   keyboardDismissMode?: ScrollViewProps["keyboardDismissMode"];
   keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
   showsVerticalScrollIndicator?: boolean;
-  scrollOnlyOnOverflow?: boolean;
 }
 
 export function SheetScrollView({
@@ -32,12 +31,7 @@ export function SheetScrollView({
   keyboardDismissMode,
   keyboardShouldPersistTaps,
   showsVerticalScrollIndicator = false,
-  scrollOnlyOnOverflow = false,
 }: SheetScrollViewProps) {
-  const [viewportHeight, setViewportHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const keyboardVisible = useKeyboardState((state) => state.isVisible);
-  const canScroll = !scrollOnlyOnOverflow || keyboardVisible || contentHeight > viewportHeight + 1;
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const headerShown = useContext(HeaderShownContext);
   const nativeHeader = isIOS && headerShown && !header;
@@ -50,12 +44,9 @@ export function SheetScrollView({
       disableScrollOnKeyboardHide
       mode="insets"
       automaticallyAdjustKeyboardInsets={false}
-      scrollEnabled={canScroll}
-      onLayout={scrollOnlyOnOverflow ? (event) => setViewportHeight(event.nativeEvent.layout.height) : undefined}
-      onContentSizeChange={scrollOnlyOnOverflow ? (_width, height) => setContentHeight(height) : undefined}
-      bounces={false}
+      style={{ flex: 1 }}
       alwaysBounceVertical={false}
-      overScrollMode="never"
+      overScrollMode="auto"
       contentInsetAdjustmentBehavior={nativeHeader ? "never" : contentInsetAdjustmentBehavior}
       keyboardDismissMode={keyboardDismissMode}
       keyboardShouldPersistTaps={keyboardShouldPersistTaps}

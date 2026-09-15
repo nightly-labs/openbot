@@ -25,11 +25,16 @@ Follow [DESIGN.md — Sheets](./DESIGN.md#sheets) for presentation options, toke
 and inspect the current route options in `src/app/(app)/_layout.tsx`, when adding or changing a
 sheet. Four rules decide the shape of the screen before any of that detail applies:
 
-- A multi-page flow is ONE outer sheet with a nested native stack. Inner routes use
-  `presentation: "card"` and the native back button, never another sheet. A nested navigator cannot
-  measure intrinsic height, so it needs stable detents and no `flex: 1` wrapper.
+- Use native `formSheet` with fixed detents and a visible grabber. Ordinary standalone forms
+  use `[0.85]`, search uses `[1]`, and message actions use fixed route-specific heights. Do not
+  size sheets from their content. A multi-page flow is ONE outer sheet with a nested native
+  stack. Inner routes use `presentation: "card"` and the native back button, never another sheet.
 - `SheetScrollView` is the screen's scroll container and owns header clearance, safe-area behavior
-  and scroll-edge effects. Do not add screen-local header padding or another inset layer.
+  and scroll-edge effects. Keep scrolling enabled and its viewport bounded with `flex: 1`.
+  Do not gate scrolling on content measurements or keyboard visibility, or add screen-local
+  header padding or another inset layer. Keep native bounce and overscroll for long content,
+  with `alwaysBounceVertical={false}` so short content stays still. Keep
+  `sheetExpandsWhenScrolledToEdge: false`; overflow scrolls inside the fixed sheet.
 - Save and create actions use `SheetSaveAction` in the native header. Do not add a second
   Save/Create button in sheet content.
 - Do not add a redundant Done or close button to a dismissible sheet. Add an explicit action only

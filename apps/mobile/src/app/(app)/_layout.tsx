@@ -113,7 +113,7 @@ function AuthenticatedStack() {
             headerBlurEffect: "none",
             scrollEdgeEffects: { top: "soft" },
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
             title: "Create an agent",
           }}
@@ -135,7 +135,7 @@ function AuthenticatedStack() {
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
           }}
         />
@@ -156,7 +156,7 @@ function AuthenticatedStack() {
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
           }}
         />
