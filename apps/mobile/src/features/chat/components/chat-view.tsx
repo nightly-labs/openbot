@@ -315,6 +315,14 @@ export function ChatView({
     })();
   }
 
+  const replyToMessage =
+    !readOnly && !questionForm?.question
+      ? (message: ChatBubbleMessage) => {
+          setReplyTarget(message);
+          setReplyFocusVersion((version) => version + 1);
+        }
+      : undefined;
+
   return (
     <GestureDetector gesture={edgeBackGesture}>
       <View className="flex-1" style={{ backgroundColor: background }}>
@@ -375,24 +383,12 @@ export function ChatView({
               olderLoading={olderLoading}
               olderError={olderError}
               onLoadOlder={loadOlder}
-              onReply={
-                !readOnly && !questionForm?.question
-                  ? (message) => {
-                      setReplyTarget(message);
-                      setReplyFocusVersion((version) => version + 1);
-                    }
-                  : undefined
-              }
+              onReply={replyToMessage}
               onOpenActions={(message) => {
                 Keyboard.dismiss();
                 selectMessageActions({
                   message,
-                  onReply: !questionForm?.question
-                    ? () => {
-                        setReplyTarget(message);
-                        setReplyFocusVersion((version) => version + 1);
-                      }
-                    : null,
+                  onReply: replyToMessage ? () => replyToMessage(message) : null,
                 });
                 router.push("/message-actions");
               }}
