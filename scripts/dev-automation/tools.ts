@@ -131,9 +131,13 @@ export async function waitForRole(
   target: WaitTarget,
   timeoutMs: number,
   logger: Logger = dummyLogger,
+  exact = false,
 ): Promise<void> {
   logger.info(`wait-for role=${target.role} name=${target.name}`);
-  await page.getByRole(target.role, { name: target.name }).first().waitFor({ state: "visible", timeout: timeoutMs });
+  await page
+    .getByRole(target.role, { name: target.name, exact })
+    .first()
+    .waitFor({ state: "visible", timeout: timeoutMs });
 }
 
 export interface AutomationSnapshot {
@@ -221,8 +225,14 @@ export async function snapshotPage(page: Page, logger: Logger = dummyLogger): Pr
   return snapshot;
 }
 
-export async function clickByRole(page: Page, role: AutomationRole, name: string, timeoutMs: number): Promise<void> {
-  await page.getByRole(role, { name }).click({ timeout: timeoutMs });
+export async function clickByRole(
+  page: Page,
+  role: AutomationRole,
+  name: string,
+  timeoutMs: number,
+  exact = false,
+): Promise<void> {
+  await page.getByRole(role, { name, exact }).click({ timeout: timeoutMs });
 }
 
 export async function typeByRole(
@@ -232,8 +242,9 @@ export async function typeByRole(
   text: string,
   timeoutMs: number,
   submit: boolean,
+  exact = false,
 ): Promise<void> {
-  const control = page.getByRole(role, { name });
+  const control = page.getByRole(role, { name, exact });
   await control.fill(text, { timeout: timeoutMs });
   if (submit) await control.press("Enter", { timeout: timeoutMs });
 }
