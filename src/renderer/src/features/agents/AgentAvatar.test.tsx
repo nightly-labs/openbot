@@ -64,7 +64,7 @@ describe("AgentAvatar playback", () => {
         <For each={state.seeds}>
           {(seed) => (
             <button type="button" aria-label={`${state.label} ${seed}`}>
-              <AgentAvatar seed={seed} hue={state.hue} motion="idle" />
+              <AgentAvatar seed={seed} hue={state.hue} motion="working" />
             </button>
           )}
         </For>
@@ -110,8 +110,8 @@ describe("AgentAvatar playback", () => {
   });
 
   it.each([
-    ["idle", "working", "orbit"],
-    ["working", "idle", "idle"],
+    ["connecting", "working", "orbit"],
+    ["working", "connecting", "orbit"],
   ] as const)("changes from %s to %s without restarting playback", (from, to, expectedState) => {
     motionPreference(false);
     const clock = playback();
@@ -217,6 +217,54 @@ describe("AgentAvatar playback", () => {
     await fireEvent.focusIn(target);
     expect(clock.callbacks.size).toBe(1);
     await fireEvent.focusOut(target);
+    expect(clock.callbacks.size).toBe(0);
+  });
+
+  it("rests an idle avatar until it is interacted with, and keeps a working one playing", async () => {
+    motionPreference(false);
+    const clock = playback();
+    render(() => (
+      <button type="button">
+        Agent
+        <AgentAvatar seed="agent-alpha" motion="idle" />
+      </button>
+    ));
+    const target = screen.getByRole("button", { name: "Agent" });
+    // Every sidebar row shows `idle` while its agent does nothing, and the
+    // sidebar is not virtualized, so a playing `idle` avatar is a cost that
+    // grows with the agent count and never stops.
+    expect(clock.callbacks.size).toBe(0);
+    await fireEvent.pointerEnter(target);
+    expect(clock.callbacks.size).toBe(1);
+    await fireEvent.pointerLeave(target);
+    expect(clock.callbacks.size).toBe(0);
+  });
+
+  it("keeps playing the motions that report an agent is busy", () => {
+    motionPreference(false);
+    const clock = playback();
+    // Motion is the only signal the sidebar gives that an agent runs, so these
+    // two must not follow `idle` into the resting set.
+    render(() => <AgentAvatar seed="agent-alpha" motion="working" />);
+    flush();
+    expect(clock.callbacks.size).toBe(1);
+    clock.callbacks.clear();
+    render(() => <AgentAvatar seed="agent-beta" motion="connecting" />);
+    flush();
+    expect(clock.callbacks.size).toBe(1);
+  });
+
+  it("stops playback when a busy agent goes back to idle", () => {
+    motionPreference(false);
+    const clock = playback();
+    const [state, setState] = createStore<{ motion: AvatarMotion }>({ motion: "working" });
+    render(() => <AgentAvatar seed="agent-alpha" motion={state.motion} />);
+    flush();
+    expect(clock.callbacks.size).toBe(1);
+    setState((draft) => {
+      draft.motion = "idle";
+    });
+    flush();
     expect(clock.callbacks.size).toBe(0);
   });
 
