@@ -433,6 +433,9 @@ export async function createApplicationServices({
     hostedSites,
     sidebarLayout,
     preferredModel: setupState.preferredModel,
+    // Only a dev build leads with the OpenCode development model; a packaged app keeps the
+    // built-in default.
+    developmentDefaults: appVariant === "dev",
     credentials: {
       apiKey: (provider) => providerCredentials.get(provider),
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the

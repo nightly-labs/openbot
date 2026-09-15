@@ -96,6 +96,7 @@ import {
   responseAttachmentMessageId,
 } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
+import { DEVELOPMENT_DEFAULT_PROVIDER, developmentStartingModel } from "./agent/development-defaults";
 import { DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
@@ -178,6 +179,11 @@ export interface AgentServiceOptions {
    */
   credentials?: ProviderClientContext;
   localSkillTools?: () => LocalSkillTools;
+  /**
+   * Whether a new agent starts on the development default model rather than the built-in one.
+   * The main process passes the app variant; only a dev build turns it on.
+   */
+  developmentDefaults?: boolean;
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
@@ -246,6 +252,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #duplication: DuplicationGate;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
+  readonly #developmentDefaults: boolean;
   #initialized = false;
   #stopping = false;
 
@@ -265,7 +272,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       sidebarLayout = null,
       credentials = NO_PROVIDER_CREDENTIALS,
       localSkillTools,
+      developmentDefaults = false,
     } = options;
+    this.#developmentDefaults = developmentDefaults;
     this.#localSkillTools = localSkillTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
@@ -976,6 +985,33 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  /**
+   * The provider and model a new agent starts on, or `null` when the preferred provider lists
+   * nothing at all.
+   *
+   * `#startingModel` answers for one provider; this one chooses the provider too, which is what a
+   * development default needs: the model it names belongs to OpenCode, and a preferred provider of
+   * Codex would never list it.
+   *
+   * That default stands in for the built-in one and nothing else. A preferred provider that is not
+   * the built-in one, or a model recorded beside it, is the developer's own choice and is left as
+   * it is.
+   */
+  #startingChoice(models: AgentModelOption[]): { provider: AgentProvider; model: AgentModelOption } | null {
+    const preferredProvider = this.#providers.preferredProvider();
+    const development =
+      preferredProvider === DEFAULT_AGENT_PROVIDER && this.#providers.preferredModel() === null
+        ? developmentStartingModel({
+            enabled: this.#developmentDefaults,
+            models,
+            providerAvailable: (provider) => this.#providerAvailable(provider),
+          })
+        : null;
+    if (development) return { provider: DEVELOPMENT_DEFAULT_PROVIDER, model: development };
+    const model = this.#startingModel(preferredProvider, models);
+    return model ? { provider: preferredProvider, model } : null;
+  }
+
   async createAgent(
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,
@@ -987,18 +1023,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     let agent = await this.#store.createAgent(input, profileOperationId);
     try {
       await this.#prepareAgentWorkspace(agent);
-      const preferredProvider = this.#providers.preferredProvider();
+      const starting = this.#startingChoice(this.#availableModels());
+      // The provider a start lands on, even when it lists no model: the throw below names the
+      // provider the developer expected, and a preferred provider that equals the record's own is
+      // still the no-op it always was.
+      const startingProvider = starting?.provider ?? this.#providers.preferredProvider();
       // A new record starts on the built-in default provider, so this is the one place a preferred
       // provider lands on a new agent -- and with it the model setup chose, which is how a custom
       // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
-      if (preferredProvider !== agent.provider) {
-        const preferredModel = this.#startingModel(preferredProvider, this.#availableModels());
-        if (!preferredModel) throw new Error(`${providerLabel(preferredProvider)} has no available model.`);
+      if (startingProvider !== agent.provider) {
+        if (!starting) throw new Error(`${providerLabel(startingProvider)} has no available model.`);
         agent = await this.#store.updateAgent({
           agentId: agent.id,
-          provider: preferredProvider,
-          model: preferredModel.id,
-          reasoningEffort: preferredModel.defaultReasoningEffort,
+          provider: starting.provider,
+          model: starting.model.id,
+          reasoningEffort: starting.model.defaultReasoningEffort,
         });
       }
       if (configure) agent = await configure(agent);

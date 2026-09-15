@@ -4,6 +4,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEVELOPMENT_DEFAULT_MODEL, DEVELOPMENT_DEFAULT_REASONING_EFFORT } from "./agent/development-defaults";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
@@ -41,6 +42,97 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentService: queue", () => {
+  it("starts a new agent in a development build on the OpenCode development model", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      developmentDefaults: true,
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "opencode") {
+          client.modelList = () => ({
+            data: [{ model: "opencode/muse-spark-1.3-contributor-free" }, { model: DEVELOPMENT_DEFAULT_MODEL }],
+          });
+        }
+        return client;
+      },
+    });
+
+    await service.initialize();
+    await service.ensureProvider("opencode");
+
+    // The developer asked for this model at this effort, and OpenCode lists it, so the built-in
+    // `codex` default steps aside -- provider included, because the model belongs to OpenCode.
+    await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
+      provider: "opencode",
+      model: DEVELOPMENT_DEFAULT_MODEL,
+      reasoningEffort: DEVELOPMENT_DEFAULT_REASONING_EFFORT,
+    });
+  });
+
+  it("starts a new agent on the built-in default when OpenCode does not list the development model", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      developmentDefaults: true,
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        // The free tier, which is what an OpenCode with no Go key and no sign-in lists. A default
+        // nobody can run is a first turn that answers "Invalid API key.".
+        if (provider === "opencode") {
+          client.modelList = () => ({ data: [{ model: "opencode/muse-spark-1.3-contributor-free" }] });
+        }
+        return client;
+      },
+    });
+
+    await service.initialize();
+    await service.ensureProvider("opencode");
+
+    await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      reasoningEffort: "low",
+    });
+  });
+
+  it("leaves a packaged build and a recorded preference on their own model", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "opencode") client.modelList = () => ({ data: [{ model: DEVELOPMENT_DEFAULT_MODEL }] });
+        return client;
+      },
+    });
+
+    await service.initialize();
+    await service.ensureProvider("opencode");
+
+    // Same catalog, no development build: the built-in default stands.
+    await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-luna",
+    });
+
+    // And a provider the developer chose is theirs, development build or not.
+    await service.setPreferredProvider("claude");
+    await expect(
+      service.createAgent({ ...CREATE_AGENT_INPUT, name: "Chosen Agent", avatarSeed: "setup:chosen" }),
+    ).resolves.toMatchObject({
+      provider: "claude",
+      model: "claude-sonnet-5",
+    });
+  });
+
   it("updates the active account and new-agent defaults with the preferred provider", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);

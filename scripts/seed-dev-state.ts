@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, mkdtemp, readFile, readlink, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -6,6 +7,9 @@ import { pathToFileURL } from "node:url";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type {
+  AgentModelId,
+  AgentProviderId,
+  AgentReasoningEffort,
   AgentSummary,
   AttachmentSummary,
   ChannelMessage,
@@ -17,12 +21,23 @@ import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc"
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 import { agentNamesById, displayMessageReferences } from "../src/backend/agent/delivery-content";
+import {
+  DEVELOPMENT_DEFAULT_MODEL,
+  DEVELOPMENT_DEFAULT_PROVIDER,
+  DEVELOPMENT_DEFAULT_REASONING_EFFORT,
+} from "../src/backend/agent/development-defaults";
 import { AgentMemoryStore } from "../src/backend/agent-memory-store";
 import { AgentRoutineStore } from "../src/backend/agent-routine-store";
-import { AgentStore } from "../src/backend/agent-store";
+import {
+  AgentStore,
+  DEFAULT_AGENT_MODEL,
+  DEFAULT_AGENT_PROVIDER,
+  DEFAULT_REASONING_EFFORT,
+} from "../src/backend/agent-store";
 import { ChannelMemoryStore } from "../src/backend/channel-memory-store";
 import { ChannelRoutineStore } from "../src/backend/channel-routine-store";
 import { ChannelStore } from "../src/backend/channel-store";
+import { resolveOpencodeCli } from "../src/backend/cli";
 import { sortConversationMessages } from "../src/backend/conversation-snapshots";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
@@ -50,8 +65,47 @@ const CHANNEL_BETA_FEEDBACK = "channel-beta-feedback";
  * adopts these cursors through `ChannelStore.adoptReads`, so the seeded read state follows it.
  */
 const LOCAL_MEMBER_ID = "local";
-const SEED_AGENT_MODEL = "gpt-5.6-luna";
-const SEED_AGENT_REASONING_EFFORT = "low";
+/** The provider, model and effort every seeded agent shares. Not per-agent data: one answer. */
+export interface SeededAgentModel {
+  provider: AgentProviderId;
+  model: AgentModelId;
+  reasoningEffort: AgentReasoningEffort;
+}
+
+/**
+ * What the seeded agents run on when the development default is out of reach. The same pair the app
+ * falls back to, which is the built-in default of a new agent record.
+ */
+export const SEED_FALLBACK_AGENT: SeededAgentModel = {
+  provider: DEFAULT_AGENT_PROVIDER,
+  model: DEFAULT_AGENT_MODEL,
+  reasoningEffort: DEFAULT_REASONING_EFFORT,
+};
+
+/**
+ * What the seeded agents run on: the development default while this computer's OpenCode CLI lists
+ * it, and the built-in default otherwise.
+ *
+ * The app asks the CLI it spawns, over ACP. A seed has no provider runtime, so it asks the same
+ * binary with that CLI's own `models` command, and reads anything that fails -- nothing downloaded
+ * yet, no OpenCode Go key and no sign-in, a command that moved -- as "not listed". Four seeded
+ * agents whose first turn answers "Invalid API key." are a worse start than four on the default the
+ * app itself falls back to.
+ */
+async function seededAgentModel(): Promise<SeededAgentModel> {
+  try {
+    const cli = await resolveOpencodeCli();
+    const catalog = execFileSync(cli.executable, ["models"], { encoding: "utf8", timeout: 60_000 });
+    if (!catalog.split("\n").some((line) => line.trim() === DEVELOPMENT_DEFAULT_MODEL)) return SEED_FALLBACK_AGENT;
+    return {
+      provider: DEVELOPMENT_DEFAULT_PROVIDER,
+      model: DEVELOPMENT_DEFAULT_MODEL,
+      reasoningEffort: DEVELOPMENT_DEFAULT_REASONING_EFFORT,
+    };
+  } catch {
+    return SEED_FALLBACK_AGENT;
+  }
+}
 const GENERATED_DIRECTORY_PATTERN =
   /^generated\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHOWCASE_IMAGE_PATH = resolve(process.cwd(), "src", "renderer", "src", "assets", "openbot-logo-dev.png");
@@ -74,12 +128,19 @@ export interface DevelopmentSeedOptions {
   dryRun?: boolean;
   ifMissing?: boolean;
   instanceId?: string | null;
+  /**
+   * What the seeded agents run on. Left out, it is resolved from this computer's OpenCode CLI,
+   * which is what makes it an option: a test pins the answer instead of asking the machine.
+   */
+  agentModel?: SeededAgentModel;
 }
 
 export interface DevelopmentSeedSummary {
   targetProfile: string;
   dryRun: boolean;
   profileActive: boolean;
+  /** The model every seeded agent runs on, which a dry run reports before anything is written. */
+  agentModel: AgentModelId;
   agents: number;
   conversations: number;
   attachments: number;
@@ -125,8 +186,6 @@ const AGENTS = [
     name: "Chief",
     title: "Chief of staff",
     description: "Coordinates priorities, decisions, and handoffs across the team.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 245,
   },
   {
@@ -134,8 +193,6 @@ const AGENTS = [
     name: "Research",
     title: "Research partner",
     description: "Finds reliable sources and turns them into concise briefs.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 185,
   },
   {
@@ -143,8 +200,6 @@ const AGENTS = [
     name: "Builder",
     title: "Product engineer",
     description: "Builds product changes and records clear technical decisions.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 30,
   },
   {
@@ -152,8 +207,6 @@ const AGENTS = [
     name: "Launch",
     title: "Go-to-market lead",
     description: "Prepares launch assets, messaging, and release checklists.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 320,
   },
 ] as const;
@@ -168,10 +221,12 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
   if (dirname(targetProfile) !== appDataRoot) throw new Error(`Unsafe OpenBot dev profile path: ${targetProfile}`);
 
   const profileActive = await isDevelopmentProfileActive(targetProfile);
+  const agentModel = options.agentModel ?? (await seededAgentModel());
   const summary: DevelopmentSeedSummary = {
     targetProfile,
     dryRun: options.dryRun ?? false,
     profileActive,
+    agentModel: agentModel.model,
     ...SEED_SUMMARY,
   };
   if (options.dryRun) return summary;
@@ -184,7 +239,7 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
   const stagingProfile = await mkdtemp(join(appDataRoot, ".openbot-dev-seed-"));
   const newTransferDirectories: string[] = [];
   try {
-    await buildSeedProfile(stagingProfile, homeDirectory, newTransferDirectories);
+    await buildSeedProfile(stagingProfile, homeDirectory, newTransferDirectories, agentModel);
     if (await isDevelopmentProfileActive(targetProfile)) {
       throw new Error("Quit the OpenBot dev app before you seed its local state.");
     }
@@ -236,6 +291,7 @@ async function buildSeedProfile(
   profilePath: string,
   homeDirectory: string,
   transferDirectories: string[],
+  agentModel: SeededAgentModel,
 ): Promise<void> {
   const agentStore = new AgentStore(profilePath, homeDirectory);
   await agentStore.initialize();
@@ -244,7 +300,7 @@ async function buildSeedProfile(
 
   const clock = createSeedClock();
   try {
-    const agents = await seedAgents(agentStore);
+    const agents = await seedAgents(agentStore, agentModel);
     const attachments = await seedAttachments(mailbox, agents, transferDirectories);
     seedMemories(agentStore);
     await seedRoutines(agentStore, mailbox, clock);
@@ -252,7 +308,13 @@ async function buildSeedProfile(
     await seedConversations(agentStore, mailbox, agents, attachments, clock);
     await seedChannels(agentStore, mailbox, agents, clock, transferDirectories);
     await seedTeam(profilePath, agentStore, clock);
-    await writeSetupState(join(profilePath, SETUP_FILE), { preferredProvider: "codex", preferredModel: null });
+    // No model beside the provider, and the built-in provider: a seeded profile records no choice
+    // of the developer's, which is what lets the app apply its own development default to an agent
+    // created later. `AgentService` decides that one against the live catalog; this script cannot.
+    await writeSetupState(join(profilePath, SETUP_FILE), {
+      preferredProvider: DEFAULT_AGENT_PROVIDER,
+      preferredModel: null,
+    });
     await writeSeedManifest(profilePath, clock, transferDirectories);
   } finally {
     agentStore.database.close();
@@ -419,7 +481,7 @@ async function seedRoutineRun(
   routines.updateRunStatus(run.id, status, error);
 }
 
-async function seedAgents(agentStore: AgentStore): Promise<Map<string, AgentSummary>> {
+async function seedAgents(agentStore: AgentStore, agentModel: SeededAgentModel): Promise<Map<string, AgentSummary>> {
   const agents = new Map<string, AgentSummary>();
   for (const fixture of AGENTS) {
     await agentStore.getOrCreate(fixture.id, fixture.name, fixture.title);
@@ -428,8 +490,11 @@ async function seedAgents(agentStore: AgentStore): Promise<Map<string, AgentSumm
       name: fixture.name,
       title: fixture.title,
       description: fixture.description,
-      model: fixture.model,
-      reasoningEffort: fixture.reasoningEffort,
+      // The provider travels with the model: a record left on the built-in provider while its
+      // model belongs to another one names a model that provider cannot run.
+      provider: agentModel.provider,
+      model: agentModel.model,
+      reasoningEffort: agentModel.reasoningEffort,
       avatarSeed: fixture.id,
       avatarHue: fixture.avatarHue,
     });
@@ -1313,6 +1378,7 @@ async function main(): Promise<void> {
   logger.info(dryRun ? "OpenBot development seed dry run:" : "OpenBot development state seeded:");
   logger.info(`- profile: ${summary.targetProfile}`);
   logger.info(`- profile active: ${summary.profileActive ? "yes" : "no"}`);
+  logger.info(`- agent model: ${summary.agentModel}`);
   logger.info(`- agents: ${summary.agents}`);
   logger.info(`- conversations: ${summary.conversations}`);
   logger.info(`- managed attachments: ${summary.attachments}`);

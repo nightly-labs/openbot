@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer } from "node:net";
@@ -26,6 +26,7 @@ import {
   removeDevStackRecord,
   writeDevStackRecord,
 } from "./dev-automation/stack-registry";
+import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 import { prepareDevelopmentEnvironment } from "./prepare-dev-environment";
 
@@ -198,6 +199,45 @@ export function createDevInstanceRecord(
   };
 }
 
+// A dev profile no start has ever created is an empty one: the app opens on
+// first-run setup with no agents and no chats. `bun run dev:prepare` seeds the
+// worktree profile, but a setup that only ran `bun install` never reaches it,
+// and the shared `OpenBot Dev` profile was never seeded by either, so the
+// profile this start is about to open is seeded here instead. Only a missing
+// profile is seeded, so a later start costs nothing and no data is replaced.
+//
+// The app spec, not the shared environment, decides which profile that is: a
+// start whose default renderer port was busy takes the port as its instance id,
+// and reading it any earlier would seed the shared profile while the app opens
+// `OpenBot Dev <port>`.
+export function developmentProfileToSeed(
+  specs: readonly DevelopmentServiceSpec[],
+  profileExists: (path: string) => boolean = existsSync,
+): { profile: string; env: NodeJS.ProcessEnv } | null {
+  // The seed writes the app profile, which every target except `api` opens.
+  const app = specs.find((spec) => spec.name === "app");
+  if (!app) return null;
+  const instanceId = readDevelopmentInstanceId(app.env.OPENBOT_DEV_INSTANCE_ID);
+  const profile = resolve(
+    resolveDevelopmentAppDataRoot(process.platform, app.env),
+    developmentUserDataName("app", instanceId),
+  );
+  return profileExists(profile) ? null : { profile, env: app.env };
+}
+
+function seedDevelopmentProfile(profile: string, environment: NodeJS.ProcessEnv): void {
+  logger.info(`Seeding the new development profile ${profile}.`);
+  // `--if-missing` repeats the check above inside the seed, so a profile that
+  // appeared in between is kept rather than replaced. The seed runs with the app
+  // child's own environment, so it reads the same instance id and writes the
+  // profile that child opens.
+  execFileSync(process.execPath, ["run", "dev:seed", "--if-missing"], {
+    cwd: projectRoot,
+    stdio: "inherit",
+    env: withoutElectronRuntimeFlags(environment),
+  });
+}
+
 const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--isolated"] as const;
 
 export interface DevelopmentInvocation {
@@ -209,9 +249,9 @@ export interface DevelopmentInvocation {
   force: boolean;
   // Give this worktree a profile of its own, keyed to its path, instead of
   // whichever suffix the renderer port happened to produce. The default keeps
-  // the shared `OpenBot Dev` profile, so a worktree needs no seeding of its
-  // own; `--isolated` is for the times two worktrees must not see each other's
-  // conversations.
+  // the shared `OpenBot Dev` profile; `--isolated` is for the times two
+  // worktrees must not see each other's conversations. Either way the profile
+  // is seeded on the start that creates it.
   isolated: boolean;
 }
 
@@ -272,6 +312,11 @@ async function main(): Promise<void> {
     }
     return;
   }
+
+  // After the lock, because seeding a profile takes long enough that a sibling
+  // worktree should not wait behind it to choose its own ports.
+  const seed = developmentProfileToSeed(specs);
+  if (seed) seedDevelopmentProfile(seed.profile, seed.env);
 
   await runDevelopmentServices(specs, stack);
 }

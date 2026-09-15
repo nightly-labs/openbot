@@ -16,7 +16,12 @@ import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName } from "../src/main/development-profile";
 import { readSetupState } from "../src/main/setup-store";
 import { TeamStore } from "../src/main/team-store";
-import { cleanupSeedOwnedTransfers, DEVELOPMENT_SEED_MANIFEST_FILE, seedDevelopmentState } from "./seed-dev-state";
+import {
+  cleanupSeedOwnedTransfers,
+  DEVELOPMENT_SEED_MANIFEST_FILE,
+  SEED_FALLBACK_AGENT,
+  seedDevelopmentState,
+} from "./seed-dev-state";
 
 const temporaryDirectories: string[] = [];
 
@@ -34,7 +39,7 @@ describe("development state seed", () => {
       writeSentinel(testClientSentinel, "test client"),
     ]);
 
-    const result = await seedDevelopmentState({ appDataRoot, homeDirectory });
+    const result = await seedDevelopmentState({ appDataRoot, homeDirectory, agentModel: SEED_FALLBACK_AGENT });
     const profilePath = join(appDataRoot, developmentUserDataName("app"));
 
     expect(result).toMatchObject({
@@ -71,7 +76,14 @@ describe("development state seed", () => {
     const summaries = agents.list();
     expect(summaries).toHaveLength(4);
     expect(summaries.every((agent) => agent.threadId !== null)).toBe(true);
-    expect(summaries.every((agent) => agent.model === "gpt-5.6-luna" && agent.reasoningEffort === "low")).toBe(true);
+    expect(
+      summaries.every(
+        (agent) =>
+          agent.provider === SEED_FALLBACK_AGENT.provider &&
+          agent.model === SEED_FALLBACK_AGENT.model &&
+          agent.reasoningEffort === SEED_FALLBACK_AGENT.reasoningEffort,
+      ),
+    ).toBe(true);
 
     const persistedMessages = summaries.flatMap(
       (agent) => agents.database.readConversation(agent.id, agent.threadId).messages,
