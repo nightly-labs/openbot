@@ -195,7 +195,8 @@ export class MobileChannelStore {
               return;
             }
             const stableChannels = replaceEqualDeep(entry.state.channels, channels);
-            if (stableChannels !== entry.state.channels) this.onList?.(serverId, stableChannels);
+            // A local deletion can already match this list while its saved pin still needs cleanup.
+            this.onList?.(serverId, stableChannels);
             const ids = new Set(channels.map((channel) => channel.id));
             listedIds = ids;
             const pages = new Map(entry.state.pages);

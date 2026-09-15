@@ -150,6 +150,7 @@ function ChannelForm({
     setError(null);
     try {
       await action();
+      operation.current = null;
       setEdits({});
       if (close) setFinished(true);
     } catch (cause) {

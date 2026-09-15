@@ -7,8 +7,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { createWorkspacePreferences } from "@openbot/team-client";
 import { describe, expect, it, vi } from "vitest";
 import { projectChannelMessages } from "../../chat/model/chat-messages";
+import { reconcileChannelPins } from "../../workspace/model/agent-pins";
 import { channelRecipient, toggleChannelMember } from "./channel-draft";
 import { ChannelSend } from "./channel-send";
 import { type ChannelRequest, MobileChannelStore, mergeLatestChannelPage } from "./channel-store";
@@ -52,11 +54,14 @@ function page(from: number, to: number): ChannelPage {
     throughSequence: to,
   };
 }
-function fixture(response: (path: string, body: TeamProtocolV2Json | undefined, serverId: string) => Promise<unknown>) {
+function fixture(
+  response: (path: string, body: TeamProtocolV2Json | undefined, serverId: string) => Promise<unknown>,
+  onList?: (serverId: string, channels: ChannelSummary[]) => void,
+) {
   const calls = vi.fn(response);
   const request: ChannelRequest = async (_method, path, decode, body, serverId) =>
     decode(await calls(path, body, serverId));
-  const store = new MobileChannelStore(request);
+  const store = new MobileChannelStore(request, onList);
   store.configure("host-one", [CHANNEL_CHATS_CAPABILITY, CHANNEL_DELETE_CAPABILITY]);
   return { store, calls };
 }
@@ -325,6 +330,37 @@ describe("mobile channels", () => {
     await store.refresh("host-one");
     expect(store.get("host-one").error).toBeNull();
   });
+  it("releases a deleted pin when a stale event read races with local deletion", async () => {
+    const values = new Map<string, string>();
+    const preferences = createWorkspacePreferences("https://api.example.test", "user", {
+      get: (key) => values.get(key) ?? null,
+      set: (key, value) => {
+        values.set(key, value);
+      },
+    });
+    preferences.write("host-one", { hidden: [], pinned: ["agent-one"], pinnedChannels: [channel.id] });
+    const stale = deferred<unknown>();
+    let reads = 0;
+    const { store } = fixture(
+      async (path) => {
+        if (path !== CHANNEL_ROUTES.list) return undefined;
+        reads += 1;
+        return reads === 1 ? [channel] : reads === 2 ? stale.promise : [];
+      },
+      (serverId, channels) => {
+        reconcileChannelPins(preferences, serverId, channels);
+      },
+    );
+    await store.refresh("host-one");
+    const eventRead = store.refresh("host-one");
+    await store.delete("host-one", channel.id);
+    expect(store.get("host-one").channels).toEqual([]);
+    stale.resolve([channel]);
+    await eventRead;
+    expect(preferences.read("host-one")).toMatchObject({ pinned: ["agent-one"], pinnedChannels: [] });
+    expect(store.get("host-one").channels).toEqual([]);
+  });
+
   it("removes deleted channel history together with its list entry", async () => {
     let summaries = [channel];
     const { store } = fixture(async (path) => (path === CHANNEL_ROUTES.list ? summaries : page(1, 2)));

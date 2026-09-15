@@ -33,11 +33,12 @@ import { AddAgentScreen } from "./add-agent-screen";
 import { EditAgentScreen } from "./edit-agent-screen";
 import { HiddenChatsScreen } from "./hidden-chats-screen";
 
-vi.mock("expo-crypto", () => ({ randomUUID: () => "new-agent-seed" }));
+vi.mock("expo-crypto", () => ({ randomUUID: () => mocks.uuid() }));
 
 vi.mock("expo-secure-store", () => ({}));
 
 const mocks = vi.hoisted(() => ({
+  uuid: vi.fn(() => "new-agent-seed"),
   push: vi.fn(),
   replace: vi.fn(),
   dispatch: vi.fn(),
@@ -433,6 +434,7 @@ async function edit(name: string, value: string) {
   await act(() => fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } }));
 }
 beforeEach(() => {
+  mocks.uuid.mockReset().mockReturnValue("new-agent-seed");
   useHapticsPreference.setState({ enabled: true, ready: true });
   workspace.agents = [{ ...original }];
   workspace.servers = [{ ...host }];
@@ -1177,6 +1179,25 @@ it("keeps a failed channel draft and retries the same operation", async () => {
   expect(saves[1]?.[1]).toEqual(saves[0]?.[1]);
   expect(saves[1]?.[1]).toMatchObject({ update: true, draft: { name: "Renamed", members: [], leadAgentId: null } });
 });
+it("uses a new save operation after a successful save and a desktop edit", async () => {
+  await renderChannel();
+  mocks.uuid.mockReturnValueOnce("save-one").mockReturnValueOnce("save-two");
+  await edit("Name", "Planning");
+  await click("Save channel");
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Save channel" })).toBeNull());
+  channelRows = [{ ...channel, name: "Travel", revision: 3 }];
+  await act(async () => workspace.channelStore.refresh("host-one"));
+  expect(screen.getByRole("textbox", { name: "Name" })).toHaveProperty("value", "Travel");
+  await edit("Name", "Planning");
+  await click("Save channel");
+  const saves = channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command);
+  expect(saves.map(([, body]) => parseChannelCommand(body))).toMatchObject([
+    { operationId: "save-one", draft: { name: "Planning" } },
+    { operationId: "save-two", draft: { name: "Planning" } },
+  ]);
+  expect(workspace.channelStore.get("host-one").channels[0]?.name).toBe("Planning");
+});
+
 it("opens channel memories and routines from the channel settings sheet", async () => {
   await renderChannel();
   await click("Memories");
