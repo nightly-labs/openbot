@@ -521,6 +521,57 @@ describe.sequential("AgentService: providers", () => {
     expect(client.releasedThreads).toEqual([firstSession]);
   });
 
+  // The timeout branch of a turn start keeps the delivery waiting for lifecycle events instead of
+  // sending the work again. Those events are the only way that delivery can end, and they arrive on
+  // the routing a refresh removes.
+  it("keeps a session routed while an unconfirmed turn start waits", async () => {
+    const { store, mailbox } = stores(root);
+    let timedOut = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "turn/start" || timedOut) return;
+      timedOut = true;
+      throw new Error("Codex request timed out: turn/start");
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    const errors: string[] = [];
+    service.on("event", (event) => {
+      if (event.type === "error") errors.push(event.code);
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => errors.includes("delivery_start_unconfirmed"));
+    const session = store.activeProviderSession("chief")?.externalSessionId;
+    if (!session) throw new Error("The unconfirmed start left no provider session.");
+
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    expect(client.releasedThreads).toEqual([]);
+
+    // The turn the provider did start after all, reported the only way it can be: its events.
+    const turnId = "turn-after-the-timeout";
+    client.emit("notification", notification("turn/started", { threadId: session, turn: { id: turnId } }));
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId: session, turn: { id: turnId, status: "completed" } }),
+    );
+
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+  });
+
   // The manifest is the only record that survives a restart, and the in-memory refresh mark does
   // not. A manifest written from the set that arrived during the start would describe a session
   // that never got it, and the resume check would then accept that session for good.

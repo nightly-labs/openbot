@@ -220,7 +220,7 @@ export class DrainScheduler {
         if (!this.#hooks.servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
       };
       requireServedModel();
-      this.#threads.applyPendingRuntimeRefresh(agent);
+      this.#threads.applyPendingRuntimeRefresh(agent, delivery.id);
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id);
       await this.#providers.ensureProvider(providerForAgent(agent));
       const client = this.#providers.requireReadyClient(providerForAgent(agent));

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
@@ -88,6 +88,19 @@ describe("testMcpServer", () => {
       toolCount: 0,
       error: "Command not found: openbot-no-such-command",
     });
+  });
+
+  // The lookup of a bare command name needs a login shell, and the name is written by the user -
+  // and by a remote administrator of this machine's host.
+  it("looks up a command name that holds a shell substitution as a name", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-mcp-"));
+    roots.push(root);
+    const mark = join(root, "ran");
+    expect(await testMcpServer(config({ command: `node$(touch ${mark})` }))).toEqual({
+      toolCount: 0,
+      error: `Command not found: node$(touch ${mark})`,
+    });
+    await expect(stat(mark)).rejects.toThrow();
   });
 
   it("gives up on a server that never answers", async () => {

@@ -106,8 +106,14 @@ interface McpPanelState {
   /** The key of the one action in flight, gating the whole panel rather than any one row. */
   busy: string | null;
   error: string;
-  /** What each row's test found, keyed by MCP server id. A row with no entry was never tested. */
-  tests: Record<string, McpTestState>;
+  /**
+   * What each row's test found, keyed by MCP server id. A row with no entry was never tested.
+   *
+   * Each answer carries the configuration it was measured for, because a saved edit and a test race
+   * each other both ways: a row edited after a passing test would otherwise keep reporting the
+   * endpoint it no longer holds, and a test sent before the edit answers after it.
+   */
+  tests: Record<string, { test: McpTestState; config: McpServerConfig }>;
   /** The form's own test, which answers for the draft on screen and not for any stored row. */
   formTest: McpTestState | null;
   /**
@@ -152,6 +158,17 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   const formTest = createMemo(() =>
     state.formTestConfig && !mcpConfigChanged(state.draft, state.formTestConfig) ? state.formTest : null,
   );
+  /**
+   * A row's test result while it still describes what that row holds, on the same rule as `formTest`.
+   *
+   * The switch is left out of the comparison: it decides which agents are given the server, not what
+   * the connection is, and a test answers even for a server that is turned off.
+   */
+  const rowTest = (config: McpServerConfig): McpTestState | undefined => {
+    const entry = state.tests[config.id];
+    if (!entry || mcpConfigChanged({ ...config, enabled: entry.config.enabled }, entry.config)) return undefined;
+    return entry.test;
+  };
   const visible = (key: "name" | "command" | "url") => (state.touched ? errors()[key] : undefined);
   const removeTarget = createMemo(() => props.servers.find((config) => config.id === state.removeId) ?? null);
   const disabled = () => !props.canManage || state.busy !== null;
@@ -192,12 +209,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   }
 
   async function testRow(config: McpServerConfig): Promise<void> {
+    const tested = normalizeMcpConfig(config);
     setState((current) => {
-      current.tests[config.id] = { status: "testing" };
+      current.tests[config.id] = { test: { status: "testing" }, config: tested };
     });
-    const test = await runTest(config);
+    const test = await runTest(tested);
     setState((current) => {
-      current.tests[config.id] = test;
+      current.tests[config.id] = { test, config: tested };
     });
   }
 
@@ -355,7 +373,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                 A row that remounts would drop the switch mid-animation. */}
             <For each={props.servers} keyed={(config) => config.id}>
               {(config) => {
-                const test = () => state.tests[config().id];
+                const test = () => rowTest(config());
                 return (
                   <Item class="server-mcp-row" data-disabled={config().enabled ? undefined : ""}>
                     <ItemMedia class="server-mcp-row-icon">

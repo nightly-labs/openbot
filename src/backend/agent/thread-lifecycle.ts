@@ -382,7 +382,13 @@ export class ThreadLifecycle {
     this.#hooks.logRecovery(agentId, provider, outcome);
   }
 
-  applyPendingRuntimeRefresh(agent: AgentSummary): void {
+  /**
+   * Spends this agent's refresh mark on the sessions that can take it, and keeps it otherwise.
+   *
+   * `startingDeliveryId` names the delivery whose start is calling this, which is the one delivery
+   * whose unconfirmed state must not hold the mark back: it is about to be given the new set.
+   */
+  applyPendingRuntimeRefresh(agent: AgentSummary, startingDeliveryId?: string): void {
     if (!this.#pendingRuntimeRefreshes.has(agent.id)) return;
     // A compaction is a provider turn that deliberately keeps no conversation turn id, so the busy
     // check below reads its thread as idle. Its completion arrives on the routing this refresh
@@ -395,6 +401,12 @@ export class ThreadLifecycle {
     // about to run on and drop the routing its completion needs. The mark stays, and the next drain
     // of this agent - which follows every start - spends it.
     if (this.#pendingStarts.has(agent.id)) return;
+    // A start that was sent and not confirmed owns its session as well, although no turn id names
+    // it: a `turn/start` that timed out is deliberately left waiting for the lifecycle events
+    // instead of being retried on work that may already run. Those events arrive on the routing
+    // this refresh removes, so the mark waits for that delivery too.
+    const unconfirmed = this.#mailbox.startingDeliveryForAgent(agent.id);
+    if (unconfirmed && unconfirmed.delivery.id !== startingDeliveryId) return;
     let deferred = false;
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.

@@ -66,6 +66,17 @@ export function resolveMcpWorkingDirectory(value: string): string {
 }
 
 /**
+ * One word for a POSIX shell, whatever it holds.
+ *
+ * The lookup below needs a shell, and the word it looks up is written by the user - and by a remote
+ * administrator of this machine's host. Quoted, a name such as `node$(...)` is a name the machine
+ * does not have; unquoted, the shell would run what is inside it while answering the question.
+ */
+function shellWord(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/**
  * An absolute path for a command name, or `null` when the machine has none. A command the user
  * already wrote as a path is taken as written: it is their statement of which build to run.
  */
@@ -81,7 +92,7 @@ export async function resolveMcpCommand(command: string): Promise<string | null>
     // A login shell, because a packaged app starts with a restricted PATH - the same reason
     // `collectCandidates` in `cli.ts` uses one.
     const shell = loginShellCommand();
-    const { stdout } = await execFileAsync(shell.command, [...shell.args, `command -v ${trimmed}`], {
+    const { stdout } = await execFileAsync(shell.command, [...shell.args, `command -v -- ${shellWord(trimmed)}`], {
       timeout: 5_000,
       maxBuffer: 64 * 1024,
     });

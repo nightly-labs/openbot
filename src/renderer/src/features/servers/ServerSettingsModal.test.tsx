@@ -1,4 +1,10 @@
-import type { HostStatus, ServerSummary, TeamInviteSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
+import type {
+  HostStatus,
+  McpServerConfig,
+  ServerSummary,
+  TeamInviteSummary,
+  TeamPresenceMember,
+} from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -82,6 +88,20 @@ const members: TeamPresenceMember[] = [
     typingAgentId: null,
   },
 ];
+
+const mcpServer: McpServerConfig = {
+  id: "mcp-1",
+  name: "Filesystem",
+  transport: "stdio",
+  enabled: true,
+  command: "npx",
+  args: [],
+  env: [],
+  envPassthrough: [],
+  workingDirectory: "",
+  url: "",
+  headers: [],
+};
 
 function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSettingsModalProps {
   return {
@@ -175,21 +195,7 @@ describe("ServerSettingsModal", () => {
     render(() => (
       <ServerSettingsModal
         {...props({
-          mcpServers: [
-            {
-              id: "mcp-1",
-              name: "Filesystem",
-              transport: "stdio",
-              enabled: true,
-              command: "npx",
-              args: [],
-              env: [],
-              envPassthrough: [],
-              workingDirectory: "",
-              url: "",
-              headers: [],
-            },
-          ],
+          mcpServers: [mcpServer],
           onMcpSectionShown,
         })}
       />
@@ -231,6 +237,30 @@ describe("ServerSettingsModal", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(onRetryMcpServers).toHaveBeenCalledTimes(1);
+  });
+
+  // The same rule on a row: the answer names the endpoint that row held, so a saved edit - or a slow
+  // answer that lands after one - must not read as a working connection for the new one.
+  it("drops an MCP row's test result when that server changes", async () => {
+    const onTestMcpServer = vi.fn(async () => ({ toolCount: 3, error: null }));
+    const [servers, setServers] = createSignal<McpServerConfig[]>([mcpServer]);
+    render(() => <ServerSettingsModal {...props({ mcpServers: servers(), onTestMcpServer })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    const trigger = await screen.findByRole("button", { name: "Actions for Filesystem" });
+    await fireEvent.pointerDown(trigger, { button: 0 });
+    await fireEvent.pointerUp(trigger, { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Test connection" }), { button: 0 });
+    expect(await screen.findByText("Connected · 3 tools")).toBeInTheDocument();
+
+    // Turning the server off keeps the answer: the switch decides who is given the server, not what
+    // the connection is.
+    setServers([{ ...mcpServer, enabled: false }]);
+    expect(screen.getByText("Connected · 3 tools")).toBeInTheDocument();
+
+    setServers([{ ...mcpServer, command: "/bin/other" }]);
+    await waitFor(() => expect(screen.queryByText("Connected · 3 tools")).not.toBeInTheDocument());
+    expect(onTestMcpServer).toHaveBeenCalledTimes(1);
   });
 
   // A test answers for the settings it was given. Left on screen after an edit it would report a
