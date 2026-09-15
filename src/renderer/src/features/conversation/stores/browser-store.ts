@@ -1,4 +1,4 @@
-import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserControlSession, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 import type { ConversationProps, RightPanelMode } from "../conversation-types";
@@ -213,6 +213,19 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     },
   );
 
+  const agentsByThreadId = createMemo(() => new Map(deps.props.agents.map((agent) => [agent.threadId, agent])));
+
+  // Single pass, no copy and no localeCompare sort per evaluation.
+  const newestSession = (sessions: readonly BrowserControlSession[]) => {
+    let acting: BrowserControlSession | undefined;
+    let newest: BrowserControlSession | undefined;
+    for (const session of sessions) {
+      if (!newest || session.startedAt > newest.startedAt) newest = session;
+      if (session.phase === "acting" && (!acting || session.startedAt > acting.startedAt)) acting = session;
+    }
+    return acting ?? newest;
+  };
+
   const activeBrowserControl = createMemo(() => {
     if (deps.props.browserEnabled === false) return undefined;
     const sessions = deps.props.browserControlState.sessions;
@@ -224,11 +237,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       ? sessions.filter((session) => session.threadId === deps.props.agent?.threadId)
       : [];
     const candidates = forActiveTab.length > 0 ? forActiveTab : forActiveAgent;
-    return (
-      [...candidates]
-        .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
-        .find((session) => session.phase === "acting") ?? candidates.at(-1)
-    );
+    return newestSession(candidates);
   });
   const actingBrowserControl = createMemo(() => {
     const control = activeBrowserControl();
@@ -236,7 +245,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   });
   const browserControlAgent = createMemo(() => {
     const control = activeBrowserControl();
-    return control ? deps.props.agents.find((agent) => agent.threadId === control.threadId) : undefined;
+    return control ? agentsByThreadId().get(control.threadId) : undefined;
   });
   const browserControlForTab = (tab: BrowserTab) => {
     const sessions = deps.props.browserControlState.sessions.filter(
@@ -244,12 +253,11 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         session.tabId === tab.id ||
         (session.tabId === null && tab.id === activeBrowserTab()?.id && session.threadId === tab.ownerThreadId),
     );
-    const newestFirst = [...sessions].sort((left, right) => right.startedAt.localeCompare(left.startedAt));
-    return newestFirst.find((session) => session.phase === "acting") ?? newestFirst[0];
+    return newestSession(sessions);
   };
   const browserControllerForTab = (tab: BrowserTab) => {
     const control = browserControlForTab(tab);
-    return control ? deps.props.agents.find((agent) => agent.threadId === control.threadId) : undefined;
+    return control ? agentsByThreadId().get(control.threadId) : undefined;
   };
 
   async function openBrowserAddress(address = deps.browserAddress(), newTab = false) {

@@ -39,7 +39,7 @@ export function messageFileReferences(body: string, attachments: AttachmentSumma
   const attachmentsById = new Map(attachments.map((attachment) => [attachment.id, attachment]));
 
   for (const reference of attachmentReferences(body)) {
-    occupied.push(reference);
+    markOccupied(occupied, reference);
     const attachment = attachmentsById.get(reference.attachmentId);
     if (!attachment) continue;
     references.push({
@@ -52,7 +52,7 @@ export function messageFileReferences(body: string, attachments: AttachmentSumma
   }
 
   for (const candidate of sharedPathCandidates(body)) {
-    if (occupied.some((range) => rangesOverlap(range, candidate))) continue;
+    if (isOccupied(occupied, candidate)) continue;
     const candidatePath = body.slice(candidate.start, candidate.end);
     if (!isSharedFilePath(candidatePath)) continue;
     const attachment = attachmentForPath(candidatePath, attachments);
@@ -72,9 +72,11 @@ export function messageFileReferences(body: string, attachments: AttachmentSumma
           end: candidate.end,
         };
     references.push(reference);
-    occupied.push(candidate);
+    markOccupied(occupied, candidate);
   }
 
+  if (attachments.length === 0)
+    return references.sort((left, right) => left.start - right.start || left.end - right.end);
   const sortedAttachments = [...attachments].sort((left, right) => right.name.length - left.name.length);
   for (const attachment of sortedAttachments) {
     let searchStart = 0;
@@ -87,7 +89,7 @@ export function messageFileReferences(body: string, attachments: AttachmentSumma
 
       const range = attachmentPathRange(body, index, end);
       if (!range) continue;
-      if (occupied.some((candidate) => rangesOverlap(candidate, range))) continue;
+      if (isOccupied(occupied, range)) continue;
       references.push({
         kind: "attachment",
         attachment,
@@ -95,7 +97,7 @@ export function messageFileReferences(body: string, attachments: AttachmentSumma
         start: range.start,
         end: range.end,
       });
-      occupied.push(range);
+      markOccupied(occupied, range);
     }
   }
 
@@ -184,4 +186,35 @@ function trimPathPunctuation(value: string): string {
 
 function rangesOverlap(left: TextRange, right: TextRange): boolean {
   return left.start < right.end && right.start < left.end;
+}
+
+/**
+ * `occupied` grows with every reference found, and the scan above probes it
+ * once per candidate. A linear scan makes this quadratic on long messages;
+ * the ranges are insert-sorted by start so only neighbors can overlap.
+ */
+function isOccupied(occupied: TextRange[], range: TextRange): boolean {
+  let low = 0;
+  let high = occupied.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if ((occupied[mid]?.start ?? 0) < range.start) low = mid + 1;
+    else high = mid;
+  }
+  for (const index of [low - 1, low]) {
+    const neighbor = occupied[index];
+    if (neighbor && rangesOverlap(neighbor, range)) return true;
+  }
+  return false;
+}
+
+function markOccupied(occupied: TextRange[], range: TextRange): void {
+  let low = 0;
+  let high = occupied.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if ((occupied[mid]?.start ?? 0) < range.start) low = mid + 1;
+    else high = mid;
+  }
+  occupied.splice(low, 0, range);
 }

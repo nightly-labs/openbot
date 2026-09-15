@@ -391,7 +391,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                   <AgentAvatar
                     seed={avatarVariants.meet.seed}
                     hue={avatarVariants.meet.hue}
-                    motion="always"
+                    motion="idle"
                     cycleOffset={avatarVariants.meet.cycleOffset}
                     animationOffset={avatarVariants.meet.animationOffset}
                     class="onboarding-avatar-hero"
