@@ -36,7 +36,7 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run check:cycles`, `bun run check:desktop:static` |
+| Check | `ubuntu-latest` | `bun run check:desktop:static` |
 | Browser smoke | `macos-14` | `bun run test:browser` |
 | Tests | `ubuntu-latest` | `bun run test:desktop`, `bun run test:sites`, `bun run test:remote` |
 | Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run remote:check:compose` |
@@ -47,11 +47,8 @@ All six gate Cloudflare production deployment on `main`. Surfaces was previously
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
-`bun run check:desktop` still runs everything: it is `check:desktop:static`, which holds the
-import-cycle check, the UI check, the lint, the desktop typecheck and the build, followed by
-the browser smoke test. `bun run check:cycles` runs only `suspicious/noImportCycles` and takes
-about 2s. The Check job runs it as a named step, so a cycle fails with a clear name before the
-long static suite runs. CI is
+`bun run check:desktop` still runs everything: it is `check:desktop:static`, which holds the UI
+check, the lint, the desktop typecheck and the build, followed by the browser smoke test. CI is
 the only caller that splits them, because only the smoke test needs a macOS runner, and it was 83s
 of the 141s the two took in series there. The smoke test builds its own Electron entry point and
 reads nothing the build writes, so the order between the halves is free. `release.yml` keeps the

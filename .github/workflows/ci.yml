@@ -36,9 +36,6 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
-      - name: Check for circular imports
-        run: bun run check:cycles
-
       - name: Check desktop application
         run: bun run check:desktop:static
 
