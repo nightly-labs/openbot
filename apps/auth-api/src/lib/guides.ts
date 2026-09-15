@@ -39,5 +39,13 @@ export const GUIDES_COLLECTION: ContentCollection = {
       publishedAt: "2026-09-11",
       author: NEWS_AUTHOR,
     },
+    {
+      slug: "wtf-is-openbot",
+      title: "WTF Is OpenBot?",
+      description:
+        "A practical explanation of models, providers, agents, and the local-first workspace that brings them together.",
+      publishedAt: "2026-09-15",
+      author: NEWS_AUTHOR,
+    },
   ]),
 };

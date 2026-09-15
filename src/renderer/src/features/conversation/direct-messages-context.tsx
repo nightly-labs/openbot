@@ -403,7 +403,13 @@ const DirectMessages = createSimpleContext({
           ...current,
           [memberId]: {
             ...snapshot,
-            messages: [...snapshot.messages, message].sort((left, right) => left.sequence - right.sequence),
+            // Inbound messages arrive in sequence order, so append and only
+            // sort when an out-of-order delivery actually happened.
+            messages: (() => {
+              const last = snapshot.messages[snapshot.messages.length - 1];
+              if (!last || message.sequence >= last.sequence) return [...snapshot.messages, message];
+              return [...snapshot.messages, message].sort((left, right) => left.sequence - right.sequence);
+            })(),
             revision: Math.max(snapshot.revision, message.sequence),
             readState: nextReadState,
           },
