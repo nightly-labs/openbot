@@ -10,12 +10,13 @@ import type {
   HostedSitesDesktopApi,
   MobileConnectedDevice,
   MobileConnectTicket,
+  ProviderApiKeyStatus,
   ProviderRuntimeStatus,
   SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import {
   Button,
   CircleArrowDown,
@@ -152,9 +153,43 @@ export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
   const [activeTab, setActiveTab] = createSignal<SettingsTab>("general");
   const [openCodeKeyOpen, setOpenCodeKeyOpen] = createSignal(false);
+  /**
+   * Whether the optional OpenCode key is saved, for the row's badge. Read through the key API
+   * like the dialog does, on open and after the dialog closes with a save or a removal. Absent
+   * until the first read, and on a read failure, so the row shows no key badge rather than a
+   * wrong one.
+   */
+  const [openCodeKeyStatus, setOpenCodeKeyStatus] = createSignal<ProviderApiKeyStatus | undefined>(undefined);
   let modalElement: HTMLElement | undefined;
 
-  const general = createSettingsGeneralStore(props);
+  const general = createSettingsGeneralStore({
+    get agentStatus() {
+      return props.agentStatus;
+    },
+    get providerRuntimeStatuses() {
+      return props.providerRuntimeStatuses;
+    },
+    get providerAvailableVersions() {
+      return props.providerAvailableVersions;
+    },
+    openCodeKeyStatus,
+  });
+  async function refreshOpenCodeKeyStatus(): Promise<void> {
+    if (!props.providerKeys) return;
+    try {
+      setOpenCodeKeyStatus((await props.providerKeys.getProviderApiKeyState("opencode")).status);
+    } catch {
+      setOpenCodeKeyStatus(undefined);
+    }
+  }
+  // The badge has to answer on first paint: the key state arrives after the rows, so an open
+  // without a read would show no badge until something else re-renders the list.
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (open) void refreshOpenCodeKeyStatus();
+    },
+  );
   const profile = createSettingsProfileStore(props, () => activeTab() === "profile");
   const mobileConnect = createSettingsMobileConnectStore(props, () => activeTab() === "mobile-connect");
   const updates = createSettingsUpdatesStore(props);
@@ -205,7 +240,15 @@ export function SettingsModal(props: SettingsModalProps) {
         onContentElement={(element) => (modalElement = element)}
         floatingContent={
           <Show when={openCodeKeyOpen() && props.providerKeys}>
-            {(api) => <OpenCodeKeyDialog api={api()} onClose={() => setOpenCodeKeyOpen(false)} />}
+            {(api) => (
+              <OpenCodeKeyDialog
+                api={api()}
+                onClose={() => {
+                  setOpenCodeKeyOpen(false);
+                  void refreshOpenCodeKeyStatus();
+                }}
+              />
+            )}
           </Show>
         }
         footer={

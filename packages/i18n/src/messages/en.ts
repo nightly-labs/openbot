@@ -132,6 +132,10 @@ export const en = {
   "provider.status.unavailable": "Unavailable",
   "provider.status.checking": "Checking",
 
+  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
+  // badge: a saved key leaves the runtime "Connected" to speak for the row.
+  "provider.key.free": "Free",
+
   // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
   // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.
   "provider.action.download": "Download",

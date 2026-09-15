@@ -880,4 +880,58 @@ describe("SettingsModal", () => {
     await fireEvent.click(openCode);
     expect(custom).not.toBeChecked();
   });
+
+  // The runtime badge reports the CLI, so the row carries a tier badge only while it adds
+  // anything: "Free" with no key, gone once the key is saved and the runtime "Connected" speaks
+  // for the row. The status is re-read after the key dialog closes, so a save lands on the row
+  // without reopening Settings.
+  it("badges the OpenCode row with the account tier, and refreshes it after the key dialog closes", async () => {
+    const providerKeys = {
+      // Modal open, key dialog open: no key yet. Key dialog close: the save landed.
+      getProviderApiKeyState: vi
+        .fn()
+        .mockResolvedValueOnce({ provider: "opencode" as const, status: "missing" as const })
+        .mockResolvedValueOnce({ provider: "opencode" as const, status: "missing" as const })
+        .mockResolvedValue({ provider: "opencode" as const, status: "saved" as const }),
+      setProviderApiKey: vi.fn(async () => undefined),
+      clearProviderApiKey: vi.fn(async () => undefined),
+      openExternal: vi.fn(async () => undefined),
+    };
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        agentStatus={openCodeReadyStatus}
+        providerKeys={providerKeys}
+      />
+    ));
+
+    // The key badge beside the runtime one: both read "Connected" once the key is saved.
+    await screen.findByText("Free");
+    expect(providerKeys.getProviderApiKeyState).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to OpenCode" }));
+    const input = await screen.findByLabelText("OpenCode Go key");
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.input(input, { target: { value: "go-key-value" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+
+    await waitFor(() =>
+      expect(providerKeys.setProviderApiKey).toHaveBeenCalledWith({ provider: "opencode", key: "go-key-value" }),
+    );
+    // Modal open, key dialog open, key dialog close: the last read is the refresh the badge needs.
+    await waitFor(() => expect(providerKeys.getProviderApiKeyState).toHaveBeenCalledTimes(3));
+    // getAllByText only waits for the first match, so the count itself is what waits here: the
+    // runtime badge steps aside, leaving the single refreshed key badge.
+    await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(1));
+    expect(screen.queryByText("Free")).toBeNull();
+  });
 });

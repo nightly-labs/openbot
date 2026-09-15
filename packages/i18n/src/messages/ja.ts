@@ -124,6 +124,8 @@ export const ja = {
   "provider.status.unavailable": "利用できません",
   "provider.status.checking": "確認中",
 
+  "provider.key.free": "無料",
+
   "provider.action.download": "ダウンロード",
   "provider.action.cancel": "キャンセル",
   "provider.action.connect": "接続",

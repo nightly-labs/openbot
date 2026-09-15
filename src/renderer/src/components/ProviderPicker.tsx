@@ -4,6 +4,7 @@ import type {
   AgentProviderId,
   AgentProviderState,
   CustomProviderSummary,
+  ProviderApiKeyStatus,
   ProviderRuntimePhase,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -23,6 +24,12 @@ export interface ProviderPickerOption {
   connectionState?: "connecting";
   checkError?: string | null;
   runtimeStatus?: ProviderRuntimeStatus;
+  /**
+   * Whether the optional OpenCode key is saved. Only the OpenCode row carries it: no other
+   * provider signs in with a pasted key. Absent while unknown, so the row shows no badge rather
+   * than a wrong one.
+   */
+  keyStatus?: ProviderApiKeyStatus;
   /** The newer runtime main says exists. The renderer never works this out itself. */
   availableVersion?: string | null;
 }
@@ -361,6 +368,19 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       <Show when={version()}>
                         {(installed) => <small class="provider-picker-version">{installed()}</small>}
                       </Show>
+                      {/* The account tier, and only while it adds to the runtime badge: a saved key
+                          leaves the runtime "Connected" to speak for the row, while a missing one
+                          still runs the free tier beside it. An unreadable key runs keyless too. */}
+                      <Show
+                        when={
+                          option().id === "opencode" &&
+                          (option().keyStatus === "missing" || option().keyStatus === "unreadable")
+                        }
+                      >
+                        <Badge class="provider-picker-status provider-picker-key-status" tone="neutral" shape="pill">
+                          {i18n.t("provider.key.free")}
+                        </Badge>
+                      </Show>
                       <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
                         <Badge
                           class={`provider-picker-status provider-picker-status-${visualState()}`}
@@ -388,7 +408,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             if (action() === "cancel") {
                               void props.onCancelProviderDownload?.(option().id);
                             } else if (action() !== "download" && action() !== "retry") {
-                              void props.onConnectProvider?.(option().id);
+                              // OpenCode reconnects through its key: saving one restarts the CLI with
+                              // it, so its Connect/Reconnect opens the key dialog instead of a bare
+                              // reconnect.
+                              if (option().id === "opencode" && props.onSignInProvider) {
+                                void props.onSignInProvider(option().id);
+                              } else {
+                                void props.onConnectProvider?.(option().id);
+                              }
                             } else {
                               void props.onDownloadProvider?.(option().id);
                             }
@@ -458,13 +485,13 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       </Button>
                     </Show>
                     {/* Claude's sign-in is a browser round trip it only needs while signed out.
-                      OpenCode's is a pasted key that unlocks the paid catalog, so its button stays on
-                      a row that already works -- and stays beside Connect instead of replacing it. */}
+                      OpenCode's key dialog opens from its runtime Reconnect, so this standalone
+                      Sign in is only the fallback for a row that reports no runtime at all. */}
                     <Show
                       when={
                         props.onSignInProvider &&
                         (option().id === "opencode"
-                          ? !runtimeStatus() || runtimeStatus()?.phase === "ready"
+                          ? !runtimeAction()
                           : option().id === "claude" &&
                             !runtimeStatus() &&
                             state() === "sign-in-required" &&
