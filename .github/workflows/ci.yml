@@ -56,12 +56,11 @@ jobs:
       - name: Run the browser smoke test
         run: bun run test:browser
 
-  tests:
+  tests-desktop:
     # ubuntu-latest gives 4 vCPUs, so vitest runs 3 workers and the job is
-    # CPU-bound. Splitting it across runners buys wall clock with a checkout and
-    # an install per shard; making the run itself faster was the better trade,
-    # so it stays one job.
-    name: Tests
+    # CPU-bound. The three test suites run in parallel jobs so the short
+    # site-router and remote suites no longer wait for the desktop suite.
+    name: Tests (desktop)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -76,8 +75,34 @@ jobs:
       - name: Run desktop tests
         run: bun run test:desktop
 
+  tests-sites:
+    name: Tests (sites)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
       - name: Run site router tests
         run: bun run test:sites
+
+  tests-remote:
+    name: Tests (remote)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
 
       - name: Run remote API tests
         run: bun run test:remote
@@ -230,7 +255,7 @@ jobs:
     # `apps/auth-api`, which `api` already covers: mobile, the site router, the
     # team client and the remote stack all consume the account API, so a red
     # Surfaces is the signal that this deploy is the thing about to break them.
-    needs: [check, browser, tests, api, storybook, surfaces]
+    needs: [check, browser, tests-desktop, tests-sites, tests-remote, api, storybook, surfaces]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production
