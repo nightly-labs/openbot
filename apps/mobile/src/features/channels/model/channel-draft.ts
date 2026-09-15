@@ -3,10 +3,15 @@ import type { ChannelDraft } from "@openbot/contracts/ipc";
 
 export function toggleChannelMember(draft: ChannelDraft, agentId: string): ChannelDraft {
   const selected = draft.members.some((member) => member.agentId === agentId);
+  const members = selected
+    ? draft.members.filter((member) => member.agentId !== agentId)
+    : [...draft.members, { agentId }];
   return {
     ...draft,
-    members: selected ? draft.members.filter((member) => member.agentId !== agentId) : [...draft.members, { agentId }],
-    leadAgentId: selected && draft.leadAgentId === agentId ? null : draft.leadAgentId,
+    members,
+    leadAgentId: members.some((member) => member.agentId === draft.leadAgentId)
+      ? draft.leadAgentId
+      : (members[0]?.agentId ?? null),
   };
 }
 

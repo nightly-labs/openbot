@@ -1149,6 +1149,7 @@ it("creates a mobile channel with selected agents and opens its conversation", a
   expect(screen.queryByRole("button", { name: "Create channel" })).toBeNull();
   await act(() => fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Planning" } }));
   await click("Travel", "checkbox");
+  expect(screen.queryByText("Automatic")).toBeNull();
   await click("Create channel");
   await waitFor(() =>
     expect(mocks.replace).toHaveBeenCalledWith({
@@ -1160,7 +1161,11 @@ it("creates a mobile channel with selected agents and opens its conversation", a
     CHANNEL_ROUTES.command,
     expect.objectContaining({
       type: "save",
-      draft: expect.objectContaining({ name: "Planning", members: [{ agentId: "agent-one" }] }),
+      draft: expect.objectContaining({
+        name: "Planning",
+        members: [{ agentId: "agent-one" }],
+        leadAgentId: "agent-one",
+      }),
     }),
   );
 });

@@ -123,6 +123,8 @@ function ChannelForm({
     leadAgentId: base.leadAgentId,
     ...edits,
   };
+  if (!draft.members.some((member) => member.agentId === draft.leadAgentId))
+    draft.leadAgentId = draft.members[0]?.agentId ?? null;
   const dirty = (["name", "title", "instructions", "members", "leadAgentId"] as const).some(
     (key) => JSON.stringify(draft[key]) !== JSON.stringify(base[key]),
   );
@@ -208,6 +210,7 @@ function ChannelForm({
       />
       <SheetFormField
         label="Name"
+        placeholder="Launch hub"
         appearance="soft"
         value={draft.name}
         onChangeText={(name) => setEdits((current) => ({ ...current, name }))}
@@ -266,16 +269,8 @@ function ChannelForm({
             </SettingsRow>
           ))}
       </SettingsSection>
-      {!create ? (
+      {draft.members.length > 0 ? (
         <SettingsSection title="Lead agent">
-          <SettingsRow
-            disabled={disabled}
-            disclosure={false}
-            trailing={<Typography>{draft.leadAgentId === null ? "✓" : ""}</Typography>}
-            onPress={() => setEdits((current) => ({ ...current, leadAgentId: null }))}
-          >
-            <Typography.Paragraph>Automatic</Typography.Paragraph>
-          </SettingsRow>
           {choices
             .filter((agent) => selectedIds.has(agent.id))
             .map((agent) => (

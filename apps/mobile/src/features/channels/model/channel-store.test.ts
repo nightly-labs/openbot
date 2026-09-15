@@ -510,9 +510,13 @@ describe("mobile channels", () => {
   });
   it("removes a selected lead and permits adding that agent again", () => {
     const removed = toggleChannelMember(channel, "agent-one");
-    expect(removed.leadAgentId).toBeNull();
+    expect(removed.leadAgentId).toBe("agent-two");
     expect(removed.members).toEqual([{ agentId: "agent-two" }]);
     expect(toggleChannelMember(removed, "agent-one").members).toHaveLength(2);
+    expect(toggleChannelMember(removed, "agent-one").leadAgentId).toBe("agent-two");
+    const empty = toggleChannelMember(removed, "agent-two");
+    expect(empty.leadAgentId).toBeNull();
+    expect(toggleChannelMember(empty, "agent-one").leadAgentId).toBe("agent-one");
     expect(channel.leadAgentId).toBe("agent-one");
   });
 });
