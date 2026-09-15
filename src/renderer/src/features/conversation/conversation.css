@@ -6644,6 +6644,21 @@ button.chat-action-target:active,
   min-height: 0;
 }
 
+/*
+ * Why the queue waits, above the rows that wait. Sits inside the panel's own
+ * padding because the list below owns the row insets, not the panel.
+ */
+.agent-queue-hold {
+  margin: 0;
+  padding: var(--queue-row-gutter) var(--queue-row-inset-end) 0 var(--queue-row-inset-start);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .composer-wrap:has(.composer-attachment) .agent-queue-panel {
   margin-bottom: 0;
 }

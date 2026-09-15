@@ -52,6 +52,10 @@ export function queuedDeliveriesInOrder(snapshot: QueueSnapshot | undefined): Qu
  * that never goes away. Two more things drop out: a delivery already rendered
  * as a message, which the transcript is showing, and a queued delivery that
  * belongs to the running turn, which the activity line above is showing.
+ *
+ * A held queue is the exception: the work that holds it is a channel turn on
+ * another thread, so this agent has nothing running to hold the panel open, and
+ * without it the message the user just sent would appear nowhere at all.
  */
 export function presentQueueDeliveries(input: {
   snapshot: QueueSnapshot | undefined;
@@ -59,7 +63,8 @@ export function presentQueueDeliveries(input: {
   renderedMessageIds: ReadonlySet<string>;
 }): QueueDelivery[] {
   const snapshot = input.snapshot;
-  if (!snapshot || activeQueueDeliveries(snapshot, input.activeTurnId).length === 0) return [];
+  if (!snapshot) return [];
+  if (!snapshot.hold && activeQueueDeliveries(snapshot, input.activeTurnId).length === 0) return [];
   const queued = queuedDeliveriesInOrder(snapshot).filter(
     (delivery) =>
       (!input.activeTurnId || delivery.turnId !== input.activeTurnId) && !input.renderedMessageIds.has(delivery.id),

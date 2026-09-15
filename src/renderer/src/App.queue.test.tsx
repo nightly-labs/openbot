@@ -678,6 +678,62 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.queryByRole("group", { name: /Next work/ })).not.toBeInTheDocument();
   });
 
+  it("shows the agent working on its channel task, and what waits behind it", async () => {
+    const waiting = queuedDelivery("delivery-held", "Read the report", 1);
+    const held = queuedDelivery("delivery-sales", "Draft the outreach", 1, { recipientAgentId: "sales-outbound" });
+    const hold = {
+      reason: "channel-task" as const,
+      channelId: "channel-1",
+      channelName: "Project launch",
+      agentId: "chief",
+    };
+    vi.mocked(window.openbot.agent.listQueue).mockImplementation(async (agentId) =>
+      agentId === "chief" ? { agentId, deliveries: [waiting], hold } : { agentId, deliveries: [held], hold },
+    );
+
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    // The channel turn runs on another thread, so this agent reports no turn of its own and no
+    // started delivery. Without the hold the chat shows an idle agent and no sign of the message.
+    emitAgentEvent?.({ type: "queue-changed", snapshot: { agentId: "chief", deliveries: [waiting], hold } });
+    const queue = await screen.findByRole("region", { name: "Message queue" });
+    within(queue).getByRole("group", { name: "Queued message 1: Read the report" });
+    expect(
+      await screen.findByRole("status", { name: "Chief is working: Working in Project launch" }),
+    ).toBeInTheDocument();
+
+    // The same assignment reserves the host for every agent, but only the one it belongs to is
+    // working. The others are waiting, and their chat has to say what for.
+    await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound, Outbound specialist/ }));
+    await screen.findByRole("heading", { name: "Sales Outbound" });
+    const salesQueue = await screen.findByRole("region", { name: "Message queue" });
+    expect(within(salesQueue).getByText("Waiting - Chief is working in Project launch")).toBeVisible();
+    expect(screen.queryByRole("status", { name: /^Sales Outbound is working/u })).not.toBeInTheDocument();
+
+    // The same wait after a fresh read of the queue, which is what a reload and a reconnect do.
+    await fireEvent.click(screen.getByRole("button", { name: /Chief, Chief of staff/ }));
+    const reloaded = await screen.findByRole("region", { name: "Message queue" });
+    within(reloaded).getByRole("group", { name: "Queued message 1: Read the report" });
+    expect(
+      await screen.findByRole("status", { name: "Chief is working: Working in Project launch" }),
+    ).toBeInTheDocument();
+
+    // The channel work ended: the delivery is the agent's own running turn now, and nothing waits.
+    emitAgentEvent?.({
+      type: "queue-changed",
+      snapshot: {
+        agentId: "chief",
+        deliveries: [{ ...waiting, status: "running", position: null, turnId: "turn-held" }],
+      },
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("status", { name: "Chief is working: Working in Project launch" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it("keeps the complete agent draft when creation fails", async () => {
     vi.mocked(window.openbot.agent.createAgent).mockRejectedValueOnce(
       new Error("The first message could not be queued."),

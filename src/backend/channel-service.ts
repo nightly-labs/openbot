@@ -17,6 +17,7 @@ import {
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
+  type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -841,6 +842,25 @@ export class ChannelService {
     const next = this.mailbox.nextQueued(agentId);
     if (next && this.store.assignmentForDelivery(next.delivery.id)) return true;
     return !this.store.hasAssignmentInState(ACTIVE_ASSIGNMENT_STATES);
+  }
+
+  /**
+   * The channel work every queue is waiting behind, or null when no channel holds the host.
+   *
+   * Takes no agent: the reservation is host-wide, and an agent whose own channel delivery is at the
+   * head of its queue still keeps anything the user sends it waiting behind that turn. The channel
+   * turn runs on another thread, so an agent held here has no turn of its own to show, and this is
+   * the only way the chat can say why a message the user just sent has not started.
+   */
+  queueHold(): QueueHold | null {
+    const reserving = this.store.reservingAssignment(ACTIVE_ASSIGNMENT_STATES);
+    if (!reserving) return null;
+    return {
+      reason: "channel-task",
+      channelId: reserving.channel.id,
+      channelName: reserving.channel.title.trim() || reserving.channel.name,
+      agentId: reserving.assignment.agentId,
+    };
   }
 
   deliveryFailed(deliveryId: string, reason: string): void {

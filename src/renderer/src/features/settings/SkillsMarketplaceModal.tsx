@@ -86,6 +86,12 @@ interface SkillsMarketplace {
   detail: SkillDetail;
   installed: InstalledSkill[];
   installedForAgentId: string;
+  /**
+   * How the installed list got to its current contents. An empty list means "this agent has no
+   * skills" only when it is `loaded`; without this, a refused or failed read tells the user to
+   * install a skill that is already installed.
+   */
+  installedLoad: "idle" | "loading" | "loaded" | "failed";
   publication: SkillPublication;
   submissions: SkillSubmission[];
 }
@@ -96,6 +102,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     detail: { kind: "none" },
     installed: [],
     installedForAgentId: "",
+    installedLoad: "idle",
     publication: {
       category: "other",
       icon: null,
@@ -152,6 +159,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       else {
         setMarket((state) => {
           state.installed = [];
+          state.installedLoad = "idle";
         });
       }
     },
@@ -174,16 +182,26 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     if (!agentId) {
       setMarket((state) => {
         state.installed = [];
+        state.installedLoad = "idle";
       });
       return;
     }
+    setMarket((state) => {
+      state.installedLoad = "loading";
+    });
     const values = await run(() => window.openbot.skills.listInstalled(agentId));
-    if (values && request === installedRequest && props.open && market.browse.targetAgentId === agentId) {
+    if (request !== installedRequest || !props.open || market.browse.targetAgentId !== agentId) return;
+    if (!values) {
       setMarket((state) => {
-        state.installedForAgentId = agentId;
-        state.installed = values;
+        state.installedLoad = "failed";
       });
+      return;
     }
+    setMarket((state) => {
+      state.installedForAgentId = agentId;
+      state.installed = values;
+      state.installedLoad = "loaded";
+    });
   }
 
   async function loadMine() {
@@ -675,6 +693,11 @@ description: Turn merged work into clear, consistent release notes.
                           <SkillDetailView
                             skill={skill}
                             installed={installedById().get(skill.id)}
+                            installedLoad={
+                              market.installedForAgentId === market.browse.targetAgentId
+                                ? "loaded"
+                                : market.installedLoad
+                            }
                             busy={panel.busy === skill.id}
                             onBack={leaveDetails}
                             onTrySkill={props.onTrySkill}
@@ -1221,6 +1244,7 @@ function SkillDetailSkeleton() {
 function SkillDetailView(props: {
   skill: MarketplaceSkillDetail;
   installed: InstalledSkill | undefined;
+  installedLoad: "idle" | "loading" | "loaded" | "failed";
   busy: boolean;
   onBack: () => void;
   onInstall: (skill: MarketplaceSkillSummary) => Promise<void>;
@@ -1239,6 +1263,23 @@ function SkillDetailView(props: {
     props.installed.installedVersion === props.skill.version &&
     props.installed.state !== "needs-repair" &&
     !props.busy;
+  /**
+   * Why Try is off, in the order the reasons actually apply. The install state is the last thing
+   * asked about: an unread or failed skills list looks exactly like an empty one, and reporting a
+   * missing skill for it sends the user to install what the agent already has.
+   */
+  const unavailableReason = () => {
+    if (!props.onTrySkill) return "Open this skill from an agent chat to try it.";
+    if (!props.targetAgentId) return "Choose an agent to try this skill.";
+    if (props.busy) return "Wait for this skill to finish installing, then try it.";
+    if (props.installedLoad === "loading") return "Reading this agent's skills…";
+    if (props.installedLoad !== "loaded") return "OpenBot could not read this agent's skills. Try again.";
+    if (!props.installed) return "Install this skill for an agent to try it.";
+    if (props.installed.enabled === false) return "Enable this skill in agent settings to try it.";
+    if (props.installed.state === "needs-repair") return "Repair this skill in agent settings to try it.";
+    if (props.installed.installedVersion !== props.skill.version) return "Update this skill to try this version.";
+    return "The agent composer is unavailable.";
+  };
   return (
     <section class="skills-marketplace-detail marketplace-detail-page" aria-label={`${props.skill.name} details`}>
       <div class="skill-preview-toolbar">
@@ -1260,17 +1301,7 @@ function SkillDetailView(props: {
       <SkillPreview
         skill={props.skill}
         onTry={canTry() ? () => props.onTrySkill?.(props.targetAgentId, props.skill) : undefined}
-        unavailableReason={
-          !props.installed
-            ? "Install this skill for an agent to try it."
-            : props.installed.enabled === false
-              ? "Enable this skill in agent settings to try it."
-              : props.installed.state === "needs-repair"
-                ? "Repair this skill in agent settings to try it."
-                : props.installed.installedVersion !== props.skill.version
-                  ? "Update this skill to try this version."
-                  : "The agent composer is unavailable."
-        }
+        unavailableReason={unavailableReason()}
       />
       <p class="marketplace-detail-creator">By {props.skill.creatorName}</p>
     </section>

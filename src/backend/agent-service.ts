@@ -410,6 +410,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        // Read late: `channels` is built after this.
+        queueHold: () => this.channels.queueHold(),
       },
     });
     this.#boot = new BootRecovery({
@@ -1463,7 +1465,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   listQueue(agentId: string): QueueSnapshot {
-    return this.#mailbox.listQueue(agentId);
+    return this.#mailboxSync.queueSnapshot(agentId);
   }
 
   acknowledgeFailedTurn(agentId: string, turnId: string): void {

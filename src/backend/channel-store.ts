@@ -191,6 +191,39 @@ export class ChannelStore {
     );
   }
 
+  /**
+   * The assignment that reserves the host right now, with the channel it belongs to.
+   *
+   * `hasAssignmentInState` answers the drain question with a yes or a no; the queue the user reads
+   * has to name the cause as well. The same reason keeps this to one query: reaching a channel
+   * through `list` parses every stored message of every channel. States are tried in the order
+   * given, so a running assignment is reported before one that is only queued.
+   */
+  reservingAssignment(
+    states: readonly ChannelAssignment["state"][],
+  ): { assignment: ChannelAssignment; channel: Channel } | null {
+    if (!states.length) return null;
+    const placeholders = states.map(() => "?").join(", ");
+    const ranking = states.map((_, index) => `WHEN ? THEN ${index}`).join(" ");
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          `SELECT assignments.assignment_json AS assignment_json, channels.channel_json AS channel_json
+             FROM projection_channel_assignments AS assignments
+             JOIN projection_channels AS channels ON channels.channel_id = assignments.channel_id
+            WHERE json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
+            ORDER BY CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END, assignments.rowid
+            LIMIT 1`,
+        )
+        .get(...states, ...states),
+    );
+    if (!row) return null;
+    return {
+      assignment: decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))),
+      channel: decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json"))),
+    };
+  }
+
   assignmentForDelivery(deliveryId: string): ChannelAssignment | null {
     const row = databaseRow(
       this.database.connection
