@@ -74,6 +74,20 @@ describe("development service runner", () => {
     expect(app.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT).toBe("9340");
   });
 
+  it("strips Electron runtime flags from every child environment", () => {
+    const environment: NodeJS.ProcessEnv = {
+      ELECTRON_RUN_AS_NODE: "1",
+      ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox",
+    };
+
+    for (const service of ["api", "remote", "app", "test-client"] as const) {
+      const spec = createDevelopmentServiceSpec(service, environment);
+      expect(spec.env.ELECTRON_RUN_AS_NODE).toBeUndefined();
+      expect(spec.env.ELECTRON_EXTRA_LAUNCH_ARGS).toBeUndefined();
+    }
+    expect(environment.ELECTRON_RUN_AS_NODE).toBe("1");
+  });
+
   it("enables hosted sites in the development environment", () => {
     const environment: NodeJS.ProcessEnv = {};
 

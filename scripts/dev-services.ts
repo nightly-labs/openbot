@@ -26,6 +26,7 @@ import {
   removeDevStackRecord,
   writeDevStackRecord,
 } from "./dev-automation/stack-registry";
+import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 import { prepareDevelopmentEnvironment } from "./prepare-dev-environment";
 
 const logger = createOpenBotLogger("dev-services");
@@ -102,13 +103,18 @@ export function createDevelopmentServiceSpec(
   name: DevelopmentService,
   environment: NodeJS.ProcessEnv = process.env,
 ): DevelopmentServiceSpec {
+  // The parent shell may run inside an Electron harness with
+  // ELECTRON_RUN_AS_NODE=1. Every spec below becomes a spawned child, and the
+  // app/test-client children relaunch Electron, so the runtime flags are
+  // stripped once here rather than at each spawn.
+  const childEnvironment = withoutElectronRuntimeFlags(environment);
   if (name === "api") {
     return {
       name,
       executable: process.execPath,
       args: ["run", "--cwd", join(projectRoot, "apps", "auth-api"), "dev"],
       cwd: projectRoot,
-      env: { ...environment },
+      env: { ...childEnvironment },
     };
   }
 
@@ -133,7 +139,7 @@ export function createDevelopmentServiceSpec(
         "dev",
       ],
       cwd: projectRoot,
-      env: { ...environment },
+      env: { ...childEnvironment },
     };
   }
 
@@ -151,16 +157,16 @@ export function createDevelopmentServiceSpec(
     args: ["dev", "--watch", "--outDir", outputDirectory, "--entry", join(outputDirectory, "main", "index.js")],
     cwd: projectRoot,
     env: {
-      ...environment,
+      ...childEnvironment,
       OPENBOT_APP_VARIANT: "dev",
       OPENBOT_DEV_PROFILE: isTestClient ? "test-client" : "app",
       OPENBOT_DEV_RENDERER_PORT:
-        environment.OPENBOT_DEV_RENDERER_PORT ??
+        childEnvironment.OPENBOT_DEV_RENDERER_PORT ??
         String(isTestClient ? DEFAULT_RENDERER_PORTS["test-client"] : DEFAULT_RENDERER_PORTS.app),
       OPENBOT_DEV_REMOTE_DEBUGGING_PORT:
-        environment.OPENBOT_DEV_REMOTE_DEBUGGING_PORT ??
+        childEnvironment.OPENBOT_DEV_REMOTE_DEBUGGING_PORT ??
         String(isTestClient ? DEFAULT_REMOTE_DEBUGGING_PORTS["test-client"] : DEFAULT_REMOTE_DEBUGGING_PORTS.app),
-      OPENBOT_DEV_REMOTE_ROLE: environment.OPENBOT_DEV_REMOTE_ROLE ?? (isTestClient ? "client" : "host"),
+      OPENBOT_DEV_REMOTE_ROLE: childEnvironment.OPENBOT_DEV_REMOTE_ROLE ?? (isTestClient ? "client" : "host"),
     },
   };
 }
