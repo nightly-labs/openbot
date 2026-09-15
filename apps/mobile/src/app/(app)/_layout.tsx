@@ -100,7 +100,7 @@ function AuthenticatedStack() {
             headerBlurEffect: "none",
             scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
             title: "New channel",
           }}
