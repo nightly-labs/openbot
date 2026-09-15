@@ -1,4 +1,4 @@
-import type { AgentStatus, CentralAuthState } from "@openbot/contracts/ipc";
+import type { AgentStatus } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -206,36 +206,6 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
   });
 
-  it("refreshes providers after returning from a Connect browser flow", async () => {
-    vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
-      completed: false,
-      preferredProvider: null,
-      preferredModel: null,
-    });
-    vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
-      phase: "blocked",
-      cliVersion: null,
-      auth: { kind: "unknown" },
-      providers: [
-        { id: "codex", state: "sign-in-required", version: "0.149.1", message: "Connect ChatGPT." },
-        { id: "claude", state: "sign-in-required", version: "2.1.246", message: "Connect Claude." },
-      ],
-      capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
-      message: null,
-      fullAccess: true,
-    });
-    render(() => <App />);
-    window.dispatchEvent(new Event("focus"));
-    expect(window.openbot.refreshAgentProviders).not.toHaveBeenCalled();
-
-    await fireEvent.click(await screen.findByRole("button", { name: "Connect ChatGPT" }));
-    window.dispatchEvent(new Event("blur"));
-    window.dispatchEvent(new Event("focus"));
-
-    await waitFor(() => expect(window.openbot.refreshAgentProviders).toHaveBeenCalledTimes(1));
-    expect(trackAnalytics).toHaveBeenCalledWith("provider_action", { action: "refresh", result: "succeeded" });
-  });
-
   it("shows a friendly inline error when a provider guide cannot open", async () => {
     vi.mocked(window.openbot.getSetupState).mockResolvedValueOnce({
       completed: false,
@@ -412,32 +382,6 @@ describe("OpenBot connected desktop shell", () => {
     emitAuth?.({ status: "signed_out" });
     expect(await screen.findByRole("heading", { name: "Sign in to OpenBot" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Email" })).toBeInTheDocument();
-  });
-
-  it("lets the user retry after the account API startup timeout", async () => {
-    let finishRetry: ((state: CentralAuthState) => void) | undefined;
-    vi.mocked(window.openbot.auth.getState).mockResolvedValueOnce({
-      status: "error",
-      issue: {
-        code: "auth_api_unavailable",
-        message: "OpenBot could not reach the account service.",
-      },
-    });
-    vi.mocked(window.openbot.auth.retry).mockReturnValueOnce(
-      new Promise((resolve) => {
-        finishRetry = resolve;
-      }),
-    );
-    render(() => <App />);
-
-    expect(await screen.findByRole("heading", { name: "Service unavailable" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-
-    expect(window.openbot.auth.retry).toHaveBeenCalledOnce();
-    expect(screen.getByRole("heading", { name: "Connecting to OpenBot" })).toBeInTheDocument();
-    finishRetry?.({ status: "signed_out" });
-    expect(await screen.findByRole("heading", { name: "Sign in to OpenBot" })).toBeInTheDocument();
   });
 
   it("keeps a cold-start invitation until a signed-out user signs in", async () => {

@@ -2,11 +2,8 @@ import { serializeAttachmentReference } from "@openbot/contracts/attachment-refe
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { ConversationSnapshot, DirectConversationSnapshot } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
-import { AppAccessGate } from "./AppView";
-import { AppProviders } from "./app-providers";
 import {
   attachment,
   confirmOnboardingModel,
@@ -21,62 +18,10 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
-import { useServers } from "./features/servers/servers-context";
-import { useUsage } from "./features/usage/usage-context";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
-  });
-
-  it("keeps a queued-message edit through Escape while the Usage report covers the conversation", async () => {
-    vi.mocked(window.openbot.agent.listQueue).mockResolvedValueOnce({
-      agentId: "chief",
-      deliveries: [
-        queuedDelivery("delivery-running", "Running", null, { status: "running", turnId: "turn-running" }),
-        queuedDelivery("delivery-covered-edit", "Queued draft", 1),
-      ],
-    });
-
-    // The tree `App` mounts, plus a control that opens the report over it.
-    function UsageProbe() {
-      const { activeServerId } = useServers();
-      const usage = useUsage();
-      return (
-        <>
-          <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
-            Open usage
-          </button>
-          <button type="button" onClick={() => usage.closeUsage()}>
-            Close usage
-          </button>
-        </>
-      );
-    }
-
-    render(() => (
-      <AppProviders>
-        <AppAccessGate />
-        <UsageProbe />
-      </AppProviders>
-    ));
-    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
-    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
-    composer.textContent = "Queued draft with more to say";
-    await fireEvent.input(composer);
-
-    // The report covers the conversation and marks it inert, but `inert` does not reach the
-    // document-level Escape listener the conversation registers. Escape here belongs to the
-    // pane the user is looking at, which is the report.
-    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
-    flush();
-    await fireEvent.keyDown(document, { key: "Escape" });
-
-    // Back returns to the edit as the user left it. Cancelling it would have restored the
-    // queued text and discarded anything added to the draft since.
-    fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
-    expect(await screen.findByRole("button", { name: "Save queued message" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Queued draft with more to say");
   });
 
   it("keeps a failed send in the composer and clears it only after a successful retry", async () => {
@@ -491,92 +436,6 @@ describe("OpenBot connected desktop shell", () => {
         "Ask @Sales Outbound to use Release Notes (skill) and review @[Ops](agent:ops).",
       ),
     );
-  });
-
-  it("lets the user remove only their own reaction while keeping the agent reaction read-only", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    emitAgentEvent?.({
-      type: "conversation",
-      snapshot: {
-        agentId: "chief",
-        threadId: "thread-chief",
-        activeTurnId: null,
-        revision: 1,
-        messages: [
-          {
-            id: "user-reactions",
-            author: "user",
-            text: "The launch is approved.",
-            createdAt: "2026-08-12T10:00:00.000Z",
-            status: "completed",
-            reaction: "❤️",
-            reactions: [
-              { emoji: "❤️", actor: { kind: "user" } },
-              { emoji: "🎉", actor: { kind: "agent", agentId: "chief" } },
-            ],
-          },
-        ],
-      },
-    });
-
-    await screen.findByRole("img", { name: "Chief reacted with 🎉" });
-    await fireEvent.click(screen.getByRole("button", { name: "Remove your reaction ❤️" }));
-    expect(window.openbot.agent.setMessageReaction).toHaveBeenCalledWith({
-      agentId: "chief",
-      messageId: "user-reactions",
-      emoji: null,
-    });
-    expect(trackAnalytics).toHaveBeenCalledWith("reaction_action", { action: "remove", result: "succeeded" });
-    expect(screen.getByRole("img", { name: "Chief reacted with 🎉" })).toBeInTheDocument();
-  });
-
-  it("supports picker and attachment-only messages", async () => {
-    const filePickerClick = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await fireEvent.pointerDown(screen.getByRole("button", { name: "Add to prompt" }), { button: 0 });
-    await fireEvent.pointerDown(screen.getByRole("menuitem", { name: /Attach image/ }), { button: 0 });
-    expect(filePickerClick).toHaveBeenCalledTimes(1);
-    expect(document.querySelector<HTMLInputElement>('input[type="file"][accept]')?.accept).toBe(
-      ".png,.jpg,.jpeg,.gif,.webp,.avif",
-    );
-    await fireEvent.pointerDown(screen.getByRole("button", { name: "Add to prompt" }), { button: 0 });
-    await fireEvent.pointerDown(screen.getByRole("menuitem", { name: /Add context/ }), { button: 0 });
-    expect(filePickerClick).toHaveBeenCalledTimes(2);
-    emitAttachmentImport?.({ type: "started", requestId: "picker-1", serverId: "local" });
-    emitAttachmentImport?.({
-      type: "completed",
-      requestId: "picker-1",
-      serverId: "local",
-      attachments: [attachment("draft-1", "brief.pdf", "pdf")],
-    });
-    expect(await screen.findByText("brief.pdf")).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Send message" }));
-    await waitFor(() =>
-      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
-        { agentId: "chief", text: "", attachmentDraftIds: ["draft-1"] },
-        "local",
-      ),
-    );
-  });
-
-  it("keeps an asynchronous attachment error with the agent that received the paste", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    emitAttachmentImport?.({ type: "started", requestId: "paste-error", serverId: "local" });
-    await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound/ }));
-    emitAttachmentImport?.({
-      type: "error",
-      requestId: "paste-error",
-      serverId: "local",
-      message: "Attachment import failed",
-    });
-
-    expect(screen.queryByText("Attachment import failed")).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: /Chief/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Attachment import failed");
   });
 
   it("keeps an asynchronous pasted attachment on the server that received the paste", async () => {

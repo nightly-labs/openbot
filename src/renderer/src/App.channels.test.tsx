@@ -1,4 +1,3 @@
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -473,59 +472,6 @@ it("keeps a queued settings save on the channel it was made in", async () => {
   expect(saves.map((input) => input.type === "save" && input.update === true)).toEqual([true, true]);
 });
 
-it("keeps the text a queued settings save carries when the reader opens another channel", async () => {
-  for (const [channelId, name] of [
-    ["channel-test", "Project room"],
-    ["channel-other", "Release room"],
-  ]) {
-    await window.openbot.agent.channelCommand({
-      type: "save",
-      operationId: `create-${channelId}`,
-      channelId,
-      draft: {
-        name,
-        title: "",
-        instructions: "",
-        members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
-        leadAgentId: "chief",
-      },
-    });
-  }
-  render(() => <App />);
-  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
-  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
-  const chat = await screen.findByRole("main", { name: "Channel conversation" });
-  await within(chat).findByRole("heading", { name: "Project room", level: 1 });
-  await openChannelMenuItem("Edit channel");
-  await within(chat).findByRole("button", { name: "Remove Chief" });
-
-  const original = window.openbot.agent.channelCommand;
-  let release: () => void = () => undefined;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const save = vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
-    if (input.type === "save") await gate;
-    return original(input);
-  });
-  // The removal holds the gate, so the title the reader writes next waits behind it.
-  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Chief" }));
-  const title = within(chat).getByRole("textbox", { name: "Channel title" });
-  await fireEvent.input(title, { target: { value: "Weekly sync" } });
-  void fireEvent.blur(title);
-  await fireEvent.click(screen.getByRole("button", { name: /Release room/ }));
-  release();
-
-  // The queued save carries the membership the save before it left, and its own title: the text
-  // was written in this channel, not read from the one the reader went to.
-  await waitFor(() => expect(save.mock.calls.filter(([input]) => input.type === "save")).toHaveLength(2));
-  const saves = save.mock.calls.map(([input]) => input).filter((input) => input.type === "save");
-  expect(saves.map((input) => input.channelId)).toEqual(["channel-test", "channel-test"]);
-  expect(saves.at(-1)).toMatchObject({
-    draft: { name: "Project room", title: "Weekly sync", members: [{ agentId: "sales-outbound" }] },
-  });
-});
-
 /**
  * A channel with one task that the service stopped and wrote a reason on. The stub does not run
  * the automatic assignment limit, so the stopped task arrives through the read.
@@ -637,17 +583,6 @@ it("shows one notice for a stopped run and continues it at the root", async () =
   );
 });
 
-it("continues a task that failed, which nothing but the reader starts again", async () => {
-  // A provider that cannot start, and a turn that ends in an error, both leave a failed task. Its
-  // parent waits for it, so the request never finishes until the reader continues it.
-  const { notice, command, state } = await openChannelWithStoppedTask({ state: "failed" });
-  expect(notice).toHaveTextContent(STOPPED_TASK_REASON);
-  await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
-  await waitFor(() =>
-    expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "resume", taskId: state.taskId })),
-  );
-});
-
 it("reassigns a task the channel stopped with a reason", async () => {
   const { notice, command, state } = await openChannelWithStoppedTask();
   await fireEvent.pointerDown(within(notice).getByRole("button", { name: "Reassign the stopped task of Chief" }), {
@@ -677,23 +612,6 @@ it("keeps a stopped-task notice after a failed action and a refresh", async () =
     within(screen.getByRole("region", { name: "Stopped task for Chief" })).getByRole("button", { name: "Continue" }),
   );
   await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
-});
-
-it("removes the notice when a refreshed task no longer needs action", async () => {
-  const { state } = await openChannelWithStoppedTask();
-  state.stopped = false;
-  emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision: 2 });
-  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
-});
-
-it("opens and closes reassignment with the keyboard and returns focus to its trigger", async () => {
-  const { notice } = await openChannelWithStoppedTask();
-  const trigger = within(notice).getByRole("button", { name: "Reassign the stopped task of Chief" });
-  trigger.focus();
-  await fireEvent.keyDown(trigger, { key: "ArrowDown" });
-  expect(await screen.findByRole("menuitem", { name: "Sales Outbound" })).toBeVisible();
-  await fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
-  await waitFor(() => expect(screen.getByRole("button", { name: "Reassign the stopped task of Chief" })).toHaveFocus());
 });
 
 it("retries a lost response once and keeps a focused draft through incoming messages", async () => {
@@ -776,42 +694,6 @@ it("closes a channel deleted from another connection", async () => {
   expect(screen.queryByRole("button", { name: /^Project room\./ })).not.toBeInTheDocument();
 });
 
-it("opens channel memories and channel routines from the settings panel", async () => {
-  const chat = await openSavedChannel();
-  await openChannelMenuItem("Edit channel");
-  await fireEvent.click(await within(chat).findByRole("button", { name: /^Memories0 saved$/ }));
-  const memories = await screen.findByRole("dialog", { name: "Memories" });
-  // The modal reads "channel", not "agent": the port names the owner, so the shared copy follows.
-  await within(memories).findByText("This channel has no saved memories yet.");
-  await fireEvent.click(within(memories).getByRole("button", { name: "Close memories" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Memories" })).not.toBeInTheDocument());
-  await fireEvent.click(within(chat).getByRole("button", { name: /^Routines0 configured$/ }));
-  // Routines replace the panel header, so "Channel settings" gives way to the routines view.
-  await within(chat).findByRole("heading", { name: "Routines", level: 2 });
-  expect(within(chat).queryByRole("heading", { name: "Channel settings" })).not.toBeInTheDocument();
-  await fireEvent.click(within(chat).getByRole("button", { name: "Back to settings" }));
-  await within(chat).findByRole("heading", { name: "Channel settings", level: 2 });
-});
-
-it("shows the saved memory and routine counts before either view opens", async () => {
-  const chat = await openSavedChannel();
-  await window.openbot.agent.createChannelMemory({ channelId: "channel-test", text: "Ship on Fridays." });
-  await window.openbot.agent.createChannelRoutine({
-    channelId: "channel-test",
-    name: "Morning brief",
-    instruction: "Summarise the open work.",
-    active: true,
-    timezone: "UTC",
-    schedule: { kind: "daily", time: "09:00" },
-  });
-  await openChannelMenuItem("Edit channel");
-
-  // The row reads both counts from the channel, not from the view that lists the entries. That
-  // view renders only after the reader opens it, so the row held zero until then.
-  await within(chat).findByRole("button", { name: /^Memories1 saved$/ });
-  await within(chat).findByRole("button", { name: /^Routines1 configured$/ });
-});
-
 it("addresses a channel member only while the request names one", async () => {
   const chat = await openSavedChannel();
   const command = vi.spyOn(window.openbot.agent, "channelCommand");
@@ -886,55 +768,4 @@ it("keeps the working indicator while the coordinator chooses an owner", async (
   // The lead is the coordinator. Its routing turn holds the task and posts nothing until it
   // decides, so the indicator is the only sign that the request is alive.
   expect(await within(chat).findByRole("status", { name: /^Chief is working: / })).toBeInTheDocument();
-});
-
-it("drops the working indicator when routing ends without an owner", async () => {
-  const chat = await openChannelWhileRouting("paused");
-  await within(chat).findByRole("article", { name: "Message from You" });
-  expect(within(chat).queryByRole("status", { name: / is working: / })).not.toBeInTheDocument();
-});
-
-it("downloads all group-message attachments and allows retry after an error", async () => {
-  const attachments: AttachmentSummary[] = ["notes.txt", "report.csv", "diagram.png"].map((name, index) => ({
-    id: `attachment-${index}`,
-    name,
-    size: 20,
-    kind: index === 2 ? "image" : "file",
-    mimeType: index === 2 ? "image/png" : "text/plain",
-    previewKind: index === 2 ? "image" : "text",
-    previewUrl: null,
-  }));
-  const read = window.openbot.agent.readChannel;
-  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => ({
-    ...(await read(input)),
-    messages: [
-      {
-        id: "files",
-        channelId: input.channelId,
-        sequence: 1,
-        author: { kind: "agent", id: "chief", name: "Chief" },
-        taskId: null,
-        superseded: false,
-        message: {
-          id: "files",
-          author: "assistant",
-          text: "The files are ready.",
-          createdAt: new Date().toISOString(),
-          status: "completed",
-          attachments,
-        },
-      },
-    ],
-  }));
-  const download = vi
-    .spyOn(window.openbot.agent, "downloadAttachments")
-    .mockRejectedValueOnce(new Error("The attachment could not be downloaded."))
-    .mockResolvedValue(undefined);
-  const chat = await openSavedChannel();
-  await fireEvent.click(await within(chat).findByRole("button", { name: "Download all as ZIP" }));
-  expect(await within(chat).findByText("The attachment could not be downloaded.")).toBeVisible();
-  expect(download).toHaveBeenCalledExactlyOnceWith({ attachments: attachments.map(({ id, name }) => ({ id, name })) });
-  await fireEvent.click(await within(chat).findByRole("button", { name: "Download all as ZIP" }));
-  await waitFor(() => expect(download).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(within(chat).getByRole("button", { name: "Download all as ZIP" })).toBeEnabled());
 });

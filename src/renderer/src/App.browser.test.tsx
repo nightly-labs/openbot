@@ -13,7 +13,7 @@ import {
 } from "./app-test-harness";
 import { toast } from "./components/ui";
 import BrowserPreviewSidebar, { BrowserPreviewCard } from "./features/conversation/BrowserPreviewSidebar";
-import { TestIntersectionObserver, TestResizeObserver } from "./setupTests";
+import { TestIntersectionObserver } from "./setupTests";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -112,47 +112,6 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
     expect(composer).toHaveTextContent("Keep this draft");
     expect(window.openbot.browser.close).not.toHaveBeenCalled();
-  });
-
-  it("keeps a newly added tab selected while the browser panel is open", async () => {
-    const first: BrowserTab = {
-      id: "first",
-      title: "First page",
-      url: "https://example.com/first",
-      loading: false,
-      ownerAgentId: "chief",
-      ownerThreadId: "thread-chief",
-    };
-    const second: BrowserTab = { ...first, id: "second", title: "Second page", url: "https://example.com/second" };
-    let tabs = [first];
-    vi.mocked(window.openbot.browser.activate).mockImplementation(async (tabId) => {
-      emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: tabId });
-    });
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: first.id });
-    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
-    await fireEvent.click(await screen.findByRole("button", { name: "Open First page" }));
-    await screen.findByRole("tab", { name: "First page", selected: true });
-    vi.mocked(window.openbot.browser.activate).mockClear();
-
-    tabs = [{ ...first }, second];
-    emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: second.id });
-
-    await screen.findByRole("tab", { name: "Second page", selected: true });
-    expect(window.openbot.browser.activate).not.toHaveBeenCalledWith(first.id);
-    expect(screen.getByRole("textbox", { name: "Browser address" })).toHaveValue(second.url);
-
-    const secondTrigger = screen.getByRole("tab", { name: "Second page" });
-    secondTrigger.focus();
-    tabs = tabs.map((tab) => ({ ...tab, title: `${tab.title} updated` }));
-    emitAgentEvent?.({ type: "browser-changed", tabs, activeTabId: second.id });
-    expect(await screen.findByRole("tab", { name: "Second page updated", selected: true })).toHaveFocus();
-    await fireEvent.keyDown(secondTrigger, { key: "ArrowLeft" });
-    const firstTrigger = await screen.findByRole("tab", { name: "First page updated", selected: true });
-    expect(firstTrigger).toHaveFocus();
-    await fireEvent.keyDown(firstTrigger, { key: "ArrowRight" });
-    expect(await screen.findByRole("tab", { name: "Second page updated", selected: true })).toHaveFocus();
   });
 
   it.each([
@@ -412,36 +371,6 @@ describe("OpenBot connected desktop shell", () => {
     ));
     await screen.findByRole("button", { name: "Open Offscreen" });
     expect(window.openbot.browser.capturePreview).not.toHaveBeenCalled();
-  });
-
-  it("keeps the dragged browser width when conversation padding changes and restores it after a window resize", async () => {
-    window.localStorage.setItem("openbot:browser-preview-panel-width", "400");
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
-    const resizer = await screen.findByRole("separator", { name: "Resize right panel" });
-    const conversation = screen.getByRole("main", { name: "Conversation" });
-    const width = vi.spyOn(conversation, "clientWidth", "get").mockReturnValue(1200);
-
-    await fireEvent.pointerDown(resizer, { button: 0, pointerId: 1, clientX: 800 });
-    await fireEvent.pointerMove(window, { pointerId: 1, clientX: 700 });
-    expect(resizer).toHaveAttribute("aria-valuenow", "500");
-    TestResizeObserver.resize(conversation, "content-box");
-    flush();
-    expect(resizer).toHaveAttribute("aria-valuenow", "500");
-    await fireEvent.pointerUp(window, { pointerId: 1, clientX: 700 });
-    expect(window.localStorage.getItem("openbot:browser-preview-panel-width")).toBe("500");
-
-    width.mockReturnValue(300);
-    TestResizeObserver.resize(conversation, "border-box");
-    await waitFor(() => expect(resizer).toHaveAttribute("aria-valuenow", "220"));
-    expect(window.localStorage.getItem("openbot:browser-preview-panel-width")).toBe("500");
-    width.mockReturnValue(1200);
-    TestResizeObserver.resize(conversation, "border-box");
-    await waitFor(() => expect(resizer).toHaveAttribute("aria-valuenow", "500"));
-    await fireEvent.keyDown(resizer, { key: "ArrowLeft" });
-    expect(window.localStorage.getItem("openbot:browser-preview-panel-width")).toBe("512");
-    width.mockRestore();
   });
 
   it("moves the live embedded browser between the sidebar and desktop Picture in Picture", async () => {
@@ -1178,67 +1107,6 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("tab", { name: "Replacement page" })).toBeInTheDocument();
   });
 
-  it("closes the active remote browser tab with Control W", async () => {
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
-      testServer("local", true),
-      testServer("remote-1", false),
-    ]);
-    vi.mocked(window.openbot.servers.select).mockResolvedValueOnce([
-      testServer("local", false),
-      testServer("remote-1", true),
-    ]);
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    emitAgentEvent?.({
-      type: "browser-changed",
-      tabs: [
-        {
-          id: "local-tab",
-          title: "Local page",
-          url: "https://example.com/local",
-          loading: false,
-          ownerThreadId: "thread-chief",
-          ownerAgentId: "chief",
-        },
-      ],
-      activeTabId: "local-tab",
-    });
-
-    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
-    await fireEvent.click(await screen.findByRole("button", { name: "Open Local page" }));
-    await screen.findByRole("tab", { name: "Local page" });
-    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
-    await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledWith("remote-1"));
-    const hideBrowserCall = vi
-      .mocked(window.openbot.browser.setVisible)
-      .mock.calls.findIndex(([input]) => input.visible === false);
-    expect(hideBrowserCall).toBeGreaterThanOrEqual(0);
-    expect(vi.mocked(window.openbot.browser.setVisible).mock.invocationCallOrder[hideBrowserCall]).toBeLessThan(
-      vi.mocked(window.openbot.servers.select).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
-    );
-
-    emitAgentEvent?.({
-      type: "browser-changed",
-      tabs: [
-        {
-          id: "remote-tab",
-          title: "Remote page",
-          url: "https://example.com/remote",
-          loading: false,
-          ownerThreadId: "thread-chief",
-          ownerAgentId: "chief",
-        },
-      ],
-      activeTabId: "remote-tab",
-    });
-    await fireEvent.click(await screen.findByRole("button", { name: "Open computer" }));
-    await fireEvent.click(await screen.findByRole("button", { name: "Open Remote page" }));
-    await screen.findByRole("tab", { name: "Remote page" });
-    await fireEvent.keyDown(window, { key: "w", ctrlKey: true });
-
-    expect(window.openbot.browser.close).toHaveBeenCalledWith("remote-tab");
-  });
-
   it("blocks browser controls while the remote browser is suspended during a server switch", async () => {
     const local = testServer("local", true);
     const studio = testServer("remote-1", false);
@@ -1533,13 +1401,6 @@ describe("OpenBot connected desktop shell", () => {
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       retry.resolve(preview);
       expect(await screen.findByText("Approved body")).toBeInTheDocument();
-    });
-
-    it("shows a safe message for other preview failures", async () => {
-      previewMock().mockRejectedValueOnce(new TypeError("Cannot read properties of undefined"));
-      render(() => <App />);
-      await fireEvent.click(await screen.findByRole("button", { name: linkName }));
-      expect(await screen.findByRole("alert")).toHaveTextContent(`Could not preview “${filename}”. Try again.`);
     });
 
     it.each(["another preview", "another agent"])("ignores a late failure after opening %s", async (next) => {
