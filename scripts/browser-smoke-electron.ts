@@ -2422,7 +2422,7 @@ async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Pr
 }
 
 async function runPersistencePhase(root: string, origin: string, phase: string): Promise<void> {
-  if (!new Set(["write", "read", "clear", "verify-cleared", "read-clear-verify"]).has(phase)) {
+  if (!new Set(["write", "read", "clear", "verify-cleared", "read-clear"]).has(phase)) {
     throw new Error(`Unknown persistence phase: ${phase}`);
   }
   await app.whenReady();
@@ -2430,11 +2430,12 @@ async function runPersistencePhase(root: string, origin: string, phase: string):
   const browser = new BrowserHost(window, join(root, "downloads"), join(root, "browser-tabs.json"));
   await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
   try {
-    if (phase === "read-clear-verify") {
+    if (phase === "read-clear") {
+      // Read proves write persists across restart. Clear runs in the same
+      // boot. A later boot must verify that clear persists across restart.
       await checkOnePersistencePage(browser, origin, "read", true);
       await checkOnePersistencePage(browser, origin, "clear", false);
       await browser.flushPersistentStorage();
-      await checkOnePersistencePage(browser, origin, "verify-cleared", false);
     } else {
       await checkOnePersistencePage(browser, origin, phase, phase === "write" || phase === "read");
       await browser.flushPersistentStorage();
