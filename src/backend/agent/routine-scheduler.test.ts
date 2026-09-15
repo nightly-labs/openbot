@@ -2,12 +2,12 @@
 import { routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
   callOpenBotTool,
+  createTestService,
   expectOpenBotToolError,
   FakeAgentClient,
-  fakeBrowser,
   openBotToolPayload,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -31,11 +31,9 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("lets an agent manage routines for itself and another agent", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
@@ -134,11 +132,9 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("appends a cancellation marker before deleting an active routine run", async () => {
     const { store, mailbox } = stores(root);
     let client: FakeAgentClient | undefined;
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         client = new FakeAgentClient(provider, "", false);
@@ -182,11 +178,9 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("rolls back a routine transition and retries without a duplicate marker", async () => {
     const { store, mailbox } = stores(root);
     const createService = () =>
-      new AgentService({
+      createTestService({
         store,
         mailbox,
-        browser: fakeBrowser(),
-        requestTimeoutMs: 30_000,
         preferredProvider: "codex",
         clientFactory: (provider) => new FakeAgentClient(provider, "", false),
       });
@@ -252,11 +246,9 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("rejects invalid or cross-agent routine tool mutations", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
@@ -323,7 +315,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   });
   it("rolls back a routine mutation when its transcript marker cannot persist", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
     const initialAgent = store.list().find((candidate) => candidate.id === agent.id);
@@ -350,7 +342,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   });
   it("restores queued routine work when a delete marker cannot persist", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
     const routine = service.createRoutine({

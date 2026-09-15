@@ -11,6 +11,8 @@ export interface ComposerStoreDeps {
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
   conversationErrors: () => Record<string, string>;
   setConversationErrors: (update: (current: Record<string, string>) => Record<string, string>) => void;
+  composerErrors: () => Record<string, string>;
+  setComposerErrors: (update: (current: Record<string, string>) => Record<string, string>) => void;
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDeliveryId: () => string | null;
@@ -38,6 +40,11 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     const target = currentTarget();
     return target ? (deps.conversationErrors()[composerDraftKey(target)] ?? null) : null;
   });
+  const currentComposerError = createMemo(() => {
+    const target = currentTarget();
+    return target ? (deps.composerErrors()[composerDraftKey(target)] ?? null) : null;
+  });
+  const currentChatError = createMemo(() => currentComposerError() ?? currentConversationError());
   const unreferencedDraftAttachments = createMemo(() => {
     const referencedIds = attachmentReferenceIds(currentDraft().text);
     return currentDraft().attachments.filter((attachment) => !referencedIds.has(attachment.id));
@@ -60,9 +67,29 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   function clearConversationError(target: ConversationTarget): void {
     const key = composerDraftKey(target);
     deps.setConversationErrors((current) => {
+      if (!(key in current)) return current;
       const { [key]: _removed, ...next } = current;
       return next;
     });
+  }
+
+  function clearComposerError(target: ConversationTarget): void {
+    const key = composerDraftKey(target);
+    deps.setComposerErrors((current) => {
+      if (!(key in current)) return current;
+      const { [key]: _removed, ...next } = current;
+      return next;
+    });
+  }
+
+  function clearChatErrors(target: ConversationTarget): void {
+    clearComposerError(target);
+    clearConversationError(target);
+  }
+
+  function setComposerErrorForTarget(target: ConversationTarget, message: string): void {
+    const key = composerDraftKey(target);
+    deps.setComposerErrors((current) => (current[key] === message ? current : { ...current, [key]: message }));
   }
 
   const updateCurrentDraft = (patch: Partial<ComposerDraft>) => {
@@ -113,6 +140,8 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     currentEditingDeliveryId,
     currentDraft,
     currentConversationError,
+    currentComposerError,
+    currentChatError,
     unreferencedDraftAttachments,
     composerHasContent,
     replyTarget,
@@ -121,6 +150,9 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     clearSubmittedDraft,
     clearConversationError,
     setConversationError,
+    clearComposerError,
+    setComposerErrorForTarget,
+    clearChatErrors,
     restoreVoiceTranscript,
   };
 }

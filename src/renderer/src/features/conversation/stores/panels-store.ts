@@ -1,7 +1,13 @@
 import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
 import { errorMessage } from "../../../error-message";
-import type { ConversationProps, MediaPreview, RightPanelMode, SidebarFilePreview } from "../conversation-types";
+import type {
+  ConversationProps,
+  ConversationTarget,
+  MediaPreview,
+  RightPanelMode,
+  SidebarFilePreview,
+} from "../conversation-types";
 
 export interface RoutineSettingsRequest {
   agentId: string;
@@ -22,7 +28,7 @@ export interface PanelsStoreDeps {
   setMediaPreview: (update: MediaPreview | null | ((current: MediaPreview | null) => MediaPreview | null)) => void;
   sidebarFilePreview: () => SidebarFilePreview | null;
   setSidebarFilePreview: (preview: SidebarFilePreview | null) => void;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   nextFilePreviewGeneration: () => number;
   currentFilePreviewGeneration: () => number;
   invalidateFilePreviewGeneration: () => void;
@@ -133,28 +139,34 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   async function downloadAttachments(attachments: AttachmentSummary[]) {
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
       await window.openbot.agent.downloadAttachments({
         attachments: attachments.map(({ id, name }) => ({ id, name })),
       });
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not download attachments. Try again."));
+      deps.setComposerError(errorMessage(error, "Could not download attachments. Try again."), target);
     }
   }
 
   function attachmentAction(attachment: AttachmentSummary, action: "open" | "reveal" | "download") {
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     void window.openbot.agent
       .openAttachment({ attachmentId: attachment.id, action })
       .catch((error) =>
-        deps.setComposerError(errorMessage(error, "Could not open or save this attachment. Try again.")),
+        deps.setComposerError(errorMessage(error, "Could not open or save this attachment. Try again."), target),
       );
   }
 
   function openSharedFile(path: string) {
     const ownerAgentId = deps.props.agent?.id;
     if (!ownerAgentId) return;
+    const serverId = deps.props.server?.id ?? "local";
+    const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
-    deps.setComposerError(null);
+    deps.setComposerError(null, target);
     void window.openbot.agent.previewSharedFile({ path }).then(
       (preview) => {
         if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
@@ -162,8 +174,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         setActiveRightPanel("file-preview", ownerAgentId);
       },
       (error) => {
-        if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
-        deps.setComposerError(filePreviewError(error, path));
+        if (generation !== deps.currentFilePreviewGeneration()) return;
+        deps.setComposerError(filePreviewError(error, path), target);
       },
     );
   }
@@ -171,8 +183,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function openWorkspaceFile(path: string) {
     const agentId = deps.props.agent?.id;
     if (!agentId) return;
+    const serverId = deps.props.server?.id ?? "local";
+    const target = { agentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
-    deps.setComposerError(null);
+    deps.setComposerError(null, target);
     void window.openbot.agent.previewWorkspaceFile({ agentId, path }).then(
       (preview) => {
         if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
@@ -180,8 +194,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         setActiveRightPanel("file-preview", agentId);
       },
       (error) => {
-        if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
-        deps.setComposerError(filePreviewError(error, path));
+        if (generation !== deps.currentFilePreviewGeneration()) return;
+        deps.setComposerError(filePreviewError(error, path), target);
       },
     );
   }
@@ -189,11 +203,14 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function openSidebarFileExternally() {
     const file = deps.sidebarFilePreview();
     if (!file) return;
+    const target = { agentId: file.ownerAgentId, serverId: deps.props.server?.id ?? "local" };
     const request =
       file.source === "shared"
         ? window.openbot.agent.openSharedFile({ path: file.path })
         : window.openbot.agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: file.path });
-    void request.catch((error) => deps.setComposerError(errorMessage(error, "Could not open this file. Try again.")));
+    void request.catch((error) =>
+      deps.setComposerError(errorMessage(error, "Could not open this file. Try again."), target),
+    );
   }
 
   function closeSidebarFilePreview() {

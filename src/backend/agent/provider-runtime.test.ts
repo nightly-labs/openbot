@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
@@ -12,9 +12,9 @@ import {
   createFakeGrok,
   createFakeOpencode,
   createPendingFakeClaude,
+  createTestService,
   createUpdatableFakeClaude,
   FakeAgentClient,
-  fakeBrowser,
   readTextOrEmpty,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -45,11 +45,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);
     const clients: FakeAgentClient[] = [];
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "opencode",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);
@@ -76,11 +74,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps another provider's live delivery running when OpenCode reconnects", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
@@ -104,11 +100,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     let reconnecting = false;
     let checkingAccount = false;
     const clients: FakeAgentClient[] = [];
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "opencode",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", true, true, {}, async (method) => {
@@ -163,11 +157,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       if (accountReads.size === 3) releaseAccountReads?.();
       await allAccountReadsStarted;
     };
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) =>
         new FakeAgentClient(
@@ -209,11 +201,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   async function opencodeModelIds(storedKey: string | null, catalog?: string[]): Promise<string[]> {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "opencode",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -289,11 +279,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     let storedKey: string | null = null;
     const clients: FakeAgentClient[] = [];
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "opencode",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -336,11 +324,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("uses startup fallbacks when provider discovery is unavailable", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -381,11 +367,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         if (failure) throw new Error("Discovery unavailable");
         return response;
       };
-      service = new AgentService({
+      service = createTestService({
         store,
         mailbox,
-        browser: fakeBrowser(),
-        requestTimeoutMs: 30_000,
         preferredProvider: provider,
         clientFactory: (candidate) => (candidate === provider ? client : new FakeAgentClient(candidate)),
       });
@@ -451,11 +435,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         { model: "gpt-6-astra", displayName: "GPT-6 Astra" },
       ],
     });
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: () => client,
     });
@@ -480,11 +462,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         { model: "claude-next", displayName: "Next" },
       ],
     });
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "claude",
       clientFactory: () => client,
     });
@@ -507,11 +487,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         ? { data: [{ model: "gpt-6-astra" }, { model: "gpt-5.6-sol" }], nextCursor: repeat ? "page-2" : null }
         : { data: [{ model: repeat ? "partial-result" : "gpt-5.6-sol" }], nextCursor: "page-2" };
     };
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: () => client,
     });
@@ -538,11 +516,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
     const openExternal = vi.fn(async () => undefined);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(
@@ -612,11 +588,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env[pathVariable] = await createCli(root);
     const { store, mailbox } = stores(root);
     let clients = 0;
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: target,
       clientFactory: (provider) => {
         const authenticated = provider === target ? clients > 0 : true;
@@ -646,11 +620,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("restores the connect action when the login page cannot open", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider, "DONE", true, provider !== "codex"),
     });
@@ -667,11 +639,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("cancels a ChatGPT login that does not complete", async () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex");
@@ -704,11 +674,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_CLAUDE_PATH = await createPendingFakeClaude(root);
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", true, false);
@@ -768,11 +736,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps the active ChatGPT client until reconnect succeeds", async () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex" || codexClients.length === 0);
@@ -814,11 +780,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         process.env.OPENBOT_CLAUDE_PATH = await createPendingFakeClaude(root);
       }
       const { store, mailbox } = stores(root);
-      service = new AgentService({
+      service = createTestService({
         store,
         mailbox,
-        browser: fakeBrowser(),
-        requestTimeoutMs: 30_000,
         preferredProvider: target,
         clientFactory: (provider) => new FakeAgentClient(provider),
       });
@@ -856,11 +820,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_CLAUDE_PATH = system.executable;
     const { store, mailbox } = stores(root);
     const clients: FakeAgentClient[] = [];
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "claude",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -886,11 +848,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
     const clients: FakeAgentClient[] = [];
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "claude",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", true, provider !== "claude" || clients.length === 0);
@@ -911,11 +871,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("logs a provider's MCP server failure and raises the provider's own failures", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -978,11 +936,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("redacts an MCP credential a running provider still holds after the user removes the server", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1029,11 +985,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("redacts an MCP credential a long diagnostic quotes past the length a line is held to", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1078,11 +1032,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("redacts an MCP credential a provider error quotes, not only a diagnostic", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1127,11 +1079,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps an MCP credential out of the provider status a crashed CLI leaves behind", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1177,11 +1127,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1220,11 +1168,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("refuses to replace a CLI that is running a turn", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
@@ -1248,11 +1194,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("keeps the old key while the provider is working on a turn", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
@@ -1275,11 +1219,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("delivers messages again after a key change that could not be saved", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider),
     });
@@ -1301,11 +1243,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("refuses to replace a CLI that is running a channel turn", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
@@ -1360,11 +1300,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
     let turnStartReached = false;
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) =>
         new FakeAgentClient(provider, "", false, true, {}, async (method, target) => {
@@ -1395,11 +1333,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     let compactionReached = false;
     let client: FakeAgentClient | undefined;
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const created = new FakeAgentClient(provider, "", true, true, {}, async (method, target) => {
@@ -1446,11 +1382,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     const claude = await createUpdatableFakeClaude(root, "2.1.250");
     process.env.OPENBOT_CLAUDE_PATH = claude.executable;
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "claude",
       clientFactory: (provider) => new FakeAgentClient(provider),
     });
@@ -1494,11 +1428,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       const claude = await createUpdatableFakeClaude(root, "2.1.250");
       process.env.OPENBOT_CLAUDE_PATH = claude.executable;
       const { store, mailbox } = stores(root);
-      service = new AgentService({
+      service = createTestService({
         store,
         mailbox,
-        browser: fakeBrowser(),
-        requestTimeoutMs: 30_000,
         preferredProvider: "codex",
         clientFactory: (provider) => new FakeAgentClient(provider, "", false, claudeSignedIn || provider !== "claude"),
       });
@@ -1523,11 +1455,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps the owner of a CLI whose provider is signed out", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider, undefined, true, provider !== "claude"),
     });
@@ -1543,11 +1473,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("reports installation failure without replacing the working client", async () => {
     const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "claude",
       clientFactory: (provider) => new FakeAgentClient(provider),
       bundledExecutables: { claude: managed },
@@ -1580,11 +1508,9 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
     options: { preferred?: AgentProvider; autoComplete?: boolean; openCodeSignedIn?: boolean } = {},
   ): { service: AgentService; store: AgentStore } {
     const { store, mailbox } = stores(root);
-    const service = new AgentService({
+    const service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: options.preferred ?? "opencode",
       clientFactory: (provider) => {
         const signedIn = provider !== "opencode" || (options.openCodeSignedIn ?? true);

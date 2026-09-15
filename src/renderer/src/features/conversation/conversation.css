@@ -7430,15 +7430,25 @@ button.chat-action-target:active,
   line-height: 1.35;
 }
 
-.composer-error {
-  max-width: 560px;
-  margin: 0 auto 6px;
-  padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
-  border-radius: var(--openbot-radius-md);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-sm);
+/*
+ * The close button reads as a control, not as the action the card offers: the tinted fill above
+ * belongs to the one button that resolves a state (Sign in), and an X that carried the same fill
+ * would compete with it wherever both appear. It takes the accent only under the pointer.
+ */
+.composer-notice-dismiss {
+  flex: none;
+  align-self: flex-start;
+}
+
+.composer-notice .composer-notice-dismiss {
+  background: transparent;
+  color: var(--notice-accent);
+}
+
+@media (hover: hover) {
+  .composer-notice .composer-notice-dismiss:hover:not(:disabled):not([data-disabled]) {
+    background: color-mix(in srgb, var(--notice-accent) 18%, transparent);
+  }
 }
 
 .agent-setup-card {

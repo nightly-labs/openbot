@@ -278,7 +278,11 @@ export class TurnLifecycle {
       }
       case "error":
       case "warning": {
-        const message = getString(params, "message") ?? notification.method;
+        // A notification that carries no `message` says only that something went wrong. The method
+        // name used to stand in for it, which put the bare word "error" in front of the user as if
+        // it were the report. An empty text lets the renderer's own sentence take its place; the
+        // `code` still carries the method for the log.
+        const message = getString(params, "message") ?? "";
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
         this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
       }

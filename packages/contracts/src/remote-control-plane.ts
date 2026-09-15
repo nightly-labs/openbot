@@ -14,8 +14,9 @@
 // Guards rather than zod, like the rest of this package: it is in the graph of a Cloudflare Worker,
 // an Expo app and an Electron renderer, and there is no runtime dependency to spend.
 
+import { decodeRecord } from "./ipc-decoding";
 import { isMobileConnectDevelopmentHost } from "./mobile-connect";
-import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { isNumber, isString } from "./runtime-values";
 
 // The account-scoped session a client opens before it may ask for a ticket. `expiresAt` is
 // milliseconds - the ticket's own `sessionExpiresAt` claim is the same instant in seconds.
@@ -34,7 +35,7 @@ export interface RemoteSessionTicket {
 }
 
 export function decodeRemoteSession(value: unknown): RemoteSession {
-  const record = asRecord(value, "remote session");
+  const record = decodeRecord(value, "remote session");
   return {
     sessionId: text(record.sessionId, "sessionId"),
     hostId: text(record.hostId, "hostId"),
@@ -43,7 +44,7 @@ export function decodeRemoteSession(value: unknown): RemoteSession {
 }
 
 export function decodeRemoteSessionTicket(value: unknown): RemoteSessionTicket {
-  const record = asRecord(value, "remote connection bootstrap");
+  const record = decodeRecord(value, "remote connection bootstrap");
   const signalUrl = text(record.signalUrl, "signalUrl");
   const signal = new URL(signalUrl);
   // `ws:` is allowed only against a development host, because the ticket is a bearer credential and
@@ -56,11 +57,6 @@ export function decodeRemoteSessionTicket(value: unknown): RemoteSessionTicket {
     expiresAt: timestamp(record.expiresAt, "remote ticket expiration"),
     signalUrl,
   };
-}
-
-function asRecord(value: unknown, label: string): DynamicRecord {
-  if (!isDynamicRecord(value)) throw new Error(`Invalid ${label}.`);
-  return value;
 }
 
 function text(value: unknown, field: string): string {

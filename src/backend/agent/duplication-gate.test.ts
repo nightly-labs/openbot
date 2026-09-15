@@ -5,11 +5,11 @@ import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentMemoryStore } from "../agent-memory-store";
 import { AgentRoutineStore } from "../agent-routine-store";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
+  createTestService,
   EMPTY_LAYOUT,
   FakeAgentClient,
-  fakeBrowser,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
@@ -31,7 +31,7 @@ afterEach(async () => {
 describe.sequential("DuplicationGate: copying an agent and the pending window", () => {
   it("duplicates persistent agent data without conversation or routine-run history", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const source = await store.getOrCreate("chief", "Research", "Research lead");
     await store.updateAgent({
@@ -189,7 +189,7 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
 
   it("blocks duplication while the source agent has active work", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("chief");
     await service.sendMessage({ agentId: "chief", text: "Keep working.", attachmentDraftIds: [] });
@@ -200,7 +200,7 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
 
   it("serializes duplication until the previous copy is committed", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("chief");
     await store.getOrCreate("research");
@@ -224,11 +224,9 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
 
   it("holds the source queue for the length of the copy, then answers what waited", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         return new FakeAgentClient(provider);
@@ -256,7 +254,7 @@ describe.sequential("DuplicationGate: copying an agent and the pending window", 
 
   it("removes copied data when the source changes during duplication", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("chief");
     const duplicateInStore = store.duplicateAgent.bind(store);

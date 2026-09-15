@@ -5,11 +5,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { chmod, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import {
+  assertSupportedAttachmentName,
   attachmentFileExtension,
   IMAGE_ATTACHMENT_EXTENSIONS,
-  isSupportedAttachmentName,
   MEDIA_ATTACHMENT_EXTENSIONS,
-  SUPPORTED_ATTACHMENT_DESCRIPTION,
   supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -358,13 +357,6 @@ function assertRemoteAttachmentSupport(
   if (!names.some((name) => attachmentFileExtension(name) === "eml")) return;
   if (remoteServers.supportsCapability(serverId, TEAM_EML_ATTACHMENTS_CAPABILITY)) return;
   throw new Error("This server does not support EML attachments. Update OpenBot on the host and retry.");
-}
-
-function assertSupportedAttachmentName(name: string): void {
-  if (isSupportedAttachmentName(name)) return;
-  throw new Error(
-    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
-  );
 }
 
 // Names are archive labels only; file access always uses a managed attachment ID.

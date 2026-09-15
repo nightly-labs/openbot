@@ -2,6 +2,7 @@ import { type AgentProviderId, agentProviderName } from "@openbot/contracts/agen
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
 import { Button, TriangleAlert } from "../../components/ui";
+import { CloseIcon } from "./ConversationIcons";
 
 /**
  * The shared slab every composer notice uses: a warning-toned card in the queue's shape, above the
@@ -9,17 +10,75 @@ import { Button, TriangleAlert } from "../../components/ui";
  *
  * `tone` is the only difference between the states. It is `danger` when the user cannot send at all
  * and the wait is not in their hands, and `warning` when one press puts the state right.
+ *
+ * `onDismiss` decides the rest. A notice the user can clear gets the close button, Escape, and
+ * `role="alert"`, because a state the user did not ask for has to announce itself. The states they
+ * walked into - a signed-out provider, a spent plan window - stay until they are resolved, so they
+ * only report. `title` is optional: a failure the provider already stated in a sentence gains
+ * nothing from a label that repeats the word "error" above it.
  */
-function ComposerNotice(props: { tone?: "warning" | "danger"; title: string; body: string; action?: JSX.Element }) {
+export function ComposerNotice(props: {
+  tone?: "warning" | "danger";
+  title?: string;
+  body: string;
+  action?: JSX.Element;
+  conversationKey?: string | null;
+  onDismiss?: () => void;
+}) {
   return (
-    <div class="composer-notice" data-tone={props.tone ?? "warning"} role="status">
+    <Show
+      when={props.onDismiss}
+      fallback={
+        <div
+          class="composer-notice"
+          data-tone={props.tone ?? "warning"}
+          data-conversation-key={props.conversationKey ?? undefined}
+          role="status"
+        >
+          <NoticeContent title={props.title} body={props.body} action={props.action} />
+        </div>
+      }
+    >
+      {(dismiss) => (
+        <div
+          class="composer-notice"
+          data-tone={props.tone ?? "warning"}
+          data-conversation-key={props.conversationKey ?? undefined}
+          role="alert"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || event.defaultPrevented) return;
+            event.preventDefault();
+            dismiss()();
+          }}
+        >
+          <NoticeContent title={props.title} body={props.body} action={props.action} />
+          <Button
+            variant="ghost"
+            type="button"
+            size="sm"
+            class="composer-notice-dismiss"
+            aria-label="Dismiss error"
+            onClick={() => dismiss()()}
+          >
+            <CloseIcon />
+          </Button>
+        </div>
+      )}
+    </Show>
+  );
+}
+
+/** The icon, copy and optional action the card carries, whichever role announces it. */
+function NoticeContent(props: { title?: string; body: string; action?: JSX.Element }) {
+  return (
+    <>
       <TriangleAlert class="composer-notice-icon" aria-hidden="true" />
       <div class="composer-notice-copy">
-        <strong>{props.title}</strong>
+        <Show when={props.title}>{(title) => <strong>{title()}</strong>}</Show>
         <p>{props.body}</p>
       </div>
       <Show when={props.action}>{props.action}</Show>
-    </div>
+    </>
   );
 }
 

@@ -18,6 +18,7 @@ import { Conversation, createConversationController } from "../src/features/conv
 import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
 import { ConversationView } from "../src/features/conversation/ConversationView";
 import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
+import { composerDraftKey } from "../src/features/conversation/conversation-keys";
 import { SetupProvider } from "../src/features/onboarding/onboarding-context";
 import { ServersProvider } from "../src/features/servers/servers-context";
 import { SettingsProvider } from "../src/features/settings/settings-context";
@@ -857,6 +858,7 @@ function MockedConversation(props: {
   initialAttachments?: DraftAttachment[];
   voiceModelProgress?: number;
   takeoverStateGallery?: boolean;
+  conversationError?: string;
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
@@ -876,6 +878,16 @@ function MockedConversation(props: {
     onSettled(() => {
       controller.setVoicePhase("preparing");
       controller.setVoiceModelProgress(props.voiceModelProgress ?? null);
+    });
+  }
+  // The same keyed entry `agent-event-bridge` writes when a provider reports an error, so the
+  // story shows the banner where the chat it belongs to actually renders it.
+  if (initialAgentId && props.conversationError) {
+    onSettled(() => {
+      controller.setConversationErrors({
+        [composerDraftKey({ agentId: initialAgentId, serverId: props.args.server?.id ?? "local" })]:
+          props.conversationError ?? "",
+      });
     });
   }
   const [unreadCount, setUnreadCount] = createSignal(0);
@@ -1113,6 +1125,44 @@ export const UsageLimitReached: Story = {
     await expect(await canvas.findByText("Usage limit reached")).toBeInTheDocument();
     // The composer still takes a draft, so the user can write while they wait for the reset.
     await expect(canvas.getByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+  },
+};
+
+/**
+ * The real composer after a provider reported an error. The report stands above the input, in the
+ * same column as the usage-limit and sign-in notices, rather than as a bubble in the transcript:
+ * a provider that retries a dropped transport reports the same failure once per attempt, and one
+ * banner stands for the whole run. One press clears it.
+ */
+export const ProviderErrorBanner: Story = {
+  name: "Provider error banner",
+  render: (storyArgs) => (
+    <MockedConversation
+      args={storyArgs}
+      conversationError="Falling back from WebSockets to HTTPS transport. stream disconnected before completion: Connection refused (os error 61)"
+    />
+  ),
+  play: async ({ canvas }) => {
+    const banner = await canvas.findByRole("alert");
+    await expect(banner).toHaveTextContent(/Connection refused/u);
+    // The composer still takes a draft, so the error never costs the user their message.
+    await expect(canvas.getByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+  },
+};
+
+/** The same chat after the press: the banner goes, the composer keeps its place and its draft. */
+export const ProviderErrorDismissed: Story = {
+  name: "Provider error dismissed",
+  render: (storyArgs) => (
+    <MockedConversation
+      args={storyArgs}
+      conversationError="Falling back from WebSockets to HTTPS transport. stream disconnected before completion: Connection refused (os error 61)"
+    />
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole("button", { name: "Dismiss error" }));
+    await waitFor(() => expect(canvas.queryByRole("alert")).not.toBeInTheDocument());
+    await expect(canvas.getByRole("textbox", { name: "Message Chief" })).toHaveFocus();
   },
 };
 

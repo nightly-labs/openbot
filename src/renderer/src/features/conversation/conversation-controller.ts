@@ -100,6 +100,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
   const [editingOriginalAttachmentIds, setEditingOriginalAttachmentIds] = createSignal<string[]>([]);
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
+  const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
   const [voicePhase, setVoicePhase] = createSignal<"idle" | "preparing" | "requesting" | "recording" | "transcribing">(
     "idle",
   );
@@ -185,6 +186,8 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     setComposerFocusRequest,
     conversationErrors,
     setConversationErrors,
+    composerErrors,
+    setComposerErrors,
     voicePhase,
     setVoicePhase,
     voiceModelProgress,
@@ -211,13 +214,14 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
  * shared owner would carry "the computer panel is open for chief" from one
  * server to the next and open the wrong panel on arrival.
  *
- * `attachmentBusy`, `composerError`, `submitting` and `selectionSending` are
+ * `attachmentBusy`, `submitting` and `selectionSending` are
  * here for the same reason by a different route: they carry no key at all. Each
- * describes the composer on screen right now - "a send is in flight", "this is
- * what went wrong" - so a shared owner would disable the arriving server's
- * composer for the length of the server it was left on, and show that server's
- * failure underneath it. What has to outlive the conversation goes in
- * `conversationErrors` instead, which is keyed and sits in the stable half.
+ * describes the composer on screen right now - "a send is in flight" - so a
+ * shared owner would disable the arriving server's composer for the length of
+ * the server it was left on. What has to outlive the conversation goes in
+ * `conversationErrors` and `composerErrors` instead, which are keyed by
+ * chat/conversation and sit in the stable half so one chat's banner never
+ * leaks into another chat on the same server.
  *
  * Created inside the keyed scope in `app-providers.tsx`, so a server switch
  * discards all of it by unmounting rather than by a list of setters.
@@ -225,7 +229,6 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
 export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
   const [attachmentBusy, setAttachmentBusy] = createSignal(false);
-  const [composerError, setComposerError] = createSignal<string | null>(null);
   const [submitting, setSubmitting] = createSignal(false);
   const [selectionSending, setSelectionSending] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
@@ -254,8 +257,6 @@ export function createServerConversationState() {
     setShowComposerActions,
     attachmentBusy,
     setAttachmentBusy,
-    composerError,
-    setComposerError,
     submitting,
     setSubmitting,
     selectionSending,

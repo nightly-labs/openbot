@@ -51,7 +51,7 @@ export interface VoiceStoreDeps {
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
   setConversationErrors: (update: (current: Record<string, string>) => Record<string, string>) => void;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   setComposerFocusRequest: (update: (current: number) => number) => void;
   clearConversationError: (target: ConversationTarget) => void;
   setConversationError: (target: ConversationTarget, message: string) => void;
