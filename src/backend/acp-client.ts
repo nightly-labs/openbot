@@ -16,6 +16,7 @@ import {
   type RequestPermissionResponse,
   type SessionConfigOption,
   type SessionNotification,
+  type SetSessionConfigOptionResponse,
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
@@ -46,6 +47,20 @@ import { createDiagnosticStream } from "./stderr-diagnostics";
  * agent that answers slowly stops delaying the catalog the user is waiting for.
  */
 const MODEL_REASONING_PROBE_BUDGET_MS = 5_000;
+
+/**
+ * How long one model's probe may take before the sweep goes on without it. An agent that stops
+ * answering for one model then costs that model's efforts alone, and not the efforts of every model
+ * after it in the catalog.
+ */
+const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
+
+/**
+ * What the sweep leaves of the caller's own deadline for the two requests that follow it: the restore
+ * of the model the session opened on, and the close of the probe session. Both are one round trip,
+ * and the catalog the caller waits for is already built when they run.
+ */
+const MODEL_REASONING_CLEANUP_MS = 1_000;
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -349,11 +364,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   async #discoverModels(timeoutMs = this.#requestTimeoutMs): Promise<AcpModel[]> {
     const connection = this.#requireConnection();
+    // One deadline for the whole discovery, read before the session opens: what the sweep may spend
+    // is what a slow `session/new` left of the time the caller gave `model/list`. A sweep that timed
+    // the caller out instead would return no catalog at all.
+    const deadline = Date.now() + timeoutMs;
     return withTimeout(
       (async () => {
         const probe = await connection.newSession({ cwd: process.cwd(), mcpServers: [] });
         try {
-          return await this.#modelReasoningEfforts(connection, probe, modelsFromSessionSetup(probe));
+          return await this.#modelReasoningEfforts(connection, probe, modelsFromSessionSetup(probe), deadline);
         } finally {
           await connection.closeSession({ sessionId: probe.sessionId }).catch(() => undefined);
         }
@@ -361,6 +380,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       timeoutMs,
       `${agentProviderName(this.provider)} request timed out: model/list`,
     );
+  }
+
+  /** One `session/set_config_option`, which gives up at `until` and reports any failure as `null`. */
+  async #selectConfigOption(
+    connection: ClientSideConnection,
+    params: { sessionId: string; configId: string; value: string },
+    until: number,
+  ): Promise<SetSessionConfigOptionResponse | null> {
+    const remaining = until - Date.now();
+    if (remaining <= 0) return null;
+    return withTimeout(
+      connection.setSessionConfigOption(params),
+      remaining,
+      `${agentProviderName(this.provider)} request timed out: session/set_config_option`,
+    ).catch(() => null);
   }
 
   /**
@@ -376,41 +410,47 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * Only for a catalog that came from the config option. An agent that describes each model's efforts
    * in `session/new` has answered already and is not asked again.
    *
-   * No probe has to succeed. A model whose probe fails, or that the time budget does not reach, keeps
-   * the session-wide efforts the catalog held before. The budget matters because this runs inside the
-   * caller's `model/list` timeout, where a long catalog on a slow agent would otherwise leave the
-   * user with no models rather than with imprecise efforts.
+   * No probe has to succeed. A model whose probe fails, or that the time does not reach, keeps the
+   * session-wide efforts the catalog held before. `deadline` is when the caller's own `model/list`
+   * times out: a sweep that ran past it would leave the user with no models at all, rather than with
+   * imprecise efforts.
    */
   async #modelReasoningEfforts(
     connection: ClientSideConnection,
     probe: SessionSetupResponse & { sessionId: string },
     models: AcpModel[],
+    deadline: number,
   ): Promise<AcpModel[]> {
     const option = (probe.configOptions ?? []).find(
       (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
         candidate.category === "model" && candidate.type === "select",
     );
     if (!option || availableModels(probe).length > 0) return models;
-    const deadline = Date.now() + MODEL_REASONING_PROBE_BUDGET_MS;
+    // The sweep, and each request in it, ends at whichever comes first: its own budget, or the point
+    // where the caller's deadline still holds the cleanup. One agent that never answers then costs
+    // its own model's efforts, and not the whole catalog.
+    const sweepEnd = Math.min(Date.now() + MODEL_REASONING_PROBE_BUDGET_MS, deadline - MODEL_REASONING_CLEANUP_MS);
     const probed: AcpModel[] = [];
     let selected = option.currentValue;
     for (const model of models) {
-      const response =
-        Date.now() < deadline
-          ? await connection
-              .setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: model.id })
-              .catch(() => null)
-          : null;
+      const response = await this.#selectConfigOption(
+        connection,
+        { sessionId: probe.sessionId, configId: option.id, value: model.id },
+        Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
+      );
       if (response) selected = model.id;
       probed.push(response ? { ...model, ...reasoningFromConfig(response.configOptions) } : model);
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the
-    // user's own next CLI session would start on a model they never chose.
+    // user's own next CLI session would start on a model they never chose. Half of the cleanup
+    // reserve, so the close that follows keeps the other half.
     if (selected !== option.currentValue) {
-      await connection
-        .setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: option.currentValue })
-        .catch(() => undefined);
+      await this.#selectConfigOption(
+        connection,
+        { sessionId: probe.sessionId, configId: option.id, value: option.currentValue },
+        Date.now() + MODEL_REASONING_CLEANUP_MS / 2,
+      );
     }
     return probed;
   }

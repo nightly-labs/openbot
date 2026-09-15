@@ -53,7 +53,14 @@ let buffer = "";
 // An agent of the second kind: no \`models\` in \`session/new\`, one \`model\` config option, and a
 // \`thought_level\` option that exists only while the session is on a model that reasons. OpenCode
 // works this way, and \`minimal\` next to \`low\` is its own naming.
-const CONFIG_MODELS = ["agent/thinker", "agent/plain"];
+const FAILING_MODEL = process.env.OPENBOT_FAKE_ACP_CONFIG_FAIL ?? null;
+const HANGING_MODEL = process.env.OPENBOT_FAKE_ACP_CONFIG_HANG ?? null;
+const CONFIG_MODELS = [
+  ...(FAILING_MODEL ? [FAILING_MODEL] : []),
+  "agent/thinker",
+  ...(HANGING_MODEL ? [HANGING_MODEL] : []),
+  "agent/plain",
+];
 const THOUGHT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "default"];
 let selected = CONFIG_MODELS[0];
 const configOptions = () => [
@@ -109,6 +116,12 @@ function handle(message) {
   if (message.method === "session/set_config_option") {
     const configLog = process.env.OPENBOT_FAKE_ACP_CONFIG_LOG;
     if (configLog) fs.appendFileSync(configLog, JSON.stringify(message.params) + NL);
+    // No answer at all, which is what a hung agent gives.
+    if (message.params.value === HANGING_MODEL) return;
+    if (message.params.value === FAILING_MODEL) {
+      write({ jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Model unavailable." } });
+      return;
+    }
     if (message.params.configId === "model") selected = message.params.value;
     write({ jsonrpc: "2.0", id: message.id, result: { configOptions: configOptions() } });
     return;
@@ -210,6 +223,8 @@ function startOpencode(
     servesModel?: (modelId: string) => boolean;
     /** Read at every session, the same way the real source is. */
     mcpServers?: () => McpServerConfig[];
+    /** How long one request may take, which is also the deadline model discovery works inside. */
+    requestTimeoutMs?: number;
   } = {},
 ): AgentClient {
   vi.stubEnv("OPENBOT_FAKE_ACP_ENV_LOG", envLog);
@@ -220,9 +235,10 @@ function startOpencode(
     mcpServers: options.mcpServers ?? (() => []),
     servesModel: options.servesModel,
   };
+  const timeoutMs = options.requestTimeoutMs ?? 10_000;
   const client = options.profile
-    ? (driver.createProfileClient?.(cli, 10_000, context) ?? driver.createClient(cli, 10_000, context))
-    : driver.createClient(cli, 10_000, context);
+    ? (driver.createProfileClient?.(cli, timeoutMs, context) ?? driver.createClient(cli, timeoutMs, context))
+    : driver.createClient(cli, timeoutMs, context);
   started.push(client);
   client.start();
   return client;
@@ -436,6 +452,57 @@ describe("OpenCode ACP reasoning efforts", () => {
       configId: "model",
       value: "agent/thinker",
     });
+  });
+
+  it("keeps reading the rest of the catalog when one model refuses to be selected", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    // The session opens on this model, and the agent rejects every attempt to select it.
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_FAIL", "agent/broken");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+
+    // A model an agent will not answer for keeps the efforts the session published, and costs the
+    // models after it nothing: a catalog is what the user picks from, so one refusal must not empty it.
+    expect(
+      models.data.map((model) => [
+        model.model,
+        model.supportedReasoningEfforts?.map((effort) => effort.reasoningEffort),
+      ]),
+    ).toEqual([
+      ["agent/broken", ["medium"]],
+      ["agent/thinker", ["low", "medium", "high", "xhigh"]],
+      ["agent/plain", ["medium"]],
+    ]);
+  });
+
+  it("returns the catalog when a model's probe never answers", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    // The agent accepts the selection of this model and then says nothing more about it.
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_HANG", "agent/silent");
+    const client = startOpencode(fake.cli, () => null, fake.envLog, { requestTimeoutMs: 4_000 });
+
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+
+    // The sweep runs inside the caller's own timeout, so a probe that never answers has to end
+    // before that timeout does. A sweep that waited for it would time `model/list` out, and the
+    // user would have no models to pick from instead of one model with imprecise efforts.
+    expect(
+      models.data.map((model) => [
+        model.model,
+        model.supportedReasoningEfforts?.map((effort) => effort.reasoningEffort),
+      ]),
+    ).toEqual([
+      ["agent/thinker", ["low", "medium", "high", "xhigh"]],
+      // What the session published, which is the efforts of the model it opened on.
+      ["agent/silent", ["low", "medium", "high", "xhigh"]],
+      // The model after the silent one keeps its own answer: one probe ends, not the sweep.
+      ["agent/plain", ["medium"]],
+    ]);
   });
 
   it("sends the agent's own low effort, not the lowest effort the model has", async () => {
