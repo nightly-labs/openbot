@@ -408,10 +408,10 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             if (action() === "cancel") {
                               void props.onCancelProviderDownload?.(option().id);
                             } else if (action() !== "download" && action() !== "retry") {
-                              // OpenCode reconnects through its key: saving one restarts the CLI with
-                              // it, so its Connect/Reconnect opens the key dialog instead of a bare
-                              // reconnect.
-                              if (option().id === "opencode" && props.onSignInProvider) {
+                              // Only Reconnect opens the OpenCode key dialog: saving a key restarts
+                              // the CLI with it. Connect and Restart stay on onConnectProvider, so a
+                              // failed free provider with no stored key can still retry from Settings.
+                              if (option().id === "opencode" && action() === "reconnect" && props.onSignInProvider) {
                                 void props.onSignInProvider(option().id);
                               } else {
                                 void props.onConnectProvider?.(option().id);

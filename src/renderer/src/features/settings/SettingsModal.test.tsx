@@ -897,6 +897,7 @@ describe("SettingsModal", () => {
       clearProviderApiKey: vi.fn(async () => undefined),
       openExternal: vi.fn(async () => undefined),
     };
+    const onConnectProvider = vi.fn(async () => undefined);
     render(() => (
       <SettingsModal
         open
@@ -911,16 +912,20 @@ describe("SettingsModal", () => {
         onUpdateAccountAvatar={vi.fn(async () => undefined)}
         agentStatus={openCodeReadyStatus}
         providerKeys={providerKeys}
+        onConnectProvider={onConnectProvider}
       />
     ));
 
-    // The key badge beside the runtime one: both read "Connected" once the key is saved.
     await screen.findByText("Free");
     expect(providerKeys.getProviderApiKeyState).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Sign in to OpenCode" }));
     const input = await screen.findByLabelText("OpenCode Go key");
     await waitFor(() => expect(input).toBeEnabled());
+    // The dialog reconnects without touching credentials. The row behind keeps its own
+    // "Connect OpenCode" button, so the name matches exactly.
+    fireEvent.click(screen.getByRole("button", { name: /^Reconnect$/ }));
+    await waitFor(() => expect(onConnectProvider).toHaveBeenCalledWith("opencode"));
     fireEvent.input(input, { target: { value: "go-key-value" } });
     fireEvent.click(screen.getByRole("button", { name: "Save key" }));
 
@@ -930,7 +935,7 @@ describe("SettingsModal", () => {
     // Modal open, key dialog open, key dialog close: the last read is the refresh the badge needs.
     await waitFor(() => expect(providerKeys.getProviderApiKeyState).toHaveBeenCalledTimes(3));
     // getAllByText only waits for the first match, so the count itself is what waits here: the
-    // runtime badge steps aside, leaving the single refreshed key badge.
+    // Free badge is gone, leaving the single runtime Connected.
     await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(1));
     expect(screen.queryByText("Free")).toBeNull();
   });

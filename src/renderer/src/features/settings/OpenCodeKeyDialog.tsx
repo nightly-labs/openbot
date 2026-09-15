@@ -39,6 +39,12 @@ export interface ProviderKeyApi {
 export interface OpenCodeKeyDialogProps {
   api: ProviderKeyApi;
   onClose: () => void;
+  /**
+   * Retries the connection without touching credentials. Without it a failed free provider with
+   * no stored key could never retry from here: saving needs a key, removing needs one saved,
+   * and closing answers nothing.
+   */
+  onReconnect?: () => void | Promise<void>;
 }
 
 type DialogPhase = "idle" | "loading" | "saving" | "removing";
@@ -93,6 +99,15 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     } catch (cause) {
       setError(errorMessage(cause, "Could not remove the key."));
       setPhase("idle");
+    }
+  }
+
+  async function reconnect(): Promise<void> {
+    if (!props.onReconnect) return;
+    try {
+      await props.onReconnect();
+    } catch (cause) {
+      setError(errorMessage(cause, "Could not reconnect."));
     }
   }
   return (
@@ -164,6 +179,11 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 <Button type="button" variant="ghost" disabled={busy()} onClick={props.onClose}>
                   Cancel
                 </Button>
+                <Show when={props.onReconnect}>
+                  <Button type="button" variant="ghost" disabled={busy()} onClick={() => void reconnect()}>
+                    Reconnect
+                  </Button>
+                </Show>
                 <Show when={stored() !== "missing"}>
                   <Button
                     type="button"

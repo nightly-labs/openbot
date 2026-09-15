@@ -247,6 +247,7 @@ export function SettingsModal(props: SettingsModalProps) {
                   setOpenCodeKeyOpen(false);
                   void refreshOpenCodeKeyStatus();
                 }}
+                onReconnect={props.onConnectProvider ? () => props.onConnectProvider?.("opencode") : undefined}
               />
             )}
           </Show>

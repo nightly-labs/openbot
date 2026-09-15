@@ -22,9 +22,9 @@ function createApi(overrides: Partial<ProviderKeyApi> = {}) {
 
 // Queried through `screen`, not the render container: the dialog is a portal, so its content is a
 // child of the document body rather than of the element `render` returns.
-function renderDialog(api: ProviderKeyApi) {
+function renderDialog(api: ProviderKeyApi, onReconnect?: () => void | Promise<void>) {
   const onClose = vi.fn();
-  render(() => <OpenCodeKeyDialog api={api} onClose={onClose} />);
+  render(() => <OpenCodeKeyDialog api={api} onClose={onClose} onReconnect={onReconnect} />);
   return { onClose };
 }
 
@@ -98,5 +98,40 @@ describe("OpenCodeKeyDialog", () => {
     await waitFor(() => expect(api.setProviderApiKey).toHaveBeenCalled());
     expect(await screen.findByRole("alert")).toHaveTextContent("OpenCode rejected the key.");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("offers no reconnect action without a reconnect handler", async () => {
+    renderDialog(createApi());
+
+    await screen.findByLabelText("OpenCode Go key");
+    expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
+  });
+
+  it("reconnects without touching credentials and leaves the dialog open", async () => {
+    const api = createApi();
+    const onReconnect = vi.fn(async () => undefined);
+    const { onClose } = renderDialog(api, onReconnect);
+
+    // The input is disabled until the dialog has read whether a key is stored already.
+    const input = await screen.findByLabelText("OpenCode Go key");
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
+    await waitFor(() => expect(onReconnect).toHaveBeenCalledTimes(1));
+    // A reconnect answers the failure; the dialog stays for the key.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(api.setProviderApiKey).not.toHaveBeenCalled();
+    expect(api.clearProviderApiKey).not.toHaveBeenCalled();
+  });
+
+  it("keeps the dialog open and states why a reconnect failed", async () => {
+    const onReconnect = vi.fn(async () => {
+      throw new Error("OpenCode did not answer.");
+    });
+    renderDialog(createApi(), onReconnect);
+
+    const input = await screen.findByLabelText("OpenCode Go key");
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("OpenCode did not answer.");
   });
 });

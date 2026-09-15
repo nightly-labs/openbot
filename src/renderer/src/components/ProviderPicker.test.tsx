@@ -80,6 +80,28 @@ describe("ProviderPicker", () => {
     expect(onConnectProvider).not.toHaveBeenCalled();
   });
 
+  it("keeps Connect and Restart on the provider connection, with the dialog only on Reconnect", () => {
+    const onSignInProvider = vi.fn();
+    const onConnectProvider = vi.fn();
+    const renderRow = (option: ProviderPickerOption) => renderPicker([option], onSignInProvider, onConnectProvider);
+
+    // A failed provider offers a retry that needs no key.
+    const failed = renderRow({ ...openCode, state: "error", runtimeStatus: runtime({}) });
+    fireEvent.click(failed.view.getByRole("button", { name: "Connect OpenCode" }));
+    expect(onConnectProvider).toHaveBeenCalledWith("opencode");
+
+    // A connecting provider offers a restart that needs no key either.
+    const restarting = renderRow({
+      ...openCode,
+      state: "available",
+      connectionState: "connecting",
+      runtimeStatus: runtime({}),
+    });
+    fireEvent.click(restarting.view.getByRole("button", { name: "Restart OpenCode" }));
+    expect(onConnectProvider).toHaveBeenCalledWith("opencode");
+    expect(onSignInProvider).not.toHaveBeenCalled();
+  });
+
   it("keeps only Cancel on a downloading OpenCode row", () => {
     const downloading = renderPicker([
       { ...openCode, runtimeStatus: runtime({ phase: "downloading", progress: 40, version: null }) },
