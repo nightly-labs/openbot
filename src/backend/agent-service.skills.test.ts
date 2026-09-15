@@ -50,12 +50,9 @@ describe.sequential("local skill provider tools", () => {
           clients.set(selected, client);
           return client;
         },
-        bundledExecutables: undefined,
-        prepareAgentWorkspace: undefined,
         hostedSites: null,
         sidebarLayout: null,
         preferredModel: null,
-        credentials: undefined,
         localSkillTools: () => api,
       });
       await service.initialize();

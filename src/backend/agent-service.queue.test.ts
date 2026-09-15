@@ -1386,8 +1386,6 @@ describe.sequential("AgentService: queue", () => {
         clients.set(selectedProvider, client);
         return client;
       },
-      bundledExecutables: undefined,
-      prepareAgentWorkspace: undefined,
       hostedSites: null,
       sidebarLayout: context === "unavailable" ? null : sidebar,
     });
@@ -1470,8 +1468,6 @@ describe.sequential("AgentService: queue", () => {
         clients.set(provider, client);
         return client;
       },
-      bundledExecutables: undefined,
-      prepareAgentWorkspace: undefined,
       hostedSites: null,
       sidebarLayout: sidebar,
     });

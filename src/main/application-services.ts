@@ -425,7 +425,6 @@ export async function createApplicationServices({
     browser,
     requestTimeoutMs: 30_000,
     preferredProvider: setupState.preferredProvider ?? "codex",
-    clientFactory: null,
     bundledExecutables: providerRuntimes.bundledExecutables(),
     prepareAgentWorkspace: async (agent) => {
       await managedSkills.syncAgent(agent);

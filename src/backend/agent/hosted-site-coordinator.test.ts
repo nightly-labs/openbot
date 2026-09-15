@@ -63,7 +63,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      bundledExecutables: undefined,
       prepareAgentWorkspace: async () => undefined,
       hostedSites,
     });
@@ -250,7 +249,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      bundledExecutables: undefined,
       prepareAgentWorkspace: async () => undefined,
       hostedSites,
     });
@@ -351,7 +349,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      bundledExecutables: undefined,
       prepareAgentWorkspace: async () => undefined,
       hostedSites,
     });
@@ -459,7 +456,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      bundledExecutables: undefined,
       prepareAgentWorkspace: async () => undefined,
       hostedSites,
     });
@@ -577,7 +573,6 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         clients.set(provider, client);
         return client;
       },
-      bundledExecutables: undefined,
       prepareAgentWorkspace: async () => undefined,
       hostedSites,
     });
