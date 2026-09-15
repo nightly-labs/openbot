@@ -8,6 +8,7 @@
 
 import { decodeMcpServerConfigs, decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
+import { McpServerError } from "../backend/mcp-server-store";
 import { createTeamApiFixture, stopTeamApiFixtures, type TeamApiOptions } from "./team-api-server-test-harness";
 
 afterEach(stopTeamApiFixtures);
@@ -129,6 +130,45 @@ describe("Team API MCP server access", () => {
 
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility).toMatchObject({ capabilities: expect.arrayContaining(["mcp-servers-v1"]) });
+  });
+
+  // An administrator manages this machine from another one, and the sentence is the whole answer:
+  // a name already in use, or a row somebody else deleted, is theirs to correct. A plain `Error`
+  // reads as a host fault, so the reason is replaced by "Request failed." and only the host logs it.
+  it("tells an admin what to correct, and keeps an unexpected failure generic", async () => {
+    const mcpServers = createMcpServers();
+    mcpServers.saveMcpServer = () => {
+      throw new McpServerError("An MCP server named Filesystem already exists.");
+    };
+    mcpServers.removeMcpServer = () => {
+      throw new Error("no such column: mcp_server_id");
+    };
+    const fixture = await createTeamApiFixture("mcp-errors", { configure: true });
+    const { base } = await fixture.start({ mcpServers });
+    const headers = {
+      Authorization: `Bearer ${await fixture.signIn()}`,
+      "OpenBot-Protocol-Version": "3",
+      "OpenBot-Capabilities": "mcp-servers-v1",
+      "Content-Type": "application/json",
+    };
+
+    const save = await fetch(`${base}/v1/mcp-servers/save`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ config }),
+    });
+    expect(save.status).toBe(400);
+    expect(await save.json()).toEqual({ error: "An MCP server named Filesystem already exists." });
+
+    // The other half: a broken database is not the administrator's to correct, and its text - a
+    // column name here, a file path elsewhere - stays on the machine that holds it.
+    const removed = await fetch(`${base}/v1/mcp-servers/delete`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ mcpServerId: "mcp-1" }),
+    });
+    expect(removed.status).toBe(500);
+    expect(await removed.json()).toEqual({ error: "Request failed." });
   });
 
   it("advertises nothing when the host has no MCP service", async () => {

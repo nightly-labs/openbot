@@ -58,6 +58,15 @@ describe("McpServerStore", () => {
     expect(saved.env).toEqual([{ key: "TOKEN", value: " padded secret " }]);
   });
 
+  // An argument is handed to the process as one word, so a file name or a token that ends in a
+  // space is a different word once it is trimmed - and the form's change check, which runs the same
+  // normalization, would read the space typed back as no change at all.
+  it("keeps an argument's own spaces and drops a blank row", async () => {
+    const { store } = await setup();
+    const saved = store.save(stdioConfig({ args: ["--file", " report 2026 .txt", "   ", ""] }));
+    expect(saved.args).toEqual(["--file", " report 2026 .txt"]);
+  });
+
   it("clears the fields of the transport that is not in use", async () => {
     const { store } = await setup();
     const saved = store.save({

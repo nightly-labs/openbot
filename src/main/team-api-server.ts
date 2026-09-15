@@ -54,6 +54,7 @@ import { encodeTeamProtocolV4CurrentHttpResponse } from "@openbot/contracts/team
 import { encodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type * as Ws from "ws";
+import { McpServerError } from "../backend/mcp-server-store";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { RemoteScreenError } from "./remote-screen-gateway";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
@@ -538,6 +539,7 @@ export class TeamApiServer {
         error instanceof HttpError ||
         error instanceof RemoteScreenError ||
         error instanceof TeamStoreError ||
+        error instanceof McpServerError ||
         error instanceof AnalyticsInputError;
       const status =
         error instanceof HttpError || error instanceof RemoteScreenError ? error.status : expected ? 400 : 500;

@@ -412,6 +412,49 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // The same refresh asks one question of each thread: is a turn running on it. `readConversation`
+  // answers that too, but it loads and parses every message of the thread to do it, so a settings
+  // change would read the whole history of every agent on the main process and throw it away.
+  it("does not read a conversation to find whether a thread is busy", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    const readConversation = vi.spyOn(store.database, "readConversation");
+    const readActiveTurnId = vi.spyOn(store.database, "readActiveTurnId");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    // The refresh did reach the question - otherwise the first expectation would pass on a path that
+    // never ran - and it answered it from the thread row alone.
+    expect(readActiveTurnId).toHaveBeenCalled();
+    expect(readConversation).not.toHaveBeenCalled();
+    readConversation.mockRestore();
+    readActiveTurnId.mockRestore();
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+  });
+
   // The queue keeps a failed delivery's reason in the database and shows it again in the app, so a
   // provider that rejects a start by quoting what it was sent would store the credential for good.
   it("keeps an MCP credential out of the reason a failed delivery keeps", async () => {

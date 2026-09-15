@@ -127,7 +127,12 @@ export function isReservedMcpServerName(name: string): boolean {
 /**
  * What a save sends: the surrounding spaces of each name taken off, the empty rows the form shows
  * dropped, and the transport the user did not choose cleared, so a stored configuration never
- * carries a half-typed alternative. A credential's own value is kept as written - see below.
+ * carries a half-typed alternative.
+ *
+ * A value is kept exactly as written - an argument as well as a credential. An argument is handed
+ * to the process as one word, so a token or a file name that ends in a space is a different word
+ * once it is trimmed, and the form's change check runs this same normalization, which would read
+ * the space typed back as no change at all.
  */
 export function normalizeMcpConfig(config: McpServerConfig): McpServerConfig {
   const stdio = config.transport === "stdio";
@@ -135,7 +140,7 @@ export function normalizeMcpConfig(config: McpServerConfig): McpServerConfig {
     ...config,
     name: config.name.trim(),
     command: stdio ? config.command.trim() : "",
-    args: stdio ? config.args.map((value) => value.trim()).filter(Boolean) : [],
+    args: stdio ? config.args.filter((value) => value.trim().length > 0) : [],
     env: stdio ? normalizePairs(config.env) : [],
     envPassthrough: stdio ? config.envPassthrough.map((value) => value.trim()).filter(Boolean) : [],
     workingDirectory: stdio ? config.workingDirectory.trim() : "",

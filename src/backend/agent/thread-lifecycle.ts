@@ -424,7 +424,7 @@ export class ThreadLifecycle {
     const snapshot = [...this.#conversation.activeSnapshots()].find(
       ([id, candidate]) => id === agentId && candidate.threadId === threadId,
     )?.[1];
-    return snapshot?.activeTurnId ?? this.#store.database.readConversation(agentId, threadId).activeTurnId;
+    return snapshot?.activeTurnId ?? this.#store.database.readActiveTurnId(agentId, threadId);
   }
 
   /**

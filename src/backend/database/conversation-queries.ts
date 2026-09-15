@@ -78,6 +78,23 @@ export class ConversationQueries {
     };
   }
 
+  /**
+   * The turn that runs on one thread, read from the thread row alone.
+   *
+   * `readConversation` answers this as well, but it loads and parses every message of the thread to
+   * do it. The callers here ask only "is this thread busy" - a refresh after an MCP or tool change
+   * asks it of every thread of every agent - so a whole history would be read and thrown away.
+   */
+  readActiveTurnId(agentId: string, threadId: string | null): string | null {
+    if (!threadId) return null;
+    const row = databaseRow(
+      this.#core.connection
+        .prepare("SELECT active_turn_id FROM projection_threads WHERE thread_id = ? AND agent_id = ?")
+        .get(threadId, agentId),
+    );
+    return row ? optionalStringColumn(row, "active_turn_id") : null;
+  }
+
   readConversationRuntime(
     agentId: string,
     threadId: string | null,

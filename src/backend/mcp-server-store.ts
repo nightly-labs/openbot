@@ -23,6 +23,17 @@ import type { OpenBotDatabase } from "./openbot-database";
  * Every write runs `normalizeMcpConfig` - the same function the settings form previews with - so a
  * stored row can never hold something the user was not shown.
  */
+/**
+ * A configuration the user can correct: a name already in use, the list at its limit, a row that was
+ * deleted. Not a broken database, which stays an unexpected failure.
+ *
+ * The type is what carries the sentence out of the process. A local save reads `error.message` in a
+ * toast, but the Team API answers a plain `Error` with a 500 "Request failed." - so a remote
+ * administrator was told a duplicate name was a server fault, with nothing to correct it by. The
+ * single catch in `team-api-server.ts` classifies by `instanceof`, and this class is what it reads.
+ */
+export class McpServerError extends Error {}
+
 export class McpServerStore {
   constructor(private readonly database: OpenBotDatabase) {}
 
@@ -48,18 +59,18 @@ export class McpServerStore {
     const normalized = normalizeMcpConfig(config);
     const errors = mcpConfigErrors(normalized);
     const firstError = errors.name ?? errors.command ?? errors.url;
-    if (firstError) throw new Error(firstError);
+    if (firstError) throw new McpServerError(firstError);
 
     const db = this.database.connection;
     db.exec("BEGIN IMMEDIATE");
     try {
       const existing = normalized.id ? this.get(normalized.id) : null;
-      if (normalized.id && !existing) throw new Error("This MCP server no longer exists.");
+      if (normalized.id && !existing) throw new McpServerError("This MCP server no longer exists.");
       if (!existing && this.count() >= INPUT_LIMITS.mcpServers)
-        throw new Error(`OpenBot keeps up to ${INPUT_LIMITS.mcpServers} MCP servers.`);
+        throw new McpServerError(`OpenBot keeps up to ${INPUT_LIMITS.mcpServers} MCP servers.`);
       // Reported here rather than left to the unique index, so the user reads a sentence.
       if (this.nameTaken(normalized.name, existing?.id ?? null))
-        throw new Error(`An MCP server named ${normalized.name} already exists.`);
+        throw new McpServerError(`An MCP server named ${normalized.name} already exists.`);
 
       // A draft carries an empty id, which is not nullish - `??` would store the empty string.
       const stored: McpServerConfig = { ...normalized, id: existing?.id || createMcpServerId() };
@@ -110,7 +121,7 @@ export class McpServerStore {
 
   setEnabled(mcpServerId: string, enabled: boolean, now = new Date().toISOString()): McpServerConfig {
     const current = this.get(mcpServerId);
-    if (!current) throw new Error("This MCP server no longer exists.");
+    if (!current) throw new McpServerError("This MCP server no longer exists.");
     this.database.connection
       .prepare("UPDATE projection_mcp_servers SET enabled = ?, updated_at = ? WHERE mcp_server_id = ?")
       .run(enabled ? 1 : 0, now, mcpServerId);
