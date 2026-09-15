@@ -1940,7 +1940,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         await this.channels.tool(channelId, senderAgentId, params.turnId, params.callId, params.tool, params.arguments),
       );
     }
-    if (params.tool.startsWith("channel_")) throw new Error("Channel tools require an active channel assignment.");
+    if (params.tool.startsWith("channel_")) {
+      return {
+        success: false,
+        contentItems: [
+          {
+            type: "inputText",
+            text: "This chat has no active channel assignment. Channel tools work only inside a channel task. Use openbot.send_message for direct teammate work, or sidebar section tools (list_sections, create_section, assign_agent_section) to group agents.",
+          },
+        ],
+      };
+    }
 
     if (params.tool === "list_sites") {
       return openBotToolResult({ sites: await this.#hostedSites.listSites(), limit: 10 });
