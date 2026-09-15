@@ -1,5 +1,5 @@
 /**
- * The optional OpenCode Zen key.
+ * The optional OpenCode Go key.
  *
  * OpenCode's free models run with no account, so this dialog is an addition and never a gate: it
  * says so first, and it opens from a provider row that is already usable. A saved key is reported
@@ -7,7 +7,6 @@
  * could show a key would carry it into every screenshot and crash report that follows.
  */
 
-import { ProviderLogo } from "@openbot/brand";
 import type {
   AgentProviderId,
   ExternalDestination,
@@ -23,11 +22,9 @@ import {
   AlertTitle,
   Button,
   Dialog,
-  ExternalLink,
   Field,
   Input,
   OctagonX,
-  Text,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 
@@ -42,6 +39,12 @@ export interface ProviderKeyApi {
 export interface OpenCodeKeyDialogProps {
   api: ProviderKeyApi;
   onClose: () => void;
+  /**
+   * Retries the connection without touching credentials. Without it a failed free provider with
+   * no stored key could never retry from here: saving needs a key, removing needs one saved,
+   * and closing answers nothing.
+   */
+  onReconnect?: () => void | Promise<void>;
 }
 
 type DialogPhase = "idle" | "loading" | "saving" | "removing";
@@ -99,12 +102,14 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     }
   }
 
-  function openPage(destination: ExternalDestination): void {
-    props.api.openExternal(destination).catch((cause: unknown) => {
-      setError(errorMessage(cause, "Could not open the page."));
-    });
+  async function reconnect(): Promise<void> {
+    if (!props.onReconnect) return;
+    try {
+      await props.onReconnect();
+    } catch (cause) {
+      setError(errorMessage(cause, "Could not reconnect."));
+    }
   }
-
   return (
     <Dialog.Root
       open={true}
@@ -116,25 +121,26 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
         <Dialog.Overlay class="opencode-key-backdrop">
           <Dialog.Content class="opencode-key-dialog" as="section">
             <header class="opencode-key-header">
-              <ProviderLogo provider="opencode" class="opencode-key-logo" />
-              <Dialog.Title class="opencode-key-title">Sign in to OpenCode Zen</Dialog.Title>
+              <Dialog.Title class="opencode-key-title">Sign in to OpenCode Go</Dialog.Title>
+              {/* One line that is always the dialog's whole message: the default pitch, the saved
+                  fact, or the unreadable warning. A second text block would repeat it. */}
               <Dialog.Description class="opencode-key-description">
-                OpenCode's free models work on this computer with no account. Add a key only to use the paid OpenCode
-                Zen models.
+                <Show
+                  when={stored() === "saved"}
+                  fallback={
+                    <Show
+                      when={stored() === "unreadable"}
+                      fallback={"Free models need no account. A key unlocks the paid Go models."}
+                    >
+                      Saved key is unreadable. Paste it again, or remove it.
+                    </Show>
+                  }
+                >
+                  <span class="opencode-key-status-dot" aria-hidden="true" />
+                  Key saved. Paste a new one to replace it.
+                </Show>
               </Dialog.Description>
             </header>
-
-            <Show when={stored() === "saved"}>
-              <Text class="opencode-key-saved" variant="body-sm" tone="secondary">
-                A key is saved on this computer. Paste a new one to replace it.
-              </Text>
-            </Show>
-            <Show when={stored() === "unreadable"}>
-              <Text class="opencode-key-saved" variant="body-sm" tone="secondary">
-                OpenBot could not read the saved key, so OpenCode uses only the free models. Paste the key again, or
-                remove it.
-              </Text>
-            </Show>
 
             <form
               class="opencode-key-form"
@@ -143,10 +149,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 void save();
               }}
             >
-              <Field
-                label="OpenCode Zen key"
-                description="OpenBot encrypts the key on this computer and passes it only to the OpenCode CLI."
-              >
+              <Field label="OpenCode Go key">
                 <Input
                   type="password"
                   autocomplete="off"
@@ -165,7 +168,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                       <OctagonX />
                     </AlertIcon>
                     <AlertContent>
-                      <AlertTitle>OpenCode Zen</AlertTitle>
+                      <AlertTitle>OpenCode Go</AlertTitle>
                       <AlertDescription>{message()}</AlertDescription>
                     </AlertContent>
                   </Alert>
@@ -173,6 +176,26 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
               </Show>
 
               <footer class="opencode-key-actions">
+                <Button type="button" variant="ghost" disabled={busy()} onClick={props.onClose}>
+                  Cancel
+                </Button>
+                <Show when={props.onReconnect}>
+                  <Button type="button" variant="ghost" disabled={busy()} onClick={() => void reconnect()}>
+                    Reconnect
+                  </Button>
+                </Show>
+                <Show when={stored() !== "missing"}>
+                  <Button
+                    type="button"
+                    variant="destructive-ghost"
+                    loading={phase() === "removing"}
+                    loadingLabel="Removing…"
+                    disabled={busy()}
+                    onClick={() => void remove()}
+                  >
+                    Remove key
+                  </Button>
+                </Show>
                 <Button
                   type="submit"
                   variant="default"
@@ -182,33 +205,8 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 >
                   Save key
                 </Button>
-                <Show when={stored() !== "missing"}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    loading={phase() === "removing"}
-                    loadingLabel="Removing…"
-                    disabled={busy()}
-                    onClick={() => void remove()}
-                  >
-                    Remove key
-                  </Button>
-                </Show>
-                <Button type="button" variant="ghost" disabled={busy()} onClick={props.onClose}>
-                  Cancel
-                </Button>
               </footer>
             </form>
-
-            <div class="opencode-key-links">
-              <Button type="button" variant="outline" size="sm" onClick={() => openPage("opencode-auth")}>
-                <ExternalLink size={13} aria-hidden="true" />
-                Get a key
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => openPage("opencode-install")}>
-                Learn about OpenCode
-              </Button>
-            </div>
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>

@@ -29,10 +29,17 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
   it("commits an automatic memory only after a successful turn and refreshes the next turn context", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", false);
-      clients.set(provider, client);
-      return client;
+    service = new AgentService({
+      store,
+      mailbox,
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -79,10 +86,17 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
   it("discards staged memories after a failed turn and preserves a concurrent manual edit", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", false);
-      clients.set(provider, client);
-      return client;
+    service = new AgentService({
+      store,
+      mailbox,
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));

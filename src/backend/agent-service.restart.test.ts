@@ -33,14 +33,14 @@ afterEach(async () => {
 describe.sequential("AgentService: restart", () => {
   it("notifies other devices when a member reads a reply without clearing another member's unread state", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = new AgentService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider),
-    );
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Reply to this" });
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
@@ -70,14 +70,14 @@ describe.sequential("AgentService: restart", () => {
 
   it("resumes stored threads and does not replay an uncertain running delivery", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Remember this" });
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
     const threadId = (await store.getOrCreate("chief")).threadId;
     await service.stop();
 
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     await service.initialize();
     expect(service.listQueue("chief").deliveries[0]?.status).toBe("interrupted");
     await service.sendMessage({ agentId: "chief", text: "Continue" });
@@ -97,7 +97,7 @@ describe.sequential("AgentService: restart", () => {
 
   it("expires a persisted question prompt after restart", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Start a recoverable turn" });
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
@@ -130,7 +130,7 @@ describe.sequential("AgentService: restart", () => {
     });
     store.database.persistConversation(snapshot, "test.question-prompt-pending");
 
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     await service.initialize();
 
     const recovered = await service.readConversation("chief");
@@ -167,25 +167,32 @@ describe.sequential("AgentService: restart", () => {
     const events: AgentEvent[] = [];
     const createService = () => {
       const restored = stores(root);
-      const next = new AgentService(restored.store, restored.mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-        const client = new FakeAgentClient(provider);
-        client.threadRead = () => {
-          if (failRead) throw new Error("Saved provider history is unavailable. Try again.");
-          return {
-            thread: {
-              id: "old-session",
-              turns: [
-                {
-                  id: "old-turn",
-                  status: "completed",
-                  startedAt: 1785585600,
-                  items: [{ id: "old-reply", type: "agentMessage", text: "Reply saved before the update" }],
-                },
-              ],
-            },
+      const next = new AgentService({
+        store: restored.store,
+        mailbox: restored.mailbox,
+        browser: fakeBrowser(),
+        requestTimeoutMs: 30_000,
+        preferredProvider: "codex",
+        clientFactory: (provider) => {
+          const client = new FakeAgentClient(provider);
+          client.threadRead = () => {
+            if (failRead) throw new Error("Saved provider history is unavailable. Try again.");
+            return {
+              thread: {
+                id: "old-session",
+                turns: [
+                  {
+                    id: "old-turn",
+                    status: "completed",
+                    startedAt: 1785585600,
+                    items: [{ id: "old-reply", type: "agentMessage", text: "Reply saved before the update" }],
+                  },
+                ],
+              },
+            };
           };
-        };
-        return client;
+          return client;
+        },
       });
       next.on("event", (event) => events.push(event));
       return { next, restored };
@@ -250,24 +257,31 @@ describe.sequential("AgentService: restart", () => {
       { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [answer] },
       "test.saved-claude-answer",
     );
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      client.threadRead = () => ({
-        thread: {
-          id: "claude-history",
-          turns: [
-            {
-              id: "saved-turn",
-              status: "completed",
-              items: [
-                { id: "part-1", type: "agentMessage", text: "Before." },
-                { id: "part-2", type: "agentMessage", text: "After." },
-              ],
-            },
-          ],
-        },
-      });
-      return client;
+    service = new AgentService({
+      store,
+      mailbox,
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        client.threadRead = () => ({
+          thread: {
+            id: "claude-history",
+            turns: [
+              {
+                id: "saved-turn",
+                status: "completed",
+                items: [
+                  { id: "part-1", type: "agentMessage", text: "Before." },
+                  { id: "part-2", type: "agentMessage", text: "After." },
+                ],
+              },
+            ],
+          },
+        });
+        return client;
+      },
     });
     await service.initialize();
     await waitFor(() =>
@@ -284,10 +298,17 @@ describe.sequential("AgentService: restart", () => {
     const clients: FakeAgentClient[] = [];
     const { store, mailbox } = stores(root);
     const createService = () =>
-      new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.push(client);
-        return client;
+      new AgentService({
+        store,
+        mailbox,
+        browser: fakeBrowser(),
+        requestTimeoutMs: 30_000,
+        preferredProvider: "codex",
+        clientFactory: (provider) => {
+          const client = new FakeAgentClient(provider);
+          clients.push(client);
+          return client;
+        },
       });
     service = createService();
     await service.initialize();
@@ -315,7 +336,7 @@ describe.sequential("AgentService: restart", () => {
   it("unarchives a stored Codex thread and resumes the queued delivery", async () => {
     process.env.OPENBOT_FAKE_ARCHIVED_THREAD = "1";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -325,7 +346,7 @@ describe.sequential("AgentService: restart", () => {
     const externalThreadId = store.activeProviderSession("chief")?.externalSessionId;
     await service.stop();
 
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     service.on("event", (event) => events.push(event));
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Continue" });
@@ -357,7 +378,7 @@ describe.sequential("AgentService: restart", () => {
 
   it("deletes idle agents and refuses to orphan active work", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     await service.initialize();
 
     const deletedAgent = await store.getOrCreate("sales-outbound");
@@ -410,7 +431,7 @@ describe.sequential("AgentService: restart", () => {
 
   it("keeps an agent available for retry when mailbox deletion fails", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
     await service.initialize();
     const agent = await store.getOrCreate("delete-retry");
     const events: AgentEvent[] = [];
@@ -428,15 +449,15 @@ describe.sequential("AgentService: restart", () => {
 
   it("holds due routines and rejects messages during deletion, then resumes after failure", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = new AgentService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
       // Keep the resumed turn running until the test can observe it.
-      (provider) => new FakeAgentClient(provider, "", false),
-    );
+      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+    });
     await service.initialize();
     const agent = await store.getOrCreate("delete-routine");
     vi.useFakeTimers({ now: new Date("2026-08-25T11:00:00.000Z") });
@@ -491,10 +512,17 @@ describe.sequential("AgentService: restart", () => {
   it("queues independent manual routine runs and renders routine metadata", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = new AgentService({
+      store,
+      mailbox,
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
@@ -607,14 +635,14 @@ describe.sequential("AgentService: restart", () => {
 
   it("queues only the last missed run after sleep and does not duplicate it after restart", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = new AgentService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider),
-    );
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
     vi.useFakeTimers({ now: new Date("2026-08-25T11:07:00.000Z") });
@@ -641,14 +669,14 @@ describe.sequential("AgentService: restart", () => {
     expect(service.listRoutines(agent.id)[0]?.trigger.nextRunAt).toBe("2026-08-25T11:15:00.000Z");
 
     await service.stop();
-    service = new AgentService(
+    service = new AgentService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider),
-    );
+      browser: fakeBrowser(),
+      requestTimeoutMs: 30_000,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
     await service.initialize();
 
     expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toHaveLength(1);

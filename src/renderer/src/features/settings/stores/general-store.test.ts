@@ -1,4 +1,9 @@
-import type { AgentProviderStatus, AgentStatus, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderStatus,
+  AgentStatus,
+  ProviderApiKeyStatus,
+  ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { createSettingsGeneralStore } from "./general-store";
@@ -57,5 +62,30 @@ describe("settings general store", () => {
     );
 
     expect(option.runtimeStatus?.phase).toBe("not-downloaded");
+  });
+
+  it("carries the OpenCode key status to the row, and only there", () => {
+    function optionWith(keyStatus: ProviderApiKeyStatus | undefined) {
+      return createRoot((dispose) => {
+        const store = createSettingsGeneralStore({
+          agentStatus: statusWith({ id: "opencode", state: "available", version: "1.18.30", message: null }),
+          providerRuntimeStatuses: { opencode: notDownloaded },
+          openCodeKeyStatus: () => keyStatus,
+        });
+        const option = store.providerOptions().find((candidate) => candidate.id === "opencode");
+        dispose();
+        if (!option) throw new Error("Expected an OpenCode row.");
+        return { option, options: store.providerOptions() };
+      });
+    }
+
+    // Unknown until the first read: no badge rather than a wrong one.
+    expect(optionWith(undefined).option.keyStatus).toBeUndefined();
+    expect(optionWith("saved").option.keyStatus).toBe("saved");
+    expect(
+      optionWith("saved").options.every(
+        (candidate) => candidate.id === "opencode" || candidate.keyStatus === undefined,
+      ),
+    ).toBe(true);
   });
 });

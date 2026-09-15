@@ -99,7 +99,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     onboardingDescription: "Free models, no account needed",
     // Only reached when a spawn lists no model at all, which is not the keyless free tier: that
     // one works with no credential. So this asks for the optional key instead of a terminal login.
-    signInMessage: "OpenCode listed no model. Add an OpenCode Zen key to continue.",
+    signInMessage: "OpenCode listed no model. Add an OpenCode Go key to continue.",
     installGuideLink: null,
     defaultModel: "",
     legacyModelPrefix: null,
@@ -153,7 +153,7 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
  * Whether an OpenCode model's display name marks it as one the free tier covers.
  *
  * OpenCode states the price in the name and nowhere else: `model/list` carries no price field, and
- * neither OpenCode Zen endpoint authenticates, so this trailing word is the only thing that
+ * neither OpenCode endpoint authenticates, so this trailing word is the only thing that
  * separates a model any user can run from one that bills. The picker labels a model with it and the
  * catalog order picks the default from it, and those two have to agree -- a "Free" badge on a model
  * OpenBot would never default to, or a default that quietly bills, is the same bug twice.
@@ -163,4 +163,19 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
  */
 export function isFreeOpencodeModelName(name: string): boolean {
   return /\bfree$/i.test(name.trim());
+}
+
+/**
+ * Free OpenCode models whose ids carry no Free marker.
+ *
+ * Keyless `opencode models` lists exactly these plus the `*-free` family -- re-run it with a clean
+ * home directory if the free tier changes shape. Explicit on purpose: a stale entry hides a free
+ * model, while guessing billed models as free bills the user. Every free decision -- the picker
+ * badge, the catalog order, the stored-key drop -- goes through `isFreeOpencodeModel`, so the
+ * three cannot disagree about what costs money.
+ */
+const FREE_TIER_MODEL_IDS = new Set(["opencode/big-pickle"]);
+
+export function isFreeOpencodeModel(id: string, name: string): boolean {
+  return FREE_TIER_MODEL_IDS.has(id.trim().toLowerCase()) || isFreeOpencodeModelName(name);
 }

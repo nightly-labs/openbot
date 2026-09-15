@@ -658,7 +658,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const message =
         this.provider === "opencode" &&
         /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
-          ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Zen key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
+          ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
           : detail;
       this.emit("notification", {
         method: "error",

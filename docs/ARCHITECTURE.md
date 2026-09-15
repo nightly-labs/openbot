@@ -707,7 +707,7 @@ login and billing hooks. The OpenCode driver starts `opencode acp` on the runtim
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
 OpenCode has no login step OpenBot can drive, because the account is one environment variable: a
-spawn without `OPENCODE_API_KEY` lists the free OpenCode Zen models, and a spawn with one lists the
+spawn without `OPENCODE_API_KEY` lists the free OpenCode Go models, and a spawn with one lists the
 paid catalog. So `AcpAgentClient` derives `#signedIn` from the models `session/new` returns, not
 from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptions.extraEnv` is read
 at every spawn, which is what lets a key saved in Settings reach the next process with no other
@@ -722,10 +722,10 @@ the provider's serialized connection command. It refuses a provider that is runn
 deliveries while it writes, and reports success only after a new process runs with the new key.
 
 That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
-catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and a Zen key
-does not buy Go. So `CREDENTIAL_ONLY_MODEL_PREFIXES` in `src/backend/agent/provider-runtime.ts`
-drops the `opencode-go/` models from `#refreshModelCatalog` while OpenBot is the one supplying the
-key; with no key stored those models can only come from the user's own OpenCode sign-in, which does
+catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot
+supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-runtime.ts`
+drops the paid Zen models from `#refreshModelCatalog` while OpenBot is the one supplying the key;
+with no key stored those models can only come from the user's own OpenCode sign-in, which does
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.
 
@@ -736,7 +736,7 @@ OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first
 the rest, then OpenCode's own paid models, then everything behind a separate sign-in. The sort is
 stable, so the CLI's order survives inside one tier.
 
-Free means a display name ending in "Free": `model/list` carries no price and neither Zen endpoint
+Free means a display name ending in "Free": `model/list` carries no price and neither Go endpoint
 authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
 `packages/contracts/src/agent-providers.ts` is shared with the picker badge in
 `src/renderer/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
