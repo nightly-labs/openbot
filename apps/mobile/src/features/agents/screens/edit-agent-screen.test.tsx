@@ -29,6 +29,7 @@ import { ChatHeader } from "../../chat/components/chat-header";
 import { saveAgentRecord } from "../../workspace/model/save-agent-record";
 import type { MobileAgent, MobileServer } from "../../workspace/model/workspace-types";
 import { useAgentContextMenu } from "../components/agent-context-menu";
+import { AgentPhoto } from "../components/agent-photo";
 import { AddAgentScreen } from "./add-agent-screen";
 import { EditAgentScreen } from "./edit-agent-screen";
 import { HiddenChatsScreen } from "./hidden-chats-screen";
@@ -36,8 +37,25 @@ import { HiddenChatsScreen } from "./hidden-chats-screen";
 vi.mock("expo-crypto", () => ({ randomUUID: () => mocks.uuid() }));
 
 vi.mock("expo-secure-store", () => ({}));
+vi.mock("expo-image", () => ({
+  Image: ({ source }: { source: { uri: string } }) => <img alt="Agent avatar" src={source.uri} />,
+}));
+vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: (...args: unknown[]) => mocks.choosePhoto(...args) }));
+vi.mock("expo-file-system", () => ({
+  File: class {
+    name = "photo.png";
+    type = "image/png";
+    get size() {
+      return mocks.fileSize;
+    }
+    bytes = async () => new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    base64 = async () => "iVBORw0KGgo=";
+  },
+}));
 
 const mocks = vi.hoisted(() => ({
+  choosePhoto: vi.fn(),
+  fileSize: 8,
   uuid: vi.fn(() => "new-agent-seed"),
   push: vi.fn(),
   replace: vi.fn(),
@@ -129,6 +147,19 @@ const workspace = {
   updateAgent: vi.fn(async (input: UpdateAgentInput, _serverId?: string) => {
     workspace.agents = [{ ...workspace.agents[0], ...input }];
   }),
+  loadAgentAvatar: vi.fn(async (_id: string, _url: string, _serverId: string) => "data:image/png;base64,iVBORw0KGgo="),
+  setAgentAvatar: vi.fn(
+    async (
+      _id: string,
+      image: import("@openbot/team-client/remote-peer").RemoteFileUpload | null,
+      _serverId: string,
+    ) => {
+      workspace.agents = workspace.agents.map((agent) => ({
+        ...agent,
+        avatarUrl: image ? "openbot-avatar://agent-one?v=new" : null,
+      }));
+    },
+  ),
   saveAgentMemory: vi.fn(async () => {}),
   deleteAgentMemory: vi.fn(async () => {}),
   createAgentRoutine: vi.fn(async () => {}),
@@ -434,6 +465,12 @@ async function edit(name: string, value: string) {
   await act(() => fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } }));
 }
 beforeEach(() => {
+  mocks.choosePhoto
+    .mockReset()
+    .mockResolvedValue({ canceled: false, assets: [{ uri: "file:///photo.png", mimeType: "image/png" }] });
+  mocks.fileSize = 8;
+  workspace.setAgentAvatar.mockClear();
+  workspace.loadAgentAvatar.mockClear();
   mocks.uuid.mockReset().mockReturnValue("new-agent-seed");
   useHapticsPreference.setState({ enabled: true, ready: true });
   workspace.agents = [{ ...original }];
@@ -1386,3 +1423,79 @@ vi.mock("@/features/chat/components/streaming-tail-text", () => ({
   StreamingBlock: ({ children }: PropsWithChildren) => <>{children}</>,
   StreamingTailText: ({ body }: { body: string }) => <span>{body}</span>,
 }));
+
+it("keeps a selected avatar draft after a failed upload and retries on its original host", async () => {
+  await renderSheet("appearance");
+  await click("Add photo");
+  expect(mocks.blocked).toBe(true);
+  expect(workspace.setAgentAvatar).not.toHaveBeenCalled();
+  workspace.activeServer = { ...host, id: "host-two" };
+  workspace.setAgentAvatar.mockRejectedValueOnce(new Error("Upload failed"));
+  await click("Save changes");
+  expect(screen.getByText("Upload failed")).toBeTruthy();
+  await click("Save changes");
+  expect(workspace.setAgentAvatar).toHaveBeenLastCalledWith(
+    original.id,
+    expect.objectContaining({ mimeType: "image/png", base64: "iVBORw0KGgo=" }),
+    host.id,
+  );
+  expect(workspace.updateAgent).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+});
+
+it("removes the desktop photo only after Save", async () => {
+  workspace.agents = [{ ...original, avatarUrl: "openbot-avatar://agent-one?v=desktop" }];
+  await renderSheet("appearance");
+  await click("Remove photo");
+  expect(workspace.setAgentAvatar).not.toHaveBeenCalled();
+  await click("Save changes");
+  expect(workspace.setAgentAvatar).toHaveBeenCalledWith(original.id, null, host.id);
+  await renderSheet("appearance");
+  expect(screen.getByRole("button", { name: "Add photo" })).toBeTruthy();
+});
+
+it("keeps the form unchanged when photo selection is canceled or the file is too large", async () => {
+  await renderSheet("appearance");
+  mocks.choosePhoto.mockResolvedValueOnce({ canceled: true });
+  await click("Add photo");
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  mocks.fileSize = 600_000;
+  await click("Add photo");
+  expect(screen.getByText("Choose a photo smaller than 512 KB.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  expect(workspace.setAgentAvatar).not.toHaveBeenCalled();
+});
+
+it("loads desktop avatar revisions from the correct host and returns to the generated face after removal", async () => {
+  workspace.agents = [{ ...original, avatarUrl: "openbot-avatar://agent-one?v=desktop" }];
+  const renderPhoto = () =>
+    act(() =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <AgentPhoto agentId={original.id} serverId={host.id} size={48}>
+            <span>Generated face</span>
+          </AgentPhoto>
+        </QueryClientProvider>,
+      ),
+    );
+  await renderPhoto();
+  await waitFor(() => expect(screen.getByRole("img", { name: "Agent avatar" })).toBeTruthy());
+  expect(workspace.loadAgentAvatar).toHaveBeenLastCalledWith(
+    original.id,
+    "openbot-avatar://agent-one?v=desktop",
+    host.id,
+  );
+  workspace.agents = [{ ...original, avatarUrl: "openbot-avatar://agent-one?v=replaced" }];
+  await renderPhoto();
+  await waitFor(() =>
+    expect(workspace.loadAgentAvatar).toHaveBeenLastCalledWith(
+      original.id,
+      "openbot-avatar://agent-one?v=replaced",
+      host.id,
+    ),
+  );
+  workspace.agents = [{ ...original, avatarUrl: null }];
+  await renderPhoto();
+  expect(screen.queryByRole("img", { name: "Agent avatar" })).toBeNull();
+  expect(screen.getByText("Generated face")).toBeTruthy();
+});

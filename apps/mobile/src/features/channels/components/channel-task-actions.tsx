@@ -58,6 +58,8 @@ function TaskActionCard({
         <View className="flex-row items-center gap-2">
           {task.ownerAgentId ? (
             <BloubAvatarThumbnail
+              agentId={agent?.id}
+              serverId={agent?.serverId}
               seed={agent?.avatarSeed ?? task.ownerAgentId}
               hue={agent?.avatarHue ?? null}
               size={24}

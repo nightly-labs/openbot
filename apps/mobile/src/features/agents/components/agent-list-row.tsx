@@ -110,7 +110,14 @@ export function AgentListRow({
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const avatar = (
     <AgentPinAvatar agentId={agent.id} location={avatarLocation} size={54}>
-      <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={54} animateIdle={false} />
+      <BloubAvatar
+        agentId={agent.id}
+        serverId={agent.serverId}
+        hue={agent.avatarHue}
+        seed={agent.avatarSeed}
+        size={54}
+        animateIdle={false}
+      />
     </AgentPinAvatar>
   );
 

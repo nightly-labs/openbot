@@ -106,7 +106,13 @@ export function ChatHeader({
             ) : (
               <Link.AppleZoomTarget>
                 <AgentPinAvatar agentId={target.id} location="chat" size={28}>
-                  <BloubAvatar agentId={target.id} hue={target.avatarHue} seed={target.avatarSeed} size={28} />
+                  <BloubAvatar
+                    agentId={target.id}
+                    serverId={target.serverId}
+                    hue={target.avatarHue}
+                    seed={target.avatarSeed}
+                    size={28}
+                  />
                 </AgentPinAvatar>
               </Link.AppleZoomTarget>
             )}

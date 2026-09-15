@@ -72,6 +72,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
               <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
                 <BloubAvatar
                   agentId={agent.id}
+                  serverId={agent.serverId}
                   hue={agent.avatarHue}
                   seed={agent.avatarSeed}
                   size={64}

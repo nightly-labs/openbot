@@ -23,6 +23,7 @@ const EMPTY_DRAFT: ChannelDraft = { name: "", title: "", instructions: "", membe
 const MemberChoice = memo(function MemberChoice({
   id,
   name,
+  serverId,
   avatarSeed,
   avatarHue,
   selected,
@@ -31,6 +32,7 @@ const MemberChoice = memo(function MemberChoice({
 }: {
   id: string;
   name: string;
+  serverId: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
   selected: boolean;
@@ -46,7 +48,7 @@ const MemberChoice = memo(function MemberChoice({
       onPress={() => onToggle(id)}
       className="min-h-12 flex-row items-center gap-3 px-4 py-3"
     >
-      <BloubAvatarThumbnail seed={avatarSeed} hue={avatarHue} size={32} />
+      <BloubAvatarThumbnail agentId={id} serverId={serverId} seed={avatarSeed} hue={avatarHue} size={32} />
       <Typography.Paragraph className="flex-1">{name}</Typography.Paragraph>
       <Typography>{selected ? "✓" : ""}</Typography>
     </Pressable>
@@ -241,6 +243,7 @@ function ChannelForm({
             key={agent.id}
             id={agent.id}
             name={agent.name}
+            serverId={agent.serverId}
             avatarSeed={agent.avatarSeed}
             avatarHue={agent.avatarHue}
             selected={selectedIds.has(agent.id)}
