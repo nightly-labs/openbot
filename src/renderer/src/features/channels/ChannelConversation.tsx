@@ -444,7 +444,12 @@ export function ChannelConversation() {
                   disabled={page().channel.archived}
                 >
                   <ChannelAvatar members={page().channel.members} agents={agentList()} />
-                  <h1>{page().channel.name}</h1>
+                  <span class="channel-header-copy">
+                    <h1>{page().channel.name}</h1>
+                    <Show when={page().channel.title.trim()}>
+                      {(title) => <span class="channel-header-title">{title()}</span>}
+                    </Show>
+                  </span>
                 </Button>
               </div>
             </header>

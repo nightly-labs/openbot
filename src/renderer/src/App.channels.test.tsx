@@ -69,6 +69,47 @@ it("restores the selected channel after restart and clears it when returning to 
   view.unmount();
 });
 
+it("shows the channel title in the header and sidebar and refreshes it after editing", async () => {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create-titled",
+    channelId: "channel-titled",
+    draft: {
+      name: "Launch room",
+      title: "Ship OpenBot 1.0",
+      instructions: "Ship the launch",
+      members: [{ agentId: "chief" }],
+      leadAgentId: "chief",
+    },
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+
+  const row = await screen.findByRole("button", { name: "Launch room, Ship OpenBot 1.0. No messages yet" });
+  expect(within(row).getByText("Ship OpenBot 1.0")).toBeVisible();
+  await fireEvent.click(row);
+
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  const settings = await within(chat).findByRole("button", { name: "Channel settings" });
+  expect(within(settings).getByText("Ship OpenBot 1.0")).toBeVisible();
+
+  await fireEvent.click(settings);
+  const title = await within(chat).findByRole("textbox", { name: "Channel title" });
+  await fireEvent.input(title, { target: { value: "Weekly sync" } });
+  await fireEvent.blur(title);
+
+  await waitFor(() => {
+    expect(
+      within(within(chat).getByRole("button", { name: "Channel settings" })).getByText("Weekly sync"),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("button", { name: "Launch room, Weekly sync. No messages yet" })).getByText(
+        "Weekly sync",
+      ),
+    ).toBeVisible();
+  });
+});
+
 it("shows the lead's routing choice as activity, not as a message from the lead", async () => {
   await window.openbot.agent.channelCommand({
     type: "save",
