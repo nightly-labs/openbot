@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -110,6 +110,7 @@
     "mobile:doctor": "bun run --cwd apps/mobile doctor",
     "dev:seed": "tsx scripts/seed-dev-state.ts",
     "dev:automation": "bun scripts/dev-automation/cli.ts",
+    "dev:cpu": "bun scripts/dev-automation/cli.ts cpu",
     "dev:status": "bun scripts/dev-stack.ts status",
     "dev:verify": "bun scripts/dev-verify.ts",
     "dev:stop": "bun scripts/dev-stack.ts stop",

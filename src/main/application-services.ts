@@ -439,6 +439,9 @@ export async function createApplicationServices({
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
       customProviders: () => customProviders.configs(),
+      // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
+      // into the object being constructed; nothing calls it before the constructor returns.
+      mcpServers: () => service.enabledMcpServers(),
     },
     () => localSkillTools(skills),
   );
@@ -506,6 +509,8 @@ export async function createApplicationServices({
     browser,
     chat: teamChatStore,
     channels: service.channels,
+    // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
+    mcpServers: service,
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),

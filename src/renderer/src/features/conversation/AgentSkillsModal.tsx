@@ -562,6 +562,9 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                               }
                                             : undefined
                                         }
+                                        // The conditions on `onTry` above, in the same order: a
+                                        // save in flight reads as an unavailable composer without
+                                        // this, which names the wrong cause.
                                         unavailableReason={
                                           !mutable()
                                             ? "Remote skills are read-only."
@@ -569,7 +572,9 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                               ? "Repair this skill to try it."
                                               : skill().installedVersion !== current().version
                                                 ? "Update this skill to try this version."
-                                                : "The agent composer is unavailable."
+                                                : savingId() === skill().skillId
+                                                  ? "Wait for this skill to finish saving, then try it."
+                                                  : "The agent composer is unavailable."
                                         }
                                       />
                                     )}

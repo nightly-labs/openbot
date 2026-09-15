@@ -191,6 +191,46 @@ export class ChannelStore {
     );
   }
 
+  /**
+   * The assignment that reserves the host right now, with the channel it belongs to.
+   *
+   * `hasAssignmentInState` answers the drain question with a yes or a no; the queue the user reads
+   * has to name the cause as well. The same reason keeps this to one query: reaching a channel
+   * through `list` parses every stored message of every channel. States are tried in the order
+   * given, so a running assignment is reported before one that is only queued.
+   *
+   * `preferredAgentId` is the agent whose queue asks. Two agents can hold assignments at the same
+   * time when neither task reserves the host, and the work of that agent itself is the answer its
+   * own chat needs: it is working, not waiting for somebody else.
+   */
+  reservingAssignment(
+    states: readonly ChannelAssignment["state"][],
+    preferredAgentId?: string,
+  ): { assignment: ChannelAssignment; channel: Channel } | null {
+    if (!states.length) return null;
+    const placeholders = states.map(() => "?").join(", ");
+    const ranking = states.map((_, index) => `WHEN ? THEN ${index}`).join(" ");
+    const row = databaseRow(
+      this.database.connection
+        .prepare(
+          `SELECT assignments.assignment_json AS assignment_json, channels.channel_json AS channel_json
+             FROM projection_channel_assignments AS assignments
+             JOIN projection_channels AS channels ON channels.channel_id = assignments.channel_id
+            WHERE json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
+            ORDER BY CASE WHEN json_extract(assignments.assignment_json, '$.agentId') = ? THEN 0 ELSE 1 END,
+                     CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
+                     assignments.rowid
+            LIMIT 1`,
+        )
+        .get(...states, preferredAgentId ?? "", ...states),
+    );
+    if (!row) return null;
+    return {
+      assignment: decodeAssignment(JSON.parse(requiredStringColumn(row, "assignment_json"))),
+      channel: decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json"))),
+    };
+  }
+
   assignmentForDelivery(deliveryId: string): ChannelAssignment | null {
     const row = databaseRow(
       this.database.connection

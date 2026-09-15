@@ -9,6 +9,7 @@ import {
   channelRoutingConversationEvent,
   channelRoutingConversationEventItemType,
   decodeChannel,
+  decodeMcpServerConfigs,
   hostedSiteConversationEvent,
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
@@ -28,6 +29,8 @@ import {
   isDynamicIslandAction,
   isFilePreviewKind,
   isHostedSiteConversationEventUrl,
+  isMcpServerConfig,
+  isMcpTestResult,
   isMessageReaction,
   isQueuedMessageReceipt,
   isQueueSnapshot,
@@ -940,5 +943,48 @@ describe("renderer-to-main boundary guards", () => {
     expect(isCustomProviderResult({ providers: [{ ...summary, apiKey: "sk-live" }], restart: "restarted" })).toBe(
       false,
     );
+  });
+});
+
+describe("MCP server contracts", () => {
+  const config = {
+    id: "mcp-1",
+    name: "Filesystem",
+    transport: "stdio",
+    enabled: true,
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem"],
+    env: [{ key: "TOKEN", value: "secret" }],
+    envPassthrough: ["HOME"],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  };
+
+  it("accepts a configuration and a test result", () => {
+    expect(isMcpServerConfig(config)).toBe(true);
+    expect(isMcpTestResult({ toolCount: 4, error: null })).toBe(true);
+    expect(isMcpTestResult({ toolCount: 0, error: "Command not found: npx" })).toBe(true);
+  });
+
+  it("rejects an over-long name, an unknown transport and a non-string env value", () => {
+    expect(isMcpServerConfig({ ...config, name: "n".repeat(INPUT_LIMITS.mcpServerName + 1) })).toBe(false);
+    expect(isMcpServerConfig({ ...config, transport: "websocket" })).toBe(false);
+    expect(isMcpServerConfig({ ...config, env: [{ key: "TOKEN", value: 7 }] })).toBe(false);
+    expect(isMcpServerConfig({ ...config, args: "npx" })).toBe(false);
+  });
+
+  it("rejects a negative tool count and a missing error field on a test result", () => {
+    expect(isMcpTestResult({ toolCount: -1, error: null })).toBe(false);
+    expect(isMcpTestResult({ toolCount: 1 })).toBe(false);
+  });
+
+  // The list decoder is what a remote host's reply goes through, so it has to fail closed rather
+  // than hand a malformed row on to the panel.
+  it("decodes a list and throws on anything else", () => {
+    expect(decodeMcpServerConfigs([config])).toHaveLength(1);
+    expect(() => decodeMcpServerConfigs(config)).toThrow();
+    expect(() => decodeMcpServerConfigs([{ ...config, transport: "websocket" }])).toThrow();
+    expect(() => decodeMcpServerConfigs(new Array(INPUT_LIMITS.mcpServers + 1).fill(config))).toThrow();
   });
 });

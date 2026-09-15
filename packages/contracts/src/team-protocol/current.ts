@@ -1,4 +1,5 @@
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
+import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
@@ -7,7 +8,7 @@ export const TEAM_CONVERSATION_UNREAD_CAPABILITY = "conversation-unread";
 export const TEAM_MODEL_SCOPED_USAGE_CAPABILITY = "model-scoped-usage";
 export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
-export { CHANNEL_DELETE_CAPABILITY };
+export { CHANNEL_DELETE_CAPABILITY, MCP_SERVERS_CAPABILITY };
 
 export const TEAM_CURRENT_CAPABILITIES = [
   ...TEAM_PROTOCOL_V4_CAPABILITIES,
@@ -22,6 +23,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   "channel-chats-v1",
   CHANNEL_DELETE_CAPABILITY,
+  MCP_SERVERS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

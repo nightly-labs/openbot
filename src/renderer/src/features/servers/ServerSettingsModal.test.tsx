@@ -1,4 +1,10 @@
-import type { HostStatus, ServerSummary, TeamInviteSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
+import type {
+  HostStatus,
+  McpServerConfig,
+  ServerSummary,
+  TeamInviteSummary,
+  TeamPresenceMember,
+} from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -83,6 +89,20 @@ const members: TeamPresenceMember[] = [
   },
 ];
 
+const mcpServer: McpServerConfig = {
+  id: "mcp-1",
+  name: "Filesystem",
+  transport: "stdio",
+  enabled: true,
+  command: "npx",
+  args: [],
+  env: [],
+  envPassthrough: [],
+  workingDirectory: "",
+  url: "",
+  headers: [],
+};
+
 function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSettingsModalProps {
   return {
     open: true,
@@ -160,6 +180,128 @@ describe("ServerSettingsModal", () => {
       expect(screen.getByText(message)).toBeInTheDocument();
     },
   );
+
+  // `mcpServers` gates the tab and the panel together, so the prop is the whole feature gate: a
+  // member of a remote server is never handed one and never sees a tab that would answer 403.
+  it("shows the MCP tab only when a caller supplies the list", async () => {
+    render(() => <ServerSettingsModal {...props()} />);
+    expect(screen.queryByRole("tab", { name: "MCP" })).not.toBeInTheDocument();
+  });
+
+  // The list is read when the section opens, not when the dialog does, because most visits to this
+  // dialog never reach it.
+  it("asks for the MCP list when the section is opened", async () => {
+    const onMcpSectionShown = vi.fn();
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          mcpServers: [mcpServer],
+          onMcpSectionShown,
+        })}
+      />
+    ));
+    expect(onMcpSectionShown).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await waitFor(() => expect(onMcpSectionShown).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Filesystem")).toBeInTheDocument();
+
+    // Leaving and coming back reads the list again; staying in the section does not.
+    await fireEvent.click(screen.getByRole("tab", { name: "General" }));
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await waitFor(() => expect(onMcpSectionShown).toHaveBeenCalledTimes(2));
+  });
+
+  // MCP servers belong to this machine and are started by the agents on it, so they are manageable
+  // before the user publishes a Team API host at all - unlike members, invites and the identity.
+  it("manages MCP servers on a local server with no host configured", async () => {
+    render(() => <ServerSettingsModal {...props({ hostStatus: unconfiguredHost, mcpServers: [] })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    expect(await screen.findByRole("button", { name: "Connect a custom MCP" })).toBeEnabled();
+  });
+
+  // "No MCP servers yet." says the server holds none. A failed read holds no such statement, and
+  // the user needs a way out of it that is not closing the dialog.
+  it("explains a failed MCP list read and offers a retry", async () => {
+    const onRetryMcpServers = vi.fn();
+    render(() => (
+      <ServerSettingsModal
+        {...props({ mcpServers: [], mcpLoadError: "The host is not reachable.", onRetryMcpServers })}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    expect(await screen.findByText("The host is not reachable.")).toBeInTheDocument();
+    expect(screen.queryByText("No MCP servers yet.")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetryMcpServers).toHaveBeenCalledTimes(1);
+  });
+
+  // The same rule on a row: the answer names the endpoint that row held, so a saved edit - or a slow
+  // answer that lands after one - must not read as a working connection for the new one.
+  it("drops an MCP row's test result when that server changes", async () => {
+    const onTestMcpServer = vi.fn(async () => ({ toolCount: 3, error: null }));
+    const [servers, setServers] = createSignal<McpServerConfig[]>([mcpServer]);
+    render(() => <ServerSettingsModal {...props({ mcpServers: servers(), onTestMcpServer })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    const trigger = await screen.findByRole("button", { name: "Actions for Filesystem" });
+    await fireEvent.pointerDown(trigger, { button: 0 });
+    await fireEvent.pointerUp(trigger, { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Test connection" }), { button: 0 });
+    expect(await screen.findByText("Connected · 3 tools")).toBeInTheDocument();
+
+    // Turning the server off keeps the answer: the switch decides who is given the server, not what
+    // the connection is.
+    setServers([{ ...mcpServer, enabled: false }]);
+    expect(screen.getByText("Connected · 3 tools")).toBeInTheDocument();
+
+    setServers([{ ...mcpServer, command: "/bin/other" }]);
+    await waitFor(() => expect(screen.queryByText("Connected · 3 tools")).not.toBeInTheDocument());
+    expect(onTestMcpServer).toHaveBeenCalledTimes(1);
+  });
+
+  // A test answers for the settings it was given. Left on screen after an edit it would report a
+  // working connection for a command nobody tried.
+  it("drops the MCP test result when the draft changes", async () => {
+    const onTestMcpServer = vi.fn(async () => ({ toolCount: 3, error: null }));
+    render(() => <ServerSettingsModal {...props({ mcpServers: [], onTestMcpServer })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Connect a custom MCP" }));
+    await fireEvent.input(screen.getByPlaceholderText("MCP server name"), { target: { value: "Filesystem" } });
+    await fireEvent.input(screen.getByPlaceholderText("openai-dev-mcp"), { target: { value: "/bin/echo" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(await screen.findByText("Connected · 3 tools")).toBeInTheDocument();
+
+    await fireEvent.input(screen.getByPlaceholderText("openai-dev-mcp"), { target: { value: "/bin/other" } });
+    await waitFor(() => expect(screen.queryByText("Connected · 3 tools")).not.toBeInTheDocument());
+    expect(screen.getByText("Not tested yet.")).toBeInTheDocument();
+    expect(onTestMcpServer).toHaveBeenCalledTimes(1);
+  });
+
+  // The gate can close under an open form: a remote host that answers without the capability, or a
+  // role that loses it. The dialog keeps the breadcrumb and the save bar, so the panel has to take
+  // them back with it.
+  it("drops the MCP form's breadcrumb when the panel is no longer shown", async () => {
+    const [servers, setServers] = createSignal<McpServerConfig[] | undefined>([]);
+    render(() => <ServerSettingsModal {...props({ mcpServers: servers() })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Connect a custom MCP" }));
+    expect(await screen.findByText("Connect to a custom MCP")).toBeInTheDocument();
+
+    setServers(undefined);
+    await waitFor(() => expect(screen.queryByRole("tab", { name: "MCP" })).not.toBeInTheDocument());
+
+    // The gate opens again on the next read, and the panel it builds starts on the list.
+    setServers([]);
+    await fireEvent.click(await screen.findByRole("tab", { name: "MCP" }));
+    expect(await screen.findByRole("button", { name: "Connect a custom MCP" })).toBeInTheDocument();
+    expect(screen.queryByText("Connect to a custom MCP")).not.toBeInTheDocument();
+  });
 
   it("saves the first local identity without publishing it", async () => {
     const onSaveIdentity = vi.fn(async () => undefined);
@@ -249,7 +391,8 @@ describe("ServerSettingsModal", () => {
 
     await fireEvent.input(name, { target: { value: "" } });
     expect(screen.queryByText("Enter at least 6 characters.")).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
+    // The bar shrinks back into the bottom edge before it leaves, so this waits for the close.
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument());
     expect(name).not.toHaveAttribute("aria-invalid");
 
     await fireEvent.input(name, { target: { value: "Tiny" } });

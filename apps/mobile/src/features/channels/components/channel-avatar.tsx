@@ -41,6 +41,8 @@ export const ChannelAvatar = memo(function ChannelAvatar({
         return (
           <BloubAvatarThumbnail
             key={member.agentId}
+            agentId={agent?.id}
+            serverId={agent?.serverId}
             disconnected={disconnected}
             seed={agent?.avatarSeed ?? member.agentId}
             hue={agent?.avatarHue ?? null}

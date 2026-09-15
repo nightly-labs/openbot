@@ -28,6 +28,7 @@ import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
+import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
@@ -326,6 +327,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
+    ...mcpServerIpcHandlers({ service, remoteServers }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers }),

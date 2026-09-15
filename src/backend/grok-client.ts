@@ -2,13 +2,21 @@ import type { ClientSideConnection, InitializeResponse } from "@agentclientproto
 import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { AcpAgentClient } from "./acp-client";
 import type { GrokCliInfo } from "./cli";
+import type { McpServerSource } from "./mcp-provider-shapes";
 import { type AccountRateLimitsReadResult, getRecord, getString } from "./protocol";
 
 export class GrokAgentClient extends AcpAgentClient {
-  constructor(cli: GrokCliInfo, requestTimeoutMs = 30_000, profileGeneration = false) {
+  constructor(
+    cli: GrokCliInfo,
+    requestTimeoutMs = 30_000,
+    profileGeneration = false,
+    mcpServers: McpServerSource = () => [],
+  ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
       profileGeneration,
+      // A profile-generation client asks one question and must not act, so it is given none.
+      mcpServers: profileGeneration ? () => [] : mcpServers,
       argv: [
         "--no-auto-update",
         ...(profileGeneration ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),

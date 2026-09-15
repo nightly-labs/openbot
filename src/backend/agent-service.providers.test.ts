@@ -25,12 +25,22 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+import { loginShellPath } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 let root: string;
 let logPath: string;
 let service: AgentService | null = null;
+
+/**
+ * What a stdio MCP server is launched with: this user's own `PATH`, then the configuration's pairs.
+ * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
+ */
+async function launchEnvironment(pairs: Record<string, string> = {}): Promise<Record<string, string>> {
+  const path = await loginShellPath();
+  return { ...(path ? { PATH: path } : {}), ...pairs };
+}
 
 beforeEach(async () => {
   ({ root, logPath } = await startAgentTestFixture());
@@ -294,6 +304,380 @@ describe.sequential("AgentService: providers", () => {
     expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
   });
 
+  it("gives Codex its MCP servers and replaces the session when the set changes", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    const startService = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    expect(paramsRecord(client.requests.find((request) => request.method === "thread/start")?.params)?.config).toBe(
+      undefined,
+    );
+
+    // Codex ignores the configuration on resume, so a new MCP server has to force a new session.
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [{ key: "TOKEN", value: "secret" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    await service.stop();
+    service = await startService();
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: {
+        Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment({ TOKEN: "secret" }) },
+      },
+    });
+  });
+
+  // Save, remove and toggle all go through the same refresh, so one of them proves the mechanism.
+  // Without it a loaded session keeps the tools it was given until the app restarts: the reason the
+  // test above had to stop and start the service to see its new server.
+  it("starts a fresh provider session for the next turn after an MCP server changes", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Database",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["--database", "./data.db"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: root,
+        url: "",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    // The replaced session is closed in the client as well. Left open, it would keep the MCP servers
+    // it started, and every further change would add another set of processes.
+    expect(client.releasedThreads).toEqual([firstSession]);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    // `Database` is left out: the Codex configuration shape for a working directory is unconfirmed,
+    // and a server told to open `./data.db` from the wrong place creates a second database.
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
+    });
+  });
+
+  // The same refresh asks one question of each thread: is a turn running on it. `readConversation`
+  // answers that too, but it loads and parses every message of the thread to do it, so a settings
+  // change would read the whole history of every agent on the main process and throw it away.
+  it("does not read a conversation to find whether a thread is busy", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    const readConversation = vi.spyOn(store.database, "readConversation");
+    const readActiveTurnId = vi.spyOn(store.database, "readActiveTurnId");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    // The refresh did reach the question - otherwise the first expectation would pass on a path that
+    // never ran - and it answered it from the thread row alone.
+    expect(readActiveTurnId).toHaveBeenCalled();
+    expect(readConversation).not.toHaveBeenCalled();
+    readConversation.mockRestore();
+    readActiveTurnId.mockRestore();
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+  });
+
+  // The queue keeps a failed delivery's reason in the database and shows it again in the app, so a
+  // provider that rejects a start by quoting what it was sent would store the credential for good.
+  it("keeps an MCP credential out of the reason a failed delivery keeps", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method === "thread/start") throw new Error("Rejected abcdef123456 from Filesystem.");
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    const failed = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "failed");
+    expect(failed?.error).toBe("Rejected ••• from Filesystem.");
+  });
+
+  // The refresh mark is spent on the sessions the table holds, and a session that is still starting
+  // is in no table. Without the wait, the change would be marked as applied to a session that was
+  // given the set as it was before it.
+  it("starts a fresh session when an MCP server changes while the first session starts", async () => {
+    const { store, mailbox } = stores(root);
+    let started = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "thread/start" || started) return;
+      started = true;
+      service?.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      });
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    // Released, which only the refresh path does: a session replaced for an outdated tool
+    // fingerprint is retired without a release, so this names the mark that was held back.
+    expect(client.releasedThreads).toEqual([firstSession]);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
+    });
+  });
+
+  // The turn start is the second wait a change can land in: the session exists by then, and it has
+  // no turn id until the provider answers. A refresh spent there would close the session the turn
+  // is about to run on, and its completion would reach nobody.
+  it("keeps a session routed when an MCP server changes while a turn starts", async () => {
+    const { store, mailbox } = stores(root);
+    let changed = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "turn/start" || changed) return;
+      changed = true;
+      service?.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      });
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    // Completed, not left running: the turn that was starting still owns its routing.
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    expect(client.releasedThreads).toEqual([]);
+
+    // The change is not lost either: the next turn is the one that applies it.
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+  });
+
+  // The timeout branch of a turn start keeps the delivery waiting for lifecycle events instead of
+  // sending the work again. Those events are the only way that delivery can end, and they arrive on
+  // the routing a refresh removes.
+  it("keeps a session routed while an unconfirmed turn start waits", async () => {
+    const { store, mailbox } = stores(root);
+    let timedOut = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "turn/start" || timedOut) return;
+      timedOut = true;
+      throw new Error("Codex request timed out: turn/start");
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    const errors: string[] = [];
+    service.on("event", (event) => {
+      if (event.type === "error") errors.push(event.code);
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => errors.includes("delivery_start_unconfirmed"));
+    const session = store.activeProviderSession("chief")?.externalSessionId;
+    if (!session) throw new Error("The unconfirmed start left no provider session.");
+
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    expect(client.releasedThreads).toEqual([]);
+
+    // The turn the provider did start after all, reported the only way it can be: its events.
+    const turnId = "turn-after-the-timeout";
+    client.emit("notification", notification("turn/started", { threadId: session, turn: { id: turnId } }));
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId: session, turn: { id: turnId, status: "completed" } }),
+    );
+
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+  });
+
+  // The manifest is the only record that survives a restart, and the in-memory refresh mark does
+  // not. A manifest written from the set that arrived during the start would describe a session
+  // that never got it, and the resume check would then accept that session for good.
+  it("records the MCP set a session was given, not one that arrived while it started", async () => {
+    const { store, mailbox } = stores(root);
+    let started = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "thread/start" || started) return;
+      started = true;
+      service?.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      });
+    });
+    const start = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await start();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    // The restart drops the held refresh, so the manifest alone decides whether the session is kept.
+    await service.stop();
+    service = await start();
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
+    });
+  });
+
   it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
     const { store, mailbox } = stores(root);
     let rejectTurn = false;
@@ -406,7 +790,7 @@ describe.sequential("AgentService: providers", () => {
         );
         expect(instructions).toContain("required user input or approval");
         expect(instructions).toContain("If the user asks for a detailed coordination report, provide it");
-        expect(instructions).toContain("explicitly send the result back");
+        expect(instructions).toContain("send the result back in the Status/Result/Evidence format");
         expect(instructions).toContain("Do not create acknowledgement loops");
         expect(instructions).not.toContain("When you receive a reply, summarize it for the user");
         await service.stop();

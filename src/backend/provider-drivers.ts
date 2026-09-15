@@ -5,6 +5,7 @@ import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "./cli";
 import { GrokAgentClient } from "./grok-client";
+import type { McpServerSource } from "./mcp-provider-shapes";
 import {
   type CustomProviderSource,
   OPENCODE_PROFILE_CONFIG,
@@ -65,6 +66,11 @@ export interface ProviderClientContext {
   apiKey(provider: AgentProviderId): string | null;
   readonly customProviders: CustomProviderSource;
   /**
+   * The MCP servers the user enabled, read at spawn like the endpoints above. Each client resolves
+   * and converts them itself, because the three providers take three different shapes.
+   */
+  readonly mcpServers: McpServerSource;
+  /**
    * Whether this model may still be used. A removed endpoint stays in the running process, with the
    * credentials it started with, until that process restarts, and the restart waits for the work in
    * flight. Read at the last moment before a prompt leaves, because everything above it awaits.
@@ -73,7 +79,11 @@ export interface ProviderClientContext {
 }
 
 /** Nothing stored and no endpoint, for tests and for call sites that predate the credential store. */
-export const NO_PROVIDER_CREDENTIALS: ProviderClientContext = { apiKey: () => null, customProviders: () => [] };
+export const NO_PROVIDER_CREDENTIALS: ProviderClientContext = {
+  apiKey: () => null,
+  customProviders: () => [],
+  mcpServers: () => [],
+};
 
 /**
  * What a provider *does*. What it is called, how it is described and where its sign-in help points
@@ -119,7 +129,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
     },
     resolveCli: resolveClaudeCli,
-    createClient: (cli, requestTimeoutMs) => new ClaudeAgentClient(cli, undefined, undefined, requestTimeoutMs),
+    createClient: (cli, requestTimeoutMs, context) =>
+      new ClaudeAgentClient(cli, undefined, undefined, requestTimeoutMs, context.mcpServers),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
@@ -134,7 +145,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
     },
     resolveCli: resolveGrokCli,
-    createClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs),
+    createClient: (cli, requestTimeoutMs, context) =>
+      new GrokAgentClient(cli, requestTimeoutMs, false, context.mcpServers),
     createProfileClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs, true),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -157,6 +169,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => ({ ...opencodeEnv(cli, context), ...openCodeConfigEnv({}, context.customProviders) }),
         signInMessage: openCodeSignInMessage(context.customProviders().length),
         servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {

@@ -285,6 +285,15 @@ export const IPC_ENDPOINTS = {
     event: event(IPC_CHANNELS.serversEvent),
     invite: event(IPC_CHANNELS.serversInvite),
   },
+  // A separate group, not part of `servers`: a group is what one registrar covers in full, and
+  // `servers` is bound against `RemoteServerManager` while these are bound against `AgentService`.
+  mcpServers: {
+    list: request(IPC_CHANNELS.serversListMcpServers),
+    save: request(IPC_CHANNELS.serversSaveMcpServer),
+    remove: request(IPC_CHANNELS.serversRemoveMcpServer),
+    setEnabled: request(IPC_CHANNELS.serversSetMcpServerEnabled),
+    test: request(IPC_CHANNELS.serversTestMcpServer),
+  },
   host: {
     getStatus: request(IPC_CHANNELS.hostGetStatus),
     configure: request(IPC_CHANNELS.hostConfigure),

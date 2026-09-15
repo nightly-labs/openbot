@@ -17,6 +17,7 @@ import {
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
   type DeleteChannelMemoryInput,
+  type QueueHold,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -47,6 +48,8 @@ export interface ChannelHooks {
     text: string,
   ): Promise<"accepted" | "rejected" | "uncertain">;
   changed(channelId: string, revision: number): void;
+  /** The channel work that queues wait behind has changed, so every held queue needs a new hold. */
+  queueHoldChanged?(): void;
   /** A memory is not part of the channel revision, so a tool write needs its own notification. */
   memoriesChanged?(channelId: string): void;
   error(error: unknown): void;
@@ -88,6 +91,8 @@ export class ChannelService {
   readonly #wakeAgain = new Set<string>();
   readonly #deletedChannels = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
+  /** The active assignments last seen per channel, so turn traffic reports no new hold. */
+  readonly #activeAssignments = new Map<string, string>();
 
   constructor(
     database: OpenBotDatabase,
@@ -843,6 +848,28 @@ export class ChannelService {
     return !this.store.hasAssignmentInState(ACTIVE_ASSIGNMENT_STATES);
   }
 
+  /**
+   * The channel work the queue of `agentId` is waiting behind, or null when no channel holds the
+   * host.
+   *
+   * The reservation is host-wide: an agent whose own channel delivery is at the head of its queue
+   * still keeps anything the user sends it waiting behind that turn. The channel turn runs on
+   * another thread, so an agent held here has no turn of its own to show, and this is the only way
+   * the chat can say why a message the user just sent has not started. When that agent runs
+   * channel work of its own, that assignment is the one reported: its chat then shows it working
+   * instead of waiting for another member.
+   */
+  queueHold(agentId: string): QueueHold | null {
+    const reserving = this.store.reservingAssignment(ACTIVE_ASSIGNMENT_STATES, agentId);
+    if (!reserving) return null;
+    return {
+      reason: "channel-task",
+      channelId: reserving.channel.id,
+      channelName: reserving.channel.title.trim() || reserving.channel.name,
+      agentId: reserving.assignment.agentId,
+    };
+  }
+
   deliveryFailed(deliveryId: string, reason: string): void {
     const assignment = this.store.assignmentForDelivery(deliveryId);
     if (!assignment || !activeAssignment(assignment)) return;
@@ -1535,6 +1562,29 @@ export class ChannelService {
 
   private publish(channelId: string): void {
     this.hooks.changed(channelId, this.store.get(channelId).revision);
+    this.#syncQueueHolds(channelId);
+  }
+
+  /**
+   * A queue snapshot names the channel work it waits behind, read at the moment the queue is
+   * emitted. A held agent drains nothing, so no queue event of its own follows: when the
+   * reservation moves to another channel or another agent, every held queue keeps naming work that
+   * has ended. This reports the change instead.
+   *
+   * The gate is which agent holds which assignment in this channel. Every message batch of a
+   * running channel turn publishes as well, and no queue names a turn of work that is already
+   * reported, so only a new or ended assignment is allowed through.
+   */
+  #syncQueueHolds(channelId: string): void {
+    const active = this.store
+      .assignments(channelId)
+      .filter(activeAssignment)
+      .map((assignment) => `${assignment.id}:${assignment.agentId}`)
+      .join(",");
+    // A channel with no assignment has nothing to report, so an unseen channel counts as empty.
+    if ((this.#activeAssignments.get(channelId) ?? "") === active) return;
+    this.#activeAssignments.set(channelId, active);
+    this.hooks.queueHoldChanged?.();
   }
 
   async stop(): Promise<void> {

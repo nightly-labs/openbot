@@ -1,7 +1,8 @@
 // AI-facing bridge to the live dev app. Read-only by default; anything that
 // changes app state needs --allow-mutations. This tool never seeds, resets or
 // copies openbot.db: it drives the instance you already have open.
-import { join, resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import {
   assertMutationAllowed,
@@ -12,6 +13,8 @@ import {
   readTargetId,
   resolveAutomationPort,
 } from "./cdp-client";
+import { compareProfiles, profileCpu } from "./cpu-profile";
+import { parseCpuReport } from "./cpu-sampling";
 import {
   type DevInstanceRecord,
   type DevInstanceService,
@@ -25,6 +28,7 @@ import {
   parseWaitTarget,
   reportableScreenshotPath,
   resolveScreenshotPath,
+  resolveWritablePath,
   screenshotTo,
   snapshotPage,
   typeByRole,
@@ -40,6 +44,14 @@ const logger = createOpenBotLogger("dev-automation", (line) => process.stderr.wr
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const SCREENSHOT_ROOT = join(process.cwd(), ".openbot-build", "dev-automation");
+const CPU_ROOT = join(SCREENSHOT_ROOT, "cpu");
+const DEFAULT_CPU_DURATION_MS = 60_000;
+const MAX_CPU_DURATION_MS = 600_000;
+const DEFAULT_CPU_INTERVAL_MS = 5_000;
+// A sampler that runs every few hundred milliseconds becomes the load it is
+// there to measure, and the counters it reads are cumulative, so nothing is
+// lost by asking rarely.
+const MIN_CPU_INTERVAL_MS = 1_000;
 
 // `null` means the flag is absent, `""` means it was passed empty. The two
 // differ for `--text=`, which legitimately clears a field.
@@ -94,6 +106,16 @@ function readWaitTarget(): WaitTarget | null {
   return parseWaitTarget(raw);
 }
 
+function readMilliseconds(name: string, fallback: number, minimum: number, maximum: number): number {
+  const raw = flagValue(name);
+  if (raw === null) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer of ${minimum}..${maximum} ms.`);
+  }
+  return value;
+}
+
 function readService(): DevInstanceService {
   const raw = flagValue("--service");
   if (raw === null || raw === "app") return "app";
@@ -104,6 +126,9 @@ function readService(): DevInstanceService {
 interface AutomationTarget {
   port: number;
   expectedRendererPort: number | null;
+  // The dev supervisor process the registry published, and the anchor for the
+  // `ps` walk in `cpu`. Null when no record owns this port.
+  pid: number | null;
   instanceNamed: boolean;
   description: string;
 }
@@ -137,6 +162,7 @@ function resolveTarget(records: DevInstanceRecord[], service: DevInstanceService
     return {
       port: explicitPort.port,
       expectedRendererPort: published?.rendererPort ?? null,
+      pid: published?.pid ?? null,
       instanceNamed: true,
       description: published ? describeDevInstance(published) : `:${explicitPort.port}`,
     };
@@ -164,6 +190,7 @@ function resolveTarget(records: DevInstanceRecord[], service: DevInstanceService
     return {
       port: explicitPort.port,
       expectedRendererPort: null,
+      pid: null,
       instanceNamed: false,
       description: `:${explicitPort.port} (no registry record)`,
     };
@@ -171,11 +198,53 @@ function resolveTarget(records: DevInstanceRecord[], service: DevInstanceService
   return {
     port: selection.record.remoteDebuggingPort,
     expectedRendererPort: selection.record.rendererPort,
+    pid: selection.record.pid,
     // A foreign instance is the dev app of another worktree. Readable, so an
     // agent can still take a snapshot, but not something to click blind.
     instanceNamed: selection.match !== "foreign",
     description: `${describeDevInstance(selection.record)} [${selection.match}]`,
   };
+}
+
+function readComparisonReport(path: string) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    throw new Error(`Could not read --compare=${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const report = parseCpuReport(parsed);
+  if (!report) throw new Error(`--compare=${path} is not a cpu report this tool wrote.`);
+  return report;
+}
+
+async function measureCpu(target: AutomationTarget): Promise<void> {
+  const durationMs = readMilliseconds("--duration", DEFAULT_CPU_DURATION_MS, MIN_CPU_INTERVAL_MS, MAX_CPU_DURATION_MS);
+  const intervalMs = readMilliseconds("--interval", DEFAULT_CPU_INTERVAL_MS, MIN_CPU_INTERVAL_MS, durationMs);
+  const label = flagValue("--label") ?? "run";
+  const comparePath = flagValue("--compare");
+  const baseline = comparePath === null || comparePath === "" ? null : readComparisonReport(comparePath);
+  // Resolved before the run, not after it: a rejected `--out` should cost the
+  // developer nothing, and finding out at the end throws a minute of sampling
+  // away. `--compare` stays relative to the working directory, because it only
+  // reads and the usual call passes the path an earlier run printed.
+  const out = flagValue("--out");
+  const outPath = out === null || out === "" ? null : resolveWritablePath(CPU_ROOT, out, ".json", "CPU reports");
+  const browser = await openDevBrowser(target.port, logger);
+  let profile: Awaited<ReturnType<typeof profileCpu>>;
+  try {
+    logger.info(`sampling for ${durationMs} ms every ${intervalMs} ms`);
+    profile = await profileCpu({ browser, rootPid: target.pid, durationMs, intervalMs, label, logger });
+  } finally {
+    await browser.close();
+  }
+  const document = baseline ? { ...profile, delta: compareProfiles(baseline, profile) } : profile;
+  if (outPath !== null) {
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, `${JSON.stringify(document, null, 2)}\n`);
+    logger.info(`wrote ${redactText(outPath)}`);
+  }
+  process.stdout.write(`${JSON.stringify(document, null, 2)}\n`);
 }
 
 async function main(): Promise<void> {
@@ -199,10 +268,11 @@ async function main(): Promise<void> {
     command !== "snapshot" &&
     command !== "click" &&
     command !== "type" &&
-    command !== "screenshot"
+    command !== "screenshot" &&
+    command !== "cpu"
   ) {
     throw new Error(
-      "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot> [flags]",
+      "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot|cpu> [flags]",
     );
   }
   const target = resolveTarget(readDevInstanceRecords(), readService());
@@ -215,6 +285,13 @@ async function main(): Promise<void> {
     } finally {
       await browser.close();
     }
+    return;
+  }
+  // Read-only: it attaches CDP counters and runs `ps`, and changes nothing in
+  // the app. So it stays out of the mutation gate below and works against an
+  // instance nobody named.
+  if (command === "cpu") {
+    await measureCpu(target);
     return;
   }
   if (command === "click" || command === "type") {

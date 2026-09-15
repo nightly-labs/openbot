@@ -118,6 +118,7 @@ export async function exportDiagnostics(
       ),
     };
   });
+  const mcpServers = context.service.listMcpServers();
   const update = context.updater.getStatus();
   const diagnostics = {
     // 3, not 2: schema 2 reported `botCount` and `botId`, and this report says `agentCount` and `agentId`.
@@ -141,6 +142,17 @@ export async function exportDiagnostics(
       fullAccess: status.fullAccess,
       agentCount: agents.length,
       queues: queueCounts,
+    },
+    // Ids, transports and whether each one is enabled. A name is user text and a configuration holds
+    // `env` values and headers, so neither one belongs in a report the user mails to somebody else.
+    mcpServers: {
+      count: mcpServers.length,
+      enabledCount: mcpServers.filter((config) => config.enabled).length,
+      servers: mcpServers.map((config) => ({
+        mcpServerId: config.id,
+        transport: config.transport,
+        enabled: config.enabled,
+      })),
     },
     browser: {
       tabCount: context.browser.listTabs().length,

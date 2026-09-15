@@ -4,12 +4,14 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CanUseTool, ModelInfo, SDKUserMessage, SessionMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AgentStore } from "./agent-store";
 import { ClaudeAgentClient } from "./claude-client";
 import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
+import { loginShellPath } from "./mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 import {
   decodeAccountRateLimitsReadResult,
@@ -1079,6 +1081,153 @@ async function waitFor(check: () => boolean): Promise<void> {
   await vi.waitFor(() => {
     if (!check()) throw new Error("Timed out waiting for Claude adapter events.");
   });
+}
+
+it("hands the enabled MCP servers to the spawn and keeps the bridge names", async () => {
+  const query = new TestQuery(new TestQueue<TestStreamMessage>());
+  // An array rather than a reassigned variable: the callback runs after this scope is narrowed, so
+  // a `let` here would read as `null` to the checker.
+  const spawned: DynamicRecord[] = [];
+  const mcpServers = [
+    mcpConfig({ id: "mcp-1", name: "Filesystem", command: "/bin/echo", args: ["ready"] }),
+    mcpConfig({ id: "mcp-2", name: "Disabled", enabled: false }),
+    // All four providers key MCP servers by name, so a configuration taking a bridge name would
+    // displace the tools the agent depends on.
+    mcpConfig({ id: "mcp-3", name: "openbot", command: "/bin/echo" }),
+  ];
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    (params) => {
+      if (isDynamicRecord(params.options)) spawned.push(params.options);
+      return query;
+    },
+    undefined,
+    undefined,
+    () => mcpServers,
+  );
+  client.start();
+  try {
+    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    const started = spawned.at(-1);
+    const servers = isDynamicRecord(started?.mcpServers) ? started.mcpServers : {};
+    expect(servers.Filesystem).toMatchObject({ type: "stdio", command: "/bin/echo", args: ["ready"] });
+    expect(servers.Disabled).toBeUndefined();
+    expect(isDynamicRecord(servers.openbot) ? servers.openbot.instance : null).toBeTruthy();
+  } finally {
+    await client.stop();
+  }
+});
+
+// A `npx` or `uvx` from nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so the server needs
+// the `PATH` the login shell found it on. An app the user started from Finder inherits none of it.
+it("launches an MCP server with this user's own PATH, and lets a configured value win", async () => {
+  const query = new TestQuery(new TestQueue<TestStreamMessage>());
+  const spawned: DynamicRecord[] = [];
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    (params) => {
+      if (isDynamicRecord(params.options)) spawned.push(params.options);
+      return query;
+    },
+    undefined,
+    undefined,
+    () => [
+      mcpConfig({ id: "mcp-1", name: "Filesystem" }),
+      mcpConfig({ id: "mcp-2", name: "Own path", env: [{ key: "PATH", value: "/only/here" }] }),
+    ],
+  );
+  client.start();
+  try {
+    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    const servers = isDynamicRecord(spawned.at(-1)?.mcpServers) ? spawned.at(-1)?.mcpServers : {};
+    const environment = (name: string): DynamicRecord => {
+      const server = isDynamicRecord(servers) ? servers[name] : null;
+      const env = isDynamicRecord(server) ? server.env : null;
+      return isDynamicRecord(env) ? env : {};
+    };
+    const path = await loginShellPath();
+    expect(path).toBeTruthy();
+    expect(environment("Filesystem").PATH).toBe(path);
+    expect(environment("Own path").PATH).toBe("/only/here");
+  } finally {
+    await client.stop();
+  }
+});
+
+it("closes the query of a released thread, with the MCP servers it started, and keeps the others", async () => {
+  const queries = [
+    new TestQuery(new TestQueue<TestStreamMessage>()),
+    new TestQuery(new TestQueue<TestStreamMessage>()),
+  ];
+  const spawned: TestQuery[] = [];
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    () => {
+      const next = queries.shift();
+      if (!next) throw new Error("Unexpected Claude query.");
+      spawned.push(next);
+      return next;
+    },
+    undefined,
+    undefined,
+    () => [mcpConfig({ id: "mcp-1", name: "Filesystem", command: "/bin/echo" })],
+  );
+  client.start();
+  try {
+    const released = await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+
+    await client.releaseThread(released.thread.id);
+
+    // The query owns the MCP servers of its thread, so this close is what ends those processes.
+    expect(spawned[0]?.closed).toBe(true);
+    expect(spawned[1]?.closed).toBe(false);
+  } finally {
+    await client.stop();
+  }
+});
+
+it("gives a profile-generation thread no MCP servers at all", async () => {
+  const query = new TestQuery(new TestQueue<TestStreamMessage>());
+  let options: DynamicRecord | null = null;
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    (params) => {
+      if (isDynamicRecord(params.options)) options = params.options;
+      return query;
+    },
+    undefined,
+    undefined,
+    () => [mcpConfig({ id: "mcp-1", name: "Filesystem", command: "/bin/echo" })],
+  );
+  client.start();
+  try {
+    await client.request(
+      "thread/start",
+      { cwd: process.cwd(), profileGeneration: true, persistSession: false },
+      decodeThreadResponse,
+    );
+    expect(options).toMatchObject({ mcpServers: {} });
+  } finally {
+    await client.stop();
+  }
+});
+
+function mcpConfig(overrides: Partial<McpServerConfig>): McpServerConfig {
+  return {
+    id: "mcp-1",
+    name: "Filesystem",
+    transport: "stdio",
+    enabled: true,
+    command: "/bin/echo",
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+    ...overrides,
+  };
 }
 
 it("disables tools, project settings and session persistence for profile generation", async () => {

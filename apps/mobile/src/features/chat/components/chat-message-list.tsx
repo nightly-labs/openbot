@@ -247,7 +247,13 @@ export function ChatMessageList({
             const badge = (
               <View key={id ?? legacyName} className="flex-row items-center gap-1">
                 {participant ? (
-                  <BloubAvatarThumbnail hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
+                  <BloubAvatarThumbnail
+                    agentId={participant.id}
+                    serverId={participant.serverId}
+                    hue={participant.avatarHue}
+                    seed={participant.avatarSeed}
+                    size={22}
+                  />
                 ) : null}
                 <Typography.Paragraph type="body-sm" style={{ color: muted }}>
                   {participant?.name ??
@@ -299,6 +305,8 @@ export function ChatMessageList({
             <View className="flex-row items-center gap-1 px-1">
               {message.speaker.kind === "agent" ? (
                 <BloubAvatarThumbnail
+                  agentId={speaker?.id}
+                  serverId={speaker?.serverId}
                   seed={speaker?.avatarSeed ?? message.speaker.id}
                   hue={speaker?.avatarHue ?? null}
                   size={20}
@@ -428,6 +436,8 @@ export function ChatMessageList({
       >
         {activityAgent ? (
           <BloubAvatarPreview
+            agentId={activityAgent.id}
+            serverId={activityAgent.serverId}
             hue={activityAgent.avatarHue}
             seed={activityAgent.avatarSeed}
             size={36}

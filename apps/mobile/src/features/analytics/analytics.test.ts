@@ -385,6 +385,8 @@ it("instruments message commands without sending their contents or changing the 
     refreshServers: unexpected,
     refreshServer: unexpected,
     addRemoteServer: unexpected,
+    setAgentAvatar: async () => {},
+    loadAgentAvatar: async () => "",
     createAgent: unexpected,
     updateAgent: unexpected,
     deleteAgent: unexpected,

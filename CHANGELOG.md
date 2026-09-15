@@ -5,6 +5,31 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-15
+
+### Added
+
+- Manage MCP servers from server settings, including save, remove, enable, and test actions.
+- Add mobile channels, agent pins, and workspace connectivity, with channel chat, records, and
+  task actions. Preserve deleted channels as read-only previews.
+- Add custom agent photos to the mobile avatar experience.
+- Queue a message to a busy agent and show why it waits.
+- Add an OpenCode download action to the custom provider row.
+- Add an Introducing OpenBot article under `/news`.
+
+### Changed
+
+- Repository moved to `nightly-labs/openbot`; release links and the update feed follow it.
+- Tighten agent-to-agent communication prompts and route agent instructions instead of
+  front-loading them.
+- Stop the two animations that burn idle CPU, and add `dev:cpu` to measure it.
+- Explain a failed update check, make the retry answer, and stop routing updates through a
+  rename redirect.
+- Display channel titles in channel UI; draw a routing receipt as channel activity, not a message.
+- Fix mobile sheet sizing, restore progressive blur on iOS, and update the iOS app icon asset.
+- Fix browser preview layout, tab selection, address navigation, and sidebar icon styles.
+- Keep chat input scroll position while editing earlier lines.
+
 ## [0.9.0] - 2026-09-14
 
 ### Added

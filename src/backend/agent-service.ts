@@ -41,8 +41,11 @@ import type {
   HostAnalyticsInput,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
+  McpServerConfig,
+  McpTestResult,
   QueuedMessageReceipt,
   QueueSnapshot,
+  RemoveMcpServerInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
@@ -51,12 +54,15 @@ import type {
   RoutineRun,
   SaveAgentProfileInput,
   SaveAgentProfileResult,
+  SaveMcpServerInput,
   SendMessageInput,
+  SetMcpServerEnabledInput,
   SetMessageReactionInput,
   SidebarLayoutSnapshot,
   SidebarSection,
   SteerQueuedMessageInput,
   TestChannelRoutineInput,
+  TestMcpServerInput,
   TestRoutineInput,
   UpdateAgentInput,
   UpdateAgentMemoryInput,
@@ -69,6 +75,8 @@ import {
   AGENT_RUNTIME_TEXT_LIMIT,
   defaultProviderModel,
   isMessageReaction,
+  mcpConfigErrors,
+  normalizeMcpConfig,
   skillConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -115,6 +123,10 @@ import type { BundledProviderExecutables } from "./cli";
 import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
+import { McpHandoffLog } from "./mcp-handoff-log";
+import { testMcpServer } from "./mcp-probe";
+import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
+import { McpServerStore } from "./mcp-server-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { RoutineTimer } from "./routine-timer";
@@ -188,6 +200,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
+  readonly #mcpServers: McpServerStore;
+  /**
+   * What has already been handed to a provider process, kept for redaction. Declared here because
+   * both hand-off paths - the client credentials and `enabledMcpServers` - start in this class.
+   */
+  readonly #mcpHandoff = new McpHandoffLog();
   readonly #providers: ProviderRuntime;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Promise<void>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -234,6 +252,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     super();
     this.#store = store;
+    // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
+    // given that callback.
+    this.#mcpServers = new McpServerStore(store.database);
     this.#sidebarLayout = sidebarLayout;
     this.#profileSave = new ProfileSave(store, {
       create: (input, configure) =>
@@ -351,7 +372,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       bundledExecutables,
       // The exclusion travels with the credentials, so the client that holds a session on a removed
       // endpoint can refuse the prompt itself, after the waits every caller above it makes.
-      credentials: { ...credentials, servesModel: (modelId) => this.#servesModel(modelId) },
+      credentials: {
+        ...credentials,
+        servesModel: (modelId) => this.#servesModel(modelId),
+        // Every MCP set that leaves for a provider is remembered, so its secrets stay redactable
+        // after the user edits them. This is the second of the two ways one leaves; the other is
+        // `enabledMcpServers`, which the Codex thread configuration reads.
+        mcpServers: () => this.#mcpHandoff.record(credentials.mcpServers()),
+      },
+      mcpHandoff: this.#mcpHandoff,
+      redactMcp: (text) => this.#redactMcp(text),
     });
     this.#compaction = new ContextCompaction({
       store,
@@ -410,6 +440,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        // Read late: `channels` is built after this.
+        queueHold: (agentId) => this.channels.queueHold(agentId),
       },
     });
     this.#boot = new BootRecovery({
@@ -448,9 +480,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       memories: this.#memories,
       compaction: this.#compaction,
+      // Read at each spawn, not now: the store is built further down this constructor.
+      mcpServers: () => this.enabledMcpServers(),
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
+        logReleaseFailure: (provider, error) =>
+          logger.warn("Could not close a replaced provider session.", { provider, error }),
       },
     });
     this.channels = new ChannelService(store.database, mailbox, {
@@ -530,6 +566,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#emit({ type: "channels-changed", channelId, revision });
       },
       memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
+      // A held agent starts nothing, so its queue has no event of its own while the reservation
+      // moves. Without this its panel keeps naming the channel task that has already ended.
+      queueHoldChanged: () => {
+        for (const agent of this.#store.list())
+          if (this.#mailbox.nextQueued(agent.id)) this.#mailboxSync.emitQueue(agent.id);
+      },
       error: (error) => this.#emitError("channel_coordination_failed", error),
     });
     this.#channelRoutines = new ChannelRoutineScheduler({
@@ -557,6 +599,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       threads: this.#threads,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        redactMcp: (text) => this.#redactMcp(text),
         isStopping: () => this.#stopping,
         servesModel: (model) => this.#servesModel(model),
       },
@@ -765,6 +808,63 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listChannelRoutineRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
     return this.#channelRoutines.listRuns(input);
+  }
+
+  /**
+   * The MCP servers this machine holds.
+   *
+   * Configurations only: OpenBot holds no connection of its own to report. A connection is made
+   * when the user asks for a test, and when an agent starts - and the second is the provider's own.
+   */
+  listMcpServers(): McpServerConfig[] {
+    return this.#mcpServers.list();
+  }
+
+  saveMcpServer(input: SaveMcpServerInput): McpServerConfig[] {
+    this.#mcpServers.save(input.config);
+    return this.#mcpServersChanged();
+  }
+
+  removeMcpServer(input: RemoveMcpServerInput): McpServerConfig[] {
+    this.#mcpServers.remove(input.mcpServerId);
+    return this.#mcpServersChanged();
+  }
+
+  setMcpServerEnabled(input: SetMcpServerEnabledInput): McpServerConfig[] {
+    this.#mcpServers.setEnabled(input.mcpServerId, input.enabled);
+    return this.#mcpServersChanged();
+  }
+
+  /**
+   * The new list, and every agent marked to start a fresh provider session for its next turn.
+   *
+   * Without the mark, a provider session that is already loaded keeps the tools it was given: a
+   * removed server stays callable and an added one is invisible until the app restarts. The public
+   * thread and its history are untouched - only the private provider session is replaced.
+   */
+  #mcpServersChanged(): McpServerConfig[] {
+    this.#threads.refreshAllAgentRuntimes();
+    return this.listMcpServers();
+  }
+
+  /**
+   * Connects to the configuration the user is looking at, once, and reports what it found.
+   *
+   * The configuration comes from the form, not from the table, so a draft can be tested before it
+   * is saved. It is validated here first: a name this machine reserves, or a missing command, is a
+   * sentence rather than a connection attempt.
+   */
+  async testMcpServer(input: TestMcpServerInput): Promise<McpTestResult> {
+    const config = normalizeMcpConfig(input.config);
+    const errors = mcpConfigErrors(config);
+    const firstError = errors.name ?? errors.command ?? errors.url;
+    if (firstError) throw new Error(firstError);
+    return testMcpServer(config);
+  }
+
+  /** What the providers are given at spawn. They connect for themselves; a test is not used. */
+  enabledMcpServers(): McpServerConfig[] {
+    return this.#mcpHandoff.record(this.#mcpServers.listEnabled());
   }
 
   listModels(): AgentModelOption[] {
@@ -1463,7 +1563,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   listQueue(agentId: string): QueueSnapshot {
-    return this.#mailbox.listQueue(agentId);
+    return this.#mailboxSync.queueSnapshot(agentId);
   }
 
   acknowledgeFailedTurn(agentId: string, turnId: string): void {
@@ -1985,8 +2085,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // Redacted, because every error from a provider CLI arrives here on its way to the renderer
       // and the log, and a CLI quotes what it was given: a failure against a custom endpoint can
       // carry that endpoint's API key or a header value.
-      message: redactText(error instanceof Error ? error.message : String(error)),
+      message: this.#redactMcp(error instanceof Error ? error.message : String(error)),
     });
+  }
+
+  /**
+   * One piece of provider text with the MCP credentials taken out of it.
+   *
+   * The stored configurations and the hand-off log together, so a credential a running process
+   * still holds stays covered after the user edits or removes the server that named it. Every
+   * reader of provider text that leaves this class - a renderer error event, and the failure reason
+   * the queue writes to the database - goes through here. `redactMcpValues` ends with `redactText`,
+   * which covers the patterns shared across the app.
+   */
+  #redactMcp(text: string): string {
+    return redactMcpValues(text, [...mcpSecretValues(this.#mcpServers.list()), ...this.#mcpHandoff.values()]);
   }
 
   #emitRuntimeSnapshot(): void {

@@ -142,6 +142,17 @@ describe("presentQueueDeliveries", () => {
     expect(present(queue, "turn-1", ["waiting", "steer"])).toEqual([]);
   });
 
+  it("shows what is waiting while a channel task holds the agent", () => {
+    const queue: QueueSnapshot = {
+      ...snapshot(delivery({ id: "waiting", status: "queued", position: 1 })),
+      hold: { reason: "channel-task", channelId: "channel-1", channelName: "Project launch", agentId: "chief" },
+    };
+
+    // Nothing of this agent's own is running: the work that holds it is a channel turn, and
+    // without this the message the user just sent would appear in no surface at all.
+    expect(present(queue, null)).toEqual(["waiting"]);
+  });
+
   it("has nothing to show without a queue", () => {
     expect(present(undefined, "turn-1")).toEqual([]);
   });

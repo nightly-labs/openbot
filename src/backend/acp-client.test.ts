@@ -15,6 +15,7 @@
 import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentClient } from "./agent-client";
@@ -78,6 +79,8 @@ function handle(message) {
     return;
   }
   if (message.method === "session/new") {
+    const sessionLog = process.env.OPENBOT_FAKE_ACP_SESSION_LOG;
+    if (sessionLog) fs.appendFileSync(sessionLog, JSON.stringify(message.params) + NL);
     if (process.env.OPENBOT_FAKE_ACP_REJECT_KEY === "1") {
       write({ jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Invalid api key." } });
       return;
@@ -154,6 +157,8 @@ function startOpencode(
     profile?: boolean;
     /** Read at every prompt, so a test can remove an endpoint while a turn is prepared. */
     servesModel?: (modelId: string) => boolean;
+    /** Read at every session, the same way the real source is. */
+    mcpServers?: () => McpServerConfig[];
   } = {},
 ): AgentClient {
   vi.stubEnv("OPENBOT_FAKE_ACP_ENV_LOG", envLog);
@@ -161,6 +166,7 @@ function startOpencode(
   const context = {
     apiKey,
     customProviders: options.customProviders ?? (() => []),
+    mcpServers: options.mcpServers ?? (() => []),
     servesModel: options.servesModel,
   };
   const client = options.profile
@@ -347,5 +353,75 @@ describe("OpenCode ACP environment", () => {
 
     // Nothing reached the process, which still holds the session it opened on that endpoint.
     expect(await fake.readPrompts()).toEqual([]);
+  });
+});
+
+describe("OpenCode ACP MCP servers", () => {
+  it("sends the enabled servers as ACP name/value pairs", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    const sessionLog = join(tmpdir(), `openbot-acp-session-${Date.now()}.ndjson`);
+    vi.stubEnv("OPENBOT_FAKE_ACP_SESSION_LOG", sessionLog);
+    const configs: McpServerConfig[] = [
+      {
+        id: "mcp-1",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [{ key: "TOKEN", value: "secret" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+      {
+        id: "mcp-2",
+        name: "Off",
+        transport: "stdio",
+        enabled: false,
+        command: "/bin/echo",
+        args: [],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+      {
+        id: "mcp-3",
+        name: "Database",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["--database", "./data.db"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: tmpdir(),
+        url: "",
+        headers: [],
+      },
+    ];
+    const client = startOpencode(fake.cli, () => null, fake.envLog, { mcpServers: () => configs });
+    await client.request("initialize", {}, decodeRecordResponse);
+    await client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse);
+
+    const logged = (await readFile(sessionLog, "utf8")).split("\n").filter((line) => line.trim());
+    // The first session is the model probe the client opens in its own directory; the thread is the
+    // last one.
+    const params = JSON.parse(logged.at(-1) ?? "{}");
+    // ACP takes an array whose env is `{ name, value }` pairs, not a record. The launch `PATH` is
+    // in there as well, which `claude-client.test.ts` covers.
+    expect(params.mcpServers[0]).toMatchObject({
+      name: "Filesystem",
+      command: "/bin/echo",
+      args: ["ready"],
+      env: expect.arrayContaining([{ name: "TOKEN", value: "secret" }]),
+    });
+    // A disabled server is not sent, and OpenBot's own bridge entries append after these, so a
+    // user's server can never displace one. `Database` is not sent either: ACP carries no working
+    // directory, and a server told to open `./data.db` somewhere else creates a second database
+    // rather than reading the one the user named.
+    expect(params.mcpServers.map((server: { name: string }) => server.name)).toEqual(["Filesystem"]);
   });
 });

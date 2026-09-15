@@ -18,6 +18,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import type { ClaudeCliInfo } from "./cli";
+import { claudeMcpServers, type McpServerSource, usableMcpServers } from "./mcp-provider-shapes";
 import { OPENBOT_TOOL_DEFINITIONS } from "./openbot-tools";
 import {
   type AccountRateLimitsReadResult,
@@ -120,6 +121,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #createQuery: QueryFactory;
   readonly #readSessionMessages: SessionHistoryReader;
   readonly #requestTimeoutMs: number;
+  readonly #mcpServers: McpServerSource;
   readonly #threads = new Map<string, ThreadRuntime>();
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
@@ -131,12 +133,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     createQuery: QueryFactory = query,
     readSessionMessages: SessionHistoryReader = getSessionMessages,
     requestTimeoutMs = 30_000,
+    mcpServers: McpServerSource = () => [],
   ) {
     super();
     this.#cli = cli;
     this.#createQuery = createQuery;
     this.#readSessionMessages = readSessionMessages;
     this.#requestTimeoutMs = requestTimeoutMs;
+    this.#mcpServers = mcpServers;
   }
 
   get running(): boolean {
@@ -159,6 +163,22 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       pending.reject(new Error("Claude session stopped."));
     }
     this.#pendingServerRequests.clear();
+  }
+
+  /**
+   * Closes one thread runtime and keeps the rest of the client. The SDK query owns the MCP servers
+   * of that thread, so the close is what ends those child processes. The caller releases an idle
+   * thread: a turn that still runs would end with the query that carries it.
+   */
+  async releaseThread(threadId: string): Promise<void> {
+    const runtime = this.#threads.get(threadId);
+    if (!runtime) return;
+    this.#threads.delete(threadId);
+    runtime.input.close();
+    runtime.query.close();
+    // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
+    // from the map, so there is nothing left to report it against.
+    await runtime.consume.catch(() => undefined);
   }
 
   request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T>;
@@ -374,7 +394,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       return this.#requestUserInput(threadId, toolInput, options.toolUseID ?? randomUUID());
     };
-    const mcpServers = config.profileGeneration ? {} : this.#createOpenBotServers(threadId);
+    // OpenBot's own servers spread last: Claude keys this record by name, so a user configuration
+    // that reached one of those names would take the agent's own tools away. Profile generation
+    // asks one question and must not act, so it gets neither set.
+    const mcpServers = config.profileGeneration
+      ? {}
+      : {
+          ...claudeMcpServers(await usableMcpServers(this.#mcpServers())),
+          ...this.#createOpenBotServers(threadId),
+        };
     const claudeQuery = this.#createQuery({
       prompt: input,
       options: {

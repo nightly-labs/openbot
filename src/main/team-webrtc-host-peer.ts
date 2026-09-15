@@ -10,6 +10,7 @@ import {
   isChannelRoute,
 } from "@openbot/contracts/team-protocol/channels-v1";
 import { supportsTeamSemanticTags, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
+import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -445,9 +446,11 @@ export class TeamWebRtcHostPeer {
               : JSON.stringify(
                   (isChannelRoute(input.path)
                     ? channelRequestForMethod
-                    : peerCapabilities.has("opencode")
-                      ? decodeTeamProtocolV4WebRtcHttpRequest
-                      : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
+                    : isMcpRoute(input.path)
+                      ? mcpRequestForMethod
+                      : peerCapabilities.has("opencode")
+                        ? decodeTeamProtocolV4WebRtcHttpRequest
+                        : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
                     preserveSemanticTags,
                   }),
                 ),
@@ -483,9 +486,11 @@ export class TeamWebRtcHostPeer {
       status: response.status,
       body: (isChannelRoute(input.path)
         ? channelResponseForMethod
-        : peerCapabilities.has("opencode")
-          ? encodeTeamProtocolV4WebRtcHttpResponse
-          : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
+        : isMcpRoute(input.path)
+          ? mcpResponseForMethod
+          : peerCapabilities.has("opencode")
+            ? encodeTeamProtocolV4WebRtcHttpResponse
+            : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
         preserveSemanticTags,
       }),
     };
@@ -791,4 +796,10 @@ function channelRequestForMethod(_method: string, path: string, value: unknown) 
 }
 function channelResponseForMethod(_method: string, path: string, status: number, value: unknown) {
   return channelResponse(path, status, value);
+}
+function mcpRequestForMethod(_method: string, path: string, value: unknown) {
+  return mcpRequest(path, value);
+}
+function mcpResponseForMethod(_method: string, path: string, status: number, value: unknown) {
+  return mcpResponse(path, status, value);
 }

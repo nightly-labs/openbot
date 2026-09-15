@@ -49,6 +49,24 @@ describe("CodexAppServerClient", () => {
     });
   });
 
+  it("releases one thread with an unsubscribe and keeps the app server for the others", async () => {
+    const client = createClient(await createFakeCodex(), 5_000);
+    const observed: unknown[] = [];
+    client.on("notification", (notification) => {
+      if (notification.method === "test/unsubscribed") observed.push(notification.params);
+    });
+    client.start();
+
+    await client.releaseThread("thread-7");
+
+    // The app server keeps the thread and its history; it unloads the thread, with the MCP servers
+    // it started, once nothing is subscribed to it.
+    await vi.waitFor(() => expect(observed).toEqual([{ threadId: "thread-7" }]));
+    await expect(client.request("test/echo", { text: "still serving" }, decodeEchoResponse)).resolves.toEqual({
+      echoed: "still serving",
+    });
+  });
+
   it("resets fragmented JSON state when restarted after a process crash", async () => {
     const client = createClient(await createFakeCodex(), 5_000);
     client.start();
@@ -99,6 +117,9 @@ process.stdin.on("data", (chunk) => {
         process.stdout.write(JSON.stringify({ method: "test/notification", params: {} }) + "\\n");
       } else if (message.method === "test/error") {
         process.stdout.write(JSON.stringify({ id: message.id, error: { code: 412, message: "Fake RPC failure" } }) + "\\n");
+      } else if (message.method === "thread/unsubscribe") {
+        process.stdout.write(JSON.stringify({ id: message.id, result: { status: "Unsubscribed" } }) + "\\n");
+        process.stdout.write(JSON.stringify({ method: "test/unsubscribed", params: message.params }) + "\\n");
       } else if (message.method === "test/partial-exit") {
         process.stdout.write('{"id":');
         process.exit(9);

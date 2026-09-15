@@ -108,6 +108,8 @@ function AgentMention({ agent, presentation }: { agent: MobileAgent; presentatio
       style={{ transform: [{ translateY: presentation.mentionOffset }], borderCurve: "circular" }}
     >
       <BloubAvatarThumbnail
+        agentId={agent.id}
+        serverId={agent.serverId}
         hue={agent.avatarHue}
         seed={agent.avatarSeed}
         size={(presentation.type === "body-sm" ? 16 : 18) * fontScale}

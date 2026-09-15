@@ -367,9 +367,9 @@ export class RemoteEventStream {
           }
           try {
             const value = JSON.parse(message.data);
-            const channel = channelEvent(value);
-            const decoded = channel
-              ? { kind: "known" as const, event: channel }
+            const optional = channelEvent(value);
+            const decoded = optional
+              ? { kind: "known" as const, event: optional }
               : decodeTeamProtocolV4BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {

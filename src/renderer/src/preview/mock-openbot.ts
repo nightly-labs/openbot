@@ -74,7 +74,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   composedCustomModelId,
+  createMcpServerId,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  normalizeMcpConfig,
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
@@ -97,6 +99,7 @@ import {
   STORY_MARKETPLACE_AGENTS,
   STORY_MARKETPLACE_SKILL_DETAILS,
   STORY_MARKETPLACE_SKILLS,
+  STORY_MCP_SERVERS,
   STORY_MODELS,
   STORY_PRESENCE,
   STORY_REMOTE_DESKTOP_SESSION,
@@ -214,6 +217,9 @@ function mockFilePreview(path: string, fallbackName: string): FilePreview {
   );
 }
 
+/** What each story server answers with when it is tested, so a story reads the same way twice. */
+const MOCK_MCP_TOOL_COUNTS: Record<string, number> = { "Local SQLite": 12, Linear: 1, Figma: 6 };
+
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
@@ -240,6 +246,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
   const agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
+  let mcpServers = clone(STORY_MCP_SERVERS);
   let sidebarLayout: SidebarLayoutSnapshot = {
     revision: 0,
     sections: [],
@@ -1172,6 +1179,33 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
+      listMcpServers: async () => clone(mcpServers),
+      saveMcpServer: async ({ config }) => {
+        const normalized = normalizeMcpConfig(config);
+        const existing = mcpServers.findIndex((server) => server.id === normalized.id);
+        if (existing < 0) mcpServers = [...mcpServers, { ...normalized, id: normalized.id || createMcpServerId() }];
+        else mcpServers = mcpServers.map((server, index) => (index === existing ? normalized : server));
+        return clone(mcpServers);
+      },
+      removeMcpServer: async ({ mcpServerId }) => {
+        mcpServers = mcpServers.filter((server) => server.id !== mcpServerId);
+        return clone(mcpServers);
+      },
+      setMcpServerEnabled: async ({ mcpServerId, enabled }) => {
+        mcpServers = mcpServers.map((server) => (server.id === mcpServerId ? { ...server, enabled } : server));
+        return clone(mcpServers);
+      },
+      /**
+       * A test takes a moment, so the panel shows its connecting state before the answer lands. A
+       * command that is not on this machine fails, the way the real probe reports a missing one.
+       */
+      testMcpServer: async ({ config }) => {
+        await new Promise((resolve) => schedule(() => resolve(null), 400));
+        const command = config.command.split(" ")[0] ?? "";
+        if (config.transport === "stdio" && command.startsWith("bunx"))
+          return { toolCount: 0, error: `Command not found: ${command}` };
+        return { toolCount: MOCK_MCP_TOOL_COUNTS[config.name] ?? 4, error: null };
+      },
       getSidebarLayout: async () => clone(sidebarLayout),
       mutateSidebarLayout: async (action) => {
         sidebarLayout = applySidebarLayoutAction(sidebarLayout, action);

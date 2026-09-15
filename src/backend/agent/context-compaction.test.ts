@@ -61,6 +61,46 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     expect((await protocolMessages(logPath)).some((message) => message.method === "thread/compact/start")).toBe(false);
   });
 
+  it("continues queued work when an MCP server changes while the context is compacting", async () => {
+    process.env.OPENBOT_FAKE_AUTO_COMPLETE = "DONE";
+    process.env.OPENBOT_FAKE_CONTEXT_USAGE = "82000";
+    // Long enough to save a server inside the compaction, which is the window the deadlock needs.
+    process.env.OPENBOT_FAKE_COMPACTION_DELAY = "400";
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser());
+    await service.initialize();
+
+    await service.sendMessage({ agentId: "chief", text: "First large task" });
+    await service.sendMessage({ agentId: "chief", text: "Run after compaction" });
+    await waitFor(async () =>
+      (await protocolMessages(logPath)).some((message) => message.method === "thread/compact/start"),
+    );
+
+    // A compaction keeps no conversation turn id, so a refresh reads its thread as idle. Dropping
+    // the routing here would lose the compaction's own completion, and the agent would hold its
+    // queue for good.
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+
+    await waitFor(async () => {
+      const messages = await protocolMessages(logPath);
+      return messages.filter((message) => message.method === "turn/start").length === 2;
+    });
+  });
+
   it("continues queued work when context compaction is unavailable", async () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "DONE";
     process.env.OPENBOT_FAKE_CONTEXT_USAGE = "82000";

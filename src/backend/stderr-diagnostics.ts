@@ -34,6 +34,19 @@ const ANSI_SEQUENCE = new RegExp(
   "gu",
 );
 
+/**
+ * What one diagnostic may carry to a log line or a renderer event.
+ *
+ * Applied by the reader of a record, after every redaction it runs and not before them: a redactor
+ * matches a whole value, and the first half of a quoted credential is not one. A record that a
+ * shortening cut in two would keep that half.
+ */
+export const DIAGNOSTIC_TEXT_LIMIT = 2_000;
+
+export function shortenDiagnostic(message: string): string {
+  return message.slice(0, DIAGNOSTIC_TEXT_LIMIT);
+}
+
 export interface DiagnosticStream {
   /** Takes one stderr chunk and emits every record it completes. */
   push: (chunk: string) => void;

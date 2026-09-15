@@ -238,29 +238,36 @@ export async function typeByRole(
   if (submit) await control.press("Enter", { timeout: timeoutMs });
 }
 
-// `screenshot` is one of the two read-only commands, so its destination must
-// stay inside the build directory: `--out=src/main/index.ts` would otherwise
-// overwrite tracked code without `--allow-mutations`, and `screenshotTo`
-// creates missing parents on the way.
-export function resolveScreenshotPath(root: string, requested: string | null, now: number): string {
+// Every read-only command that writes a file owes the same two promises: the
+// destination stays inside the build directory, so `--out=src/main/index.ts`
+// cannot overwrite tracked code without `--allow-mutations`, and no symbolic
+// link on the way redirects the write out of it. The writers create missing
+// parents, so the check has to happen before the write, not after.
+// `subject` names the artefact in the message; `extension` is what `--out`
+// must end with.
+export function resolveWritablePath(root: string, requested: string, extension: string, subject: string): string {
   const base = resolve(root);
-  if (requested === null) return resolve(base, `screenshot-${now}.png`);
   if (requested === "") throw new Error("--out=<path> cannot be empty.");
   const target = resolve(base, requested);
   if (target !== base && !target.startsWith(`${base}${sep}`)) {
-    throw new Error(`--out must stay inside ${base}. Screenshots never write outside the build directory.`);
+    throw new Error(`--out must stay inside ${base}. ${subject} never write outside the build directory.`);
   }
-  if (!target.endsWith(".png")) throw new Error("--out must name a .png file.");
-  assertNoSymlinkOnPath(base, target);
+  if (!target.endsWith(extension)) throw new Error(`--out must name a ${extension} file.`);
+  assertNoSymlinkOnPath(base, target, subject);
   return target;
 }
 
-// The containment check above is lexical, and `page.screenshot` follows links:
-// a symlink at the destination, or on any directory below the build root,
-// would let a read-only command overwrite a file outside it without
+export function resolveScreenshotPath(root: string, requested: string | null, now: number): string {
+  if (requested === null) return resolve(resolve(root), `screenshot-${now}.png`);
+  return resolveWritablePath(root, requested, ".png", "Screenshots");
+}
+
+// The containment check above is lexical, and both writers follow links: a
+// symlink at the destination, or on any directory below the build root, would
+// let a read-only command overwrite a file outside it without
 // `--allow-mutations`. Components that do not exist yet are the normal case
 // and are fine - `mkdir` will create real directories for them.
-function assertNoSymlinkOnPath(base: string, target: string): void {
+function assertNoSymlinkOnPath(base: string, target: string, subject: string): void {
   const steps = relative(base, target).split(sep);
   let current = base;
   for (const step of [".", ...steps]) {
@@ -275,7 +282,7 @@ function assertNoSymlinkOnPath(base: string, target: string): void {
     if (link) {
       throw new Error(
         `${current} is a symbolic link, so writing through it would leave ${base}. ` +
-          "Screenshots never follow a link out of the build directory.",
+          `${subject} never follow a link out of the build directory.`,
       );
     }
   }

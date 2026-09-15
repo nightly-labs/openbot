@@ -141,6 +141,10 @@ export function ConversationComposer() {
               <Loading>
                 <QueuePanel
                   deliveries={presentedQueueDeliveries()}
+                  // Only for an agent that is waiting. When the channel work is this agent's own,
+                  // the activity line above already shows it working, and naming it twice reads as
+                  // two different waits.
+                  hold={props.queue?.hold?.agentId === props.agent?.id ? null : props.queue?.hold}
                   agents={props.agents}
                   skills={installedSkills()}
                   editingDeliveryId={editingDeliveryId()}

@@ -1,3 +1,4 @@
+import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   type AgentEvent,
   type AgentSummary,
@@ -97,7 +98,7 @@ type RemoteAgent = Pick<
   AgentSummary,
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
 > &
-  Partial<Pick<AgentSummary, "provider" | "model" | "reasoningEffort">>;
+  Partial<Pick<AgentSummary, "provider" | "model" | "reasoningEffort" | "avatarUrl">>;
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -189,7 +190,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const id of serverAgentIds.current.get(server.id) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(server.id);
         presenceSignatures.current.delete(server.id);
-        for (const kind of ["server-members", "server-invites"]) {
+        for (const kind of ["server-members", "server-invites", "agent-avatar"]) {
           queryClient.removeQueries({ queryKey: [kind, session.apiUrl, session.user.id, sessionScope, server.id] });
         }
       }
@@ -861,6 +862,49 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ),
         );
       },
+      setAgentAvatar: async (agentId, image, serverId) => {
+        if (!agents.some((agent) => agent.id === agentId && agent.serverId === serverId))
+          throw new Error("The agent is unavailable on this host.");
+        const updated = await request(
+          image ? "PUT" : "DELETE",
+          TEAM_API_ROUTES.agent.avatar(agentId),
+          decodeAgent,
+          undefined,
+          serverId,
+          image ?? undefined,
+        );
+        if (image && updated.avatarUrl) {
+          queryClient.setQueryData(
+            ["agent-avatar", session.apiUrl, session.user.id, sessionScope, serverId, agentId, updated.avatarUrl],
+            `data:${image.mimeType};base64,${image.base64}`,
+          );
+        }
+        setAgents((current) =>
+          current.map((agent) =>
+            agent.id === updated.id && agent.serverId === serverId ? projectAgent(serverId, updated) : agent,
+          ),
+        );
+      },
+      loadAgentAvatar: async (agentId, avatarUrl, serverId) => {
+        const version = new URL(avatarUrl).searchParams.get("v");
+        if (!version) throw new Error("The agent avatar has no version.");
+        return request(
+          "GET",
+          `${TEAM_API_ROUTES.agent.avatar(agentId)}?${new URLSearchParams({ v: version })}`,
+          (value) => {
+            if (
+              !isDynamicRecord(value) ||
+              !isString(value.mimeType) ||
+              !isAvatarMimeType(value.mimeType) ||
+              !isString(value.base64)
+            )
+              throw new Error("The host returned an invalid avatar.");
+            return `data:${value.mimeType};base64,${value.base64}`;
+          },
+          undefined,
+          serverId,
+        );
+      },
       deleteAgent: async (agentId) => {
         await request("DELETE", TEAM_API_ROUTES.agent.one(agentId), ignoreResponse);
       },
@@ -1088,6 +1132,7 @@ function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
     provider: agent.provider,
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
+    avatarUrl: agent.avatarUrl ?? null,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
   };
@@ -1117,6 +1162,7 @@ function decodeAgent(value: unknown): RemoteAgent {
     provider: isAgentProvider(value.provider) ? value.provider : undefined,
     model: isAgentModel(value.model) ? value.model : undefined,
     reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
+    avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     avatarSeed: value.avatarSeed,
     avatarHue: value.avatarHue,
   };

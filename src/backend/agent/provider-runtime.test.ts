@@ -25,6 +25,7 @@ import type { AgentStore } from "../agent-store";
 
 import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
+import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
 
 let root: string;
@@ -215,7 +216,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       null,
       null,
       null,
-      { apiKey: () => storedKey, customProviders: () => [] },
+      { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
     );
     await service.initialize();
     return service
@@ -284,7 +285,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       null,
       null,
       null,
-      { apiKey: () => storedKey, customProviders: () => [] },
+      { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
     );
     await service.initialize();
 
@@ -807,11 +808,44 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("logs a provider's MCP server failure and raises the provider's own failures", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
-    });
+    service = new AgentService(
+      store,
+      mailbox,
+      fakeBrowser(),
+      30_000,
+      "codex",
+      (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      {},
+      async () => undefined,
+      null,
+      null,
+      null,
+      {
+        apiKey: () => null,
+        customProviders: () => [],
+        // A server OpenBot configured. The user asked for this one here, so its failure is theirs
+        // to fix and must stay visible.
+        mcpServers: () => [
+          {
+            id: "mcp-1",
+            name: "Filesystem",
+            transport: "stdio",
+            enabled: true,
+            command: "/bin/echo",
+            args: [],
+            env: [{ key: "API_KEY", value: "abcdef123456" }],
+            envPassthrough: [],
+            workingDirectory: "",
+            url: "",
+            headers: [],
+          },
+        ],
+      },
+    );
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -827,11 +861,185 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     client.emit("diagnostic", "ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed");
     client.emit("diagnostic", "ERROR the provider failed to reach the model endpoint");
+    // Named in this app's own settings, so the user can act on it and has to be told - and the CLI
+    // reports the failure by quoting what it sent, credential and all.
+    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': rejected abcdef123456");
 
-    await waitFor(() => events.some((event) => event.type === "error"));
+    await waitFor(() => events.filter((event) => event.type === "error").length === 2);
     expect(events.filter((event) => event.type === "error")).toEqual([
       expect.objectContaining({ message: "ERROR the provider failed to reach the model endpoint" }),
+      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': rejected •••" }),
     ]);
+  });
+
+  it("redacts an MCP credential a running provider still holds after the user removes the server", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    // What a spawn reads. The running process keeps this credential until it stops.
+    expect(service.enabledMcpServers()).toHaveLength(1);
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
+    // The user removes the server while that process runs, so the store no longer names the value.
+    service.removeMcpServer({ mcpServerId: service.listMcpServers()[0]?.id ?? "" });
+    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': rejected abcdef123456");
+
+    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': rejected •••" }),
+    ]);
+  });
+
+  // A CLI reports a failure by quoting what it sent, and that line can be long enough for the bound
+  // on a diagnostic to fall inside the credential. Redacted whole first, the bound cuts text that no
+  // longer holds the value; the other way round it would leave the head of one on screen.
+  it("redacts an MCP credential a long diagnostic quotes past the length a line is held to", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    // What a spawn reads. The process holds this server, so its failure stays visible to the user.
+    expect(service.enabledMcpServers()).toHaveLength(1);
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
+    // The credential starts just before the bound, so a line shortened first would keep its head.
+    const opening = "Failed to spawn MCP server 'Filesystem': rejected ";
+    const filler = ".".repeat(DIAGNOSTIC_TEXT_LIMIT - 5 - opening.length);
+    client.emit("diagnostic", `${opening}${filler}abcdef123456 after the bound`);
+
+    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
+    const [error] = events.filter((event) => event.type === "error");
+    expect(error?.type === "error" && error.message.length).toBeLessThanOrEqual(DIAGNOSTIC_TEXT_LIMIT);
+    expect(error?.type === "error" && error.message).not.toContain("abcde");
+  });
+
+  it("redacts an MCP credential a provider error quotes, not only a diagnostic", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
+    // A provider error notification, which takes its own path to the shared error boundary rather
+    // than the diagnostic handler. It reaches the renderer, so the value has to go first.
+    client.emit("notification", {
+      method: "error",
+      params: { message: "Filesystem MCP failed: rejected abcdef123456" },
+    });
+
+    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "Filesystem MCP failed: rejected •••" }),
+    ]);
+  });
+
+  it("keeps an MCP credential out of the provider status a crashed CLI leaves behind", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    const messages: (string | null)[] = [];
+    service.on("event", (event) => {
+      if (event.type !== "status") return;
+      for (const provider of event.status.providers ?? []) {
+        if (provider.id === "codex" && provider.state === "error") messages.push(provider.message);
+      }
+    });
+
+    // The CLI quotes what it was given as it dies, and its last words become the provider status
+    // the renderer shows beside the provider.
+    client.emit("exit", new Error("Codex App Server exited: rejected abcdef123456"));
+
+    await waitFor(() => messages.length > 0);
+    expect(messages[0]).toBe("Codex App Server exited: rejected •••");
   });
 
   it("keeps Grok's telemetry export failure out of the chat it was switched into", async () => {
@@ -1244,7 +1452,7 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
       null,
       null,
       null,
-      { apiKey: () => null, customProviders: () => endpoints },
+      { apiKey: () => null, customProviders: () => endpoints, mcpServers: () => [] },
     );
     return { service, store };
   }

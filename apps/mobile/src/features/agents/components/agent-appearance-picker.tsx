@@ -3,25 +3,32 @@ import type { AvatarHue } from "@openbot/contracts/ipc";
 import { Button } from "heroui-native";
 import { type ReactNode, useState } from "react";
 import { View } from "react-native";
-
 import { BloubAvatarPreview, BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
+import type { AgentPhotoProps } from "./agent-photo";
 
-interface AgentAppearancePickerProps {
+interface AgentAppearancePickerProps extends AgentPhotoProps {
   seed: string;
   hue: AvatarHue | null;
   name: string;
   nameField: ReactNode;
+  photoField?: ReactNode;
+  showFaces?: boolean;
   disabled: boolean;
   onSeedChange: (seed: string) => void;
   onHueChange: (hue: AvatarHue | null) => void;
 }
 
 export function AgentAppearancePicker({
+  agentId,
+  serverId,
+  imageUrl,
   seed,
   hue,
   name,
   nameField,
+  photoField,
+  showFaces = true,
   disabled,
   onSeedChange,
   onHueChange,
@@ -35,73 +42,85 @@ export function AgentAppearancePicker({
         accessible
         accessibilityLabel={`Avatar preview for ${name.trim() || "New agent"}`}
       >
-        <BloubAvatarPreview seed={seed} hue={hue} size={144} />
+        <BloubAvatarPreview
+          agentId={agentId}
+          serverId={serverId}
+          imageUrl={imageUrl}
+          seed={seed}
+          hue={hue}
+          size={144}
+        />
       </View>
       {nameField}
-      <View
-        className="mt-4 flex-row flex-wrap justify-center gap-2"
-        accessibilityRole="radiogroup"
-        accessibilityLabel="Shape and expression"
-      >
-        {candidates.seeds.map((candidate, index) => (
-          <Button
-            key={candidate}
-            isIconOnly
-            className="size-16"
-            variant={seed === candidate ? "secondary" : "ghost"}
-            accessibilityRole="radio"
-            accessibilityLabel={`Agent face ${index + 1}`}
-            accessibilityState={{ checked: seed === candidate, disabled }}
-            isDisabled={disabled}
-            onPress={() => onSeedChange(candidate)}
+      {photoField}
+      {showFaces ? (
+        <>
+          <View
+            className="mt-4 flex-row flex-wrap justify-center gap-2"
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Shape and expression"
           >
-            <BloubAvatarThumbnail seed={candidate} hue={hue} size={48} />
-          </Button>
-        ))}
-      </View>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="self-center"
-        isDisabled={disabled}
-        onPress={() => setCandidates((current) => createAvatarCandidates(seed, current))}
-      >
-        <Button.Label>More faces</Button.Label>
-      </Button>
-      <View
-        className="flex-row flex-wrap justify-center gap-2"
-        accessibilityRole="radiogroup"
-        accessibilityLabel="Avatar color"
-      >
-        {AVATAR_HUE_OPTIONS.map((option) => (
-          <Button
-            key={option.hue}
-            isIconOnly
-            variant={hue === option.hue ? "secondary" : "ghost"}
-            accessibilityRole="radio"
-            accessibilityLabel={option.label}
-            accessibilityState={{ checked: hue === option.hue, disabled }}
-            isDisabled={disabled}
-            onPress={() => onHueChange(option.hue)}
-          >
-            <View className="size-6 rounded-full" style={{ backgroundColor: avatarHueSwatch(option.hue) }} />
-          </Button>
-        ))}
-        <View className="w-full items-center">
+            {candidates.seeds.map((candidate, index) => (
+              <Button
+                key={candidate}
+                isIconOnly
+                className="size-16"
+                variant={seed === candidate ? "secondary" : "ghost"}
+                accessibilityRole="radio"
+                accessibilityLabel={`Agent face ${index + 1}`}
+                accessibilityState={{ checked: seed === candidate, disabled }}
+                isDisabled={disabled}
+                onPress={() => onSeedChange(candidate)}
+              >
+                <BloubAvatarThumbnail seed={candidate} hue={hue} size={48} />
+              </Button>
+            ))}
+          </View>
           <Button
             variant="ghost"
             size="sm"
             className="self-center"
-            accessibilityRole="radio"
-            accessibilityLabel="Automatic"
-            accessibilityState={{ checked: hue === null, disabled }}
             isDisabled={disabled}
-            onPress={() => onHueChange(null)}
+            onPress={() => setCandidates((current) => createAvatarCandidates(seed, current))}
           >
-            <Button.Label>{hue === null ? "✓ Automatic" : "Automatic"}</Button.Label>
+            <Button.Label>More faces</Button.Label>
           </Button>
-        </View>
-      </View>
+          <View
+            className="flex-row flex-wrap justify-center gap-2"
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Avatar color"
+          >
+            {AVATAR_HUE_OPTIONS.map((option) => (
+              <Button
+                key={option.hue}
+                isIconOnly
+                variant={hue === option.hue ? "secondary" : "ghost"}
+                accessibilityRole="radio"
+                accessibilityLabel={option.label}
+                accessibilityState={{ checked: hue === option.hue, disabled }}
+                isDisabled={disabled}
+                onPress={() => onHueChange(option.hue)}
+              >
+                <View className="size-6 rounded-full" style={{ backgroundColor: avatarHueSwatch(option.hue) }} />
+              </Button>
+            ))}
+            <View className="w-full items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-center"
+                accessibilityRole="radio"
+                accessibilityLabel="Automatic"
+                accessibilityState={{ checked: hue === null, disabled }}
+                isDisabled={disabled}
+                onPress={() => onHueChange(null)}
+              >
+                <Button.Label>{hue === null ? "✓ Automatic" : "Automatic"}</Button.Label>
+              </Button>
+            </View>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }

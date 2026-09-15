@@ -4,6 +4,7 @@ export { default as ArrowRight } from "lucide-solid/icons/arrow-right";
 export { default as ArrowUp } from "lucide-solid/icons/arrow-up";
 export { default as Bell } from "lucide-solid/icons/bell";
 export { default as BellOff } from "lucide-solid/icons/bell-off";
+export { default as Blocks } from "lucide-solid/icons/blocks";
 export { default as Bot } from "lucide-solid/icons/bot";
 export { default as Brain } from "lucide-solid/icons/brain";
 export { default as CalendarClock } from "lucide-solid/icons/calendar-clock";
@@ -62,6 +63,7 @@ export { default as PictureInPicture2 } from "lucide-solid/icons/picture-in-pict
 export { default as Pin } from "lucide-solid/icons/pin";
 export { default as PinOff } from "lucide-solid/icons/pin-off";
 export { default as Play } from "lucide-solid/icons/play";
+export { default as Plug } from "lucide-solid/icons/plug";
 export { default as Plus } from "lucide-solid/icons/plus";
 export { default as Puzzle } from "lucide-solid/icons/puzzle";
 export { default as RefreshCw } from "lucide-solid/icons/refresh-cw";

@@ -52,6 +52,7 @@ export interface MobileAgent {
   description: string;
   preview: string;
   updatedLabel: string;
+  avatarUrl?: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
 }
@@ -88,6 +89,8 @@ export interface MobileWorkspaceContextValue {
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   createAgent: (input: CreateAgentInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;
+  setAgentAvatar: (agentId: string, image: RemoteFileUpload | null, serverId: string) => Promise<void>;
+  loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
   deleteAgent: (agentId: string) => Promise<void>;
   duplicateAgent: (agentId: string) => Promise<void>;
   saveAgentMemory: (agentId: string, text: string, serverId: string, memoryId?: string) => Promise<void>;

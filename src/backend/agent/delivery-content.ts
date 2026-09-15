@@ -98,14 +98,12 @@ export function renderHandoffMessage(
   const attachmentMetadata = (message.attachments ?? [])
     .map((attachment) => `[attachment: ${attachment.name}; ${attachment.mimeType}; ${attachment.size} bytes]`)
     .join("\n");
-  const sender = message.senderAgentId ? ` agent:${message.senderAgentId}` : "";
-  return [
-    `[${message.createdAt}] ${message.author}${sender}:`,
-    displayMessageReferences(message.text, message.attachments ?? [], agentNames),
-    attachmentMetadata,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const senderName = message.senderAgentId ? agentNames.get(message.senderAgentId) : undefined;
+  const sender = message.senderAgentId
+    ? ` agent:${senderName ? `${senderName} (${message.senderAgentId})` : message.senderAgentId}`
+    : "";
+  const body = displayMessageReferences(message.text, message.attachments ?? [], agentNames);
+  return [`[${message.createdAt}] ${message.author}${sender}:`, body, attachmentMetadata].filter(Boolean).join("\n");
 }
 
 export function estimateTokens(text: string): number {

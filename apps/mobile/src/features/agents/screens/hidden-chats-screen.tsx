@@ -29,7 +29,14 @@ export function HiddenChatsScreen() {
       name: agent.name,
       href: { pathname: "/chat/[agentId]" as const, params: { agentId: agent.id } },
       avatar: (
-        <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={46} animateIdle={false} />
+        <BloubAvatar
+          agentId={agent.id}
+          serverId={agent.serverId}
+          hue={agent.avatarHue}
+          seed={agent.avatarSeed}
+          size={46}
+          animateIdle={false}
+        />
       ),
       show: () => {
         unhideAgent(agent.id);

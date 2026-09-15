@@ -31,6 +31,7 @@ import type {
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "../data";
+import type { McpServerConfig } from "../features/servers/mcp-servers";
 
 export const STORY_NOW = "2026-08-19T10:00:00.000Z";
 
@@ -737,6 +738,61 @@ export const STORY_INSTALLED_SKILLS: Record<string, InstalledSkill[]> = {
     },
   ],
 };
+
+export const STORY_MCP_SERVERS: McpServerConfig[] = [
+  {
+    id: "mcp-sqlite",
+    name: "Local SQLite",
+    transport: "stdio",
+    enabled: true,
+    command: "openai-dev-mcp",
+    args: ["serve-sqlite", "--database", "./openbot.db"],
+    env: [{ key: "SQLITE_READONLY", value: "1" }],
+    envPassthrough: ["HOME"],
+    workingDirectory: "~/code",
+    url: "",
+    headers: [],
+  },
+  {
+    id: "mcp-linear",
+    name: "Linear",
+    transport: "http",
+    enabled: true,
+    command: "",
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "https://mcp.linear.app/mcp",
+    headers: [{ key: "Authorization", value: "Bearer ***" }],
+  },
+  {
+    id: "mcp-figma",
+    name: "Figma",
+    transport: "http",
+    enabled: false,
+    command: "",
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "https://mcp.figma.com/mcp",
+    headers: [],
+  },
+  {
+    id: "mcp-playwright",
+    name: "Playwright",
+    transport: "stdio",
+    enabled: true,
+    command: "bunx @playwright/mcp",
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  },
+];
 
 export const STORY_SKILL_SUBMISSIONS: SkillSubmission[] = [
   {

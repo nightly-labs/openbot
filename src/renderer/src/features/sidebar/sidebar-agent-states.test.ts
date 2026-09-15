@@ -53,6 +53,30 @@ describe("computeSidebarAgentStates", () => {
     }
   });
 
+  it("shows working for the agent that owns the channel task, not the ones it holds up", () => {
+    const hold = {
+      reason: "channel-task" as const,
+      channelId: "channel-1",
+      channelName: "Project launch",
+      agentId: "chief",
+    };
+
+    // A channel turn runs on another thread: it reports no active turn and no started delivery
+    // here, so the hold is the only signal that the agent doing that work is busy. The same hold
+    // reaches every other agent's queue, because the assignment reserves the whole host.
+    const states = computeSidebarAgentStates(
+      input({
+        agentIds: ["chief", "sales"],
+        queues: {
+          chief: { ...queue("chief", "queued"), hold },
+          sales: { ...queue("sales", "queued"), hold },
+        },
+      }),
+    );
+
+    expect(states).toEqual({ chief: { kind: "working" } });
+  });
+
   it("counts unread replies ahead of the completed indicator", () => {
     const states = computeSidebarAgentStates(input({ unreadReplies: { chief: 2 }, recentReplies: { chief: true } }));
 

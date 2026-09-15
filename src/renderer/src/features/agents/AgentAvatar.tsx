@@ -17,6 +17,15 @@ const IDLE_CYCLE: Block[] = [slowerBlock("idle")];
 const WORKING_CYCLE: Block[] = [slowerBlock("orbit")];
 const CONNECTING_CYCLE: Block[] = [makeBlock("orbit"), makeBlock("swirl")];
 
+// The motions that rest until the pointer or focus arrives. `idle` is here
+// because it is what a sidebar row shows while its agent does nothing, and the
+// sidebar is not virtualized, so every row animates for as long as the list is
+// on screen. A profile of an idle window found four `idle` avatars driving 83
+// style recalculations a second, and that did not fall when the window lost
+// focus or was minimized. `working` and `connecting` keep animating: motion is
+// the only sidebar signal that an agent runs.
+const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
+
 function slowerBlock(state: StateId): Block {
   const block = makeBlock(state);
   return { ...block, duration: block.duration * SIDEBAR_MOTION_HOLD_FACTOR };
@@ -91,7 +100,7 @@ function GeneratedAvatar(props: {
   const profile = createMemo(() => bloubAvatarProfile(props.seed, props.hue));
   const cycle = createMemo(() => offsetCycle(DEFAULT_CYCLE, props.cycleOffset ?? 0));
   const animated = () =>
-    !reducedMotion() && (Boolean(props.animationState) || props.motion !== "hover" || interacting());
+    !reducedMotion() && (Boolean(props.animationState) || !STATIC_MOTIONS.has(props.motion) || interacting());
   const motionCycle = () => {
     if (props.animationState) return [slowerBlock(props.animationState)];
     if (props.motion === "connecting") return CONNECTING_CYCLE;

@@ -70,6 +70,7 @@ type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
   channels?: ChannelService;
+  mcpServers?: ForwardedApiOptions["mcpServers"];
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads">;
@@ -201,6 +202,7 @@ export class HostService extends EventEmitter<HostEvents> {
       store: options.store,
       agents: options.agents,
       channels: options.channels,
+      mcpServers: options.mcpServers,
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,

@@ -1,6 +1,8 @@
 import type {
   AvatarImageInput,
   InviteSummary,
+  McpServerConfig,
+  McpTestResult,
   TeamInviteSummary,
   TeamPresenceMember,
   UpdateTeamMemberInput,
@@ -39,8 +41,16 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsInvites, setServerSettingsInvites] = createSignal<TeamInviteSummary[]>([]);
     const [serverSettingsLoading, setServerSettingsLoading] = createSignal(false);
     const [serverSettingsError, setServerSettingsError] = createSignal<string | null>(null);
+    const [serverSettingsMcp, setServerSettingsMcp] = createSignal<McpServerConfig[]>([]);
+    const [serverSettingsMcpError, setServerSettingsMcpError] = createSignal<string | null>(null);
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
+    /**
+     * The same guard for the MCP list, counted separately. The two loads start from different
+     * events - a presence update refreshes the settings, opening the section reads the MCP list -
+     * so one counter would let either one discard the other's reply and its cleanup.
+     */
+    let serverSettingsMcpRequest = 0;
     let serverSettingsRestoreTarget: HTMLElement | null = null;
 
     const serverSettingsTarget = createMemo(() => servers().find((server) => server.id === serverSettingsTargetId()));
@@ -120,11 +130,14 @@ const ServerSettings = createSimpleContext({
 
     function openServerSettings(serverId: string, trigger: HTMLElement | null): void {
       serverSettingsRequest += 1;
+      serverSettingsMcpRequest += 1;
       serverSettingsRestoreTarget = trigger;
       setServerSettingsTargetId(serverId);
       setServerSettingsOpen(true);
       setServerSettingsMembers([]);
       setServerSettingsInvites([]);
+      setServerSettingsMcp([]);
+      setServerSettingsMcpError(null);
       setServerSettingsError(null);
       void refreshServerSettings(serverId);
     }
@@ -293,6 +306,106 @@ const ServerSettings = createSimpleContext({
         throw error;
       }
     }
+
+    /**
+     * The MCP list.
+     *
+     * It is read when the MCP section opens, not when the dialog opens, because most visits to this
+     * dialog never reach that section. Nothing connects here: OpenBot connects only when the user
+     * asks for a test, and the providers make their own connections when an agent starts.
+     */
+    async function refreshMcpServers(): Promise<void> {
+      const server = serverSettingsTarget();
+      if (!server) return;
+      const request = ++serverSettingsMcpRequest;
+      const current = (): boolean => request === serverSettingsMcpRequest && serverSettingsTargetId() === server.id;
+      try {
+        const configs = await window.openbot.agent.listMcpServers(server.id);
+        if (!current()) return;
+        setServerSettingsMcp(configs);
+        setServerSettingsMcpError(null);
+      } catch (error) {
+        // Reported in the panel rather than thrown: the callers ask for this list on a section
+        // change, where nothing is waiting for the promise and an unreported failure would leave
+        // the panel saying the server has no MCP servers at all.
+        if (current()) setServerSettingsMcpError(errorMessage(error, "The MCP servers could not load."));
+      }
+    }
+
+    /**
+     * One test connection, for the configuration the user is looking at. The configuration is sent
+     * whole rather than by id, so the form can test a draft that was never saved. The answer is not
+     * stored: the panel holds it while it is open, and it says nothing about any later moment.
+     */
+    async function testMcpServer(config: McpServerConfig): Promise<McpTestResult> {
+      const server = serverSettingsTarget();
+      if (!server) throw new Error("This server is not available.");
+      const analytics = desktopAnalytics.scope();
+      const result = await window.openbot.agent.testMcpServer({ config }, server.id);
+      analytics.track("team_action", {
+        action: "mcp_server_tested",
+        result: result.error ? "failed" : "succeeded",
+        server_kind: server.kind,
+        ...(result.error ? { failure_code: "mcp_server_test_failed" } : {}),
+      });
+      return result;
+    }
+
+    async function saveMcpServer(config: McpServerConfig): Promise<void> {
+      await runMcpMutation("mcp_server_saved", "mcp_server_save_failed", (serverId) =>
+        window.openbot.agent.saveMcpServer({ config }, serverId),
+      );
+    }
+
+    async function removeMcpServer(mcpServerId: string): Promise<void> {
+      await runMcpMutation("mcp_server_removed", "mcp_server_remove_failed", (serverId) =>
+        window.openbot.agent.removeMcpServer({ mcpServerId }, serverId),
+      );
+    }
+
+    async function setMcpServerEnabled(mcpServerId: string, enabled: boolean): Promise<void> {
+      await runMcpMutation("mcp_server_toggled", "mcp_server_toggle_failed", (serverId) =>
+        window.openbot.agent.setMcpServerEnabled({ mcpServerId, enabled }, serverId),
+      );
+    }
+
+    /**
+     * Main answers every mutation with the whole list, so the rows are taken from the reply rather
+     * than patched. The `operationSucceeded` latch keeps a failure after the write from being
+     * reported as a failed write, as every other mutation in this file does.
+     */
+    async function runMcpMutation(
+      action: "mcp_server_saved" | "mcp_server_removed" | "mcp_server_toggled",
+      failureCode: string,
+      mutate: (serverId: string) => Promise<McpServerConfig[]>,
+    ): Promise<void> {
+      const server = serverSettingsTarget();
+      if (!server) throw new Error("This server is not available.");
+      const analytics = desktopAnalytics.scope();
+      let operationSucceeded = false;
+      try {
+        const configs = await mutate(server.id);
+        analytics.track("team_action", { action, result: "succeeded", server_kind: server.kind });
+        operationSucceeded = true;
+        if (serverSettingsTargetId() !== server.id) return;
+        // A read that is still in flight started before this write and would answer with the list
+        // as it was, putting a removed server back or showing the old enabled state. The reply
+        // carries the whole list, so nothing is lost by dropping that read.
+        serverSettingsMcpRequest += 1;
+        setServerSettingsMcp(configs);
+        setServerSettingsMcpError(null);
+      } catch (error) {
+        if (!operationSucceeded) {
+          analytics.track("team_action", {
+            action,
+            result: "failed",
+            server_kind: server.kind,
+            failure_code: failureCode,
+          });
+        }
+        throw error;
+      }
+    }
     return {
       serverSettingsTarget,
       serverSettingsOpen,
@@ -310,6 +423,13 @@ const ServerSettings = createSimpleContext({
       updateServerMember,
       removeServerMember,
       revokeServerInvite,
+      serverSettingsMcp,
+      serverSettingsMcpError,
+      refreshMcpServers,
+      saveMcpServer,
+      removeMcpServer,
+      setMcpServerEnabled,
+      testMcpServer,
     };
   },
 });
