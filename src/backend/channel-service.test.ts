@@ -23,6 +23,7 @@ let data: ReturnType<typeof stores>;
 let draft: ChannelDraft;
 const actor = { id: "human-1", name: "Alex" };
 const changed = vi.fn();
+const queueHoldChanged = vi.fn();
 const schedule = vi.fn();
 const interrupt = vi.fn(async () => undefined);
 const busy = vi.fn((_agentId: string) => false);
@@ -49,6 +50,7 @@ beforeEach(async () => {
   busy.mockReset();
   busy.mockReturnValue(false);
   changed.mockClear();
+  queueHoldChanged.mockClear();
   service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
@@ -56,6 +58,7 @@ beforeEach(async () => {
     interrupt,
     busy,
     changed,
+    queueHoldChanged,
     error: (error) => {
       throw error;
     },
@@ -99,6 +102,36 @@ describe("shared channel coordination", () => {
     expect(execution?.text).toContain(task.instruction);
     expect(data.mailbox.conversationMessages("agent-a")).toEqual([]);
   });
+  it("reports the hold of a waiting queue when the assignment changes, not for its turn traffic", async () => {
+    await send("Prepare the report");
+    // An agent held by this work drains nothing, so its queue has no event of its own. The hold it
+    // shows is only as new as the last one reported here.
+    await vi.waitFor(() => expect(queueHoldChanged).toHaveBeenCalledTimes(1));
+    expect(service.queueHold("agent-b")).toEqual({
+      reason: "channel-task",
+      channelId: "channel-1",
+      channelName: "Release coordination",
+      agentId: "agent-a",
+    });
+
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = assignment.deliveryId ?? "";
+    service.accepted(deliveryId, "session-1", "turn-1");
+    expect(queueHoldChanged).toHaveBeenCalledTimes(1);
+
+    // Two tasks that reserve nothing run at the same time. The queue of agent-b waits behind the
+    // host as well, but the work it waits for is its own, and its chat has to show that.
+    service.store.update(service.store.get("channel-1"), {
+      assignments: [{ ...assignment, id: "assignment-b", agentId: "agent-b", deliveryId: null, turnId: null }],
+    });
+    expect(service.queueHold("agent-b")?.agentId).toBe("agent-b");
+    expect(service.queueHold("agent-a")?.agentId).toBe("agent-a");
+
+    service.deliveryFailed(deliveryId, "The provider stopped.");
+    expect(queueHoldChanged).toHaveBeenCalledTimes(2);
+    expect(service.queueHold("agent-a")?.agentId).toBe("agent-b");
+  });
+
   it("saves one visible request when a command is retried", async () => {
     const command = {
       type: "send" as const,

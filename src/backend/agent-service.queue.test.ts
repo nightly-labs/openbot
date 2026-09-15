@@ -1106,6 +1106,66 @@ describe.sequential("AgentService: queue", () => {
     await expect(update).rejects.toThrow(/Runtime download failed/u);
   });
 
+  it("says which channel a message waits for, and runs it when that work ends", async () => {
+    const { store, mailbox } = stores(root);
+    service = new AgentService(store, mailbox, fakeBrowser());
+    await service.initialize();
+    await store.getOrCreate("chief");
+
+    const actor = { id: "human", name: "Alex" };
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-1",
+        operationId: "create",
+        draft: {
+          name: "project",
+          title: "Project launch",
+          instructions: "Shared work",
+          members: [{ agentId: "chief" }],
+          leadAgentId: "chief",
+        },
+      },
+      actor,
+    );
+    await service.channels.command(
+      {
+        type: "send",
+        channelId: "channel-1",
+        operationId: "send",
+        text: "Work in the channel.",
+        recipientAgentId: "chief",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      actor,
+    );
+    await waitFor(() => service?.channels.store.assignments("channel-1").some((item) => item.turnId));
+
+    // The channel turn runs on its own thread, so nothing in this agent's own chat reports it.
+    await service.sendMessage({ agentId: "chief", text: "Read the report" });
+    await waitFor(() => service?.listQueue("chief").hold !== undefined);
+
+    const held = service.listQueue("chief");
+    expect(held.hold).toEqual({
+      reason: "channel-task",
+      channelId: "channel-1",
+      channelName: "Project launch",
+      agentId: "chief",
+    });
+    // Waiting, not failed: a message to a busy agent always queues.
+    expect(held.deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
+
+    const turnId = service.channels.store.assignments("channel-1")[0]?.turnId ?? "";
+    await service.interrupt("chief", turnId, service.channels.store.context("channel-1", "chief").threadId);
+
+    await waitFor(() => {
+      const queue = service?.listQueue("chief");
+      return queue?.deliveries.some((delivery) => delivery.status === "running") === true;
+    });
+    expect(service.listQueue("chief").hold).toBeUndefined();
+  });
+
   it("waits for active queue drains before shutdown completes", async () => {
     process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "100";
     const { store, mailbox } = stores(root);

@@ -25,13 +25,13 @@ export interface SidebarAgentStatesInput {
 export function computeSidebarAgentStates(input: SidebarAgentStatesInput): Record<string, SidebarAgentState> {
   const states: Record<string, SidebarAgentState> = {};
   for (const agentId of input.agentIds) {
+    // A channel turn belongs to another thread, so it reports no active turn and no running
+    // delivery here. The queue's hold is the only signal that the agent doing that work is busy.
+    const queue = input.queues[agentId];
     const working =
       Boolean(input.activeTurns[agentId]) ||
-      Boolean(
-        input.queues[agentId]?.deliveries.some(
-          (delivery) => delivery.status === "starting" || delivery.status === "running",
-        ),
-      );
+      queue?.hold?.agentId === agentId ||
+      Boolean(queue?.deliveries.some((delivery) => delivery.status === "starting" || delivery.status === "running"));
     if (working) states[agentId] = { kind: "working" };
     else if ((input.unreadReplies[agentId] ?? 0) > 0) {
       states[agentId] = { kind: "unread", count: input.unreadReplies[agentId] ?? 1 };

@@ -410,6 +410,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        // Read late: `channels` is built after this.
+        queueHold: (agentId) => this.channels.queueHold(agentId),
       },
     });
     this.#boot = new BootRecovery({
@@ -530,6 +532,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#emit({ type: "channels-changed", channelId, revision });
       },
       memoriesChanged: (channelId) => this.#emit({ type: "channel-memories-changed", channelId }),
+      // A held agent starts nothing, so its queue has no event of its own while the reservation
+      // moves. Without this its panel keeps naming the channel task that has already ended.
+      queueHoldChanged: () => {
+        for (const agent of this.#store.list())
+          if (this.#mailbox.nextQueued(agent.id)) this.#mailboxSync.emitQueue(agent.id);
+      },
       error: (error) => this.#emitError("channel_coordination_failed", error),
     });
     this.#channelRoutines = new ChannelRoutineScheduler({
@@ -1463,7 +1471,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   listQueue(agentId: string): QueueSnapshot {
-    return this.#mailbox.listQueue(agentId);
+    return this.#mailboxSync.queueSnapshot(agentId);
   }
 
   acknowledgeFailedTurn(agentId: string, turnId: string): void {

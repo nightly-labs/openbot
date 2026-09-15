@@ -221,8 +221,12 @@ export class DrainScheduler {
       }
       let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
+      // A turn started on this thread while the provider and the thread were prepared. The user
+      // cannot see that race, so the delivery goes back to the head of the queue rather than
+      // failing: a message to a busy agent always waits. `drainAgent` reschedules it in its
+      // `finally`, and `mayDrain` holds it there until the turn ends.
       if (snapshot.activeTurnId) {
-        await this.#mailbox.markTerminal(delivery.id, "failed", "The recipient already has an active turn.");
+        await this.#mailbox.restoreQueued(delivery.id);
         this.#mailboxSync.emitQueue(agent.id);
         return;
       }

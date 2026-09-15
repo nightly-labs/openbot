@@ -1,5 +1,5 @@
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { InstalledSkill, QueueDelivery } from "@openbot/contracts/ipc";
+import type { InstalledSkill, QueueDelivery, QueueHold } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
 import { Button } from "../../components/ui";
@@ -12,6 +12,8 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 
 interface QueuePanelProps {
   deliveries: QueueDelivery[];
+  /** Why the queue is waiting, when the cause is not a turn this conversation can show. */
+  hold?: QueueHold | null;
   agents?: AgentProfile[];
   skills?: InstalledSkill[];
   editingDeliveryId?: string | null;
@@ -346,6 +348,11 @@ export function QueuePanel(props: QueuePanelProps) {
     return text || delivery.attachments.map((attachment) => attachment.name).join(", ") || "Attachment";
   }
 
+  function holdText(hold: QueueHold): string {
+    const name = (props.agents ?? []).find((agent) => agent.id === hold.agentId)?.name;
+    return `Waiting - ${name ?? "this agent"} is working in ${hold.channelName}`;
+  }
+
   function openActionTooltip(anchor: HTMLElement, content: string) {
     setActionTooltip({ anchor, content });
   }
@@ -386,6 +393,13 @@ export function QueuePanel(props: QueuePanelProps) {
           dragPreview.stop();
         }}
       >
+        <Show when={props.hold}>
+          {(hold) => (
+            <p class="agent-queue-hold" role="status">
+              {holdText(hold())}
+            </p>
+          )}
+        </Show>
         <div class="agent-queue-panel-resize" ref={(element) => (queueResizeContainer = element)}>
           <div class="agent-queue-panel-list" ref={(element) => (queueList = element)}>
             <For each={visibleDeliveries()}>
