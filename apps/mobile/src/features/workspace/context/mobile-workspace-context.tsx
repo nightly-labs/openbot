@@ -51,6 +51,7 @@ import { Alert, View } from "react-native";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
   ServerConnection,
@@ -58,7 +59,12 @@ import {
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
 import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
-import { canToggleAgentPin, reconcileAgentPins } from "@/features/workspace/model/agent-pins";
+import {
+  canToggleAgentPin,
+  reconcileAgentPins,
+  reconcileChannelPins,
+  setChannelHidden,
+} from "@/features/workspace/model/agent-pins";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
@@ -70,6 +76,7 @@ import type {
   MobileServerDirectoryState,
   MobileWorkspaceContextValue,
 } from "@/features/workspace/model/workspace-types";
+import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 
 export type {
@@ -162,8 +169,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [session.apiUrl, session.user.id],
   );
   const [preferences, setPreferences] = useState<Record<string, RemoteWorkspacePreferences>>({});
+  const preferencesRef = useRef(preferences);
+  preferencesRef.current = preferences;
   const hiddenAgentIds = (activeServerId ? preferences[activeServerId]?.hidden : null) ?? [];
   const pinnedAgentIds = (activeServerId ? preferences[activeServerId]?.pinned : null) ?? [];
+  const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? [];
+  const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? [];
   const readWrites = useRef(new Map<string, Promise<void>>());
   const [unreadAgentIds, setUnreadAgentIds] = useState<string[]>([]);
 
@@ -267,6 +278,29 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
 
+  const channelStore = useMemo(
+    () =>
+      new MobileChannelStore(request, (serverId, channels) => {
+        const pinned = preferencesRef.current[serverId]?.pinnedChannels;
+        if (!pinned?.length) return;
+        const available = new Set(channels.map((channel) => channel.id));
+        if (pinned.every((id) => available.has(id))) return;
+        try {
+          const saved = reconcileChannelPins(preferenceStore, serverId, channels);
+          setPreferences((current) => ({ ...current, [serverId]: saved }));
+        } catch {
+          Alert.alert("Could not save chat preferences", "Your previous preferences have been kept. Please try again.");
+        }
+      }),
+    [request, preferenceStore],
+  );
+  useEffect(() => () => channelStore.dispose(), [channelStore]);
+  useEffect(() => channelStore.setActive(foreground), [channelStore, foreground]);
+
+  useEffect(() => {
+    channelStore.retainServers(servers.map((server) => server.id));
+  }, [servers, channelStore]);
+
   const replaceServerAgents = useCallback(
     (serverId: string, summaries: RemoteAgent[]) => {
       try {
@@ -302,6 +336,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         throw new Error("Update OpenBot Mobile or the desktop app before connecting.");
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
+      channelStore.configure(serverId, compatibility.capabilities);
+      void channelStore.refresh(serverId);
       context.stage = "agents";
       const summaries = await client.request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
       if (!context.isCurrent()) return;
@@ -335,7 +371,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       context.stage = "connection";
     },
-    [replaceServerAgents, preferenceStore, readRefresh, conversationStore],
+    [replaceServerAgents, preferenceStore, readRefresh, conversationStore, channelStore],
   );
 
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
@@ -412,6 +448,31 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
+      if (
+        event.type === "channels-changed" ||
+        event.type === "channel-memories-changed" ||
+        event.type === "channel-routines-changed"
+      ) {
+        if (event.type === "channels-changed") void channelStore.refresh(serverId, event.channelId);
+        void queryClient.invalidateQueries({
+          queryKey: [
+            "channel-info",
+            session.apiUrl,
+            session.user.id,
+            sessionScope,
+            serverId,
+            event.channelId,
+            ...(event.type === "channel-memories-changed"
+              ? ["memories"]
+              : event.type === "channel-routines-changed"
+                ? ["routines"]
+                : []),
+          ],
+          // Message streaming also emits channels-changed. Only settings events need an immediate settings read.
+          refetchType: event.type === "channels-changed" ? "none" : "active",
+        });
+        return;
+      }
       if (event.type === "team-presence") {
         const signature = JSON.stringify(
           event.snapshot.members.map((member) => [member.id, member.role, member.disabled, member.online]),
@@ -474,6 +535,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
     },
     [
+      channelStore,
       loadConversation,
       replaceServerAgents,
       conversationStore,
@@ -555,6 +617,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const value = useMemo<MobileWorkspaceContextValue>(() => {
     const activeServer = servers.find((server) => server.id === activeServerId) ?? EMPTY_SERVER;
     const workspace: MobileWorkspaceContextValue = {
+      channelStore,
       servers,
       teamDirectory: directory,
       serverDirectoryState,
@@ -566,6 +629,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         : [],
       hiddenAgents: agents.filter((agent) => agent.serverId === activeServer.id && hiddenAgentIds.includes(agent.id)),
       pinnedAgentIds,
+      pinnedChannelIds,
+      hiddenChannelIds,
+      hideChannel: (id, serverId) =>
+        Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, true))),
+      unhideChannel: (id, serverId) =>
+        Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, false))),
       unreadAgentIds,
       conversationStore,
       activityByServer,
@@ -897,6 +966,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       hideAgent: (agentId) => {
         const saved = updatePreferences(activeServer.id, (current) => ({
+          ...current,
           hidden: [...new Set([...current.hidden, agentId])],
           pinned: current.pinned.filter((id) => id !== agentId),
         }));
@@ -913,8 +983,22 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       markAgentUnread: (agentId) => {
         markAgentRead(agentId, null);
       },
+      toggleChannelPin: (channelId, serverId) => {
+        let result: "pinned" | "unpinned" = "pinned";
+        const saved = updatePreferences(serverId, (current) => {
+          const pinned = current.pinnedChannels ?? [];
+          if (!canToggleAgentPin([...current.pinned, ...pinned], channelId)) return current;
+          result = pinned.includes(channelId) ? "unpinned" : "pinned";
+          return {
+            ...current,
+            pinnedChannels: result === "unpinned" ? pinned.filter((id) => id !== channelId) : [...pinned, channelId],
+          };
+        });
+        if (!saved || (result === "pinned" && !saved.pinnedChannels?.includes(channelId))) return "error";
+        return result;
+      },
       toggleAgentPin: (agentId) => {
-        if (!canToggleAgentPin(pinnedAgentIds, agentId)) return "error";
+        if (!canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agentId)) return "error";
         if (pinnedAgentIds.includes(agentId)) {
           return updatePreferences(activeServer.id, (current) => ({
             ...current,
@@ -933,6 +1017,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     };
     return trackWorkspaceActions(workspace);
   }, [
+    channelStore,
     activeServerId,
     activityByServer,
     agents,
@@ -944,6 +1029,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     loadOlderMessages,
     markAgentRead,
     pinnedAgentIds,
+    pinnedChannelIds,
+    hiddenChannelIds,
     refreshHosts,
     readRefresh,
     request,
@@ -1004,17 +1091,6 @@ function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
   };
-}
-
-function formatUpdatedAt(value: string | null): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const today = new Date();
-  if (date.toDateString() === today.toDateString()) {
-    return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date);
-  }
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
 }
 
 function decodeAgent(value: unknown): RemoteAgent {

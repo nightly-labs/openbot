@@ -2,31 +2,45 @@ import {
   type AgentAnalytics,
   type AgentMemory,
   analyticsRange,
+  CHANNEL_CHATS_CAPABILITY,
+  CHANNEL_DELETE_CAPABILITY,
+  type ChannelSummary,
+  type ChannelTask,
   type CreateAgentInput,
   emptyAnalyticsTotals,
+  parseChannelCommand,
   type Routine,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
-import { act, type PropsWithChildren } from "react";
+import { act, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { ChatTarget } from "@/features/chat/model/chat-target";
 import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { ChannelHistoryRefreshError, MobileChannelStore } from "../../channels/model/channel-store";
+import { ChannelActionsScreen } from "../../channels/screens/channel-actions-screen";
+import { ChannelFormScreen } from "../../channels/screens/channel-form-screen";
 import { ChatHeader } from "../../chat/components/chat-header";
 import { saveAgentRecord } from "../../workspace/model/save-agent-record";
 import type { MobileAgent, MobileServer } from "../../workspace/model/workspace-types";
 import { useAgentContextMenu } from "../components/agent-context-menu";
 import { AddAgentScreen } from "./add-agent-screen";
 import { EditAgentScreen } from "./edit-agent-screen";
+import { HiddenChatsScreen } from "./hidden-chats-screen";
 
-vi.mock("expo-crypto", () => ({ randomUUID: () => "new-agent-seed" }));
+vi.mock("expo-crypto", () => ({ randomUUID: () => mocks.uuid() }));
 
 vi.mock("expo-secure-store", () => ({}));
 
 const mocks = vi.hoisted(() => ({
+  uuid: vi.fn(() => "new-agent-seed"),
   push: vi.fn(),
+  replace: vi.fn(),
   dispatch: vi.fn(),
   alert: vi.fn(),
   back: vi.fn(),
@@ -58,12 +72,58 @@ const host: MobileServer = {
   membershipId: "member",
   role: "member",
 };
+const channel: ChannelSummary = {
+  id: "channel-one",
+  name: "Travel channel",
+  title: "Trip planning",
+  instructions: "Compare routes",
+  members: [{ agentId: "agent-one" }],
+  leadAgentId: "agent-one",
+  revision: 1,
+  createdAt: "2026-09-14T00:00:00Z",
+  archived: false,
+  unreadCount: 0,
+  activeTasks: 0,
+  lastMessage: null,
+};
+let channelRows = [channel];
+let actionTasks: ChannelTask[] = [];
+let failChannelSave = false;
+const channelRequests = vi.fn(async (path: string, body?: TeamProtocolV2Json) => {
+  if (path === CHANNEL_ROUTES.list) return channelRows;
+  if (path === CHANNEL_ROUTES.read)
+    return { channel, tasks: actionTasks, messages: [], olderCursor: null, throughSequence: 0 };
+  const command = parseChannelCommand(body);
+  if (failChannelSave) throw new Error("Could not save this channel.");
+  if (command.type === "save") {
+    const saved = { ...channel, ...command.draft, id: command.channelId, revision: channel.revision + 1 };
+    channelRows = [saved];
+    return saved;
+  }
+  if (command.type === "resume" || command.type === "reassign")
+    actionTasks = actionTasks.filter((task) => task.id !== command.taskId);
+  return channel;
+});
+function createChannelStore() {
+  const store = new MobileChannelStore(async (_method, path, decode, body) =>
+    decode(await channelRequests(path, body)),
+  );
+  store.configure("host-one", [CHANNEL_CHATS_CAPABILITY, CHANNEL_DELETE_CAPABILITY]);
+  return store;
+}
+const hiddenChannelIds: string[] = [];
+const hiddenAgents: MobileAgent[] = [];
 const workspace = {
+  channelStore: createChannelStore(),
   agents: [original],
   servers: [host],
   activeServer: host,
   activityByServer: {},
   pinnedAgentIds: [],
+  pinnedChannelIds: [],
+  hiddenAgents,
+  hiddenChannelIds,
+  unhideChannel: vi.fn((_id: string, _serverId: string) => true),
   unreadAgentIds: [],
   createAgent: vi.fn(async (_input: CreateAgentInput) => {}),
   updateAgent: vi.fn(async (input: UpdateAgentInput, _serverId?: string) => {
@@ -109,10 +169,16 @@ vi.mock("expo-router", () => ({
         ),
     }),
   },
-  router: { push: mocks.push, back: mocks.back },
-  useLocalSearchParams: () => ({ agentId: "agent-one", serverId: "host-one", recordId: mocks.recordId }),
+  router: { push: mocks.push, back: mocks.back, replace: mocks.replace },
+  useLocalSearchParams: () => ({
+    agentId: "agent-one",
+    channelId: "channel-one",
+    serverId: "host-one",
+    recordId: mocks.recordId,
+  }),
   useNavigation: () => ({ dispatch: mocks.dispatch }),
-  Link: {
+  Link: Object.assign(({ children }: PropsWithChildren) => <>{children}</>, {
+    Trigger: ({ children }: PropsWithChildren) => children,
     AppleZoomTarget: ({ children }: PropsWithChildren) => children,
     Menu: ({ children }: PropsWithChildren) => <div>{children}</div>,
     MenuAction: ({ children, onPress }: PropsWithChildren<{ onPress: () => void }>) => (
@@ -120,7 +186,7 @@ vi.mock("expo-router", () => ({
         {children}
       </button>
     ),
-  },
+  }),
 }));
 vi.mock("expo-router/react-navigation", () => ({
   usePreventRemove: (blocked: boolean, callback: (value: { data: { action: { type: string } } }) => void) => {
@@ -135,17 +201,37 @@ vi.mock("expo-router/react-navigation", () => ({
 vi.mock("react-native", () => ({
   Alert: { alert: mocks.alert },
   Platform: { OS: "ios" },
+  useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
   View: ({ children }: PropsWithChildren) => <div>{children}</div>,
   Pressable: ({
     children,
     onPress,
     accessibilityLabel,
-  }: PropsWithChildren<{ onPress: () => void; accessibilityLabel: string }>) => (
-    <button type="button" aria-label={accessibilityLabel} onClick={onPress}>
-      {children}
-    </button>
-  ),
+    accessibilityRole,
+    accessibilityState,
+    disabled,
+  }: PropsWithChildren<{
+    onPress: () => void;
+    accessibilityLabel: string;
+    accessibilityRole?: "button" | "checkbox";
+    accessibilityState?: { checked?: boolean };
+    disabled?: boolean;
+  }>) =>
+    accessibilityRole === "checkbox" ? (
+      <input
+        type="checkbox"
+        checked={accessibilityState?.checked ?? false}
+        disabled={disabled}
+        aria-label={accessibilityLabel}
+        onChange={onPress}
+      />
+    ) : (
+      <button type="button" disabled={disabled} aria-label={accessibilityLabel} onClick={onPress}>
+        {children}
+      </button>
+    ),
 }));
+vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => "gray" }));
 vi.mock("heroui-native", () => {
   const Text = ({ children }: PropsWithChildren) => <span>{children}</span>;
   const Button = ({
@@ -235,7 +321,17 @@ vi.mock("@/features/agents/components/agent-pin-transition", () => ({
   useAgentPinTransition: () => ({ toggleAgentPinAnimated: vi.fn() }),
 }));
 vi.mock("expo-glass-effect", () => ({ GlassView: ({ children }: PropsWithChildren) => <div>{children}</div> }));
-vi.mock("@/features/chat/components/chat-glass-icon-button", () => ({ ChatGlassIconButton: () => null }));
+vi.mock("@/features/chat/components/chat-glass-icon-button", () => ({
+  ChatGlassIconButton: ({
+    children,
+    accessibilityLabel,
+    onPress,
+  }: PropsWithChildren<{ accessibilityLabel: string; onPress: () => void }>) => (
+    <button type="button" aria-label={accessibilityLabel} onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));
 vi.mock("@/shared/components/sheet-scroll-edge-effect", () => ({ SheetScrollEdgeEffect: () => null }));
 vi.mock("@expo/ui/community/datetime-picker", () => ({
   DateTimePicker: ({
@@ -313,8 +409,8 @@ vi.mock("@expo/ui", () => {
   };
 });
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
-vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {} } }));
-vi.mock("lucide-react-native", () => ({ ArrowLeft: () => null }));
+vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {}, notification: async () => {} } }));
+vi.mock("lucide-react-native", () => ({ ArrowLeft: () => null, Eye: () => null, TriangleAlert: () => null }));
 
 const container = document.createElement("div");
 document.body.append(container);
@@ -338,10 +434,13 @@ async function edit(name: string, value: string) {
   await act(() => fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } }));
 }
 beforeEach(() => {
+  mocks.uuid.mockReset().mockReturnValue("new-agent-seed");
   useHapticsPreference.setState({ enabled: true, ready: true });
   workspace.agents = [{ ...original }];
   workspace.servers = [{ ...host }];
   workspace.activeServer = host;
+  hiddenChannelIds.length = 0;
+  workspace.unhideChannel.mockReset().mockReturnValue(true);
   workspace.createAgent.mockReset().mockResolvedValue();
   workspace.updateAgent.mockClear();
   workspace.saveAgentMemory.mockClear();
@@ -352,6 +451,12 @@ beforeEach(() => {
   workspace.loadAgentMemories.mockReset().mockResolvedValue([]);
   workspace.loadAgentRoutines.mockReset().mockResolvedValue([]);
   workspace.loadAgentAnalytics.mockReset().mockResolvedValue(null);
+  channelRows = [channel];
+  actionTasks = [];
+  failChannelSave = false;
+  workspace.channelStore = createChannelStore();
+  channelRequests.mockClear();
+  mocks.replace.mockClear();
   mocks.recordId = "";
   mocks.blocked = false;
   mocks.leave = () => {};
@@ -376,7 +481,7 @@ it.each([true, false])("keeps the native Info action available with haptics enab
     root.render(
       <>
         <ChatHeader
-          agent={original}
+          target={{ ...original, kind: "agent" }}
           fallbackBackground="white"
           foreground="black"
           liquidGlassAvailable={false}
@@ -394,6 +499,26 @@ it.each([true, false])("keeps the native Info action available with haptics enab
     [{ pathname: "/agent-info/[agentId]", params: { agentId: original.id, serverId: original.serverId } }],
     [{ pathname: "/agent-info/[agentId]", params: { agentId: original.id, serverId: original.serverId } }],
   ]);
+});
+
+it("opens channel settings from the shared chat header", async () => {
+  await act(() =>
+    root.render(
+      <ChatHeader
+        target={{ kind: "channel", id: channel.id, serverId: host.id, name: channel.name, members: [original] }}
+        fallbackBackground="white"
+        foreground="black"
+        liquidGlassAvailable={false}
+        topInset={0}
+        onBack={() => {}}
+      />,
+    ),
+  );
+  await act(() => fireEvent.click(screen.getByRole("button", { name: `Info for ${channel.name}` })));
+  expect(mocks.push).toHaveBeenCalledWith({
+    pathname: "/channel-info/[channelId]",
+    params: { channelId: channel.id, serverId: host.id },
+  });
 });
 
 it("saves name and instructions on the original host and shows them after reopening", async () => {
@@ -1012,3 +1137,252 @@ it("shows an incomplete routine change and hides it when the time zone is restor
   await edit("Time zone", initialTimezone);
   expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 });
+
+async function renderChannel(create = false) {
+  await act(async () => {
+    await workspace.channelStore.refresh("host-one");
+    root.render(<ChannelFormScreen create={create} />);
+  });
+}
+it("creates a mobile channel with selected agents and opens its conversation", async () => {
+  await renderChannel(true);
+  expect(screen.queryByRole("button", { name: "Create channel" })).toBeNull();
+  await act(() => fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Planning" } }));
+  await click("Travel", "checkbox");
+  expect(screen.queryByText("Automatic")).toBeNull();
+  await click("Create channel");
+  await waitFor(() =>
+    expect(mocks.replace).toHaveBeenCalledWith({
+      pathname: "/channel/[channelId]",
+      params: { channelId: "channel-new-agent-seed", serverId: "host-one" },
+    }),
+  );
+  expect(channelRequests).toHaveBeenCalledWith(
+    CHANNEL_ROUTES.command,
+    expect.objectContaining({
+      type: "save",
+      draft: expect.objectContaining({
+        name: "Planning",
+        members: [{ agentId: "agent-one" }],
+        leadAgentId: "agent-one",
+      }),
+    }),
+  );
+});
+it("keeps a failed channel draft and retries the same operation", async () => {
+  await renderChannel();
+  await act(() => fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Renamed" } }));
+  await click("Travel", "checkbox");
+  failChannelSave = true;
+  await click("Save channel");
+  expect(screen.getByRole("textbox", { name: "Name" })).toHaveProperty("value", "Renamed");
+  expect(mocks.blocked).toBe(true);
+  failChannelSave = false;
+  await click("Save channel");
+  const saves = channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command);
+  expect(saves).toHaveLength(2);
+  expect(saves[1]?.[1]).toEqual(saves[0]?.[1]);
+  expect(saves[1]?.[1]).toMatchObject({ update: true, draft: { name: "Renamed", members: [], leadAgentId: null } });
+});
+it("uses a new save operation after a successful save and a desktop edit", async () => {
+  await renderChannel();
+  mocks.uuid.mockReturnValueOnce("save-one").mockReturnValueOnce("save-two");
+  await edit("Name", "Planning");
+  await click("Save channel");
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Save channel" })).toBeNull());
+  channelRows = [{ ...channel, name: "Travel", revision: 3 }];
+  await act(async () => workspace.channelStore.refresh("host-one"));
+  expect(screen.getByRole("textbox", { name: "Name" })).toHaveProperty("value", "Travel");
+  await edit("Name", "Planning");
+  await click("Save channel");
+  const saves = channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command);
+  expect(saves.map(([, body]) => parseChannelCommand(body))).toMatchObject([
+    { operationId: "save-one", draft: { name: "Planning" } },
+    { operationId: "save-two", draft: { name: "Planning" } },
+  ]);
+  expect(workspace.channelStore.get("host-one").channels[0]?.name).toBe("Planning");
+});
+
+it("opens channel memories and routines from the channel settings sheet", async () => {
+  await renderChannel();
+  await click("Memories");
+  expect(mocks.push).toHaveBeenCalledWith({
+    pathname: "/channel-info/[channelId]/memories",
+    params: { channelId: "channel-one", serverId: "host-one" },
+  });
+  await click("Routines");
+  expect(mocks.push).toHaveBeenCalledWith({
+    pathname: "/channel-info/[channelId]/routines",
+    params: { channelId: "channel-one", serverId: "host-one" },
+  });
+  expect(screen.queryByRole("button", { name: "Delete channel" })).toBeNull();
+});
+
+it("restores a channel from Hidden chats and keeps the sheet open if saving fails", async () => {
+  await workspace.channelStore.refresh(host.id);
+  hiddenChannelIds.push(channel.id);
+  mocks.back.mockClear();
+  await act(() => root.render(<HiddenChatsScreen />));
+  expect(screen.getByRole("button", { name: `Open chat with ${channel.name}` })).toBeTruthy();
+  workspace.unhideChannel.mockReturnValueOnce(false);
+  await click(`Show ${channel.name}`);
+  expect(mocks.back).not.toHaveBeenCalled();
+  await click(`Show ${channel.name}`);
+  expect(workspace.unhideChannel).toHaveBeenLastCalledWith(channel.id, host.id);
+  expect(mocks.back).toHaveBeenCalledTimes(1);
+});
+
+vi.mock("@expo/ui/community/menu", () => ({
+  MenuView: ({
+    actions,
+    onPressAction,
+    shouldOpenOnLongPress,
+  }: {
+    actions: { id: string; title: string; attributes?: { disabled?: boolean } }[];
+    onPressAction: (event: { nativeEvent: { event: string } }) => void;
+    shouldOpenOnLongPress?: boolean;
+  }) => {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button
+          type="button"
+          disabled={actions.every((action) => action.attributes?.disabled)}
+          onClick={() => {
+            if (!shouldOpenOnLongPress) setOpen(true);
+          }}
+        >
+          Reassign
+        </button>
+        {open
+          ? actions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                disabled={action.attributes?.disabled}
+                onClick={() => onPressAction({ nativeEvent: { event: action.id } })}
+              >
+                {action.title}
+              </button>
+            ))
+          : null}
+      </div>
+    );
+  },
+}));
+
+it("opens the action sheet from the warning button only when action is needed", async () => {
+  const renderHeader = (needsAction: boolean) =>
+    act(() =>
+      root.render(
+        <ChatHeader
+          target={{ kind: "channel", id: channel.id, serverId: host.id, name: channel.name, members: [original] }}
+          fallbackBackground="white"
+          foreground="black"
+          liquidGlassAvailable={false}
+          topInset={0}
+          onBack={() => {}}
+          needsAction={needsAction}
+        />,
+      ),
+    );
+  await renderHeader(false);
+  expect(screen.queryByRole("button", { name: "Actions needed" })).toBeNull();
+  await renderHeader(true);
+  await click("Actions needed");
+  expect(mocks.push).toHaveBeenCalledWith({
+    pathname: "/channel-actions/[channelId]",
+    params: { channelId: channel.id, serverId: host.id },
+  });
+  await renderHeader(false);
+  expect(screen.queryByRole("button", { name: "Actions needed" })).toBeNull();
+});
+
+const failedAction: ChannelTask = {
+  id: "task-one",
+  channelId: channel.id,
+  parentTaskId: null,
+  rootTaskId: "task-one",
+  ownerAgentId: original.id,
+  requestMessageId: "message-one",
+  instruction: "Ask @[Travel](agent:agent-one) to compare routes.",
+  attachmentDraftIds: [],
+  expectedResult: "A route",
+  sourceMessageIds: [],
+  dependencies: [],
+  resources: [],
+  state: "failed",
+  revision: 1,
+  assignmentCount: 1,
+  error: "Could not complete the task.",
+};
+it("shows recovery actions in the sheet and removes resolved tasks", async () => {
+  actionTasks = [failedAction, { ...failedAction, id: "task-running", state: "running" }];
+  await act(() => root.render(<ChannelActionsScreen />));
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Resume" })).toHaveLength(1));
+  expect(screen.queryByText("@Travel")).toBeNull();
+  expect(screen.getAllByText("Travel").length).toBeGreaterThan(1);
+  await click("Resume");
+  await waitFor(() => expect(screen.getByText("No actions needed.")).toBeTruthy());
+  expect(channelRequests).toHaveBeenCalledWith(
+    CHANNEL_ROUTES.command,
+    expect.objectContaining({ type: "resume", taskId: failedAction.id, channelId: channel.id }),
+  );
+});
+it("keeps a failed action in the sheet for retry and supports reassign", async () => {
+  actionTasks = [failedAction];
+  await act(() => root.render(<ChannelActionsScreen />));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy());
+  mocks.uuid.mockReturnValueOnce("task-one").mockReturnValueOnce("task-two");
+  failChannelSave = true;
+  await click("Resume");
+  await waitFor(() => expect(screen.getByText("Could not save this channel.")).toBeTruthy());
+  expect(screen.getByRole("button", { name: "Resume" })).toHaveProperty("disabled", false);
+  await click("Resume");
+  const retries = channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command);
+  expect(retries).toHaveLength(2);
+  expect(retries[1][1]).toEqual(retries[0][1]);
+  failChannelSave = false;
+  await click("Reassign");
+  await click("Travel");
+  await waitFor(() => expect(screen.getByText("No actions needed.")).toBeTruthy());
+  expect(channelRequests).toHaveBeenCalledWith(
+    CHANNEL_ROUTES.command,
+    expect.objectContaining({ type: "reassign", taskId: failedAction.id, recipientAgentId: original.id }),
+  );
+});
+
+it("retries only history after a task action was accepted", async () => {
+  actionTasks = [failedAction];
+  await act(() => root.render(<ChannelActionsScreen />));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy());
+  const refresh = vi
+    .spyOn(workspace.channelStore, "refreshHistory")
+    .mockRejectedValueOnce(new ChannelHistoryRefreshError("History unavailable"))
+    .mockRejectedValueOnce(new ChannelHistoryRefreshError("History still unavailable"));
+  await click("Resume");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Refresh history" })).toBeTruthy());
+  expect(screen.getByRole("button", { name: "Resume" })).toHaveProperty("disabled", true);
+  await click("Refresh history");
+  expect(screen.getByRole("button", { name: "Resume" })).toHaveProperty("disabled", true);
+  await click("Refresh history");
+  await waitFor(() => expect(screen.getByText("No actions needed.")).toBeTruthy());
+  expect(screen.queryByRole("button", { name: "Refresh history" })).toBeNull();
+  expect(channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command)).toHaveLength(1);
+  refresh.mockRestore();
+});
+
+vi.mock("expo-linking", () => ({ openURL: vi.fn() }));
+vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
+vi.mock("react-native-reanimated", () => ({ useReducedMotion: () => true }));
+// This DOM harness checks actions; native blur transitions run on the device.
+vi.mock("@/shared/components/blur-reveal", () => ({
+  BlurReveal: ({ value, children }: { value: ChatTarget | null; children: (value: ChatTarget) => React.ReactNode }) =>
+    value ? children(value) : null,
+}));
+// Render static text while leaving the real markdown and mention renderer in use.
+vi.mock("@/features/chat/components/streaming-tail-text", () => ({
+  StreamRevealProvider: ({ children }: PropsWithChildren) => <>{children}</>,
+  StreamingBlock: ({ children }: PropsWithChildren) => <>{children}</>,
+  StreamingTailText: ({ body }: { body: string }) => <span>{body}</span>,
+}));

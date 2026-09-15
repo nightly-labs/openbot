@@ -18,6 +18,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import type { MobileChannelStore } from "@/features/channels/model/channel-store";
 import type { MobileAgentActivities } from "./agent-activity";
 import type { MobileConversationStore } from "./conversation-store";
 
@@ -62,6 +63,7 @@ interface AddRemoteServerInput {
 }
 
 export interface MobileWorkspaceContextValue {
+  channelStore: MobileChannelStore;
   servers: MobileServer[];
   teamDirectory: RemoteTeamDirectoryClient;
   serverDirectoryState: MobileServerDirectoryState;
@@ -71,6 +73,11 @@ export interface MobileWorkspaceContextValue {
   activeAgents: MobileAgent[];
   hiddenAgents: MobileAgent[];
   pinnedAgentIds: string[];
+  pinnedChannelIds: string[];
+  hiddenChannelIds: string[];
+  hideChannel: (channelId: string, serverId: string) => boolean;
+  unhideChannel: (channelId: string, serverId: string) => boolean;
+  toggleChannelPin: (channelId: string, serverId: string) => ToggleAgentPinResult;
   unreadAgentIds: string[];
   conversationStore: MobileConversationStore;
   activityByServer: Record<string, MobileAgentActivities>;

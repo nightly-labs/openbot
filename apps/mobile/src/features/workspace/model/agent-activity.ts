@@ -1,6 +1,7 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 
 export interface MobileAgentActivity {
+  agentId?: string;
   turnId: string | null;
   phase: "working" | "responding" | "waiting";
   detail: string | null;

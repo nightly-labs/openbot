@@ -1,5 +1,7 @@
 import type { AgentEvent, ConversationMessage, ConversationPage } from "@openbot/contracts/ipc";
 
+import { replaceEqualDeep } from "@tanstack/react-query";
+
 type Delta = Extract<AgentEvent, { type: "conversation-delta" }>;
 export interface MobileConversation extends ConversationPage {
   olderLoading: boolean;
@@ -72,6 +74,8 @@ export class MobileConversationStore {
       this.remove(agentId);
       return;
     }
+    const current = this.get(agentId);
+    if (entry === current) return;
     this.#entries.set(agentId, entry);
     if (reindex) this.#indices.set(agentId, new Map(entry.messages.map((message, index) => [message.id, index])));
     for (const listener of this.#listeners.get(agentId) ?? []) listener();
@@ -93,7 +97,7 @@ export class MobileConversationStore {
       const old = oldById.get(message.id);
       if (!old) return message;
       if (cursor) return old;
-      return JSON.stringify(old) === JSON.stringify(message) ? old : message;
+      return replaceEqualDeep(old, message);
     });
     const fetchedById = new Map(fetched.map((message) => [message.id, message]));
     const fetchedIds = new Set(fetchedById.keys());
@@ -109,7 +113,7 @@ export class MobileConversationStore {
     else {
       messages = [...oldMessages.slice(0, first).filter((message) => !fetchedIds.has(message.id)), ...fetched];
     }
-    this.#publish(page.agentId, {
+    const next = replaceEqualDeep(current, {
       ...page,
       ...(cursor && current ? { revision: current.revision, activeTurnId: current.activeTurnId } : {}),
       messages,
@@ -118,6 +122,7 @@ export class MobileConversationStore {
       olderLoading: current?.olderLoading ?? false,
       olderError: false,
     });
+    this.#publish(page.agentId, next);
   }
 
   loadLatest(agentId: string, read: ReadPage, isCurrent: () => boolean, refresh = false): Promise<ConversationPage> {

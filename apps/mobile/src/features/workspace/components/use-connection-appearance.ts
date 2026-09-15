@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { Easing, ReduceMotion, useDerivedValue, useSharedValue, withTiming } from "react-native-reanimated";
 
+export const DISCONNECTED_APPEARANCE = { saturation: 0.15, opacity: 0.6 };
+
 const CONNECTION_TRANSITION = {
   duration: 280,
   easing: Easing.bezier(0.77, 0, 0.175, 1),
@@ -15,7 +17,7 @@ export function useConnectionAppearance(disconnected: boolean) {
   }, [disconnected, faded]);
 
   return useDerivedValue(() => ({
-    saturation: 1 - faded.get() * 0.85,
-    opacity: 1 - faded.get() * 0.4,
+    saturation: 1 - faded.get() * (1 - DISCONNECTED_APPEARANCE.saturation),
+    opacity: 1 - faded.get() * (1 - DISCONNECTED_APPEARANCE.opacity),
   }));
 }
