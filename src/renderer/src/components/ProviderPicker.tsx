@@ -186,9 +186,44 @@ export function ProviderPicker(props: ProviderPickerProps) {
             {i18n.t("provider.action.add")}
           </Button>
         </Show>
-        {/* The same install the OpenCode row offers, and only when that row offers it. */}
+        {/* The same install the OpenCode row offers, and only when that row offers it.
+            Beside it the same download: OpenCode runs every custom endpoint, so fetching the
+            runtime is what unblocks Add. */}
+        <Show
+          when={(() => {
+            if (!props.onDownloadProvider && !props.onCancelProviderDownload) return undefined;
+            const engineOption = engine();
+            const runtime = engineOption.runtimeStatus;
+            if (!runtime) return undefined;
+            if (runtime.phase === "not-downloaded") return "download" as const;
+            if (runtime.phase === "downloading") return "cancel" as const;
+            if (runtime.phase === "download-error") return "retry" as const;
+            return undefined;
+          })()}
+        >
+          {(action) => (
+            <Button
+              type="button"
+              variant={action() === "download" ? "default" : "outline"}
+              size="xs"
+              class="provider-picker-install"
+              aria-label={i18n.t(PROVIDER_ACTION_LABEL[action()], { name: engine().name })}
+              disabled={props.disabled || props.refreshingProviders}
+              onClick={() => {
+                if (action() === "cancel") {
+                  void props.onCancelProviderDownload?.("opencode");
+                } else {
+                  void props.onDownloadProvider?.("opencode");
+                }
+              }}
+            >
+              {i18n.t(PROVIDER_ACTION_TEXT[action()])}
+            </Button>
+          )}
+        </Show>
         <Show
           when={
+            !engine().runtimeStatus &&
             engine().state === "not-installed" &&
             agentProviderDescriptor("opencode").installGuideLink !== null &&
             props.onInstallProvider

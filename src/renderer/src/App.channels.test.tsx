@@ -69,6 +69,79 @@ it("restores the selected channel after restart and clears it when returning to 
   view.unmount();
 });
 
+it("shows the channel title in the header and sidebar and refreshes it after editing", async () => {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create-titled",
+    channelId: "channel-titled",
+    draft: {
+      name: "Launch room",
+      title: "Ship OpenBot 1.0",
+      instructions: "Ship the launch",
+      members: [{ agentId: "chief" }],
+      leadAgentId: "chief",
+    },
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+
+  const row = await screen.findByRole("button", { name: "Launch room, Ship OpenBot 1.0. No messages yet" });
+  expect(within(row).getByText("Ship OpenBot 1.0")).toBeVisible();
+  await fireEvent.click(row);
+
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  const settings = await within(chat).findByRole("button", { name: "Channel settings" });
+  expect(within(settings).getByText("Ship OpenBot 1.0")).toBeVisible();
+
+  await fireEvent.click(settings);
+  const title = await within(chat).findByRole("textbox", { name: "Channel title" });
+  await fireEvent.input(title, { target: { value: "Weekly sync" } });
+  await fireEvent.blur(title);
+
+  await waitFor(() => {
+    expect(
+      within(within(chat).getByRole("button", { name: "Channel settings" })).getByText("Weekly sync"),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("button", { name: "Launch room, Weekly sync. No messages yet" })).getByText(
+        "Weekly sync",
+      ),
+    ).toBeVisible();
+  });
+});
+
+it("shows the lead's routing choice as activity, not as a message from the lead", async () => {
+  await window.openbot.agent.channelCommand({
+    type: "save",
+    operationId: "create-routed",
+    channelId: "channel-routed",
+    draft: {
+      name: "Launch room",
+      title: "",
+      instructions: "Ship the launch",
+      members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
+      leadAgentId: "chief",
+    },
+  });
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.click(await screen.findByRole("button", { name: /Launch room/ }));
+  const chat = await screen.findByRole("main", { name: "Channel conversation" });
+  await within(chat).findByRole("heading", { name: "Launch room", level: 1 });
+  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+  composer.textContent = "Someone please draft the announcement";
+  await fireEvent.input(composer);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+
+  const receipt = await within(chat).findByLabelText("Assigned to Chief");
+  // Activity carries no bubble, so it offers none of the actions a message row does.
+  expect(within(receipt).queryByRole("button", { name: "Copy" })).toBeNull();
+  expect(within(receipt).queryByRole("button", { name: "Reply" })).toBeNull();
+  expect(within(chat).queryByRole("article", { name: "Message from Chief" })).toBeNull();
+  // The member it names stays reachable from the row.
+  expect(within(receipt).getByRole("button", { name: "Open chat with Chief" })).toBeInTheDocument();
+});
+
 it("opens the agent chat when Edit agent runs while a channel is open", async () => {
   await openSavedChannel();
 
@@ -623,17 +696,34 @@ it("retries a lost response once and keeps a focused draft through incoming mess
   expect(composer).toHaveTextContent("Keep this draft");
 });
 
-it("deletes a channel from the sidebar and keeps its member agents", async () => {
-  await openSavedChannel();
+it("keeps deleted channel history for preview below active chats", async () => {
+  const chat = await openSavedChannel();
+  const composer = within(chat).getByRole("textbox", { name: "Message to channel" });
+  composer.textContent = "Keep this history";
+  await fireEvent.input(composer);
+  await fireEvent.click(within(chat).getByRole("button", { name: "Send message" }));
+  await within(chat).findByText("Keep this history");
+  await waitFor(() => expect(composer).toHaveTextContent(""));
+  await waitFor(() => expect(channelRow("Project room")).toHaveAccessibleName("Project room. Keep this history"));
   await openChannelMenuItem("Delete channel");
   const dialog = await screen.findByRole("alertdialog", { name: "Delete Project room?" });
   await fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-  await waitFor(() => expect(screen.queryByRole("main", { name: "Channel conversation" })).not.toBeInTheDocument());
   expect(screen.queryByRole("button", { name: /^Project room\./ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /^Chief, Chief of staff/ })).toBeInTheDocument();
-  expect(window.localStorage.getItem(CHANNEL_SELECTION_STORAGE_KEY)).toBe("{}");
-  expect((await window.openbot.agent.listChannels()).some((channel) => channel.id === "channel-test")).toBe(false);
+  expect((await window.openbot.agent.listChannels()).find((channel) => channel.id === "channel-test")?.archived).toBe(
+    true,
+  );
+  await within(chat).findByText("Deleted channel. Preview only.");
+  expect(within(chat).queryByRole("textbox")).not.toBeInTheDocument();
+  expect(within(chat).queryByRole("button", { name: /Reply to/ })).not.toBeInTheDocument();
+  expect(within(chat).getByRole("button", { name: "Channel settings" })).toBeDisabled();
+  expect(within(chat).getByText("Keep this history")).toBeInTheDocument();
+  await fireEvent.contextMenu(screen.getByLabelText("Sidebar free area"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Deleted channels" }), { button: 0 });
+  const deleted = await screen.findByRole("region", { name: "Deleted channels" });
+  expect(within(deleted).getByRole("button", { name: /^Project room\./ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /^Chief, Chief of staff/ })).toBeInTheDocument();
 });
 
 it("closes a channel deleted from another connection", async () => {

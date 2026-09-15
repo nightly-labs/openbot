@@ -19,8 +19,9 @@ and state which default you set aside. Do not argue by citing this file.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) for the security boundaries and
-[architecture change rules](docs/ARCHITECTURE.md#change-rules) for code ownership.
+Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
+boundary or a security test, and [architecture change rules](docs/ARCHITECTURE.md#change-rules) when
+adding a module or moving ownership between workspaces.
 
 ## Product constraints
 
@@ -34,6 +35,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) for the securi
   Do not reset an agent to simplify state.
 
 ## Checks
+
+`bun run lint`, `bun run typecheck`, `bun run check:ui` and a single test file are the default
+checks. They read the worktree, touch no user profile and no network. Run them, fix what the
+requested change broke, and rerun them without asking at each step.
 
 1. In a fresh worktree, run `bun install --frozen-lockfile` first. Alternatively, run
    `bun scripts/prepare-dev-environment.ts` to also check Bun, migrate local D1, and create the
@@ -69,51 +74,31 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 
 ## Development data and processes
 
-- Never run `bun run dev:seed` or `bun run dev:reset` unless asked. Seed replaces the whole
-  `OpenBot Dev` profile and deletes its staging copy on success. Reset deletes app, test-client,
-  and legacy host profiles. `bun run dev:seed --dry-run` is read-only.
+- `bun run dev:seed --dry-run` is read-only.
+- Never kill by process pattern, such as `pkill -f electron` or `pkill -f bun`. `bun run dev:stop`
+  stops only this worktree's stack; name another one with `--pid=<supervisor pid>` or `--all`.
+  For a process outside the registry, target a PID you started or ask.
+- Never drive another worktree's app. Use `bun run dev:automation` for smoke checks instead of
+  starting Electron directly; `snapshot` and `screenshot` are read-only, and `click` and `type`
+  need `--allow-mutations` and a named instance.
+- Do not delete a dead stack record you did not resolve. Stop keeps the record and exits non-zero
+  when it cannot confirm a PID's identity; resolve the process, then `bun run dev:forget`. Dead
+  records do not reserve ports.
 - Reuse a running dev instance, or use `bun run dev --isolated` for a profile tied to this worktree.
-  Dev and Storybook allocate ports through a shared registry; use the ports they report. A second
-  dev stack in the same worktree requires `--force`.
-- Use `bun run dev:automation` for smoke checks instead of starting Electron directly.
-  `instances` lists worktrees, profiles, and ports. `snapshot` and `screenshot` are read-only.
-  `click` and `type` require `--allow-mutations` and a named instance: this worktree's record,
-  `--instance=<id>`, or `--port=`. Never click another worktree's app.
-- `pages` lists all window targets. Use `--page=<target-id|url-substring>` for any target, including
-  Dynamic Island or embedded browser views; the default is the app window. Use
-  `--wait-for=<role>,<name>` to wait for an accessible target before capture and after mutation.
-- Never kill by process pattern, such as `pkill -f electron` or `pkill -f bun`.
-  `bun run dev:status` lists all stacks. `bun run dev:stop` stops only this worktree's stack.
-  Use `--pid=<supervisor pid>` to name another stack or `--all` to name all stacks explicitly.
-- Stop checks each PID's start time. If identity cannot be confirmed, it keeps the record and
-  exits non-zero. Resolve the process first, then use `bun run dev:forget` to remove its record.
-  Dead records do not reserve ports; readers must not delete them. For a process outside the
-  registry, target a PID you started or ask.
+  Use the ports the stack reports rather than a fixed port.
+
+See [README.md — Commands](README.md#commands) for the flags these commands take, and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for why the registry works this way, when a dev command
+does not behave as expected.
 
 ## Terms
 
-- **agent**: the product object (`AgentStore`, `AgentSummary`, `agent-${uuid}`,
-  `~/OpenBot/Agents/<id>`, `projection_agents`), a coding agent, or a marketplace agent
-  (`ipc-marketplace-agents.ts`). **teammate** is prompt and marketing text, never a type.
-  Human members use `TeamMemberSummary`.
-- **bot**: do not use for new product code. Keep released names: Team API v1-v3
-  `bot`/`botId`/`bots-changed` (`current-agent-keys.ts` translates), `bots.json`, `mailbox.json`,
-  `legacy-import:bots:v1`, and readable `~/OpenBot/Bots` path prefixes. Accept `bot-<uuid>` IDs from
-  databases that did not run migration v13. `"first-bot"` is an avatar seed; `BloubBot` and the
-  lucide `Bot` icon are library names.
-- **channel**: the shared multi-agent chat (`ChannelStore`, `ChannelSummary`, `projection_channels`,
-  `channel-chats-v1`). **group** is not a product term: it means a sidebar section
-  (`SidebarPinnedGroup`, `create_section`), an IPC endpoint group (`IpcEndpointGroup`,
-  `define-ipc-group.ts`), or an ARIA `role="group"`. An IPC **channel** is a wire name in
-  `IPC_CHANNELS` (`ipc-channels.ts`); the product contract is `ipc-chat-channels.ts`.
-- **server**: a joined team server (`ServerSummary`, `servers:*`), the local Team API host
-  (`HostStatus`, `host:*`, `src/main/team-api-server.ts`), the account API (`apps/auth-api`,
-  `auth:*`), or an MCP server (`createSdkMcpServer`).
-- **thread**: durable `projection_threads` record. **conversation**: its read projection, with no
-  separate table. **provider session**: private CLI resume state (`projection_provider_sessions`).
-  **team session**: authenticated remote connection. **turn**: one exchange in a thread.
-- **routine**: a scheduled instruction for one agent (`projection_agent_routines`), not Claude
-  Code `/schedule`.
+- **bot** is not for new product code. Released names stay: Team API v1-v3 `bot`/`botId`,
+  `bots.json`, `legacy-import:bots:v1`, and `~/OpenBot/Bots` path prefixes.
+- **teammate** and **group** are prompt and UI words, never types.
+
+Use [docs/glossary.md](docs/glossary.md) when naming a new type, table, IPC channel or product
+string, or when a term in the code disagrees with the UI.
 
 ## Task-specific instructions
 

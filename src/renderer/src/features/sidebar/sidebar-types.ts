@@ -18,13 +18,13 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
  */
 export interface SidebarProps {
   channels?: ChannelSummary[];
+  deletedChannels?: ChannelSummary[];
   activeChannelId?: string | null;
   onSelectChannel?: (channelId: string) => void;
   showingArchivedChannels?: boolean;
   onToggleArchivedChannels?: () => void;
   onCreateChannel?: () => void;
   onEditChannel?: (channelId: string) => void;
-  onRestoreChannel?: (channelId: string) => Promise<void>;
   onDeleteChannel?: (channelId: string) => Promise<void>;
   serverName: string;
   onOpenServerSettings: (trigger: HTMLElement) => void;

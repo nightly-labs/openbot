@@ -17,11 +17,7 @@
         },
         "ITSAppUsesNonExemptEncryption": false
       },
-      "icon": {
-        "light": "./assets/icons/app-icon.png",
-        "dark": "./assets/icons/app-icon-ios-dark.png",
-        "tinted": "./assets/icons/app-icon-ios-tinted-light.png"
-      }
+      "icon": "./assets/icons/app-icon.icon"
     },
     "android": {
       "package": "run.openbot.mobile",

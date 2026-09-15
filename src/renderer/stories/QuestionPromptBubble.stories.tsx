@@ -395,3 +395,8 @@ export const PersistedLongAnswerNarrow: Story = {
     ),
   ],
 };
+
+export const PreviewOnly: Story = {
+  args: { readOnly: true },
+  render: renderInChat,
+};

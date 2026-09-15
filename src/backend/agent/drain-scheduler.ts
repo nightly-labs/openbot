@@ -233,8 +233,12 @@ export class DrainScheduler {
       }
       let threadId = await this.#threads.ensureThread(agent, client, execution?.threadId);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
+      // A turn started on this thread while the provider and the thread were prepared. The user
+      // cannot see that race, so the delivery goes back to the head of the queue rather than
+      // failing: a message to a busy agent always waits. `drainAgent` reschedules it in its
+      // `finally`, and `mayDrain` holds it there until the turn ends.
       if (snapshot.activeTurnId) {
-        await this.#mailbox.markTerminal(delivery.id, "failed", "The recipient already has an active turn.");
+        await this.#mailbox.restoreQueued(delivery.id);
         this.#mailboxSync.emitQueue(agent.id);
         return;
       }
@@ -261,12 +265,13 @@ export class DrainScheduler {
           ? [
               "This is a reply to a message you sent earlier.",
               "Surface or summarize the result naturally for the user.",
-              "Do not send an acknowledgement back unless the message asks for another action; avoid reply loops.",
+              "Reply to the teammate only when the message requests another action or reports blocked/failed work; otherwise do not send an acknowledgement and avoid reply loops.",
             ]
           : [
               `After completing the request, send a concise result back to ${sender?.name ?? senderAgentId} with openbot.send_message.`,
               `Use recipientAgentIds ["${senderAgentId}"] and replyToMessageId "${delivery.messageId}".`,
-              "Do not leave the sender waiting for a result.",
+              "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.",
+              "Do not acknowledge without a Status line. Do not leave the sender waiting for a result.",
             ];
         text = [
           `Message from OpenBot teammate ${sender?.name ?? senderAgentId} (${senderAgentId}).`,

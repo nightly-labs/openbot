@@ -18,7 +18,7 @@ export function AgentPinAvatar({ agentId, children, location, size }: AgentPinAv
     return () => registerAvatar(agentId, location, null);
   }, [agentId, location, registerAvatar]);
 
-  const hidden = transition?.agentId === agentId && (transition.source === location || transition.target === location);
+  const hidden = transition?.chatId === agentId && (transition.source === location || transition.target === location);
 
   return (
     <View

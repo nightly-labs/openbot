@@ -200,12 +200,14 @@ describe("development state seed", () => {
     expect(channelSummaries.map((channel) => channel.id)).toEqual(["channel-launch-room", "channel-beta-feedback"]);
     const launchRoom = channelSummaries[0];
     expect(launchRoom?.archived).toBe(false);
-    expect(launchRoom?.unreadCount).toBe(2);
+    // Two rows sit past the read cursor, and one of them is the routing receipt of the lead. That
+    // one is channel activity, not a message, so it leaves the badge of the reader where it was.
+    expect(launchRoom?.unreadCount).toBe(1);
     expect(launchRoom?.activeTasks).toBe(0);
     // The seed reads as `local`, but the app resolves a team member id once the owner signs in.
     // Adoption is what keeps the seeded read state, and the unread count, on that reader.
     channels.adoptReads("local", owner?.id ?? "");
-    expect(channels.list(owner?.id ?? "", true)[0]?.unreadCount).toBe(2);
+    expect(channels.list(owner?.id ?? "", true)[0]?.unreadCount).toBe(1);
     expect(channelSummaries[1]?.archived).toBe(true);
     const channelMessages = channelSummaries.flatMap((channel) => channels.messages(channel.id));
     expect(channelMessages).toHaveLength(12);
@@ -287,6 +289,35 @@ describe("development state seed", () => {
       targetProfile: profilePath,
     });
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
+  });
+
+  it("keeps an existing isolated profile when seeding only if missing", async () => {
+    const { appDataRoot, homeDirectory } = await createRoots();
+    const profilePath = join(appDataRoot, developmentUserDataName("app", "5197"));
+    const sentinel = join(profilePath, "keep.txt");
+    await writeSentinel(sentinel, "keep");
+
+    await expect(
+      seedDevelopmentState({ appDataRoot, homeDirectory, ifMissing: true, instanceId: "5197" }),
+    ).resolves.toMatchObject({ targetProfile: profilePath });
+    await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
+  });
+
+  it("removes staged data when an isolated profile appears during seeding", async () => {
+    const { appDataRoot, homeDirectory } = await createRoots();
+    const profilePath = join(appDataRoot, developmentUserDataName("app", "5197"));
+    const sentinel = join(profilePath, "keep.txt");
+
+    const seeding = seedDevelopmentState({ appDataRoot, homeDirectory, ifMissing: true, instanceId: "5197" });
+    while (!(await readdir(appDataRoot)).some((entry) => entry.startsWith(".openbot-dev-seed-"))) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    await writeSentinel(sentinel, "keep");
+    await expect(seeding).resolves.toMatchObject({ targetProfile: profilePath });
+
+    await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
+    expect((await readdir(appDataRoot)).filter((entry) => entry.startsWith(".openbot-dev-seed-"))).toEqual([]);
+    await expect(readdir(join(homeDirectory, "OpenBot", "Shared", "Transfers", "generated"))).resolves.toEqual([]);
   });
 
   it("seeds an isolated development instance without changing the default profile", async () => {

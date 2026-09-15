@@ -761,7 +761,7 @@ system notifications. Remote notification content uses the source server's agent
 server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
 not yet deliver system notifications; mute settings are not synchronized between devices.
 
-## Shared desktop channel chats
+## Shared channel chats
 
 Channels are separate from sidebar sections. A channel has one host, a purpose, participating agents,
 a selected lead, and linked agent conversations. Agent membership selects who can receive work.
@@ -820,6 +820,28 @@ Desktop IPC and remote desktop transports expose `channel-chats-v1` as an option
 separate payload codecs. Released Team API adapters keep their existing meaning. A host advertises
 the capability only when its channel service is connected. Unsupported remote hosts show an explanation
 in place of channel controls. The account API and Signal service add no channel storage or routing.
+
+Mobile uses the same host channel IDs and `channel-chats-v1` commands. The host database stores
+channel settings, members, messages, memories, routines, and read positions. Mobile keeps only an
+in-memory view. Reconnect loads the host list again. `channels-changed` events refresh the list and
+open channel history, with one request sequence per host and one pending refresh for an event burst.
+Closing a channel retains a short message window (up to 50 messages), as single chats do,
+and releases larger windows. Only open channels refresh their history. Server removal discards its cached channels and late
+responses. The mobile chat list and message history use virtualized lists. Channel member selection
+uses static avatar thumbnails without activity subscriptions or animation timers. Channels appear
+next to agents in the same list, with up to four static member avatars that fade when the host
+is offline. Channel pins share the existing pinned grid and 16-chat limit; local preferences
+preserve agent pins and channel pins separately. Hide removes a channel from the home list and
+unpins it; the shared Hidden chats sheet restores it. Channel and agent pinning use the same
+measured overlay movement, with static folder artwork for channels. Agent and channel screens
+use the same mobile `ChatView`, header, message list, reply gestures, composer, camera, and keyboard
+motion. Their data adapters provide history, sending, and read positions; channels also provide
+author labels and task actions. Channel send retries retain their operation ID and uploaded files.
+
+Mobile channel settings use one native sheet with a nested stack for memories and routines. The
+memory and routine editors share their controls with agent settings and use channel API operations.
+Channel settings have no provider or model controls because each member retains its own runtime.
+No account API, Signal, IPC contract, or database migration changes are required for mobile channels.
 
 ## Local skill library
 

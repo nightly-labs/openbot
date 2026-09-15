@@ -22,6 +22,12 @@ import {
   type TeamProtocolV2Json,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
+import {
+  channelEvent,
+  channelRequest,
+  channelResponse,
+  isChannelRoute,
+} from "@openbot/contracts/team-protocol/channels-v1";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 import { createRemoteFileReceiver } from "./file-download";
 import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
@@ -628,12 +634,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       } else {
         pending.resolve({
           status: frame.result.status,
-          body: decodeTeamProtocolV4WebRtcHttpResponse(
-            pending.method,
-            pending.path,
-            frame.result.status,
-            frame.result.body,
-          ),
+          body: isChannelRoute(pending.path)
+            ? channelResponse(pending.path, frame.result.status, frame.result.body)
+            : decodeTeamProtocolV4WebRtcHttpResponse(
+                pending.method,
+                pending.path,
+                frame.result.status,
+                frame.result.body,
+              ),
         });
       }
       // Keep the request registered until decoding succeeds, so failPeer can
@@ -661,7 +669,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       return;
     }
     if (frame.sequence !== state.lastEventSequence + 1) throw new Error("The host event stream has a gap.");
-    const decoded = decodeTeamProtocolV4CurrentEvent(frame);
+    const channel = channelEvent(frame.payload);
+    const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV4CurrentEvent(frame);
     if (decoded.status === "invalid") throw new Error("The host returned a malformed event.");
     state.lastEventSequence = frame.sequence;
     if (decoded.status === "known") await actions.current.onTeamEvent(state.hostId, decoded.event);
@@ -727,6 +736,13 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }
     const bodyTransferId = upload ? await files.upload(upload) : null;
     if (peer !== state || !isPeerOnline(state)) throw new Error("The attachment connection changed.");
+    // Validate before registering a pending promise. A rejected local payload must not leave
+    // an unobserved promise to reject again on timeout or disconnection.
+    const payloadBody = upload
+      ? null
+      : isChannelRoute(path)
+        ? channelRequest(path, body)
+        : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
@@ -754,9 +770,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         payload: {
           method,
           path,
-          body: upload
-            ? null
-            : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true }),
+          body: payloadBody,
           ...(bodyTransferId ? { bodyTransferId, contentType: upload?.mimeType } : {}),
           capabilities: [...TEAM_CURRENT_CAPABILITIES],
         },

@@ -2,13 +2,22 @@
 
 The UI stack sits on prerelease channels your training data does not cover: `solid-js@2.0.0-rc.0`
 with `@solidjs/signals` and `@solidjs/web` at the same RC, `@kobalte/core@2.0.0-alpha.0` (patched
-here), plus patched `lucide-solid` and `solid-sonner`. Do not trust your memory of these APIs: check
-`package.json`, then read `.agents/skills/react-to-solid/docs/` (`kobalte-patterns.md`,
-`corvu-patterns.md`, `base-ui-mapping.md`, `third-party-deps.md`) and
-`.agents/skills/zaidan/references/`. Those two skills are vendored and re-synced from upstream, so
-their code samples are 1.x-era and cannot be corrected here — `node_modules/solid-js/CHEATSHEET.md`
-is the source of truth for core APIs, and where they disagree the cheatsheet wins. Read the skills
-for the component patterns, not the imports.
+here), plus patched `lucide-solid` and `solid-sonner`. Do not trust your memory of these APIs —
+check `package.json` for what is actually installed, and load the reference that matches the work:
+
+- `node_modules/solid-js/CHEATSHEET.md` — the source of truth for core Solid APIs. Read it before
+  using a reactive primitive you have not already used in this repository.
+- `.agents/skills/react-to-solid/docs/kobalte-patterns.md` — when composing or typing a Kobalte
+  primitive part.
+- `.agents/skills/react-to-solid/docs/corvu-patterns.md` — when using a Corvu primitive.
+- `.agents/skills/react-to-solid/docs/base-ui-mapping.md` — when porting Radix or Base UI markup,
+  data attributes or CSS variables.
+- `.agents/skills/react-to-solid/docs/third-party-deps.md` — when replacing a React-only package.
+- `.agents/skills/zaidan/references/` — when choosing or composing a component pattern.
+
+Those two skills are vendored and re-synced from upstream, so their code samples are 1.x-era and
+cannot be corrected here. Where a skill and the cheatsheet disagree, the cheatsheet wins. Read the
+skills for the component patterns, not the imports.
 
 - `bun run dev` for integrated work — it starts the local Auth API and the Electron dev app
   together. `bun run dev:api` is for API-only debugging.
@@ -17,8 +26,9 @@ for the component patterns, not the imports.
   controls, Kobalte and Lucide only inside `components/ui`, and palette tokens instead of colour,
   size, radius and transition literals. It reads the whole renderer in 60 ms, so run it on any
   change here rather than waiting for CI — its budgets only ever go down. All of them sit at zero
-  except the `data-testid` hook count, frozen at the five already in the tree; root AGENTS.md says
-  why that one is a ratchet instead of a ban.
+  except the `data-testid` hook count, frozen at the five already in the tree;
+  [check design notes](../../docs/development-checks.md#lint-and-ui-rules) say why that one is a
+  ratchet instead of a ban.
 - Nothing here imports `src/main`, `src/backend` or `src/preload`. `biome.json` rejects it by path,
   so reaching past the IPC contract fails `bun run lint` rather than review.
 - Never verify UI with `dist/`, a packaged `.app`, a production build, or an ad-hoc preview — those

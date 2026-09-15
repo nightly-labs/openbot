@@ -57,15 +57,64 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="channel/[channelId]"
+          options={{
+            animation: "slide_from_right",
+            contentStyle: { backgroundColor: background },
+            fullScreenGestureEnabled: false,
+            gestureEnabled: true,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="channel-info/[channelId]"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
+          name="channel-actions/[channelId]"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerStyle: { backgroundColor: sheetBackground },
+            headerTransparent: false,
+            headerBlurEffect: "none",
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.6],
+            sheetGrabberVisible: true,
+            title: "Actions needed",
+          }}
+        />
+        <Stack.Screen
+          name="add-channel"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+            headerTransparent: isIOS,
+            headerBlurEffect: "none",
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+            title: "New channel",
+          }}
+        />
+        <Stack.Screen
           name="add-agent"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
             headerBlurEffect: "none",
-            scrollEdgeEffects: { top: "soft" },
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
             title: "Create an agent",
           }}
@@ -75,6 +124,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -86,8 +136,9 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
           }}
         />
@@ -96,6 +147,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [1],
             sheetGrabberVisible: true,
@@ -107,8 +159,9 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
-            sheetAllowedDetents: "fitToContents",
+            sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
           }}
         />
@@ -117,6 +170,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -127,6 +181,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [segments.at(-1) === "select-text" ? 0.85 : 0.4],
             sheetGrabberVisible: true,
@@ -137,6 +192,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,

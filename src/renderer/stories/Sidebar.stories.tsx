@@ -857,7 +857,6 @@ export const Channels: Story = {
     activeChannelId: "channel-3",
     onSelectChannel: fn(),
     onEditChannel: fn(),
-    onRestoreChannel: fn(async () => undefined),
     onDeleteChannel: fn(async () => undefined),
     pinnedItems: [
       { kind: "channel", id: "channel-4" },
@@ -956,5 +955,13 @@ export const DeleteConfirmationKeyboard: Story = {
       );
       await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
     }
+  },
+};
+
+export const DeletedChats: Story = {
+  args: {
+    ...Channels.args,
+    showingArchivedChannels: true,
+    deletedChannels: storyChannels.map((channel) => ({ ...channel, id: `deleted-${channel.id}`, archived: true })),
   },
 };

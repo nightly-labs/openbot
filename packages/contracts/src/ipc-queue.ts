@@ -66,9 +66,42 @@ function isQueueSender(value: unknown): value is QueueDelivery["sender"] {
   );
 }
 
+export const QUEUE_HOLD_REASONS = ["channel-task"] as const;
+export type QueueHoldReason = (typeof QUEUE_HOLD_REASONS)[number];
+
+/**
+ * Why a queue is waiting for something other than its own running turn.
+ *
+ * A channel assignment reserves the whole host, so an agent with nothing running of its own can
+ * still be unable to start the message the user just sent it. Without this the wait has no visible
+ * cause: the channel turn's events are not the agent's own, so the agent reads as idle.
+ */
+export interface QueueHold {
+  reason: QueueHoldReason;
+  channelId: string;
+  channelName: string;
+  /** The agent the channel work belongs to. Equal to the snapshot's agent when it is its own work. */
+  agentId: string;
+}
+
+export function isQueueHold(value: unknown): value is QueueHold {
+  return (
+    isDynamicRecord(value) &&
+    isOneOf(QUEUE_HOLD_REASONS, value.reason) &&
+    isIdentifier(value.channelId) &&
+    isBoundedString(value.channelName, INPUT_LIMITS.agentTitle) &&
+    isIdentifier(value.agentId)
+  );
+}
+
 export interface QueueSnapshot {
   agentId: string;
   deliveries: QueueDelivery[];
+  /**
+   * Absent rather than null on a released Team API response: the shipped adapters project a fixed
+   * key list, so a remote server drops this field instead of reporting it.
+   */
+  hold?: QueueHold | null;
 }
 
 export function isQueueSnapshot(value: unknown): value is QueueSnapshot {
@@ -76,7 +109,8 @@ export function isQueueSnapshot(value: unknown): value is QueueSnapshot {
     isDynamicRecord(value) &&
     isIdentifier(value.agentId) &&
     Array.isArray(value.deliveries) &&
-    value.deliveries.every(isQueueDelivery)
+    value.deliveries.every(isQueueDelivery) &&
+    (value.hold === undefined || value.hold === null || isQueueHold(value.hold))
   );
 }
 

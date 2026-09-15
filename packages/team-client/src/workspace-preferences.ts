@@ -4,6 +4,8 @@ import { remoteHostFingerprint } from "./remote-directory";
 export interface RemoteWorkspacePreferences {
   hidden: string[];
   pinned: string[];
+  pinnedChannels?: string[];
+  hiddenChannels?: string[];
 }
 
 export function createWorkspacePreferences(
@@ -32,9 +34,18 @@ function decodePreferences(value: unknown): RemoteWorkspacePreferences {
     !Array.isArray(value.hidden) ||
     !value.hidden.every(isString) ||
     !Array.isArray(value.pinned) ||
-    !value.pinned.every(isString)
+    !value.pinned.every(isString) ||
+    (value.pinnedChannels !== undefined &&
+      (!Array.isArray(value.pinnedChannels) || !value.pinnedChannels.every(isString))) ||
+    (value.hiddenChannels !== undefined &&
+      (!Array.isArray(value.hiddenChannels) || !value.hiddenChannels.every(isString)))
   ) {
     throw new Error("The saved chat preferences could not be read.");
   }
-  return { hidden: value.hidden, pinned: value.pinned };
+  return {
+    hidden: value.hidden,
+    pinned: value.pinned,
+    ...(value.pinnedChannels ? { pinnedChannels: value.pinnedChannels } : {}),
+    ...(value.hiddenChannels ? { hiddenChannels: value.hiddenChannels } : {}),
+  };
 }

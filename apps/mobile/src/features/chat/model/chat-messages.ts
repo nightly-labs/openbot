@@ -1,17 +1,34 @@
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
+  ChannelMessage,
+  ChannelRoutingConversationEvent,
   ConversationMessage,
   ConversationQuestionPrompt,
 } from "@openbot/contracts/ipc";
 
+import { channelRoutingConversationEvent } from "@openbot/contracts/ipc";
+
 export type ChatMessage =
+  | {
+      id: string;
+      kind: "channel-routing";
+      event:
+        | ChannelRoutingConversationEvent
+        | {
+            action: ChannelRoutingConversationEvent["action"];
+            agentId: null;
+            agentName: string;
+          };
+    }
   | { id: string; kind: "exchange"; exchange: AgentExchangeSummary }
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
   | {
       id: string;
       kind: "message";
       author: "agent" | "user";
+      speaker?: ChannelMessage["author"];
+      superseded?: boolean;
       body: string;
       streaming: boolean;
       replyToMessageId?: string | null;
@@ -109,4 +126,78 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
       Boolean(message.questionPrompt) ||
       (message.author !== "system" && (message.text.trim().length > 0 || Boolean(message.attachments?.length))),
   );
+}
+
+const projectedChannelMessages = new WeakMap<ChannelMessage, { self: boolean; message: ChatMessage }>();
+
+function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessage {
+  if (entry.message.questionPrompt) {
+    return {
+      id: entry.id,
+      kind: "question",
+      turnId: entry.message.turnId,
+      prompt:
+        entry.superseded && !entry.message.questionPrompt.resolution
+          ? { ...entry.message.questionPrompt, resolution: { status: "expired" } }
+          : entry.message.questionPrompt,
+    };
+  }
+  const routing = channelRoutingConversationEvent(entry.message);
+  if (routing) return { id: entry.id, kind: "channel-routing", event: routing };
+  // Older hosts stored only the receipt text. Never reinterpret a typed event as legacy text.
+  if (
+    !entry.message.itemType &&
+    entry.author.kind === "agent" &&
+    entry.message.author === "system" &&
+    entry.message.status === "completed" &&
+    entry.taskId
+  ) {
+    const assigned = /^Assigned to (.+)\.$/.exec(entry.message.text);
+    const continued = /^Continuing existing work with (.+)\.$/.exec(entry.message.text);
+    const name = assigned?.[1] ?? continued?.[1];
+    if (name)
+      return {
+        id: entry.id,
+        kind: "channel-routing",
+        event: { action: assigned ? "assigned" : "continued", agentId: null, agentName: name },
+      };
+  }
+  if (entry.author.kind === "agent" && entry.message.itemType === "commentary" && !entry.superseded) {
+    return {
+      id: entry.id,
+      kind: "thinking",
+      turnId: entry.message.turnId,
+      steps: [{ id: entry.id, text: entry.message.text }],
+    };
+  }
+  return {
+    id: entry.id,
+    kind: "message",
+    author: self ? "user" : "agent",
+    speaker: entry.author,
+    superseded: entry.superseded,
+    body: entry.message.text,
+    streaming: entry.message.status === "streaming",
+    replyToMessageId: entry.message.replyToMessageId,
+    attachments: entry.message.attachments,
+  };
+}
+
+/** Keep channel authors explicit: another human member is not the current user. */
+export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
+  return messages
+    .filter((entry) => entry.message.questionPrompt || entry.message.text.trim() || entry.message.attachments?.length)
+    .map((entry) => {
+      const self = entry.author.kind === "member" && entry.author.id === memberId;
+      const cached = projectedChannelMessages.get(entry);
+      if (cached && cached.self === self) return cached.message;
+      const message = projectChannelMessage(entry, self);
+      projectedChannelMessages.set(entry, { self, message });
+      return message;
+    });
+}
+
+/** The host accepted a send, but its transcript still needs a successful read. */
+export interface ChatHistoryReceipt {
+  refreshHistory: () => Promise<void>;
 }

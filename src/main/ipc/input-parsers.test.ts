@@ -638,6 +638,22 @@ describe("routine IPC input parsing", () => {
 });
 
 describe("browser IPC input parsing", () => {
+  it("validates loading a web address into an existing tab", () => {
+    expect(parseBrowserNavigate({ tabId: "tab-1", url: "https://example.com" })).toEqual({
+      tabId: "tab-1",
+      url: "https://example.com",
+    });
+    for (const input of [
+      { tabId: "", url: "https://example.com" },
+      { tabId: "tab-1", url: "javascript:alert(1)" },
+      { tabId: "tab-1", url: "file:///tmp/test" },
+      { tabId: "tab-1", url: "https://example.com", direction: "back" },
+      { tabId: "tab-1", url: `https://example.com/${"a".repeat(INPUT_LIMITS.browserUrl)}` },
+    ]) {
+      expect(() => parseBrowserNavigate(input)).toThrow();
+    }
+  });
+
   it("parses URLs, owners, visibility, and bounds", () => {
     expect(parseBrowserOpen({ url: "https://example.com", ownerThreadId: "thread-1", focus: true })).toEqual({
       url: "https://example.com",

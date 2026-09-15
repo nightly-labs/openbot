@@ -8,6 +8,7 @@ import { useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
 import { AgentInformation } from "@/features/agents/components/agent-information";
+import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -18,7 +19,7 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
-  "name" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
+  "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
 >;
 
 type AgentPage = "info" | "appearance" | "usage" | "memories" | "routines" | "runtime" | "memory" | "routine";
@@ -46,18 +47,24 @@ export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
 }
 
 function AgentForm({ agent, available, page }: { agent: MobileAgent; available: boolean; page: AgentPage }) {
-  const { updateAgent } = useMobileWorkspace();
+  const { updateAgent, setAgentAvatar } = useMobileWorkspace();
   const navigation = useNavigation();
   const [edits, setEdits] = useState<AgentEdits>({});
+  const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
+  const [pickingPhoto, setPickingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const name = edits.name ?? agent.name;
+  const title = edits.title ?? agent.title;
   const description = edits.description ?? agent.description;
   const avatarSeed = edits.avatarSeed ?? agent.avatarSeed;
   const avatarHue = edits.avatarHue === undefined ? agent.avatarHue : edits.avatarHue;
+  const photoChanged = photo !== undefined && (photo !== null || Boolean(agent.avatarUrl));
   const dirty =
+    photoChanged ||
     name.trim() !== agent.name ||
+    title.trim() !== agent.title ||
     description.trim() !== agent.description ||
     avatarSeed !== agent.avatarSeed ||
     avatarHue !== agent.avatarHue ||
@@ -68,10 +75,11 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
     page !== "info" ||
     (Boolean(name.trim() && description.trim()) &&
       name.length <= INPUT_LIMITS.agentName &&
+      title.length <= INPUT_LIMITS.agentTitle &&
       description.length <= INPUT_LIMITS.agentDescription);
 
-  usePreventRemove(dirty || saving, ({ data }) => {
-    if (pending.current) return;
+  usePreventRemove(dirty || saving || pickingPhoto, ({ data }) => {
+    if (pending.current || pickingPhoto) return;
     Alert.alert("Discard changes?", "Your changes have not been saved.", [
       { text: "Keep editing", style: "cancel" },
       { text: "Discard", style: "destructive", onPress: () => navigation.dispatch(data.action) },
@@ -84,25 +92,31 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
   }
 
   async function submit(): Promise<void> {
-    if (!valid || !dirty || !available || pending.current) return;
+    if (!valid || !dirty || !available || pickingPhoto || pending.current) return;
     pending.current = true;
     setSaving(true);
     setError(null);
     try {
-      await updateAgent(
-        {
-          agentId: agent.id,
-          ...(edits.name === undefined ? {} : { name: name.trim() }),
-          ...(edits.description === undefined ? {} : { description: description.trim() }),
-          ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
-          ...(edits.avatarHue === undefined ? {} : { avatarHue }),
-          ...(edits.provider === undefined ? {} : { provider: edits.provider }),
-          ...(edits.model === undefined ? {} : { model: edits.model }),
-          ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
-        },
-        agent.serverId,
-      );
+      if (Object.keys(edits).length > 0)
+        await updateAgent(
+          {
+            agentId: agent.id,
+            ...(edits.name === undefined ? {} : { name: name.trim() }),
+            ...(edits.title === undefined ? {} : { title: title.trim() }),
+            ...(edits.description === undefined ? {} : { description: description.trim() }),
+            ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
+            ...(edits.avatarHue === undefined ? {} : { avatarHue }),
+            ...(edits.provider === undefined ? {} : { provider: edits.provider }),
+            ...(edits.model === undefined ? {} : { model: edits.model }),
+            ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
+          },
+          agent.serverId,
+        );
       setEdits({});
+      if (photoChanged) {
+        await setAgentAvatar(agent.id, photo ?? null, agent.serverId);
+        setPhoto(undefined);
+      }
     } catch (cause) {
       setError(errorMessage(cause, "OpenBot could not update this agent."));
     } finally {
@@ -113,7 +127,6 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
 
   return (
     <SheetScrollView
-      scrollOnlyOnOverflow
       className="bg-sheet"
       contentContainerClassName={page === "info" ? "gap-5 px-5 pb-safe-offset-5" : "gap-5 px-5 pb-safe-offset-5 pt-5"}
       keyboardDismissMode="interactive"
@@ -123,7 +136,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
         <>
           <View className="gap-3">
             <Pressable
-              className="self-center"
+              className="items-center gap-2 self-center"
               accessibilityRole="button"
               accessibilityLabel="Edit appearance"
               onPress={() =>
@@ -133,8 +146,14 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 })
               }
             >
-              <BloubAvatarPreview seed={avatarSeed} hue={avatarHue} size={112} />
-              <Typography type="body-xs" className="-mt-3 text-center text-grouped-secondary">
+              <BloubAvatarPreview
+                agentId={agent.id}
+                serverId={agent.serverId}
+                seed={avatarSeed}
+                hue={avatarHue}
+                size={112}
+              />
+              <Typography type="body-xs" className="text-center text-grouped-secondary">
                 Edit appearance
               </Typography>
             </Pressable>
@@ -151,6 +170,14 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
             />
           </View>
           <SheetFormField
+            label="Title"
+            appearance="soft"
+            maxLength={INPUT_LIMITS.agentTitle}
+            value={title}
+            editable={!saving}
+            onChangeText={(value) => change({ title: value })}
+          />
+          <SheetFormField
             label="Instructions"
             appearance="soft"
             multiline
@@ -163,11 +190,26 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
       ) : null}
       {page === "appearance" ? (
         <AgentAppearancePicker
+          agentId={agent.id}
+          serverId={agent.serverId}
+          imageUrl={photo === undefined ? undefined : (photo?.uri ?? null)}
           seed={avatarSeed}
           hue={avatarHue}
           name={name}
           nameField={null}
-          disabled={saving}
+          showFaces={photo === undefined ? !agent.avatarUrl : !photo}
+          photoField={
+            <AgentPhotoPicker
+              hasPhoto={photo === undefined ? Boolean(agent.avatarUrl) : Boolean(photo)}
+              disabled={saving || pickingPhoto}
+              onChange={(value) => {
+                setPhoto(value);
+                setError(null);
+              }}
+              onBusyChange={setPickingPhoto}
+            />
+          }
+          disabled={saving || pickingPhoto}
           onSeedChange={(value) => change({ avatarSeed: value })}
           onHueChange={(value) => change({ avatarHue: value })}
         />
@@ -202,7 +244,12 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
         </Typography.Paragraph>
       ) : null}
       {page === "info" || page === "appearance" || page === "runtime" ? (
-        <SheetSaveAction dirty={dirty} canSave={valid && available} pending={saving} onSave={() => void submit()} />
+        <SheetSaveAction
+          dirty={dirty}
+          canSave={valid && available}
+          pending={saving || pickingPhoto}
+          onSave={() => void submit()}
+        />
       ) : null}
       {page === "info" ? (
         <>

@@ -195,6 +195,19 @@ it("replies to the selected message and returns to chat", async () => {
   }).toEqual({ target: "answer", dismissals: 1 });
 });
 
+it("keeps copy and text selection available without a reply action", async () => {
+  await open(false);
+  const reply = screen.getByRole("button", { name: "Reply" });
+  expect(reply).toHaveProperty("disabled", true);
+  await act(async () => fireEvent.click(reply));
+  expect(screen.getByRole("status", { name: "Reply target" }).textContent).toBe("");
+  expect(mocks.back).not.toHaveBeenCalled();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Copy" })));
+  expect(mocks.copy).toHaveBeenCalledWith(message.body);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Select Text" })));
+  expect(mocks.push).toHaveBeenCalledWith("/message-actions/select-text");
+});
+
 it("opens text selection without placing message text in the route", async () => {
   await open();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Select Text" })));

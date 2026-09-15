@@ -3921,6 +3921,18 @@ button.chat-action-target:active,
   opacity: 0;
 }
 
+/* The canvas above rests at `opacity: 0` once the image arrives, but the glow
+ * inside it keeps two infinite keyframes on `mask-size` and `mask-position`,
+ * and the compositor can take neither. One finished image in the history
+ * therefore costs a style recalculation and a repaint every frame for as long
+ * as the conversation is open. A profile of an idle window measured 60 style
+ * recalculations a second with no script running at all. The reduced-motion
+ * block at the end of this file already stops these keyframes for the same
+ * element, so this only makes the finished state agree with it. */
+.image-generation-ready .image-generation-glow {
+  animation: none;
+}
+
 .image-generation-dots {
   position: absolute;
   inset: 2px;
@@ -6644,6 +6656,21 @@ button.chat-action-target:active,
   min-height: 0;
 }
 
+/*
+ * Why the queue waits, above the rows that wait. Sits inside the panel's own
+ * padding because the list below owns the row insets, not the panel.
+ */
+.agent-queue-hold {
+  margin: 0;
+  padding: var(--queue-row-gutter) var(--queue-row-inset-end) 0 var(--queue-row-inset-start);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .composer-wrap:has(.composer-attachment) .agent-queue-panel {
   margin-bottom: 0;
 }
@@ -8259,6 +8286,7 @@ button.chat-action-target:active,
 }
 
 .browser-preview-image {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
   display: flex;
@@ -8284,6 +8312,31 @@ button.chat-action-target:active,
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--openbot-text-sm);
+}
+
+.browser-preview-open-label {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.browser-preview-open-label > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-preview-open:hover .browser-preview-open-label {
+  opacity: 1;
 }
 
 .browser-preview-close {
@@ -8357,16 +8410,6 @@ body:has(.browser-panel-expanded) .app-frame {
   .browser-expanded-backdrop {
     opacity: 0;
   }
-}
-
-.browser-motion-preview {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
-  pointer-events: none;
 }
 
 .browser-hide {

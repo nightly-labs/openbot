@@ -216,7 +216,13 @@ export function ChatComposer({
                   inputRef.current?.focus();
                 }}
               >
-                <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={28} />
+                <BloubAvatar
+                  agentId={agent.id}
+                  serverId={agent.serverId}
+                  hue={agent.avatarHue}
+                  seed={agent.avatarSeed}
+                  size={28}
+                />
                 <Typography.Paragraph numberOfLines={1} className="flex-1">
                   {agent.name}
                 </Typography.Paragraph>

@@ -12,9 +12,11 @@ import {
 } from "@/features/settings/components/settings-content";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
+import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 export function GeneralSettingsScreen() {
   const { theme } = useUniwind();
+  const { activeServer } = useMobileWorkspace();
   const hapticsPreference = useHapticsPreference();
   const [hapticsError, setHapticsError] = useState<string | null>(null);
   function saveHaptics(enabled: boolean) {
@@ -122,6 +124,12 @@ export function GeneralSettingsScreen() {
           supportingText="Show conversations you have hidden"
         >
           <Typography.Paragraph type="body-sm">Hidden chats</Typography.Paragraph>
+        </SettingsRow>
+        <SettingsRow
+          onPress={() => router.push({ pathname: "/settings/deleted-chats", params: { serverId: activeServer.id } })}
+          supportingText="Preview channels you have deleted"
+        >
+          <Typography.Paragraph type="body-sm">Deleted channels</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
     </SettingsContent>

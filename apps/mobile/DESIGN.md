@@ -55,14 +55,14 @@ a standalone sheet with a native title is:
 ```tsx
 {
   presentation: "formSheet",
-  sheetAllowedDetents: "fitToContents",
+  sheetAllowedDetents: [0.85],
   sheetGrabberVisible: true,
   sheetExpandsWhenScrolledToEdge: false,
   contentStyle: { backgroundColor: sheetBackground },
   headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
   headerTransparent: isIOS,
   headerBlurEffect: "none",
-  scrollEdgeEffects: { top: "soft" },
+  scrollEdgeEffects: { top: "hidden", bottom: "soft" },
   title: "Profile",
 }
 ```
@@ -80,8 +80,8 @@ opens an inner page and `router.back` returns to the previous page without dismi
 Include secondary flows such as joining a server in this stack. Do not register each settings page
 as another modal. Use `initialRouteName: "index"` so direct entry into a detail page has a back route.
 
-A nested navigator requires a stable viewport; do not combine it with `fitToContents`. The
-intrinsic-height rule applies to standalone forms, not multi-page settings. Preserve the active
+All sheets require a stable viewport. Use fixed detents for standalone forms and nested
+navigators; do not use `fitToContents` or measure content to set the sheet height. Preserve the active
 page and unsaved input when navigating forward and back; do not replace routing with conditional
 screen rendering or a custom back-button imitation.
 
@@ -91,7 +91,14 @@ to the content scroll view, not a larger sheet detent. Native dismissal remains 
 
 `headerTransparent` alone does not remove a configured blur material. Do not restore
 `systemMaterial` or another `headerBlurEffect` on these sheets, or put an opaque header color back
-on iOS. The native soft scroll edge handles the transition under the title.
+on iOS. `SheetScrollView` draws the top progressive blur with the existing
+`SheetScrollEdgeEffect` behind the native title and actions. The native top edge is hidden to
+avoid two effects. Keep the bottom edge explicitly soft.
+
+This is a fallback for the missing native effect reported on iOS 27 in both Expo Go and
+TestFlight, even with an explicit soft edge. The native cause is not yet confirmed. The fallback
+uses installed visual components and keeps native navigation controls. It does not require
+a new native dependency.
 
 ### Save and create actions
 
@@ -116,35 +123,44 @@ on the right of the native header. Do not put a second Save/Create button in the
 
 Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. In particular:
 
-- Disable bounce and overscroll (`bounces={false}`, `alwaysBounceVertical={false}` and
-  `overScrollMode="never"`). Content that fits stays still; longer content keeps native scrolling.
-  Do not disable scrolling globally. Agent Info uses `scrollOnlyOnOverflow` to disable touch
-  scrolling on short pages. It compares native content and viewport sizes without changing layout,
-  and permits scrolling while the keyboard is visible. Keep this opt-in behavior in `SheetScrollView`.
-- With an iOS native header, it reads `HeaderHeightContext` and `HeaderShownContext` from
-  `expo-router/react-navigation`, disables automatic content inset adjustment, and adds the
-  measured header height inside scrollable content. This keeps the first item below the title at
-  rest while allowing it to scroll underneath. No hardcoded header height or additional safe-area
-  wrapper belongs in the screen.
-- It suppresses `SheetScrollEdgeEffect` when a native header owns the edge. Do not combine custom
-  masking, blur material and native scroll-edge effects; they can obscure content in overlapping
-  bands. Headerless sheets retain their existing shared edge behavior.
-- Keep the scroll view reachable directly from the sheet. Avoid surrounding `flex: 1` containers
-  for standalone fit-to-content presentations. A nested settings stack has a bounded viewport. Keep the last action in the same scroll flow, with the existing
+- Keep native bounce on iOS and `overScrollMode="auto"` on Android for content that overflows.
+  Use `alwaysBounceVertical={false}` so content that fits stays still. Do not force hard stops
+  at the edges by disabling bounce or overscroll globally.
+  Keep scrolling enabled. Do not use content measurements or keyboard visibility to decide
+  whether scrolling is available. The native scroll view handles content that fits.
+- With an iOS native header, it reads `HeaderShownContext` from `expo-router/react-navigation`
+  and uses automatic content inset adjustment when the header overlays the content. UIKit owns
+  the clearance under the header and its relationship to the native scroll edge. Do not replace
+  this with a padding view or add another safe-area wrapper. A non-overlay header uses `never`
+  because navigation already places the content below it.
+- Under an overlaid iOS native header, a fixed `SheetScrollEdgeEffect` covers the measured
+  header height and a 48 pt fade. It follows the scroll view as a sibling so it cannot intercept
+  gestures or obstruct first-child scroll view discovery. Its position does not depend on scroll
+  events. Headerless sheets keep their existing shared edge behavior; non-overlay headers do not
+  add a blur overlay.
+- Keep the scroll view reachable directly from the sheet. `SheetScrollView` uses `flex: 1`
+  to fill the fixed viewport. Keep the last action in the same scroll flow, with the existing
   bottom safe-area utilities, so it remains reachable on small screens and with the keyboard open.
 - Use `keyboardDismissMode="interactive"` and `keyboardShouldPersistTaps="handled"` for forms,
   following existing screens. Reuse `SheetFormField` instead of rebuilding its platform inputs.
 - `SheetScrollView` uses `KeyboardAwareScrollView` to reveal the focused field and keep the last
-  action reachable above the keyboard. Keep `mode="insets"`: a layout spacer changes the intrinsic
-  sheet height and conflicts with native sheet sizing. Use `disableScrollOnKeyboardHide` to keep
-  the user's position. The keyboard-controller 1.21.9 patch shrinks insets during dismissal and
+  action reachable above the keyboard. Keep `mode="insets"` so keyboard clearance does not add a
+  layout spacer. Use `disableScrollOnKeyboardHide` to keep the user's position. The keyboard-controller 1.21.9 patch shrinks insets during dismissal and
   clamps only the current offset beyond the remaining content, instead of replaying a saved offset
   after a new drag. `scripts/mobile-keyboard-scroll.test.ts` covers that event sequence against the
   installed library. Leave `automaticallyAdjustKeyboardInsets` disabled and do not add another
   keyboard-avoiding wrapper. Verify tapping outside a field followed immediately by scrolling,
-  interactive keyboard dismissal, reaching the final action, and short fit-to-content sheets.
+  interactive keyboard dismissal, reaching the final action, and both short and long content.
 
 ### Palette, groups and text
+
+On iOS, sheet edges use `ProgressiveSheetBlur`: six weak native blur layers with separate,
+overlapping smooth masks. Each mask becomes transparent before the physical view edge.
+The material follows the system theme and has no additional solid color overlay. Render it
+following the scrolling content so the native blur samples that content. The masks are static;
+scrolling does not update React state. This approximates a variable blur radius using public
+Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
+Android keeps the existing sheet color fade. Chat and drawer edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.

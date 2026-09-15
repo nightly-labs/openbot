@@ -1,5 +1,5 @@
 import type { AgentEvent, ConversationMessage, ConversationPage } from "@openbot/contracts/ipc";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { indexChatMessages, projectChatMessages } from "../../chat/model/chat-messages";
 import { reduceAgentActivity } from "./agent-activity";
 import { decodeConversationPage } from "./conversation";
@@ -46,6 +46,24 @@ function setup() {
 }
 
 describe("mobile conversation windows", () => {
+  it("does not rebuild or notify an unchanged history on refresh", () => {
+    const { store } = setup();
+    store.applyPage(page(["recent", "reply"]));
+    const current = store.get("agent");
+    const notify = vi.fn();
+    const close = store.subscribe("agent", notify);
+    store.applyPage(page(["recent", "reply"]));
+    expect(store.get("agent")).toBe(current);
+    expect(notify).not.toHaveBeenCalled();
+    const updated = page(["recent", "reply"], 2);
+    updated.messages[1].text = "Updated reply";
+    store.applyPage(updated);
+    expect(store.get("agent")?.messages[0]).toBe(current?.messages[0]);
+    expect(store.get("agent")?.messages[1].text).toBe("Updated reply");
+    expect(notify).toHaveBeenCalledTimes(1);
+    close();
+  });
+
   it("does not let an older page advance the live revision and discard queued text", () => {
     const { store, frame } = setup();
     store.applyPage(page(["reply"], 10));

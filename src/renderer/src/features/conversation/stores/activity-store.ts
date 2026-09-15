@@ -28,12 +28,24 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     }
     return null;
   });
+  /** The channel work of this very agent, which the chat has no turn of its own to show. */
+  const heldByOwnChannelWork = createMemo(() => {
+    const hold = deps.props.queue?.hold;
+    if (!hold || hold.agentId !== deps.props.agent?.id) return null;
+    return deps.props.activeTurnId ? null : hold;
+  });
   const activeActivityId = createMemo(() => {
     const agentId = deps.props.agent?.id;
     if (!agentId) return null;
     const delivery = deps.activeDeliveries()[0];
     if (delivery) return `${agentId}:delivery:${delivery.id}`;
     if (deps.props.activeTurnId) return `${agentId}:turn:${deps.props.activeTurnId}`;
+    // The agent is working, on a channel thread rather than this one. Its turn belongs to that
+    // thread, so nothing above reports it, and without this the chat shows an idle agent that
+    // answers nothing. Only the agent the work belongs to: the same channel assignment holds the
+    // queue of every other agent, and those agents are waiting, not working.
+    const hold = heldByOwnChannelWork();
+    if (hold) return `${agentId}:hold:${hold.channelId}`;
     const streamingMessage = streamingAgentMessage();
     if (!streamingMessage) return null;
     const current = untrack(renderedAgentActivity);
@@ -56,9 +68,11 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     }
     return null;
   });
-  const activeActivityDetail = createMemo(
-    () => latestActiveCommentary() ?? (deps.props.activityDetail?.trim() || null),
-  );
+  const activeActivityDetail = createMemo(() => {
+    const hold = heldByOwnChannelWork();
+    if (hold) return `Working in ${hold.channelName}`;
+    return latestActiveCommentary() ?? (deps.props.activityDetail?.trim() || null);
+  });
   const agentActivity = createMemo<"Working" | null>(() => (activeActivityId() ? "Working" : null));
   const activityPresentation = createMemo<AgentActivityPresentation | null>(() => {
     const agentId = deps.props.agent?.id;

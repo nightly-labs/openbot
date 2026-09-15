@@ -10,12 +10,24 @@ export function ChatQuestionPrompt({
   prompt,
   controller,
   canSend,
+  onActivate,
 }: {
   prompt: ConversationQuestionPrompt;
   controller?: QuestionPromptController;
   canSend: boolean;
+  onActivate?: () => void;
 }) {
   const muted = useThemeColor("muted");
+  if (!prompt.resolution && !controller && onActivate) {
+    return (
+      <View className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
+        <Typography>{prompt.questions[0]?.question}</Typography>
+        <Button variant="ghost" onPress={onActivate}>
+          <Button.Label>Answer form</Button.Label>
+        </Button>
+      </View>
+    );
+  }
   const resolution =
     prompt.resolution ?? controller?.resolution ?? (controller ? null : { status: "expired" as const });
   if (resolution) {

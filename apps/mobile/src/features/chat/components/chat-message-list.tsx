@@ -1,4 +1,4 @@
-import { useIsFocused } from "expo-router";
+import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
 import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -13,18 +13,24 @@ import Animated, {
   useReducedMotion,
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
-import { BloubAvatar, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
+import {
+  BloubAvatarPreview,
+  BloubAvatarThumbnail,
+  getBloubAvatarColor,
+} from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { type ChatMessage, indexChatMessages } from "@/features/chat/model/chat-messages";
-import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
+import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
 import { mentionDraft } from "../model/chat-mentions";
+import type { ChatTarget } from "../model/chat-target";
 import { ChatAttachmentView } from "./chat-attachment";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
@@ -76,15 +82,19 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
 const AGENT_MESSAGE_ENTRANCE = FadeIn.duration(240).reduceMotion(ReduceMotion.System);
 
 interface ChatMessageListProps {
-  agent: MobileAgent;
+  target: ChatTarget;
+  activity?: MobileAgentActivity;
+  activities?: MobileAgentActivity[];
   agents: MobileAgent[];
   motion: ChatMotion;
   sending: boolean;
   keyboardOffset: number;
   canSend: boolean;
+  online: boolean;
   appActive: boolean;
   activeTurnId: string | null;
-  questionForm: QuestionPromptController;
+  questionForm?: QuestionPromptController;
+  onSelectQuestion?: (messageId: string) => void;
   fieldBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
@@ -107,15 +117,19 @@ interface ChatMessageListProps {
 }
 
 export function ChatMessageList({
-  agent,
+  target,
+  activity,
+  activities,
   agents,
   motion,
   sending,
   keyboardOffset,
   canSend,
+  online,
   appActive,
   activeTurnId,
   questionForm,
+  onSelectQuestion,
   fieldBackground,
   foreground,
   historyState,
@@ -137,6 +151,7 @@ export function ChatMessageList({
   onOpenActions,
 }: ChatMessageListProps) {
   const isFocused = useIsFocused();
+  const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
     () => indexChatMessages(messages, messageAliases, referenceMessages),
     [messages, messageAliases, referenceMessages],
@@ -159,32 +174,12 @@ export function ChatMessageList({
     "--openbot-text-muted",
   ]).map(String);
   const reducedMotion = useReducedMotion();
-  const animateMessages = isFocused && canSend && appActive;
-  const arrivals = useMessageArrivals(agent.id, messages, animateMessages && historyState === "ready");
-  const activity = useAgentActivity(agent.id);
-  const latestThinking = messages.findLast(
-    (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
+  const animateMessages = isFocused && online && appActive;
+  const arrivals = useMessageArrivals(target.id, messages, animateMessages && historyState === "ready");
+  const userBubbleColor = getBloubAvatarColor(
+    target.kind === "agent" ? target.avatarSeed : target.id,
+    target.kind === "agent" ? target.avatarHue : null,
   );
-  const thinkingDetail =
-    latestThinking?.kind === "thinking" &&
-    !messages.some((message) => message.kind === "message" && message.author === "agent" && message.streaming)
-      ? latestThinking.steps.at(-1)?.text
-      : null;
-  const activityLabel =
-    sending && !activity
-      ? "Sending…"
-      : activity?.phase === "waiting"
-        ? messages.some(
-            (message) => message.kind === "question" && !message.prompt.resolution && message.turnId === activeTurnId,
-          )
-          ? "Waiting for your answer"
-          : "Waiting for your input on desktop"
-        : thinkingDetail
-          ? thinkingDetail
-          : activity?.phase === "responding"
-            ? "Responding…"
-            : activity?.detail || "Thinking…";
-  const userBubbleColor = getBloubAvatarColor(agent.avatarSeed, agent.avatarHue);
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);
   const green = Number.parseInt(userBubbleColor.slice(3, 5), 16);
@@ -202,6 +197,21 @@ export function ChatMessageList({
   const visibleMessages = useMemo(() => messages.filter((message) => message.kind !== "thinking"), [messages]);
   const tailIndex = visibleMessages.findLastIndex((message) => message.kind === "message" && message.author === "user");
   const tailId = visibleMessages[tailIndex]?.id ?? null;
+  const [boundary, setBoundary] = useState<ChatHistoryBoundary>({ firstId: null, headId: null });
+  const promptIndex = visibleMessages.findIndex((message) => message.id === questionForm?.messageId);
+  const historyStart = chatHistoryStart(visibleMessages, tailIndex, boundary);
+  const windowStart = promptIndex >= 0 ? Math.min(historyStart, promptIndex) : historyStart;
+  const firstId = visibleMessages[windowStart]?.id ?? null;
+  const headId = visibleMessages[0]?.id ?? null;
+  if (boundary.firstId !== firstId || boundary.headId !== headId) setBoundary({ firstId, headId });
+  const windowMessages = useMemo(() => visibleMessages.slice(windowStart), [visibleMessages, windowStart]);
+  const hasCachedOlder = windowStart > 0;
+  const canLoadOlder = hasCachedOlder || (online && hasOlder && !olderLoading);
+  const loadPrevious = () => {
+    if (hasCachedOlder) {
+      setBoundary({ firstId: visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)].id, headId });
+    } else if (canLoadOlder) onLoadOlder();
+  };
   const listRef = useRef<FlatList<VisibleMessage>>(null);
   const tailLayout = useMemo(() => ({ id: tailId, motion }), [tailId, motion]);
   const seekLatest = useCallback(() => {
@@ -211,26 +221,58 @@ export function ChatMessageList({
     if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
   }, [tailId, motion.needsSendPosition, motion.atLatest]);
   const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
+    const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
     const rendered =
-      message.kind === "exchange" ? (
+      message.kind === "exchange" || message.kind === "channel-routing" ? (
         <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
           <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-            {message.exchange.direction === "outgoing" ? "Messaged" : "Message from"}
+            {message.kind === "channel-routing"
+              ? message.event.action === "assigned"
+                ? "Assigned to"
+                : "Continuing with"
+              : message.exchange.direction === "outgoing"
+                ? "Messaged"
+                : "Message from"}
           </Typography.Paragraph>
-          {(message.exchange.direction === "incoming"
-            ? [message.exchange.senderAgentId]
-            : message.exchange.recipientAgentIds
+          {(message.kind === "channel-routing"
+            ? [message.event.agentId]
+            : message.exchange.direction === "incoming"
+              ? [message.exchange.senderAgentId]
+              : message.exchange.recipientAgentIds
           ).map((id) => {
-            const participant = agents.find((candidate) => candidate.id === id);
-            return (
-              <View key={id} className="flex-row items-center gap-1">
+            const legacyName =
+              message.kind === "channel-routing" && message.event.agentId === null ? message.event.agentName : null;
+            const legacyMatches = legacyName ? agents.filter((agent) => agent.name === legacyName) : [];
+            const participant = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
+            const badge = (
+              <View key={id ?? legacyName} className="flex-row items-center gap-1">
                 {participant ? (
-                  <BloubAvatar agentId={id} hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
+                  <BloubAvatarThumbnail
+                    agentId={participant.id}
+                    serverId={participant.serverId}
+                    hue={participant.avatarHue}
+                    seed={participant.avatarSeed}
+                    size={22}
+                  />
                 ) : null}
                 <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-                  {participant?.name ?? "Unknown agent"}
+                  {participant?.name ??
+                    (message.kind === "channel-routing" ? (legacyName ?? "Unavailable agent") : "Unknown agent")}
                 </Typography.Paragraph>
               </View>
+            );
+            return message.kind === "channel-routing" && participant ? (
+              <Link
+                key={participant.id}
+                href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }}
+                asChild
+              >
+                <Pressable accessibilityRole="link" accessibilityLabel={`Open chat with ${participant.name}`}>
+                  {badge}
+                </Pressable>
+              </Link>
+            ) : (
+              <View key={id ?? legacyName}>{badge}</View>
             );
           })}
         </View>
@@ -238,8 +280,9 @@ export function ChatMessageList({
         <ChatQuestionPrompt
           key={message.id}
           prompt={message.prompt}
-          controller={message.id === questionForm.messageId ? questionForm : undefined}
+          controller={message.id === questionForm?.messageId ? questionForm : undefined}
           canSend={canSend}
+          onActivate={onSelectQuestion ? () => onSelectQuestion(message.id) : undefined}
         />
       ) : (
         <Animated.View
@@ -258,11 +301,28 @@ export function ChatMessageList({
           }
           style={[{ borderCurve: "circular" }, isFirstUser ? motion.firstMessageStyle : undefined]}
         >
+          {message.speaker && message.author !== "user" ? (
+            <View className="flex-row items-center gap-1 px-1">
+              {message.speaker.kind === "agent" ? (
+                <BloubAvatarThumbnail
+                  agentId={speaker?.id}
+                  serverId={speaker?.serverId}
+                  seed={speaker?.avatarSeed ?? message.speaker.id}
+                  hue={speaker?.avatarHue ?? null}
+                  size={20}
+                />
+              ) : null}
+              <Typography.Paragraph type="body-xs" className="text-muted">
+                {message.speaker.name}
+                {message.superseded ? " · Superseded" : ""}
+              </Typography.Paragraph>
+            </View>
+          ) : null}
           {message.attachments?.map((attachment) => (
             <ChatAttachmentView
               key={attachment.id}
               attachment={attachment}
-              serverId={agent.serverId}
+              serverId={target.serverId}
               alignment={message.author === "user" ? "right" : "left"}
             />
           ))}
@@ -270,16 +330,19 @@ export function ChatMessageList({
             <Animated.View
               className={
                 message.author === "user"
-                  ? `self-end rounded-[30px] px-4 py-3 ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                  ? `self-end rounded-[30px] px-4 py-3 ${target.kind === "channel" ? "bg-control/60" : ""} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
                   : "max-w-full self-start rounded-[30px] bg-control/60 px-4 py-3"
               }
-              style={[{ borderCurve: "circular" }, message.author === "user" ? userBubbleStyle : undefined]}
+              style={[
+                { borderCurve: "circular" },
+                message.author === "user" && target.kind === "agent" ? userBubbleStyle : undefined,
+              ]}
             >
               <ChatMarkdown
                 agents={agents}
                 body={message.body}
                 selectable={message.author === "user"}
-                color={message.author === "user" ? userForeground : foreground}
+                color={message.author === "user" && target.kind === "agent" ? userForeground : foreground}
                 streaming={message.author === "agent" && message.streaming}
                 animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
               />
@@ -288,27 +351,21 @@ export function ChatMessageList({
         </Animated.View>
       );
     if (message.kind !== "message") return rendered;
-    if (message.author === "agent") {
-      return (
-        <ChatMessageGesture
-          key={message.id}
-          screenReaderEnabled={screenReaderEnabled}
-          onReply={onReply ? () => onReply(message) : undefined}
-          onOpenActions={() => onOpenActions(message)}
-        >
-          {rendered}
-        </ChatMessageGesture>
-      );
-    }
     const source = message.replyToMessageId ? messagesById.get(message.replyToMessageId) : undefined;
     return (
       <View
         key={message.id}
-        className={message.attachments?.length ? "max-w-full self-end gap-1" : "max-w-[88%] self-end gap-1"}
+        className={
+          message.author === "agent"
+            ? "max-w-full self-start gap-1"
+            : message.attachments?.length
+              ? "max-w-full self-end gap-1"
+              : "max-w-[88%] self-end gap-1"
+        }
         onLayout={isTailUser ? motion.onUserLayout : undefined}
       >
         {message.replyToMessageId ? (
-          <View className="flex-row items-center gap-1 self-end">
+          <View className={`flex-row items-center gap-1 ${message.author === "user" ? "self-end" : "self-start"}`}>
             <CornerUpRight size={14} color={themeMuted} />
             <Typography.Paragraph
               type="body-xs"
@@ -320,20 +377,75 @@ export function ChatMessageList({
             </Typography.Paragraph>
           </View>
         ) : null}
-        {rendered}
+        {message.author === "agent" ? (
+          <ChatMessageGesture
+            screenReaderEnabled={screenReaderEnabled}
+            onReply={onReply ? () => onReply(message) : undefined}
+            onOpenActions={() => onOpenActions(message)}
+          >
+            {rendered}
+          </ChatMessageGesture>
+        ) : (
+          rendered
+        )}
       </View>
     );
   };
-  const renderActivity = () =>
-    activity || sending ? (
+  const renderActivity = (activity?: MobileAgentActivity) => {
+    const latestThinking = messages.findLast(
+      (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
+    );
+    const thinkingDetail =
+      latestThinking?.kind === "thinking" &&
+      !messages.some(
+        (message) =>
+          message.kind === "message" &&
+          message.author === "agent" &&
+          message.streaming &&
+          (!activity?.agentId || message.speaker?.id === activity.agentId),
+      )
+        ? latestThinking.steps.at(-1)?.text
+        : null;
+    const activityLabel =
+      sending && !activity
+        ? "Sending…"
+        : activity?.phase === "waiting"
+          ? messages.some(
+              (message) => message.kind === "question" && !message.prompt.resolution && message.turnId === activeTurnId,
+            )
+            ? "Waiting for your answer"
+            : "Waiting for your input on desktop"
+          : thinkingDetail
+            ? thinkingDetail
+            : activity?.phase === "responding"
+              ? "Responding…"
+              : activity?.detail || "Thinking…";
+    const activityAgent = activity?.agentId
+      ? agentsById.get(activity.agentId)
+      : target.kind === "agent"
+        ? target
+        : undefined;
+    return activity || sending ? (
       <View
         className="flex-row items-center gap-2 px-1 py-2"
         accessible
         accessibilityLiveRegion="polite"
         accessibilityRole="text"
-        accessibilityLabel={`${agent.name}: ${activityLabel}`}
+        key={activity?.agentId ?? "sending"}
+        accessibilityLabel={`${activityAgent?.name ?? target.name}: ${activityLabel}`}
       >
-        <BloubAvatar agentId={agent.id} hue={agent.avatarHue} seed={agent.avatarSeed} size={36} />
+        {activityAgent ? (
+          <BloubAvatarPreview
+            agentId={activityAgent.id}
+            serverId={activityAgent.serverId}
+            hue={activityAgent.avatarHue}
+            seed={activityAgent.avatarSeed}
+            size={36}
+            disconnected={!online}
+            working={animateMessages && Boolean(activity && activity.phase !== "waiting")}
+            animateIdle={animateMessages}
+          />
+        ) : null}
         <StreamRevealProvider>
           <ThinkingTextGradient
             text={activityLabel}
@@ -364,6 +476,7 @@ export function ChatMessageList({
         </StreamRevealProvider>
       </View>
     ) : null;
+  };
 
   return (
     <Animated.View
@@ -374,25 +487,27 @@ export function ChatMessageList({
       <TailLayoutContext.Provider value={tailLayout}>
         <FlatList
           ref={listRef}
-          data={visibleMessages}
+          data={windowMessages}
           keyExtractor={(message) => message.id}
           CellRendererComponent={MessageCell}
-          initialNumToRender={50}
+          initialNumToRender={CHAT_HISTORY_BATCH}
           maxToRenderPerBatch={8}
           windowSize={7}
           removeClippedSubviews={false}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           onStartReached={() => {
-            if (motion.historyVisible && canSend && hasOlder && !olderLoading && !olderError) onLoadOlder();
+            if (motion.historyVisible && canLoadOlder && (hasCachedOlder || !olderError)) loadPrevious();
           }}
           onStartReachedThreshold={0.5}
           renderItem={({ item, index }) => (
             <Animated.View
-              style={[{ paddingBottom: 10 }, index > tailIndex ? motion.responseStyle : undefined]}
-              accessibilityElementsHidden={index > tailIndex && !motion.responseVisible}
-              importantForAccessibility={index > tailIndex && !motion.responseVisible ? "no-hide-descendants" : "auto"}
+              style={[{ paddingBottom: 10 }, index + windowStart > tailIndex ? motion.responseStyle : undefined]}
+              accessibilityElementsHidden={index + windowStart > tailIndex && !motion.responseVisible}
+              importantForAccessibility={
+                index + windowStart > tailIndex && !motion.responseVisible ? "no-hide-descendants" : "auto"
+              }
             >
-              {renderMessage(item, index === tailIndex, index === 0 && !hasOlder)}
+              {renderMessage(item, index + windowStart === tailIndex, index === 0 && !hasOlder && !hasCachedOlder)}
             </Animated.View>
           )}
           renderScrollComponent={(props) => (
@@ -428,13 +543,13 @@ export function ChatMessageList({
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <>
-              {hasOlder ? (
+              {hasOlder || hasCachedOlder ? (
                 <View className="items-center pb-3">
-                  <Button variant="tertiary" isDisabled={!canSend || olderLoading} onPress={onLoadOlder}>
+                  <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={loadPrevious}>
                     <Button.Label>
-                      {olderLoading
+                      {!hasCachedOlder && olderLoading
                         ? "Loading older messages…"
-                        : olderError
+                        : !hasCachedOlder && olderError
                           ? "Try loading older messages again"
                           : "Load older messages"}
                     </Button.Label>
@@ -469,7 +584,9 @@ export function ChatMessageList({
           }
           ListFooterComponent={
             <>
-              <Animated.View style={motion.responseStyle}>{renderActivity()}</Animated.View>
+              <Animated.View style={motion.responseStyle}>
+                {activities?.length ? activities.map(renderActivity) : renderActivity(activity)}
+              </Animated.View>
               {showStarter ? (
                 <View
                   className="gap-4 rounded-[26px] p-4"

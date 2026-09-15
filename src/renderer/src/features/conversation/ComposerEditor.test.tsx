@@ -137,6 +137,47 @@ describe("ComposerEditor", () => {
     expect(editor.contains(window.getSelection()?.getRangeAt(0).commonAncestorContainer ?? null)).toBe(true);
   });
 
+  it.each([
+    { key: "x", shiftKey: false, inserted: "x" },
+    { key: "Enter", shiftKey: true, inserted: "\n" },
+  ])("keeps the scroll position when inserting $inserted in an earlier line", async ({ key, shiftKey, inserted }) => {
+    const draft = Array.from({ length: 30 }, (_, index) => `Line ${index + 1}`).join("\n");
+    const { editor, onValueChange } = renderComposer([], draft);
+    editor.focus();
+    const text = editor.firstChild;
+    if (!text) throw new Error("The draft text is missing");
+    placeCaret(text, 3);
+    Object.defineProperty(editor, "scrollHeight", { configurable: true, value: 900 });
+    editor.scrollTop = 24;
+
+    await fireEvent.keyDown(editor, { key, shiftKey });
+
+    expect(onValueChange).toHaveBeenLastCalledWith(`${draft.slice(0, 3)}${inserted}${draft.slice(3)}`);
+    expect(editor.scrollTop).toBe(24);
+    const selection = window.getSelection();
+    const prefix = selection?.getRangeAt(0).cloneRange();
+    prefix?.selectNodeContents(editor);
+    if (selection?.anchorNode) prefix?.setEnd(selection.anchorNode, selection.anchorOffset);
+    expect(prefix?.toString()).toBe(`${draft.slice(0, 3)}${inserted}`);
+  });
+
+  it.each([
+    { key: "x", shiftKey: false, inserted: "x" },
+    { key: "Enter", shiftKey: true, inserted: "\n" },
+  ])("follows the caret when inserting $inserted at the end", async ({ key, shiftKey, inserted }) => {
+    const draft = "First line\nLast line\n";
+    const { editor, onValueChange } = renderComposer([], draft);
+    editor.focus();
+    placeCaretAtEnd(editor);
+    Object.defineProperty(editor, "scrollHeight", { configurable: true, value: 900 });
+    editor.scrollTop = 24;
+
+    await fireEvent.keyDown(editor, { key, shiftKey });
+
+    expect(onValueChange).toHaveBeenLastCalledWith(`${draft}${inserted}`);
+    expect(editor.scrollTop).toBe(900);
+  });
+
   it("does not duplicate printable keys when a native input event arrives", async () => {
     const { editor, onValueChange } = renderComposer();
     editor.focus();

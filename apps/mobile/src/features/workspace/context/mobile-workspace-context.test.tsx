@@ -2,7 +2,7 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { remoteHostFingerprint } from "@openbot/team-client";
 import type { RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { act, type PropsWithChildren, useImperativeHandle, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
@@ -187,3 +187,37 @@ it.each(["foreground", "manual"])(
     expect(current.activityByServer[host.hostId]).toEqual({});
   },
 );
+
+it.each(["memories", "routines"] as const)("refreshes active channel %s after a remote edit", async (section) => {
+  await act(async () =>
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <MobileWorkspaceProvider>
+          <Workspace />
+        </MobileWorkspaceProvider>
+      </QueryClientProvider>,
+    ),
+  );
+  let records = ["original"];
+  const key = ["channel-info", session.apiUrl, session.user.id, 1, host.hostId, "channel", section];
+  const read = vi.fn(async () => records);
+  const observer = new QueryObserver(queryClient, { queryKey: key, queryFn: read, staleTime: Infinity });
+  const close = observer.subscribe(() => {});
+  await observer.refetch();
+  const reads = read.mock.calls.length;
+  await act(async () => emit({ type: "channels-changed", channelId: "channel", revision: 1 }));
+  expect(read).toHaveBeenCalledTimes(reads);
+  const otherKey = [...key.slice(0, 5), "other-channel", section];
+  queryClient.setQueryData(otherKey, ["unchanged"]);
+  records = [];
+  await act(async () =>
+    emit({
+      type: section === "memories" ? "channel-memories-changed" : "channel-routines-changed",
+      channelId: "channel",
+    }),
+  );
+  await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual([]));
+  expect(queryClient.getQueryData(otherKey)).toEqual(["unchanged"]);
+  expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  close();
+});

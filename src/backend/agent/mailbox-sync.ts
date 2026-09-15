@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentSummary, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentSummary, ConversationSnapshot, QueueHold, QueueSnapshot } from "@openbot/contracts/ipc";
 import { sortConversationMessages } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -9,6 +9,8 @@ import type { RoutineScheduler } from "./routine-scheduler";
 export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
+  /** What holds the queue back, when the reason is not this agent's own running turn. */
+  queueHold(agentId: string): QueueHold | null;
 }
 
 export interface MailboxSyncOptions {
@@ -87,8 +89,20 @@ export class MailboxSync {
     if (live) this.syncMailboxMessages(live);
   }
 
-  emitQueue(agentId: string): void {
+  /**
+   * The queue the user reads, carrying the reason it waits when something outside this agent holds
+   * it. `AgentService.listQueue` returns this as well, so a reload and a reconnect report the same
+   * wait as the event below.
+   */
+  queueSnapshot(agentId: string): QueueSnapshot {
     const queue = this.#mailbox.listQueue(agentId);
+    if (!queue.deliveries.some((delivery) => delivery.status === "queued")) return queue;
+    const hold = this.#hooks.queueHold(agentId);
+    return hold ? { ...queue, hold } : queue;
+  }
+
+  emitQueue(agentId: string): void {
+    const queue = this.queueSnapshot(agentId);
     let routinesChanged = false;
     for (const delivery of queue.deliveries) {
       if (this.#routines.reconcileDelivery(delivery)) routinesChanged = true;

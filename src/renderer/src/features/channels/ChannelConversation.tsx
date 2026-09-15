@@ -19,6 +19,7 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
+import { ChatActionMarker } from "../conversation/ChatActionMarker";
 import { ChatMessageRow } from "../conversation/ChatMessageRow";
 import { ComposerEditor, expandComposerMentions } from "../conversation/ComposerEditor";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
@@ -440,9 +441,15 @@ export function ChannelConversation() {
                   class="conversation-title channel-title no-drag"
                   aria-label="Channel settings"
                   onClick={openSettings}
+                  disabled={page().channel.archived}
                 >
                   <ChannelAvatar members={page().channel.members} agents={agentList()} />
-                  <h1>{page().channel.name}</h1>
+                  <span class="channel-header-copy">
+                    <h1>{page().channel.name}</h1>
+                    <Show when={page().channel.title.trim()}>
+                      {(title) => <span class="channel-header-title">{title()}</span>}
+                    </Show>
+                  </span>
                 </Button>
               </div>
             </header>
@@ -542,75 +549,95 @@ export function ChannelConversation() {
                             }}
                           />
                         </Show>
-                        <ChatMessageRow
-                          message={entry()?.message ?? initialEntry.message}
-                          author={entry()?.author ?? initialEntry.author}
-                          showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
-                          showTime
-                          animate={animate}
-                          agents={agentList()}
-                          referencedMessage={referenced()?.message}
-                          referencedAuthorName={referenced()?.author.name}
-                          onSelectAgent={(id) => {
-                            channels.close();
-                            selectAgent(id);
-                          }}
-                          onOpenLink={(url) => {
-                            void window.openbot.openUrl(url);
-                          }}
-                          onPreview={(attachment) => {
-                            void channels.perform(() =>
-                              window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }),
-                            );
-                          }}
-                          onAttachmentAction={(attachment, action) => {
-                            void channels.perform(() =>
-                              window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),
-                            );
-                          }}
-                          actions={
-                            <MessageActions
-                              message={entry()?.message ?? initialEntry.message}
-                              authorName={entry()?.author.name ?? initialEntry.author.name}
-                              reactions={false}
-                              pickerOpen={false}
-                              moreOpen={openMoreMessageId() === initialEntry.id}
-                              expandedEmoji={false}
-                              copied={copiedMessageId() === initialEntry.id}
-                              onTogglePicker={() => {}}
-                              onToggleMore={() =>
-                                setOpenMoreMessageId((current) =>
-                                  current === initialEntry.id ? null : initialEntry.id,
-                                )
-                              }
-                              onExpandEmoji={() => {}}
-                              onReact={() => {}}
-                              onReply={() =>
-                                setComposer((state) => {
-                                  state.reply = initialEntry.id;
-                                })
-                              }
-                              onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
+                        {initialEntry.message.actionMarker ? (
+                          <article class={{ "chat-action-entry-animated": animate }}>
+                            <ChatActionMarker
+                              marker={initialEntry.message.actionMarker}
+                              agents={agentList()}
+                              announce={animate}
+                              onSelectAgent={(id) => {
+                                channels.close();
+                                selectAgent(id);
+                              }}
                             />
-                          }
-                        >
-                          <Show when={entry()?.message.questionPrompt}>
-                            {(prompt) => (
-                              <QuestionPromptBubble
-                                questions={prompt().questions}
-                                resolution={prompt().resolution}
-                                onSubmit={(answers) =>
-                                  channels.perform(() =>
-                                    window.openbot.agent.respondToPrompt({
-                                      requestId: prompt().requestId,
-                                      answers,
-                                    }),
+                          </article>
+                        ) : (
+                          <ChatMessageRow
+                            message={entry()?.message ?? initialEntry.message}
+                            author={entry()?.author ?? initialEntry.author}
+                            showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
+                            showTime
+                            animate={animate}
+                            agents={agentList()}
+                            referencedMessage={referenced()?.message}
+                            referencedAuthorName={referenced()?.author.name}
+                            onSelectAgent={(id) => {
+                              channels.close();
+                              selectAgent(id);
+                            }}
+                            onOpenLink={(url) => {
+                              void window.openbot.openUrl(url);
+                            }}
+                            onPreview={(attachment) => {
+                              void channels.perform(() =>
+                                window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }),
+                              );
+                            }}
+                            onAttachmentAction={(attachment, action) => {
+                              void channels.perform(() =>
+                                window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),
+                              );
+                            }}
+                            actions={
+                              <MessageActions
+                                message={entry()?.message ?? initialEntry.message}
+                                authorName={entry()?.author.name ?? initialEntry.author.name}
+                                reactions={false}
+                                pickerOpen={false}
+                                moreOpen={openMoreMessageId() === initialEntry.id}
+                                expandedEmoji={false}
+                                copied={copiedMessageId() === initialEntry.id}
+                                onTogglePicker={() => {}}
+                                onToggleMore={() =>
+                                  setOpenMoreMessageId((current) =>
+                                    current === initialEntry.id ? null : initialEntry.id,
                                   )
                                 }
+                                onExpandEmoji={() => {}}
+                                onReact={() => {}}
+                                onReply={
+                                  page().channel.archived
+                                    ? undefined
+                                    : () =>
+                                        setComposer((state) => {
+                                          state.reply = initialEntry.id;
+                                        })
+                                }
+                                onCopy={() => void copyChannelMessage(entry()?.message ?? initialEntry.message)}
                               />
-                            )}
-                          </Show>
-                        </ChatMessageRow>
+                            }
+                          >
+                            <Show when={entry()?.message.questionPrompt}>
+                              {(prompt) => (
+                                <QuestionPromptBubble
+                                  questions={prompt().questions}
+                                  resolution={prompt().resolution}
+                                  readOnly={page().channel.archived}
+                                  onSubmit={(answers) =>
+                                    page().channel.archived
+                                      ? Promise.resolve(false)
+                                      : channels.perform(() =>
+                                          window.openbot.agent.respondToPrompt({
+                                            requestId: prompt().requestId,
+                                            answers,
+                                          }),
+                                        )
+                                  }
+                                />
+                              )}
+                            </Show>
+                          </ChatMessageRow>
+                        )}
                       </div>
                     );
                   }}
@@ -625,6 +652,7 @@ export function ChannelConversation() {
                 {(member) => (
                   <Show
                     when={
+                      !page().channel.archived &&
                       page().tasks.some((task) => task.ownerAgentId === member.agentId && task.state === "running") &&
                       pendingApprovals()[member.agentId]
                     }
@@ -657,7 +685,8 @@ export function ChannelConversation() {
                 {(member) => {
                   const takeover = () => {
                     const event = pendingPrompts()[member.agentId];
-                    return event?.type === "browser-takeover-requested" &&
+                    return !page().channel.archived &&
+                      event?.type === "browser-takeover-requested" &&
                       page().tasks.some((task) => task.ownerAgentId === member.agentId && task.state === "running")
                       ? event.request
                       : undefined;
@@ -729,10 +758,13 @@ export function ChannelConversation() {
                   </section>
                 )}
               </For>
-              <Show when={!page().channel.members.length}>
+              <Show when={!page().channel.archived && !page().channel.members.length}>
                 <p>Add agents in channel settings to start work.</p>
               </Show>
             </section>
+            <Show when={page().channel.archived}>
+              <p class="channel-preview-notice">Deleted channel. Preview only.</p>
+            </Show>
             <Show when={!page().channel.archived}>
               <div class="composer-wrap">
                 <form
@@ -843,7 +875,7 @@ export function ChannelConversation() {
                 </form>
               </div>
             </Show>
-            <Show when={channels.state.editing === "settings"}>
+            <Show when={!page().channel.archived && channels.state.editing === "settings"}>
               <SettingsPanel
                 id="channel-side-panel"
                 label="Channel panel"

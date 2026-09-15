@@ -3,7 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { ChannelDraft, ChannelMessage, ChannelTask } from "@openbot/contracts/ipc";
+import {
+  type ChannelDraft,
+  type ChannelMessage,
+  type ChannelTask,
+  channelRoutingConversationEvent,
+  channelRoutingConversationEventItemType,
+} from "@openbot/contracts/ipc";
 import { validateProfileName } from "@openbot/contracts/validation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stores } from "./agent-service-test-harness";
@@ -17,6 +23,7 @@ let data: ReturnType<typeof stores>;
 let draft: ChannelDraft;
 const actor = { id: "human-1", name: "Alex" };
 const changed = vi.fn();
+const queueHoldChanged = vi.fn();
 const schedule = vi.fn();
 const interrupt = vi.fn(async () => undefined);
 const busy = vi.fn((_agentId: string) => false);
@@ -43,6 +50,7 @@ beforeEach(async () => {
   busy.mockReset();
   busy.mockReturnValue(false);
   changed.mockClear();
+  queueHoldChanged.mockClear();
   service = new ChannelService(data.store.database, data.mailbox, {
     agents: () => data.store.list(),
     generate,
@@ -50,6 +58,7 @@ beforeEach(async () => {
     interrupt,
     busy,
     changed,
+    queueHoldChanged,
     error: (error) => {
       throw error;
     },
@@ -115,6 +124,36 @@ describe("shared channel coordination", () => {
     );
     expect(data.store.database.activeProviderSessionThreads("agent-b")).toEqual([]);
   });
+  it("reports the hold of a waiting queue when the assignment changes, not for its turn traffic", async () => {
+    await send("Prepare the report");
+    // An agent held by this work drains nothing, so its queue has no event of its own. The hold it
+    // shows is only as new as the last one reported here.
+    await vi.waitFor(() => expect(queueHoldChanged).toHaveBeenCalledTimes(1));
+    expect(service.queueHold("agent-b")).toEqual({
+      reason: "channel-task",
+      channelId: "channel-1",
+      channelName: "Release coordination",
+      agentId: "agent-a",
+    });
+
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = assignment.deliveryId ?? "";
+    service.accepted(deliveryId, "session-1", "turn-1");
+    expect(queueHoldChanged).toHaveBeenCalledTimes(1);
+
+    // Two tasks that reserve nothing run at the same time. The queue of agent-b waits behind the
+    // host as well, but the work it waits for is its own, and its chat has to show that.
+    service.store.update(service.store.get("channel-1"), {
+      assignments: [{ ...assignment, id: "assignment-b", agentId: "agent-b", deliveryId: null, turnId: null }],
+    });
+    expect(service.queueHold("agent-b")?.agentId).toBe("agent-b");
+    expect(service.queueHold("agent-a")?.agentId).toBe("agent-a");
+
+    service.deliveryFailed(deliveryId, "The provider stopped.");
+    expect(queueHoldChanged).toHaveBeenCalledTimes(2);
+    expect(service.queueHold("agent-a")?.agentId).toBe("agent-b");
+  });
+
   it("saves one visible request when a command is retried", async () => {
     const command = {
       type: "send" as const,
@@ -411,6 +450,10 @@ describe("shared channel coordination", () => {
     expect(dispatch.author).toEqual({ kind: "agent", id: "agent-a", name: required(agent("agent-a")).name });
     expect(dispatch.taskId).toBe(task.id);
     expect(dispatch.message.text).toContain(required(agent("agent-b")).name);
+    // The receipt is channel activity, not a reply: it carries the marker item type, it names the
+    // member it went to, and it leaves the unread badge of the reader where it was.
+    expect(channelRoutingConversationEvent(dispatch.message)).toEqual({ action: "assigned", agentId: "agent-b" });
+    expect(required(service.store.list("member-9")[0]).unreadCount).toBe(1);
     expect(service.store.messages("channel-1")).toHaveLength(2);
   });
   it("tells the renderer about the dispatch before the chosen member is free", async () => {
@@ -906,6 +949,36 @@ describe("shared channel coordination", () => {
     for (const [, prompt] of model.mock.calls) expect(prompt.length).toBeLessThanOrEqual(120_000);
     // The message stays in the channel, so it is still available by its source ID.
     expect(service.store.messages("channel-1").some((message) => message.id === "history-huge")).toBe(true);
+  });
+
+  it("keeps a routing receipt out of the history a member reads", async () => {
+    const task = await send("Write the report");
+    service.store.update(service.store.get("channel-1"), {
+      messages: [
+        {
+          id: "history-receipt",
+          channelId: "channel-1",
+          sequence: 0,
+          author: { kind: "agent", id: "agent-a", name: "A" },
+          taskId: task.id,
+          superseded: false,
+          message: {
+            id: "history-receipt",
+            author: "system",
+            text: "Assigned to B.",
+            status: "completed",
+            createdAt: "2026-09-07T12:00:00.000Z",
+            itemType: channelRoutingConversationEventItemType("assigned", "agent-b"),
+          },
+        },
+      ],
+    });
+    const history = new ChannelHistory(service.store, vi.fn<ChannelTextModel>(), service.memories);
+    const prepared = await history.prepare(task, required(data.store.list()[0]), required(data.store.list()[0]));
+    expect(prepared.text).toContain("Write the report");
+    expect(prepared.text).not.toContain("Assigned to B.");
+    // The receipt stays in the channel, so the reader still sees the activity row.
+    expect(service.store.messages("channel-1").some((message) => message.id === "history-receipt")).toBe(true);
   });
 
   it("transfers one owner and waits for the declared task dependency", async () => {

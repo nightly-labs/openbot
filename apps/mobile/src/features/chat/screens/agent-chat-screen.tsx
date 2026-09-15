@@ -4,7 +4,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import { ArrowLeft } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
-import { MobileChatView } from "@/features/chat/components/chat-view";
+import { MobileChatView } from "@/features/chat/components/agent-chat-view";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 
 export function AgentChatScreen() {

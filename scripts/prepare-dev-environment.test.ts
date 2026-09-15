@@ -6,6 +6,7 @@ import {
   assertSupportedBunVersion,
   type DevelopmentCommandRunner,
   prepareDevelopmentEnvironment,
+  prepareDevelopmentWorktree,
 } from "./prepare-dev-environment";
 
 const temporaryRoots: string[] = [];
@@ -46,6 +47,23 @@ describe("development environment preparation", () => {
       ["install", "--frozen-lockfile"],
       ["run", "api:migrate:local"],
     ]);
+  });
+
+  it("prepares the isolated worktree fixtures after the base environment", () => {
+    const root = createTemporaryRoot();
+    const calls: Array<{ args: string[]; instanceId?: string }> = [];
+    const run: DevelopmentCommandRunner = (_executable, args, options) =>
+      calls.push({ args, instanceId: options.env?.OPENBOT_DEV_INSTANCE_ID });
+
+    prepareDevelopmentWorktree({ projectRoot: root, executable: "bun", bunVersion: "1.4.0", run });
+
+    expect(calls.map((call) => call.args)).toEqual([
+      ["install", "--frozen-lockfile"],
+      ["run", "api:migrate:local"],
+      ["run", "dev:seed", "--if-missing"],
+      ["run", "marketplace:seed:local"],
+    ]);
+    expect(calls[2]?.instanceId).toMatch(/^wt-[a-f0-9]{64}$/u);
   });
 });
 

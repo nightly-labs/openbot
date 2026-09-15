@@ -1,5 +1,6 @@
 import { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MobileChannelStore } from "../channels/model/channel-store";
 import { MobileConversationStore } from "../workspace/model/conversation-store";
 import type { MobileWorkspaceContextValue } from "../workspace/model/workspace-types";
 import { MobileAnalytics, type MobileAnalyticsClient } from "./analytics-core";
@@ -347,11 +348,19 @@ it("instruments message commands without sending their contents or changing the 
   };
   const sendMessage = vi.fn(async () => "message-receipt");
   const workspace: MobileWorkspaceContextValue = {
+    channelStore: new MobileChannelStore(async () => {
+      throw new Error("Unexpected channel request");
+    }),
     servers: [],
     agents: [],
     activeAgents: [],
     hiddenAgents: [],
     pinnedAgentIds: [],
+    pinnedChannelIds: [],
+    hiddenChannelIds: [],
+    hideChannel: () => true,
+    unhideChannel: () => true,
+    toggleChannelPin: () => "pinned",
     unreadAgentIds: [],
     activityByServer: {},
     serverDirectoryState: "ready",
@@ -376,6 +385,8 @@ it("instruments message commands without sending their contents or changing the 
     refreshServers: unexpected,
     refreshServer: unexpected,
     addRemoteServer: unexpected,
+    setAgentAvatar: async () => {},
+    loadAgentAvatar: async () => "",
     createAgent: unexpected,
     updateAgent: unexpected,
     deleteAgent: unexpected,

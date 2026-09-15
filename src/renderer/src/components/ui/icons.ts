@@ -44,6 +44,7 @@ export { default as LoaderCircle } from "lucide-solid/icons/loader-circle";
 export { default as LogIn } from "lucide-solid/icons/log-in";
 export { default as LogOut } from "lucide-solid/icons/log-out";
 export { default as Mail } from "lucide-solid/icons/mail";
+export { default as Maximize2 } from "lucide-solid/icons/maximize-2";
 export { default as Megaphone } from "lucide-solid/icons/megaphone";
 export { default as MessageCircle } from "lucide-solid/icons/message-circle";
 export { default as MessageCircleQuestionMark } from "lucide-solid/icons/message-circle-question-mark";

@@ -1,8 +1,9 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
+import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { router, Stack, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Bot, Ellipsis, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
+import { Bot, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
 import { useLayoutEffect, useMemo } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
@@ -14,6 +15,8 @@ import {
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
+import { ChannelListRow } from "@/features/channels/components/channel-list";
+import { useChannels } from "@/features/channels/components/use-channels";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
@@ -27,23 +30,25 @@ const ROW_EXIT = FadeOut.duration(120).easing(EASE_OUT).reduceMotion(ReduceMotio
 // Agent search is not available in the current mobile release, so keep its entry points hidden until it is ready.
 const IS_AGENT_SEARCH_ENABLED = false;
 
-function TransitioningAgentRow({
-  agent,
+function TransitioningChatRow({
+  chatId,
+  children,
   index,
   reveal,
 }: {
-  agent: MobileAgent;
+  chatId: string;
+  children: React.ReactNode;
   index: number;
   reveal: AgentListRevealState;
 }) {
   const { transition } = useAgentPinTransition();
-  const isTarget = transition?.agentId === agent.id && transition.target === "row";
-  const isSource = transition?.agentId === agent.id && transition.source === "row";
+  const isTarget = transition?.chatId === chatId && transition.target === "row";
+  const isSource = transition?.chatId === chatId && transition.source === "row";
 
   return (
     <Animated.View entering={isTarget ? ROW_ENTER : undefined} exiting={isSource ? ROW_EXIT : undefined}>
       <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
-        <AgentListRow agent={agent} leftInset={15} rightInset={24} />
+        {children}
       </AgentListRowReveal>
     </Animated.View>
   );
@@ -76,15 +81,23 @@ export function ConnectedScreen() {
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const { openDrawer } = useAppDrawer();
   const {
+    agents,
     activeAgents,
     activeServer,
     hiddenAgents,
+    hiddenChannelIds,
     pinnedAgentIds,
+    pinnedChannelIds,
     refreshServers,
     serverDirectoryError,
     serverDirectoryState,
     servers,
   } = useMobileWorkspace();
+  const channels = useChannels(activeServer.id);
+  const channelAgents = useMemo(
+    () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
+    [agents, activeServer.id],
+  );
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
@@ -101,14 +114,31 @@ export function ConnectedScreen() {
   const pinnedAgents = pinnedAgentIds
     .map((agentId) => activeAgents.find((agent) => agent.id === agentId))
     .filter((agent): agent is (typeof activeAgents)[number] => Boolean(agent));
+  const hasHiddenChats =
+    hiddenAgents.length > 0 ||
+    channels.channels.some((channel) => !channel.archived && hiddenChannelIds.includes(channel.id));
+  const pinnedChannels = channels.channels.filter(
+    (channel) => !channel.archived && !hiddenChannelIds.includes(channel.id) && pinnedChannelIds.includes(channel.id),
+  );
+  const hasPins = pinnedAgents.length + pinnedChannels.length > 0;
   const unpinnedAgents = activeAgents.filter((agent) => !pinnedAgentIds.includes(agent.id));
-  const listReveal = useAgentListReveal(listReady, unpinnedAgents.length + (pinnedAgents.length > 0 ? 1 : 0));
+  const items: ({ kind: "agent"; agent: MobileAgent } | { kind: "channel"; channel: ChannelSummary })[] = [
+    ...channels.channels
+      .filter(
+        (channel) =>
+          !hiddenChannelIds.includes(channel.id) && !channel.archived && !pinnedChannelIds.includes(channel.id),
+      )
+      .map((channel) => ({ kind: "channel" as const, channel })),
+    ...unpinnedAgents.map((agent) => ({ kind: "agent" as const, agent })),
+  ];
+  const listReveal = useAgentListReveal(listReady, items.length + (hasPins ? 1 : 0));
   const optionsActions = useMemo<MenuAction[]>(
     () => [
       { id: "add-agent", title: "Add agent" },
-      ...(hiddenAgents.length > 0 ? [{ id: "hidden-chats", title: "Hidden chats" }] : []),
+      ...(channels.supported ? [{ id: "add-channel", title: "New channel" }] : []),
+      ...(hasHiddenChats ? [{ id: "hidden-chats", title: "Hidden chats" }] : []),
     ],
-    [hiddenAgents.length],
+    [hasHiddenChats, channels.supported],
   );
 
   return (
@@ -117,17 +147,39 @@ export function ConnectedScreen() {
         <FlatList
           className="flex-1 bg-background"
           alwaysBounceVertical={false}
-          contentContainerClassName={activeAgents.length > 0 ? "pb-safe-offset-8 pt-3" : "grow pb-safe-offset-8 pt-3"}
+          contentContainerClassName={items.length > 0 ? "pb-safe-offset-8 pt-3" : "grow pb-safe-offset-8 pt-3"}
           // Keep the native header inset even when short content cannot scroll or bounce.
           contentInsetAdjustmentBehavior="always"
-          data={unpinnedAgents}
-          keyExtractor={(agent) => agent.id}
+          data={items}
+          keyExtractor={(item) => (item.kind === "agent" ? `agent:${item.agent.id}` : `channel:${item.channel.id}`)}
           renderItem={({ item, index }) => (
-            <TransitioningAgentRow agent={item} index={index + (pinnedAgents.length > 0 ? 1 : 0)} reveal={listReveal} />
+            <TransitioningChatRow
+              chatId={item.kind === "agent" ? item.agent.id : item.channel.id}
+              index={index + (hasPins ? 1 : 0)}
+              reveal={listReveal}
+            >
+              {item.kind === "channel" ? (
+                <ChannelListRow channel={item.channel} serverId={activeServer.id} agents={channelAgents} />
+              ) : (
+                <AgentListRow agent={item.agent} leftInset={15} rightInset={24} />
+              )}
+            </TransitioningChatRow>
           )}
           ListHeaderComponent={
             <AgentListRowReveal index={0} reveal={listReveal}>
-              <PinnedAgentsGrid agents={pinnedAgents} />
+              <PinnedAgentsGrid agents={pinnedAgents}>
+                {pinnedChannels.length
+                  ? pinnedChannels.map((channel) => (
+                      <ChannelListRow
+                        key={channel.id}
+                        channel={channel}
+                        serverId={activeServer.id}
+                        agents={channelAgents}
+                        pinned
+                      />
+                    ))
+                  : null}
+              </PinnedAgentsGrid>
             </AgentListRowReveal>
           }
           ListEmptyComponent={
@@ -220,17 +272,19 @@ export function ConnectedScreen() {
                     actions={optionsActions}
                     onPressAction={(event) => {
                       if (event.nativeEvent.event === "add-agent") router.push("/add-agent");
+                      if (event.nativeEvent.event === "add-channel")
+                        router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } });
                       if (event.nativeEvent.event === "hidden-chats") router.push("/hidden-chats");
                     }}
                     style={{ height: 44, width: 44 }}
                   >
                     <View
-                      accessibilityLabel="More options"
+                      accessibilityLabel="Chat options"
                       accessibilityRole="button"
                       accessible
                       className="size-11 items-center justify-center rounded-full"
                     >
-                      <Ellipsis color={iconColor} size={24} strokeWidth={1.9} />
+                      <Plus color={iconColor} size={24} strokeWidth={1.9} />
                     </View>
                   </MenuView>
                 </View>
@@ -253,11 +307,19 @@ export function ConnectedScreen() {
             {IS_AGENT_SEARCH_ENABLED ? (
               <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search-agents")} />
             ) : null}
-            <Stack.Toolbar.Menu icon="ellipsis">
+            <Stack.Toolbar.Menu icon="plus" accessibilityLabel="Chat options">
               <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => router.push("/add-agent")}>
                 Add agent
               </Stack.Toolbar.MenuAction>
-              {hiddenAgents.length > 0 ? (
+              {channels.supported ? (
+                <Stack.Toolbar.MenuAction
+                  icon="number"
+                  onPress={() => router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } })}
+                >
+                  New channel
+                </Stack.Toolbar.MenuAction>
+              ) : null}
+              {hasHiddenChats ? (
                 <Stack.Toolbar.MenuAction icon="eye.slash" onPress={() => router.push("/hidden-chats")}>
                   Hidden chats
                 </Stack.Toolbar.MenuAction>

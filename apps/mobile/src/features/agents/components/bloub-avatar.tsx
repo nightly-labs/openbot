@@ -7,11 +7,14 @@ import Svg, { Circle, Defs, FeColorMatrix, Filter, G, Mask, Path, Rect } from "r
 import { useBloubActivityFrame } from "@/features/agents/components/use-bloub-activity-frame";
 import { type BloubActivityFrame, bloubActivityGeometry } from "@/features/agents/model/bloub-activity";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
-
-import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
+import {
+  DISCONNECTED_APPEARANCE,
+  useConnectionAppearance,
+} from "@/features/workspace/components/use-connection-appearance";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { AgentPhoto, type AgentPhotoProps } from "./agent-photo";
 
-interface BloubAvatarProps {
+interface BloubAvatarProps extends AgentPhotoProps {
   agentId: string;
   hue: AvatarHue | null;
   seed: string;
@@ -35,13 +38,15 @@ function AvatarDot({ frame, index, color }: { frame: DerivedValue<BloubActivityF
   return <AnimatedCircle fill={color} animatedProps={props} />;
 }
 
-export function BloubAvatar({ agentId, hue, seed, size = 54, animateIdle = true }: BloubAvatarProps) {
+export function BloubAvatar({ agentId, serverId: hostId, hue, seed, size = 54, animateIdle = true }: BloubAvatarProps) {
   const { agents, servers } = useMobileWorkspace();
-  const serverId = agents.find((agent) => agent.id === agentId)?.serverId;
+  const serverId = hostId ?? agents.find((agent) => agent.id === agentId)?.serverId;
   const disconnected = !servers.some((server) => server.id === serverId && server.state === "online");
   const activity = useAgentActivity(agentId);
   return (
     <BloubAvatarPreview
+      agentId={agentId}
+      serverId={serverId}
       hue={hue}
       seed={seed}
       size={size}
@@ -52,7 +57,17 @@ export function BloubAvatar({ agentId, hue, seed, size = 54, animateIdle = true 
   );
 }
 
-export const BloubAvatarPreview = memo(function BloubAvatarPreview({
+export const BloubAvatarPreview = memo(function BloubAvatarPreview(
+  props: Omit<BloubAvatarProps, "agentId"> & AgentPhotoProps & { disconnected?: boolean; working?: boolean },
+) {
+  return (
+    <AgentPhoto {...props} size={props.size ?? 54}>
+      <AnimatedAvatarPreview {...props} />
+    </AgentPhoto>
+  );
+});
+
+const AnimatedAvatarPreview = memo(function AnimatedAvatarPreview({
   hue,
   seed,
   size = 54,
@@ -101,11 +116,22 @@ export const BloubAvatarPreview = memo(function BloubAvatarPreview({
 
 // Choices show the same idle pose without mounting animation clocks, worklets,
 // filters, or masks for every item in the picker.
-export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail({
+export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail(
+  props: Omit<BloubAvatarProps, "agentId"> & AgentPhotoProps & { disconnected?: boolean },
+) {
+  return (
+    <AgentPhoto {...props} size={props.size ?? 48}>
+      <AvatarThumbnail {...props} />
+    </AgentPhoto>
+  );
+});
+
+const AvatarThumbnail = memo(function AvatarThumbnail({
   seed,
   hue,
   size = 48,
-}: Omit<BloubAvatarProps, "agentId">) {
+  disconnected = false,
+}: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean }) {
   const frame = useMemo(() => {
     const geometry = bloubActivityGeometry(seed);
     return new BotEngine(100, "idle", geometry.radii, geometry.expression).sample(0);
@@ -114,12 +140,17 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail({
     <Svg
       accessibilityElementsHidden
       accessible={false}
+      opacity={disconnected ? DISCONNECTED_APPEARANCE.opacity : 1}
       height={size}
       pointerEvents="none"
       viewBox="-158 -158 316 316"
       width={size}
     >
-      <Path d={frame.bodyPath} fill={getBloubAvatarColor(seed, hue)} opacity={frame.bodyAlpha} />
+      <Path
+        d={frame.bodyPath}
+        fill={thumbnailColor(getBloubAvatarColor(seed, hue), disconnected)}
+        opacity={frame.bodyAlpha}
+      />
       {(["left", "right"] as const).map((side) => {
         const eye = frame.eyes[side === "left" ? 0 : 1];
         return eye ? (
@@ -133,4 +164,13 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail({
 export function getBloubAvatarColor(seed: string, hue: AvatarHue | null): string {
   const profile = bloubAvatarProfile(seed, hue);
   return COLOR_BY_ID.get(profile.color)?.hex ?? "#8b5cf6";
+}
+
+function thumbnailColor(color: string, disconnected: boolean) {
+  if (!disconnected) return color;
+  const r = Number.parseInt(color.slice(1, 3), 16);
+  const g = Number.parseInt(color.slice(3, 5), 16);
+  const b = Number.parseInt(color.slice(5, 7), 16);
+  const gray = r * 0.213 + g * 0.715 + b * 0.072;
+  return `rgb(${[r, g, b].map((value) => Math.round(gray + (value - gray) * DISCONNECTED_APPEARANCE.saturation)).join(",")})`;
 }

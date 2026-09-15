@@ -53,12 +53,18 @@ export function browserIpcHandlers({
       ),
       navigate: payloadHandler(parseBrowserNavigate, (parsed) =>
         routeToServer(remoteServers.activeServerId, {
-          local: () => browser.navigate(parsed.tabId, parsed.direction),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
+          local: () =>
+            "url" in parsed
+              ? browser.loadUrl(parsed.tabId, parsed.url)
+              : browser.navigate(parsed.tabId, parsed.direction),
+          remote: (serverId) => {
+            if ("url" in parsed)
+              throw new Error("This remote host does not support address-bar navigation in an existing tab.");
+            return remoteServers.request(serverId, TEAM_API_ROUTES.browser.navigate, decodeVoid, {
               method: "POST",
               body: parsed,
-            }),
+            });
+          },
         }),
       ),
       reload: payloadHandler(stringPayload("tabId"), (tabId) =>
