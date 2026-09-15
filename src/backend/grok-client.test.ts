@@ -162,7 +162,7 @@ describe.sequential("GrokAgentClient", () => {
     expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
       expect.objectContaining({
         message:
-          "OpenCode rejected the selected model's credentials. Update or remove the OpenCode Zen key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\nRequestError: Internal error: Invalid API key.",
+          "OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\nRequestError: Internal error: Invalid API key.",
       }),
     ]);
     const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);

@@ -158,6 +158,28 @@ export interface ResolvedSharedFile {
   size: number;
 }
 
+export interface AgentServiceOptions {
+  store: AgentStore;
+  mailbox: MailboxStore;
+  browser: AgentBrowserHost;
+  requestTimeoutMs?: number;
+  preferredProvider?: AgentProvider;
+  /** The model chosen beside `preferredProvider`, or `null` for that provider's own default. */
+  preferredModel?: AgentModelId | null;
+  clientFactory?: AgentClientFactory | null;
+  bundledExecutables?: BundledProviderExecutables;
+  prepareAgentWorkspace?: (agent: AgentSummary) => Promise<void>;
+  hostedSites?: AgentHostedSites | null;
+  sidebarLayout?: AgentSidebar | null;
+  /**
+   * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
+   * endpoints. The main process owns both, because they carry secrets that must not reach the
+   * renderer or the database.
+   */
+  credentials?: ProviderClientContext;
+  localSkillTools?: () => LocalSkillTools;
+}
+
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
@@ -223,34 +245,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #compaction: ContextCompaction;
   readonly #duplication: DuplicationGate;
   readonly #sidebarLayout: AgentSidebar | null;
+  readonly #localSkillTools?: () => LocalSkillTools;
   #initialized = false;
   #stopping = false;
 
-  constructor(
-    store: AgentStore,
-    mailbox: MailboxStore,
-    browser: AgentBrowserHost,
-    requestTimeoutMs = 30_000,
-    preferredProvider: AgentProvider = "codex",
-    clientFactory: AgentClientFactory | null = null,
-    bundledExecutables: BundledProviderExecutables = DEFAULT_BUNDLED_EXECUTABLES,
-    prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
-    hostedSites: AgentHostedSites | null = null,
-    sidebarLayout: AgentSidebar | null = null,
-    /**
-     * The model setup chose beside `preferredProvider`, or `null` for that provider's own default.
-     * It arrives last because it was added last, and every caller that has no answer says `null`.
-     */
-    preferredModel: AgentModelId | null = null,
-    /**
-     * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
-     * endpoints. The main process owns both, because they carry secrets that must not reach the
-     * renderer or the database.
-     */
-    credentials: ProviderClientContext = NO_PROVIDER_CREDENTIALS,
-    private readonly localSkillTools?: () => LocalSkillTools,
-  ) {
+  constructor(options: AgentServiceOptions) {
     super();
+    const {
+      store,
+      mailbox,
+      browser,
+      requestTimeoutMs = 30_000,
+      preferredProvider = "codex",
+      preferredModel = null,
+      clientFactory = null,
+      bundledExecutables = DEFAULT_BUNDLED_EXECUTABLES,
+      prepareAgentWorkspace = async () => undefined,
+      hostedSites = null,
+      sidebarLayout = null,
+      credentials = NO_PROVIDER_CREDENTIALS,
+      localSkillTools,
+    } = options;
+    this.#localSkillTools = localSkillTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
     // given that callback.
@@ -1843,9 +1859,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
     if (LOCAL_SKILL_TOOL_DEFINITIONS.some((tool) => tool.name === params.tool)) {
       try {
-        if (!this.localSkillTools) throw new Error("Local skill tools are unavailable.");
+        if (!this.#localSkillTools) throw new Error("Local skill tools are unavailable.");
         const result = openBotToolResult(
-          await runLocalSkillTool(this.localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
+          await runLocalSkillTool(this.#localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
             const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
             const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
             snapshot.messages.push({

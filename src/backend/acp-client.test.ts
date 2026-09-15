@@ -3,7 +3,7 @@
 /*
  * The OpenCode driver's environment seam, through a real spawn.
  *
- * OpenCode's whole account is one variable: with `OPENCODE_API_KEY` the CLI lists the paid Zen
+ * OpenCode's whole account is one variable: with `OPENCODE_API_KEY` the CLI lists the paid Go
  * catalog, without it the free one. Nothing else in OpenBot reads that variable, so this file spawns
  * a fake ACP agent that reports the environment it was given, and asserts what a user gets: free
  * models with no account, the paid list after a key is saved, and no forced sign-in in between.
@@ -90,7 +90,7 @@ function handle(message) {
       return;
     }
     const ids = process.env.OPENCODE_API_KEY
-      ? ["opencode/zen-one", "opencode/zen-two", "opencode/zen-three"]
+      ? ["opencode-go/go-one", "opencode-go/go-two", "opencode-go/go-three"]
       : ["opencode/big-pickle"];
     write({
       jsonrpc: "2.0",
@@ -214,17 +214,17 @@ describe("OpenCode ACP environment", () => {
     await client.request("initialize", {}, decodeRecordResponse);
     await client.stop();
 
-    key = "zen-key-value";
+    key = "go-key-value";
     client.start();
     await client.request("initialize", {}, decodeRecordResponse);
 
     const environments = await fake.readSpawnEnvironments();
-    expect(environments.map((environment) => environment.apiKey)).toEqual([null, "zen-key-value"]);
+    expect(environments.map((environment) => environment.apiKey)).toEqual([null, "go-key-value"]);
     const models = await client.request("model/list", {}, decodeModelListResponse);
     expect(models.data.map((model) => model.model)).toEqual([
-      "opencode/zen-one",
-      "opencode/zen-two",
-      "opencode/zen-three",
+      "opencode-go/go-one",
+      "opencode-go/go-two",
+      "opencode-go/go-three",
     ]);
   });
 

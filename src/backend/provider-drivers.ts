@@ -26,7 +26,7 @@ const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
 /**
  * The environment one OpenCode process gets, read at spawn time.
  *
- * `OPENCODE_API_KEY` is the whole of the optional account: with it the CLI lists the paid Zen
+ * `OPENCODE_API_KEY` is the whole of the optional account: with it the CLI lists the paid Go
  * catalog, without it the free one. `OPENCODE_DISABLE_AUTOUPDATE` is not optional on a managed
  * install -- a CLI that updates itself past the pin fails the exact-version compare in
  * `verifyInstalledRuntime`, and OpenBot would then keep re-downloading a runtime it already has.
@@ -154,7 +154,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "opencode",
     // `opencode auth login` is an interactive terminal UI and cannot be spawned headless, so the
-    // optional OpenCode Zen key is pasted into OpenBot instead. Nothing is required to sign in:
+    // optional OpenCode Go key is pasted into OpenBot instead. Nothing is required to sign in:
     // with no credential at all the CLI still lists the free models and answers a turn.
     signIn: { kind: "external" },
     resolveCli: resolveOpencodeCli,

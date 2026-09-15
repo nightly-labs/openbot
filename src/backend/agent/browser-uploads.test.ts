@@ -70,10 +70,17 @@ function uploadBrowser() {
 async function startService(browser: ReturnType<typeof uploadBrowser>["browser"]) {
   const clients = new Map<AgentProvider, FakeAgentClient>();
   const { store, mailbox } = stores(root);
-  service = new AgentService(store, mailbox, browser, 30_000, "codex", (provider) => {
-    const client = new FakeAgentClient(provider);
-    clients.set(provider, client);
-    return client;
+  service = new AgentService({
+    store,
+    mailbox,
+    browser,
+    requestTimeoutMs: 30_000,
+    preferredProvider: "codex",
+    clientFactory: (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    },
   });
   await service.initialize();
   await service.sendMessage({ agentId: "chief", text: "Upload a file" });

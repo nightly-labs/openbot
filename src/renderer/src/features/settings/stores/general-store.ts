@@ -3,6 +3,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   agentProviderName,
+  type ProviderApiKeyStatus,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
@@ -14,6 +15,13 @@ interface GeneralStoreProps {
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   /** The newer runtime main says exists, per provider. Decided there, never worked out here. */
   providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>>;
+  /**
+   * Whether the optional OpenCode key is saved. An accessor, because the modal refreshes it after
+   * the key dialog closes and the options memo has to recompute. Read by the modal through the key
+   * API, because only the status crosses IPC and no getter returns the key. Absent until the first
+   * read, so the row shows no key badge rather than a wrong one.
+   */
+  openCodeKeyStatus?: () => ProviderApiKeyStatus | undefined;
 }
 
 /**
@@ -38,6 +46,7 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         connectionState: agent?.connectionState,
         checkError: agent?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider] ?? null,
+        keyStatus: provider === "opencode" ? props.openCodeKeyStatus?.() : undefined,
         /*
          * A CLI the user installed themselves is the one the provider runs, whatever the managed
          * runtime holds, so the row reads it as ready on the version the provider reports. An

@@ -305,6 +305,10 @@ async function main(): Promise<void> {
   const role = command === "click" || command === "type" ? parseAutomationRole(requireFlagValue("--role")) : null;
   const name = command === "click" || command === "type" ? requireFlagValue("--name") : null;
   const text = command === "type" ? requireTextFlag() : null;
+  // Substring matching is the default because control names carry context --
+  // "Sign in to OpenCode" reads better than an exact label. `--exact` is for
+  // the names that nest: a "Settings" gear beside "View agent settings".
+  const exact = hasFlag("--exact");
   const timeoutMs = readTimeout();
   const waitTarget = readWaitTarget();
   const session = await connectToDevApp(target.port, logger, {
@@ -313,7 +317,7 @@ async function main(): Promise<void> {
   });
   try {
     const settle = async (): Promise<void> => {
-      if (waitTarget) await waitForRole(session.page, waitTarget, timeoutMs, logger);
+      if (waitTarget) await waitForRole(session.page, waitTarget, timeoutMs, logger, exact);
     };
     if (command === "snapshot") {
       await settle();
@@ -321,13 +325,13 @@ async function main(): Promise<void> {
       process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
     } else if (command === "click" && role && name) {
       logger.info(`click role=${role} name=${name}`);
-      await clickByRole(session.page, role, name, timeoutMs);
+      await clickByRole(session.page, role, name, timeoutMs, exact);
       await settle();
       const snapshot = await snapshotPage(session.page, logger);
       process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
     } else if (command === "type" && role && name && text !== null) {
       logger.info(`type role=${role} name=${name} chars=${text.length} submit=${hasFlag("--submit")}`);
-      await typeByRole(session.page, role, name, text, timeoutMs, hasFlag("--submit"));
+      await typeByRole(session.page, role, name, text, timeoutMs, hasFlag("--submit"), exact);
       await settle();
       const snapshot = await snapshotPage(session.page, logger);
       process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
