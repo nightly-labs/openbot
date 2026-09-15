@@ -784,10 +784,46 @@ it("uses assignment markers only for host routing receipts and preserves comment
   };
   entries[2].message.text = "Assigned to Builder.";
   expect(projectChannelMessages(entries, null)).toEqual([
-    { id: receipt.id, kind: "assignment", agentName: "Builder" },
+    { id: receipt.id, kind: "channel-routing", event: { action: "assigned", agentId: null, agentName: "Builder" } },
     { id: comment.id, kind: "thinking", turnId: "turn-one", steps: [{ id: comment.id, text: "Checking the routes" }] },
     expect.objectContaining({ kind: "message", body: "Assigned to Builder." }),
   ]);
+});
+
+it.each(["assigned", "continued"] as const)("projects typed %s receipts by agent ID, independent of text", (action) => {
+  const entry = page(1, 1).messages[0];
+  entry.message = {
+    ...entry.message,
+    author: "system",
+    text: "An old agent name",
+    itemType: `channel-routing-event:${action}:agent-two`,
+  };
+  expect(projectChannelMessages([entry], null)).toEqual([
+    {
+      id: entry.id,
+      kind: "channel-routing",
+      event: { action, agentId: "agent-two" },
+    },
+  ]);
+  const malformed = {
+    ...entry,
+    message: { ...entry.message, text: "Assigned to Builder.", itemType: "channel-routing-event:invalid:agent-two" },
+  };
+  expect(projectChannelMessages([malformed], null)[0].kind).toBe("message");
+  expect(projectChannelMessages([{ ...entry, message: { ...entry.message, author: "assistant" } }], null)[0].kind).toBe(
+    "message",
+  );
+});
+
+it("keeps old continuation receipts as activity without inventing an agent ID", () => {
+  const entry = page(1, 1).messages[0];
+  entry.author = { kind: "agent", id: "agent-one", name: "Lead" };
+  entry.taskId = "task-one";
+  entry.message = { ...entry.message, author: "system", text: "Continuing existing work with Builder." };
+  expect(projectChannelMessages([entry], null)[0]).toMatchObject({
+    kind: "channel-routing",
+    event: { action: "continued", agentId: null, agentName: "Builder" },
+  });
 });
 
 it("shows each active channel task and clears activity when work pauses or finishes", () => {

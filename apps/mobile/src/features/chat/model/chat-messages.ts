@@ -2,12 +2,25 @@ import type {
   AgentExchangeSummary,
   AttachmentSummary,
   ChannelMessage,
+  ChannelRoutingConversationEvent,
   ConversationMessage,
   ConversationQuestionPrompt,
 } from "@openbot/contracts/ipc";
 
+import { channelRoutingConversationEvent } from "@openbot/contracts/ipc";
+
 export type ChatMessage =
-  | { id: string; kind: "assignment"; agentName: string }
+  | {
+      id: string;
+      kind: "channel-routing";
+      event:
+        | ChannelRoutingConversationEvent
+        | {
+            action: ChannelRoutingConversationEvent["action"];
+            agentId: null;
+            agentName: string;
+          };
+    }
   | { id: string; kind: "exchange"; exchange: AgentExchangeSummary }
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
   | {
@@ -129,9 +142,25 @@ function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessag
           : entry.message.questionPrompt,
     };
   }
-  if (entry.author.kind === "agent" && entry.message.author === "system" && entry.taskId) {
-    const assignment = /^Assigned to (.+)\.$/.exec(entry.message.text);
-    if (assignment) return { id: entry.id, kind: "assignment", agentName: assignment[1] };
+  const routing = channelRoutingConversationEvent(entry.message);
+  if (routing) return { id: entry.id, kind: "channel-routing", event: routing };
+  // Older hosts stored only the receipt text. Never reinterpret a typed event as legacy text.
+  if (
+    !entry.message.itemType &&
+    entry.author.kind === "agent" &&
+    entry.message.author === "system" &&
+    entry.message.status === "completed" &&
+    entry.taskId
+  ) {
+    const assigned = /^Assigned to (.+)\.$/.exec(entry.message.text);
+    const continued = /^Continuing existing work with (.+)\.$/.exec(entry.message.text);
+    const name = assigned?.[1] ?? continued?.[1];
+    if (name)
+      return {
+        id: entry.id,
+        kind: "channel-routing",
+        event: { action: assigned ? "assigned" : "continued", agentId: null, agentName: name },
+      };
   }
   if (entry.author.kind === "agent" && entry.message.itemType === "commentary" && !entry.superseded) {
     return {

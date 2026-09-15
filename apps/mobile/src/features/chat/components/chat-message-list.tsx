@@ -1,4 +1,4 @@
-import { useIsFocused } from "expo-router";
+import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
 import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -223,31 +223,50 @@ export function ChatMessageList({
   const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
     const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
     const rendered =
-      message.kind === "exchange" || message.kind === "assignment" ? (
+      message.kind === "exchange" || message.kind === "channel-routing" ? (
         <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
           <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-            {message.kind === "assignment"
-              ? "Assigned to"
+            {message.kind === "channel-routing"
+              ? message.event.action === "assigned"
+                ? "Assigned to"
+                : "Continuing with"
               : message.exchange.direction === "outgoing"
                 ? "Messaged"
                 : "Message from"}
           </Typography.Paragraph>
-          {(message.kind === "assignment"
-            ? [agents.find((agent) => agent.name === message.agentName)?.id ?? message.agentName]
+          {(message.kind === "channel-routing"
+            ? [message.event.agentId]
             : message.exchange.direction === "incoming"
               ? [message.exchange.senderAgentId]
               : message.exchange.recipientAgentIds
           ).map((id) => {
-            const participant = agents.find((candidate) => candidate.id === id);
-            return (
-              <View key={id} className="flex-row items-center gap-1">
+            const legacyName =
+              message.kind === "channel-routing" && message.event.agentId === null ? message.event.agentName : null;
+            const legacyMatches = legacyName ? agents.filter((agent) => agent.name === legacyName) : [];
+            const participant = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
+            const badge = (
+              <View key={id ?? legacyName} className="flex-row items-center gap-1">
                 {participant ? (
                   <BloubAvatarThumbnail hue={participant.avatarHue} seed={participant.avatarSeed} size={22} />
                 ) : null}
                 <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-                  {participant?.name ?? (message.kind === "assignment" ? message.agentName : "Unknown agent")}
+                  {participant?.name ??
+                    (message.kind === "channel-routing" ? (legacyName ?? "Unavailable agent") : "Unknown agent")}
                 </Typography.Paragraph>
               </View>
+            );
+            return message.kind === "channel-routing" && participant ? (
+              <Link
+                key={participant.id}
+                href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }}
+                asChild
+              >
+                <Pressable accessibilityRole="link" accessibilityLabel={`Open chat with ${participant.name}`}>
+                  {badge}
+                </Pressable>
+              </Link>
+            ) : (
+              <View key={id ?? legacyName}>{badge}</View>
             );
           })}
         </View>
