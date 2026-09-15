@@ -565,9 +565,10 @@ it("opens channel settings from the shared chat header", async () => {
   });
 });
 
-it("saves name and instructions on the original host and shows them after reopening", async () => {
+it("saves name, title, and instructions on the original host and shows them after reopening", async () => {
   await renderSheet();
   await edit("Name", "  Explorer  ");
+  await edit("Title", "  Travel planner  ");
   await edit("Instructions", "  Plan journeys  ");
   workspace.activeServer = { ...host, id: "host-two" };
   await renderSheet();
@@ -577,6 +578,7 @@ it("saves name and instructions on the original host and shows them after reopen
     {
       agentId: original.id,
       name: "Explorer",
+      title: "Travel planner",
       description: "Plan journeys",
     },
     "host-one",
@@ -587,6 +589,7 @@ it("saves name and instructions on the original host and shows them after reopen
   await renderSheet();
   expect(screen.getByRole("textbox", { name: "Name" })).toHaveProperty("value", "Explorer");
   expect(screen.getByRole("textbox", { name: "Instructions" })).toHaveProperty("value", "Plan journeys");
+  expect(screen.getByRole("textbox", { name: "Title" })).toHaveProperty("value", "Travel planner");
   expect(mocks.blocked).toBe(false);
 });
 
@@ -1521,4 +1524,20 @@ it("loads desktop avatar revisions from the correct host and returns to the gene
   await renderPhoto();
   expect(screen.queryByRole("img", { name: "Agent avatar" })).toBeNull();
   expect(screen.getByText("Generated face")).toBeTruthy();
+});
+
+it("keeps a title after a failed save and permits clearing it", async () => {
+  workspace.agents = [{ ...original, title: "Travel planner" }];
+  await renderSheet();
+  await edit("Title", "Route planner");
+  workspace.updateAgent.mockRejectedValueOnce(new Error("Title save failed"));
+  await click("Save changes");
+  expect(screen.getByRole("textbox", { name: "Title" })).toHaveProperty("value", "Route planner");
+  expect(mocks.blocked).toBe(true);
+  await click("Save changes");
+  await renderSheet();
+  expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  await edit("Title", "");
+  await click("Save changes");
+  expect(workspace.updateAgent).toHaveBeenLastCalledWith({ agentId: original.id, title: "" }, host.id);
 });

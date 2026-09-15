@@ -63,7 +63,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
       <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
         <Link.Trigger>
           <ChatLinkPressable
-            accessibilityLabel={`Open pinned chat with ${agent.name}`}
+            accessibilityLabel={`Open pinned chat with ${agent.name}${agent.title.trim() ? `, ${agent.title.trim()}` : ""}`}
             accessibilityRole="button"
             className="w-full items-center gap-2 px-1"
             style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
@@ -86,14 +86,21 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
                 ) : null}
               </AgentPinAvatar>
             </Link.AppleZoom>
-            <Typography.Paragraph
-              type="body-xs"
-              align="center"
-              className="w-full text-text-secondary"
-              numberOfLines={1}
-            >
-              {agent.name}
-            </Typography.Paragraph>
+            <View className="w-full gap-0.5">
+              <Typography.Paragraph
+                type="body-xs"
+                align="center"
+                className="w-full text-text-secondary"
+                numberOfLines={1}
+              >
+                {agent.name}
+              </Typography.Paragraph>
+              {agent.title.trim() ? (
+                <Typography.Paragraph type="body-xs" align="center" className="w-full text-muted" numberOfLines={1}>
+                  {agent.title.trim()}
+                </Typography.Paragraph>
+              ) : null}
+            </View>
           </ChatLinkPressable>
         </Link.Trigger>
         {agentContextMenu}

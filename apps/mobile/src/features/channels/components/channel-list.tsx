@@ -53,7 +53,7 @@ export const ChannelListRow = memo(function ChannelListRow({
       <Link.Trigger>
         <ChatLinkPressable
           accessibilityRole="button"
-          accessibilityLabel={`Open channel ${channel.name}${channel.unreadCount ? `, ${channel.unreadCount} unread messages` : ""}`}
+          accessibilityLabel={`Open channel ${channel.name}${channel.title.trim() ? `, ${channel.title.trim()}` : ""}${channel.unreadCount ? `, ${channel.unreadCount} unread messages` : ""}`}
           className="w-full"
           onLongPress={isAndroid ? () => menu.current?.show() : undefined}
           accessibilityActions={[{ name: "pin", label: `${isPinned ? "Unpin" : "Pin"} ${channel.name}` }]}
@@ -66,7 +66,7 @@ export const ChannelListRow = memo(function ChannelListRow({
               className={
                 pinned
                   ? "w-full items-center gap-2 px-1"
-                  : "min-h-20 w-full flex-row items-center gap-3 bg-background py-3"
+                  : "min-h-20 w-full flex-row items-center gap-3 bg-background py-1"
               }
               style={{ paddingLeft: pinned ? 4 : 15, paddingRight: pinned ? 4 : 24, opacity: pressed ? 0.58 : 1 }}
             >
@@ -84,26 +84,40 @@ export const ChannelListRow = memo(function ChannelListRow({
                 </AgentPinAvatar>
               </Link.AppleZoom>
               {pinned ? (
-                <Typography.Paragraph
-                  type="body-xs"
-                  align="center"
-                  className="w-full text-text-secondary"
-                  numberOfLines={1}
-                >
-                  {channel.name}
-                </Typography.Paragraph>
+                <View className="w-full gap-0.5">
+                  <Typography.Paragraph
+                    type="body-xs"
+                    align="center"
+                    className="w-full text-text-secondary"
+                    numberOfLines={1}
+                  >
+                    {channel.name}
+                  </Typography.Paragraph>
+                  {channel.title.trim() ? (
+                    <Typography.Paragraph type="body-xs" align="center" className="w-full text-muted" numberOfLines={1}>
+                      {channel.title.trim()}
+                    </Typography.Paragraph>
+                  ) : null}
+                </View>
               ) : (
                 <View className="min-w-0 flex-1 gap-1">
-                  <View className="flex-row items-center gap-2">
-                    {channel.unreadCount > 0 ? <View className="size-2 rounded-full bg-accent" /> : null}
-                    <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={1}>
-                      {channel.name}
-                    </Typography.Paragraph>
-                    <Typography.Paragraph type="body-xs" className="text-muted">
-                      {formatUpdatedAt(channel.lastMessage?.at ?? channel.createdAt)}
-                    </Typography.Paragraph>
+                  <View className="gap-0">
+                    <View className="flex-row items-center gap-2">
+                      {channel.unreadCount > 0 ? <View className="size-2 rounded-full bg-accent" /> : null}
+                      <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={2}>
+                        {channel.name}
+                      </Typography.Paragraph>
+                      <Typography.Paragraph type="body-xs" className="text-muted">
+                        {formatUpdatedAt(channel.lastMessage?.at ?? channel.createdAt)}
+                      </Typography.Paragraph>
+                    </View>
+                    {channel.title.trim() ? (
+                      <Typography.Paragraph type="body-xs" className="-mt-1.5 text-muted" numberOfLines={2}>
+                        {channel.title.trim()}
+                      </Typography.Paragraph>
+                    ) : null}
                   </View>
-                  <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1}>
+                  <Typography.Paragraph type="body-xs" className="text-text-secondary -mt-1" numberOfLines={1}>
                     {channel.lastMessage?.text ?? "No messages yet"}
                   </Typography.Paragraph>
                 </View>

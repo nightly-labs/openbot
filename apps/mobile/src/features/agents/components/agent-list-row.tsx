@@ -128,7 +128,7 @@ export function AgentListRow({
   const linkTrigger = (
     <Link.Trigger>
       <ChatLinkPressable
-        accessibilityLabel={`Open chat with ${agent.name}`}
+        accessibilityLabel={`Open chat with ${agent.name}${agent.title.trim() ? `, ${agent.title.trim()}` : ""}`}
         accessibilityRole="button"
         accessibilityActions={enableActions ? [{ name: "pin", label: `Pin ${agent.name}` }] : undefined}
         onAccessibilityAction={
@@ -143,7 +143,7 @@ export function AgentListRow({
       >
         {({ pressed }) => (
           <View
-            className="min-h-20 w-full flex-row items-center gap-3 py-3"
+            className="min-h-20 w-full flex-row items-center gap-3 py-1"
             style={{
               backgroundColor: background,
               opacity: pressed ? 0.58 : 1,
@@ -154,16 +154,23 @@ export function AgentListRow({
             {enableZoomTransition ? <Link.AppleZoom>{avatar}</Link.AppleZoom> : avatar}
             <AgentRowTextReveal active={isUnpinTarget}>
               <View className="min-w-0 flex-1 gap-1">
-                <View className="flex-row items-center gap-2">
-                  {isUnread ? <View className="size-2 rounded-full bg-accent" /> : null}
-                  <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={1}>
-                    {agent.name}
-                  </Typography.Paragraph>
-                  <Typography.Paragraph type="body-xs" className="text-muted">
-                    {agent.updatedLabel}
-                  </Typography.Paragraph>
+                <View className="gap-0">
+                  <View className="flex-row items-center gap-2">
+                    {isUnread ? <View className="size-2 rounded-full bg-accent" /> : null}
+                    <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={2}>
+                      {agent.name}
+                    </Typography.Paragraph>
+                    <Typography.Paragraph type="body-xs" className="text-muted">
+                      {agent.updatedLabel}
+                    </Typography.Paragraph>
+                  </View>
+                  {agent.title.trim() ? (
+                    <Typography.Paragraph type="body-xs" className="-mt-1.5 text-muted" numberOfLines={2}>
+                      {agent.title.trim()}
+                    </Typography.Paragraph>
+                  ) : null}
                 </View>
-                <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1}>
+                <Typography.Paragraph type="body-xs" className="text-text-secondary -mt-1" numberOfLines={1}>
                   {agent.preview}
                 </Typography.Paragraph>
               </View>

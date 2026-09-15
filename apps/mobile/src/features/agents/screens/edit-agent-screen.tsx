@@ -19,7 +19,7 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
-  "name" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
+  "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
 >;
 
 type AgentPage = "info" | "appearance" | "usage" | "memories" | "routines" | "runtime" | "memory" | "routine";
@@ -56,6 +56,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const name = edits.name ?? agent.name;
+  const title = edits.title ?? agent.title;
   const description = edits.description ?? agent.description;
   const avatarSeed = edits.avatarSeed ?? agent.avatarSeed;
   const avatarHue = edits.avatarHue === undefined ? agent.avatarHue : edits.avatarHue;
@@ -63,6 +64,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
   const dirty =
     photoChanged ||
     name.trim() !== agent.name ||
+    title.trim() !== agent.title ||
     description.trim() !== agent.description ||
     avatarSeed !== agent.avatarSeed ||
     avatarHue !== agent.avatarHue ||
@@ -73,6 +75,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
     page !== "info" ||
     (Boolean(name.trim() && description.trim()) &&
       name.length <= INPUT_LIMITS.agentName &&
+      title.length <= INPUT_LIMITS.agentTitle &&
       description.length <= INPUT_LIMITS.agentDescription);
 
   usePreventRemove(dirty || saving || pickingPhoto, ({ data }) => {
@@ -99,6 +102,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
           {
             agentId: agent.id,
             ...(edits.name === undefined ? {} : { name: name.trim() }),
+            ...(edits.title === undefined ? {} : { title: title.trim() }),
             ...(edits.description === undefined ? {} : { description: description.trim() }),
             ...(edits.avatarSeed === undefined ? {} : { avatarSeed }),
             ...(edits.avatarHue === undefined ? {} : { avatarHue }),
@@ -165,6 +169,14 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
               onChangeText={(value) => change({ name: value })}
             />
           </View>
+          <SheetFormField
+            label="Title"
+            appearance="soft"
+            maxLength={INPUT_LIMITS.agentTitle}
+            value={title}
+            editable={!saving}
+            onChangeText={(value) => change({ title: value })}
+          />
           <SheetFormField
             label="Instructions"
             appearance="soft"
