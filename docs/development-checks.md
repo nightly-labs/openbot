@@ -91,11 +91,14 @@ reports four vCPUs, so it runs three. Asking for a fourth is slower, not faster 
 100.6s - because the workers then contend with the main process.
 
 Compare pool settings with the summed `tests` phase divided by the wall clock, not the wall clock
-alone. That ratio is how many workers were actually busy, and it is stable where the wall clock is
-not: three workers give 2.00, 2.07 and 1.99 across three runs whose durations were 100.6s, 101.7s
-and 134.1s, while four workers give 2.64. The 134.1s run was a slow runner, and reading it as a
-worker-count change cost a wrong commit here. Runner speed varies by about 30% between runs, so no
-single pair of runs supports a conclusion about a config change.
+alone. The wall clock is not usable evidence on its own: five runs of one commit, with nothing
+changed between them, took 106.7s, 131.8s, 134.0s, 134.1s and 141.5s, a spread of 33%. Two runs of
+a config change will therefore agree with almost any conclusion, and reading one slow run as a
+worker-count change cost a wrong commit here.
+
+The ratio is stable where the wall clock is not, because it says how many workers were actually
+busy: it held between 1.99 and 2.08 across all seven runs on three workers, at durations from 100.6s
+to 141.5s, and reached 2.64 on four. Use it, or repeat the run, before believing a pool change.
 
 `deps.optimizer` is not enabled: it left `import` unchanged, at 26.1s against 26.2s, because that
 phase is this repository's own module graph re-executing per file rather than dependency resolution.
