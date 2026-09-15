@@ -1,3 +1,4 @@
+import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
@@ -35,7 +36,7 @@ import type { FirstAgentDraft } from "./FirstAgentSetup";
 const AgentActions = createSimpleContext({
   name: "Agent actions",
   init: () => {
-    const { activeServerId, activeServerSupportsCapability } = useServers();
+    const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const scopeIsCurrent = createScopeGuard();
     const {
       agentList,
@@ -67,11 +68,17 @@ const AgentActions = createSimpleContext({
       setCreatingAgent(true);
       setAgentSetupError(null);
       try {
+        // The provider and model travel with the creation request: the backend applies them before
+        // the initial message is queued, while a later provider change would be rejected as active
+        // work. A remote host without the capability drops the pair and starts its own default.
+        const createModelSupported =
+          activeServer()?.kind !== "remote" || activeServerSupportsCapability(TEAM_AGENT_CREATE_MODEL_CAPABILITY);
         const stored = await window.openbot.agent.createAgent({
           name: submitted.name.trim(),
           description: submitted.purpose.trim() || "General-purpose assistant",
           avatarSeed: submitted.avatarSeed,
           avatarHue: submitted.avatarHue,
+          ...(createModelSupported ? { provider: submitted.provider, model: submitted.model } : {}),
           initialMessage: createAgentInitialMessage(submitted),
         });
         const newAgent = createStoredProfile(toAgentProfile(stored));

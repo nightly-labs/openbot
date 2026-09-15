@@ -274,6 +274,29 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
+  it("keeps the CLI version with sign-in-required and no models when OpenCode reports no account", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => new FakeAgentClient(provider, "DONE", false, provider !== "opencode"),
+    });
+    await service.initialize();
+    // The version comes from the resolve step while the models come from the later discovery, so a
+    // connected CLI with no account keeps its version on the row while the catalog stays empty.
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({
+        id: "opencode",
+        state: "sign-in-required",
+        version: expect.any(String),
+        message: expect.stringContaining("OpenCode"),
+      }),
+    );
+    expect(service.listModels().filter((model) => model.provider === "opencode")).toEqual([]);
+  });
+
   it("restarts OpenCode on a changed key before it reports the change", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     let storedKey: string | null = null;

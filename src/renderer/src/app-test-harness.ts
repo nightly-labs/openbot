@@ -405,6 +405,7 @@ export function installOpenbotStub(): void {
       getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
       setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
       onAppLanguagePreference: vi.fn(() => () => undefined),
+      onOpenSettings: vi.fn(() => () => undefined),
       dynamicIsland: {
         getPreference: vi.fn().mockResolvedValue({
           enabled: true,
@@ -638,6 +639,8 @@ export function installOpenbotStub(): void {
           description: input.description,
           avatarSeed: input.avatarSeed,
           avatarHue: input.avatarHue,
+          provider: input.provider ?? AGENTS[0]?.provider,
+          model: input.model ?? AGENTS[0]?.model,
         })),
         duplicateAgent: vi.fn().mockImplementation(async (agentId) => {
           const source = AGENTS.find((agent) => agent.id === agentId) ?? AGENTS[0];

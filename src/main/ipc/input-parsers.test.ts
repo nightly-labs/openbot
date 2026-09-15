@@ -411,6 +411,27 @@ describe("agent IPC input parsing", () => {
       avatarHue: 215,
       initialMessage: "Help me plan a trip.",
     });
+    expect(
+      parseCreateAgent({
+        name: "Trip Planner",
+        description: "Builds practical itineraries.",
+        avatarSeed: "setup:trip",
+        avatarHue: 215,
+        provider: "opencode",
+        model: "opencode/example-model",
+        reasoningEffort: "high",
+        initialMessage: "Help me plan a trip.",
+      }),
+    ).toEqual({
+      name: "Trip Planner",
+      description: "Builds practical itineraries.",
+      avatarSeed: "setup:trip",
+      avatarHue: 215,
+      provider: "opencode",
+      model: "opencode/example-model",
+      reasoningEffort: "high",
+      initialMessage: "Help me plan a trip.",
+    });
     expect(parseUpdateAgent({ agentId: "bot-1", name: "Ada", title: "Coordinator", notifications: true })).toEqual({
       agentId: "bot-1",
       name: "Ada",
@@ -507,6 +528,26 @@ describe("agent IPC input parsing", () => {
         initialMessage: " ",
       }),
     ).toThrowError("initialMessage is required.");
+    expect(() =>
+      parseCreateAgent({
+        name: "Trip Planner",
+        description: "Builds practical itineraries.",
+        avatarSeed: "setup:trip",
+        avatarHue: 215,
+        provider: "unknown",
+        initialMessage: "Help me plan a trip.",
+      }),
+    ).toThrowError("Invalid agent provider.");
+    expect(() =>
+      parseCreateAgent({
+        name: "Trip Planner",
+        description: "Builds practical itineraries.",
+        avatarSeed: "setup:trip",
+        avatarHue: 215,
+        model: "not a model id!",
+        initialMessage: "Help me plan a trip.",
+      }),
+    ).toThrowError("Invalid agent model.");
     expect(() => parseUpdateAgent({ agentId: "bot-1", role: "Coordinator" })).toThrowError("Invalid role.");
     expect(() => parseAgentRequest(null)).toThrowError("Invalid agent request.");
     expect(() => parseSendMessage({ agentId: "bot-1", text: " " })).toThrowError(

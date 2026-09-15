@@ -986,6 +986,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The provider and model a creation request names, resolved against what the CLIs list right now,
+   * or `null` when the request names neither. A named model must be listed for the named provider;
+   * a lone provider takes its default when listed, else whatever it lists first.
+   */
+  #creationModel(input: CreateAgentInput): { provider: AgentProvider; model: AgentModelOption } | null {
+    const { provider, model: requestedId } = input;
+    if (provider === undefined && requestedId === undefined) return null;
+    const models = this.#availableModels();
+    if (requestedId !== undefined) {
+      const model = models.find(
+        (candidate) => candidate.id === requestedId && (provider === undefined || candidate.provider === provider),
+      );
+      if (!model) throw new Error("The selected agent model is unavailable.");
+      if (provider !== undefined && model.provider !== provider) {
+        throw new Error("The selected model does not belong to that provider.");
+      }
+      return { provider: model.provider, model };
+    }
+    if (provider === undefined) return null;
+    const model =
+      models.find((candidate) => candidate.provider === provider && candidate.id === defaultProviderModel(provider)) ??
+      models.find((candidate) => candidate.provider === provider) ??
+      null;
+    if (!model) throw new Error(`${providerLabel(provider)} has no available model.`);
+    return { provider, model };
+  }
+
+  /**
    * The provider and model a new agent starts on, or `null` when the preferred provider lists
    * nothing at all.
    *
@@ -1023,22 +1051,37 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     let agent = await this.#store.createAgent(input, profileOperationId);
     try {
       await this.#prepareAgentWorkspace(agent);
-      const starting = this.#startingChoice(this.#availableModels());
-      // The provider a start lands on, even when it lists no model: the throw below names the
-      // provider the developer expected, and a preferred provider that equals the record's own is
-      // still the no-op it always was.
-      const startingProvider = starting?.provider ?? this.#providers.preferredProvider();
-      // A new record starts on the built-in default provider, so this is the one place a preferred
-      // provider lands on a new agent -- and with it the model setup chose, which is how a custom
-      // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
-      if (startingProvider !== agent.provider) {
-        if (!starting) throw new Error(`${providerLabel(startingProvider)} has no available model.`);
+      // A named pair lands before the initial message is queued: a provider change afterwards is
+      // rejected while the delivery or turn is active, so a follow-up update could never apply it.
+      const requested = this.#creationModel(input);
+      if (requested) {
         agent = await this.#store.updateAgent({
           agentId: agent.id,
-          provider: starting.provider,
-          model: starting.model.id,
-          reasoningEffort: starting.model.defaultReasoningEffort,
+          provider: requested.provider,
+          model: requested.model.id,
+          reasoningEffort:
+            input.reasoningEffort && requested.model.supportedReasoningEfforts.includes(input.reasoningEffort)
+              ? input.reasoningEffort
+              : requested.model.defaultReasoningEffort,
         });
+      } else {
+        const starting = this.#startingChoice(this.#availableModels());
+        // The provider a start lands on, even when it lists no model: the throw below names the
+        // provider the developer expected, and a preferred provider that equals the record's own is
+        // still the no-op it always was.
+        const startingProvider = starting?.provider ?? this.#providers.preferredProvider();
+        // A new record starts on the built-in default provider, so this is the one place a preferred
+        // provider lands on a new agent -- and with it the model setup chose, which is how a custom
+        // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
+        if (startingProvider !== agent.provider) {
+          if (!starting) throw new Error(`${providerLabel(startingProvider)} has no available model.`);
+          agent = await this.#store.updateAgent({
+            agentId: agent.id,
+            provider: starting.provider,
+            model: starting.model.id,
+            reasoningEffort: starting.model.defaultReasoningEffort,
+          });
+        }
       }
       if (configure) agent = await configure(agent);
       await this.sendMessage({ agentId: agent.id, text: initialMessage, attachmentDraftIds: [] });

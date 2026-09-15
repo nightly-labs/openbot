@@ -133,6 +133,50 @@ describe.sequential("AgentService: queue", () => {
     });
   });
 
+  it("starts a new agent on the requested provider and model before the initial message", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "opencode") client.modelList = () => ({ data: [{ model: "opencode/example-model" }] });
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await service.initialize();
+
+    await expect(
+      service.createAgent({ ...CREATE_AGENT_INPUT, provider: "opencode", model: "opencode/example-model" }),
+    ).resolves.toMatchObject({ provider: "opencode", model: "opencode/example-model" });
+    // The initial turn ran on the requested provider: a follow-up provider change would be rejected
+    // as active work, so the record has to name it before the first message is queued.
+    await waitFor(
+      () =>
+        clients.get("opencode")?.requests.some((request) => request.method === "turn/start") === true &&
+        clients.get("codex")?.requests.some((request) => request.method === "turn/start") !== true,
+    );
+  });
+
+  it("rejects creation with an unlisted model and removes the incomplete agent", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
+    await service.initialize();
+
+    await expect(
+      service.createAgent({ ...CREATE_AGENT_INPUT, provider: "opencode", model: "opencode/no-such-model" }),
+    ).rejects.toThrow("The selected agent model is unavailable.");
+    expect(service.listAgents()).toEqual([]);
+  });
+
   it("updates the active account and new-agent defaults with the preferred provider", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);

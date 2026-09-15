@@ -113,6 +113,72 @@ it("keeps profile save responses frozen across HTTP and WebRTC adapters", () => 
   });
 });
 
+// The frozen base projection names no provider or model, so the pair rides beside it only behind
+// the capability: both directions drop it without the flag, which is the released behavior.
+it("carries a chosen provider and model on agent creation only behind the capability", () => {
+  const path = "/v1/agents";
+  const input = {
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
+    provider: "opencode",
+    model: "opencode/example-model",
+    reasoningEffort: "high",
+  };
+  const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", path, input, { agentCreateModel: true }));
+  expect(wire).toMatchObject({
+    name: "Helper",
+    provider: "opencode",
+    model: "opencode/example-model",
+    reasoningEffort: "high",
+  });
+  expect(decodeTeamProtocolV4CurrentHttpRequest("POST", path, wire, { agentCreateModel: true })).toEqual(input);
+  const bare = JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", path, input));
+  expect(bare).not.toHaveProperty("provider");
+  expect(bare).not.toHaveProperty("model");
+  expect(decodeTeamProtocolV4CurrentHttpRequest("POST", path, wire)).toEqual({
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
+  });
+  expect(() =>
+    decodeTeamProtocolV4CurrentHttpRequest("POST", path, { ...wire, provider: "unknown" }, { agentCreateModel: true }),
+  ).toThrow();
+});
+
+// The WebRTC arm runs the same current-layer codec around the frozen v2 framing, so the chosen
+// pair needs the flag at both WebRTC calls too — without it the frozen projection drops the
+// fields while both peers advertise the capability.
+it("carries a chosen provider and model on agent creation through WebRTC only behind the capability", () => {
+  const path = "/v1/agents";
+  const input = {
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
+    provider: "opencode",
+    model: "opencode/example-model",
+    reasoningEffort: "high",
+  };
+  const wire = encodeTeamProtocolV4WebRtcHttpRequest("POST", path, input, { agentCreateModel: true });
+  expect(isDynamicRecord(wire) ? wire.provider : undefined).toBe("opencode");
+  expect(decodeTeamProtocolV4WebRtcHttpRequest("POST", path, wire, { agentCreateModel: true })).toEqual(input);
+  const bare = encodeTeamProtocolV4WebRtcHttpRequest("POST", path, input);
+  expect(isDynamicRecord(bare) && "provider" in bare).toBe(false);
+  expect(decodeTeamProtocolV4WebRtcHttpRequest("POST", path, wire)).toEqual({
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
+  });
+});
+
 it("round trips reviewed profiles through the additive v4 HTTP and WebRTC routes", () => {
   const draft = {
     name: "Researcher",

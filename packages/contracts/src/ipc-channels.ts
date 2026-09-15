@@ -7,6 +7,7 @@ export const IPC_CHANNELS = {
   getAppLanguagePreference: "app:get-language-preference",
   setAppLanguagePreference: "app:set-language-preference",
   appLanguagePreference: "app:language-preference",
+  openSettings: "app:open-settings",
   dynamicIslandGetPreference: "dynamic-island:get-preference",
   dynamicIslandSetPreference: "dynamic-island:set-preference",
   dynamicIslandPublishPresentation: "dynamic-island:publish-presentation",

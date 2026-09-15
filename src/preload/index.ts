@@ -767,6 +767,11 @@ const openbotApi: OpenBotDesktopApi = {
     ipcRenderer.on(IPC_CHANNELS.appLanguagePreference, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.appLanguagePreference, handler);
   },
+  onOpenSettings: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IPC_CHANNELS.openSettings, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.openSettings, handler);
+  },
   dynamicIsland: {
     getPreference: () =>
       ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandGetPreference).then(decodeDynamicIslandPreference),

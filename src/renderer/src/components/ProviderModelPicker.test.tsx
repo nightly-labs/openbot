@@ -203,3 +203,35 @@ it("selects OpenCode reasoning model IDs and can return to the default model", a
   await fireEvent.click(await within(document.body).findByRole("option", { name: "Default" }));
   expect(onChange).toHaveBeenLastCalledWith("opencode/free", "opencode");
 });
+
+it("shows the sign-in message and a Connect action when OpenCode lists no models", async () => {
+  const onConnect = vi.fn();
+  const status: AgentStatus = {
+    ...agentStatus,
+    providers: [
+      ...(agentStatus.providers ?? []),
+      {
+        id: "opencode",
+        state: "sign-in-required",
+        version: "1.18.30",
+        message: "OpenCode listed no model. Add an OpenCode Go key to continue.",
+        email: null,
+      },
+    ],
+  };
+  const view = render(() => (
+    <ProviderModelPicker
+      provider="opencode"
+      value="opencode/free"
+      modelOptions={[]}
+      agentStatus={status}
+      onConnectProvider={onConnect}
+      onChange={vi.fn()}
+    />
+  ));
+  await fireEvent.click(view.getByRole("button", { name: /Agent model:/ }));
+  const dialog = within(view.getByRole("dialog", { name: "Choose agent model" }));
+  expect(dialog.getByRole("status")).toHaveTextContent("OpenCode listed no model.");
+  await fireEvent.click(dialog.getByRole("button", { name: "Connect" }));
+  expect(onConnect).toHaveBeenCalledWith("opencode");
+});

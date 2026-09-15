@@ -1,14 +1,22 @@
 import { decodeAgentAnalytics } from "../ipc-agent-analytics";
+import { isAgentModel, isReasoningEffort } from "../ipc-agent-identity";
 import {
   decodeAgentProfileDraft,
   decodeSaveAgentProfileResult,
   parseGenerateAgentProfile,
   parseSaveAgentProfile,
 } from "../ipc-agent-profile";
+import { isAgentProvider } from "../ipc-agent-status";
 import { decodeHostAnalytics } from "../ipc-host-analytics";
 import { isDynamicRecord } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
-import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, isHostAnalyticsRoute } from "./current";
+import {
+  isAgentAnalyticsRoute,
+  isAgentCreateRoute,
+  isAgentProfileRoute,
+  isConversationUnreadRoute,
+  isHostAnalyticsRoute,
+} from "./current";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeProfileV4Request, decodeProfileV4Response } from "./profile-v4";
@@ -25,7 +33,7 @@ export function encodeTeamProtocolV4CurrentHttpRequest(
   method: string,
   path: string,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): string {
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path))
     return JSON.stringify(decodeScopedUsageRequest(value));
@@ -34,7 +42,19 @@ export function encodeTeamProtocolV4CurrentHttpRequest(
   if (scopedUsageRoute(method, path)) {
     return JSON.stringify(decodeScopedUsageRequest(value));
   }
-  if (!duplicateRoute(method, path)) return encodeTeamProtocolV4BaseCurrentHttpRequest(method, path, value, options);
+  if (!duplicateRoute(method, path)) {
+    // The frozen base projection names no provider or model, so a chosen pair rides beside it:
+    // only a host behind the capability reads them, and anything older drops unknown keys.
+    if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
+      const projected = JSON.parse(
+        encodeTeamProtocolV4BaseCurrentHttpRequest(method, path, value, {
+          preserveSemanticTags: options.preserveSemanticTags,
+        }),
+      );
+      return JSON.stringify({ ...projected, ...decodeAgentCreateModel(value) });
+    }
+    return encodeTeamProtocolV4BaseCurrentHttpRequest(method, path, value, options);
+  }
   // The duplicate route reaches the frozen v3 codec directly, so the vocabulary swap happens here.
   const currentValue: TeamProtocolV4BaseJsonValue = JSON.parse(JSON.stringify(value ?? null));
   return JSON.stringify(decodeTeamProtocolV4HttpRequest(method, path, toWireAgentKeys(currentValue)));
@@ -44,7 +64,7 @@ export function decodeTeamProtocolV4CurrentHttpRequest(
   method: string,
   path: string,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): TeamProtocolV4BaseJsonObject {
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) return decodeScopedUsageRequest(value);
   if (isAgentProfileRoute(method, path))
@@ -54,14 +74,23 @@ export function decodeTeamProtocolV4CurrentHttpRequest(
     return decodeScopedUsageRequest(value);
   }
   if (!duplicateRoute(method, path)) {
-    if (options.preserveSemanticTags) return decodeTeamProtocolV4BaseCurrentHttpRequest(method, path, value);
-    // The encode call is only here to expand semantic tags, and it leaves the object in wire vocabulary.
-    // Decoding its output is what brings the keys back to the current spelling the handlers read.
-    return decodeTeamProtocolV4BaseCurrentHttpRequest(
-      method,
-      path,
-      JSON.parse(encodeTeamProtocolV4BaseCurrentHttpRequest(method, path, value)),
-    );
+    const decoded = options.preserveSemanticTags
+      ? decodeTeamProtocolV4BaseCurrentHttpRequest(method, path, value)
+      : decodeTeamProtocolV4BaseCurrentHttpRequest(
+          method,
+          path,
+          // The encode call is only here to expand semantic tags, and it leaves the object in wire
+          // vocabulary. Decoding its output is what brings the keys back to the current spelling the
+          // handlers read.
+          JSON.parse(encodeTeamProtocolV4BaseCurrentHttpRequest(method, path, value)),
+        );
+    // Read off the raw request, not the projection: the frozen base codec drops unknown keys, so
+    // the pair is gone by the time `decoded` exists. A request without the capability takes the
+    // host default exactly as before.
+    if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
+      return { ...decoded, ...decodeAgentCreateModel(value) };
+    }
+    return decoded;
   }
   return toCurrentAgentKeysObjectForPath(path, structuredClone(decodeTeamProtocolV4HttpRequest(method, path, value)));
 }
@@ -116,6 +145,29 @@ function decodeUnreadRequest(value: unknown): TeamProtocolV4BaseJsonObject {
     throw new Error("Invalid conversation-unread request.");
   }
   return {};
+}
+
+/**
+ * The provider, model and reasoning effort of an agent creation request, validated and fail-closed:
+ * a present field with the wrong shape rejects the request rather than silently starting the agent
+ * on the host default. Absent fields stay absent, so the host default still applies.
+ */
+function decodeAgentCreateModel(value: unknown): TeamProtocolV4BaseJsonObject {
+  if (!isDynamicRecord(value)) throw new Error("Invalid agent creation request.");
+  const result: TeamProtocolV4BaseJsonObject = {};
+  if (value.provider !== undefined) {
+    if (!isAgentProvider(value.provider)) throw new Error("Invalid agent provider.");
+    result.provider = value.provider;
+  }
+  if (value.model !== undefined) {
+    if (!isAgentModel(value.model)) throw new Error("Invalid agent model.");
+    result.model = value.model;
+  }
+  if (value.reasoningEffort !== undefined) {
+    if (!isReasoningEffort(value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
+    result.reasoningEffort = value.reasoningEffort;
+  }
+  return result;
 }
 
 function readPath(path: string): string {

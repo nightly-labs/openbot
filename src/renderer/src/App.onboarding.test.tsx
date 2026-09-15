@@ -463,6 +463,8 @@ describe("OpenBot connected desktop shell", () => {
         initialMessage: "Greet me briefly.",
         avatarSeed: expect.any(String),
         avatarHue: null,
+        provider: "codex",
+        model: "gpt-5.6-luna",
       }),
     );
     expect(await screen.findByRole("heading", { name: "New agent" })).toBeInTheDocument();

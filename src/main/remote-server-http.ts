@@ -55,6 +55,7 @@ export async function requestJson<T>(
     appVersion?: string;
     capabilities?: readonly TeamCurrentCapability[];
     preserveSemanticTags?: boolean;
+    agentCreateModel?: boolean;
     timeoutMs?: number;
   } = {},
 ): Promise<T> {
@@ -81,6 +82,7 @@ export async function requestJson<T>(
               : options.protocol === 4
                 ? encodeTeamProtocolV4CurrentHttpRequest(method, path, options.body, {
                     preserveSemanticTags: options.preserveSemanticTags,
+                    agentCreateModel: options.agentCreateModel,
                   })
                 : options.protocol === TEAM_PROTOCOL_V3
                   ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {

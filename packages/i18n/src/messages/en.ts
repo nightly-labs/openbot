@@ -10,9 +10,10 @@ import type { MessageCatalog } from "../message";
  */
 export const en = {
   // The native application menu. Electron localizes its own `role:` entries from the operating
-  // system, so only the two custom items are here.
+  // system, so only the custom items are here.
   "menu.stopAllAgents": "Stop all agents",
   "menu.checkForUpdates": "Check for Updates…",
+  "menu.preferences": "Settings…",
 
   // Desktop notifications, raised by the main process while the window may be closed.
   "notification.needsInput": "Needs your input.",

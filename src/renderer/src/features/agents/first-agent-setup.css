@@ -159,6 +159,33 @@
   min-width: 132px;
 }
 
+/*
+ * The model picker in this form reads as a form control, like the inputs above it: the same
+ * border, radius and background, and no press-down scale, so opening it never moves it.
+ */
+.first-agent-fields .provider-model-trigger-field {
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  box-shadow: none;
+}
+
+.first-agent-fields .provider-model-trigger-field:hover:not(:disabled),
+.first-agent-fields .provider-model-trigger-field[aria-expanded="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-control);
+}
+
+.first-agent-fields .provider-model-trigger-field:active:not(:disabled) {
+  transform: none;
+}
+
+.first-agent-fields .provider-model-trigger-field:focus-visible {
+  border-color: var(--openbot-border-focus);
+  outline: none;
+  box-shadow: var(--openbot-focus-ring);
+}
+
 .first-agent-submit-actions {
   display: flex;
   justify-content: center;

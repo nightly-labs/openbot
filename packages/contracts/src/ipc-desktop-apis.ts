@@ -470,6 +470,7 @@ export interface OpenBotDesktopApi {
   getAppLanguagePreference: () => Promise<AppLanguagePreference>;
   setAppLanguagePreference: (input: SetAppLanguagePreferenceInput) => Promise<AppLanguagePreference>;
   onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
+  onOpenSettings: (listener: () => void) => () => void;
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseMacSetupState: () => Promise<ComputerUseMacSetupState>;
   openComputerUsePermissionSetup: (permission: MacPermissionId) => Promise<ComputerUseMacSetupState>;

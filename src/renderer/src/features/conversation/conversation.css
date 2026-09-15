@@ -2342,6 +2342,19 @@
   border-top: 0;
 }
 
+.agent-settings-model .agent-settings-workspace-row > span:last-child {
+  overflow-wrap: anywhere;
+}
+
+.agent-settings-access-note {
+  margin: 0;
+  background: var(--openbot-hover);
+  padding: 6px 8px 8px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+}
+
 .agent-settings-save-error {
   margin: -8px 2px 15px;
   color: var(--openbot-danger);
@@ -4245,6 +4258,7 @@ button.chat-action-target:active,
   line-height: 20px;
   overflow-wrap: anywhere;
   white-space: pre-line;
+  user-select: text;
 }
 
 .message-markdown {

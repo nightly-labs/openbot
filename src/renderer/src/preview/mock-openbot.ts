@@ -596,6 +596,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       languageListeners.add(listener);
       return () => languageListeners.delete(listener);
     },
+    onOpenSettings: () => () => undefined,
     dynamicIsland: {
       getPreference: async () => clone(dynamicIslandPreference),
       setPreference: async (preference) => {
@@ -1240,6 +1241,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           description: input.description,
           avatarSeed: input.avatarSeed,
           avatarHue: input.avatarHue,
+          ...(input.provider === undefined ? {} : { provider: input.provider }),
+          ...(input.model === undefined ? {} : { model: input.model }),
+          ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
         });
         agents = [...agents, agent];
         queues.set(agent.id, emptyQueue(agent.id));

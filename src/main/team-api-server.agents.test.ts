@@ -70,6 +70,38 @@ describe("TeamApiServer agents", () => {
     ).toThrow("description is invalid.");
   });
 
+  it("passes a named provider and model through agent creation", () => {
+    expect(
+      agentCreate({
+        name: "Explorer",
+        description: "Explores ideas.",
+        initialMessage: "Greet me briefly.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+        provider: "opencode",
+        model: "opencode/example-model",
+      }),
+    ).toEqual({
+      name: "Explorer",
+      description: "Explores ideas.",
+      avatarSeed: "mobile:newagentseed",
+      avatarHue: null,
+      initialMessage: "Greet me briefly.",
+      provider: "opencode",
+      model: "opencode/example-model",
+    });
+    expect(() =>
+      agentCreate({
+        name: "Explorer",
+        description: "Explores ideas.",
+        initialMessage: "Greet me briefly.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+        provider: "unknown",
+      }),
+    ).toThrow("provider is invalid.");
+  });
+
   it("downloads uploaded and replaced avatars through a WebRTC request and removes them", async () => {
     const { root, start, signIn } = await createTeamApiFixture("agent-avatar", { configure: true });
     const store = new AgentStore(join(root, "agents"), join(root, "home"));

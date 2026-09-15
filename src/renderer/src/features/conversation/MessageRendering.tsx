@@ -300,7 +300,10 @@ export function MessageBody(props: {
                   );
                 }
                 return (
-                  <p class="message-copy">
+                  <p
+                    class="message-copy"
+                    data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
+                  >
                     <RichMessageText
                       body={block.text}
                       agents={props.agents}

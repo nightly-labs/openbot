@@ -804,4 +804,22 @@ describe("OpenBot connected desktop shell", () => {
     }
     expect(screen.getByRole("textbox", { name: "Agent instructions" })).toBe(description);
   });
+
+  it("opens Settings with Command+,", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument();
+    await fireEvent.keyDown(document.body, { key: ",", metaKey: true });
+    expect(await screen.findByRole("dialog", { name: "General" })).toBeInTheDocument();
+  });
+
+  it("opens Settings when main sends the Preferences menu event", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument();
+    const listener = vi.mocked(window.openbot.onOpenSettings).mock.calls[0]?.[0];
+    if (!listener) throw new Error("Settings did not subscribe to the Preferences menu event.");
+    listener();
+    expect(await screen.findByRole("dialog", { name: "General" })).toBeInTheDocument();
+  });
 });

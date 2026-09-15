@@ -470,6 +470,8 @@ describe("OpenBot connected desktop shell", () => {
         initialMessage: "Greet me briefly.",
         avatarSeed: expect.any(String),
         avatarHue: null,
+        provider: "codex",
+        model: "gpt-5.6-luna",
       }),
     );
     expect(await screen.findByRole("heading", { name: "Helper" })).toBeInTheDocument();
@@ -503,11 +505,46 @@ describe("OpenBot connected desktop shell", () => {
       description: draft.purpose,
       avatarSeed: expect.any(String),
       avatarHue: 215,
+      provider: "codex",
+      model: "gpt-5.6-luna",
       initialMessage:
         "Your ongoing role is: Compare travel options and turn my rough ideas into practical, day-by-day itineraries.",
     });
     expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
     expect(await screen.findByRole("heading", { name: "Trip Planner" })).toBeInTheDocument();
+  });
+
+  it("seeds the creation form from the saved setup choice and submits the pair", async () => {
+    vi.mocked(window.openbot.getSetupState).mockResolvedValue({
+      completed: true,
+      preferredProvider: "opencode",
+      preferredModel: null,
+    });
+    vi.mocked(window.openbot.agent.listModels).mockResolvedValue([
+      {
+        provider: "opencode",
+        id: "opencode/example-free",
+        name: "Example Free",
+        description: "Free OpenCode model.",
+        defaultReasoningEffort: "medium",
+        supportedReasoningEfforts: ["medium"],
+      },
+    ]);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
+    expect(await screen.findByRole("heading", { name: "Create a new agent" })).toBeInTheDocument();
+    // The hard-coded codex default would fail against this catalog; the saved choice stands instead.
+    expect(await screen.findByRole("button", { name: "Agent model: Example Free" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+
+    await waitFor(() =>
+      expect(window.openbot.agent.createAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "opencode", model: "opencode/example-free" }),
+      ),
+    );
   });
 
   it("opens and cancels agent creation from a private conversation", async () => {
