@@ -382,7 +382,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         } finally {
           // Bounded like the probes, and for the same reason: the catalog is complete by now, and an
           // agent that is slow to close a session it is about to lose anyway must not take it away.
-          await this.#requestBefore(connection.closeSession({ sessionId: probe.sessionId }), deadline, "session/close");
+          await this.#requestBefore(
+            () => connection.closeSession({ sessionId: probe.sessionId }),
+            deadline,
+            "session/close",
+          );
         }
       })(),
       timeoutMs,
@@ -390,11 +394,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
-  /** A discovery request that gives up at `until`, and reports any failure as `null`. */
-  async #requestBefore<T>(request: Promise<T>, until: number, method: string): Promise<T | null> {
+  /**
+   * A discovery request that gives up at `until`, and reports any failure as `null`.
+   *
+   * The request is sent here, and not by the caller: after `until` there is nothing to send. A
+   * request made anyway would still reach the agent and still change the session the sweep is about
+   * to give back, and its own failure would have nobody left to read it.
+   */
+  async #requestBefore<T>(request: () => Promise<T>, until: number, method: string): Promise<T | null> {
     const remaining = until - Date.now();
     if (remaining <= 0) return null;
-    return withTimeout(request, remaining, `${agentProviderName(this.provider)} request timed out: ${method}`).catch(
+    return withTimeout(request(), remaining, `${agentProviderName(this.provider)} request timed out: ${method}`).catch(
       () => null,
     );
   }
@@ -436,7 +446,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     let selected = option.currentValue;
     for (const model of models) {
       const response = await this.#requestBefore(
-        connection.setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: model.id }),
+        () => connection.setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: model.id }),
         Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
         "session/set_config_option",
       );
@@ -449,11 +459,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // reserve, so the close that follows keeps the other half.
     if (selected !== option.currentValue) {
       await this.#requestBefore(
-        connection.setSessionConfigOption({
-          sessionId: probe.sessionId,
-          configId: option.id,
-          value: option.currentValue,
-        }),
+        () =>
+          connection.setSessionConfigOption({
+            sessionId: probe.sessionId,
+            configId: option.id,
+            value: option.currentValue,
+          }),
         Math.min(Date.now() + MODEL_REASONING_CLEANUP_MS / 2, deadline),
         "session/set_config_option",
       );
