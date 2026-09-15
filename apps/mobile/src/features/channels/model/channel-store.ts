@@ -262,7 +262,11 @@ export class MobileChannelStore {
     entry.historyWaiters.delete(channelId);
     for (const finish of waiters) finish(success);
   }
-  refreshHistory(serverId: string, channelId: string): Promise<void> {
+  refreshHistory(
+    serverId: string,
+    channelId: string,
+    failureMessage = "The message was sent, but chat history could not refresh.",
+  ): Promise<void> {
     const entry = this.entry(serverId);
     return new Promise((resolve, reject) => {
       const finish = (success: boolean) => {
@@ -270,7 +274,7 @@ export class MobileChannelStore {
         waiters?.delete(finish);
         if (!waiters?.size) entry.historyWaiters.delete(channelId);
         if (success) resolve();
-        else reject(new ChannelHistoryRefreshError("The message was sent, but chat history could not refresh."));
+        else reject(new ChannelHistoryRefreshError(failureMessage));
       };
       const waiters = entry.historyWaiters.get(channelId) ?? new Set();
       waiters.add(finish);
@@ -390,6 +394,8 @@ export class MobileChannelStore {
         });
       }
       if (options?.waitForRefresh && command.type === "send") await this.refreshHistory(serverId, result.id);
+      else if (options?.waitForRefresh && (command.type === "resume" || command.type === "reassign"))
+        await this.refreshHistory(serverId, result.id, "The task was changed, but chat history could not refresh.");
       else {
         const refresh = this.refresh(serverId);
         if (options?.waitForRefresh) await refresh;

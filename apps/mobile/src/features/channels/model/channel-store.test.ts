@@ -576,6 +576,51 @@ describe("channel data in the shared chat", () => {
     stop();
   });
 
+  it.each(["resume", "reassign"] as const)(
+    "releases %s after its history read while streaming refreshes continue",
+    async (type) => {
+      const historyRead = deferred<ChannelPage>();
+      const trailingRead = deferred<ChannelPage>();
+      let commanded = false;
+      let reads = 0;
+      const { store } = fixture(async (path) => {
+        if (path === CHANNEL_ROUTES.command) {
+          commanded = true;
+          return channel;
+        }
+        if (path === CHANNEL_ROUTES.list) return [channel];
+        if (!commanded) return page(1, 1);
+        return ++reads === 1 ? historyRead.promise : trailingRead.promise;
+      });
+      const stop = store.observe("host-one", channel.id);
+      await store.refresh("host-one");
+      const action = store.command(
+        "host-one",
+        {
+          type,
+          operationId: "task-action",
+          channelId: channel.id,
+          taskId: "task-one",
+          recipientAgentId: "agent-two",
+        },
+        { waitForRefresh: true },
+      );
+      await vi.waitFor(() => expect(reads).toBe(1));
+      let finished = false;
+      const refresh = store.refresh("host-one").then(() => {
+        finished = true;
+      });
+      historyRead.resolve(page(1, 2));
+      await action;
+      expect(store.get("host-one").pages.get(channel.id)?.throughSequence).toBe(2);
+      await vi.waitFor(() => expect(reads).toBe(2));
+      expect(finished).toBe(false);
+      trailingRead.resolve(page(1, 3));
+      await refresh;
+      stop();
+    },
+  );
+
   it("completes an unchanged history read without waiting for the sidebar", async () => {
     const listRead = deferred<ChannelSummary[]>();
     let waiting = false;
