@@ -8,7 +8,7 @@
 // for an A/B comparison - a confident wrong number that does not move when the
 // code gets better. The only correct reading is a delta of the cumulative
 // `cputime` counter across a known wall-clock interval, which is what
-// `cpuPercentBetween` does.
+// `cpuSecondsBetween` does for every consecutive pair of samples.
 //
 // "Percent" here is percent of one core. 100 means one core fully used; a
 // machine with eight cores can therefore report more than 100 in total.
@@ -28,12 +28,6 @@ export interface ProcessSnapshot {
 export interface CpuSample {
   atMs: number;
   processes: ProcessSnapshot[];
-}
-
-export interface ProcessCpuUsage {
-  pid: number;
-  type: ChromiumProcessType;
-  cpuPercent: number;
 }
 
 export interface ProcessTypeUsage {
@@ -198,20 +192,6 @@ function cpuSecondsBetween(before: ProcessSnapshot[], after: ProcessSnapshot[]):
     used.push({ pid: process.pid, type: process.type, cpuSeconds: delta });
   }
   return used;
-}
-
-/** Percent of one core, per process, over `wallMs` of wall-clock time. */
-export function cpuPercentBetween(
-  before: ProcessSnapshot[],
-  after: ProcessSnapshot[],
-  wallMs: number,
-): ProcessCpuUsage[] {
-  if (wallMs <= 0) return [];
-  return cpuSecondsBetween(before, after).map((process) => ({
-    pid: process.pid,
-    type: process.type,
-    cpuPercent: (process.cpuSeconds / (wallMs / 1_000)) * 100,
-  }));
 }
 
 const REPORTED_TYPES: readonly ChromiumProcessType[] = [

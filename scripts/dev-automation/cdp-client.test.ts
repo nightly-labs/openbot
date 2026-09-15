@@ -19,6 +19,7 @@ import {
   redactSensitiveSnapshotValues,
   reportableScreenshotPath,
   resolveScreenshotPath,
+  resolveWritablePath,
 } from "./tools";
 
 describe("isOpenBotBrowser", () => {
@@ -276,6 +277,28 @@ describe("resolveScreenshotPath containment", () => {
     symlinkSync(join(outside, "target.png"), join(root, "direct.png"));
     expect(() => resolveScreenshotPath(root, "direct.png", 0)).toThrow("symbolic link");
     expect(resolveScreenshotPath(root, "real/shot.png", 0)).toBe(join(root, "real", "shot.png"));
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  });
+});
+
+describe("resolveWritablePath", () => {
+  it("holds a CPU report to the same containment the screenshots get", () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-cpu-root-"));
+    const outside = mkdtempSync(join(tmpdir(), "openbot-cpu-outside-"));
+    expect(resolveWritablePath(root, "base.json", ".json", "CPU reports")).toBe(join(root, "base.json"));
+    expect(resolveWritablePath(root, "run-1/after.json", ".json", "CPU reports")).toBe(
+      join(root, "run-1", "after.json"),
+    );
+    // `..json` is a legal file name, so the containment test must look for a
+    // `..` path segment and not for a `..` prefix.
+    expect(resolveWritablePath(root, "..weird.json", ".json", "CPU reports")).toBe(join(root, "..weird.json"));
+    expect(() => resolveWritablePath(root, "../escaped.json", ".json", "CPU reports")).toThrow(/must stay inside/u);
+    expect(() => resolveWritablePath(root, "/etc/hosts", ".json", "CPU reports")).toThrow(/must stay inside/u);
+    expect(() => resolveWritablePath(root, "report.txt", ".json", "CPU reports")).toThrow(".json");
+    expect(() => resolveWritablePath(root, "", ".json", "CPU reports")).toThrow(/cannot be empty/u);
+    symlinkSync(outside, join(root, "escape"));
+    expect(() => resolveWritablePath(root, "escape/report.json", ".json", "CPU reports")).toThrow("symbolic link");
     rmSync(root, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   });

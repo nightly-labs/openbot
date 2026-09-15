@@ -9,7 +9,6 @@ import { describe, expect, it } from "vitest";
 import {
   classifyChromiumProcess,
   collectDescendants,
-  cpuPercentBetween,
   type ProcessSnapshot,
   parseCpuReport,
   parseProcessTable,
@@ -94,31 +93,6 @@ describe("parseProcessTable and collectDescendants", () => {
   });
 });
 
-describe("cpuPercentBetween", () => {
-  it("reports the delta over the interval as percent of one core", () => {
-    const usage = cpuPercentBetween([snapshot(1, 10)], [snapshot(1, 13)], 10_000);
-    expect(usage).toEqual([{ pid: 1, type: "renderer", cpuPercent: 30 }]);
-  });
-
-  it("drops a process that appeared or died inside the interval", () => {
-    // 40 cumulative seconds on a renderer that opened mid-run is a lifetime
-    // total, not work done during this interval. Counting it would read as a
-    // spike that never happened.
-    const usage = cpuPercentBetween([snapshot(1, 10)], [snapshot(1, 11), snapshot(2, 40)], 10_000);
-    expect(usage.map((process) => process.pid)).toEqual([1]);
-    const closed = cpuPercentBetween([snapshot(1, 10), snapshot(3, 5)], [snapshot(1, 11)], 10_000);
-    expect(closed.map((process) => process.pid)).toEqual([1]);
-  });
-
-  it("drops a pid whose counter went backwards, which means it was recycled", () => {
-    expect(cpuPercentBetween([snapshot(1, 10)], [snapshot(1, 2)], 10_000)).toEqual([]);
-  });
-
-  it("reports nothing rather than dividing by zero", () => {
-    expect(cpuPercentBetween([snapshot(1, 10)], [snapshot(1, 13)], 0)).toEqual([]);
-  });
-});
-
 describe("summarize", () => {
   it("groups the run by process kind over the full span", () => {
     const report = summarize(
@@ -150,6 +124,40 @@ describe("summarize", () => {
     );
     // 2.5 s of renderer work over a 10 s span, not over the 5 s it was alive.
     expect(report.processes).toContainEqual({ type: "renderer", cpuPercent: 25, processes: 1 });
+  });
+
+  it("drops a process that appeared or died inside the interval", () => {
+    // 40 cumulative seconds on a renderer that opened mid-interval is a
+    // lifetime total, not work done during it. Counting it from zero would read
+    // as a spike that never happened.
+    const arrived = summarize(
+      [
+        { atMs: 0, processes: [snapshot(1, 10)] },
+        { atMs: 10_000, processes: [snapshot(1, 11), snapshot(2, 40)] },
+      ],
+      "arrived",
+    );
+    expect(arrived.processes).toEqual([{ type: "renderer", cpuPercent: 10, processes: 1 }]);
+    const departed = summarize(
+      [
+        { atMs: 0, processes: [snapshot(1, 10), snapshot(3, 5)] },
+        { atMs: 10_000, processes: [snapshot(1, 11)] },
+      ],
+      "departed",
+    );
+    expect(departed.processes).toEqual([{ type: "renderer", cpuPercent: 10, processes: 1 }]);
+  });
+
+  it("drops a pid whose counter went backwards, which means it was recycled", () => {
+    const report = summarize(
+      [
+        { atMs: 0, processes: [snapshot(1, 10)] },
+        { atMs: 10_000, processes: [snapshot(1, 2)] },
+      ],
+      "recycled",
+    );
+    expect(report.processes).toEqual([]);
+    expect(report.totalCpuPercent).toBe(0);
   });
 
   it("reports an empty run rather than dividing by zero", () => {
