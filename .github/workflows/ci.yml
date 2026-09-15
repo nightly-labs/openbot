@@ -21,8 +21,13 @@ env:
 
 jobs:
   check:
+    # `check:desktop` is this job and `browser` together, in that order. Only the
+    # browser smoke test needs a macOS runner, and it was 83s of the 141s these
+    # two used to take in series on one. Nothing here reads what that test
+    # writes, so the two run side by side. The install is the full one: this job
+    # builds with electron-vite, which resolves the `electron` package.
     name: Check
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Check out repository
@@ -32,7 +37,24 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Check desktop application
-        run: bun run check:desktop
+        run: bun run check:desktop:static
+
+  browser:
+    # The smoke test starts the real Electron binary and opens windows, so it
+    # needs a desktop session rather than a container. It stays on macOS, where
+    # the runner provides one and where the shipped application is built.
+    name: Browser smoke
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Run the browser smoke test
+        run: bun run test:browser
 
   tests:
     # ubuntu-latest gives 4 vCPUs, and `vitest.config.ts` asks for all four under
@@ -209,7 +231,7 @@ jobs:
     # `apps/auth-api`, which `api` already covers: mobile, the site router, the
     # team client and the remote stack all consume the account API, so a red
     # Surfaces is the signal that this deploy is the thing about to break them.
-    needs: [check, tests, api, storybook, surfaces]
+    needs: [check, browser, tests, api, storybook, surfaces]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production

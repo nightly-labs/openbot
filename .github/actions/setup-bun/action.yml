@@ -1,10 +1,10 @@
 name: Set up Bun
 description: >-
-  Install the repository's pinned Bun and Node and, unless the job installs
-  later, its dependencies, restoring the Bun package store and the Electron
-  download from the cache first. Node is not optional: every caller builds, packages
-  or tests something that needs it. Checkout is the caller's job: a composite action in
-  this repository cannot run before the repository is on disk.
+  Install the repository's pinned Bun and Node and, unless the job installs later,
+  its dependencies, restoring the Bun package store from the cache first. Node is
+  not optional: every caller builds, packages or tests something that needs it.
+  Checkout is the caller's job: a composite action in this repository cannot run
+  before the repository is on disk.
 
   `remote-desktop-runtime.yml` deliberately does not use this action. Its
   toolchain is part of a versioned build recipe: the workflow makes a change to
@@ -58,21 +58,6 @@ runs:
         # A lockfile change re-downloads only what moved, rather than all 1295
         # packages.
         restore-keys: bun-store-${{ runner.os }}-
-
-    # Only the modes that run `postinstall` reach `install-electron`, and an
-    # `ignore-scripts` job would otherwise save an empty directory under the key
-    # the jobs that do need Electron read back. `install-skia` copies inside
-    # `node_modules` and downloads nothing, so it needs no entry here. Both cache
-    # paths are listed because `@electron/get` picks one by platform; the path
-    # that does not exist on this runner is skipped.
-    - name: Cache the Electron download
-      if: inputs.install != 'ignore-scripts'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: |
-          ~/Library/Caches/electron
-          ~/.cache/electron
-        key: electron-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
     - name: Install dependencies
       if: inputs.install != 'none'
