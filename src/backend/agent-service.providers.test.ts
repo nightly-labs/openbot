@@ -406,7 +406,7 @@ describe.sequential("AgentService: providers", () => {
         );
         expect(instructions).toContain("required user input or approval");
         expect(instructions).toContain("If the user asks for a detailed coordination report, provide it");
-        expect(instructions).toContain("explicitly send the result back");
+        expect(instructions).toContain("send the result back in the Status/Result/Evidence format");
         expect(instructions).toContain("Do not create acknowledgement loops");
         expect(instructions).not.toContain("When you receive a reply, summarize it for the user");
         await service.stop();
