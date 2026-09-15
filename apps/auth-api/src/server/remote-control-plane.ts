@@ -7,6 +7,7 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import { importJWK, type JWK, SignJWT } from "jose";
+import { hmacSha256, randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -988,25 +989,6 @@ function invalid(name: string): RemoteControlPlaneError {
   return new RemoteControlPlaneError(400, "invalid_remote_request", `The ${name} is invalid.`);
 }
 
-function randomToken(): string {
-  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
-}
-
-async function sha256(value: string): Promise<string> {
-  return bytesToBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
-}
-
-async function hmacSha256(secret: string, value: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  return bytesToBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))));
-}
-
 export async function verifyRemoteServiceSignature(
   secret: string,
   body: string,
@@ -1039,12 +1021,6 @@ function decodeBase64Url(value: string): ArrayBuffer {
   const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
   return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)).buffer;
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
 function parseJwk(value: string): JWK {
