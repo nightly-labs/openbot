@@ -8,10 +8,10 @@ export default defineConfig({
   test: {
     execArgv: ["--disable-warning=ExperimentalWarning"],
     globals: true,
-    // GitHub's runners have four vCPUs, and vitest's default holds one back for
-    // the main process, which is idle while the workers run. Locally the default
-    // is the right one: it leaves a core for everything else a developer runs.
-    ...(process.env.CI ? { maxWorkers: 4 } : {}),
+    // The worker count is left to vitest, which uses one less than the machine
+    // reports. Asking a four-vCPU runner for a fourth worker was measured and is
+    // slower, not faster: it took the run from 100.6s to 125.7s, and every phase
+    // with it, because the workers then contend with the main process.
     // Every spy, global patch and fake timer a test file installs is undone
     // after each test, in both projects, so nothing depends on file order.
     restoreMocks: true,

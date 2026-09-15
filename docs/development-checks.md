@@ -82,8 +82,15 @@ under both `vmThreads` and the previous `forks` default. Use that flag when chan
 a green run in the default order proves nothing here.
 
 The `node` project stays on isolated `forks`. Its files register IPC handlers and read
-per-process globals, so they fail on `threads` whether or not isolation is on, and it spends its
-time in the tests themselves rather than in environment setup, so it has little to gain.
+per-process globals, so they fail on `threads` whether or not isolation is on, and on `vmForks`
+they fail on the filesystem; it also spends its time in the tests themselves rather than in
+environment setup, so it has little to gain.
+
+The worker count is left to vitest, which uses one less than the machine reports. A four-vCPU
+runner given a fourth worker is slower, not faster: the run went from 100.6s to 125.7s, and every
+phase with it, because the workers then contend with the main process. `deps.optimizer` is also
+not enabled: it left `import` unchanged, at 26.1s against 26.2s, because that phase is this
+repository's own module graph re-executing per file rather than dependency resolution.
 
 ### The `App.*.test.tsx` files are not at the wrong boundary
 
