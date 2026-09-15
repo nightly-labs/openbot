@@ -197,3 +197,20 @@ it("routes steer, delete and reorder to the original host and expected turn", as
   });
   expect(boundary.changeQueue).toHaveBeenLastCalledWith("agent", "host", "cancel", { deliveryId: delivery.id });
 });
+
+it("clears a rejected begin but preserves an uncertain begin for recovery", async () => {
+  const { QueueEditRejectedError } = await import("@openbot/contracts/team-protocol/queue-edit-v1");
+  boundary.editQueue.mockRejectedValueOnce(new QueueEditRejectedError("Already held"));
+  const view = mount();
+  await act(async () => {
+    await view.state().begin(delivery);
+  });
+  expect(view.state().edit).toBeNull();
+  expect(boundary.storage.size).toBe(0);
+  boundary.editQueue.mockRejectedValueOnce(new Error("Connection lost"));
+  await act(async () => {
+    await view.state().begin(delivery);
+  });
+  expect(view.state().edit?.delivery.id).toBe(delivery.id);
+  expect(boundary.storage.size).toBe(1);
+});

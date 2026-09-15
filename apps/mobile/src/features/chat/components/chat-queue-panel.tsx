@@ -158,7 +158,7 @@ export const ChatQueuePanel = memo(function ChatQueuePanel({
   const open = expanded || visible.length === 1;
   const locked = queue.busy || !queue.online || disabled;
   const maxHeight = Math.min(240 * Math.min(fontScale, 1.5), height * 0.28);
-  if (!visible.length && !pending && !queue.edit && !queue.error && !queue.loading) return null;
+  if (!visible.length && !pending && !queue.edit && !queue.loading) return null;
   function row({ item }: { item: QueueDelivery }) {
     return (
       <View className="flex-row items-center gap-1 px-3 py-1">

@@ -199,7 +199,13 @@ describe("mobile conversation windows", () => {
       createdAt: "2026-09-10T10:00:03Z",
     });
     frame();
-    expect(store.get("agent")?.messages.map((item) => item.id)).toEqual(["test-1", "reply-1", "test-2", "test-3"]);
+    expect(store.get("agent")?.messages.map((item) => item.id)).toEqual(["test-1", "test-2", "test-3", "reply-1"]);
+    expect(projectChatMessages(store.get("agent")?.messages ?? []).map((item) => item.id)).toEqual([
+      "test-1",
+      "reply-1",
+      "test-2",
+      "test-3",
+    ]);
   });
 
   it("sorts a loaded page by turn so late answers stay with their question", () => {
@@ -236,7 +242,7 @@ describe("mobile conversation windows", () => {
       references: {},
       pageInfo: { hasOlder: false, olderCursor: null },
     });
-    expect(store.get("agent")?.messages.map((item) => item.id)).toEqual([
+    expect(projectChatMessages(store.get("agent")?.messages ?? []).map((item) => item.id)).toEqual([
       "hej",
       "reply-1",
       "hej-2",
@@ -244,6 +250,58 @@ describe("mobile conversation windows", () => {
       "hej-3",
       "hej-4",
     ]);
+  });
+
+  it("retains storage-order history before an overlapping latest page", () => {
+    const { store } = setup();
+    const messages: ConversationMessage[] = [
+      {
+        id: "q1",
+        author: "user",
+        source: "user",
+        text: "First",
+        turnId: "turn-1",
+        status: "completed",
+        createdAt: "2026-09-10T10:00:00Z",
+      },
+      {
+        id: "q2",
+        author: "user",
+        source: "user",
+        text: "Second",
+        turnId: "turn-2",
+        status: "completed",
+        createdAt: "2026-09-10T10:00:01Z",
+      },
+      {
+        id: "r1",
+        author: "assistant",
+        source: "assistant",
+        text: "Answer",
+        turnId: "turn-1",
+        status: "completed",
+        createdAt: "2026-09-10T10:00:02Z",
+      },
+    ];
+    const page = {
+      agentId: "agent",
+      threadId: "thread",
+      activeTurnId: null,
+      revision: 1,
+      messages,
+      references: {},
+      pageInfo: { hasOlder: true, olderCursor: "older" },
+    };
+    store.applyPage(page);
+    store.applyPage({
+      ...page,
+      revision: 2,
+      messages: [messages[2]],
+      pageInfo: { hasOlder: true, olderCursor: "at-r1" },
+    });
+    expect(store.get("agent")?.messages.map((item) => item.id)).toEqual(["q1", "q2", "r1"]);
+    expect(projectChatMessages(store.get("agent")?.messages ?? []).map((item) => item.id)).toEqual(["q1", "r1", "q2"]);
+    expect(store.get("agent")?.pageInfo.olderCursor).toBe("older");
   });
 
   it("shares a pending page request and refreshes again when invalidated during the request", async () => {

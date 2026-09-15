@@ -1633,6 +1633,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const held = queueEdits.get(input.editId);
         if (!held || held.agentId !== input.agentId || held.delivery.id !== input.deliveryId)
           throw new Error("This edit is no longer available.");
+        if (input.action === "retain-attachments") return structuredClone(queue);
         queueEdits.delete(input.editId);
         const delivery =
           input.action === "save"

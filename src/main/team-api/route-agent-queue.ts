@@ -1,4 +1,8 @@
-import { decodeQueueEditRequest, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import {
+  decodeQueueEditRequest,
+  QueueEditRejectedError,
+  TEAM_QUEUE_EDIT_CAPABILITY,
+} from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { HttpError } from "./http-error";
 // One agent's outgoing queue, and the ways a member can change their mind about it.
 //
@@ -36,7 +40,12 @@ export async function routeAgentQueue(
   if (method === "POST" && action === "queue/edit") {
     if (context.protocol < 3 || !context.capabilities.has(TEAM_QUEUE_EDIT_CAPABILITY))
       throw new HttpError(400, "This client does not support queue editing.");
-    return json(200, await agents.editQueuedMessage(agentId, decodeQueueEditRequest(await readJson(request))));
+    try {
+      return json(200, await agents.editQueuedMessage(agentId, decodeQueueEditRequest(await readJson(request))));
+    } catch (error) {
+      if (error instanceof QueueEditRejectedError) throw new HttpError(409, error.message);
+      throw error;
+    }
   }
   if (method === "GET" && action === "queue") {
     return json(200, agents.listQueue(agentId));

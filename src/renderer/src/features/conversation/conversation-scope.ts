@@ -303,6 +303,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const { startVoiceRecording, stopVoiceRecording } = voice;
   const actions = createComposerActions({
     props,
+    attachmentBusy,
     agentReady,
     drafts,
     setDrafts,
@@ -465,7 +466,7 @@ export function createConversationViewScope(props: ConversationProps) {
       } else if (event.type === "error") {
         const target = resources.importTargetAgents.get(event.requestId);
         resources.importTargetAgents.delete(event.requestId);
-        setAttachmentBusy(false);
+        setAttachmentBusy(resources.importTargetAgents.size > 0);
         if (target) {
           setConversationErrors((current) => ({
             ...current,
@@ -473,12 +474,14 @@ export function createConversationViewScope(props: ConversationProps) {
           }));
         }
       } else {
-        setAttachmentBusy(false);
         const target = resources.importTargetAgents.get(event.requestId);
-        resources.importTargetAgents.delete(event.requestId);
         if (target) {
-          addAttachments(event.attachments, target);
+          void addAttachments(event.attachments, target).finally(() => {
+            resources.importTargetAgents.delete(event.requestId);
+            setAttachmentBusy(resources.importTargetAgents.size > 0);
+          });
         } else {
+          setAttachmentBusy(resources.importTargetAgents.size > 0);
           for (const attachment of event.attachments) {
             void window.openbot.agent.discardDraftAttachment(attachment.id, event.serverId);
           }

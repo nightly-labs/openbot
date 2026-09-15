@@ -414,6 +414,7 @@ export function ConversationComposer() {
                           : "Send message"
                     }
                     disabled={
+                      attachmentBusy() ||
                       submitting() ||
                       selectionSending() ||
                       !agentReady() ||

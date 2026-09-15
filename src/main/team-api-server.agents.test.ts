@@ -1,4 +1,5 @@
 import { isAgentSummary } from "@openbot/contracts/ipc";
+import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 // @vitest-environment node
 
@@ -63,6 +64,13 @@ describe("TeamApiServer agents", () => {
     const accepted = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
     expect(accepted.status).toBe(200);
     expect(editQueuedMessage).toHaveBeenCalledExactlyOnceWith("chief", input);
+    editQueuedMessage.mockRejectedValueOnce(new QueueEditRejectedError("Held by another device"));
+    const rejected = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
+    expect(rejected.status).toBe(409);
+    editQueuedMessage.mockRejectedValueOnce(new Error("Disk write failed"));
+    const uncertain = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
+    expect(uncertain.ok).toBe(false);
+    expect(uncertain.status).not.toBe(409);
   });
 
   it.each(["", "   ", "Plan trips"])("creates an agent through the API with description %j", async (description) => {

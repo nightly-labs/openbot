@@ -28,6 +28,31 @@ afterEach(async () => {
 });
 
 describe("MailboxStore", () => {
+  it("preserves edit attachment bytes across restart and clears unrelated drafts", async () => {
+    const file = join(root, "pasted.txt");
+    await writeFile(file, "Pasted bytes");
+    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const id = receipt.deliveries[0].id;
+    store.beginQueueEdit("chief", id, "edit-files");
+    const [kept] = await store.prepareImportedAttachments([file], []);
+    const [unrelated] = await store.prepareImportedAttachments([file], []);
+    store.retainQueueEditAttachments("chief", id, "edit-files", [kept.id]);
+    await expect(
+      store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Other", draftIds: [kept.id] }),
+    ).rejects.toThrow("belongs to a queue edit");
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    await expect(restored.updateQueuedMessage("chief", id, "Edited", [], [unrelated.id], "edit-files")).rejects.toThrow(
+      "no longer exists",
+    );
+    await restored.updateQueuedMessage("chief", id, "Edited", [], [kept.id], "edit-files");
+    const next = restored.nextQueued("chief");
+    expect(next?.delivery.text).toBe("Edited");
+    expect(next?.delivery.attachments).toHaveLength(1);
+    const saved = await restored.resolveAttachment(next?.delivery.attachments[0].id ?? "");
+    await expect(readFile(saved?.path ?? "", "utf8")).resolves.toBe("Pasted bytes");
+  });
+
   it("rolls back failed hold, save and release writes without changing the message", async () => {
     const database = new OpenBotDatabase(join(root, "user-data"));
     const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);

@@ -80,7 +80,7 @@ import {
   skillConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
-import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
@@ -1581,7 +1581,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async editQueuedMessage(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {
     if (this.#mailbox.queueEditFinished(agentId, input.deliveryId, input.editId)) {
-      if (input.action === "begin") throw new Error("This edit has already finished.");
+      if (input.action === "begin" || input.action === "retain-attachments")
+        throw new QueueEditRejectedError("This edit has already finished.");
       if (input.action === "save")
         await Promise.all(input.attachmentDraftIds.map((id) => this.#mailbox.discardDraft(id)));
       this.#drain.scheduleDrain(agentId);
@@ -1592,6 +1593,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       throw new Error("Use the channel task controls for this assignment.");
     if (input.action === "begin") this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId);
     else {
+      if (input.action === "retain-attachments")
+        this.#mailbox.retainQueueEditAttachments(agentId, input.deliveryId, input.editId, input.attachmentDraftIds);
       if (input.action === "save") {
         await this.#mailbox.updateQueuedMessage(
           agentId,

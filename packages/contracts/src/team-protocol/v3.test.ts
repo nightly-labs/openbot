@@ -84,6 +84,14 @@ describe("Team protocol v3", () => {
       { encode: encodeTeamProtocolV4CurrentHttpRequest, decode: decodeTeamProtocolV4CurrentHttpRequest },
     ]) {
       expect(decode("POST", path, JSON.parse(encode("POST", path, body)))).toEqual(body);
+      const retain = {
+        action: "retain-attachments",
+        deliveryId: "delivery-1",
+        editId: "edit-1",
+        attachmentDraftIds: ["draft-1"],
+      };
+      expect(decode("POST", path, JSON.parse(encode("POST", path, retain)))).toEqual(retain);
+      expect(() => encode("POST", path, { ...retain, attachmentDraftIds: [42] })).toThrow("Invalid queue edit request");
       expect(() => encode("POST", path, { ...body, keepAttachmentIds: [42] })).toThrow("Invalid queue edit request");
     }
     expect(encodeTeamProtocolV3WebRtcHttpRequest("POST", path, body)).toEqual(body);

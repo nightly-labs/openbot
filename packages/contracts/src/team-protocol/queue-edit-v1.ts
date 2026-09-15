@@ -5,6 +5,7 @@ import { isDynamicRecord } from "../runtime-values";
 export const TEAM_QUEUE_EDIT_CAPABILITY = "queue-edit-v1";
 export type QueueEditRequest =
   | { action: "begin" | "cancel"; deliveryId: string; editId: string }
+  | { action: "retain-attachments"; deliveryId: string; editId: string; attachmentDraftIds: string[] }
   | {
       action: "save";
       deliveryId: string;
@@ -24,6 +25,18 @@ export function decodeQueueEditRequest(value: unknown): QueueEditRequest {
   if (value.action === "begin" || value.action === "cancel")
     return { action: value.action, deliveryId: value.deliveryId, editId: value.editId };
   if (
+    value.action === "retain-attachments" &&
+    Array.isArray(value.attachmentDraftIds) &&
+    value.attachmentDraftIds.length <= INPUT_LIMITS.attachments &&
+    value.attachmentDraftIds.every(isIdentifier)
+  )
+    return {
+      action: value.action,
+      deliveryId: value.deliveryId,
+      editId: value.editId,
+      attachmentDraftIds: value.attachmentDraftIds,
+    };
+  if (
     value.action !== "save" ||
     !isBoundedString(value.text, INPUT_LIMITS.messageText) ||
     !Array.isArray(value.keepAttachmentIds) ||
@@ -41,4 +54,13 @@ export function decodeQueueEditRequest(value: unknown): QueueEditRequest {
     keepAttachmentIds: value.keepAttachmentIds,
     attachmentDraftIds: value.attachmentDraftIds,
   };
+}
+
+export class QueueEditRejectedError extends Error {
+  constructor(message: string) {
+    super(`Queue edit rejected: ${message}`);
+  }
+}
+export function isQueueEditRejected(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Queue edit rejected: ");
 }

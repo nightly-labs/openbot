@@ -252,6 +252,7 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   "agent.analytics",
   "analytics",
   // Additive v3 routes: peers without the capability receive 400 before any JSON success body.
+  "agent.queueEdit",
   "agents.generateProfile",
   "agents.saveProfile",
   // Same reason, one adapter deeper: v3 rewrites this to the `read` path before the v1 codec sees a

@@ -1,4 +1,5 @@
 import type { QueueDelivery } from "@openbot/contracts/ipc";
+import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { userErrorMessage } from "@openbot/user-errors";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
@@ -38,12 +39,9 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   // An edit request in flight still owns the outcome: the queue can report the
   // delivery as started before the host answers, which flashes the finished
   // notice on every edit. Settle the request first; a genuinely gone delivery
-  // shows the notice (with the request error) right after.
+  // marks the edit unavailable after the request completes.
   const editUnavailable = Boolean(
-    edit &&
-      !busy &&
-      query.data &&
-      query.data.deliveries.some((item) => item.id === edit.delivery.id && item.status !== "queued"),
+    edit && !busy && query.data?.deliveries.some((item) => item.id === edit.delivery.id && item.status !== "queued"),
   );
   const queued = useMemo(() => orderedQueue(query.data?.deliveries ?? []), [query.data]);
   // Persist typing after a pause, without blocking each key event. The edit identity is
@@ -126,6 +124,9 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
           action: "begin",
           deliveryId: delivery.id,
           editId: next.editId,
+        }).catch(async (cause) => {
+          if (isQueueEditRejected(cause)) await clearEdit();
+          throw cause;
         });
         if (!next.initialized) {
           const currentDelivery = currentQueue.deliveries.find(
@@ -146,7 +147,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
         setConfirmed(true);
       });
     },
-    [edit, run, storageKey, editQueue, agentId, serverId],
+    [edit, run, storageKey, editQueue, agentId, serverId, clearEdit],
   );
   const save = useCallback(
     async (text: string, files: ChatAttachment[]) => {

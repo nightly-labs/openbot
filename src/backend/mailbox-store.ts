@@ -25,6 +25,7 @@ import {
   isMessageReaction,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { redactText } from "@openbot/logging";
 import {
   AttachmentFiles,
@@ -143,11 +144,19 @@ export class MailboxStore {
       await this.#database.backupLegacyFile(this.#statePath);
       await this.#persist("mailbox.legacy-imported", "legacy-import:mailbox:v1");
     }
-    if (this.#state.drafts.length > 0) {
-      this.#state.drafts = [];
+    const activeEdits = new Set(
+      this.#state.deliveries
+        .filter((delivery) => delivery.status === "queued" && delivery.editId)
+        .map((delivery) => delivery.editId),
+    );
+    const retainedDrafts = this.#state.drafts.filter(
+      (draft) => draft.ownerEditId && activeEdits.has(draft.ownerEditId),
+    );
+    if (retainedDrafts.length !== this.#state.drafts.length) {
+      this.#state.drafts = retainedDrafts;
       await this.#persist("mailbox.drafts-cleared");
     }
-    await this.#files.resetDrafts();
+    await this.#files.resetDrafts(retainedDrafts.map((draft) => draft.id));
     await this.#drainFileDeletionOutbox();
   }
 
@@ -228,6 +237,7 @@ export class MailboxStore {
     const drafts = (input.draftIds ?? []).map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
       if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      if (draft.ownerEditId) throw new Error("An attachment belongs to a queue edit.");
       return draft;
     });
     if (drafts.length !== new Set(input.draftIds ?? []).size) {
@@ -322,6 +332,7 @@ export class MailboxStore {
     const drafts = input.draftIds.map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
       if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      if (draft.ownerEditId) throw new Error("An attachment belongs to a queue edit.");
       return draft;
     });
     if (drafts.length > MAX_ATTACHMENTS) throw new Error(`Attach at most ${MAX_ATTACHMENTS} files.`);
@@ -879,15 +890,41 @@ export class MailboxStore {
   beginQueueEdit(agentId: string, deliveryId: string, editId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
-    if (delivery?.status !== "queued") throw new Error("This queued message is no longer available.");
+    if (delivery?.status !== "queued") throw new QueueEditRejectedError("This queued message is no longer available.");
     if (delivery.editId && delivery.editId !== editId)
-      throw new Error("This message is being edited on another device.");
+      throw new QueueEditRejectedError("This message is being edited on another device.");
     const previous = delivery.editId;
     delivery.editId = editId;
     try {
       this.#persist("delivery.edit-started");
     } catch (error) {
       delivery.editId = previous;
+      throw error;
+    }
+  }
+
+  retainQueueEditAttachments(agentId: string, deliveryId: string, editId: string, draftIds: string[]): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    if (delivery?.status !== "queued" || delivery.editId !== editId)
+      throw new QueueEditRejectedError("This edit is no longer available.");
+    if (draftIds.length > MAX_ATTACHMENTS || new Set(draftIds).size !== draftIds.length)
+      throw new Error("Invalid edit attachment count.");
+    const drafts = draftIds.map((id) => {
+      const draft = this.#state.drafts.find((item) => item.id === id);
+      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      return draft;
+    });
+    if (drafts.some((draft) => draft.ownerEditId && draft.ownerEditId !== editId))
+      throw new Error("An attachment belongs to another edit.");
+    const previous = drafts.map((draft) => draft.ownerEditId);
+    for (const draft of drafts) draft.ownerEditId = editId;
+    try {
+      this.#persist("delivery.edit-attachments-retained");
+    } catch (error) {
+      drafts.forEach((draft, index) => {
+        draft.ownerEditId = previous[index];
+      });
       throw error;
     }
   }
@@ -901,7 +938,7 @@ export class MailboxStore {
   finishQueueEdit(agentId: string, deliveryId: string, editId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
-    if (!delivery || delivery.editId !== editId) throw new Error("This edit is no longer available.");
+    if (!delivery || delivery.editId !== editId) throw new QueueEditRejectedError("This edit is no longer available.");
     const previousFinished = delivery.finishedEditId;
     delivery.finishedEditId = editId;
     delete delivery.editId;
@@ -963,6 +1000,7 @@ export class MailboxStore {
     const drafts = attachmentDraftIds.map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
       if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      if (draft.ownerEditId && draft.ownerEditId !== editId) throw new Error("An attachment belongs to another edit.");
       return draft;
     });
     if (keepAttachmentIds.length + drafts.length > MAX_ATTACHMENTS) {
@@ -1470,7 +1508,12 @@ function isStoredGeneratedAttachment(value: unknown): value is StoredGeneratedAt
 }
 
 function isStoredDraft(value: unknown): value is StoredDraft {
-  return isRecord(value) && isString(value.createdAt) && isStoredAttachment(value);
+  return (
+    isRecord(value) &&
+    isString(value.createdAt) &&
+    (value.ownerEditId === undefined || isString(value.ownerEditId)) &&
+    isStoredAttachment(value)
+  );
 }
 
 function isStoredMessage(value: unknown): value is StoredMessage {
