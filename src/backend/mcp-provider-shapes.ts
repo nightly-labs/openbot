@@ -11,10 +11,10 @@ const execFileAsync = promisify(execFile);
 /** Where a provider client reads the enabled configurations at spawn. */
 export type McpServerSource = () => readonly McpServerConfig[];
 
-/** A configuration with its stdio command and directory resolved, or the reason it cannot start. */
+/** A configuration with its stdio command, directory and `PATH` resolved, or why it cannot start. */
 export type UsableMcpServer =
-  | { config: McpServerConfig; command: string; workingDirectory: string; error?: undefined }
-  | { config: McpServerConfig; command?: undefined; workingDirectory?: undefined; error: string };
+  | { config: McpServerConfig; command: string; workingDirectory: string; path: string | null; error?: undefined }
+  | { config: McpServerConfig; command?: undefined; workingDirectory?: undefined; path?: undefined; error: string };
 
 /**
  * The enabled configurations a provider can actually be given.
@@ -40,10 +40,11 @@ export async function usableMcpServers(configs: readonly McpServerConfig[]): Pro
  * before turning it on - so this one, unlike `usableMcpServers`, does not filter.
  */
 export async function usableMcpServer(config: McpServerConfig): Promise<UsableMcpServer> {
-  if (config.transport !== "stdio") return { config, command: "", workingDirectory: "" };
-  const command = await resolveMcpCommand(config.command);
+  // An http server starts no process, so it needs neither a command nor a `PATH`.
+  if (config.transport !== "stdio") return { config, command: "", workingDirectory: "", path: null };
+  const [command, path] = await Promise.all([resolveMcpCommand(config.command), loginShellPath()]);
   if (!command) return { config, error: `Command not found: ${config.command}` };
-  return { config, command, workingDirectory: resolveMcpWorkingDirectory(config.workingDirectory) };
+  return { config, command, workingDirectory: resolveMcpWorkingDirectory(config.workingDirectory), path };
 }
 
 /**
@@ -103,6 +104,48 @@ export async function resolveMcpCommand(command: string): Promise<string | null>
 }
 
 /**
+ * This user's own `PATH`, as their login shell builds it, or `null` when it cannot be read.
+ *
+ * Read once per run and reused, because every hand-off and every test would otherwise start a login
+ * shell of its own. Windows has no equivalent: `where.exe` runs against the process `PATH` already.
+ */
+let loginShellPathOnce: Promise<string | null> | null = null;
+
+export function loginShellPath(): Promise<string | null> {
+  loginShellPathOnce ??= readLoginShellPath();
+  return loginShellPathOnce;
+}
+
+async function readLoginShellPath(): Promise<string | null> {
+  if (process.platform === "win32") return null;
+  try {
+    const shell = loginShellCommand();
+    const { stdout } = await execFileAsync(shell.command, [...shell.args, 'printf %s "$PATH"'], {
+      timeout: 5_000,
+      maxBuffer: 64 * 1024,
+    });
+    // `printf` writes no newline, so the value is the last line whatever the user's profile printed
+    // before it.
+    return stdout.split(/\r?\n/u).pop()?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The environment a stdio MCP server is launched with, `PATH` included.
+ *
+ * The login shell that found the command holds the `PATH` that makes it run: an `npx` or `uvx`
+ * installed by nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so it needs that same `PATH`
+ * to find its own runtime. An app the user started from Finder or a launcher inherits none of it,
+ * which is a server that tests green from a terminal and fails everywhere else. The configuration's
+ * own pairs are applied last, so a `PATH` the user wrote there still wins.
+ */
+export function mcpLaunchEnvironment(server: UsableMcpServer): Record<string, string> {
+  return { ...(server.path ? { PATH: server.path } : {}), ...mcpEnvironment(server.config) };
+}
+
+/**
  * The environment a stdio MCP server starts with, beyond the provider's own.
  *
  * `envPassthrough` is spent here and nowhere else: it names the variables this machine already
@@ -135,7 +178,7 @@ export function claudeMcpServers(servers: readonly UsableMcpServer[]): Record<st
             type: "stdio",
             command: server.command,
             args: [...config.args],
-            env: mcpEnvironment(config),
+            env: mcpLaunchEnvironment(server),
             ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
           }
         : { type: "http", url: config.url, headers: headerRecord(config) };
@@ -166,7 +209,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): AcpMcpServer
         name: config.name,
         command: server.command,
         args: [...config.args],
-        env: Object.entries(mcpEnvironment(config)).map(([name, value]) => ({ name, value })),
+        env: Object.entries(mcpLaunchEnvironment(server)).map(([name, value]) => ({ name, value })),
       });
     } else {
       entries.push({
@@ -200,7 +243,7 @@ export function codexMcpServers(servers: readonly UsableMcpServer[]): Record<str
     record[server.config.name] = {
       command: server.command,
       args: [...server.config.args],
-      env: mcpEnvironment(server.config),
+      env: mcpLaunchEnvironment(server),
     };
   }
   return record;

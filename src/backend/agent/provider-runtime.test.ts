@@ -25,6 +25,7 @@ import type { AgentStore } from "../agent-store";
 
 import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
+import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
 
 let root: string;
@@ -910,6 +911,51 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(events.filter((event) => event.type === "error")).toEqual([
       expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': rejected •••" }),
     ]);
+  });
+
+  // A CLI reports a failure by quoting what it sent, and that line can be long enough for the bound
+  // on a diagnostic to fall inside the credential. Redacted whole first, the bound cuts text that no
+  // longer holds the value; the other way round it would leave the head of one on screen.
+  it("redacts an MCP credential a long diagnostic quotes past the length a line is held to", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    // What a spawn reads. The process holds this server, so its failure stays visible to the user.
+    expect(service.enabledMcpServers()).toHaveLength(1);
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+
+    // The credential starts just before the bound, so a line shortened first would keep its head.
+    const opening = "Failed to spawn MCP server 'Filesystem': rejected ";
+    const filler = ".".repeat(DIAGNOSTIC_TEXT_LIMIT - 5 - opening.length);
+    client.emit("diagnostic", `${opening}${filler}abcdef123456 after the bound`);
+
+    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
+    const [error] = events.filter((event) => event.type === "error");
+    expect(error?.type === "error" && error.message.length).toBeLessThanOrEqual(DIAGNOSTIC_TEXT_LIMIT);
+    expect(error?.type === "error" && error.message).not.toContain("abcde");
   });
 
   it("redacts an MCP credential a provider error quotes, not only a diagnostic", async () => {

@@ -41,6 +41,7 @@ import {
   type ProviderClientContext,
   requireProviderDriver,
 } from "./../provider-drivers";
+import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -1471,8 +1472,9 @@ export class ProviderRuntime implements ProviderPort {
       ]);
       // Redacted before the first use, not at each one. A CLI reports an MCP failure by quoting
       // what it sent, so an API key or an inherited credential is in the line that is about to be
-      // logged or turned into a renderer error event.
-      const message = this.#redactMcp(raw);
+      // logged or turned into a renderer error event. Shortened after that, because a value cut in
+      // half is a value the redactor does not match.
+      const message = shortenDiagnostic(this.#redactMcp(raw));
       if (isMcpSubsystemDiagnostic(message, [...names])) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
         return;

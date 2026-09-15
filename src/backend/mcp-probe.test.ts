@@ -38,6 +38,12 @@ const PAGED_SERVER = FAKE_SERVER.replace(
             : { tools: [{ name: "one", inputSchema: { type: "object" } }, { name: "two", inputSchema: { type: "object" } }], nextCursor: "page-2" };`,
 );
 
+// The same wire, behind the startup log a server writes before it answers. The write is synchronous,
+// as a Rust or Python server's logging is, so an unread pipe stops the process at 64 KB.
+const NOISY_SERVER = `import { writeSync } from "node:fs";
+for (let block = 0; block < 16; block += 1) writeSync(2, "noise".repeat(13_107) + "\\n");
+${FAKE_SERVER}`;
+
 const roots: string[] = [];
 
 afterEach(async () => {
@@ -77,6 +83,11 @@ describe("testMcpServer", () => {
   // The count answers "what would an agent get", and an agent is given every tool, not a first page.
   it("counts the tools on every page a server answers with", async () => {
     expect(await testMcpServer(await scriptConfig(PAGED_SERVER))).toEqual({ toolCount: 3, error: null });
+  });
+
+  // Nothing reads the child's stderr, so a piped one fills and holds the server before it answers.
+  it("answers for a server that writes a long startup log to stderr", async () => {
+    expect(await testMcpServer(await scriptConfig(NOISY_SERVER), 2_000)).toEqual({ toolCount: 2, error: null });
   });
 
   // A test answers for the configuration in front of the user, which they may not have enabled yet.

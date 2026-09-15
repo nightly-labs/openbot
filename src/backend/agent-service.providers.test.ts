@@ -25,12 +25,22 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+import { loginShellPath } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 let root: string;
 let logPath: string;
 let service: AgentService | null = null;
+
+/**
+ * What a stdio MCP server is launched with: this user's own `PATH`, then the configuration's pairs.
+ * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
+ */
+async function launchEnvironment(pairs: Record<string, string> = {}): Promise<Record<string, string>> {
+  const path = await loginShellPath();
+  return { ...(path ? { PATH: path } : {}), ...pairs };
+}
 
 beforeEach(async () => {
   ({ root, logPath } = await startAgentTestFixture());
@@ -336,7 +346,9 @@ describe.sequential("AgentService: providers", () => {
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(starts).toHaveLength(2);
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
-      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: { TOKEN: "secret" } } },
+      mcp_servers: {
+        Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment({ TOKEN: "secret" }) },
+      },
     });
   });
 
@@ -396,7 +408,7 @@ describe.sequential("AgentService: providers", () => {
     // `Database` is left out: the Codex configuration shape for a working directory is unconfirmed,
     // and a server told to open `./data.db` from the wrong place creates a second database.
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
-      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: {} } },
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
     });
   });
 
@@ -474,7 +486,7 @@ describe.sequential("AgentService: providers", () => {
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(starts).toHaveLength(2);
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
-      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: {} } },
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
     });
   });
 
@@ -619,7 +631,7 @@ describe.sequential("AgentService: providers", () => {
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(starts).toHaveLength(2);
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
-      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: {} } },
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
     });
   });
 

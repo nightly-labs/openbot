@@ -410,12 +410,13 @@ describe("OpenCode ACP MCP servers", () => {
     // The first session is the model probe the client opens in its own directory; the thread is the
     // last one.
     const params = JSON.parse(logged.at(-1) ?? "{}");
-    // ACP takes an array whose env is `{ name, value }` pairs, not a record.
+    // ACP takes an array whose env is `{ name, value }` pairs, not a record. The launch `PATH` is
+    // in there as well, which `claude-client.test.ts` covers.
     expect(params.mcpServers[0]).toMatchObject({
       name: "Filesystem",
       command: "/bin/echo",
       args: ["ready"],
-      env: [{ name: "TOKEN", value: "secret" }],
+      env: expect.arrayContaining([{ name: "TOKEN", value: "secret" }]),
     });
     // A disabled server is not sent, and OpenBot's own bridge entries append after these, so a
     // user's server can never displace one. `Database` is not sent either: ACP carries no working

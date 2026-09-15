@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { createMemo, createStore, For, Show } from "solid-js";
+import { createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import {
   AlertDialog,
   Badge,
@@ -172,6 +172,10 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   const visible = (key: "name" | "command" | "url") => (state.touched ? errors()[key] : undefined);
   const removeTarget = createMemo(() => props.servers.find((config) => config.id === state.removeId) ?? null);
   const disabled = () => !props.canManage || state.busy !== null;
+  // The dialog holds the form's breadcrumb and save bar, and it outlives this panel: the capability
+  // gate that shows the panel drops it while the section stays on MCP. Without this the header would
+  // name a form that is gone, and its save bar would call back into a panel that no longer exists.
+  onCleanup(() => props.onDetailChange?.(null));
 
   async function run(key: string, action: () => Promise<void>): Promise<boolean> {
     if (state.busy !== null) return false;

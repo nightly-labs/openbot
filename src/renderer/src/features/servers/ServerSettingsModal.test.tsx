@@ -282,6 +282,27 @@ describe("ServerSettingsModal", () => {
     expect(onTestMcpServer).toHaveBeenCalledTimes(1);
   });
 
+  // The gate can close under an open form: a remote host that answers without the capability, or a
+  // role that loses it. The dialog keeps the breadcrumb and the save bar, so the panel has to take
+  // them back with it.
+  it("drops the MCP form's breadcrumb when the panel is no longer shown", async () => {
+    const [servers, setServers] = createSignal<McpServerConfig[] | undefined>([]);
+    render(() => <ServerSettingsModal {...props({ mcpServers: servers() })} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Connect a custom MCP" }));
+    expect(await screen.findByText("Connect to a custom MCP")).toBeInTheDocument();
+
+    setServers(undefined);
+    await waitFor(() => expect(screen.queryByRole("tab", { name: "MCP" })).not.toBeInTheDocument());
+
+    // The gate opens again on the next read, and the panel it builds starts on the list.
+    setServers([]);
+    await fireEvent.click(await screen.findByRole("tab", { name: "MCP" }));
+    expect(await screen.findByRole("button", { name: "Connect a custom MCP" })).toBeInTheDocument();
+    expect(screen.queryByText("Connect to a custom MCP")).not.toBeInTheDocument();
+  });
+
   it("saves the first local identity without publishing it", async () => {
     const onSaveIdentity = vi.fn(async () => undefined);
     const onSetPublished = vi.fn(async () => undefined);

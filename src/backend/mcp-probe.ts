@@ -5,7 +5,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { mcpEnvironment, type UsableMcpServer, usableMcpServer } from "./mcp-provider-shapes";
+import { mcpLaunchEnvironment, type UsableMcpServer, usableMcpServer } from "./mcp-provider-shapes";
 import { redactMcpSecrets } from "./mcp-redaction";
 
 export const MCP_PROBE_TIMEOUT_MS = 10_000;
@@ -112,13 +112,18 @@ function createTransport(server: UsableMcpServer): Transport {
     // The resolved directory, not the stored one: process creation does not expand a leading `~`,
     // which the form's own example uses.
     ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
-    // The SDK default first, then the names the user asked to pass through, then the user's own
-    // pairs. `envPassthrough` has no other meaning anywhere in OpenBot; this is where it is spent.
+    // The SDK default first, then this user's own `PATH`, the names the user asked to pass through,
+    // and the user's own pairs. `envPassthrough` has no other meaning anywhere in OpenBot; this is
+    // where it is spent. The launch environment is the providers' as well, so what the panel tests
+    // is what an agent starts.
     env: {
       ...getDefaultEnvironment(),
-      ...mcpEnvironment(config),
+      ...mcpLaunchEnvironment(server),
     },
-    stderr: "pipe",
+    // Discarded, not piped. Nothing here reads that pipe, so a server that writes its startup log to
+    // stderr - which a Rust or Python server does with a blocking write - fills the 64 KB buffer and
+    // stops before it answers the handshake. The probe would report a timeout for a working server.
+    stderr: "ignore",
   });
 }
 

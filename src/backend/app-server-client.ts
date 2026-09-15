@@ -236,9 +236,13 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 }
 
+/**
+ * The record as it leaves this client. It is not shortened here: the reader redacts the MCP
+ * credentials this process handed the CLI, and a value cut in half by a bound applied first is a
+ * value that redactor no longer recognises. `shortenDiagnostic` is applied there instead.
+ */
 export function redactDiagnostic(message: string): string {
   return message
     .replace(/(?:sk|sess|Bearer|token)[-_a-zA-Z0-9.=]{8,}/gi, "[redacted]")
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
-    .slice(0, 2_000);
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]");
 }

@@ -11,6 +11,7 @@ import { z } from "zod";
 import { AgentStore } from "./agent-store";
 import { ClaudeAgentClient } from "./claude-client";
 import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
+import { loginShellPath } from "./mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 import {
   decodeAccountRateLimitsReadResult,
@@ -1112,6 +1113,42 @@ it("hands the enabled MCP servers to the spawn and keeps the bridge names", asyn
     expect(servers.Filesystem).toMatchObject({ type: "stdio", command: "/bin/echo", args: ["ready"] });
     expect(servers.Disabled).toBeUndefined();
     expect(isDynamicRecord(servers.openbot) ? servers.openbot.instance : null).toBeTruthy();
+  } finally {
+    await client.stop();
+  }
+});
+
+// A `npx` or `uvx` from nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so the server needs
+// the `PATH` the login shell found it on. An app the user started from Finder inherits none of it.
+it("launches an MCP server with this user's own PATH, and lets a configured value win", async () => {
+  const query = new TestQuery(new TestQueue<TestStreamMessage>());
+  const spawned: DynamicRecord[] = [];
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    (params) => {
+      if (isDynamicRecord(params.options)) spawned.push(params.options);
+      return query;
+    },
+    undefined,
+    undefined,
+    () => [
+      mcpConfig({ id: "mcp-1", name: "Filesystem" }),
+      mcpConfig({ id: "mcp-2", name: "Own path", env: [{ key: "PATH", value: "/only/here" }] }),
+    ],
+  );
+  client.start();
+  try {
+    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    const servers = isDynamicRecord(spawned.at(-1)?.mcpServers) ? spawned.at(-1)?.mcpServers : {};
+    const environment = (name: string): DynamicRecord => {
+      const server = isDynamicRecord(servers) ? servers[name] : null;
+      const env = isDynamicRecord(server) ? server.env : null;
+      return isDynamicRecord(env) ? env : {};
+    };
+    const path = await loginShellPath();
+    expect(path).toBeTruthy();
+    expect(environment("Filesystem").PATH).toBe(path);
+    expect(environment("Own path").PATH).toBe("/only/here");
   } finally {
     await client.stop();
   }
