@@ -2,7 +2,7 @@
 // changes app state needs --allow-mutations. This tool never seeds, resets or
 // copies openbot.db: it drives the instance you already have open.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import {
   assertMutationAllowed,
@@ -217,6 +217,23 @@ function readComparisonReport(path: string) {
   return report;
 }
 
+// `--out` names a file under the report directory, and only there. `resolve`
+// alone would follow an absolute path or a `../` out of it and write wherever
+// it landed, which is not what the flag is documented to do. The developer who
+// passes the flag already has a shell and needs no help writing elsewhere, so
+// this is not a privilege boundary - it keeps a mistyped path from putting a
+// report somewhere nobody thinks to look, and makes the documented promise true.
+function cpuReportPath(out: string): string {
+  const path = resolve(CPU_ROOT, out);
+  const inside = relative(CPU_ROOT, path);
+  // `..foo.json` is a legal file name, so the test is for a `..` segment, not
+  // for a `..` prefix.
+  if (inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+    throw new Error(`--out=${out} must name a file under ${CPU_ROOT}.`);
+  }
+  return path;
+}
+
 async function measureCpu(target: AutomationTarget): Promise<void> {
   const durationMs = readMilliseconds("--duration", DEFAULT_CPU_DURATION_MS, MIN_CPU_INTERVAL_MS, MAX_CPU_DURATION_MS);
   const intervalMs = readMilliseconds("--interval", DEFAULT_CPU_INTERVAL_MS, MIN_CPU_INTERVAL_MS, durationMs);
@@ -234,7 +251,7 @@ async function measureCpu(target: AutomationTarget): Promise<void> {
   const document = baseline ? { ...profile, delta: compareProfiles(baseline, profile) } : profile;
   const out = flagValue("--out");
   if (out !== null && out !== "") {
-    const path = resolve(CPU_ROOT, out);
+    const path = cpuReportPath(out);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`);
     logger.info(`wrote ${redactText(path)}`);
