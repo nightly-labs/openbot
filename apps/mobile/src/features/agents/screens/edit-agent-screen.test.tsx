@@ -22,7 +22,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ChatTarget } from "@/features/chat/model/chat-target";
 import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
-import { MobileChannelStore } from "../../channels/model/channel-store";
+import { ChannelHistoryRefreshError, MobileChannelStore } from "../../channels/model/channel-store";
 import { ChannelActionsScreen } from "../../channels/screens/channel-actions-screen";
 import { ChannelFormScreen } from "../../channels/screens/channel-form-screen";
 import { ChatHeader } from "../../chat/components/chat-header";
@@ -1333,10 +1333,15 @@ it("keeps a failed action in the sheet for retry and supports reassign", async (
   actionTasks = [failedAction];
   await act(() => root.render(<ChannelActionsScreen />));
   await waitFor(() => expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy());
+  mocks.uuid.mockReturnValueOnce("task-one").mockReturnValueOnce("task-two");
   failChannelSave = true;
   await click("Resume");
   await waitFor(() => expect(screen.getByText("Could not save this channel.")).toBeTruthy());
   expect(screen.getByRole("button", { name: "Resume" })).toHaveProperty("disabled", false);
+  await click("Resume");
+  const retries = channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command);
+  expect(retries).toHaveLength(2);
+  expect(retries[1][1]).toEqual(retries[0][1]);
   failChannelSave = false;
   await click("Reassign");
   await click("Travel");
@@ -1345,6 +1350,26 @@ it("keeps a failed action in the sheet for retry and supports reassign", async (
     CHANNEL_ROUTES.command,
     expect.objectContaining({ type: "reassign", taskId: failedAction.id, recipientAgentId: original.id }),
   );
+});
+
+it("retries only history after a task action was accepted", async () => {
+  actionTasks = [failedAction];
+  await act(() => root.render(<ChannelActionsScreen />));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy());
+  const refresh = vi
+    .spyOn(workspace.channelStore, "refreshHistory")
+    .mockRejectedValueOnce(new ChannelHistoryRefreshError("History unavailable"))
+    .mockRejectedValueOnce(new ChannelHistoryRefreshError("History still unavailable"));
+  await click("Resume");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Refresh history" })).toBeTruthy());
+  expect(screen.getByRole("button", { name: "Resume" })).toHaveProperty("disabled", true);
+  await click("Refresh history");
+  expect(screen.getByRole("button", { name: "Resume" })).toHaveProperty("disabled", true);
+  await click("Refresh history");
+  await waitFor(() => expect(screen.getByText("No actions needed.")).toBeTruthy());
+  expect(screen.queryByRole("button", { name: "Refresh history" })).toBeNull();
+  expect(channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command)).toHaveLength(1);
+  refresh.mockRestore();
 });
 
 vi.mock("expo-linking", () => ({ openURL: vi.fn() }));

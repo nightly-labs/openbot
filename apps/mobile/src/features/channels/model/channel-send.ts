@@ -8,6 +8,8 @@ type SendCommand = Extract<ChannelCommand, { type: "send" }>;
 
 /** Retain uploads and the operation ID when delivery is uncertain. */
 export class ChannelSend {
+  private activeSends = 0;
+  private disposed = false;
   private failed: SendCommand | null = null;
   private uploaded = new Map<string, string>();
   constructor(
@@ -18,6 +20,21 @@ export class ChannelSend {
   ) {}
 
   async send(
+    text: string,
+    files: ChatAttachment[],
+    replyToMessageId: string | null,
+    members: ChannelMember[],
+  ): Promise<ChatHistoryReceipt | null> {
+    this.activeSends++;
+    try {
+      return await this.performSend(text, files, replyToMessageId, members);
+    } finally {
+      this.activeSends--;
+      if (this.disposed) this.dispose();
+    }
+  }
+
+  private async performSend(
     text: string,
     files: ChatAttachment[],
     replyToMessageId: string | null,
@@ -74,9 +91,13 @@ export class ChannelSend {
   }
 
   dispose() {
-    for (const id of this.uploaded.values()) {
-      if (!this.failed?.attachmentDraftIds.includes(id))
+    this.disposed = true;
+    if (this.activeSends) return;
+    for (const [key, id] of this.uploaded) {
+      if (!this.failed?.attachmentDraftIds.includes(id)) {
+        this.uploaded.delete(key);
         void this.store.discard(this.serverId, id).catch(() => undefined);
+      }
     }
   }
 }

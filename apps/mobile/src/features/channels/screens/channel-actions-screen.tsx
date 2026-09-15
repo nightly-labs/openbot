@@ -1,12 +1,13 @@
 import { userErrorMessage } from "@openbot/user-errors";
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams } from "expo-router";
-import { Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { ChannelTaskActions } from "../components/channel-task-actions";
 import { useChannels } from "../components/use-channels";
+import { ChannelHistoryRefreshError } from "../model/channel-store";
 import { channelTasksNeedingAction } from "../model/channel-task-actions";
 
 export function ChannelActionsScreen() {
@@ -23,24 +24,61 @@ export function ChannelActionsScreen() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
-  async function command(taskId: string, type: "resume" | "reassign", recipientAgentId: string | null = null) {
-    if (lock.current || !online || !channel || channel.archived || !tasks.some((task) => task.id === taskId)) return;
+  const operations = useRef(new Map<string, string>());
+  const [historyPending, setHistoryPending] = useState(false);
+  async function refreshHistory() {
+    if (lock.current || !online) return;
     lock.current = true;
     setPending(true);
     setError(null);
+    try {
+      await state.store.refreshHistory(
+        serverId,
+        channelId,
+        "The task was changed, but chat history could not refresh.",
+      );
+      setHistoryPending(false);
+    } catch (cause) {
+      setError(userErrorMessage(cause, "Could not refresh task history. Try again."));
+    } finally {
+      lock.current = false;
+      setPending(false);
+    }
+  }
+  async function command(taskId: string, type: "resume" | "reassign", recipientAgentId: string | null = null) {
+    if (
+      lock.current ||
+      historyPending ||
+      !online ||
+      !channel ||
+      channel.archived ||
+      !tasks.some((task) => task.id === taskId)
+    )
+      return;
+    lock.current = true;
+    setPending(true);
+    setError(null);
+    const signature = JSON.stringify([serverId, channelId, taskId, type, recipientAgentId]);
+    const operationId = operations.current.get(signature) ?? Crypto.randomUUID();
+    operations.current.set(signature, operationId);
     try {
       await state.store.command(
         serverId,
         {
           type,
-          operationId: Crypto.randomUUID(),
+          operationId,
           channelId,
           taskId,
           recipientAgentId,
         },
         { waitForRefresh: true },
       );
+      operations.current.delete(signature);
     } catch (cause) {
+      if (cause instanceof ChannelHistoryRefreshError) {
+        operations.current.delete(signature);
+        setHistoryPending(true);
+      }
       setError(userErrorMessage(cause, "Could not change this task. Try again."));
     } finally {
       lock.current = false;
@@ -54,11 +92,16 @@ export function ChannelActionsScreen() {
         members={members}
         online={online}
         archived={channel?.archived ?? false}
-        pending={pending}
+        pending={pending || historyPending}
         onCommand={(...args) => {
           void command(...args);
         }}
       />
+      {historyPending ? (
+        <Button variant="ghost" isDisabled={pending || !online} onPress={() => void refreshHistory()}>
+          <Button.Label>Refresh history</Button.Label>
+        </Button>
+      ) : null}
       {!tasks.length ? (
         <Typography.Paragraph>
           {!page ? (state.error ?? "Loading actions…") : "No actions needed."}
