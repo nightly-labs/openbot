@@ -2,6 +2,7 @@ import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, usePreventZoomTransitionDismissal } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
+import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useChannels } from "../components/use-channels";
@@ -57,6 +58,16 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       });
   }, [state.store, serverId, channelId, throughSequence]);
   const canSend = online && Boolean(channel) && !channel?.archived;
+  const [selectedPromptId, selectPrompt] = useState<string | null>(null);
+  const pendingPrompts = messages.filter((message) => message.kind === "question" && !message.prompt.resolution);
+  const activePrompt = pendingPrompts.find((message) => message.id === selectedPromptId) ?? pendingPrompts[0];
+  const promptAuthor = page?.messages.find((message) => message.id === activePrompt?.id)?.author;
+  const questionForm = useQuestionPrompt(
+    promptAuthor?.kind === "agent" ? promptAuthor.id : "",
+    activePrompt?.kind === "question" ? activePrompt : undefined,
+    canSend,
+    (agentId, input) => state.store.respondToPrompt(serverId, channelId, agentId, input),
+  );
   return (
     <ChatView
       target={{ kind: "channel", id: channelId, serverId, name: channel?.name ?? "Channel", members }}
@@ -69,6 +80,8 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       canSend={canSend}
       activities={activities}
       activeTurnId={null}
+      questionForm={questionForm}
+      onSelectQuestion={selectPrompt}
       readBoundary={throughSequence ? String(throughSequence) : null}
       markRead={markRead}
       fetchHistory={() => {

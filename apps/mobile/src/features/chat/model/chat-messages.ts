@@ -118,6 +118,17 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
 const projectedChannelMessages = new WeakMap<ChannelMessage, { self: boolean; message: ChatMessage }>();
 
 function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessage {
+  if (entry.message.questionPrompt) {
+    return {
+      id: entry.id,
+      kind: "question",
+      turnId: entry.message.turnId,
+      prompt:
+        entry.superseded && !entry.message.questionPrompt.resolution
+          ? { ...entry.message.questionPrompt, resolution: { status: "expired" } }
+          : entry.message.questionPrompt,
+    };
+  }
   if (entry.author.kind === "agent" && entry.message.author === "system" && entry.taskId) {
     const assignment = /^Assigned to (.+)\.$/.exec(entry.message.text);
     if (assignment) return { id: entry.id, kind: "assignment", agentName: assignment[1] };
@@ -146,7 +157,7 @@ function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessag
 /** Keep channel authors explicit: another human member is not the current user. */
 export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
   return messages
-    .filter((entry) => entry.message.text.trim() || entry.message.attachments?.length)
+    .filter((entry) => entry.message.questionPrompt || entry.message.text.trim() || entry.message.attachments?.length)
     .map((entry) => {
       const self = entry.author.kind === "member" && entry.author.id === memberId;
       const cached = projectedChannelMessages.get(entry);

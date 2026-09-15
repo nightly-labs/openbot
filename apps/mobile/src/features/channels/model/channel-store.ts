@@ -11,6 +11,7 @@ import {
   decodeChannelRoutines,
   decodeChannelSummaries,
   isAttachmentSummary,
+  type RespondToPromptInput,
   type UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -19,6 +20,7 @@ import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/cont
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { userErrorMessage } from "@openbot/user-errors";
 import { replaceEqualDeep } from "@tanstack/react-query";
+import { answeredPromptResolution } from "../../chat/model/question-prompt";
 
 export type ChannelRequest = <T>(
   method: string,
@@ -273,6 +275,55 @@ export class MobileChannelStore {
       olderCursor: page.olderCursor,
     });
     this.publish(entry, { pages });
+  }
+  async respondToPrompt(serverId: string, channelId: string, agentId: string, input: RespondToPromptInput) {
+    const entry = this.entry(serverId);
+    const page = entry.state.pages.get(channelId);
+    const message = page?.messages.find(
+      (item) =>
+        item.author.kind === "agent" &&
+        item.author.id === agentId &&
+        !item.superseded &&
+        item.message.questionPrompt?.requestId === input.requestId &&
+        !item.message.questionPrompt.resolution,
+    );
+    const prompt = message?.message.questionPrompt;
+    if (!prompt || page?.channel.archived) throw new Error("This form is no longer available.");
+    await this.request(
+      "POST",
+      TEAM_API_ROUTES.respond.prompt,
+      () => undefined,
+      {
+        requestId: input.requestId,
+        answers: input.answers,
+      },
+      serverId,
+    );
+    // A successful answer stays resolved even if the history refresh loses connection.
+    const current = entry.state.pages.get(channelId);
+    if (entry.valid && current) {
+      const pages = new Map(entry.state.pages);
+      pages.set(channelId, {
+        ...current,
+        messages: current.messages.map((item) =>
+          item.id === message.id && item.message.questionPrompt && !item.message.questionPrompt.resolution
+            ? {
+                ...item,
+                message: {
+                  ...item.message,
+                  questionPrompt: {
+                    ...item.message.questionPrompt,
+                    resolution: answeredPromptResolution(prompt.questions, input.answers),
+                  },
+                },
+              }
+            : item,
+        ),
+      });
+      entry.writes++;
+      this.publish(entry, { pages });
+      void this.refresh(serverId, channelId);
+    }
   }
   async command(serverId: string, command: ChannelCommand, options?: { waitForRefresh: boolean }) {
     const entry = this.entry(serverId);

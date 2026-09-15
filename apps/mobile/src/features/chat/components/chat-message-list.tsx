@@ -94,6 +94,7 @@ interface ChatMessageListProps {
   appActive: boolean;
   activeTurnId: string | null;
   questionForm?: QuestionPromptController;
+  onSelectQuestion?: (messageId: string) => void;
   fieldBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
@@ -128,6 +129,7 @@ export function ChatMessageList({
   appActive,
   activeTurnId,
   questionForm,
+  onSelectQuestion,
   fieldBackground,
   foreground,
   historyState,
@@ -196,7 +198,9 @@ export function ChatMessageList({
   const tailIndex = visibleMessages.findLastIndex((message) => message.kind === "message" && message.author === "user");
   const tailId = visibleMessages[tailIndex]?.id ?? null;
   const [boundary, setBoundary] = useState<ChatHistoryBoundary>({ firstId: null, headId: null });
-  const windowStart = chatHistoryStart(visibleMessages, tailIndex, boundary);
+  const promptIndex = visibleMessages.findIndex((message) => message.id === questionForm?.messageId);
+  const historyStart = chatHistoryStart(visibleMessages, tailIndex, boundary);
+  const windowStart = promptIndex >= 0 ? Math.min(historyStart, promptIndex) : historyStart;
   const firstId = visibleMessages[windowStart]?.id ?? null;
   const headId = visibleMessages[0]?.id ?? null;
   if (boundary.firstId !== firstId || boundary.headId !== headId) setBoundary({ firstId, headId });
@@ -253,6 +257,7 @@ export function ChatMessageList({
           prompt={message.prompt}
           controller={message.id === questionForm?.messageId ? questionForm : undefined}
           canSend={canSend}
+          onActivate={onSelectQuestion ? () => onSelectQuestion(message.id) : undefined}
         />
       ) : (
         <Animated.View

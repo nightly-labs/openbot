@@ -50,6 +50,7 @@ export interface ChatViewProps {
   activities?: MobileAgentActivity[];
   activeTurnId: string | null;
   questionForm?: QuestionPromptController;
+  onSelectQuestion?: (messageId: string) => void;
   readBoundary: string | null;
   markRead: () => void;
   fetchHistory: () => void;
@@ -87,6 +88,7 @@ export function ChatView({
   activities,
   activeTurnId,
   questionForm,
+  onSelectQuestion,
   readBoundary,
   markRead,
   fetchHistory,
@@ -360,6 +362,7 @@ export function ChatView({
               appActive={appActive}
               activeTurnId={activeTurnId}
               questionForm={questionForm}
+              onSelectQuestion={onSelectQuestion}
               fieldBackground={fieldBackground}
               foreground={foreground}
               messages={messages}

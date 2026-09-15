@@ -5,6 +5,7 @@ import {
   type ChannelSummary,
   type ChannelTask,
 } from "@openbot/contracts/ipc";
+import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { createWorkspacePreferences } from "@openbot/team-client";
@@ -70,6 +71,119 @@ function deferred<T>() {
 }
 
 describe("mobile channels", () => {
+  it("preserves empty channel forms and expires superseded prompts", () => {
+    const history = page(1, 1);
+    const message = history.messages[0];
+    message.message.text = "";
+    message.message.questionPrompt = {
+      requestId: "question-one",
+      questions: [{ id: "choice", header: "Choice", question: "Which option?", isSecret: false, options: null }],
+      resolution: null,
+    };
+    const projected = projectChannelMessages(history.messages, null);
+    expect(projected).toEqual([
+      {
+        id: message.id,
+        kind: "question",
+        turnId: undefined,
+        prompt: message.message.questionPrompt,
+      },
+    ]);
+    expect(projectChannelMessages([{ ...message, superseded: true }], null)[0]).toMatchObject({
+      kind: "question",
+      prompt: { resolution: { status: "expired" } },
+    });
+    expect(projectChannelMessages(history.messages, null)[0]).toBe(projected[0]);
+  });
+
+  it("answers the channel form on its host without needing a single-chat snapshot", async () => {
+    const history = page(1, 2);
+    for (const [index, message] of history.messages.entries()) {
+      message.author = { kind: "agent", id: "agent-two", name: "Research" };
+      message.message.questionPrompt = {
+        requestId: `question-${index}`,
+        questions: [{ id: "secret", header: "Secret", question: "Enter value", isSecret: true, options: null }],
+        resolution: null,
+      };
+    }
+    let answered = false;
+    const { store, calls } = fixture(async (path) => {
+      if (path === TEAM_API_ROUTES.respond.prompt) {
+        answered = true;
+        return {};
+      }
+      if (answered) throw new Error("Connection lost after answer");
+      return path === CHANNEL_ROUTES.list ? [channel] : history;
+    });
+    const release = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    await expect(
+      store.respondToPrompt("host-one", channel.id, "agent-one", {
+        requestId: "question-0",
+        answers: {},
+      }),
+    ).rejects.toThrow("This form is no longer available.");
+    await store.respondToPrompt("host-one", channel.id, "agent-two", {
+      requestId: "question-0",
+      answers: { secret: ["private-value"] },
+    });
+    expect(calls).toHaveBeenCalledWith(
+      TEAM_API_ROUTES.respond.prompt,
+      {
+        requestId: "question-0",
+        answers: { secret: ["private-value"] },
+      },
+      "host-one",
+    );
+    await store.refresh("host-one");
+    const messages = store.get("host-one").pages.get(channel.id)?.messages;
+    expect(messages?.[0].message.questionPrompt?.resolution).toEqual({
+      status: "answered",
+      responses: { secret: { status: "answered" } },
+    });
+    expect(messages?.[1].message.questionPrompt?.resolution).toBeNull();
+    expect(JSON.stringify(messages)).not.toContain("private-value");
+    await expect(
+      store.respondToPrompt("host-one", channel.id, "agent-two", {
+        requestId: "question-0",
+        answers: {},
+      }),
+    ).rejects.toThrow("This form is no longer available.");
+    release();
+  });
+
+  it("keeps a rejected prompt answer available for retry and supports cancellation", async () => {
+    const history = page(1, 1);
+    const message = history.messages[0];
+    message.author = { kind: "agent", id: "agent-two", name: "Research" };
+    message.message.questionPrompt = {
+      requestId: "question-one",
+      questions: [{ id: "choice", header: "Choice", question: "Which option?", isSecret: false, options: null }],
+      resolution: null,
+    };
+    let attempts = 0;
+    const { store } = fixture(async (path) => {
+      if (path === TEAM_API_ROUTES.respond.prompt) {
+        if (++attempts === 1) throw new Error("Offline");
+        const prompt = message.message.questionPrompt;
+        if (!prompt) throw new Error("Missing prompt fixture");
+        message.message.questionPrompt = { ...prompt, resolution: { status: "cancelled" } };
+        return {};
+      }
+      return path === CHANNEL_ROUTES.list ? [channel] : history;
+    });
+    const release = store.observe("host-one", channel.id);
+    await store.refresh("host-one");
+    const input = { requestId: "question-one", answers: {} };
+    await expect(store.respondToPrompt("host-one", channel.id, "agent-two", input)).rejects.toThrow("Offline");
+    expect(store.get("host-one").pages.get(channel.id)?.messages[0].message.questionPrompt?.resolution).toBeNull();
+    await store.respondToPrompt("host-one", channel.id, "agent-two", input);
+    expect(store.get("host-one").pages.get(channel.id)?.messages[0].message.questionPrompt?.resolution).toEqual({
+      status: "cancelled",
+    });
+    release();
+  });
+
   it("keeps a reconnect refresh queued when the previous connection fails", async () => {
     const oldConnection = deferred<unknown>();
     let reads = 0;
