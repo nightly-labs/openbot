@@ -4,8 +4,9 @@ import { basename, join } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
+  createTestService,
   FakeAgentClient,
   fakeBrowser,
   startAgentTestFixture,
@@ -70,11 +71,10 @@ function uploadBrowser() {
 async function startService(browser: ReturnType<typeof uploadBrowser>["browser"]) {
   const clients = new Map<AgentProvider, FakeAgentClient>();
   const { store, mailbox } = stores(root);
-  service = new AgentService({
+  service = createTestService({
     store,
     mailbox,
     browser,
-    requestTimeoutMs: 30_000,
     preferredProvider: "codex",
     clientFactory: (provider) => {
       const client = new FakeAgentClient(provider);

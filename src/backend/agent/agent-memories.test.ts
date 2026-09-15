@@ -2,10 +2,10 @@
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
+  createTestService,
   FakeAgentClient,
-  fakeBrowser,
   notification,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -29,11 +29,9 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
   it("commits an automatic memory only after a successful turn and refreshes the next turn context", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);
@@ -86,11 +84,9 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
   it("discards staged memories after a failed turn and preserves a concurrent manual edit", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);

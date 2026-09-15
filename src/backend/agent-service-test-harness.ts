@@ -10,7 +10,7 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { expect, vi } from "vitest";
 import type { BrowserUploadHooks } from "./agent/browser-uploads";
 import type { AgentClient, AgentProvider } from "./agent-client";
-import type { AgentService } from "./agent-service";
+import { AgentService, type AgentServiceOptions } from "./agent-service";
 import { AgentStore } from "./agent-store";
 import { MailboxStore } from "./mailbox-store";
 import {
@@ -361,6 +361,17 @@ export function fakeBrowser(tabs: BrowserTab[] = [], uploadTarget = { inputId: "
       return { success: true, contentItems: [] };
     },
   };
+}
+
+/**
+ * `AgentService` with the arguments every test here would otherwise repeat. The browser stub and the
+ * request timeout are harness defaults, not assertions: a test that cares about either one passes its
+ * own value and overrides the default.
+ */
+export function createTestService(
+  options: Partial<AgentServiceOptions> & Pick<AgentServiceOptions, "store" | "mailbox">,
+): AgentService {
+  return new AgentService({ browser: fakeBrowser(), requestTimeoutMs: 30_000, ...options });
 }
 
 export function nextRoutinesChanged(agentService: AgentService, agentId: string): Promise<void> {

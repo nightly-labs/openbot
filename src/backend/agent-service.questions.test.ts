@@ -1,12 +1,12 @@
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProvider } from "./agent-client";
-import { AgentService } from "./agent-service";
+import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
+  createTestService,
   FakeAgentClient,
-  fakeBrowser,
   notification,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -30,11 +30,9 @@ describe.sequential("AgentService: questions", () => {
   it("does not use a question prompt summary as the completed assistant reply", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);
@@ -86,11 +84,9 @@ describe.sequential("AgentService: questions", () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);

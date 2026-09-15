@@ -5,15 +5,15 @@ import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
-import { AgentService } from "./agent-service";
+import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
   callOpenBotTool,
   createFakeClaude,
   createFakeGrok,
   createFakeOpencode,
+  createTestService,
   FakeAgentClient,
-  fakeBrowser,
   firstInputText,
   inputRecords,
   notification,
@@ -44,11 +44,9 @@ describe.sequential("AgentService: queue", () => {
   it("updates the active account and new-agent defaults with the preferred provider", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "claude",
     });
 
@@ -123,11 +121,9 @@ describe.sequential("AgentService: queue", () => {
     process.chdir(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -183,11 +179,9 @@ describe.sequential("AgentService: queue", () => {
     const metadataReleased = new Promise<void>((resolve) => {
       releaseMetadata = resolve;
     });
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) =>
         new FakeAgentClient(provider, "DONE", true, true, {}, async (method) => {
@@ -210,11 +204,9 @@ describe.sequential("AgentService: queue", () => {
   it("keeps a connected provider and surfaces its account refresh warning", async () => {
     const { store, mailbox } = stores(root);
     let accountReads = 0;
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) =>
         new FakeAgentClient(provider, "DONE", true, true, {}, async (method) => {
@@ -238,7 +230,7 @@ describe.sequential("AgentService: queue", () => {
 
   it("removes a new Agent and its workspace when the first message cannot enter the queue", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     vi.spyOn(mailbox, "enqueue").mockRejectedValueOnce(new Error("Queue write failed."));
 
@@ -252,11 +244,9 @@ describe.sequential("AgentService: queue", () => {
   it("removes queued profile creation on receipt failure and runs only the successful retry", async () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex");
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: () => client,
     });
@@ -336,11 +326,9 @@ describe.sequential("AgentService: queue", () => {
       store.database.close();
       const restarted = stores(root);
       const client = new FakeAgentClient("codex");
-      service = new AgentService({
+      service = createTestService({
         store: restarted.store,
         mailbox: restarted.mailbox,
-        browser: fakeBrowser(),
-        requestTimeoutMs: 30_000,
         preferredProvider: "codex",
         clientFactory: () => client,
       });
@@ -363,7 +351,7 @@ describe.sequential("AgentService: queue", () => {
 
   it("keeps the agent model and thread when a lazy provider cannot start", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("chief");
     const threadId = await store.ensureThreadId("chief");
@@ -380,7 +368,7 @@ describe.sequential("AgentService: queue", () => {
   it("starts the second provider when an agent selects its model", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("chief");
 
@@ -405,11 +393,9 @@ describe.sequential("AgentService: queue", () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -465,11 +451,9 @@ describe.sequential("AgentService: queue", () => {
     let rejectTurnStart = true;
     let grokClient: FakeAgentClient | undefined;
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, undefined, true, true, {}, async (method) => {
@@ -514,11 +498,9 @@ describe.sequential("AgentService: queue", () => {
       let rejectResume = false;
       let providerClient: FakeAgentClient | undefined;
       const { store, mailbox } = stores(root);
-      service = new AgentService({
+      service = createTestService({
         store,
         mailbox,
-        browser: fakeBrowser(),
-        requestTimeoutMs: 30_000,
         preferredProvider: "codex",
         clientFactory: (provider) => {
           const client = new FakeAgentClient(provider, "PROVIDER_DONE", true, true, {}, async (method) => {
@@ -573,11 +555,9 @@ describe.sequential("AgentService: queue", () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const output = provider === "codex" ? "X".repeat(250_000) : "CLAUDE_DONE";
@@ -606,7 +586,7 @@ describe.sequential("AgentService: queue", () => {
 
   it("starts a new thread with the persisted onboarding remit", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("chief");
     await service.updateAgent({
@@ -638,7 +618,7 @@ describe.sequential("AgentService: queue", () => {
 
   it("keeps rapid messages in FIFO order before the first turn-start event is observed", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
 
     await service.sendMessage({ agentId: "chief", text: "Start immediately" });
@@ -656,11 +636,9 @@ describe.sequential("AgentService: queue", () => {
   it("keeps each completed response after the queued message that started its turn", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -719,7 +697,7 @@ describe.sequential("AgentService: queue", () => {
 
   it("queues FIFO instead of steering and continues draining after an interrupt", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -761,11 +739,9 @@ describe.sequential("AgentService: queue", () => {
   it("steers a queued delivery into the active turn and completes it with that turn", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "CODEX_DONE", false);
@@ -825,11 +801,9 @@ describe.sequential("AgentService: queue", () => {
     const { store, mailbox } = stores(root);
     const imagePath = join(root, "codex-image.png");
     await writeFile(imagePath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
@@ -914,11 +888,9 @@ describe.sequential("AgentService: queue", () => {
   it("falls back to Codex base64 image results without persisting the encoded payload", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
@@ -977,11 +949,9 @@ describe.sequential("AgentService: queue", () => {
   it("keeps failed and interrupted image generations visible in the conversation", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
@@ -1054,11 +1024,9 @@ describe.sequential("AgentService: queue", () => {
   it("marks an active image generation interrupted before a late Codex result arrives", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
@@ -1135,11 +1103,9 @@ describe.sequential("AgentService: queue", () => {
       failInstall = reject;
     });
     const { store, mailbox } = stores(root);
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
@@ -1205,7 +1171,7 @@ describe.sequential("AgentService: queue", () => {
 
   it("says which channel a message waits for, and runs it when that work ends", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("chief");
 
@@ -1266,7 +1232,7 @@ describe.sequential("AgentService: queue", () => {
   it("waits for active queue drains before shutdown completes", async () => {
     process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "100";
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
 
     await service.sendMessage({ agentId: "chief", text: "Stop during startup" });
@@ -1286,7 +1252,7 @@ describe.sequential("AgentService: queue", () => {
     ]);
     process.env.OPENBOT_FAKE_AGENT_TOOL_PATHS = JSON.stringify([notePath, imagePath]);
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await Promise.all([store.getOrCreate("sales-outbound"), store.getOrCreate("inbox-manager")]);
     await service.sendMessage({ agentId: "chief", text: "Coordinate the team" });
@@ -1375,11 +1341,9 @@ describe.sequential("AgentService: queue", () => {
     const sidebar = new SidebarLayoutStore(sidebarPath);
     await sidebar.initialize();
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: provider,
       clientFactory: (selectedProvider) => {
         const client = new FakeAgentClient(selectedProvider);
@@ -1457,11 +1421,9 @@ describe.sequential("AgentService: queue", () => {
     await sidebar.initialize();
     const changes: unknown[] = [];
     sidebar.on("changed", (layout) => changes.push(layout));
-    service = new AgentService({
+    service = createTestService({
       store,
       mailbox,
-      browser: fakeBrowser(),
-      requestTimeoutMs: 30_000,
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
@@ -1632,7 +1594,7 @@ describe.sequential("AgentService: queue", () => {
       },
     ]);
     const { store, mailbox } = stores(root);
-    service = new AgentService({ store, mailbox, browser: fakeBrowser() });
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("design", "Designer", "Design");
     await service.sendMessage({ agentId: "chief", text: "Update the design teammate." });
