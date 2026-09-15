@@ -107,18 +107,47 @@ export class ChannelStore {
    * the host's signed-out messages are unread for them until they read them.
    */
   list(memberId: string, signedOutMessagesAreTheirs = false): ChannelSummary[] {
-    return databaseRows(
-      this.database.connection.prepare("SELECT channel_json FROM projection_channels ORDER BY rowid").all(),
-    ).map((row) => {
+    // The sidebar is rebuilt on every `channels-changed`, and a streaming reply emits those while
+    // it arrives. One query returns every summary: the previous per-channel latest-message, unread,
+    // and task queries made this O(channels x queries) per stream frame.
+    const excludedId = signedOutMessagesAreTheirs ? SIGNED_OUT_CHANNEL_MEMBER_ID : memberId;
+    const rows = databaseRows(
+      this.database.connection
+        .prepare(
+          `SELECT c.channel_json AS channel_json,
+            (SELECT m.message_json FROM projection_channel_messages AS m
+              WHERE m.channel_id = c.channel_id
+              ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
+            (SELECT COUNT(*) FROM projection_channel_messages AS m
+              WHERE m.channel_id = c.channel_id
+                AND m.sequence > COALESCE(
+                  (SELECT r.through_sequence FROM projection_channel_reads AS r
+                    WHERE r.channel_id = c.channel_id AND r.member_id = ?), 0)
+                AND json_extract(m.message_json, '$.author.id') IS NOT ?
+                AND json_extract(m.message_json, '$.author.id') IS NOT ?
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
+            (SELECT COUNT(*) FROM projection_channel_tasks AS t
+              WHERE t.channel_id = c.channel_id
+                AND json_extract(t.task_json, '$.state') = 'running') AS running
+            FROM projection_channels AS c ORDER BY c.rowid`,
+        )
+        .all(memberId, memberId, excludedId, `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`),
+    );
+    return rows.map((row) => {
       const channel = decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
-      // The sidebar is rebuilt on every `channels-changed`, and a streaming reply emits those while
-      // it arrives. So each summary reads one message and counts the rest in SQL: reading the whole
-      // history of every channel would parse the entire archive on each frame of a stream.
-      const latest = this.messages(channel.id, Number.MAX_SAFE_INTEGER, 1).at(-1);
+      const latestJson = row["latest_json"];
+      const latest =
+        typeof latestJson === "string" && latestJson.length > 0
+          ? (() => {
+              const value = JSON.parse(latestJson);
+              if (!isChannelMessage(value)) throw new Error("Invalid stored channel message.");
+              return value;
+            })()
+          : undefined;
       return {
         ...channel,
-        unreadCount: this.#unreadCount(channel.id, memberId, signedOutMessagesAreTheirs),
-        activeTasks: this.#countTasksInState(channel.id, "running"),
+        unreadCount: Number(row["unread"] ?? 0),
+        activeTasks: Number(row["running"] ?? 0),
         lastMessage: latest
           ? { authorName: latest.author.name, text: previewText(latest), at: latest.message.createdAt }
           : null,
@@ -651,41 +680,6 @@ export class ChannelStore {
     }
   }
 
-  /** The unread messages of one member, over the sequence index. A member's own message is read. */
-  #unreadCount(channelId: string, memberId: string, signedOutMessagesAreTheirs: boolean): number {
-    const row = databaseRow(
-      this.database.connection
-        .prepare(
-          // A routing receipt is system activity the channel shows, not a message a member sent, so
-          // it never makes a channel unread or raises the badge of the sidebar.
-          `SELECT COUNT(*) AS count FROM projection_channel_messages
-           WHERE channel_id = ? AND sequence > ?
-             AND json_extract(message_json, '$.author.id') IS NOT ?
-             AND json_extract(message_json, '$.author.id') IS NOT ?
-             AND COALESCE(json_extract(message_json, '$.message.itemType'), '') NOT LIKE ?`,
-        )
-        .get(
-          channelId,
-          this.readSequence(channelId, memberId),
-          memberId,
-          signedOutMessagesAreTheirs ? SIGNED_OUT_CHANNEL_MEMBER_ID : memberId,
-          `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
-        ),
-    );
-    return row ? requiredNumberColumn(row, "count") : 0;
-  }
-
-  #countTasksInState(channelId: string, state: ChannelTask["state"]): number {
-    const row = databaseRow(
-      this.database.connection
-        .prepare(
-          "SELECT COUNT(*) AS count FROM projection_channel_tasks WHERE channel_id = ? AND json_extract(task_json, '$.state') = ?",
-        )
-        .get(channelId, state),
-    );
-    return row ? requiredNumberColumn(row, "count") : 0;
-  }
-
   /** A stored cursor of zero is a reader that read nothing, not a reader with no cursor at all. */
   #hasReadCursor(channelId: string, memberId: string): boolean {
     return (
@@ -693,15 +687,6 @@ export class ChannelStore {
         .prepare("SELECT 1 FROM projection_channel_reads WHERE channel_id = ? AND member_id = ?")
         .get(channelId, memberId) !== undefined
     );
-  }
-
-  private readSequence(channelId: string, memberId: string): number {
-    const row = databaseRow(
-      this.database.connection
-        .prepare("SELECT through_sequence FROM projection_channel_reads WHERE channel_id = ? AND member_id = ?")
-        .get(channelId, memberId),
-    );
-    return row ? requiredNumberColumn(row, "through_sequence") : 0;
   }
 }
 

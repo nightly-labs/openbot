@@ -10,7 +10,7 @@ import {
   SettingsPanelHeader,
   settingsPanelMaxWidth,
 } from "../../components/SettingsPanel";
-import { ArrowUp, Button, buttonVariants, DropdownMenu, Plus, X } from "../../components/ui";
+import { ArrowUp, Button, Plus, X } from "../../components/ui";
 import type { AgentMessage } from "../../data";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
@@ -45,6 +45,7 @@ import { usePresence } from "../team/team-context";
 import { ChannelActivityIndicator, type ChannelWorker } from "./ChannelActivityIndicator";
 import { ChannelAvatar } from "./ChannelAvatar";
 import { ChannelEditor } from "./ChannelEditor";
+import { ChannelStoppedTasks } from "./ChannelStoppedTasks";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 import { useChannels } from "./channels-context";
 
@@ -721,43 +722,6 @@ export function ChannelConversation() {
                   );
                 }}
               </For>
-              {/*
-               * A task the service stopped and left a reason on. The automatic assignment limit is
-               * the case that needs both actions: the run halts mid-way, and the reason it writes
-               * asks the reader to continue it or to give it to somebody else. Without the two
-               * controls the task stays stopped, because no other screen reaches it.
-               */}
-              <For each={pausedTasks()}>
-                {(task) => (
-                  <section class="channel-paused-task" aria-label={`Stopped task for ${name(task.ownerAgentId)}`}>
-                    <p class="channel-paused-task-reason">{task.error}</p>
-                    <div class="channel-paused-task-actions">
-                      <Button size="xs" onClick={() => void resumeTask(task.id, null)}>
-                        Continue
-                      </Button>
-                      <DropdownMenu.Root placement="top-start">
-                        <DropdownMenu.Trigger
-                          class={buttonVariants({ variant: "ghost", size: "xs" })}
-                          aria-label={`Reassign the stopped task of ${name(task.ownerAgentId)}`}
-                        >
-                          Reassign
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Portal>
-                          <DropdownMenu.Content>
-                            <For each={page().channel.members.filter((member) => member.agentId !== task.ownerAgentId)}>
-                              {(member) => (
-                                <DropdownMenu.Item onSelect={() => void resumeTask(task.id, member.agentId)}>
-                                  {name(member.agentId)}
-                                </DropdownMenu.Item>
-                              )}
-                            </For>
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Portal>
-                      </DropdownMenu.Root>
-                    </div>
-                  </section>
-                )}
-              </For>
               <Show when={!page().channel.archived && !page().channel.members.length}>
                 <p>Add agents in channel settings to start work.</p>
               </Show>
@@ -767,6 +731,12 @@ export function ChannelConversation() {
             </Show>
             <Show when={!page().channel.archived}>
               <div class="composer-wrap">
+                <ChannelStoppedTasks
+                  tasks={pausedTasks()}
+                  members={page().channel.members}
+                  name={name}
+                  onResume={resumeTask}
+                />
                 <form
                   class="composer"
                   data-compact={
