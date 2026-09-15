@@ -7431,14 +7431,26 @@ button.chat-action-target:active,
 }
 
 .composer-error {
+  display: flex;
   max-width: 560px;
+  align-items: center;
+  gap: var(--openbot-space-2);
   margin: 0 auto 6px;
-  padding: 7px 10px;
+  padding: 7px 6px 7px 10px;
   border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
   border-radius: var(--openbot-radius-md);
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
+}
+
+.composer-error-message {
+  min-width: 0;
+  flex: 1;
+}
+
+.composer-error-dismiss {
+  flex: none;
 }
 
 .agent-setup-card {

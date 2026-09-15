@@ -60,7 +60,7 @@ describe("Conversation HMR boundary", () => {
               controller?.setEditingDeliveryId("delivery-1");
               controller?.setEditingDraftBackup({ text: "Backup", attachments: [], replyToMessageId: null });
               controller?.setComposerFocusRequest(4);
-              controller?.setComposerError("Preserved error");
+              controller?.setComposerErrors({ chief: "Preserved error" });
               controller?.setSubmitting(true);
               controller?.setChatSearchQuery("rollback owner");
               controller?.setChatSearchOpen(true);
@@ -110,7 +110,7 @@ describe("Conversation HMR boundary", () => {
     expect(controller?.editingDeliveryId()).toBe("delivery-1");
     expect(controller?.editingDraftBackup()?.text).toBe("Backup");
     expect(controller?.composerFocusRequest()).toBe(4);
-    expect(controller?.composerError()).toBe("Preserved error");
+    expect(controller?.composerErrors().chief).toBe("Preserved error");
     expect(controller?.submitting()).toBe(true);
     expect(controller?.chatSearchOpen()).toBe(true);
     expect(controller?.chatSearchMessageIds()).toEqual(["message-1"]);
