@@ -95,7 +95,14 @@ export const SEED_FALLBACK_AGENT: SeededAgentModel = {
 async function seededAgentModel(): Promise<SeededAgentModel> {
   try {
     const cli = await resolveOpencodeCli();
-    const catalog = execFileSync(cli.executable, ["models"], { encoding: "utf8", timeout: 60_000 });
+    const catalog = execFileSync(cli.executable, ["models"], {
+      encoding: "utf8",
+      timeout: 60_000,
+      // The flag the app spawns a managed CLI with. A managed binary that updates itself while a
+      // profile is seeded stops being the exact version the app verifies, and the app downloads it
+      // again on the next start.
+      env: { ...process.env, ...(cli.source === "managed" ? { OPENCODE_DISABLE_AUTOUPDATE: "1" } : {}) },
+    });
     if (!catalog.split("\n").some((line) => line.trim() === DEVELOPMENT_DEFAULT_MODEL)) return SEED_FALLBACK_AGENT;
     return {
       provider: DEVELOPMENT_DEFAULT_PROVIDER,
