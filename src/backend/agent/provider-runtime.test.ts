@@ -954,6 +954,48 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     ]);
   });
 
+  it("keeps an MCP credential out of the provider status a crashed CLI leaves behind", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
+      const client = new FakeAgentClient(provider);
+      clients.set(provider, client);
+      return client;
+    });
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    const messages: (string | null)[] = [];
+    service.on("event", (event) => {
+      if (event.type !== "status") return;
+      for (const provider of event.status.providers ?? []) {
+        if (provider.id === "codex" && provider.state === "error") messages.push(provider.message);
+      }
+    });
+
+    // The CLI quotes what it was given as it dies, and its last words become the provider status
+    // the renderer shows beside the provider.
+    client.emit("exit", new Error("Codex App Server exited: rejected abcdef123456"));
+
+    await waitFor(() => messages.length > 0);
+    expect(messages[0]).toBe("Codex App Server exited: rejected •••");
+  });
+
   it("keeps Grok's telemetry export failure out of the chat it was switched into", async () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);

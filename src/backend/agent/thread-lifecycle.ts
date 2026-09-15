@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentSummary } from "@openbot/contracts/ipc";
+import type { AgentSummary, McpServerConfig } from "@openbot/contracts/ipc";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
@@ -64,6 +64,14 @@ export class ThreadLifecycle {
   readonly #mcpServers: McpServerSource;
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #pendingRuntimeRefreshes = new Set<string>();
+  /**
+   * How many provider sessions are being started per agent.
+   *
+   * A session that is starting is not in the provider session table yet, and it read the MCP set
+   * before the change that is being applied. Counted rather than flagged: an agent can start its
+   * own thread and a channel execution thread at the same time.
+   */
+  readonly #startingSessions = new Map<string, number>();
 
   constructor(options: ThreadLifecycleOptions) {
     this.#store = options.store;
@@ -137,6 +145,7 @@ export class ThreadLifecycle {
   dispose(): void {
     this.#pendingHandoffs.clear();
     this.#pendingRuntimeRefreshes.clear();
+    this.#startingSessions.clear();
   }
 
   async ensureThread(agent: AgentSummary, client: AgentClient, executionThreadId?: string): Promise<string> {
@@ -179,10 +188,25 @@ export class ThreadLifecycle {
   }
 
   async startProviderThread(agent: AgentSummary, client: AgentClient, publicThreadId: string): Promise<string> {
+    this.#startingSessions.set(agent.id, (this.#startingSessions.get(agent.id) ?? 0) + 1);
+    try {
+      return await this.#startProviderThread(agent, client, publicThreadId);
+    } finally {
+      const remaining = (this.#startingSessions.get(agent.id) ?? 1) - 1;
+      if (remaining > 0) this.#startingSessions.set(agent.id, remaining);
+      else this.#startingSessions.delete(agent.id);
+    }
+  }
+
+  async #startProviderThread(agent: AgentSummary, client: AgentClient, publicThreadId: string): Promise<string> {
+    // One reading of the MCP set for the request and for the manifest below. Read twice, a change
+    // that lands while the provider answers would be recorded as what this session was given, and
+    // `hasCurrentTools` would then accept a session that never got it.
+    const mcpServers = this.#mcpServers();
     const response = await client.request(
       "thread/start",
       {
-        ...(await this.codexConfig(client)),
+        ...(await this.codexConfig(client, mcpServers)),
         model: agent.model,
         effort: agent.reasoningEffort,
         cwd: agent.workspacePath,
@@ -200,7 +224,7 @@ export class ThreadLifecycle {
     try {
       if (client.provider === "codex") {
         await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
-        await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(), { mode: 0o600 });
+        await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(mcpServers), { mode: 0o600 });
       }
       const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
       if (handoff) {
@@ -253,9 +277,10 @@ export class ThreadLifecycle {
    */
   private async codexConfig(
     client: AgentClient,
+    configs: readonly McpServerConfig[],
   ): Promise<{ config?: { mcp_servers: Record<string, CodexMcpServer> } }> {
     if (client.provider !== "codex") return {};
-    const servers = codexMcpServers(await usableMcpServers(this.#mcpServers()));
+    const servers = codexMcpServers(await usableMcpServers(configs));
     return Object.keys(servers).length > 0 ? { config: { mcp_servers: servers } } : {};
   }
 
@@ -265,17 +290,15 @@ export class ThreadLifecycle {
    * force a replacement session as surely as an added server. `mcpFingerprintValues` reduces the
    * secret values to a digest first, so the file this string is written to holds none of them.
    */
-  private toolFingerprint(): string {
+  private toolFingerprint(configs: readonly McpServerConfig[]): string {
     return createHash("sha256")
-      .update(
-        JSON.stringify([[...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS], mcpFingerprintValues(this.#mcpServers())]),
-      )
+      .update(JSON.stringify([[...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS], mcpFingerprintValues(configs)]))
       .digest("hex");
   }
 
   private async hasCurrentTools(sessionId: string): Promise<boolean> {
     try {
-      return (await readFile(this.toolManifestPath(sessionId), "utf8")) === this.toolFingerprint();
+      return (await readFile(this.toolManifestPath(sessionId), "utf8")) === this.toolFingerprint(this.#mcpServers());
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
       throw error;
@@ -294,7 +317,7 @@ export class ThreadLifecycle {
       sandbox: "danger-full-access",
       developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
-      ...(await this.codexConfig(client)),
+      ...(await this.codexConfig(client, this.#mcpServers())),
     };
 
     try {
@@ -347,14 +370,13 @@ export class ThreadLifecycle {
     // removes, and the agent would stay marked as compacting and hold its queue for good. The mark
     // stays, and the drain that `ContextCompaction.finish` schedules refreshes the thread then.
     if (!this.#compaction.mayDrain(agent.id)) return;
+    // A session that is starting is not in the table below, and it was given the MCP set as it was
+    // before this change. Spending the mark now would leave that session holding the old set for
+    // the rest of its life, so the mark waits for the session to exist and is spent on it.
+    let deferred = this.#startingSessions.has(agent.id);
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.
     const threadIds = this.#store.database.activeProviderSessionThreads(agent.id);
-    if (threadIds.length === 0) {
-      this.#pendingRuntimeRefreshes.delete(agent.id);
-      return;
-    }
-    let deferred = false;
     for (const threadId of threadIds) {
       // A running turn owns its provider session, so the refresh waits for it. The mark stays, and
       // the next drain of this agent refreshes the thread that was busy this time.

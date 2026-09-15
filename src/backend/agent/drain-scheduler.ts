@@ -27,6 +27,12 @@ export interface DrainHooks {
    * keeps a delivery off an endpoint the user has taken out.
    */
   servesModel(model: string): boolean;
+  /**
+   * One piece of provider text with the MCP credentials taken out of it. The queue keeps a failed
+   * delivery's reason in the database and shows it again, and `MailboxStore` can only apply the
+   * generic redaction: it does not know which values this machine's MCP servers were given.
+   */
+  redactMcp(text: string): string;
 }
 
 export interface DrainSchedulerOptions {
@@ -395,7 +401,11 @@ export class DrainScheduler {
         );
         return;
       }
-      await this.#mailbox.markTerminal(delivery.id, "failed", error instanceof Error ? error.message : String(error));
+      await this.#mailbox.markTerminal(
+        delivery.id,
+        "failed",
+        this.#hooks.redactMcp(error instanceof Error ? error.message : String(error)),
+      );
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       this.#channels?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
       this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);

@@ -400,6 +400,135 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // The queue keeps a failed delivery's reason in the database and shows it again in the app, so a
+  // provider that rejects a start by quoting what it was sent would store the credential for good.
+  it("keeps an MCP credential out of the reason a failed delivery keeps", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method === "thread/start") throw new Error("Rejected abcdef123456 from Filesystem.");
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: [],
+        env: [{ key: "API_KEY", value: "abcdef123456" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    const failed = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "failed");
+    expect(failed?.error).toBe("Rejected ••• from Filesystem.");
+  });
+
+  // The refresh mark is spent on the sessions the table holds, and a session that is still starting
+  // is in no table. Without the wait, the change would be marked as applied to a session that was
+  // given the set as it was before it.
+  it("starts a fresh session when an MCP server changes while the first session starts", async () => {
+    const { store, mailbox } = stores(root);
+    let started = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "thread/start" || started) return;
+      started = true;
+      service?.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      });
+    });
+    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    // Released, which only the refresh path does: a session replaced for an outdated tool
+    // fingerprint is retired without a release, so this names the mark that was held back.
+    expect(client.releasedThreads).toEqual([firstSession]);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: {} } },
+    });
+  });
+
+  // The manifest is the only record that survives a restart, and the in-memory refresh mark does
+  // not. A manifest written from the set that arrived during the start would describe a session
+  // that never got it, and the resume check would then accept that session for good.
+  it("records the MCP set a session was given, not one that arrived while it started", async () => {
+    const { store, mailbox } = stores(root);
+    let started = false;
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      if (method !== "thread/start" || started) return;
+      started = true;
+      service?.saveMcpServer({
+        config: {
+          id: "",
+          name: "Filesystem",
+          transport: "stdio",
+          enabled: true,
+          command: "/bin/echo",
+          args: ["ready"],
+          env: [],
+          envPassthrough: [],
+          workingDirectory: "",
+          url: "",
+          headers: [],
+        },
+      });
+    });
+    const start = async () => {
+      const next = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+      await next.initialize();
+      return next;
+    };
+    service = await start();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+
+    // The restart drops the held refresh, so the manifest alone decides whether the session is kept.
+    await service.stop();
+    service = await start();
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    expect(paramsRecord(starts[1]?.params)?.config).toEqual({
+      mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: {} } },
+    });
+  });
+
   it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
     const { store, mailbox } = stores(root);
     let rejectTurn = false;

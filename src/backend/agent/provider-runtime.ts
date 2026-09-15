@@ -22,7 +22,6 @@ import {
   resolveCodexCli,
 } from "./../cli";
 import { McpHandoffLog } from "./../mcp-handoff-log";
-import { mcpSecretValues, redactMcpValues } from "./../mcp-redaction";
 import { openCodeSignInMessage } from "./../opencode-config";
 import {
   type AccountLoginCompletedResult,
@@ -340,6 +339,15 @@ export class ProviderRuntime implements ProviderPort {
    * therefore miss the value the process is quoting.
    */
   readonly #mcpHandoff: McpHandoffLog;
+  /**
+   * One piece of provider text with the MCP credentials taken out of it.
+   *
+   * Owned by the service, not by this class, because only the store holds every credential the user
+   * wrote: the source this class reads carries the enabled servers alone. Every provider message
+   * that becomes a status message, a log line or a renderer event passes through here, because a
+   * CLI reports a failure by quoting what it sent.
+   */
+  readonly #redactMcp: (text: string) => string;
   /** What each client's process read when it spawned, which decides what its catalogue may confirm. */
   readonly #configRevisions = new WeakMap<AgentClient, number>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
@@ -384,6 +392,7 @@ export class ProviderRuntime implements ProviderPort {
     bundledExecutables: BundledProviderExecutables;
     credentials: ProviderClientContext;
     mcpHandoff?: McpHandoffLog;
+    redactMcp: (text: string) => string;
   }) {
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
@@ -396,6 +405,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#bundledExecutables = { ...options.bundledExecutables };
     this.#credentials = options.credentials;
     this.#mcpHandoff = options.mcpHandoff ?? new McpHandoffLog();
+    this.#redactMcp = options.redactMcp;
   }
 
   /**
@@ -1370,13 +1380,15 @@ export class ProviderRuntime implements ProviderPort {
           return null;
         } catch (error) {
           if (client) await client.stop().catch(() => undefined);
-          const message = error instanceof Error ? error.message : String(error);
+          // The CLI's own words reach the status message and the joined start failure below, so
+          // the MCP values go first. `providerFailureStatus` applies only the generic redaction.
+          const message = this.#redactMcp(error instanceof Error ? error.message : String(error));
+          const failure = providerFailureStatus(provider, error, cli?.version);
           this.#setStatus({
-            providers: updateProviderStatus(
-              this.#status.providers,
-              provider,
-              providerFailureStatus(provider, error, cli?.version),
-            ),
+            providers: updateProviderStatus(this.#status.providers, provider, {
+              ...failure,
+              message: failure.message === null ? null : this.#redactMcp(failure.message),
+            }),
           });
           if (!(error instanceof CodexCliError)) this.#emitError(`${provider}_start_failed`, error);
           return message;
@@ -1453,16 +1465,14 @@ export class ProviderRuntime implements ProviderPort {
     this.#hooks.bindClient(client);
     client.on("diagnostic", (raw) => {
       if (!/error|failed|warning/i.test(raw)) return;
-      // The configuration as it stands now, joined with what this client was actually given. The
-      // union covers both directions: a server added since the spawn, and a credential this process
-      // still holds after the user changed it.
-      const configs = this.#credentials.mcpServers();
-      const names = new Set([...configs.map((config) => config.name), ...this.#mcpHandoff.names()]);
-      const values = new Set([...mcpSecretValues(configs), ...this.#mcpHandoff.values()]);
+      const names = new Set([
+        ...this.#credentials.mcpServers().map((config) => config.name),
+        ...this.#mcpHandoff.names(),
+      ]);
       // Redacted before the first use, not at each one. A CLI reports an MCP failure by quoting
       // what it sent, so an API key or an inherited credential is in the line that is about to be
       // logged or turned into a renderer error event.
-      const message = redactMcpValues(raw, values);
+      const message = this.#redactMcp(raw);
       if (isMcpSubsystemDiagnostic(message, [...names])) {
         logger.warn("A provider reported an MCP server failure.", { provider: client.provider, message });
         return;
@@ -1486,7 +1496,7 @@ export class ProviderRuntime implements ProviderPort {
     const providers = updateProviderStatus(this.#status.providers, client.provider, {
       state: "error",
       version: this.#cli.get(client.provider)?.version ?? null,
-      message: error.message,
+      message: this.#redactMcp(error.message),
     });
     const anotherProviderIsReady = this.#clients.size > 0;
 

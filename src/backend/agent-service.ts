@@ -381,6 +381,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mcpServers: () => this.#mcpHandoff.record(credentials.mcpServers()),
       },
       mcpHandoff: this.#mcpHandoff,
+      redactMcp: (text) => this.#redactMcp(text),
     });
     this.#compaction = new ContextCompaction({
       store,
@@ -590,6 +591,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       threads: this.#threads,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        redactMcp: (text) => this.#redactMcp(text),
         isStopping: () => this.#stopping,
         servesModel: (model) => this.#servesModel(model),
       },
@@ -2074,15 +2076,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       code,
       // Redacted, because every error from a provider CLI arrives here on its way to the renderer
       // and the log, and a CLI quotes what it was given: a failure against a custom endpoint can
-      // carry that endpoint's API key or a header value. The MCP values come from the store and
-      // from the hand-off log together, so a credential a running process still holds stays
-      // covered after the user edits or removes the server that named it. `redactMcpValues` ends
-      // with `redactText`, which covers the patterns shared across the app.
-      message: redactMcpValues(error instanceof Error ? error.message : String(error), [
-        ...mcpSecretValues(this.#mcpServers.list()),
-        ...this.#mcpHandoff.values(),
-      ]),
+      // carry that endpoint's API key or a header value.
+      message: this.#redactMcp(error instanceof Error ? error.message : String(error)),
     });
+  }
+
+  /**
+   * One piece of provider text with the MCP credentials taken out of it.
+   *
+   * The stored configurations and the hand-off log together, so a credential a running process
+   * still holds stays covered after the user edits or removes the server that named it. Every
+   * reader of provider text that leaves this class - a renderer error event, and the failure reason
+   * the queue writes to the database - goes through here. `redactMcpValues` ends with `redactText`,
+   * which covers the patterns shared across the app.
+   */
+  #redactMcp(text: string): string {
+    return redactMcpValues(text, [...mcpSecretValues(this.#mcpServers.list()), ...this.#mcpHandoff.values()]);
   }
 
   #emitRuntimeSnapshot(): void {
