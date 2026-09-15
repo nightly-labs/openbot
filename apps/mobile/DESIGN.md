@@ -62,7 +62,7 @@ a standalone sheet with a native title is:
   headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
   headerTransparent: isIOS,
   headerBlurEffect: "none",
-  scrollEdgeEffects: { top: "soft" },
+  scrollEdgeEffects: { top: "hidden", bottom: "soft" },
   title: "Profile",
 }
 ```
@@ -91,7 +91,14 @@ to the content scroll view, not a larger sheet detent. Native dismissal remains 
 
 `headerTransparent` alone does not remove a configured blur material. Do not restore
 `systemMaterial` or another `headerBlurEffect` on these sheets, or put an opaque header color back
-on iOS. The native soft scroll edge handles the transition under the title.
+on iOS. `SheetScrollView` draws the top progressive blur with the existing
+`SheetScrollEdgeEffect` behind the native title and actions. The native top edge is hidden to
+avoid two effects. Keep the bottom edge explicitly soft.
+
+This is a fallback for the missing native effect reported on iOS 27 in both Expo Go and
+TestFlight, even with an explicit soft edge. The native cause is not yet confirmed. The fallback
+uses installed visual components and keeps native navigation controls. It does not require
+a new native dependency.
 
 ### Save and create actions
 
@@ -121,14 +128,16 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
   at the edges by disabling bounce or overscroll globally.
   Keep scrolling enabled. Do not use content measurements or keyboard visibility to decide
   whether scrolling is available. The native scroll view handles content that fits.
-- With an iOS native header, it reads `HeaderHeightContext` and `HeaderShownContext` from
-  `expo-router/react-navigation`, disables automatic content inset adjustment, and adds the
-  measured header height inside scrollable content. This keeps the first item below the title at
-  rest while allowing it to scroll underneath. No hardcoded header height or additional safe-area
-  wrapper belongs in the screen.
-- It suppresses `SheetScrollEdgeEffect` when a native header owns the edge. Do not combine custom
-  masking, blur material and native scroll-edge effects; they can obscure content in overlapping
-  bands. Headerless sheets retain their existing shared edge behavior.
+- With an iOS native header, it reads `HeaderShownContext` from `expo-router/react-navigation`
+  and uses automatic content inset adjustment when the header overlays the content. UIKit owns
+  the clearance under the header and its relationship to the native scroll edge. Do not replace
+  this with a padding view or add another safe-area wrapper. A non-overlay header uses `never`
+  because navigation already places the content below it.
+- Under an overlaid iOS native header, a fixed `SheetScrollEdgeEffect` covers the measured
+  header height and a 48 pt fade. It follows the scroll view as a sibling so it cannot intercept
+  gestures or obstruct first-child scroll view discovery. Its position does not depend on scroll
+  events. Headerless sheets keep their existing shared edge behavior; non-overlay headers do not
+  add a blur overlay.
 - Keep the scroll view reachable directly from the sheet. `SheetScrollView` uses `flex: 1`
   to fill the fixed viewport. Keep the last action in the same scroll flow, with the existing
   bottom safe-area utilities, so it remains reachable on small screens and with the keyboard open.
@@ -144,6 +153,14 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
   interactive keyboard dismissal, reaching the final action, and both short and long content.
 
 ### Palette, groups and text
+
+On iOS, sheet edges use `ProgressiveSheetBlur`: six weak native blur layers with separate,
+overlapping smooth masks. Each mask becomes transparent before the physical view edge.
+The material follows the system theme and has no additional solid color overlay. Render it
+following the scrolling content so the native blur samples that content. The masks are static;
+scrolling does not update React state. This approximates a variable blur radius using public
+Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
+Android keeps the existing sheet color fade. Chat and drawer edges keep their canvas effect.
 
 The values belong to `packages/brand/src/tokens.css` and `tokens-native.css`; `global.css` only
 maps them to utilities. Do not copy these hex values into components.

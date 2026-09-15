@@ -71,6 +71,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -83,7 +84,7 @@ function AuthenticatedStack() {
             headerStyle: { backgroundColor: sheetBackground },
             headerTransparent: false,
             headerBlurEffect: "none",
-            scrollEdgeEffects: { top: "soft" },
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.6],
             sheetGrabberVisible: true,
@@ -97,7 +98,7 @@ function AuthenticatedStack() {
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
             headerBlurEffect: "none",
-            scrollEdgeEffects: { top: "soft" },
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: "fitToContents",
             sheetGrabberVisible: true,
@@ -111,7 +112,7 @@ function AuthenticatedStack() {
             headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
             headerTransparent: isIOS,
             headerBlurEffect: "none",
-            scrollEdgeEffects: { top: "soft" },
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -123,6 +124,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -134,6 +136,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -144,6 +147,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [1],
             sheetGrabberVisible: true,
@@ -155,6 +159,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -165,6 +170,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
@@ -175,6 +181,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [segments.at(-1) === "select-text" ? 0.85 : 0.4],
             sheetGrabberVisible: true,
@@ -185,6 +192,7 @@ function AuthenticatedStack() {
           options={{
             contentStyle: { backgroundColor: sheetBackground },
             headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,

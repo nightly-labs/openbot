@@ -15,7 +15,7 @@ export default function SettingsLayout() {
         headerTransparent: isIOS,
         headerStyle: { backgroundColor: isIOS ? "transparent" : background },
         headerBlurEffect: "none",
-        scrollEdgeEffects: { top: "soft" },
+        scrollEdgeEffects: { top: "hidden", bottom: "soft" },
         contentStyle: { backgroundColor: background },
       }}
     >
