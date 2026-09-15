@@ -166,14 +166,16 @@ export function isFreeOpencodeModelName(name: string): boolean {
 }
 
 /**
- * Whether an OpenCode model runs without a paid subscription.
+ * Free OpenCode models whose ids carry no Free marker.
  *
- * That is the Free-suffixed tier plus Big Pickle: a keyless `opencode models` lists exactly
- * `opencode/big-pickle` and the `*-free` ids, and both answer a turn with no key at all. Big
- * Pickle carries no Free suffix, so the name alone cannot tell it apart from paid Zen. Every
- * free decision -- the picker badge, the catalog order, the stored-key drop -- goes through
- * this pair, so the three cannot disagree about what costs money.
+ * Keyless `opencode models` lists exactly these plus the `*-free` family -- re-run it with a clean
+ * home directory if the free tier changes shape. Explicit on purpose: a stale entry hides a free
+ * model, while guessing billed models as free bills the user. Every free decision -- the picker
+ * badge, the catalog order, the stored-key drop -- goes through `isFreeOpencodeModel`, so the
+ * three cannot disagree about what costs money.
  */
+const FREE_TIER_MODEL_IDS = new Set(["opencode/big-pickle"]);
+
 export function isFreeOpencodeModel(id: string, name: string): boolean {
-  return id.trim().toLowerCase() === "opencode/big-pickle" || isFreeOpencodeModelName(name);
+  return FREE_TIER_MODEL_IDS.has(id.trim().toLowerCase()) || isFreeOpencodeModelName(name);
 }
