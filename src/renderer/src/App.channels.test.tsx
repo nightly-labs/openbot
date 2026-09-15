@@ -585,10 +585,11 @@ async function openChannelWithStoppedTask(options: { withChild?: boolean; state?
     attachmentDraftIds: [],
   });
   const originalRead = window.openbot.agent.readChannel;
-  const state = { taskId: "" };
-  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
+  const state = { taskId: "", stopped: true };
+  const read = vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
     const page = await originalRead(input);
     state.taskId = page.tasks[0]?.id ?? "";
+    if (!state.stopped) return page;
     const stopped = page.tasks.map((task) => ({
       ...task,
       state: options.state ?? ("paused" as const),
@@ -599,13 +600,18 @@ async function openChannelWithStoppedTask(options: { withChild?: boolean; state?
     const child = stopped[0] ? [{ ...stopped[0], id: `${stopped[0].id}-child`, parentTaskId: stopped[0].id }] : [];
     return { ...page, tasks: options.withChild ? [...stopped, ...child] : stopped };
   });
-  const command = vi.spyOn(window.openbot.agent, "channelCommand");
+  const originalCommand = window.openbot.agent.channelCommand;
+  const command = vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
+    const result = await originalCommand(input);
+    if (input.type === "resume" || input.type === "reassign") state.stopped = false;
+    return result;
+  });
   render(() => <App />);
   await screen.findByRole("button", { name: /Open account (actions|menu)/ });
   await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
   const chat = await screen.findByRole("main", { name: "Channel conversation" });
   const notice = await within(chat).findByRole("region", { name: "Stopped task for Chief" });
-  return { notice, command, state };
+  return { chat, notice, command, read, state };
 }
 
 it("continues a task the channel stopped with a reason", async () => {
@@ -617,6 +623,7 @@ it("continues a task the channel stopped with a reason", async () => {
       expect.objectContaining({ type: "resume", taskId: state.taskId, recipientAgentId: null }),
     ),
   );
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
 });
 
 it("shows one notice for a stopped run and continues it at the root", async () => {
@@ -651,6 +658,41 @@ it("reassigns a task the channel stopped with a reason", async () => {
       expect.objectContaining({ type: "reassign", taskId: state.taskId, recipientAgentId: "sales-outbound" }),
     ),
   );
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
+});
+
+it("keeps a stopped-task notice after a failed action and a refresh", async () => {
+  const { notice, command, read } = await openChannelWithStoppedTask();
+  command.mockRejectedValueOnce(new Error("Connection lost. Try again."));
+  await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
+  await screen.findByText("Connection lost. Try again.");
+  expect(screen.getByRole("region", { name: "Stopped task for Chief" })).toHaveTextContent(STOPPED_TASK_REASON);
+
+  read.mockClear();
+  await fireEvent.focus(window);
+  await waitFor(() => expect(read).toHaveBeenCalled());
+  expect(await screen.findByRole("region", { name: "Stopped task for Chief" })).toHaveTextContent(STOPPED_TASK_REASON);
+  await fireEvent.click(
+    within(screen.getByRole("region", { name: "Stopped task for Chief" })).getByRole("button", { name: "Continue" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
+});
+
+it("removes the notice when a refreshed task no longer needs action", async () => {
+  const { state } = await openChannelWithStoppedTask();
+  state.stopped = false;
+  emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision: 2 });
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
+});
+
+it("opens and closes reassignment with the keyboard and returns focus to its trigger", async () => {
+  const { notice } = await openChannelWithStoppedTask();
+  const trigger = within(notice).getByRole("button", { name: "Reassign the stopped task of Chief" });
+  trigger.focus();
+  await fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  expect(await screen.findByRole("menuitem", { name: "Sales Outbound" })).toBeVisible();
+  await fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Reassign the stopped task of Chief" })).toHaveFocus());
 });
 
 it("retries a lost response once and keeps a focused draft through incoming messages", async () => {
