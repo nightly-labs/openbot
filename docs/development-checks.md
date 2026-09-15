@@ -46,6 +46,52 @@ All five gate Cloudflare production deployment on `main`. Surfaces was previousl
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
+`setup-bun` restores the Bun package store and the Electron download before installing. The store
+key falls back through `restore-keys`, so a lockfile change re-downloads only what moved. The
+Electron entry is skipped for `install: ignore-scripts`, which never runs `postinstall`; without
+that condition those jobs would publish an empty directory under the key the Check job reads.
+
+## Why the jsdom projects use `vmThreads`
+
+`test:desktop` is not slow because of test count. The 54 `renderer` files hold 732 of the 3401
+tests and take three quarters of the run, and what cost the most was per-file setup rather than
+anything in the tests: building a jsdom for each file was 61.8s of a 176.7s CI run. So the
+`renderer` and `mobile-ui` projects use `pool: "vmThreads"`: one jsdom per worker, and a module
+registry per file inside a VM context. That took the full suite from 118.7s to 92.6s locally.
+
+The mounts themselves are not the cost, which is worth recording because the file sizes suggest
+otherwise. Measured on one worker: `installOpenbotStub()` is 0.4ms, `AppProviders` with a probe
+under it is 4.3ms, and a full `<App />` is 21.8ms, of which the view tree is 17.4ms. Dividing a
+file's total time by its render count attributes the whole test to the mount and overstates it by
+more than twenty times. Two other theories also measured close to nothing: the 50ms `waitFor` poll
+interval is worth 9% on the worst file, because `waitFor` runs its callback once before it polls
+and the condition is usually already true.
+
+Isolation is the reason that pool was chosen over the faster `isolate: false`. The renderer files
+share module-level store state, so without a per-file registry they pass only in the order vitest
+happens to pick: `--sequence.shuffle.files` fails eight files under `isolate: false` and passes
+under both `vmThreads` and the previous `forks` default. Use that flag when changing pool settings;
+a green run in the default order proves nothing here.
+
+The `node` project stays on isolated `forks`. Its files register IPC handlers and read
+per-process globals, so they fail on `threads` whether or not isolation is on, and it spends its
+time in the tests themselves rather than in environment setup, so it has little to gain.
+
+### The `App.*.test.tsx` files are not at the wrong boundary
+
+`App.read-state.test.tsx` is the largest test file in the repository, and moving its tests down to
+`AppProviders` with no view was investigated and rejected. Of its 27 `render(() => <App />)` tests,
+22 assert the rendered result - the `"1 new message"` badge, the `"New messages"` separator, or
+`"Responded"` on a sidebar row - and the remaining five drive through the view, opening an agent or
+switching servers by clicking it. None mounts the view without using it. Read state spans IPC, the
+conversation store, window focus, which surface covers the conversation, and the badge, so the
+application is the lowest boundary at which those tests hold together.
+
+The five tests that genuinely need no view already use the `AppProviders` harness with a probe
+underneath, and that is the pattern to follow for a new test that asserts only state. Reach for it
+when a test asserts state; do not convert a test that asserts the badge into one that asserts a
+probe, because the badge is the behaviour.
+
 The development setup script checks Bun, migrates local D1, and creates a missing
 `apps/auth-api/.env.dev`. This file is per-machine and untracked. Only `.env.production` remains
 encrypted; a missing `.env.keys` does not block ordinary local setup.
