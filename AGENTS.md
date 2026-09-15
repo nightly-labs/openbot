@@ -74,9 +74,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 
 ## Development data and processes
 
-- Never run `bun run dev:seed` or `bun run dev:reset` unless asked. Seed replaces the whole
-  `OpenBot Dev` profile and deletes its staging copy on success. Reset deletes app, test-client,
-  and legacy host profiles. `bun run dev:seed --dry-run` is read-only.
+- `bun run dev:seed --dry-run` is read-only.
 - Never kill by process pattern, such as `pkill -f electron` or `pkill -f bun`. `bun run dev:stop`
   stops only this worktree's stack; name another one with `--pid=<supervisor pid>` or `--all`.
   For a process outside the registry, target a PID you started or ask.

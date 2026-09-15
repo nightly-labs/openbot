@@ -249,12 +249,13 @@ export class DrainScheduler {
           ? [
               "This is a reply to a message you sent earlier.",
               "Surface or summarize the result naturally for the user.",
-              "Do not send an acknowledgement back unless the message asks for another action; avoid reply loops.",
+              "Reply to the teammate only when the message requests another action or reports blocked/failed work; otherwise do not send an acknowledgement and avoid reply loops.",
             ]
           : [
               `After completing the request, send a concise result back to ${sender?.name ?? senderAgentId} with openbot.send_message.`,
               `Use recipientAgentIds ["${senderAgentId}"] and replyToMessageId "${delivery.messageId}".`,
-              "Do not leave the sender waiting for a result.",
+              "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.",
+              "Do not acknowledge without a Status line. Do not leave the sender waiting for a result.",
             ];
         text = [
           `Message from OpenBot teammate ${sender?.name ?? senderAgentId} (${senderAgentId}).`,
