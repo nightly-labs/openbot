@@ -1,12 +1,15 @@
 import type { JSX } from "@solidjs/web";
-import { Button } from "../../components/ui";
-import { CloseIcon } from "./ConversationIcons";
+import { ComposerNotice } from "./ComposerNotice";
 
 /**
  * Desktop notification pattern: chat-scoped error banner.
  *
+ * Shape: the same card `ComposerUsageLimitNotice` and `ComposerSignInNotice` use, in its danger
+ * tone. One column, one slab, one set of colours, so a chat that fails does not introduce a second
+ * error surface beside the two states the reader already knows.
+ *
  * Placement: in normal flow directly above the composer input, under the
- * queue/reply/notices, same column as `ComposerNotice`. It pushes content
+ * queue/reply/notices, same column as the other notices. It pushes content
  * rather than overlaying the composer, so it never obscures the input and
  * causes no overlay jump. Max width matches the composer column.
  *
@@ -22,8 +25,12 @@ import { CloseIcon } from "./ConversationIcons";
  * Lifecycle: errors are keyed by `composerDraftKey({ agentId, serverId })`
  * in stable state. Switching chats shows only the target chat's error.
  * Global errors stay global only when emitted via `toast.*` (for example
- * provider failures in `agent-event-bridge`); chat failures never emit a
- * global toast.
+ * provider failures that name no agent in `agent-event-bridge`); chat
+ * failures never emit a global toast.
+ *
+ * Copy: the message is the whole card. There is no title, because every caller
+ * already passes a sentence that names the failure, and a label above it would
+ * only repeat the word "error" back at the reader.
  *
  * Focus/accessibility: `role="alert"` announces without stealing focus.
  * The dismiss button is a native button (Enter/Space) with
@@ -43,29 +50,12 @@ export function ComposerErrorBanner(props: {
   action?: JSX.Element;
 }): JSX.Element {
   return (
-    <div
-      class="composer-error"
-      role="alert"
-      data-conversation-key={props.conversationKey ?? undefined}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !event.defaultPrevented) {
-          event.preventDefault();
-          props.onDismiss();
-        }
-      }}
-    >
-      <span class="composer-error-message">{props.message}</span>
-      {props.action}
-      <Button
-        variant="ghost"
-        type="button"
-        size="sm"
-        class="composer-error-dismiss"
-        aria-label="Dismiss error"
-        onClick={() => props.onDismiss()}
-      >
-        <CloseIcon />
-      </Button>
-    </div>
+    <ComposerNotice
+      tone="danger"
+      body={props.message}
+      conversationKey={props.conversationKey}
+      action={props.action}
+      onDismiss={() => props.onDismiss()}
+    />
   );
 }

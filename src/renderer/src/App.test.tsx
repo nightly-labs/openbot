@@ -1309,7 +1309,7 @@ describe("OpenBot connected desktop shell", () => {
     });
   });
 
-  it("notifies and keeps the inline entry when an agent reports an error", async () => {
+  it("states an agent's error once above the composer, not in the transcript", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
@@ -1320,9 +1320,27 @@ describe("OpenBot connected desktop shell", () => {
       message: "The model endpoint refused the request.",
     });
 
-    expect(await screen.findByText("Chief could not continue")).toBeVisible();
-    // Once in the notification and once in the agent's own message list.
-    await waitFor(() => expect(screen.getAllByText("The model endpoint refused the request.")).toHaveLength(2));
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("The model endpoint refused the request.");
+    // The banner is the whole report: no transcript bubble and no toast beside it.
+    expect(screen.getAllByText("The model endpoint refused the request.")).toHaveLength(1);
+    expect(screen.queryByText("Chief could not continue")).not.toBeInTheDocument();
+  });
+
+  it("collapses a retrying provider's repeated errors into one banner", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    const dropped = "stream disconnected before completion: the transport closed";
+    for (let attempt = 0; attempt < 4; attempt++) {
+      emitAgentEvent?.({ type: "error", agentId: "chief", code: "agent_error", message: dropped });
+    }
+
+    await waitFor(() => expect(screen.getAllByText(dropped)).toHaveLength(1));
+
+    // Dismissal clears the whole run rather than revealing the next copy of it.
+    await fireEvent.click(screen.getByRole("button", { name: "Dismiss error" }));
+    await waitFor(() => expect(screen.queryByText(dropped)).not.toBeInTheDocument());
   });
 
   it("notifies about a provider error that names no agent", async () => {
@@ -1372,8 +1390,8 @@ describe("OpenBot connected desktop shell", () => {
 
     emitAgentEvent?.({ type: "error", agentId: "chief", code: "agent_error", message: CODEX_401 });
 
-    await screen.findAllByText("Authentication failed. Check your account or server connection, then try again.");
-    expect(await screen.findByText("Sign in required")).toBeVisible();
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("Authentication failed. Check your account or server connection, then try again.");
     expect(screen.queryByText(/AppServerError|chatgpt\.com|unauthorized_unknown/u)).not.toBeInTheDocument();
   });
 
