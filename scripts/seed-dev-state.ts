@@ -42,6 +42,7 @@ import { sortConversationMessages } from "../src/backend/conversation-snapshots"
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName, readDevelopmentInstanceId } from "../src/main/development-profile";
+import { ProviderRuntimeManager, providerRuntimeRoot } from "../src/main/provider-runtime-manager";
 import { writeSetupState } from "../src/main/setup-store";
 import { TeamStore } from "../src/main/team-store";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
@@ -92,9 +93,9 @@ export const SEED_FALLBACK_AGENT: SeededAgentModel = {
  * agents whose first turn answers "Invalid API key." are a worse start than four on the default the
  * app itself falls back to.
  */
-async function seededAgentModel(): Promise<SeededAgentModel> {
+async function seededAgentModel(appDataRoot: string): Promise<SeededAgentModel> {
   try {
-    const cli = await resolveOpencodeCli();
+    const cli = await resolveOpencodeCli({ bundledExecutable: managedOpencodeExecutable(appDataRoot) });
     const catalog = execFileSync(cli.executable, ["models"], {
       encoding: "utf8",
       timeout: 60_000,
@@ -113,6 +114,23 @@ async function seededAgentModel(): Promise<SeededAgentModel> {
     return SEED_FALLBACK_AGENT;
   }
 }
+
+/**
+ * Where the app's own OpenCode is: the runtime store this computer shares, which is where a CLI the
+ * user downloaded in OpenBot is the only copy there is. A seed that looked at the repository's
+ * `build/` tree and the user's own installs instead would find nothing on such a computer, and would
+ * put four agents on a provider the app does not start a new agent on.
+ *
+ * The store, not the status: the manager is read for the path it computes, and nothing here creates
+ * a directory, downloads, or collects an old version.
+ */
+function managedOpencodeExecutable(appDataRoot: string): string | null {
+  const runtimes = new ProviderRuntimeManager({
+    root: providerRuntimeRoot({ appData: appDataRoot, userDataOverride: "" }),
+  });
+  return runtimes.executablePath("opencode");
+}
+
 const GENERATED_DIRECTORY_PATTERN =
   /^generated\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHOWCASE_IMAGE_PATH = resolve(process.cwd(), "src", "renderer", "src", "assets", "openbot-logo-dev.png");
@@ -228,7 +246,7 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
   if (dirname(targetProfile) !== appDataRoot) throw new Error(`Unsafe OpenBot dev profile path: ${targetProfile}`);
 
   const profileActive = await isDevelopmentProfileActive(targetProfile);
-  const agentModel = options.agentModel ?? (await seededAgentModel());
+  const agentModel = options.agentModel ?? (await seededAgentModel(appDataRoot));
   const summary: DevelopmentSeedSummary = {
     targetProfile,
     dryRun: options.dryRun ?? false,
