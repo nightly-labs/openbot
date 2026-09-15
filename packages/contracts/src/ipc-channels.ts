@@ -141,6 +141,7 @@ export const IPC_CHANNELS = {
   agentChooseAttachments: "agent:choose-attachments",
   agentImportAttachments: "agent:import-attachments",
   agentDiscardDraftAttachment: "agent:discard-draft-attachment",
+  agentDownloadAttachments: "agent:download-attachments",
   agentOpenAttachment: "agent:open-attachment",
   agentOpenSharedFile: "agent:open-shared-file",
   agentOpenWorkspaceFile: "agent:open-workspace-file",

@@ -132,6 +132,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     }
   }
 
+  async function downloadAttachments(attachments: AttachmentSummary[]) {
+    try {
+      await window.openbot.agent.downloadAttachments({
+        attachments: attachments.map(({ id, name }) => ({ id, name })),
+      });
+    } catch (error) {
+      deps.setComposerError(errorMessage(error, "Could not download attachments. Try again."));
+    }
+  }
+
   function attachmentAction(attachment: AttachmentSummary, action: "open" | "reveal" | "download") {
     void window.openbot.agent
       .openAttachment({ attachmentId: attachment.id, action })
@@ -209,6 +219,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
+    downloadAttachments,
     openSharedFile,
     openWorkspaceFile,
     openSidebarFileExternally,

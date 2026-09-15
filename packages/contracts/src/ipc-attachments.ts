@@ -61,6 +61,10 @@ export type AttachmentImportEvent =
   | { type: "completed"; requestId: string; serverId: string; attachments: DraftAttachment[] }
   | { type: "error"; requestId: string; serverId: string; message: string };
 
+export interface DownloadAttachmentsInput {
+  attachments: { id: string; name: string }[];
+}
+
 export interface OpenAttachmentInput {
   attachmentId: string;
   action: "open" | "reveal" | "download";

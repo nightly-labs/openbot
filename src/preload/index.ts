@@ -997,6 +997,7 @@ const openbotApi: OpenBotDesktopApi = {
     },
     discardDraftAttachment: (attachmentId, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentDiscardDraftAttachment, attachmentId, decodeVoid),
+    downloadAttachments: (input) => invokeAgent(IPC_CHANNELS.agentDownloadAttachments, input, decodeVoid),
     openAttachment: (input) => invokeAgent(IPC_CHANNELS.agentOpenAttachment, input, decodeVoid),
     openSharedFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenSharedFile, input, decodeVoid),
     openWorkspaceFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenWorkspaceFile, input, decodeVoid),

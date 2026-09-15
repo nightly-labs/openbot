@@ -228,6 +228,7 @@ export const IPC_ENDPOINTS = {
     chooseAttachments: request(IPC_CHANNELS.agentChooseAttachments),
     importAttachments: request(IPC_CHANNELS.agentImportAttachments),
     discardDraftAttachment: request(IPC_CHANNELS.agentDiscardDraftAttachment),
+    downloadAttachments: request(IPC_CHANNELS.agentDownloadAttachments),
     openAttachment: request(IPC_CHANNELS.agentOpenAttachment),
     openSharedFile: request(IPC_CHANNELS.agentOpenSharedFile),
     openWorkspaceFile: request(IPC_CHANNELS.agentOpenWorkspaceFile),

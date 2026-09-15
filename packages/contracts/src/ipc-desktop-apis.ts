@@ -41,6 +41,7 @@ import type { RespondToApprovalInput, RespondToBrowserTakeoverInput } from "./ip
 import type {
   AttachmentImportEvent,
   ChooseAttachmentsInput,
+  DownloadAttachmentsInput,
   DraftAttachment,
   FilePreview,
   OpenAttachmentInput,
@@ -253,6 +254,7 @@ export interface AgentDesktopApi {
   chooseAttachments: (input: ChooseAttachmentsInput) => Promise<DraftAttachment[]>;
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
   discardDraftAttachment: (attachmentId: string, serverId?: string) => Promise<void>;
+  downloadAttachments: (input: DownloadAttachmentsInput) => Promise<void>;
   openAttachment: (input: OpenAttachmentInput) => Promise<void>;
   openSharedFile: (input: OpenSharedFileInput) => Promise<void>;
   openWorkspaceFile: (input: OpenWorkspaceFileInput) => Promise<void>;

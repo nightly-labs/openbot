@@ -49,6 +49,7 @@ export function ConversationTimeline() {
     agentActivitySpaceReserved,
     agentReady,
     attachmentAction,
+    downloadAttachments,
     browserTakeoverPreview,
     browserTakeoverResolution,
     browserTakeoverTab,
@@ -381,6 +382,7 @@ export function ConversationTimeline() {
                             onAttachmentAction={attachmentAction}
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={openWorkspaceFile}
+                            onDownloadAttachments={downloadAttachments}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             actions={
                               <MessageActions

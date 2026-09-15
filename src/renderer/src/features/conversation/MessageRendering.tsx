@@ -147,6 +147,7 @@ export function MessageBody(props: {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
+  onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
   onDownload?: (attachment: AttachmentSummary) => void;
 }) {
   const streamingBody = createStreamingBody(
@@ -170,6 +171,7 @@ export function MessageBody(props: {
       (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
     );
   });
+  const [downloadingAttachments, setDownloadingAttachments] = createSignal(false);
   const standaloneImageAttachments = createMemo(() =>
     props.message.author === "agent"
       ? standaloneAttachments().filter((attachment) => attachment.previewKind === "image")
@@ -355,6 +357,24 @@ export function MessageBody(props: {
             )}
           </For>
         </div>
+      </Show>
+      <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={downloadingAttachments()}
+          onClick={async () => {
+            if (downloadingAttachments()) return;
+            setDownloadingAttachments(true);
+            try {
+              await props.onDownloadAttachments?.(props.message.attachments ?? []);
+            } finally {
+              setDownloadingAttachments(false);
+            }
+          }}
+        >
+          {downloadingAttachments() ? "Downloading ZIP…" : "Download all as ZIP"}
+        </Button>
       </Show>
       <Show when={standaloneFileAttachments().length > 0}>
         <AttachmentCards

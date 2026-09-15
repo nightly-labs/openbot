@@ -1,3 +1,4 @@
+import { parseDownloadAttachments } from "./agent-inputs";
 // @vitest-environment node
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -874,4 +875,22 @@ it("validates the server mute request", () => {
   ]) {
     expect(() => parseSetServerMuted(input)).toThrow();
   }
+});
+
+describe("ZIP download inputs", () => {
+  const attachments = ["first", "second", "third"].map((id) => ({ id, name: `${id}.txt` }));
+  it("preserves attachment order and names", () => {
+    expect(parseDownloadAttachments({ attachments })).toEqual({ attachments });
+  });
+  it.each([
+    null,
+    {},
+    { attachments: [] },
+    { attachments: attachments.slice(0, 2) },
+    { attachments: [attachments[0], attachments[0], attachments[1]] },
+    { attachments: [...attachments, { id: "fourth", name: "" }] },
+    { attachments: Array.from({ length: 1000 }, (_, index) => ({ id: String(index), name: "file" })) },
+  ])("rejects an invalid archive request", (value) => {
+    expect(() => parseDownloadAttachments(value)).toThrow();
+  });
 });

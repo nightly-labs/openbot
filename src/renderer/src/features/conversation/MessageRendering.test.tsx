@@ -1226,3 +1226,51 @@ describe("ImageGeneration", () => {
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   });
 });
+
+describe.each(["you", "agent"] as const)("message ZIP download for %s", (author) => {
+  it.each([0, 1, 2, 3, 5])("offers a ZIP only for 3 or more files: %i", async (count) => {
+    const attachments: AttachmentSummary[] = Array.from({ length: count }, (_, index) => ({
+      id: `file-${index}`,
+      name: `file-${index}.${index === 1 ? "png" : "txt"}`,
+      size: 10,
+      kind: index === 1 ? "image" : "file",
+      mimeType: index === 1 ? "image/png" : "text/plain",
+      previewKind: index === 1 ? "image" : "text",
+      previewUrl: null,
+    }));
+    let finish: (() => void) | undefined;
+    const download = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(() => (
+      <MessageBody
+        message={{
+          id: "zip",
+          author,
+          time: "10:00",
+          body: count ? serializeAttachmentReference(attachments[0].name, attachments[0].id) : "Hello",
+          attachments,
+        }}
+        agents={agents}
+        onSelectAgent={vi.fn()}
+        onOpenLink={vi.fn()}
+        onPreview={vi.fn()}
+        onAttachmentAction={vi.fn()}
+        onDownloadAttachments={download}
+      />
+    ));
+    expect(download).not.toHaveBeenCalled();
+    if (count < 3) {
+      expect(screen.queryByRole("button", { name: "Download all as ZIP" })).toBeNull();
+      return;
+    }
+    await fireEvent.click(screen.getByRole("button", { name: "Download all as ZIP" }));
+    expect(download).toHaveBeenCalledExactlyOnceWith(attachments);
+    expect(screen.getByRole("button", { name: "Downloading ZIP…" })).toBeDisabled();
+    finish?.();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Download all as ZIP" })).toBeEnabled());
+  });
+});

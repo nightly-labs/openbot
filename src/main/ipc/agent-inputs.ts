@@ -13,6 +13,7 @@ import {
   type DeleteChannelMemoryInput,
   type DeleteChannelRoutineInput,
   type DeleteRoutineInput,
+  type DownloadAttachmentsInput,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
   isAgentModel,
@@ -496,6 +497,27 @@ export function parseChooseAttachments(value: unknown): ChooseAttachmentsInput {
     throw new Error("Invalid attachment picker filter.");
   }
   return { filter: value.filter };
+}
+
+export function parseDownloadAttachments(value: unknown): DownloadAttachmentsInput {
+  if (
+    !isObject(value) ||
+    !Array.isArray(value.attachments) ||
+    value.attachments.length < 3 ||
+    value.attachments.length > INPUT_LIMITS.attachments
+  ) {
+    throw new Error("Invalid attachment list.");
+  }
+  const attachments = value.attachments.map((item) => {
+    if (!isObject(item)) throw new Error("Invalid attachment.");
+    return {
+      id: requireString(item.id, "attachmentId"),
+      name: requireString(item.name, "attachment name", INPUT_LIMITS.attachmentName),
+    };
+  });
+  if (new Set(attachments.map((item) => item.id)).size !== attachments.length)
+    throw new Error("Duplicate attachments.");
+  return { attachments };
 }
 
 export function parseOpenAttachment(value: unknown): OpenAttachmentInput {
