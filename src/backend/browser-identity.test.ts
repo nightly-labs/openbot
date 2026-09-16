@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scrubbedBrowserUserAgent, siteIdentityForUrl } from "./browser-identity";
+import { applySiteIdentity, scrubbedBrowserUserAgent, siteIdentityForUrl } from "./browser-identity";
 
 describe("scrubbedBrowserUserAgent", () => {
   it("removes the build and product tokens for gated hosts", () => {
@@ -35,5 +35,39 @@ describe("siteIdentityForUrl", () => {
   it("falls back to native when no host can be read", () => {
     expect(siteIdentityForUrl("about:blank")).toBe("native");
     expect(siteIdentityForUrl("not a url")).toBe("native");
+  });
+
+  it("ignores a trailing dot on the hostname", () => {
+    expect(siteIdentityForUrl("https://web.whatsapp.com./")).toBe("scrubbed");
+  });
+});
+
+describe("applySiteIdentity", () => {
+  const rawAgent = "Mozilla/5.0 AppleWebKit/537.36 OpenBot/0.3.5 Chrome/152.0.7977.54 Electron/44.0.0 Safari/537.36";
+  const cleanAgent = "Mozilla/5.0 AppleWebKit/537.36 Chrome/152.0.7977.54 Safari/537.36";
+
+  it("scrubs a listed host and keeps one canonical entry", () => {
+    expect(applySiteIdentity("https://web.whatsapp.com/", { "user-agent": rawAgent, Accept: "text/html" })).toEqual({
+      "User-Agent": cleanAgent,
+      Accept: "text/html",
+    });
+  });
+
+  it("passes other hosts through with the same content", () => {
+    expect(applySiteIdentity("https://accounts.google.com/", { "User-Agent": rawAgent })).toEqual({
+      "User-Agent": rawAgent,
+    });
+  });
+
+  it("invents no header when none is sent", () => {
+    expect(applySiteIdentity("https://web.whatsapp.com/", { Accept: "text/html" })).toEqual({
+      Accept: "text/html",
+    });
+  });
+
+  it("never mutates the input record", () => {
+    const input = { "user-agent": rawAgent };
+    applySiteIdentity("https://web.whatsapp.com/", input);
+    expect(input).toEqual({ "user-agent": rawAgent });
   });
 });

@@ -9,8 +9,7 @@
  *
  * To add a site: append a row with the measured reason and cover it with an opt-in live
  * probe in `scripts/browser-smoke-electron.ts` (`--*-live`), the way WhatsApp is covered.
- * Rows never overlap by construction: the first match in table order wins, and the
- * fallback below the table stays native.
+ * The first match in table order wins, and anything unmatched stays native.
  */
 export type BrowserSiteIdentity = "native" | "scrubbed";
 
@@ -31,7 +30,7 @@ const SITE_POLICIES: readonly BrowserSitePolicy[] = [
 export function siteIdentityForUrl(url: string): BrowserSiteIdentity {
   let hostname: string;
   try {
-    hostname = new URL(url).hostname;
+    hostname = new URL(url).hostname.replace(/\.+$/u, "");
   } catch {
     return "native";
   }
@@ -45,4 +44,20 @@ export function siteIdentityForUrl(url: string): BrowserSiteIdentity {
 
 export function scrubbedBrowserUserAgent(userAgent: string): string {
   return userAgent.replace(/\s(?:Electron|OpenBot)\/[^\s]+/gu, "");
+}
+
+/**
+ * The request headers with the site policy applied. Returns a copy; the input is never
+ * mutated. Hosts outside the table pass through untouched, as does a request without a
+ * user agent -- no header is ever invented.
+ */
+export function applySiteIdentity(url: string, requestHeaders: Record<string, string>): Record<string, string> {
+  const headers = { ...requestHeaders };
+  if (siteIdentityForUrl(url) !== "scrubbed") return headers;
+  const userAgentName = Object.keys(headers).find((candidate) => candidate.toLowerCase() === "user-agent");
+  if (userAgentName === undefined) return headers;
+  const scrubbed = scrubbedBrowserUserAgent(headers[userAgentName]);
+  if (userAgentName !== "User-Agent") delete headers[userAgentName];
+  headers["User-Agent"] = scrubbed;
+  return headers;
 }
