@@ -133,19 +133,19 @@ const buildMp3 = (): Uint8Array => {
 const buildXlsx = (): Uint8Array =>
   zipSync({
     "xl/workbook.xml": strToU8(
-      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Operating plan" sheetId="1" r:id="rId1"/><sheet name="Regional view" sheetId="2" r:id="rId2"/></sheets></workbook>',
+      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="1"/><sheets><sheet name="Operating plan" sheetId="1" r:id="rId1"/><sheet name="Regional view" sheetId="2" r:id="rId2"/></sheets></workbook>',
     ),
     "xl/_rels/workbook.xml.rels": strToU8(
       '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>',
     ),
     "xl/styles.xml": strToU8(
-      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="165" formatCode="0.0%"/></numFmts><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="165"/></cellXfs></styleSheet>',
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="165" formatCode="0.0%"/><numFmt numFmtId="166" formatCode="yyyy-mm-dd"/><numFmt numFmtId="167" formatCode="h:mm"/></numFmts><cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="165"/><xf numFmtId="166"/><xf numFmtId="167"/></cellXfs></styleSheet>',
     ),
     "xl/worksheets/sheet1.xml": strToU8(
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Workstream</t></is></c><c r="B1" t="inlineStr"><is><t>Owner</t></is></c><c r="C1" t="inlineStr"><is><t>Status</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Product QA</t></is></c><c r="B2" t="inlineStr"><is><t>Builder</t></is></c><c r="C2" t="inlineStr"><is><t>Ready</t></is></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>Evidence</t></is></c><c r="B3" t="inlineStr"><is><t>Research</t></is></c><c r="C3" t="inlineStr"><is><t>In review</t></is></c></row></sheetData></worksheet>',
     ),
     "xl/worksheets/sheet2.xml": strToU8(
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1" t="inlineStr"><is><t>Activation</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2" s="1"><v>0.55</v></c></row></sheetData></worksheet>',
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1" t="inlineStr"><is><t>Activation</t></is></c><c r="C1" t="inlineStr"><is><t>Date</t></is></c><c r="D1" t="inlineStr"><is><t>Time</t></is></c><c r="E1" t="inlineStr"><is><t>Empty</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2" s="1"><v>0.55</v></c><c r="C2" s="2"><v>0</v></c><c r="D2" s="3"><v>0.5</v></c><c r="E2" s="1"/></row></sheetData></worksheet>',
     ),
   });
 

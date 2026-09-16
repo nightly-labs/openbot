@@ -87,19 +87,32 @@ function parseNumberFormats(bytes: Uint8Array | undefined): string[] {
   });
 }
 
-function formatExcelDate(value: number, format: string): string {
-  const date = new Date(Date.UTC(1899, 11, 30) + value * 86_400_000);
+function formatExcelDate(value: number, format: string, date1904: boolean): string {
+  const epoch = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+  const date = new Date(epoch + value * 86_400_000);
   if (Number.isNaN(date.getTime())) return String(value);
   const pad = (part: number) => String(part).padStart(2, "0");
   const day = `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
-  if (!/[hms]/iu.test(format)) return day;
+  if (!/[hs]/iu.test(format)) return day;
   return `${day} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
 }
 
-function formatExcelNumber(value: string, format: string): string {
+function formatExcelTime(value: number, format: string): string {
+  const totalSeconds = Math.max(0, Math.round(value * 86_400));
+  const hours = format.includes("[h]") ? Math.floor(totalSeconds / 3_600) : Math.floor(totalSeconds / 3_600) % 24;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const seconds = totalSeconds % 60;
+  const suffix = /am\/pm/iu.test(format) ? (hours >= 12 ? " PM" : " AM") : "";
+  const displayedHours = /am\/pm/iu.test(format) ? hours % 12 || 12 : hours;
+  return `${String(displayedHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}${/[s]/iu.test(format) ? `:${String(seconds).padStart(2, "0")}` : ""}${suffix}`;
+}
+
+function formatExcelNumber(value: string, format: string, date1904: boolean): string {
   const number = Number(value);
   if (!Number.isFinite(number) || format === "General" || format === "@") return value;
-  if (/[dy]/iu.test(format) && !/\[[^\]]+\]/u.test(format)) return formatExcelDate(number, format);
+  const hasDate = /[dy]/iu.test(format) && !/\[[^\]]+\]/u.test(format);
+  if (hasDate) return formatExcelDate(number, format, date1904);
+  if (/h|s|am\/pm/iu.test(format)) return formatExcelTime(number, format);
   if (format.includes("%")) {
     const decimals = format.match(/\.(0+)/u)?.[1].length ?? 0;
     return `${(number * 100).toFixed(decimals)}%`;
@@ -108,20 +121,24 @@ function formatExcelNumber(value: string, format: string): string {
   return number.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-function cellValue(cell: Element, sharedStrings: string[], numberFormats: string[]): string {
+function cellValue(cell: Element, sharedStrings: string[], numberFormats: string[], date1904: boolean): string {
   const type = cell.getAttribute("t");
   if (type === "inlineStr") return cell.getElementsByTagNameNS("*", "is")[0]?.textContent ?? "";
-  const value = cell.getElementsByTagNameNS("*", "v")[0]?.textContent ?? "";
+  const valueElement = cell.getElementsByTagNameNS("*", "v")[0];
+  if (!valueElement) return "";
+  const value = valueElement.textContent ?? "";
+  if (!value) return "";
   if (type === "s") return sharedStrings[Number(value)] ?? "";
   if (type === "b") return value === "1" ? "TRUE" : "FALSE";
   const style = Number(cell.getAttribute("s"));
-  return formatExcelNumber(value, numberFormats[style] ?? "General");
+  return formatExcelNumber(value, numberFormats[style] ?? "General", date1904);
 }
 
 function parseSheet(
   bytes: Uint8Array,
   sharedStrings: string[],
   numberFormats: string[],
+  date1904: boolean,
   name: string,
 ): SpreadsheetSheet {
   const document = xmlDocument(bytes, "a worksheet");
@@ -133,7 +150,7 @@ function parseSheet(
     for (const cell of Array.from(rowElement.getElementsByTagNameNS("*", "c"))) {
       const index = columnIndex(cell.getAttribute("r"));
       if (index === null || index >= MAX_COLUMNS) continue;
-      row[index] = cellValue(cell, sharedStrings, numberFormats);
+      row[index] = cellValue(cell, sharedStrings, numberFormats, date1904);
       maxColumns = Math.max(maxColumns, index + 1);
     }
     row.length = Math.min(maxColumns, MAX_COLUMNS);
@@ -163,6 +180,7 @@ function unzipSpreadsheet(bytes: Uint8Array) {
 export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
   const files = unzipSpreadsheet(bytes);
   const workbook = xmlDocument(files["xl/workbook.xml"], "xl/workbook.xml");
+  const date1904 = workbook.getElementsByTagNameNS("*", "workbookPr")[0]?.getAttribute("date1904") === "1";
   const relationships = xmlDocument(files["xl/_rels/workbook.xml.rels"], "xl/_rels/workbook.xml.rels");
   const relationshipTargets = new Map(
     Array.from(relationships.getElementsByTagNameNS("*", "Relationship")).map((relationship) => [
@@ -184,7 +202,7 @@ export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
         sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
       const target = id ? relationshipTargets.get(id) : undefined;
       if (!target || !files[target]) return null;
-      return parseSheet(files[target], sharedStrings, numberFormats, sheet.getAttribute("name") ?? "Sheet");
+      return parseSheet(files[target], sharedStrings, numberFormats, date1904, sheet.getAttribute("name") ?? "Sheet");
     })
     .filter((sheet): sheet is SpreadsheetSheet => sheet !== null);
   if (sheets.length === 0) throw new Error("The workbook contains no readable sheets.");
