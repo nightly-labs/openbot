@@ -84,8 +84,9 @@ const DynamicIsland = createSimpleContext({
       window.openbot.agent.onScopedEvent((event) => {
         flush(() => {
           const server = servers().find((candidate) => candidate.id === event.serverId);
-          if (server?.notificationsMuted) return;
           if (server?.kind === "remote" && server.state !== "online") return;
+          // Muted servers stay out of serverOrder() below, but their state keeps
+          // updating here so unmuting shows current attention instead of stale items.
           connectedServers.add(event.serverId);
           coordinator.applyEvent(event, activeServerId());
           publishPresentation();

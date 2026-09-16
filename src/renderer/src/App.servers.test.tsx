@@ -746,6 +746,98 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("does not resurface stale muted-server attention after unmute", async () => {
+    const local: ServerSummary = {
+      id: "local",
+      name: "Local",
+      logoUrl: null,
+      notificationsMuted: false,
+      kind: "local",
+      state: "online",
+      apiUrl: null,
+      remoteDesktopAvailable: false,
+      role: null,
+      active: true,
+    };
+    const remote: ServerSummary = {
+      id: "remote-1",
+      name: "Studio Mac",
+      logoUrl: null,
+      notificationsMuted: false,
+      kind: "remote",
+      state: "online",
+      apiUrl: "https://studio.example.com",
+      remoteDesktopAvailable: false,
+      role: "member",
+      active: false,
+    };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
+
+    render(() => <App />);
+    await waitFor(() => expect(emitScopedAgentEvent).toBeTypeOf("function"));
+    emitScopedAgentEvent?.({ serverId: remote.id, event: { type: "agents-changed", agents: AGENTS } });
+    emitScopedAgentEvent?.({
+      serverId: remote.id,
+      event: {
+        type: "approval",
+        approval: {
+          requestId: "approval-stale",
+          agentId: "chief",
+          threadId: "thread-chief",
+          turnId: "turn-remote",
+          kind: "permissions",
+          command: null,
+          cwd: null,
+          reason: "Review remote access.",
+          grantRoot: null,
+          permissions: { fileSystem: { read: ["/workspace"], write: [] }, network: false },
+        },
+      },
+    });
+    await waitFor(() =>
+      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: remote.id,
+        mode: "approval",
+        item: { requestId: "approval-stale" },
+      }),
+    );
+
+    emitServers?.([local, { ...remote, notificationsMuted: true }]);
+    await waitFor(() =>
+      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: "local",
+        mode: "idle",
+      }),
+    );
+    const mutedCallIndex = vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.length;
+
+    emitScopedAgentEvent?.({
+      serverId: remote.id,
+      event: {
+        type: "turn-completed",
+        agentId: "chief",
+        threadId: "thread-chief",
+        turnId: "turn-remote",
+        status: "completed",
+      },
+    });
+
+    emitServers?.([local, remote]);
+    await waitFor(() =>
+      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: "local",
+        mode: "idle",
+      }),
+    );
+    const requestIds = vi
+      .mocked(window.openbot.dynamicIsland.publishPresentation)
+      .mock.calls.slice(mutedCallIndex)
+      .map(([presentation]) =>
+        presentation.mode === "approval" || presentation.mode === "question" ? presentation.item.requestId : null,
+      );
+    expect(requestIds).not.toContain("approval-stale");
+  });
+
   it("reports a remote reply that arrives while its host is offline", async () => {
     const local: ServerSummary = {
       id: "local",
