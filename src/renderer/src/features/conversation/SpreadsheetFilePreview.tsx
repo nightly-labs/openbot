@@ -121,7 +121,13 @@ function formatLiteralSuffix(format: string): string {
 
 function isSupportedNumberFormat(format: string): boolean {
   const unquoted = unquotedFormat(format);
-  if (unquoted.includes(";") || /e[+-]?\d/iu.test(unquoted) || /,+\s*$/u.test(unquoted.trim())) return false;
+  if (
+    unquoted.includes(";") ||
+    /e[+-]?\d/iu.test(unquoted) ||
+    /,+\s*$/u.test(unquoted.trim()) ||
+    /\[(?:m+|s+)\]/iu.test(unquoted)
+  )
+    return false;
   if (hasDateFormat(format) || hasTimeFormat(format)) return true;
   return unquoted.replace(/[%#,0.]/gu, "").trim() === "";
 }
