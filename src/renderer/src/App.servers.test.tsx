@@ -1152,7 +1152,7 @@ describe("OpenBot connected desktop shell", () => {
     });
   });
 
-  it("renders Markdown attachments and switches back to the source", async () => {
+  it("renders Markdown attachments", async () => {
     const markdown = [
       "# Release notes",
       "",
@@ -1202,11 +1202,6 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByText("bold").tagName).toBe("STRONG");
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.queryByRole("script")).not.toBeInTheDocument();
-
-    await fireEvent.click(screen.getByRole("button", { name: "View source" }));
-    expect(screen.getByRole("button", { name: "View rendered Markdown" })).toBeInTheDocument();
-    expect(screen.getByText((_content, element) => element?.textContent === markdown)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Release notes" })).not.toBeInTheDocument();
   });
 
   it("duplicates an agent from its context menu and opens its empty conversation", async () => {

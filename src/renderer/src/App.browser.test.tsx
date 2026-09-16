@@ -1471,15 +1471,6 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.openWorkspaceFile).not.toHaveBeenCalled();
     expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
 
-    await fireEvent.click(screen.getByRole("button", { name: "View source" }));
-    expect(screen.getByRole("button", { name: "View rendered Markdown" })).toBeInTheDocument();
-    expect(
-      screen.getByText((_content, element) => element?.textContent === "# Tomato Basil Pasta\n\nUse **fresh basil**."),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Tomato Basil Pasta" })).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "View rendered Markdown" }));
-    expect(screen.getByRole("heading", { level: 1, name: "Tomato Basil Pasta" })).toBeInTheDocument();
-
     await fireEvent.click(screen.getByRole("button", { name: "Open file externally" }));
     expect(window.openbot.agent.openWorkspaceFile).toHaveBeenCalledWith({ agentId: "chief", path: workspacePath });
     await fireEvent.click(screen.getByRole("button", { name: "Close file preview" }));

@@ -76,8 +76,14 @@ export function ConversationOverlays() {
                     agents={props.agents}
                     onSelectAgent={props.onSelectAgent}
                     onOpenLink={(url) => void openExternalMessageUrl(url)}
-                    onOpenSharedFile={openSharedFile}
-                    onOpenWorkspaceFile={openWorkspaceFile}
+                    onOpenSharedFile={(path) => {
+                      setMediaPreview(null);
+                      openSharedFile(path);
+                    }}
+                    onOpenWorkspaceFile={(path) => {
+                      setMediaPreview(null);
+                      openWorkspaceFile(path);
+                    }}
                   />
                 </Show>
                 <Show

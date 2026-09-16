@@ -147,6 +147,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
         <Show when={props.preview.previewKind === "text"}>
           <pre class="file-preview-text">{text().value}</pre>
+          <Show when={text().truncated}>
+            <p class="file-preview-truncated">Preview truncated after 1,000,000 characters.</p>
+          </Show>
         </Show>
         <Show when={props.preview.previewKind === "image" && previewUrl()}>
           <div class="file-preview-image-wrap">
