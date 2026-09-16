@@ -1067,25 +1067,6 @@
   height: 12px;
 }
 
-.browser-auth-notice {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  border-bottom: 1px solid var(--openbot-hover);
-  background: var(--openbot-warning-soft);
-  color: var(--openbot-warning);
-  padding: 6px 10px;
-  font-size: var(--openbot-text-sm);
-  line-height: 1.4;
-}
-
-.browser-auth-notice svg {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 auto;
-}
-
 .browser-address-bar input {
   display: block;
   width: 100%;

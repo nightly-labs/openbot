@@ -18,7 +18,6 @@ import {
   TriangleAlert,
 } from "../../components/ui";
 import type { AgentProfile } from "../../data";
-import { googleAuthBlockedMessage } from "../browser/browser-google-auth";
 import {
   BrowserBackIcon,
   BrowserControlIcon,
@@ -82,7 +81,6 @@ function diagnosticErrorLabel(count: number): string {
 
 export default function BrowserPanel(props: BrowserPanelProps) {
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
-  const googleAuthNotice = () => googleAuthBlockedMessage(props.activeTab?.url);
   let hideButton: HTMLButtonElement | undefined;
   let panel: HTMLElement | undefined;
   let surfaceElement: HTMLDivElement | undefined;
@@ -313,14 +311,6 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             <PictureInPicture2 class="browser-toolbar-icon" />
           </Button>
         </div>
-        <Show when={googleAuthNotice()}>
-          {(message) => (
-            <div class="browser-auth-notice" role="status">
-              <TriangleAlert aria-hidden="true" />
-              <span>{message()}</span>
-            </div>
-          )}
-        </Show>
         {surface()}
       </Tabs.Content>
     </Tabs.Root>

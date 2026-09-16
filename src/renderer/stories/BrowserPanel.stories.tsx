@@ -124,25 +124,3 @@ export const NarrowPanel: Story = {
     maxWidth: () => 320,
   },
 };
-
-/** Google refused one login step. The panel names the next step. */
-export const GoogleAuthBlocked: Story = {
-  args: {
-    tabs: [
-      {
-        ...tab,
-        id: "tab-google",
-        title: "Sign in - Google Accounts",
-        url: "https://accounts.google.com/signin/rejected?hl=en",
-        diagnosticErrorCount: 1,
-      },
-    ],
-    activeTab: {
-      ...tab,
-      id: "tab-google",
-      title: "Sign in - Google Accounts",
-      url: "https://accounts.google.com/signin/rejected?hl=en",
-      diagnosticErrorCount: 1,
-    },
-  },
-};
