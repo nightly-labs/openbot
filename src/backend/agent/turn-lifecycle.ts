@@ -27,7 +27,12 @@ import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
-import { isNonActionableCodexWarning, providerActivityText, toThreadItem } from "./thread-items";
+import {
+  isNonActionableCodexWarning,
+  isUserFacingCommentary,
+  providerActivityText,
+  toThreadItem,
+} from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -88,6 +93,7 @@ export class TurnLifecycle {
   readonly #deltas: DeltaBuffer;
   readonly #hooks: TurnHooks;
   readonly #failedTurns = new Map<string, string>();
+  readonly #userFacingCommentaryItems = new Set<string>();
   readonly #itemTurns = new Map<string, string>();
   readonly #turnAssociations = new Map<string, Promise<void>>();
   readonly #pendingProgress = new Map<string, { agentId: string; threadId: string; turnId: string; detail: string }>();
@@ -195,7 +201,10 @@ export class TurnLifecycle {
         const item = getRecord(params, "item");
         if (!turnId || !item) return;
         const itemId = getString(item, "id");
-        if (itemId) this.#itemTurns.set(itemId, turnId);
+        if (itemId) {
+          this.#itemTurns.set(itemId, turnId);
+          if (isUserFacingCommentary(item)) this.#userFacingCommentaryItems.add(itemId);
+        }
         if (item.type === "contextCompaction") {
           if (notification.method === "item/completed") {
             this.#compaction.markCompacted(threadId);
@@ -204,6 +213,7 @@ export class TurnLifecycle {
         }
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
+          this.#userFacingCommentaryItems.delete(itemId);
         }
         const threadItem = toThreadItem(item);
         if (!threadItem) return;
@@ -236,7 +246,7 @@ export class TurnLifecycle {
         }
         message.text += delta;
         message.status = "streaming";
-        if (message.itemType === "commentary") {
+        if (message.itemType === "commentary" && this.#userFacingCommentaryItems.has(itemId)) {
           const activity = providerActivityText(message.text);
           if (activity) this.#queueTurnProgress(agentId, publicThreadId, turnId, activity);
         }

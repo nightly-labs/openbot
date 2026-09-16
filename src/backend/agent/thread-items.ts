@@ -56,6 +56,10 @@ export function providerActivityText(text: string): string | null {
   return normalized;
 }
 
+export function isUserFacingCommentary(item: DynamicRecord): boolean {
+  return getString(item, "type") === "agentMessage" && getString(item, "phase") === "commentary";
+}
+
 export function providerForAgent(agent: { provider: AgentProvider }): AgentProvider {
   return agent.provider;
 }
