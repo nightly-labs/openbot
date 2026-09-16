@@ -391,6 +391,9 @@ function ServerRailButton(props: {
             <Show when={props.server.notificationsMuted}>
               <BellOff class="server-rail-muted size-3" aria-hidden="true" />
             </Show>
+            <Show when={props.server.notchHidden}>
+              <EyeOff class="server-rail-muted size-3" aria-hidden="true" />
+            </Show>
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label="Server actions">
