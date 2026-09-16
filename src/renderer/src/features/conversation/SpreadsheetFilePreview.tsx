@@ -19,6 +19,11 @@ interface SpreadsheetData {
   truncated: boolean;
 }
 
+interface ParsedSheet {
+  sheet: SpreadsheetSheet;
+  truncated: boolean;
+}
+
 function xmlDocument(bytes: Uint8Array | undefined, name: string): Document {
   if (!bytes) throw new Error(`The workbook is missing ${name}.`);
   const document = new DOMParser().parseFromString(strFromU8(bytes), "application/xml");
@@ -114,11 +119,14 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   if (hasDate) return formatExcelDate(number, format, date1904);
   if (/h|s|am\/pm/iu.test(format)) return formatExcelTime(number, format);
   if (format.includes("%")) {
-    const decimals = format.match(/\.(0+)/u)?.[1].length ?? 0;
-    return `${(number * 100).toFixed(decimals)}%`;
+    const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
+    const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
+    const maximumFractionDigits = decimals.length;
+    return `${(number * 100).toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits })}%`;
   }
-  const decimals = format.match(/\.(0+)/u)?.[1].length ?? 0;
-  return number.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
+  const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
+  return number.toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits: decimals.length });
 }
 
 function cellValue(cell: Element, sharedStrings: string[], numberFormats: string[], date1904: boolean): string {
@@ -140,16 +148,21 @@ function parseSheet(
   numberFormats: string[],
   date1904: boolean,
   name: string,
-): SpreadsheetSheet {
+): ParsedSheet {
   const document = xmlDocument(bytes, "a worksheet");
   const rows: string[][] = [];
-  const rowElements = Array.from(document.getElementsByTagNameNS("*", "row")).slice(0, MAX_ROWS);
+  const allRowElements = Array.from(document.getElementsByTagNameNS("*", "row"));
+  const rowElements = allRowElements.slice(0, MAX_ROWS);
+  let truncated = allRowElements.length > MAX_ROWS;
   let maxColumns = 0;
   for (const [rowIndex, rowElement] of rowElements.entries()) {
     const row = Array.from({ length: Math.min(maxColumns, MAX_COLUMNS) }, () => "");
     for (const cell of Array.from(rowElement.getElementsByTagNameNS("*", "c"))) {
       const index = columnIndex(cell.getAttribute("r"));
-      if (index === null || index >= MAX_COLUMNS) continue;
+      if (index === null || index >= MAX_COLUMNS) {
+        truncated = true;
+        continue;
+      }
       row[index] = cellValue(cell, sharedStrings, numberFormats, date1904);
       maxColumns = Math.max(maxColumns, index + 1);
     }
@@ -157,7 +170,7 @@ function parseSheet(
     rows[rowIndex] = row;
   }
   for (const row of rows) row.length = maxColumns;
-  return { name, rows };
+  return { sheet: { name, rows }, truncated };
 }
 
 function unzipSpreadsheet(bytes: Uint8Array) {
@@ -195,7 +208,7 @@ export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
       )
     : [];
   const numberFormats = parseNumberFormats(files["xl/styles.xml"]);
-  const sheets = Array.from(workbook.getElementsByTagNameNS("*", "sheet"))
+  const parsedSheets = Array.from(workbook.getElementsByTagNameNS("*", "sheet"))
     .map((sheet) => {
       const id =
         sheet.getAttribute("r:id") ??
@@ -204,13 +217,11 @@ export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
       if (!target || !files[target]) return null;
       return parseSheet(files[target], sharedStrings, numberFormats, date1904, sheet.getAttribute("name") ?? "Sheet");
     })
-    .filter((sheet): sheet is SpreadsheetSheet => sheet !== null);
-  if (sheets.length === 0) throw new Error("The workbook contains no readable sheets.");
+    .filter((sheet): sheet is ParsedSheet => sheet !== null);
+  if (parsedSheets.length === 0) throw new Error("The workbook contains no readable sheets.");
   return {
-    sheets,
-    truncated: sheets.some(
-      (sheet) => sheet.rows.length >= MAX_ROWS || sheet.rows.some((row) => row.length >= MAX_COLUMNS),
-    ),
+    sheets: parsedSheets.map(({ sheet }) => sheet),
+    truncated: parsedSheets.some(({ truncated }) => truncated),
   };
 }
 
