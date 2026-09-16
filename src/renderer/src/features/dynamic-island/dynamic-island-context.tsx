@@ -39,10 +39,15 @@ const DynamicIsland = createSimpleContext({
     function serverOrder(): string[] {
       const activeId = activeServerId();
       const ids = servers()
-        .filter((server) => connectedServers.has(server.id) && (server.kind === "local" || server.state === "online"))
+        .filter(
+          (server) =>
+            !server.notificationsMuted &&
+            connectedServers.has(server.id) &&
+            (server.kind === "local" || server.state === "online"),
+        )
         .map((server) => server.id);
       ids.sort((left, right) => Number(right === activeId) - Number(left === activeId));
-      return ids.length > 0 ? ids : ["local"];
+      return ids;
     }
 
     function publishPresentation(): void {
@@ -58,7 +63,7 @@ const DynamicIsland = createSimpleContext({
     createEffect(
       () =>
         servers()
-          .map((server) => `${server.id}:${server.state}`)
+          .map((server) => `${server.id}:${server.state}:${server.notificationsMuted ? "muted" : "loud"}`)
           .join("\u0000"),
       () => {
         const currentServers = servers();
@@ -79,6 +84,7 @@ const DynamicIsland = createSimpleContext({
       window.openbot.agent.onScopedEvent((event) => {
         flush(() => {
           const server = servers().find((candidate) => candidate.id === event.serverId);
+          if (server?.notificationsMuted) return;
           if (server?.kind === "remote" && server.state !== "online") return;
           connectedServers.add(event.serverId);
           coordinator.applyEvent(event, activeServerId());

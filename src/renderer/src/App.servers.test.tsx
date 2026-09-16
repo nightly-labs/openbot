@@ -640,6 +640,112 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("hides muted servers from Dynamic Island updates without a restart", async () => {
+    const local: ServerSummary = {
+      id: "local",
+      name: "Local",
+      logoUrl: null,
+      notificationsMuted: false,
+      kind: "local",
+      state: "online",
+      apiUrl: null,
+      remoteDesktopAvailable: false,
+      role: null,
+      active: true,
+    };
+    const mutedOne: ServerSummary = {
+      id: "remote-1",
+      name: "Studio Mac",
+      logoUrl: null,
+      notificationsMuted: true,
+      kind: "remote",
+      state: "online",
+      apiUrl: "https://studio.example.com",
+      remoteDesktopAvailable: false,
+      role: "member",
+      active: false,
+    };
+    const mutedTwo: ServerSummary = {
+      id: "remote-2",
+      name: "Office PC",
+      logoUrl: null,
+      notificationsMuted: true,
+      kind: "remote",
+      state: "online",
+      apiUrl: "https://office.example.com",
+      remoteDesktopAvailable: false,
+      role: "member",
+      active: false,
+    };
+    const loud: ServerSummary = { ...mutedTwo, notificationsMuted: false };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, mutedOne, loud]);
+
+    const approvalFor = (requestId: string) => ({
+      type: "approval" as const,
+      approval: {
+        requestId,
+        agentId: "chief",
+        threadId: "thread-chief",
+        turnId: "turn-remote",
+        kind: "permissions" as const,
+        command: null,
+        cwd: null,
+        reason: "Review remote access.",
+        grantRoot: null,
+        permissions: { fileSystem: { read: ["/workspace"], write: [] }, network: false },
+      },
+    });
+
+    render(() => <App />);
+    await waitFor(() => expect(emitScopedAgentEvent).toBeTypeOf("function"));
+    emitScopedAgentEvent?.({ serverId: mutedOne.id, event: { type: "agents-changed", agents: AGENTS } });
+    emitScopedAgentEvent?.({ serverId: loud.id, event: { type: "agents-changed", agents: AGENTS } });
+
+    emitScopedAgentEvent?.({ serverId: mutedOne.id, event: approvalFor("approval-muted-1") });
+    emitScopedAgentEvent?.({ serverId: loud.id, event: approvalFor("approval-loud") });
+    await waitFor(() =>
+      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: loud.id,
+        mode: "approval",
+        item: { requestId: "approval-loud" },
+      }),
+    );
+
+    emitServers?.([local, mutedOne, { ...mutedTwo, notificationsMuted: true }]);
+    await waitFor(() =>
+      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: "local",
+        mode: "idle",
+      }),
+    );
+
+    emitScopedAgentEvent?.({ serverId: mutedTwo.id, event: approvalFor("approval-muted-2") });
+    await waitFor(() =>
+      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: "local",
+        mode: "idle",
+      }),
+    );
+    const requestIds = vi
+      .mocked(window.openbot.dynamicIsland.publishPresentation)
+      .mock.calls.map(([presentation]) =>
+        presentation.mode === "approval" || presentation.mode === "question" ? presentation.item.requestId : null,
+      );
+    expect(requestIds).toContain("approval-loud");
+    expect(requestIds).not.toContain("approval-muted-1");
+    expect(requestIds).not.toContain("approval-muted-2");
+
+    emitServers?.([local, { ...mutedOne, notificationsMuted: false }, loud]);
+    emitScopedAgentEvent?.({ serverId: mutedOne.id, event: approvalFor("approval-unmuted") });
+    await waitFor(() =>
+      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: mutedOne.id,
+        mode: "approval",
+        item: { requestId: "approval-unmuted" },
+      }),
+    );
+  });
+
   it("reports a remote reply that arrives while its host is offline", async () => {
     const local: ServerSummary = {
       id: "local",

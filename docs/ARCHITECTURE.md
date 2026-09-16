@@ -757,7 +757,8 @@ mute change before publishing it. These preferences survive restart, re-login, a
 reconciliation. The server context menu controls mute for local and remote servers.
 
 `renderer-forwarders.ts` continues to deliver live events for muted servers, but suppresses
-system notifications. Remote notification content uses the source server's agent list. Both
+system notifications. The Dynamic Island projection drops muted servers from its order and
+ignores their scoped events, so muted servers never reach the notch. Remote notification content uses the source server's agent list. Both
 server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
 not yet deliver system notifications; mute settings are not synchronized between devices.
 
