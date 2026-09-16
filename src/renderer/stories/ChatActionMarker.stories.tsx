@@ -66,6 +66,9 @@ export const AllStates: Story = {
             onOpenRoutine={onOpenRoutine}
           />
         ))}
+        {watcherActions.map((action) => (
+          <ChatActionMarker marker={watcherMarker(action)} agents={agents} onSelectAgent={onSelectAgent} />
+        ))}
         {siteActions.flatMap((action) =>
           siteStatuses.map((status) => (
             <ChatActionMarker
@@ -88,6 +91,8 @@ export const AllStates: Story = {
     onOpenRoutine.mockClear();
     await userEvent.click(canvas.getAllByRole("button", { name: "Open routine Morning brief" })[0]);
     await expect(onOpenRoutine).toHaveBeenCalledWith({ routineId: "routine-1", name: "Morning brief" });
+    await expect(canvas.getByText("Paused watcher")).toBeTruthy();
+    await expect(canvas.getByText("Resumed watcher")).toBeTruthy();
   },
 };
 
@@ -161,6 +166,10 @@ const routineActions: Array<Extract<ChatActionMarkerModel, { kind: "routine-life
   "updated",
   "deleted",
 ];
+const watcherActions: Array<Extract<ChatActionMarkerModel, { kind: "watcher-lifecycle" }>["action"]> = [
+  "paused",
+  "resumed",
+];
 const siteActions: Array<Extract<ChatActionMarkerModel, { kind: "hosted-site" }>["action"]> = [
   "publish",
   "replace",
@@ -213,6 +222,20 @@ function lifecycleMarker(
     sourceAgentId: "chief",
     routineId: "routine-1",
     routineName: "Morning brief",
+    status: "completed",
+    timestamp,
+  };
+}
+
+function watcherMarker(
+  action: Extract<ChatActionMarkerModel, { kind: "watcher-lifecycle" }>["action"],
+): Extract<ChatActionMarkerModel, { kind: "watcher-lifecycle" }> {
+  return {
+    kind: "watcher-lifecycle",
+    action,
+    sourceAgentId: "chief",
+    watcherId: "watcher-1",
+    watcherName: "Price watch",
     status: "completed",
     timestamp,
   };

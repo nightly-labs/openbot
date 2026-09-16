@@ -9,10 +9,12 @@ import {
   type CreateChannelMemoryInput,
   type CreateChannelRoutineInput,
   type CreateRoutineInput,
+  type CreateWatcherInput,
   type DeleteAgentMemoryInput,
   type DeleteChannelMemoryInput,
   type DeleteChannelRoutineInput,
   type DeleteRoutineInput,
+  type DeleteWatcherInput,
   type DownloadAttachmentsInput,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
@@ -23,8 +25,12 @@ import {
   isMessageReaction,
   isReasoningEffort,
   isRoutineSchedule,
+  isWatcherCondition,
+  isWatcherSelector,
+  isWatcherSource,
   type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
+  type ListWatcherMatchesInput,
   type MarkConversationReadInput,
   type OpenAttachmentInput,
   type OpenSharedFileInput,
@@ -42,12 +48,14 @@ import {
   type SteerQueuedMessageInput,
   type TestChannelRoutineInput,
   type TestRoutineInput,
+  type TestWatcherInput,
   type UpdateAgentInput,
   type UpdateAgentMemoryInput,
   type UpdateChannelMemoryInput,
   type UpdateChannelRoutineInput,
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
+  type UpdateWatcherInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { parseAvatarImage } from "./avatar-inputs";
@@ -240,6 +248,85 @@ export function parseListRoutineRuns(value: unknown): ListRoutineRunsInput {
 function parseRoutineSchedule(value: unknown): CreateRoutineInput["schedule"] {
   if (!isRoutineSchedule(value)) throw new Error("Invalid routine schedule.");
   return structuredClone(value);
+}
+
+export function parseCreateWatcher(value: unknown): CreateWatcherInput {
+  if (!isObject(value)) throw new Error("Invalid watcher creation request.");
+  if (!isBoolean(value.active)) throw new Error("active must be a boolean.");
+  if (!isWatcherSource(value.source)) throw new Error("Invalid watcher source.");
+  if (value.selector !== undefined && value.selector !== null && !isWatcherSelector(value.selector)) {
+    throw new Error("Invalid watcher selector.");
+  }
+  if (value.condition !== undefined && !isWatcherCondition(value.condition)) {
+    throw new Error("Invalid watcher condition.");
+  }
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    routineId: requireString(value.routineId, "routineId", INPUT_LIMITS.identifier),
+    name: requireString(value.name, "name", INPUT_LIMITS.watcherName),
+    active: value.active,
+    intervalMinutes: parseWatcherInterval(value.intervalMinutes),
+    source: structuredClone(value.source),
+    ...(value.selector === undefined || value.selector === null ? {} : { selector: structuredClone(value.selector) }),
+    ...(value.condition === undefined ? {} : { condition: structuredClone(value.condition) }),
+  };
+}
+
+export function parseUpdateWatcher(value: unknown): UpdateWatcherInput {
+  if (!isObject(value)) throw new Error("Invalid watcher update request.");
+  const parsed: UpdateWatcherInput = {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    watcherId: requireString(value.watcherId, "watcherId", INPUT_LIMITS.identifier),
+  };
+  if (value.name !== undefined) parsed.name = requireString(value.name, "name", INPUT_LIMITS.watcherName);
+  if (value.active !== undefined) {
+    if (!isBoolean(value.active)) throw new Error("active must be a boolean.");
+    parsed.active = value.active;
+  }
+  if (value.intervalMinutes !== undefined) parsed.intervalMinutes = parseWatcherInterval(value.intervalMinutes);
+  if (value.source !== undefined) {
+    if (!isWatcherSource(value.source)) throw new Error("Invalid watcher source.");
+    parsed.source = structuredClone(value.source);
+  }
+  if (value.selector !== undefined) {
+    if (value.selector !== null && !isWatcherSelector(value.selector)) throw new Error("Invalid watcher selector.");
+    parsed.selector = value.selector === null ? null : structuredClone(value.selector);
+  }
+  if (value.condition !== undefined) {
+    if (!isWatcherCondition(value.condition)) throw new Error("Invalid watcher condition.");
+    parsed.condition = structuredClone(value.condition);
+  }
+  if (Object.keys(parsed).length === 2) throw new Error("A watcher update is required.");
+  return parsed;
+}
+
+export function parseDeleteWatcher(value: unknown): DeleteWatcherInput {
+  if (!isObject(value)) throw new Error("Invalid watcher deletion request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    watcherId: requireString(value.watcherId, "watcherId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseTestWatcher(value: unknown): TestWatcherInput {
+  return parseDeleteWatcher(value);
+}
+
+export function parseListWatcherMatches(value: unknown): ListWatcherMatchesInput {
+  const input = parseDeleteWatcher(value);
+  if (!isObject(value)) throw new Error("Invalid watcher history request.");
+  const limit = value.limit ?? 50;
+  if (!isNumber(limit) || !Number.isInteger(limit) || limit < 1 || limit > INPUT_LIMITS.watcherMatchesPage) {
+    throw new Error("Invalid watcher history limit.");
+  }
+  return { ...input, limit };
+}
+
+function parseWatcherInterval(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 3 || value > 1440) {
+    throw new Error("Watcher interval must be between 3 and 1440 minutes.");
+  }
+  return value;
 }
 
 /**

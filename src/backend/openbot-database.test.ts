@@ -14,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
+import { AgentRoutineStore } from "./agent-routine-store";
 import { OpenBotDatabase } from "./openbot-database";
 
 const roots: string[] = [];
@@ -107,6 +108,8 @@ describe("OpenBotDatabase", () => {
         "projection_channel_routines",
         "projection_channel_routine_triggers",
         "projection_channel_routine_runs",
+        "projection_agent_watchers",
+        "projection_agent_watcher_matches",
         "file_deletion_outbox",
       ]),
     );
@@ -128,6 +131,8 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
+      { version: 22 },
     ]);
     database.close();
   });
@@ -1072,6 +1077,9 @@ describe("OpenBotDatabase", () => {
     for (const table of ["assignments", "tasks", "messages", "summaries", "reads", "contexts"])
       analyticsRelease.exec(`DROP TABLE projection_channel_${table}`);
     analyticsRelease.exec("DROP TABLE projection_channels");
+    analyticsRelease.exec("DROP TABLE projection_mcp_servers");
+    analyticsRelease.exec("DROP TABLE projection_agent_watcher_matches");
+    analyticsRelease.exec("DROP TABLE projection_agent_watchers");
     analyticsRelease.exec("DELETE FROM schema_migrations WHERE version >= 17");
     analyticsRelease.close();
 
@@ -1107,6 +1115,8 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
+      { version: 22 },
     ]);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     migrated.close();
@@ -1174,7 +1184,10 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (19, 20);
+      DROP TABLE projection_mcp_servers;
+      DROP TABLE projection_agent_watcher_matches;
+      DROP TABLE projection_agent_watchers;
+      DELETE FROM schema_migrations WHERE version IN (19, 20, 21, 22);
       PRAGMA foreign_keys = ON;
     `);
     legacy.close();
@@ -1202,7 +1215,7 @@ describe("OpenBotDatabase", () => {
         .get(),
     ).toMatchObject({ sql: expect.stringContaining("'opencode'") });
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 20,
+      version: 22,
     });
     migrated.close();
   });
@@ -1216,11 +1229,14 @@ describe("OpenBotDatabase", () => {
     database.replaceAgents("agents-import", [agent], "agents.imported");
     database.close();
 
-    // A version 19 database: the table migration 20 creates is not there, and neither is its row.
+    // A version 19 database: the tables migrations 20 to 22 create are not there, and neither are
+    // their rows.
     const legacy = new DatabaseSync(database.path);
     legacy.exec(`
       DROP TABLE projection_mcp_servers;
-      DELETE FROM schema_migrations WHERE version = 20;
+      DROP TABLE projection_agent_watcher_matches;
+      DROP TABLE projection_agent_watchers;
+      DELETE FROM schema_migrations WHERE version IN (20, 21, 22);
     `);
     legacy.close();
 
@@ -1245,9 +1261,55 @@ describe("OpenBotDatabase", () => {
       { name: "Filesystem" },
     ]);
     expect(reopened.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 20,
+      version: 22,
     });
     reopened.close();
+  });
+
+  it("adds watcher check-state columns to a version 21 database and keeps routines", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-v21-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await database.initialize();
+    const agent = testAgent();
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    new AgentRoutineStore(database).create(
+      {
+        agentId: agent.id,
+        name: "Handle change",
+        instruction: "Read watcher matches and act.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "hourly", minute: 0 },
+      },
+      new Date("2026-09-01T00:00:00.000Z"),
+    );
+    database.close();
+
+    // A version 21 database: the check-state columns migration 22 adds are not there, and neither
+    // is its row.
+    const legacy = new DatabaseSync(database.path);
+    legacy.exec(`
+      ALTER TABLE projection_agent_watchers DROP COLUMN last_kept_text;
+      ALTER TABLE projection_agent_watchers DROP COLUMN last_mode;
+      DELETE FROM schema_migrations WHERE version = 22;
+    `);
+    legacy.close();
+
+    const migrated = new OpenBotDatabase(root);
+    await migrated.initialize();
+    expect(migrated.listAgents().map((summary) => summary.id)).toEqual([agent.id]);
+    expect(new AgentRoutineStore(migrated).list(agent.id)).toHaveLength(1);
+    expect(migrated.connection.prepare("PRAGMA table_info(projection_agent_watchers)").all()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "last_kept_text" }),
+        expect.objectContaining({ name: "last_mode" }),
+      ]),
+    );
+    expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
+      version: 22,
+    });
+    migrated.close();
   });
 
   it("adds post-v4 agent memory and routine projections", async () => {
@@ -1302,7 +1364,10 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
+      { version: 22 },
     ]);
+    expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     migrated.close();
   });
 
@@ -1380,6 +1445,8 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
+      { version: 22 },
     ]);
     retried.close();
   });
@@ -1919,6 +1986,9 @@ describe("OpenBotDatabase", () => {
       const legacy = new DatabaseSync(database.path);
       legacy.exec(`
       DELETE FROM schema_migrations WHERE version >= 17;
+      DROP TABLE projection_mcp_servers;
+      DROP TABLE projection_agent_watcher_matches;
+      DROP TABLE projection_agent_watchers;
       PRAGMA foreign_keys = OFF;
       CREATE TABLE projection_provider_sessions_v16 (
         id TEXT PRIMARY KEY,
@@ -2337,5 +2407,8 @@ function removeSchemaAfterVersion14(db: DatabaseSync): void {
     db.exec(`DROP TABLE projection_channel_${table}`);
   db.exec("DROP TABLE projection_channels");
   db.exec("DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity");
+  db.exec("DROP TABLE projection_mcp_servers");
+  db.exec("DROP TABLE projection_agent_watcher_matches");
+  db.exec("DROP TABLE projection_agent_watchers");
   db.exec("DELETE FROM schema_migrations WHERE version >= 15");
 }

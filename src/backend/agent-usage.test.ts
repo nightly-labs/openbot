@@ -280,7 +280,7 @@ describe("local agent usage", () => {
     try {
       migrateOpenBotDatabase(db);
       db.exec(
-        "DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity; DELETE FROM schema_migrations WHERE version >= 15; CREATE TABLE preservation(value TEXT); INSERT INTO preservation VALUES ('keep'); CREATE TABLE agent_usage_date (conflict TEXT)",
+        "DROP TABLE agent_usage_records; DROP TABLE agent_usage_checkpoints; DROP TABLE agent_usage_activity; DROP TABLE projection_mcp_servers; DROP TABLE projection_agent_watcher_matches; DROP TABLE projection_agent_watchers; DELETE FROM schema_migrations WHERE version >= 15; CREATE TABLE preservation(value TEXT); INSERT INTO preservation VALUES ('keep'); CREATE TABLE agent_usage_date (conflict TEXT)",
       );
       // Every later version goes with 15: a history that keeps 16 but drops 15 has a gap,
       // which the schema check rejects before any upgrade runs.

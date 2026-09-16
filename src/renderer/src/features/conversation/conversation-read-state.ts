@@ -9,6 +9,7 @@ import {
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
+  WATCHER_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "../../data";
 
@@ -23,13 +24,14 @@ export type AgentAutoReadEntry =
   | { messageId: string; status: "succeeded"; state: ConversationReadState };
 
 /**
- * Routine, routine-run and hosted-site markers are bookkeeping the agent writes
+ * Routine, routine-run, watcher and hosted-site markers are bookkeeping the agent writes
  * about itself, so they never make a conversation unread.
  */
 export function isRoutineEventItem(message: { itemType?: string }): boolean {
   return (
     message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) === true ||
     message.itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX) === true ||
+    message.itemType?.startsWith(WATCHER_EVENT_ITEM_TYPE_PREFIX) === true ||
     message.itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX) === true ||
     message.itemType?.startsWith(SKILL_EVENT_ITEM_TYPE_PREFIX) === true
   );

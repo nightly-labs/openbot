@@ -71,6 +71,8 @@ import type {
   UpdateQueuedMessageInput,
   UpdateStatus,
   UpdateTeamMemberInput,
+  Watcher,
+  WatcherMatch,
 } from "@openbot/contracts/ipc";
 import {
   composedCustomModelId,
@@ -147,6 +149,8 @@ export interface MockOpenBotOptions {
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   routines?: Record<string, Routine[]>;
+  watchers?: Record<string, Watcher[]>;
+  watcherMatches?: Record<string, WatcherMatch[]>;
   localSkills?: MarketplaceSkillDetail[];
   installedSkills?: Record<string, InstalledSkill[]>;
   customProviders?: CustomProviderSummary[];
@@ -400,6 +404,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
+  const watchers = new Map<string, Watcher[]>(Object.entries(clone(options.watchers ?? {})));
+  const watcherMatches = new Map<string, WatcherMatch[]>(Object.entries(clone(options.watcherMatches ?? {})));
 
   function emitAgentEvent(event: AgentEvent): void {
     emit(agentListeners, event);
@@ -1454,6 +1460,63 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(run);
       },
       listRoutineRuns: async (input) => clone((routineRuns.get(input.routineId) ?? []).slice(0, input.limit)),
+      listWatchers: async (agentId) => clone(watchers.get(agentId) ?? []),
+      createWatcher: async (input) => {
+        const now = new Date().toISOString();
+        const watcher: Watcher = {
+          id: crypto.randomUUID(),
+          agentId: input.agentId,
+          routineId: input.routineId,
+          name: input.name.trim(),
+          active: input.active,
+          intervalMinutes: input.intervalMinutes,
+          source: clone(input.source),
+          selector: input.selector ? clone(input.selector) : null,
+          condition: clone(input.condition ?? {}),
+          health: "ok",
+          lastCheckedAt: null,
+          nextCheckAt: new Date(Date.now() + input.intervalMinutes * 60_000).toISOString(),
+          lastStateHash: null,
+          lastKeptText: null,
+          lastMode: null,
+          errorCount: 0,
+          createdAt: now,
+          updatedAt: now,
+        };
+        watchers.set(input.agentId, [watcher, ...(watchers.get(input.agentId) ?? [])]);
+        emitAgentEvent({ type: "watchers-changed", agentId: input.agentId });
+        return clone(watcher);
+      },
+      updateWatcher: async (input) => {
+        const current = watchers.get(input.agentId)?.find((watcher) => watcher.id === input.watcherId);
+        if (!current) throw new Error("Watcher not found");
+        const updated: Watcher = {
+          ...current,
+          ...(input.name === undefined ? {} : { name: input.name.trim() }),
+          ...(input.active === undefined ? {} : { active: input.active }),
+          ...(input.intervalMinutes === undefined ? {} : { intervalMinutes: input.intervalMinutes }),
+          ...(input.source === undefined ? {} : { source: clone(input.source) }),
+          ...(input.selector === undefined ? {} : { selector: input.selector ? clone(input.selector) : null }),
+          ...(input.condition === undefined ? {} : { condition: clone(input.condition) }),
+          updatedAt: new Date().toISOString(),
+        };
+        watchers.set(
+          input.agentId,
+          (watchers.get(input.agentId) ?? []).map((watcher) => (watcher.id === current.id ? updated : watcher)),
+        );
+        emitAgentEvent({ type: "watchers-changed", agentId: input.agentId });
+        return clone(updated);
+      },
+      deleteWatcher: async (input) => {
+        watchers.set(
+          input.agentId,
+          (watchers.get(input.agentId) ?? []).filter((watcher) => watcher.id !== input.watcherId),
+        );
+        emitAgentEvent({ type: "watchers-changed", agentId: input.agentId });
+      },
+      testWatcher: async (input) => clone(watcherMatches.get(input.watcherId) ?? []),
+      listWatcherMatches: async (input) =>
+        clone((watcherMatches.get(input.watcherId) ?? []).slice(0, input.limit ?? 50)),
       readConversation: async (agentId) => ({
         ...clone(getSnapshot(agentId)),
         readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },

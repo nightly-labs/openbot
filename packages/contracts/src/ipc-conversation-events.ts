@@ -26,7 +26,6 @@ export interface RoutineRunConversationEvent {
 }
 
 export const HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX = "hosted-site-event:";
-
 export type HostedSiteConversationEventAction = "publish" | "replace" | "delete";
 
 export type HostedSiteConversationEventStatus = "running" | "succeeded" | "failed" | "interrupted" | "cancelled";
@@ -121,6 +120,43 @@ export function routineRunConversationEvent(message: ConversationMessage): Routi
   const routineName = message.text.trim();
   if (!event || !routineName || routineName.length > INPUT_LIMITS.routineName) return null;
   return { ...event, routineName };
+}
+
+export const WATCHER_EVENT_ITEM_TYPE_PREFIX = "watcher-event:";
+
+export type WatcherConversationEventAction = "paused" | "resumed";
+
+export interface WatcherConversationEvent {
+  action: WatcherConversationEventAction;
+  watcherId: string;
+  watcherName: string;
+}
+
+export function watcherConversationEventItemType(action: WatcherConversationEventAction, watcherId: string): string {
+  if (!isIdentifier(watcherId)) throw new Error("A valid watcher id is required.");
+  const itemType = `${WATCHER_EVENT_ITEM_TYPE_PREFIX}${action}:${watcherId}`;
+  if (itemType.length > INPUT_LIMITS.identifier) throw new Error("The watcher event item type is too long.");
+  return itemType;
+}
+
+export function parseWatcherConversationEventItemType(
+  itemType: string | undefined,
+): Pick<WatcherConversationEvent, "action" | "watcherId"> | null {
+  if (!itemType?.startsWith(WATCHER_EVENT_ITEM_TYPE_PREFIX)) return null;
+  const separator = itemType.indexOf(":", WATCHER_EVENT_ITEM_TYPE_PREFIX.length);
+  if (separator < 0) return null;
+  const action = itemType.slice(WATCHER_EVENT_ITEM_TYPE_PREFIX.length, separator);
+  const watcherId = itemType.slice(separator + 1);
+  if ((action !== "paused" && action !== "resumed") || !isIdentifier(watcherId)) return null;
+  return { action, watcherId };
+}
+
+export function watcherConversationEvent(message: ConversationMessage): WatcherConversationEvent | null {
+  if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
+  const event = parseWatcherConversationEventItemType(message.itemType);
+  const watcherName = message.text.trim();
+  if (!event || !watcherName || watcherName.length > INPUT_LIMITS.watcherName) return null;
+  return { ...event, watcherName };
 }
 
 export function hostedSiteConversationEventItemType(

@@ -71,6 +71,8 @@ import {
   isRoutineSchedule,
   isSidebarLayoutSnapshot,
   isSkillCategory,
+  isWatcher,
+  isWatcherMatch,
   LOCAL_SERVER_ID,
   type MarketplaceAgentDetail,
   type MarketplaceAgentPage,
@@ -311,6 +313,9 @@ const decodeRoutine = guardedDecoder(isRoutine, "routine response");
 const decodeRoutines = guardedListDecoder(isRoutine, "routine list response");
 const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run response");
 const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine history response");
+const decodeWatcher = guardedDecoder(isWatcher, "watcher response");
+const decodeWatchers = guardedListDecoder(isWatcher, "watcher list response");
+const decodeWatcherMatches = guardedListDecoder(isWatcherMatch, "watcher history response");
 
 function decodeFilePreview(value: unknown): FilePreview {
   const preview = decodeRecord(value, "file preview");
@@ -961,6 +966,12 @@ const openbotApi: OpenBotDesktopApi = {
     deleteRoutine: (input) => invokeAgent(IPC_CHANNELS.agentDeleteRoutine, input, decodeVoid),
     testRoutine: (input) => invokeAgent(IPC_CHANNELS.agentTestRoutine, input, decodeRoutineRun),
     listRoutineRuns: (input) => invokeAgent(IPC_CHANNELS.agentListRoutineRuns, input, decodeRoutineRuns),
+    listWatchers: (agentId) => invokeAgent(IPC_CHANNELS.agentListWatchers, agentId, decodeWatchers),
+    createWatcher: (input) => invokeAgent(IPC_CHANNELS.agentCreateWatcher, input, decodeWatcher),
+    updateWatcher: (input) => invokeAgent(IPC_CHANNELS.agentUpdateWatcher, input, decodeWatcher),
+    deleteWatcher: (input) => invokeAgent(IPC_CHANNELS.agentDeleteWatcher, input, decodeVoid),
+    testWatcher: (input) => invokeAgent(IPC_CHANNELS.agentTestWatcher, input, decodeWatcherMatches),
+    listWatcherMatches: (input) => invokeAgent(IPC_CHANNELS.agentListWatcherMatches, input, decodeWatcherMatches),
     listChannelMemories: (channelId) =>
       invokeAgent(IPC_CHANNELS.agentListChannelMemories, channelId, decodeChannelMemories),
     createChannelMemory: (input) => invokeAgent(IPC_CHANNELS.agentCreateChannelMemory, input, decodeChannelMemory),

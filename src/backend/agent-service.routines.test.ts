@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type AgentEvent, routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  routineConversationEvent,
+  routineRunConversationEvent,
+  watcherConversationEvent,
+} from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -118,6 +123,108 @@ describe.sequential("AgentService: routines", () => {
     expect(
       (await service.readConversation(agent.id)).messages.flatMap((message) => routineConversationEvent(message) ?? []),
     ).toHaveLength(3);
+  });
+
+  it("refuses to delete a routine with watchers until they are removed", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await service.initialize();
+    const agent = await store.getOrCreate("chief");
+    const routine = service.createRoutine({
+      agentId: agent.id,
+      name: "Handle change",
+      instruction: "Read watcher matches and act.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "hourly", minute: 0 },
+    });
+    const watcher = service.createWatcher({
+      agentId: agent.id,
+      routineId: routine.id,
+      name: "Price watch",
+      active: true,
+      intervalMinutes: 15,
+      source: { kind: "web", url: "https://example.com/item" },
+    });
+    await expect(service.deleteRoutine({ agentId: agent.id, routineId: routine.id })).rejects.toThrow("Price watch");
+    service.deleteWatcher({ agentId: agent.id, watcherId: watcher.id });
+    await service.deleteRoutine({ agentId: agent.id, routineId: routine.id });
+    expect(service.listRoutines(agent.id)).toHaveLength(0);
+  });
+
+  it("posts pause and resume watcher markers to the conversation", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await service.initialize();
+    const agent = await store.getOrCreate("chief");
+    const routine = service.createRoutine({
+      agentId: agent.id,
+      name: "Handle change",
+      instruction: "Report what changed.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "hourly", minute: 0 },
+    });
+    const watcher = service.createWatcher({
+      agentId: agent.id,
+      routineId: routine.id,
+      name: "Price watch",
+      active: true,
+      intervalMinutes: 15,
+      source: { kind: "web", url: "https://example.com/item" },
+    });
+    const paused = service.updateWatcher({ agentId: agent.id, watcherId: watcher.id, active: false });
+    expect(paused.active).toBe(false);
+    const events = (await service.readConversation(agent.id)).messages.flatMap(
+      (message) => watcherConversationEvent(message) ?? [],
+    );
+    expect(events).toEqual([{ action: "paused", watcherId: watcher.id, watcherName: "Price watch" }]);
+  });
+
+  it("delivers the watcher match diff inside the fired routine turn", async () => {
+    const html =
+      "<html><body><article><h1>Price list for today: apples at five dollars per kilo, pears at six dollars per kilo, in stock now</h1></article></body></html>";
+    vi.stubGlobal("fetch", async () => new Response(html, { headers: { "content-type": "text/html" } }));
+    try {
+      const { store, mailbox } = stores(root);
+      let client: FakeAgentClient | undefined;
+      service = createTestService({
+        store,
+        mailbox,
+        preferredProvider: "codex",
+        clientFactory: (provider) => {
+          client = new FakeAgentClient(provider, "", false);
+          return client;
+        },
+      });
+      await service.initialize();
+      const agent = await store.getOrCreate("chief");
+      const routine = service.createRoutine({
+        agentId: agent.id,
+        name: "Handle change",
+        instruction: "Report what changed.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "hourly", minute: 0 },
+      });
+      const watcher = service.createWatcher({
+        agentId: agent.id,
+        routineId: routine.id,
+        name: "Price watch",
+        active: true,
+        intervalMinutes: 15,
+        source: { kind: "web", url: "https://example.com/prices" },
+      });
+      const matches = await service.testWatcher({ agentId: agent.id, watcherId: watcher.id });
+      expect(matches).toHaveLength(1);
+      await waitFor(() => (client?.requests.filter((request) => request.method === "turn/start").length ?? 0) > 0);
+      const starts = (client?.requests ?? []).filter((request) => request.method === "turn/start");
+      expect(JSON.stringify(starts)).toContain("--- watcher match ---");
+      expect(JSON.stringify(starts)).toContain("Price watch");
+      expect(JSON.stringify(starts)).toContain("apples at five dollars");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("keeps a started routine delivery running while its transition marker retries", async () => {

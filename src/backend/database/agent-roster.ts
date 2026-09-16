@@ -183,6 +183,22 @@ export class AgentRoster {
              WHERE aggregate_type IN ('agent-routine', 'routine-run') AND aggregate_id IN (${placeholders})`,
           ).run(...routineIds);
         }
+        const watcherIds = databaseRows(
+          db.prepare("SELECT watcher_id FROM projection_agent_watchers WHERE agent_id = ?").all(agentId),
+        ).map((row) => requiredStringColumn(row, "watcher_id"));
+        if (watcherIds.length > 0) {
+          const placeholders = watcherIds.map(() => "?").join(", ");
+          db.prepare(
+            `DELETE FROM orchestration_command_receipts WHERE command_id IN (
+               SELECT DISTINCT command_id FROM orchestration_events
+               WHERE aggregate_type IN ('agent-watcher', 'watcher-match') AND aggregate_id IN (${placeholders})
+             )`,
+          ).run(...watcherIds);
+          db.prepare(
+            `DELETE FROM orchestration_events
+             WHERE aggregate_type IN ('agent-watcher', 'watcher-match') AND aggregate_id IN (${placeholders})`,
+          ).run(...watcherIds);
+        }
         db.prepare(
           `DELETE FROM orchestration_command_receipts WHERE command_id IN (
              SELECT DISTINCT command_id FROM orchestration_events
@@ -214,6 +230,8 @@ export class AgentRoster {
         db.prepare("DELETE FROM projection_agents WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_agent_memories WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_agent_routines WHERE agent_id = ?").run(agentId);
+        db.prepare("DELETE FROM projection_agent_watchers WHERE agent_id = ?").run(agentId);
+        db.prepare("DELETE FROM projection_agent_watcher_matches WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_reactions WHERE agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_deliveries WHERE recipient_agent_id = ?").run(agentId);
         db.prepare("DELETE FROM projection_queue_state WHERE agent_id = ?").run(agentId);

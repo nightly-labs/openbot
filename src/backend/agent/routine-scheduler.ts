@@ -245,6 +245,23 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.listRuns(input.agentId, input.routineId, 1)[0] ?? run;
   }
 
+  /**
+   * One watcher-fired run. Same manual run as test, but that one delivery carries a run-local
+   * context prefix before the stored instruction, so the turn sees what changed without a
+   * follow-up tool call. The stored routine instruction stays clean.
+   */
+  async testWithPrefix(input: TestRoutineInput, prefix: string): Promise<RoutineRun> {
+    if (!this.mayDrain(input.agentId))
+      throw new Error("Wait until the agent operation finishes before running a routine.");
+    this.#conversation.requireKnownAgent(input.agentId);
+    const routine = this.#routines.get(input.agentId, input.routineId);
+    if (!routine) throw new Error("This routine no longer exists.");
+    const run = this.#routines.createRun(routine, null, "manual", new Date().toISOString());
+    await this.#enqueueRun(run, prefix);
+    this.stateChanged(input.agentId);
+    return this.#routines.listRuns(input.agentId, input.routineId, 1)[0] ?? run;
+  }
+
   listRuns(input: ListRoutineRunsInput): RoutineRun[] {
     this.#conversation.requireKnownAgent(input.agentId);
     if (!this.#routines.get(input.agentId, input.routineId)) throw new Error("This routine no longer exists.");
@@ -454,9 +471,10 @@ export class RoutineScheduler implements RoutineDueSource {
     }
   }
 
-  async #enqueueRun(run: RoutineRun): Promise<void> {
+  async #enqueueRun(run: RoutineRun, prefixText = ""): Promise<void> {
     const validateRecipient = this.#mailbox.prepareDelivery([run.agentId]);
     const agent = await this.#store.getOrCreate(run.agentId);
+    const text = prefixText ? `${prefixText}\n\n${run.instruction}` : run.instruction;
     try {
       validateRecipient();
       const receipt = await this.#mailbox.enqueue({
@@ -468,7 +486,7 @@ export class RoutineScheduler implements RoutineDueSource {
           scheduledFor: run.scheduledFor,
         },
         recipientAgentIds: [agent.id],
-        text: run.instruction,
+        text,
         draftIds: [],
         replyToMessageId: null,
         idempotencyKey: run.triggerId ? `routine:${run.triggerId}:${run.scheduledFor}` : `routine:manual:${run.id}`,

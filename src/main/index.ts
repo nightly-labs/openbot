@@ -36,6 +36,7 @@ import { skillIpcHandlers } from "./ipc/skill-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
+import { watcherIpcHandlers } from "./ipc/watcher-handlers";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
@@ -325,6 +326,7 @@ function registerIpcHandlers({
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
+    ...watcherIpcHandlers({ service }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
     ...mcpServerIpcHandlers({ service, remoteServers }),

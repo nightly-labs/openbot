@@ -213,6 +213,14 @@ export const IPC_ENDPOINTS = {
     testRoutine: request(IPC_CHANNELS.agentTestRoutine),
     listRoutineRuns: request(IPC_CHANNELS.agentListRoutineRuns),
   },
+  agentWatchers: {
+    listWatchers: request(IPC_CHANNELS.agentListWatchers),
+    createWatcher: request(IPC_CHANNELS.agentCreateWatcher),
+    updateWatcher: request(IPC_CHANNELS.agentUpdateWatcher),
+    deleteWatcher: request(IPC_CHANNELS.agentDeleteWatcher),
+    testWatcher: request(IPC_CHANNELS.agentTestWatcher),
+    listWatcherMatches: request(IPC_CHANNELS.agentListWatcherMatches),
+  },
   channelMemories: {
     listChannelMemories: request(IPC_CHANNELS.agentListChannelMemories),
     createChannelMemory: request(IPC_CHANNELS.agentCreateChannelMemory),

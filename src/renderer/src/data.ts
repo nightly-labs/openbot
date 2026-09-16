@@ -16,6 +16,7 @@ import type {
   RoutineConversationEvent,
   RoutineRunConversationEvent,
   SkillConversationEvent,
+  WatcherConversationEvent,
 } from "@openbot/contracts/ipc";
 
 /**
@@ -55,6 +56,15 @@ export type ChatActionMarkerModel =
       sourceAgentId: string | null;
       routineId: string;
       routineName: string;
+      status: "completed";
+      timestamp: string;
+    }
+  | {
+      kind: "watcher-lifecycle";
+      action: WatcherConversationEvent["action"];
+      sourceAgentId: string | null;
+      watcherId: string;
+      watcherName: string;
       status: "completed";
       timestamp: string;
     }
