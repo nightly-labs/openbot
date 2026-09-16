@@ -43,8 +43,10 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, userAssignedSkills } from "./AgentSkillsModal";
+import { AgentWatchersSettings } from "./AgentWatchersSettings";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
+import { agentWatchersPort } from "./watchers-port";
 
 export interface AgentRuntimeSettings {
   provider: AgentProviderId;
@@ -118,6 +120,7 @@ interface AgentSettingsDraft {
   memories: { count: number; open: boolean };
   notifications: boolean;
   routines: { count: number; open: boolean };
+  watchers: { count: number; open: boolean };
   skills: { count: number; open: boolean; reopenAfterMarketplace: boolean };
   runtime: AgentRuntimeSettings;
   saveError: string | null;
@@ -139,6 +142,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     memories: { count: 0, open: false },
     notifications: true,
     routines: { count: 0, open: false },
+    watchers: { count: 0, open: false },
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
     runtime: { model: "gpt-5.6-luna", provider: props.agent.provider, reasoningEffort: "medium" },
     saveError: null,
@@ -154,6 +158,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
 
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
   const routinesPort = createMemo(() => agentRoutinesPort(props.agent.id));
+  const watchersPort = createMemo(() => agentWatchersPort(props.agent.id));
   const skillsMode = () => props.skillsMode ?? "mutable";
   let lastSkillsMarketplaceOpen = props.skillsMarketplaceOpen === true;
   const selectedModel = createMemo(() =>
@@ -231,6 +236,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.avatar.pickerOpen = false;
           state.memories.open = false;
           state.routines.open = false;
+          state.watchers.open = false;
           state.skills.open = false;
           state.skills.reopenAfterMarketplace = false;
         }
@@ -250,6 +256,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           .then((items) => {
             setDraft((state) => {
               state.routines.count = items.length;
+            });
+          });
+        void window.openbot.agent
+          .listWatchers(agent.id)
+          .catch(() => [])
+          .then((items) => {
+            setDraft((state) => {
+              state.watchers.count = items.length;
             });
           });
         void loadSkillsCount(agent.id);
@@ -757,6 +771,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 })
               }
             />
+            <SettingsLinkRow
+              label="Watchers"
+              value={`${draft.watchers.count} watching`}
+              onClick={() =>
+                setDraft((state) => {
+                  state.watchers.open = true;
+                })
+              }
+            />
           </SettingsLinkGroup>
           <section class="agent-settings-model" aria-labelledby="agent-model-heading">
             <div class="agent-settings-section-heading">
@@ -867,6 +890,24 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
+          />
+        </div>
+      </Show>
+      <Show when={draft.watchers.open}>
+        <div class="agent-routines-overlay">
+          <AgentWatchersSettings
+            port={watchersPort()}
+            onCountChange={(count) =>
+              setDraft((state) => {
+                state.watchers.count = count;
+              })
+            }
+            onBack={() =>
+              setDraft((state) => {
+                state.watchers.open = false;
+              })
+            }
+            onClose={props.onClose}
           />
         </div>
       </Show>

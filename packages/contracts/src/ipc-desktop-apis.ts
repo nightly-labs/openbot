@@ -194,6 +194,15 @@ import type {
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
+import type {
+  CreateWatcherInput,
+  DeleteWatcherInput,
+  ListWatcherMatchesInput,
+  TestWatcherInput,
+  UpdateWatcherInput,
+  Watcher,
+  WatcherMatch,
+} from "./ipc-watchers";
 
 export interface AgentDesktopApi {
   listChannels: () => Promise<ChannelSummary[]>;
@@ -227,6 +236,12 @@ export interface AgentDesktopApi {
   deleteRoutine: (input: DeleteRoutineInput) => Promise<void>;
   testRoutine: (input: TestRoutineInput) => Promise<RoutineRun>;
   listRoutineRuns: (input: ListRoutineRunsInput) => Promise<RoutineRun[]>;
+  listWatchers: (agentId: string) => Promise<Watcher[]>;
+  createWatcher: (input: CreateWatcherInput) => Promise<Watcher>;
+  updateWatcher: (input: UpdateWatcherInput) => Promise<Watcher>;
+  deleteWatcher: (input: DeleteWatcherInput) => Promise<void>;
+  testWatcher: (input: TestWatcherInput) => Promise<WatcherMatch[]>;
+  listWatcherMatches: (input: ListWatcherMatchesInput) => Promise<WatcherMatch[]>;
   listChannelMemories: (channelId: string) => Promise<ChannelMemory[]>;
   createChannelMemory: (input: CreateChannelMemoryInput) => Promise<ChannelMemory>;
   updateChannelMemory: (input: UpdateChannelMemoryInput) => Promise<ChannelMemory>;

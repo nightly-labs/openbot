@@ -597,6 +597,12 @@ export function installOpenbotStub(): void {
         listMemories: vi.fn().mockResolvedValue([]),
         listRoutines: vi.fn().mockResolvedValue([]),
         listRoutineRuns: vi.fn().mockResolvedValue([]),
+        listWatchers: vi.fn().mockResolvedValue([]),
+        createWatcher: vi.fn(),
+        updateWatcher: vi.fn(),
+        deleteWatcher: vi.fn().mockResolvedValue(undefined),
+        testWatcher: vi.fn().mockResolvedValue([]),
+        listWatcherMatches: vi.fn().mockResolvedValue([]),
         createMemory: vi.fn().mockImplementation(async (input) => ({
           id: "memory-new",
           agentId: input.agentId,

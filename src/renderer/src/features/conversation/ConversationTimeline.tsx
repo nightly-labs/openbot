@@ -23,6 +23,7 @@ function markerOnlyMessage(message: AgentMessage): boolean {
     Boolean(message.exchange) ||
     !message.routine ||
     marker.kind === "routine-lifecycle" ||
+    marker.kind === "watcher-lifecycle" ||
     marker.kind === "unavailable"
   );
 }

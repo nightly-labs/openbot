@@ -70,6 +70,9 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
             />
           )}
         </Show>
+        <Show when={props.marker.kind === "watcher-lifecycle" && props.marker}>
+          {(marker) => <WatcherTarget watcherName={marker().watcherName} />}
+        </Show>
         <Show when={props.marker.kind === "routine-run" && props.marker}>
           {(marker) => (
             <RoutineTarget
@@ -279,6 +282,10 @@ function RoutineTarget(props: {
   );
 }
 
+function WatcherTarget(props: { watcherName: string }) {
+  return <ActionTarget name={props.watcherName} icon={CalendarClock} available={false} actionLabel="" />;
+}
+
 function ActionTarget(props: {
   name: string;
   icon: ReturnType<typeof statusIcon>;
@@ -333,6 +340,9 @@ function markerLabel(marker: ChatActionMarkerModel): string {
       : marker.action === "updated"
         ? "Updated routine"
         : "Deleted routine";
+  }
+  if (marker.kind === "watcher-lifecycle") {
+    return marker.action === "paused" ? "Paused watcher" : "Resumed watcher";
   }
   if (marker.kind === "hosted-site") {
     if (marker.action === "publish") {
@@ -395,6 +405,7 @@ function markerAccessibleLabel(marker: ChatActionMarkerModel, agents: AgentProfi
     return `${label} ${agents.find((agent) => agent.id === marker.agentId)?.name ?? "Unavailable agent"}`;
   }
   if (marker.kind === "hosted-site") return `${label}, ${marker.hostname ?? marker.title}`;
+  if (marker.kind === "watcher-lifecycle") return `${label}, ${marker.watcherName}`;
   return `${label}, ${marker.routineName}`;
 }
 

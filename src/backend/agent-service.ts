@@ -30,17 +30,20 @@ import type {
   CreateChannelMemoryInput,
   CreateChannelRoutineInput,
   CreateRoutineInput,
+  CreateWatcherInput,
   CustomProviderRestart,
   DeleteAgentMemoryInput,
   DeleteChannelMemoryInput,
   DeleteChannelRoutineInput,
   DeleteRoutineInput,
+  DeleteWatcherInput,
   DraftAttachment,
   DuplicateAgentResult,
   GenerateAgentProfileInput,
   HostAnalyticsInput,
   ListChannelRoutineRunsInput,
   ListRoutineRunsInput,
+  ListWatcherMatchesInput,
   McpServerConfig,
   McpTestResult,
   QueuedMessageReceipt,
@@ -64,12 +67,16 @@ import type {
   TestChannelRoutineInput,
   TestMcpServerInput,
   TestRoutineInput,
+  TestWatcherInput,
   UpdateAgentInput,
   UpdateAgentMemoryInput,
   UpdateChannelMemoryInput,
   UpdateChannelRoutineInput,
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
+  UpdateWatcherInput,
+  Watcher,
+  WatcherMatch,
 } from "@openbot/contracts/ipc";
 import {
   AGENT_RUNTIME_TEXT_LIMIT,
@@ -115,6 +122,7 @@ import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool }
 import { isDynamicToolCall, isRequestTimeout, providerForAgent, providerLabel } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
+import { WatcherScheduler } from "./agent/watcher-scheduler";
 import type { AgentClient, AgentProvider } from "./agent-client";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
@@ -226,6 +234,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #conversationReads: ConversationReadStore;
   readonly #memories: AgentMemories;
   readonly #routines: RoutineScheduler;
+  readonly #watchers: WatcherScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
   readonly #mcpServers: McpServerStore;
@@ -309,10 +318,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
     });
-    // One timer for both routine owners. The sources are read lazily because `channels` and its
-    // scheduler are built further down, and because an owner's earliest routine changes constantly.
+    // One timer for routines, channel routines, and watchers. The sources are read lazily because
+    // `channels` and its scheduler are built further down, and because an owner's earliest time
+    // changes constantly.
     this.#routineTimer = new RoutineTimer(
-      () => [this.#routines, this.#channelRoutines],
+      () => [this.#routines, this.#channelRoutines, this.#watchers],
       () => this.#initialized && !this.#stopping,
       (code, error) => this.#emitError(code, error),
     );
@@ -332,6 +342,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#deletingAgents]),
         isRunning: () => this.#initialized && !this.#stopping,
+      },
+    });
+    this.#watchers = new WatcherScheduler({
+      database: store.database,
+      timer: this.#routineTimer,
+      conversation: this.#conversation,
+      hooks: {
+        emit: (event) => this.#emit(event),
+        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#deletingAgents]),
+        isRunning: () => this.#initialized && !this.#stopping,
+        fireRoutine: async (agentId, routineId, context) =>
+          (await this.#routines.testWithPrefix({ agentId, routineId }, context)).id,
+        requireKnownAgent: (agentId) => this.#conversation.requireKnownAgent(agentId),
       },
     });
     this.#hostedSites = new HostedSiteCoordinator({
@@ -779,7 +803,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#routines.update(input, options);
   }
 
-  deleteRoutine(input: DeleteRoutineInput, options: RoutineMutationOptions = {}): Promise<void> {
+  async deleteRoutine(input: DeleteRoutineInput, options: RoutineMutationOptions = {}): Promise<void> {
+    const linked = this.#watchers.store.list(input.agentId).filter((watcher) => watcher.routineId === input.routineId);
+    if (linked.length > 0) {
+      const names = linked.map((watcher) => watcher.name).join(", ");
+      throw new Error(
+        `This routine has ${linked.length} watcher(s) (${names}). Delete or re-link them first with openbot.delete_watcher or openbot.update_watcher.`,
+      );
+    }
     return this.#routines.delete(input, options);
   }
 
@@ -789,6 +820,37 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listRoutineRuns(input: ListRoutineRunsInput): RoutineRun[] {
     return this.#routines.listRuns(input);
+  }
+
+  listWatchers(agentId: string): Watcher[] {
+    this.#conversation.requireKnownAgent(agentId);
+    return this.#watchers.store.list(agentId);
+  }
+
+  createWatcher(input: CreateWatcherInput): Watcher {
+    return this.#watchers.create(input);
+  }
+
+  updateWatcher(input: UpdateWatcherInput): Watcher {
+    return this.#watchers.update(input);
+  }
+
+  deleteWatcher(input: DeleteWatcherInput): void {
+    this.#watchers.delete(input);
+  }
+
+  async testWatcher(input: TestWatcherInput): Promise<WatcherMatch[]> {
+    this.#conversation.requireKnownAgent(input.agentId);
+    const watcher = this.#watchers.store.get(input.agentId, input.watcherId);
+    if (!watcher) throw new Error("This watcher no longer exists.");
+    const { matched } = await this.#watchers.checkNow(watcher);
+    void matched;
+    return this.#watchers.store.listMatches(input.agentId, input.watcherId, 10);
+  }
+
+  listWatcherMatches(input: ListWatcherMatchesInput): WatcherMatch[] {
+    this.#conversation.requireKnownAgent(input.agentId);
+    return this.#watchers.store.listMatches(input.agentId, input.watcherId, input.limit ?? 50);
   }
 
   listChannelMemories(channelId: string): ChannelMemory[] {
@@ -2114,6 +2176,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
     const routineResult = await this.#routines.handleTool(params, senderAgentId);
     if (routineResult) return routineResult;
+
+    const watcherResult = await this.#watchers.handleTool(params, senderAgentId);
+    if (watcherResult) return watcherResult;
 
     const memoryResult = this.#memories.handleTool(params, senderAgentId);
     if (memoryResult) return memoryResult;

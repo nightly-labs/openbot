@@ -5,6 +5,7 @@ import {
   routineConversationEventItemType,
   routineRunConversationEventItemType,
   skillConversationEventItemType,
+  watcherConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentProfilesEqual, toAgentMessage, toAgentMessages, toAgentProfile } from "./app-message-projection";
@@ -85,6 +86,40 @@ describe("toAgentMessage", () => {
         sourceAgentId: "chief",
         routineId: "routine-1",
       },
+    });
+  });
+
+  it("projects watcher pause and resume markers for the conversation timeline", () => {
+    const paused = {
+      id: "watcher-paused",
+      author: "system",
+      source: "system",
+      text: "Price watch",
+      createdAt: "2026-09-01T10:00:00.000Z",
+      status: "completed",
+      itemType: watcherConversationEventItemType("paused", "watcher-1"),
+    } satisfies ConversationMessage;
+
+    expect(toAgentMessage(paused, "chief")).toMatchObject({
+      kind: "action-marker",
+      actionMarker: {
+        kind: "watcher-lifecycle",
+        action: "paused",
+        sourceAgentId: "chief",
+        watcherId: "watcher-1",
+        watcherName: "Price watch",
+      },
+    });
+    expect(
+      toAgentMessage(
+        { ...paused, id: "watcher-resumed", itemType: watcherConversationEventItemType("resumed", "watcher-1") },
+        "chief",
+      ).actionMarker,
+    ).toMatchObject({ kind: "watcher-lifecycle", action: "resumed" });
+    expect(toAgentMessage({ ...paused, itemType: "watcher-event:snoozed:watcher-1" }, "chief").actionMarker).toEqual({
+      kind: "unavailable",
+      label: "Action unavailable",
+      timestamp: paused.createdAt,
     });
   });
 

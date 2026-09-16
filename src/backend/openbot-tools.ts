@@ -17,6 +17,27 @@ interface OpenBotToolDefinition {
   shape: z.ZodRawShape;
 }
 
+const watcherSourceZodSchema = z.union([
+  z.strictObject({
+    kind: z.literal("gmail"),
+    query: z.string().min(1).max(INPUT_LIMITS.watcherQuery),
+    labelIds: z.array(z.string().min(1).max(INPUT_LIMITS.identifier)).max(10).optional(),
+  }),
+  z.strictObject({ kind: z.literal("web"), url: z.string().min(1).max(INPUT_LIMITS.browserUrl) }),
+]);
+
+const watcherSelectorZodSchema = z
+  .strictObject({
+    css: z.string().min(1).max(INPUT_LIMITS.watcherSelector).optional(),
+    xpath: z.string().min(1).max(INPUT_LIMITS.watcherSelector).optional(),
+    textAnchor: z.string().min(1).max(INPUT_LIMITS.watcherText).optional(),
+  })
+  .nullable();
+
+const watcherConditionZodSchema = z.strictObject({
+  textContains: z.string().min(1).max(INPUT_LIMITS.watcherText).optional(),
+});
+
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
@@ -155,6 +176,84 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
+    },
+  },
+  {
+    name: "list_watchers",
+    description:
+      "List event watchers for this agent, or for another local agent when agentId is provided. A watcher polls one source and fires its linked routine only on real change.",
+    shape: { agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },
+  },
+  {
+    name: "create_watcher",
+    description:
+      "Create an event watcher that polls one source and fires a routine only on real change. Link routineId from openbot.list_routines. Gmail source needs a Gmail search query. Web source needs an https URL. Interval must be 3 to 1440 minutes; use 15 when the user gives none.",
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
+      name: z.string().min(1).max(INPUT_LIMITS.watcherName),
+      source: watcherSourceZodSchema,
+      intervalMinutes: z.number().int().min(3).max(1440).optional(),
+      active: z.boolean().optional(),
+      selector: watcherSelectorZodSchema.optional(),
+      condition: watcherConditionZodSchema.optional(),
+    },
+  },
+  {
+    name: "update_watcher",
+    description:
+      "Update, pause, or resume an event watcher for this agent, or for another local agent when agentId is provided.",
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      watcherId: z.string().min(1).max(INPUT_LIMITS.identifier),
+      name: z.string().min(1).max(INPUT_LIMITS.watcherName).optional(),
+      intervalMinutes: z.number().int().min(3).max(1440).optional(),
+      active: z.boolean().optional(),
+      source: watcherSourceZodSchema.optional(),
+      selector: watcherSelectorZodSchema.optional(),
+      condition: watcherConditionZodSchema.optional(),
+    },
+  },
+  {
+    name: "delete_watcher",
+    description: "Delete an event watcher for this agent, or for another local agent when agentId is provided.",
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      watcherId: z.string().min(1).max(INPUT_LIMITS.identifier),
+    },
+  },
+  {
+    name: "pause_watcher",
+    description: "Pause an event watcher so its checks stop until resumed. The watcher keeps its state.",
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      watcherId: z.string().min(1).max(INPUT_LIMITS.identifier),
+    },
+  },
+  {
+    name: "resume_watcher",
+    description: "Resume a paused event watcher. Its next check runs after one full interval.",
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      watcherId: z.string().min(1).max(INPUT_LIMITS.identifier),
+    },
+  },
+  {
+    name: "test_watcher",
+    description:
+      "Run one immediate check of an event watcher and return its latest matches without waiting for the schedule.",
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      watcherId: z.string().min(1).max(INPUT_LIMITS.identifier),
+    },
+  },
+  {
+    name: "list_watcher_matches",
+    description: "List recent matches for an event watcher so the routine can process what changed.",
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      watcherId: z.string().min(1).max(INPUT_LIMITS.identifier),
+      limit: z.number().int().min(1).max(INPUT_LIMITS.watcherMatchesPage).optional(),
     },
   },
   {

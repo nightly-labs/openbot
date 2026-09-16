@@ -4,6 +4,7 @@ import {
   hostedSiteConversationEventText,
   routineConversationEventItemType,
   routineRunConversationEventItemType,
+  watcherConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { decideAgentAutoRead, readStateForMessages } from "./conversation-read-state";
@@ -70,6 +71,33 @@ describe("readStateForMessages", () => {
         createdAt: "2026-08-30T11:01:00.000Z",
         status: "completed",
         itemType: "routine-run-event:unknown",
+      },
+    ];
+
+    expect(
+      readStateForMessages({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null }, messages),
+    ).toMatchObject({ unreadCount: 0, firstUnreadMessageId: null });
+  });
+
+  it("does not count watcher pause markers, including malformed markers, as unread replies", () => {
+    const messages: ConversationMessage[] = [
+      {
+        id: "watcher-event",
+        author: "system",
+        source: "system",
+        text: "Price watch",
+        createdAt: "2026-08-30T11:00:00.000Z",
+        status: "completed",
+        itemType: watcherConversationEventItemType("paused", "watcher-1"),
+      },
+      {
+        id: "malformed-watcher-event",
+        author: "system",
+        source: "system",
+        text: "Price watch",
+        createdAt: "2026-08-30T11:01:00.000Z",
+        status: "completed",
+        itemType: "watcher-event:unknown",
       },
     ];
 

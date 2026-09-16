@@ -38,6 +38,7 @@ export type AgentEvent =
   | { type: "agents-changed"; agents: AgentSummary[] }
   | { type: "memories-changed"; agentId: string }
   | { type: "routines-changed"; agentId: string }
+  | { type: "watchers-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
@@ -109,6 +110,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "memories-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "routines-changed":
+    case "watchers-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "channel-memories-changed":
     case "channel-routines-changed":

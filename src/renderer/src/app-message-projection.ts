@@ -4,6 +4,7 @@ import {
   routineConversationEvent,
   routineRunConversationEvent,
   skillConversationEvent,
+  watcherConversationEvent,
 } from "@openbot/contracts/ipc";
 import type { AgentDeliveryMarkerStatus, AgentMessage, AgentProfile, ChatActionMarkerModel } from "./data";
 import { cleanAgentMessageText } from "./features/agents/agent-message-text";
@@ -37,7 +38,15 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
   const routineEvent = routineConversationEvent(message);
   const routineRunEvent = routineRunConversationEvent(message);
   const hostedSiteEvent = hostedSiteConversationEvent(message);
-  const actionMarker = chatActionMarker(message, ownerAgentId, routineEvent, routineRunEvent, hostedSiteEvent);
+  const watcherEvent = watcherConversationEvent(message);
+  const actionMarker = chatActionMarker(
+    message,
+    ownerAgentId,
+    routineEvent,
+    routineRunEvent,
+    hostedSiteEvent,
+    watcherEvent,
+  );
   return {
     id: message.id,
     turnId: message.turnId,
@@ -187,6 +196,7 @@ function chatActionMarker(
   routineEvent: ReturnType<typeof routineConversationEvent>,
   routineRunEvent: ReturnType<typeof routineRunConversationEvent>,
   hostedSiteEvent: ReturnType<typeof hostedSiteConversationEvent>,
+  watcherEvent: ReturnType<typeof watcherConversationEvent>,
 ): ChatActionMarkerModel | null {
   if (message.exchange) {
     const targetDeliveries = message.exchange.deliveries.map((delivery) => ({
@@ -217,6 +227,17 @@ function chatActionMarker(
       sourceAgentId: ownerAgentId ?? null,
       routineId: routineEvent.routineId,
       routineName: routineEvent.routineName,
+      status: "completed",
+      timestamp: message.createdAt,
+    };
+  }
+  if (watcherEvent) {
+    return {
+      kind: "watcher-lifecycle",
+      action: watcherEvent.action,
+      sourceAgentId: ownerAgentId ?? null,
+      watcherId: watcherEvent.watcherId,
+      watcherName: watcherEvent.watcherName,
       status: "completed",
       timestamp: message.createdAt,
     };

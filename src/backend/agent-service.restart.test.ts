@@ -159,6 +159,9 @@ describe.sequential("AgentService: restart", () => {
     // Every later version goes too: a history that keeps 15 but drops 14 has a gap, which the
     // schema check rejects before any upgrade runs.
     store.database.connection.prepare("DELETE FROM schema_migrations WHERE version >= 14").run();
+    store.database.connection.exec(
+      "DROP TABLE projection_mcp_servers; DROP TABLE projection_agent_watcher_matches; DROP TABLE projection_agent_watchers",
+    );
     store.database.close();
 
     let failRead = true;
