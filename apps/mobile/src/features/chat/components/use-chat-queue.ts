@@ -42,7 +42,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   const [edit, setEdit] = useState<QueueEditDraft | null>(restored.edit);
   const editRef = useRef(edit);
   editRef.current = edit;
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmed, setConfirmed] = useState(Boolean(restored.edit?.pendingSave));
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -121,11 +121,18 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
     setEdit(null);
     setConfirmed(false);
     if (previous)
-      await Promise.allSettled(previous.addedAttachments.map((file) => removeQueueAttachment(previous.editId, file)));
-  }, [storageKey]);
+      await Promise.allSettled([
+        ...previous.addedAttachments.map((file) => removeQueueAttachment(previous.editId, file)),
+        ...(previous.pendingSave?.attachmentDraftIds ?? []).map((id) => discardAttachment(agentId, id, serverId)),
+      ]);
+  }, [storageKey, discardAttachment, agentId, serverId]);
   const begin = useCallback(
     async (delivery: QueueDelivery) => {
       if (edit && edit.delivery.id !== delivery.id) return;
+      if (edit?.pendingSave) {
+        setConfirmed(true);
+        return;
+      }
       const next = edit ?? {
         editId: Crypto.randomUUID(),
         initialized: false,
@@ -170,7 +177,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   const changeAttachments = useCallback(
     async (files: ChatAttachment[]) => {
       const current = editRef.current;
-      if (!current || busyRef.current) throw new Error("The edit is busy. Try again.");
+      if (!current || busyRef.current || current.pendingSave) throw new Error("The edit is busy. Try again.");
       busyRef.current = true;
       setBusy(true);
       const created: StoredQueueAttachment[] = [];
@@ -209,9 +216,14 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   const save = useCallback(
     async (text: string, files: ChatAttachment[]) => {
       if (!edit || !confirmed) return false;
-      if (!text.trim() && !edit.keepAttachmentIds.length && !files.length) return false;
+      if (!edit.pendingSave && !text.trim() && !edit.keepAttachmentIds.length && !files.length) return false;
       cancelled.current = false;
       const saved = await run(async () => {
+        if (edit.pendingSave) {
+          await editQueue(agentId, serverId, edit.pendingSave);
+          await clearEdit();
+          return;
+        }
         await uploadChatAttachments(files, {
           upload: async (file) => {
             const stored = edit.addedAttachments.find((item) => item.id === file.id);
@@ -221,18 +233,33 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
               serverId,
             );
           },
-          discard: (id) => discardAttachment(agentId, id, serverId),
+          // Once Save can reach the host, these IDs must survive an uncertain response.
+          discard: async (id) => {
+            if (!editRef.current?.pendingSave) await discardAttachment(agentId, id, serverId);
+          },
           cancelled: () => cancelled.current,
           progress: files.length ? setProgress : undefined,
           send: async (ids) => {
-            await editQueue(agentId, serverId, {
-              action: "save",
+            if (ids.length)
+              await editQueue(agentId, serverId, {
+                action: "retain-attachments",
+                deliveryId: edit.delivery.id,
+                editId: edit.editId,
+                attachmentDraftIds: ids,
+              });
+            const pendingSave = {
+              action: "save" as const,
               deliveryId: edit.delivery.id,
               editId: edit.editId,
               text,
               keepAttachmentIds: edit.keepAttachmentIds,
               attachmentDraftIds: ids,
-            });
+            };
+            const next = { ...edit, text, pendingSave };
+            SecureStore.setItem(storageKey, JSON.stringify(next));
+            editRef.current = next;
+            setEdit(next);
+            await editQueue(agentId, serverId, pendingSave);
             return edit.delivery.id;
           },
         });
@@ -241,7 +268,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       setProgress(null);
       return saved;
     },
-    [edit, confirmed, run, uploadAttachment, discardAttachment, editQueue, agentId, serverId, clearEdit],
+    [edit, confirmed, run, uploadAttachment, discardAttachment, editQueue, agentId, serverId, clearEdit, storageKey],
   );
   return useMemo(
     () => ({
@@ -272,10 +299,11 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       begin,
       save,
       refresh,
-      changeText: (text: string) => setEdit((current) => (current ? { ...current, text } : current)),
+      changeText: (text: string) =>
+        setEdit((current) => (current && !current.pendingSave && !busyRef.current ? { ...current, text } : current)),
       removeAttachment: (id: string) =>
         setEdit((current) =>
-          current
+          current && !current.pendingSave && !busyRef.current
             ? { ...current, keepAttachmentIds: current.keepAttachmentIds.filter((item) => item !== id) }
             : current,
         ),

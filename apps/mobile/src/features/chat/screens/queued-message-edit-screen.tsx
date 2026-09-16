@@ -171,7 +171,7 @@ export function QueuedMessageEditScreen() {
         label="Message"
         appearance="soft"
         multiline
-        editable={!queue.busy}
+        editable={!queue.busy && !edit.pendingSave}
         maxLength={INPUT_LIMITS.messageText}
         placeholder="Message text"
         value={text}
@@ -181,7 +181,7 @@ export function QueuedMessageEditScreen() {
         }}
       />
       <SheetSaveAction
-        dirty={dirty}
+        dirty={dirty || Boolean(edit.pendingSave)}
         canSave={!queue.busy && (Boolean(text.trim()) || edit.keepAttachmentIds.length > 0 || added > 0)}
         pending={queue.busy}
         label="Save queued message"
@@ -205,7 +205,9 @@ export function QueuedMessageEditScreen() {
 
       <SettingsNote>
         {queue.progress === null
-          ? "The agent waits for this message until you save it."
+          ? edit.pendingSave
+            ? "Save is not confirmed. Retry Save to check the result."
+            : "The agent waits for this message until you save it."
           : `Uploading ${queue.progress} of ${added} files…`}
       </SettingsNote>
 
@@ -243,7 +245,7 @@ function AttachmentRemoveButton({
 function QueuedEditAttachments({ queue, kept }: { queue: ChatQueueController; kept: AttachmentSummary[] }) {
   const muted = useThemeColor("muted");
   const attachments = useChatAttachments(queue.attachments, queue.changeAttachments);
-  const busy = queue.busy || attachments.preparing;
+  const busy = queue.busy || attachments.preparing || Boolean(queue.edit?.pendingSave);
   return (
     <SettingsSection title="Attachments">
       {kept.map((file) => (

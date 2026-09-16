@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isQueueSnapshot, type QueueDelivery } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { decodeQueueEditRequest, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { ChatMessage } from "./chat-messages";
 
 export interface StoredQueueAttachment {
@@ -33,6 +34,7 @@ export interface QueueEditDraft {
   text: string;
   keepAttachmentIds: string[];
   addedAttachments: StoredQueueAttachment[];
+  pendingSave?: Extract<QueueEditRequest, { action: "save" }>;
 }
 
 export function decodeQueueEditDraft(raw: string | null): QueueEditDraft | null {
@@ -60,6 +62,14 @@ function parseQueueEditDraft(value: unknown): QueueEditDraft {
     throw new Error("Could not read the saved edit attachments.");
   const snapshot = { agentId: value.delivery.recipientAgentId, deliveries: [value.delivery] };
   if (!isQueueSnapshot(snapshot)) throw new Error("Could not read the saved queue edit.");
+  const pendingSave = value.pendingSave === undefined ? undefined : decodeQueueEditRequest(value.pendingSave);
+  if (
+    pendingSave &&
+    (pendingSave.action !== "save" ||
+      pendingSave.editId !== value.editId ||
+      pendingSave.deliveryId !== snapshot.deliveries[0].id)
+  )
+    throw new Error("Could not read the pending queue save.");
   return {
     editId: value.editId,
     initialized: value.initialized,
@@ -67,6 +77,7 @@ function parseQueueEditDraft(value: unknown): QueueEditDraft {
     text: value.text,
     keepAttachmentIds: value.keepAttachmentIds,
     addedAttachments,
+    ...(pendingSave?.action === "save" ? { pendingSave } : {}),
   };
 }
 

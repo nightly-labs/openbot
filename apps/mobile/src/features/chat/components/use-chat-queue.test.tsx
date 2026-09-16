@@ -268,22 +268,23 @@ it("restores added image and text bytes after a fresh query cache and sends them
   expect(boundary.files.size).toBe(0);
   expect(boundary.storage.size).toBe(0);
 });
-it("keeps the durable attachments after failed save and removes only a deleted attachment", async () => {
+it("keeps attachments locked after an uncertain save until cancellation", async () => {
   const view = mount();
   await act(async () => {
     await view.state().begin(delivery);
     await view.state().changeAttachments(pastedFiles);
   });
   boundary.uploadAttachment.mockResolvedValue({ id: "uploaded" });
+  boundary.editQueue.mockResolvedValueOnce({ agentId: "agent", deliveries: [delivery] });
   boundary.editQueue.mockRejectedValueOnce(new Error("Disconnected"));
   await act(async () => {
     expect(await view.state().save("Retry", view.state().attachments)).toBe(false);
   });
   expect(boundary.files.size).toBe(2);
   await act(async () => {
-    await view.state().changeAttachments(view.state().attachments.slice(1));
+    await expect(view.state().changeAttachments(view.state().attachments.slice(1))).rejects.toThrow("busy");
   });
-  expect([...boundary.files.values()]).toEqual(["ZGVm"]);
+  expect([...boundary.files.values()]).toEqual(["YWJj", "ZGVm"]);
   await act(async () => {
     await view.state().cancelEdit();
   });
@@ -316,4 +317,74 @@ it("rolls back new attachment files when saving their references fails", async (
   boundary.failStorage = false;
   expect(view.state().attachments.map((file) => file.id)).toEqual(["image"]);
   expect([...boundary.files.values()]).toEqual(["YWJj"]);
+});
+
+it("reuses the durable save request and uploads only once after lost responses and a restart", async () => {
+  const view = mount();
+  await act(async () => {
+    await view.state().begin(delivery);
+    await view.state().changeAttachments(pastedFiles);
+  });
+  boundary.uploadAttachment.mockImplementation(async (_agent, file) => ({ id: `uploaded-${file.id}` }));
+  let submitted: QueueEditRequest | undefined;
+  boundary.editQueue.mockImplementation(async (_agent, _server, input) => {
+    if (input.action === "retain-attachments") return { agentId: "agent", deliveries: [delivery] };
+    expect(input.action).toBe("save");
+    expect(JSON.parse(boundary.storage.get("queue-edit.member.host.agent") ?? "{}").pendingSave).toEqual(input);
+    if (submitted) expect(input).toEqual(submitted);
+    submitted = input;
+    throw new Error("Response lost");
+  });
+  await act(async () => {
+    expect(await view.state().save("Saved text", view.state().attachments)).toBe(false);
+  });
+  act(() => view.state().changeText("Must not replace the pending save"));
+  expect(view.state().edit?.text).toBe("Saved text");
+  await act(async () => {
+    expect(await view.state().save("Different argument", [])).toBe(false);
+  });
+  expect(boundary.uploadAttachment).toHaveBeenCalledTimes(2);
+  expect(boundary.discardAttachment).not.toHaveBeenCalled();
+  cleanups.pop();
+  view.close();
+  const restored = mount();
+  expect(restored.state().confirmed).toBe(true);
+  expect(restored.state().edit?.pendingSave).toEqual(submitted);
+  await act(async () => {
+    await restored.state().begin(delivery);
+  });
+  boundary.editQueue.mockImplementation(async (_agent, _server, input) => {
+    expect(input).toEqual(submitted);
+    return { agentId: "agent", deliveries: [delivery] };
+  });
+  await act(async () => {
+    expect(await restored.state().save("Saved text", restored.state().attachments)).toBe(true);
+  });
+  expect(boundary.uploadAttachment).toHaveBeenCalledTimes(2);
+  expect(boundary.editQueue.mock.calls.map((call) => call[2].action)).toEqual([
+    "begin",
+    "retain-attachments",
+    "save",
+    "save",
+    "save",
+  ]);
+  expect(restored.state().edit).toBeNull();
+  expect(boundary.storage.size).toBe(0);
+  expect(boundary.files.size).toBe(0);
+});
+
+it("does not send Save if its request cannot be persisted and removes the unused uploads", async () => {
+  const view = mount();
+  await act(async () => {
+    await view.state().begin(delivery);
+  });
+  boundary.uploadAttachment.mockResolvedValue({ id: "unused-upload" });
+  boundary.failStorage = true;
+  await act(async () => {
+    expect(await view.state().save("Text", pastedFiles.slice(0, 1))).toBe(false);
+  });
+  expect(boundary.editQueue.mock.calls.map((call) => call[2].action)).toEqual(["begin", "retain-attachments"]);
+  expect(boundary.discardAttachment).toHaveBeenCalledWith("agent", "unused-upload", "host");
+  expect(view.state().edit?.pendingSave).toBeUndefined();
+  boundary.failStorage = false;
 });
