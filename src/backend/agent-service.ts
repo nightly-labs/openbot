@@ -1712,7 +1712,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#drain.scheduleDrain(agentId);
     }
     this.#mailboxSync.emitQueue(agentId);
-    return this.#mailbox.listQueue(agentId, input.action === "begin" ? input.editId : undefined);
+    return this.#mailbox.listQueue(agentId);
   }
 
   async updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {

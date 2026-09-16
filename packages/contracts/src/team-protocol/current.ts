@@ -56,6 +56,11 @@ export function isConversationUnreadRoute(method: string, path: string): boolean
   );
 }
 
+/** The queue snapshot route. Its response carries the `editing` mark beside the frozen keys. */
+export function isQueueSnapshotRoute(method: string, path: string): boolean {
+  return method === "GET" && /^\/v1\/agents\/[^/]+\/queue$/u.test(new URL(path, "http://openbot.invalid").pathname);
+}
+
 export function isAgentProfileRoute(method: string, path: string): boolean {
   return (
     method === "POST" &&

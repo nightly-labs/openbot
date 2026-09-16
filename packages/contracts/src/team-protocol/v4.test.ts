@@ -5,6 +5,7 @@ import request from "./fixtures/v4/client-http-request.json";
 import response from "./fixtures/v4/host-http-response.json";
 import profileResponseFixture from "./fixtures/v4/profile-host-response.json";
 import { decodeProfileV4Draft, decodeProfileV4Request, decodeProfileV4Response } from "./profile-v4";
+import { encodeTeamProtocolV1CurrentHttpResponse } from "./v1-adapter";
 import { decodeTeamProtocolV3CurrentHttpResponse } from "./v3-adapter";
 import {
   decodeTeamProtocolV4CurrentHttpRequest,
@@ -32,6 +33,39 @@ describe("Team protocol v4", () => {
     expect(() =>
       decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/agents", 200, [{ ...response[0], provider: "unknown" }]),
     ).toThrow();
+  });
+
+  it("carries the queue edit mark to a current client and drops it for a frozen one", () => {
+    const delivery = {
+      id: "delivery-1",
+      messageId: "message-1",
+      recipientAgentId: "chief",
+      sender: { kind: "user" },
+      text: "Read the report",
+      attachments: [],
+      replyToMessageId: null,
+      status: "queued",
+      position: 1,
+      turnId: null,
+      error: null,
+      createdAt: "2026-09-16T10:00:00.000Z",
+      editing: true,
+    };
+    const snapshot = { agentId: "chief", deliveries: [delivery] };
+    const queuePath = "/v1/agents/chief/queue";
+
+    const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot));
+    expect(wire.deliveries[0].editing).toBe(true);
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, wire)).toEqual(snapshot);
+    // The queue edit response is the same snapshot, so the holder sees the mark too.
+    const edited = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", `${queuePath}/edit`, 200, snapshot));
+    expect(edited.deliveries[0].editing).toBe(true);
+    // A direct WebRTC connection carries it too, so a phone on either transport sees the mark.
+    const overWebRtc = encodeTeamProtocolV4WebRtcHttpResponse("GET", queuePath, 200, snapshot);
+    expect(decodeTeamProtocolV4WebRtcHttpResponse("GET", queuePath, 200, overWebRtc)).toEqual(snapshot);
+    // A frozen adapter projects a fixed key list: the mark is absent, not false.
+    const frozen = JSON.parse(encodeTeamProtocolV1CurrentHttpResponse("GET", queuePath, 200, snapshot));
+    expect(frozen.deliveries[0]).not.toHaveProperty("editing");
   });
 
   it("carries OpenCode agent events through HTTP events and WebRTC", () => {

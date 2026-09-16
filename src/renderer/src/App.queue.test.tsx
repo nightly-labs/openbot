@@ -472,6 +472,47 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Remove for-local.png" })).not.toBeInTheDocument());
   });
 
+  it("marks a message another device is editing and keeps its actions out of reach", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const running = queuedDelivery("delivery-running", "Current work", null, {
+      status: "starting",
+      turnId: "turn-running",
+    });
+    const edited = queuedDelivery("delivery-edited", "Edited on phone", 1, { editing: true });
+    const next = queuedDelivery("delivery-next", "Next work", 2);
+
+    emitAgentEvent?.({
+      type: "queue-changed",
+      snapshot: { agentId: "chief", deliveries: [running, edited, next] },
+    });
+
+    // The row stays in place. Hiding it looked like the message was lost.
+    const row = await screen.findByRole("group", { name: "Queued message 1, editing: Edited on phone" });
+    expect(within(row).getByText("Editing")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Queued message 2: Next work" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Steer queued message 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Edit queued message 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete queued message 1" })).toBeDisabled();
+
+    // The edit stops the queue instead of starting message 1, and the panel stays on screen.
+    emitAgentEvent?.({
+      type: "turn-completed",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-running",
+      status: "completed",
+    });
+    emitAgentEvent?.({ type: "queue-changed", snapshot: { agentId: "chief", deliveries: [edited, next] } });
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("region", { name: "Message queue" }))
+          .getAllByLabelText(/^Queued message/u)
+          .map((element) => element.getAttribute("aria-label")),
+      ).toEqual(["Queued message 1, editing: Edited on phone", "Queued message 2: Next work"]),
+    );
+  });
+
   it("keeps foreground starts out of Queue and hides waiting work between turns", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });

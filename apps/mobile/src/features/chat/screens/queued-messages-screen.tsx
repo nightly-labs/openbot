@@ -68,7 +68,7 @@ export function QueuedMessagesScreen() {
             <SettingsRow
               key={item.id}
               leading={<QueuePosition label={String(item.position ?? "–")} />}
-              supportingText={held?.id === item.id ? "Editing" : formatUpdatedAt(item.createdAt)}
+              supportingText={item.editing || held?.id === item.id ? "Editing" : formatUpdatedAt(item.createdAt)}
               onPress={() => open(item)}
             >
               <Typography numberOfLines={2}>{queuedMessagePreview(item)}</Typography>

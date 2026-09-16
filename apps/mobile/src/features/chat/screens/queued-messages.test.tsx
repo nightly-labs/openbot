@@ -262,6 +262,19 @@ it("keeps the held message listed after the host hides it from the queue snapsho
   expect(screen.getByText("Second request")).toBeTruthy();
 });
 
+it("marks a message another device is editing and keeps its actions out of reach", () => {
+  const edited = { ...first, editing: true };
+  native.context.queue = stubQueue({ queued: [edited, second], deliveries: [edited, second] });
+  mount(() => <QueuedMessagesScreen />);
+  expect(screen.getByRole("button", { name: /First request.*Editing/ })).toBeTruthy();
+  expect(screen.getByText("Second request")).toBeTruthy();
+
+  mount(() => <QueuedMessageActionsScreen />);
+  expect(screen.getByRole("button", { name: "Edit" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Steer" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Delete" }).hasAttribute("disabled")).toBe(true);
+});
+
 it("reports an empty queue", () => {
   native.context.queue = stubQueue({ queued: [], deliveries: [] });
   mount(() => <QueuedMessagesScreen />);

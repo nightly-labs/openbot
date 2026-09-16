@@ -1632,10 +1632,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           if (!delivery || (existing && existing.agentId !== input.agentId))
             throw new Error("This queued message is no longer available.");
           queueEdits.set(input.editId, { agentId: input.agentId, delivery });
-          queue.deliveries = queue.deliveries.filter((item) => item.id !== delivery.id);
+          // The host keeps a held delivery listed and marks it, so every device keeps the row.
+          queue.deliveries = queue.deliveries.map((item) =>
+            item.id === delivery.id ? { ...item, editing: true } : item,
+          );
           queues.set(input.agentId, queue);
           emitAgentEvent({ type: "queue-changed", snapshot: structuredClone(queue) });
-          return { agentId: input.agentId, deliveries: [structuredClone(delivery)] };
+          return structuredClone(queue);
         }
         const held = queueEdits.get(input.editId);
         if (!held || held.agentId !== input.agentId || held.delivery.id !== input.deliveryId)
@@ -1650,7 +1653,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                 attachments: held.delivery.attachments.filter((item) => input.keepAttachmentIds.includes(item.id)),
               }
             : held.delivery;
-        queue.deliveries.push(delivery);
+        queue.deliveries = queue.deliveries.some((item) => item.id === delivery.id)
+          ? queue.deliveries.map((item) => (item.id === delivery.id ? { ...delivery, editing: false } : item))
+          : [...queue.deliveries, { ...delivery, editing: false }];
         queues.set(input.agentId, queue);
         emitAgentEvent({ type: "queue-changed", snapshot: structuredClone(queue) });
         return structuredClone(queue);

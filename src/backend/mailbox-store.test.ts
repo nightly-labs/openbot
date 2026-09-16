@@ -72,7 +72,7 @@ describe("MailboxStore", () => {
       "Disk full",
     );
     expect(mailbox.nextQueued("chief")).toBeNull();
-    expect(mailbox.listQueue("chief", "edit-rollback").deliveries[0].text).toBe("Original");
+    expect(mailbox.listQueue("chief").deliveries[0].text).toBe("Original");
     failWrite();
     expect(() => mailbox.finishQueueEdit("chief", id, "edit-rollback")).toThrow("Disk full");
     expect(mailbox.nextQueued("chief")).toBeNull();
@@ -98,10 +98,14 @@ describe("MailboxStore", () => {
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
     await restored.initialize();
     expect(restored.nextQueued("chief")).toBeNull();
-    expect(restored.listQueue("chief").deliveries.map((item) => item.id)).toEqual([second.deliveries[0].id]);
+    // The hold is visible to every device, keeps its place, and never leaks the private edit id.
+    expect(restored.listQueue("chief").deliveries.map((item) => item.id)).toEqual([id, second.deliveries[0].id]);
+    expect(restored.listQueue("chief").deliveries.map((item) => item.editing)).toEqual([true, false]);
     expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("editId");
-    expect(restored.listQueue("chief").deliveries[0].position).toBe(1);
+    expect(restored.listQueue("chief").deliveries.map((item) => item.position)).toEqual([1, 2]);
     await restored.reorderQueue("chief", [second.deliveries[0].id]);
+    await restored.reorderQueue("chief", [id, second.deliveries[0].id]);
+    expect(restored.listQueue("chief").deliveries.map((item) => item.id)).toEqual([id, second.deliveries[0].id]);
     await restored.updateQueuedMessage("chief", id, "Edited", [], [], "phone-edit");
     expect(restored.queueEditFinished("chief", id, "phone-edit")).toBe(true);
     expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Edited", position: 1 });

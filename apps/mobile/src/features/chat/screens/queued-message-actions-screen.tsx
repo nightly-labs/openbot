@@ -33,8 +33,10 @@ export function QueuedMessageActionsScreen() {
     );
   }
 
-  // Editing holds one delivery on the host. Leave the other rows read-only until it ends.
+  // Editing holds one delivery on the host: our own hold locks every other row until it ends.
   const locked = queue.busy || !queue.online || Boolean(held && held.id !== delivery.id);
+  // Another device holds this one. Leave it alone until that edit ends.
+  const editedElsewhere = Boolean(delivery.editing) && held?.id !== delivery.id;
   const finish = (action: Promise<boolean>) => {
     void haptics.impact();
     void action.then((done) => {
@@ -59,7 +61,7 @@ export function QueuedMessageActionsScreen() {
       <SettingsSection>
         <SettingsRow
           leading={<Pencil color={foreground} size={22} />}
-          disabled={locked || !queue.canEdit}
+          disabled={locked || editedElsewhere || !queue.canEdit}
           onPress={() => {
             void haptics.selection();
             router.push({ pathname: "/queued-messages/edit", params: { deliveryId: delivery.id } });
@@ -70,7 +72,7 @@ export function QueuedMessageActionsScreen() {
         <SettingsRow
           leading={<CornerDownRight color={foreground} size={22} />}
           disclosure={false}
-          disabled={locked || !queue.activeTurnId}
+          disabled={locked || editedElsewhere || !queue.activeTurnId}
           onPress={() => finish(queue.steer(delivery))}
         >
           <Typography>Steer</Typography>
@@ -78,7 +80,7 @@ export function QueuedMessageActionsScreen() {
         <SettingsRow
           leading={<ArrowUpToLine color={foreground} size={22} />}
           disclosure={false}
-          disabled={locked || delivery.position === 1}
+          disabled={locked || editedElsewhere || delivery.position === 1}
           onPress={() => finish(queue.moveFirst(delivery))}
         >
           <Typography>Move to first</Typography>
@@ -89,7 +91,7 @@ export function QueuedMessageActionsScreen() {
         <SettingsRow
           leading={<Trash2 color={danger} size={22} />}
           disclosure={false}
-          disabled={locked}
+          disabled={locked || editedElsewhere}
           onPress={() =>
             Alert.alert("Delete queued message?", "The agent never receives it.", [
               { text: "Keep", style: "cancel" },
@@ -101,6 +103,7 @@ export function QueuedMessageActionsScreen() {
         </SettingsRow>
       </SettingsSection>
 
+      {editedElsewhere ? <SettingsNote>Another device is editing this message.</SettingsNote> : null}
       {queue.activeTurnId ? null : <SettingsNote>Steer needs a running turn.</SettingsNote>}
       {queue.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">

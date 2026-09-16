@@ -374,18 +374,18 @@ export class MailboxStore {
     return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
   }
 
-  listQueue(agentId: string, editId?: string): QueueSnapshot {
+  /**
+   * A delivery held for editing stays listed, marked `editing`, and keeps its position. Hiding it
+   * removed the row on every other device and renumbered the rest for as long as the edit ran,
+   * which reads as lost messages.
+   */
+  listQueue(agentId: string): QueueSnapshot {
     const channelMessageIds = this.#channelMessageIds();
-    const positions = this.#queuedPositions(editId);
+    const positions = this.#queuedPositions();
     return {
       agentId,
       deliveries: this.#state.deliveries
-        .filter(
-          (delivery) =>
-            delivery.recipientAgentId === agentId &&
-            !channelMessageIds.has(delivery.messageId) &&
-            (delivery.status !== "queued" || !delivery.editId || delivery.editId === editId),
-        )
+        .filter((delivery) => delivery.recipientAgentId === agentId && !channelMessageIds.has(delivery.messageId))
         .map((delivery) => this.#publicDelivery(delivery, positions)),
     };
   }
@@ -1077,23 +1077,29 @@ export class MailboxStore {
     await this.#drainFileDeletionOutbox();
   }
 
+  /**
+   * A held delivery keeps its place. `listQueue` reports it now, so a caller may send its id with
+   * the rest; both that list and one without it are accepted, and neither moves the held message.
+   */
   async reorderQueue(agentId: string, deliveryIds: string[]): Promise<void> {
     const allQueued = this.#state.deliveries.filter(
       (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
     );
+    const heldIds = new Set(allQueued.filter((delivery) => delivery.editId).map((delivery) => delivery.id));
+    const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
     const queued = allQueued.filter((delivery) => !delivery.editId);
     const expected = new Set(queued.map((delivery) => delivery.id));
     if (
-      deliveryIds.length !== queued.length ||
-      new Set(deliveryIds).size !== deliveryIds.length ||
-      deliveryIds.some((deliveryId) => !expected.has(deliveryId))
+      requested.length !== queued.length ||
+      new Set(requested).size !== requested.length ||
+      requested.some((deliveryId) => !expected.has(deliveryId))
     ) {
       throw new Error("Queue order is stale. Refresh the queue and try again.");
     }
     let nextVisible = 0;
     const orderedIds = [...allQueued]
       .sort(compareQueueOrder)
-      .map((delivery) => (delivery.editId ? delivery.id : deliveryIds[nextVisible++]));
+      .map((delivery) => (delivery.editId ? delivery.id : requested[nextVisible++]));
     const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
     for (const delivery of allQueued) {
       delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
@@ -1286,14 +1292,15 @@ export class MailboxStore {
       attachments: message.attachments.map(toAttachmentSummary),
       replyToMessageId: message.replyToMessageId,
       position: delivery.status === "queued" ? (positions.get(delivery.id) ?? null) : null,
+      editing: Boolean(delivery.editId),
     };
   }
 
-  #queuedPositions(editId?: string): Map<string, number> {
+  #queuedPositions(): Map<string, number> {
     const counts = new Map<string, number>();
     const positions = new Map<string, number>();
     const queued = [...this.#state.deliveries]
-      .filter((delivery) => delivery.status === "queued" && (!delivery.editId || delivery.editId === editId))
+      .filter((delivery) => delivery.status === "queued")
       .sort(compareQueueOrder);
     for (const delivery of queued) {
       const position = (counts.get(delivery.recipientAgentId) ?? 0) + 1;

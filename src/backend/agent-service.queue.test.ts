@@ -52,7 +52,8 @@ describe.sequential("AgentService: queue", () => {
     const deliveryId = first.deliveries[0].id;
     const editing = await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" });
     expect(editing.deliveries[0]).toMatchObject({ id: deliveryId, text: "Original" });
-    expect(service.listQueue("chief").deliveries).toEqual([]);
+    // Every device keeps the row, marked as being edited, rather than watching it disappear.
+    expect(service.listQueue("chief").deliveries).toMatchObject([{ id: deliveryId, editing: true, position: 1 }]);
     expect(mailbox.nextQueued("chief")).toBeNull();
     const save = {
       action: "save" as const,
@@ -1416,7 +1417,7 @@ describe.sequential("AgentService: queue", () => {
         (event) => event.type === "queue-changed" && event.snapshot.agentId === "chief" && !event.snapshot.hold,
       ),
     );
-    expect(service.listQueue("chief").deliveries).toEqual([]);
+    expect(service.listQueue("chief").deliveries).toMatchObject([{ id: deliveryId, editing: true }]);
     expect(mailbox.nextQueued("chief")).toBeNull();
     await service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "channel-wait-edit" });
 

@@ -53,9 +53,10 @@ export function queuedDeliveriesInOrder(snapshot: QueueSnapshot | undefined): Qu
  * as a message, which the transcript is showing, and a queued delivery that
  * belongs to the running turn, which the activity line above is showing.
  *
- * A held queue is the exception: the work that holds it is a channel turn on
- * another thread, so this agent has nothing running to hold the panel open, and
- * without it the message the user just sent would appear nowhere at all.
+ * Two exceptions keep the panel open with nothing running. A held queue waits on
+ * a channel turn on another thread, and a queue whose head is being edited on
+ * another device waits on that edit. Neither gives this agent something running,
+ * and closing the panel would take every waiting message off the screen.
  */
 export function presentQueueDeliveries(input: {
   snapshot: QueueSnapshot | undefined;
@@ -64,7 +65,8 @@ export function presentQueueDeliveries(input: {
 }): QueueDelivery[] {
   const snapshot = input.snapshot;
   if (!snapshot) return [];
-  if (!snapshot.hold && activeQueueDeliveries(snapshot, input.activeTurnId).length === 0) return [];
+  const editHold = snapshot.deliveries.some((delivery) => delivery.status === "queued" && delivery.editing);
+  if (!snapshot.hold && !editHold && activeQueueDeliveries(snapshot, input.activeTurnId).length === 0) return [];
   const queued = queuedDeliveriesInOrder(snapshot).filter(
     (delivery) =>
       (!input.activeTurnId || delivery.turnId !== input.activeTurnId) && !input.renderedMessageIds.has(delivery.id),
