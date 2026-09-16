@@ -152,7 +152,14 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   }
   const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
   const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
-  const formatted = number.toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits: decimals.length });
+  const integerFormat = unquotedFormat(format).split(".")[0] ?? "";
+  const minimumIntegerDigits = (integerFormat.match(/0/gu) ?? []).length;
+  const formatted = number.toLocaleString("en-US", {
+    minimumFractionDigits,
+    maximumFractionDigits: decimals.length,
+    minimumIntegerDigits,
+    useGrouping: integerFormat.includes(","),
+  });
   if (suffix) return suffix === "%" ? `${formatted}%` : `${formatted} ${suffix}`;
   return /"[^"]*%[^"]*"|\\%/u.test(format) ? `${formatted}%` : formatted;
 }
