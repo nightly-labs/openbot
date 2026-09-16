@@ -432,6 +432,20 @@ export function createConversationViewScope(props: ConversationProps) {
     submitComposer,
     sendSelectionInstruction,
   } = actions;
+  createEffect(
+    () => {
+      const deliveryId = currentEditingDeliveryId();
+      return (
+        !submitting() &&
+        deliveryId !== null &&
+        props.queue?.agentId === props.agent?.id &&
+        props.queue?.deliveries.some((item) => item.id === deliveryId && item.status === "cancelled")
+      );
+    },
+    (deleted) => {
+      if (deleted) void cancelQueuedMessageEdit();
+    },
+  );
   const messageActions = createMessageActions({
     props,
     installedSkills,

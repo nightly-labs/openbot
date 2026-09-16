@@ -1693,6 +1693,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             ? "This edit was cancelled, so the message keeps its original text."
             : "This edit was already saved.",
         );
+      if (
+        input.action === "save" &&
+        !this.#mailbox.matchesFinishedQueueSave(
+          agentId,
+          input.deliveryId,
+          input.editId,
+          input.text,
+          input.keepAttachmentIds,
+          input.attachmentDraftIds,
+        )
+      )
+        throw new QueueEditRejectedError(
+          "This edit was already saved with different contents. Your changes were not saved.",
+        );
       this.#drain.scheduleDrain(agentId);
       this.#mailboxSync.emitQueue(agentId);
       return this.listQueue(agentId);

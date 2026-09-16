@@ -37,7 +37,7 @@ export function QueuedMessageActionsScreen() {
 
   // Editing holds one delivery on the host: our own hold locks every other row until it ends.
   const locked = queue.busy || !queue.online || Boolean(held && held.id !== delivery.id);
-  // Another device holds this one. Leave it alone until that edit ends.
+  // Another device holds this one. Only confirmed deletion remains available.
   const editedElsewhere = Boolean(delivery.editing) && held?.id !== delivery.id;
   const finish = (action: Promise<boolean>) => {
     void haptics.impact();
@@ -96,7 +96,7 @@ export function QueuedMessageActionsScreen() {
         <SettingsRow
           leading={<Trash2 color={danger} size={22} />}
           disclosure={false}
-          disabled={locked || editedElsewhere}
+          disabled={locked}
           onPress={() =>
             Alert.alert("Delete queued message?", "The agent never receives it.", [
               { text: "Keep", style: "cancel" },

@@ -297,7 +297,7 @@ it("keeps the held message listed after the host hides it from the queue snapsho
   expect(screen.getByText("Second request")).toBeTruthy();
 });
 
-it("marks a message another device is editing and keeps its actions out of reach", () => {
+it("allows confirmed deletion while another device is editing", async () => {
   const edited = { ...first, editing: true };
   native.context.queue = stubQueue({ queued: [edited, second], deliveries: [edited, second] });
   mount(() => <QueuedMessagesScreen />);
@@ -307,7 +307,12 @@ it("marks a message another device is editing and keeps its actions out of reach
   mount(() => <QueuedMessageActionsScreen />);
   expect(screen.getByRole("button", { name: "Edit" }).hasAttribute("disabled")).toBe(true);
   expect(screen.getByRole("button", { name: "Steer" }).hasAttribute("disabled")).toBe(true);
-  expect(screen.getByRole("button", { name: "Delete" }).hasAttribute("disabled")).toBe(true);
+  act(() => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
+  expect(native.context.queue?.remove).not.toHaveBeenCalled();
+  const buttons: { text: string; onPress?: () => void }[] = native.alert.mock.calls[0][2];
+  act(() => buttons.find((button) => button.text === "Delete")?.onPress?.());
+  expect(native.context.queue?.remove).toHaveBeenCalledWith(edited);
+  await act(async () => {});
 });
 
 it("reports an empty queue", () => {

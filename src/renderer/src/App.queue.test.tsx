@@ -472,7 +472,7 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Remove for-local.png" })).not.toBeInTheDocument());
   });
 
-  it("marks a message another device is editing and keeps its actions out of reach", async () => {
+  it("allows confirmed deletion while another device is editing", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     const running = queuedDelivery("delivery-running", "Current work", null, {
@@ -493,7 +493,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("group", { name: "Queued message 2: Next work" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Steer queued message 1" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Edit queued message 1" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete queued message 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete queued message 1" })).toBeEnabled();
 
     // The edit stops the queue instead of starting message 1, and the panel stays on screen.
     emitAgentEvent?.({
@@ -510,6 +510,23 @@ describe("OpenBot connected desktop shell", () => {
           .getAllByLabelText(/^Queued message/u)
           .map((element) => element.getAttribute("aria-label")),
       ).toEqual(["Queued message 1, editing: Edited on phone", "Queued message 2: Next work"]),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Delete queued message 1" }));
+    const confirmation = await screen.findByRole("dialog", { name: "Delete queued message?" });
+    expect(window.openbot.agent.cancelQueuedMessage).not.toHaveBeenCalled();
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Keep" }));
+    expect(window.openbot.agent.cancelQueuedMessage).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("button", { name: "Delete queued message 1" }));
+    await fireEvent.click(
+      within(await screen.findByRole("dialog", { name: "Delete queued message?" })).getByRole("button", {
+        name: "Delete",
+      }),
+    );
+    await waitFor(() =>
+      expect(window.openbot.agent.cancelQueuedMessage).toHaveBeenCalledWith({
+        agentId: "chief",
+        deliveryId: "delivery-edited",
+      }),
     );
   });
 
@@ -1137,6 +1154,39 @@ it("acquires a host hold before editing and uses its identity for save and cance
     ),
   );
 });
+
+it.each(["cancelled", "missing"] as const)(
+  "releases a desktop edit when its delivery is %s on another device",
+  async (state) => {
+    installOpenbotStub();
+    const delivery = queuedDelivery("deleted-edit", "Queued text", 1);
+    vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+    });
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+    render(() => <App />);
+    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "My original draft";
+    await fireEvent.input(composer);
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
+    await waitFor(() => expect(composer).toHaveTextContent("Queued text"));
+    // A deleted delivery no longer needs a host round trip, even if that host is unavailable.
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockRejectedValue(new Error("Connection lost"));
+    emitAgentEvent?.({
+      type: "queue-changed",
+      snapshot: { agentId: "chief", deliveries: state === "cancelled" ? [{ ...delivery, status: "cancelled" }] : [] },
+    });
+    if (state === "missing") await fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
+    expect(composer).toHaveTextContent("My original draft");
+    expect(window.localStorage.getItem("openbot:queue-edit")).toBeNull();
+    expect(vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls.map(([input]) => input.action)).toEqual([
+      "begin",
+    ]);
+  },
+);
 
 it("keeps the edit identity after a lost begin response and blocks replacement until release", async () => {
   installOpenbotStub();

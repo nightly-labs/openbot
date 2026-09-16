@@ -224,7 +224,13 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const target = agentId ? { agentId, serverId } : undefined;
     const editId = deps.editingEditId();
     const deliveryId = deps.editingDeliveryId();
-    if (target && editId && deliveryId) {
+    const queue = deps.props.queue;
+    const unavailable =
+      target &&
+      deps.currentEditingDeliveryId() === deliveryId &&
+      queue?.agentId === target.agentId &&
+      queue.deliveries.find((item) => item.id === deliveryId)?.status !== "queued";
+    if (target && editId && deliveryId && !unavailable) {
       deps.setSubmitting(true);
       try {
         await window.openbot.agent.editQueuedMessage(
@@ -253,6 +259,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     }
     if (target) {
       deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: backup ?? EMPTY_DRAFT }));
+      deps.setComposerError(null, target);
     }
     deps.setEditingAgentId(null);
     deps.setEditingServerId(null);

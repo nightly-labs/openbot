@@ -2,7 +2,7 @@ import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references"
 import type { InstalledSkill, QueueDelivery, QueueHold } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
-import { Button } from "../../components/ui";
+import { Button, Dialog } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -30,6 +30,7 @@ interface DragSlot {
 }
 
 export function QueuePanel(props: QueuePanelProps) {
+  const [deleteHeldId, setDeleteHeldId] = createSignal<string | null>(null);
   const [draggedId, setDraggedId] = createSignal<string | null>(null);
   const [dragOverId, setDragOverId] = createSignal<string | null>(null);
   const [announcement, setAnnouncement] = createSignal("");
@@ -514,7 +515,7 @@ export function QueuePanel(props: QueuePanelProps) {
                         variant="destructive-ghost"
                         type="button"
                         class="agent-queue-icon-button agent-queue-delete"
-                        disabled={!actionable}
+                        disabled={delivery.status !== "queued"}
                         aria-describedby={actionTooltipId}
                         aria-label={`Delete queued message ${delivery.position ?? ""}`}
                         onPointerEnter={(event) => openActionTooltip(event.currentTarget, "Delete message")}
@@ -526,7 +527,8 @@ export function QueuePanel(props: QueuePanelProps) {
                         onKeyDown={closeActionTooltipOnEscape}
                         onClick={() => {
                           setActionTooltip(null);
-                          requestCancel(delivery.id);
+                          if (editing) setDeleteHeldId(delivery.id);
+                          else requestCancel(delivery.id);
                         }}
                       >
                         <TrashIcon />
@@ -563,6 +565,39 @@ export function QueuePanel(props: QueuePanelProps) {
           {announcement()}
         </div>
       </section>
+      <Dialog.Root
+        open={deleteHeldId() !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteHeldId(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay class="agent-memory-confirm-overlay" />
+          <Dialog.Content class="agent-memory-confirm-dialog">
+            <div class="agent-memory-confirm-content">
+              <Dialog.Title>Delete queued message?</Dialog.Title>
+              <Dialog.Description>
+                Another device is editing this message. The agent will not receive it.
+              </Dialog.Description>
+              <div class="agent-memory-confirm-actions">
+                <Button variant="ghost" onClick={() => setDeleteHeldId(null)}>
+                  Keep
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    const id = deleteHeldId();
+                    setDeleteHeldId(null);
+                    if (id) requestCancel(id);
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <Show when={actionTooltip()}>
         {(current) => <AnchoredTooltip id={actionTooltipId} anchor={current().anchor} content={current().content} />}
       </Show>

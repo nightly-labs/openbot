@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
@@ -63,6 +63,7 @@ interface StoredDelivery {
   editId?: string;
   finishedEditId?: string;
   finishedEditAction?: QueueEditOutcome;
+  finishedEditSaveHash?: string;
   id: string;
   messageId: string;
   recipientAgentId: string;
@@ -947,6 +948,23 @@ export class MailboxStore {
     return delivery?.finishedEditAction;
   }
 
+  matchesFinishedQueueSave(
+    agentId: string,
+    deliveryId: string,
+    editId: string,
+    text: string,
+    keepAttachmentIds: string[],
+    attachmentDraftIds: string[],
+  ): boolean {
+    const delivery = this.#state.deliveries.find(
+      (item) => item.id === deliveryId && item.recipientAgentId === agentId && item.finishedEditId === editId,
+    );
+    return (
+      delivery?.finishedEditAction === "save" &&
+      delivery.finishedEditSaveHash === queueSaveHash(text, keepAttachmentIds, attachmentDraftIds)
+    );
+  }
+
   finishQueueEdit(agentId: string, deliveryId: string, editId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
@@ -1030,6 +1048,7 @@ export class MailboxStore {
     const previous = structuredClone(message);
     const previousFinishedEditId = delivery.finishedEditId;
     const previousFinishedEditAction = delivery.finishedEditAction;
+    const previousFinishedEditSaveHash = delivery.finishedEditSaveHash;
     const oldAttachmentPaths = message.attachments
       .filter((attachment) => !keepIds.has(attachment.id))
       .map((attachment) => attachment.path);
@@ -1068,6 +1087,7 @@ export class MailboxStore {
         delete delivery.editId;
         delivery.finishedEditId = editId;
         delivery.finishedEditAction = "save";
+        delivery.finishedEditSaveHash = queueSaveHash(text, keepAttachmentIds, attachmentDraftIds);
       }
       this.#state.drafts = this.#state.drafts.filter((draft) => !draftIds.has(draft.id));
       await this.#persist(
@@ -1082,6 +1102,7 @@ export class MailboxStore {
         delivery.editId = editId;
         delivery.finishedEditId = previousFinishedEditId;
         delivery.finishedEditAction = previousFinishedEditAction;
+        delivery.finishedEditSaveHash = previousFinishedEditSaveHash;
       }
       for (const draft of drafts) {
         if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
@@ -1306,6 +1327,7 @@ export class MailboxStore {
       editId: _editId,
       finishedEditId: _finishedEditId,
       finishedEditAction: _finishedEditAction,
+      finishedEditSaveHash: _finishedEditSaveHash,
       ...publicDelivery
     } = delivery;
     return {
@@ -1574,6 +1596,7 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     isString(value.messageId) &&
     isString(value.recipientAgentId) &&
     (value.editId === undefined || isString(value.editId)) &&
+    (value.finishedEditSaveHash === undefined || isString(value.finishedEditSaveHash)) &&
     (value.finishedEditId === undefined || isString(value.finishedEditId)) &&
     (value.finishedEditAction === undefined ||
       value.finishedEditAction === "save" ||
@@ -1620,4 +1643,10 @@ function compareReactionActors(left: ConversationReaction, right: ConversationRe
   if (left.actor.kind !== right.actor.kind) return left.actor.kind === "user" ? -1 : 1;
   if (left.actor.kind === "user" || right.actor.kind === "user") return 0;
   return left.actor.agentId.localeCompare(right.actor.agentId);
+}
+
+function queueSaveHash(text: string, keepAttachmentIds: string[], attachmentDraftIds: string[]): string {
+  return createHash("sha256")
+    .update(JSON.stringify([text, keepAttachmentIds, attachmentDraftIds]))
+    .digest("hex");
 }

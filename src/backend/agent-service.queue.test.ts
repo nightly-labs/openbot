@@ -25,6 +25,7 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+import { MailboxStore } from "./mailbox-store";
 import { getString } from "./protocol";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
@@ -65,6 +66,27 @@ describe.sequential("AgentService: queue", () => {
     };
     await service.editQueuedMessage("chief", save);
     await service.editQueuedMessage("chief", save);
+    await expect(service.editQueuedMessage("chief", { ...save, text: "Changed after lost response" })).rejects.toThrow(
+      "different contents",
+    );
+    await expect(
+      service.editQueuedMessage("chief", { ...save, keepAttachmentIds: ["different-file"] }),
+    ).rejects.toThrow("different contents");
+    const file = join(root, "retry-upload.txt");
+    await writeFile(file, "New attachment after lost response");
+    const [draft] = await mailbox.prepareImportedAttachments([file], []);
+    await expect(service.editQueuedMessage("chief", { ...save, attachmentDraftIds: [draft.id] })).rejects.toThrow(
+      "different contents",
+    );
+    await expect(
+      mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Reuse", draftIds: [draft.id] }),
+    ).rejects.toThrow("no longer exists");
+    const restored = new MailboxStore(join(root, "user-data"), store.sharedRoot, store.database);
+    await restored.initialize();
+    expect(restored.matchesFinishedQueueSave("chief", deliveryId, save.editId, save.text, [], [])).toBe(true);
+    expect(restored.matchesFinishedQueueSave("chief", deliveryId, save.editId, "Changed", [], [])).toBe(false);
+    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditSaveHash");
+
     await waitFor(() => mailbox.listQueue("chief").deliveries[0]?.status === "completed");
     const starts = client.requests.filter((request) => request.method === "turn/start");
     expect(starts).toHaveLength(1);
