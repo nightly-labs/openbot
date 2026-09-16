@@ -1084,6 +1084,8 @@ const openbotApi: OpenBotDesktopApi = {
     select: async (serverId) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSelect, serverId)),
     reorder: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversReorder, input)),
     setMuted: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetMuted, input)),
+    setNotchHidden: async (input) =>
+      rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetNotchHidden, input)),
     join: async (input) => {
       const server = await ipcRenderer.invoke(IPC_CHANNELS.serversJoin, input);
       selectedServerId = server.id;

@@ -16,7 +16,7 @@ import { useServers } from "./servers-context";
 export function WorkspaceServerRail() {
   const platform = usePlatform();
   const { openUsage } = useUsage();
-  const { servers, reorderServers, setServerMuted, setJoinServerOpen } = useServers();
+  const { servers, reorderServers, setServerMuted, setServerNotchHidden, setJoinServerOpen } = useServers();
   const { selectServer } = useServerSelection();
   const { openServerSettings } = useServerSettings();
 
@@ -66,6 +66,8 @@ export function WorkspaceServerRail() {
         onSelect={handleSelect}
         onReorder={(serverIds) => void reorderServers(serverIds)}
         onSetMuted={(serverId, muted) => void setServerMuted(serverId, muted)}
+        onSetNotchHidden={(serverId, hidden) => void setServerNotchHidden(serverId, hidden)}
+        notchConfigVisible={platform.appInfo()?.platform === "darwin"}
         onAdd={() => {
           if (!platform.landingPreview) setJoinServerOpen(true);
         }}

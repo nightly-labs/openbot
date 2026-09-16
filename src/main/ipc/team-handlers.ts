@@ -19,6 +19,7 @@ import {
   parseReorderServers,
   parseSendDirectMessage,
   parseSetServerMuted,
+  parseSetServerNotchHidden,
   parseSetTeamTyping,
   parseUpdateTeamMember,
 } from "./server-inputs";
@@ -41,6 +42,11 @@ export function teamIpcHandlers({
     servers: {
       setMuted: payloadHandler(parseSetServerMuted, ({ serverId, muted }) =>
         remoteServers.setMuted(serverId, muted).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+      ),
+      setNotchHidden: payloadHandler(parseSetServerNotchHidden, ({ serverId, hidden }) =>
+        remoteServers
+          .setNotchHidden(serverId, hidden)
+          .then((servers) => withLocalHostSummary(servers, host.getStatus())),
       ),
       list: handler(() => withLocalHostSummary(remoteServers.list(), host.getStatus())),
       select: payloadHandler(stringPayload("serverId"), (serverId) =>

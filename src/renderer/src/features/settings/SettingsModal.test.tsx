@@ -159,6 +159,60 @@ describe("SettingsModal", () => {
     expect(await screen.findByRole("switch", { name: "Automatically download updates" })).not.toBeChecked();
   });
 
+  it("toggles per-server notch visibility from the notch section", async () => {
+    const onSetServerNotchHidden = vi.fn();
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => {}}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => {}}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        notchServers={[
+          {
+            id: "local",
+            name: "Local",
+            logoUrl: null,
+            notificationsMuted: false,
+            notchHidden: false,
+            kind: "local",
+            state: "online",
+            apiUrl: null,
+            remoteDesktopAvailable: false,
+            role: null,
+            active: true,
+          },
+          {
+            id: "remote-1",
+            name: "Studio Mac",
+            logoUrl: null,
+            notificationsMuted: true,
+            notchHidden: true,
+            kind: "remote",
+            state: "online",
+            apiUrl: "https://studio.example.com",
+            remoteDesktopAvailable: false,
+            role: "member",
+            active: false,
+          },
+        ]}
+        onSetServerNotchHidden={onSetServerNotchHidden}
+      />
+    ));
+
+    expect(await screen.findByRole("switch", { name: "Local" })).toBeChecked();
+    const remoteSwitch = await screen.findByRole("switch", { name: "Studio Mac" });
+    expect(remoteSwitch).not.toBeChecked();
+    expect(remoteSwitch).toHaveAccessibleDescription("Notifications muted");
+    await fireEvent.click(remoteSwitch);
+    expect(onSetServerNotchHidden).toHaveBeenCalledWith("remote-1", false);
+  });
+
   it("offers an update for a CLI the user installed, which has no managed download", async () => {
     const onUpdateProvider = vi.fn(async () => undefined);
     const agentStatus: AgentStatus = {

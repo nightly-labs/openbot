@@ -82,6 +82,7 @@ export const en = {
   "settings.notch.displays.description": "Show Dynamic Island on connected external displays.",
   "settings.notch.haptics.title": "Haptic feedback",
   "settings.notch.haptics.description": "Use the Force Touch trackpad to confirm Dynamic Island interactions.",
+  "settings.notch.servers.muted": "Notifications muted",
   "settings.privacy.title": "Privacy",
   "settings.analytics.title": "Share product analytics",
   "settings.analytics.description":

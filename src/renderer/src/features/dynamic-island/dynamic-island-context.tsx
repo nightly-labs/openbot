@@ -42,6 +42,7 @@ const DynamicIsland = createSimpleContext({
         .filter(
           (server) =>
             !server.notificationsMuted &&
+            !server.notchHidden &&
             connectedServers.has(server.id) &&
             (server.kind === "local" || server.state === "online"),
         )
@@ -63,7 +64,10 @@ const DynamicIsland = createSimpleContext({
     createEffect(
       () =>
         servers()
-          .map((server) => `${server.id}:${server.state}:${server.notificationsMuted ? "muted" : "loud"}`)
+          .map(
+            (server) =>
+              `${server.id}:${server.state}:${server.notificationsMuted ? "muted" : "loud"}:${server.notchHidden ? "hidden" : "shown"}`,
+          )
           .join("\u0000"),
       () => {
         const currentServers = servers();

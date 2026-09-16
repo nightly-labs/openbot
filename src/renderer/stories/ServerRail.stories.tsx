@@ -8,6 +8,8 @@ const args: Parameters<typeof ServerRail>[0] = {
   servers: STORY_SERVERS,
   onSelect: fn(),
   onSetMuted: fn(),
+  onSetNotchHidden: fn(),
+  notchConfigVisible: true,
   onReorder: fn(),
   onAdd: fn(),
   onOpenSettings: fn(),
@@ -59,6 +61,8 @@ function InteractiveServerRail(props: Parameters<typeof ServerRail>[0]) {
         props.onReorder(serverIds);
       }}
       onSetMuted={props.onSetMuted}
+      onSetNotchHidden={props.onSetNotchHidden}
+      notchConfigVisible={props.notchConfigVisible}
       onAdd={props.onAdd}
       onOpenSettings={props.onOpenSettings}
       onOpenUsage={props.onOpenUsage}

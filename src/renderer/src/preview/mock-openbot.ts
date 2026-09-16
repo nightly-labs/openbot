@@ -1783,6 +1783,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         servers = servers.map((server) => (server.id === serverId ? { ...server, notificationsMuted: muted } : server));
         return clone(servers);
       },
+      setNotchHidden: async ({ serverId, hidden }) => {
+        if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+        servers = servers.map((server) => (server.id === serverId ? { ...server, notchHidden: hidden } : server));
+        return clone(servers);
+      },
       list: async () => clone(servers),
       select: async (serverId) => {
         servers = servers.map((server) => ({ ...server, active: server.id === serverId }));
@@ -1806,6 +1811,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           name: "Joined workspace",
           logoUrl: null,
           notificationsMuted: false,
+          notchHidden: false,
           kind: "remote",
           state: "online",
           apiUrl: input.inviteUrl,

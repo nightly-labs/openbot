@@ -296,11 +296,31 @@ export class RemoteServerStore implements RemoteServerDirectory {
     await operation;
   }
 
+  isNotchHidden(serverId: string): boolean {
+    return this.#state.notchHiddenServerIds.includes(serverId);
+  }
+
+  async setNotchHidden(serverId: string, hidden: boolean): Promise<void> {
+    const operation = this.#writeChain.then(async () => {
+      if (serverId !== LOCAL_SERVER_ID && !this.has(serverId)) throw new Error("Remote server not found.");
+      const notchHiddenServerIds = this.#state.notchHiddenServerIds.filter((id) => id !== serverId);
+      if (hidden) notchHiddenServerIds.push(serverId);
+      await this.#writeSnapshot({ ...structuredClone(this.#state), notchHiddenServerIds });
+      this.#state.notchHiddenServerIds = notchHiddenServerIds;
+    });
+    this.#writeChain = operation.catch(() => undefined);
+    await operation;
+  }
+
   // Capture server state now, but use the mute preference committed by preceding writes.
   async persist(): Promise<void> {
     const snapshot = structuredClone(this.#state);
     const operation = this.#writeChain.then(() =>
-      this.#writeSnapshot({ ...snapshot, mutedServerIds: [...this.#state.mutedServerIds] }),
+      this.#writeSnapshot({
+        ...snapshot,
+        mutedServerIds: [...this.#state.mutedServerIds],
+        notchHiddenServerIds: [...this.#state.notchHiddenServerIds],
+      }),
     );
     this.#writeChain = operation.catch(() => undefined);
     await operation;

@@ -70,6 +70,7 @@ function server(id: string): ServerSummary {
     role: null,
     active: false,
     notificationsMuted: false,
+    notchHidden: false,
   };
 }
 function setup() {

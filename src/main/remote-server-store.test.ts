@@ -221,6 +221,34 @@ it("keeps independent mute preferences through restart, reconciliation and re-lo
   await expect(unmuted.setMuted("missing", true)).rejects.toThrow("Remote server not found.");
 });
 
+it("keeps independent notch visibility preferences through restart", async () => {
+  const path = await storePath({
+    version: 1,
+    activeServerId: "alpha",
+    servers: [storedServer("alpha"), storedServer("beta")],
+  });
+  const store = newStore(path);
+  await store.load();
+  expect(store.isNotchHidden("alpha")).toBe(false);
+  await store.setNotchHidden("alpha", true);
+  await store.setNotchHidden(LOCAL_SERVER_ID, true);
+  await store.setMuted("beta", true);
+  const restarted = newStore(path);
+  await restarted.load();
+  expect([
+    restarted.isNotchHidden("alpha"),
+    restarted.isNotchHidden("beta"),
+    restarted.isNotchHidden(LOCAL_SERVER_ID),
+    restarted.isMuted("beta"),
+  ]).toEqual([true, false, true, true]);
+  await restarted.setNotchHidden("alpha", false);
+  const unhidden = newStore(path);
+  await unhidden.load();
+  expect(unhidden.isNotchHidden("alpha")).toBe(false);
+  expect(unhidden.isNotchHidden(LOCAL_SERVER_ID)).toBe(true);
+  await expect(unhidden.setNotchHidden("missing", true)).rejects.toThrow("Remote server not found.");
+});
+
 it("preserves mute writes when other server writes are queued", async () => {
   const path = await storePath({ version: 3, activeServerId: "alpha", servers: [storedServer("alpha")] });
   const store = newStore(path);

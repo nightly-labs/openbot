@@ -2,7 +2,15 @@ import type { ServerSummary } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, createStore, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
-import { BellOff, buttonVariants, ChartArea, ContextMenu, ServerGradientLogo, Tooltip } from "../../components/ui";
+import {
+  BellOff,
+  buttonVariants,
+  ChartArea,
+  ContextMenu,
+  EyeOff,
+  ServerGradientLogo,
+  Tooltip,
+} from "../../components/ui";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
@@ -10,6 +18,9 @@ interface ServerRailProps {
   servers: ServerSummary[];
   onSelect: (serverId: string) => void;
   onSetMuted: (serverId: string, muted: boolean) => void;
+  onSetNotchHidden: (serverId: string, hidden: boolean) => void;
+  /** The notch exists only on macOS, so the notch item hides elsewhere. */
+  notchConfigVisible: boolean;
   onReorder: (serverIds: string[]) => void;
   onAdd: () => void;
   onOpenUsage?: (serverId: string, trigger: HTMLElement | null) => void;
@@ -215,6 +226,8 @@ export function ServerRail(props: ServerRailProps) {
               onSelect={props.onSelect}
               onOpenSettings={props.onOpenSettings}
               onSetMuted={props.onSetMuted}
+              onSetNotchHidden={props.onSetNotchHidden}
+              notchConfigVisible={props.notchConfigVisible}
               onOpenUsage={props.onOpenUsage}
             />
           )}
@@ -260,6 +273,8 @@ export function ServerRail(props: ServerRailProps) {
                     onSelect={props.onSelect}
                     onOpenSettings={props.onOpenSettings}
                     onSetMuted={props.onSetMuted}
+                    onSetNotchHidden={props.onSetNotchHidden}
+                    notchConfigVisible={props.notchConfigVisible}
                     onOpenUsage={props.onOpenUsage}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
@@ -299,6 +314,8 @@ function ServerRailButton(props: {
   server: ServerSummary;
   onSelect: (serverId: string) => void;
   onSetMuted: (serverId: string, muted: boolean) => void;
+  onSetNotchHidden: (serverId: string, hidden: boolean) => void;
+  notchConfigVisible: boolean;
   onOpenUsage?: (serverId: string, trigger: HTMLElement | null) => void;
   onOpenSettings: (serverId: string, trigger: HTMLElement | null) => void;
   onMove?: (direction: -1 | 1) => void;
@@ -332,7 +349,7 @@ function ServerRailButton(props: {
             as="button"
             type="button"
             class={buttonVariants({ variant: "ghost", class: "server-rail-button" })}
-            aria-label={`${props.server.name} server${props.server.notificationsMuted ? ", notifications muted" : ""}${props.server.state === "online" ? "" : `, ${props.server.state}`}`}
+            aria-label={`${props.server.name} server${props.server.notificationsMuted ? ", notifications muted" : ""}${props.server.notchHidden ? ", hidden from notch" : ""}${props.server.state === "online" ? "" : `, ${props.server.state}`}`}
             aria-pressed={props.server.active ? "true" : "false"}
             aria-keyshortcuts={props.onMove ? "Shift+F10 Alt+ArrowUp Alt+ArrowDown" : "Shift+F10"}
             onClick={() => props.onSelect(props.server.id)}
@@ -381,6 +398,12 @@ function ServerRailButton(props: {
                 <BellOff class="agent-context-icon size-4" aria-hidden="true" />
                 <span>{props.server.notificationsMuted ? "Unmute notifications" : "Mute notifications"}</span>
               </ContextMenu.Item>
+              <Show when={props.notchConfigVisible}>
+                <ContextMenu.Item onSelect={() => props.onSetNotchHidden(props.server.id, !props.server.notchHidden)}>
+                  <EyeOff class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{props.server.notchHidden ? "Show in notch" : "Hide from notch"}</span>
+                </ContextMenu.Item>
+              </Show>
               <Show when={props.onOpenUsage}>
                 <ContextMenu.Item onSelect={() => props.onOpenUsage?.(props.server.id, trigger)}>
                   <ChartArea class="agent-context-icon size-4" aria-hidden="true" />
@@ -410,6 +433,7 @@ function ServerRailButton(props: {
         <Tooltip.Content class="server-rail-tooltip">
           {props.server.name}
           {props.server.notificationsMuted ? " · Notifications muted" : ""}
+          {props.server.notchHidden ? " · Hidden from notch" : ""}
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>

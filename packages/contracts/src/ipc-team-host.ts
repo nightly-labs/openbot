@@ -33,6 +33,7 @@ export interface ServerCompatibility {
 
 export interface ServerSummary {
   notificationsMuted: boolean;
+  notchHidden: boolean;
   id: string;
   name: string;
   kind: "local" | "remote";

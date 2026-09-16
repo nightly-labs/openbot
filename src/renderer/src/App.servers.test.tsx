@@ -209,6 +209,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Local",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "local",
         state: "online",
         apiUrl: null,
@@ -221,6 +222,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Studio Mac",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "remote",
         state: "online",
         apiUrl: "https://studio.example.com",
@@ -482,6 +484,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Local",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "local",
         state: "online",
         apiUrl: null,
@@ -494,6 +497,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Studio Mac",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "remote",
         state: "online",
         apiUrl: "https://studio.example.com",
@@ -582,6 +586,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Local",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "local",
       state: "online",
       apiUrl: null,
@@ -594,6 +599,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Studio Mac",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "remote",
       state: "online",
       apiUrl: "https://studio.example.com",
@@ -646,6 +652,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Local",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "local",
       state: "online",
       apiUrl: null,
@@ -658,6 +665,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Studio Mac",
       logoUrl: null,
       notificationsMuted: true,
+      notchHidden: false,
       kind: "remote",
       state: "online",
       apiUrl: "https://studio.example.com",
@@ -670,6 +678,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Office PC",
       logoUrl: null,
       notificationsMuted: true,
+      notchHidden: false,
       kind: "remote",
       state: "online",
       apiUrl: "https://office.example.com",
@@ -752,6 +761,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Local",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "local",
       state: "online",
       apiUrl: null,
@@ -764,6 +774,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Studio Mac",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "remote",
       state: "online",
       apiUrl: "https://studio.example.com",
@@ -844,6 +855,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Local",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "local",
       state: "online",
       apiUrl: null,
@@ -856,6 +868,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Studio Mac",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "remote",
       state: "online",
       apiUrl: "https://studio.example.com",
@@ -1044,6 +1057,7 @@ describe("OpenBot connected desktop shell", () => {
           name: "Studio Mac",
           logoUrl: null,
           notificationsMuted: false,
+          notchHidden: false,
           kind: "remote",
           state: "online",
           apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run",
@@ -1114,6 +1128,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Studio Mac",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "remote" as const,
         state: "online" as const,
         apiUrl: "https://studio.example.com",
@@ -1126,6 +1141,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Office PC",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "remote" as const,
         state: "online" as const,
         apiUrl: "https://office.example.com",
@@ -1425,6 +1441,7 @@ describe("OpenBot connected desktop shell", () => {
       name: "Design studio",
       logoUrl: null,
       notificationsMuted: false,
+      notchHidden: false,
       kind: "remote" as const,
       state: "online" as const,
       apiUrl: "https://studio.example.com",
@@ -1438,6 +1455,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Local",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "local",
         state: "online",
         apiUrl: null,
@@ -1488,6 +1506,7 @@ describe("OpenBot connected desktop shell", () => {
           name: "Local",
           logoUrl: null,
           notificationsMuted: false,
+          notchHidden: false,
           kind: "local",
           state: "online",
           apiUrl: null,
@@ -1624,4 +1643,89 @@ it("mutes and unmutes a server without changing other servers", async () => {
   await fireEvent.contextMenu(muted);
   await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Unmute notifications" }), { button: 0 });
   expect(await screen.findByRole("button", { name: "Studio Mac server" })).toBeVisible();
+});
+
+it("hides and shows a server in the notch without changing other servers", async () => {
+  installOpenbotStub();
+  let servers = [testServer("local", true), testServer("remote-1", false)];
+  vi.mocked(window.openbot.servers.list).mockResolvedValue(servers);
+  vi.mocked(window.openbot.servers.setNotchHidden).mockImplementation(async ({ serverId, hidden }) => {
+    servers = servers.map((server) => (server.id === serverId ? { ...server, notchHidden: hidden } : server));
+    return servers;
+  });
+  render(() => <App />);
+  await fireEvent.contextMenu(await screen.findByRole("button", { name: "Studio Mac server" }));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Hide from notch" }), { button: 0 });
+  const hidden = await screen.findByRole("button", { name: "Studio Mac server, hidden from notch" });
+  expect(screen.getByRole("button", { name: "Local server" })).toBeVisible();
+  await fireEvent.contextMenu(hidden);
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Show in notch" }), { button: 0 });
+  expect(await screen.findByRole("button", { name: "Studio Mac server" })).toBeVisible();
+});
+
+it("keeps notch-hidden servers out of Dynamic Island updates", async () => {
+  const local: ServerSummary = {
+    id: "local",
+    name: "Local",
+    logoUrl: null,
+    notificationsMuted: false,
+    notchHidden: false,
+    kind: "local",
+    state: "online",
+    apiUrl: null,
+    remoteDesktopAvailable: false,
+    role: null,
+    active: true,
+  };
+  const remote: ServerSummary = {
+    id: "remote-1",
+    name: "Studio Mac",
+    logoUrl: null,
+    notificationsMuted: false,
+    notchHidden: true,
+    kind: "remote",
+    state: "online",
+    apiUrl: "https://studio.example.com",
+    remoteDesktopAvailable: false,
+    role: "member",
+    active: false,
+  };
+  vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
+
+  const approvalFor = (requestId: string) => ({
+    type: "approval" as const,
+    approval: {
+      requestId,
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-remote",
+      kind: "permissions" as const,
+      command: null,
+      cwd: null,
+      reason: "Review remote access.",
+      grantRoot: null,
+      permissions: { fileSystem: { read: ["/workspace"], write: [] }, network: false },
+    },
+  });
+
+  render(() => <App />);
+  await waitFor(() => expect(emitScopedAgentEvent).toBeTypeOf("function"));
+  emitScopedAgentEvent?.({ serverId: remote.id, event: { type: "agents-changed", agents: AGENTS } });
+  emitScopedAgentEvent?.({ serverId: remote.id, event: approvalFor("approval-hidden") });
+  await waitFor(() =>
+    expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+      serverId: "local",
+      mode: "idle",
+    }),
+  );
+
+  emitServers?.([local, { ...remote, notchHidden: false }]);
+  emitScopedAgentEvent?.({ serverId: remote.id, event: approvalFor("approval-shown") });
+  await waitFor(() =>
+    expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
+      serverId: remote.id,
+      mode: "approval",
+      item: { requestId: "approval-shown" },
+    }),
+  );
 });

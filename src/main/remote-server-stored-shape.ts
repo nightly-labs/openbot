@@ -57,6 +57,7 @@ export interface StoredRemoteServers {
   servers: StoredRemoteServer[];
   hiddenHostIds: string[];
   mutedServerIds: string[];
+  notchHiddenServerIds: string[];
   // Entries kept verbatim for whoever can read them, each with the slot it occupied. In memory only:
   // `serializeStoredRemoteServers` puts them back in `servers`, because a key of its own would be
   // invisible to the older build that is the whole reason for keeping them -- and puts them back
@@ -76,6 +77,7 @@ export function emptyStoredRemoteServers(): StoredRemoteServers {
     servers: [],
     hiddenHostIds: [],
     mutedServerIds: [],
+    notchHiddenServerIds: [],
     unreadableServers: [],
     unreadableActiveServerId: null,
   };
@@ -118,6 +120,7 @@ export function readStoredRemoteServers(value: unknown): StoredRemoteServers | n
     servers,
     hiddenHostIds,
     mutedServerIds: Array.isArray(value.mutedServerIds) ? value.mutedServerIds.filter(isString) : [],
+    notchHiddenServerIds: Array.isArray(value.notchHiddenServerIds) ? value.notchHiddenServerIds.filter(isString) : [],
     unreadableServers,
     unreadableActiveServerId: !selectable && preservedActive ? value.activeServerId : null,
   };
@@ -145,6 +148,7 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
   servers: (StoredRemoteServer | DynamicRecord)[];
   hiddenHostIds: string[];
   mutedServerIds: string[];
+  notchHiddenServerIds: string[];
 } {
   const readableIds = new Set(state.servers.map((server) => server.id));
   // A preserved entry whose id a readable server now holds is written where that server sits, so the
@@ -178,6 +182,7 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
     servers,
     hiddenHostIds: state.hiddenHostIds,
     mutedServerIds: state.mutedServerIds,
+    notchHiddenServerIds: state.notchHiddenServerIds,
   };
 }
 

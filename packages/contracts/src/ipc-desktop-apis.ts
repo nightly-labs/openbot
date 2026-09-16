@@ -359,6 +359,7 @@ export interface DynamicIslandDesktopApi {
 
 export interface ServersDesktopApi {
   setMuted: (input: { serverId: string; muted: boolean }) => Promise<ServerSummary[]>;
+  setNotchHidden: (input: { serverId: string; hidden: boolean }) => Promise<ServerSummary[]>;
   list: () => Promise<ServerSummary[]>;
   select: (serverId: string) => Promise<ServerSummary[]>;
   reorder: (input: ReorderServersInput) => Promise<ServerSummary[]>;

@@ -9,6 +9,7 @@ const server: ServerSummary = {
   name: "Studio Mac",
   logoUrl: null,
   notificationsMuted: false,
+  notchHidden: false,
   kind: "remote",
   state: "online",
   apiUrl: "https://studio.example.com",

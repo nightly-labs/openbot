@@ -254,7 +254,7 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const { agentStatus } = useAgents();
-  const { activeServer } = useServers();
+  const { activeServer, servers, setServerNotchHidden } = useServers();
   const { appSettingsOpen, setAppSettingsOpen, generalSettings, updateGeneralSettings, appSettingsRestoreTarget } =
     useSettings();
   const {
@@ -312,6 +312,8 @@ function AppSettings(props: AccountProps) {
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}
+        notchServers={servers()}
+        onSetServerNotchHidden={(serverId, hidden) => void setServerNotchHidden(serverId, hidden)}
       />
     </Loading>
   );

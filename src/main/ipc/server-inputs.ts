@@ -195,3 +195,8 @@ export function parseSetServerMuted(value: unknown): { serverId: string; muted: 
   if (!isObject(value) || !isBoolean(value.muted)) throw new Error("Invalid server mute setting.");
   return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), muted: value.muted };
 }
+
+export function parseSetServerNotchHidden(value: unknown): { serverId: string; hidden: boolean } {
+  if (!isObject(value) || !isBoolean(value.hidden)) throw new Error("Invalid server notch setting.");
+  return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), hidden: value.hidden };
+}

@@ -27,6 +27,7 @@ export { default as Crown } from "lucide-solid/icons/crown";
 export { default as Download } from "lucide-solid/icons/download";
 export { default as Ellipsis } from "lucide-solid/icons/ellipsis";
 export { default as ExternalLink } from "lucide-solid/icons/external-link";
+export { default as EyeOff } from "lucide-solid/icons/eye-off";
 export { default as File } from "lucide-solid/icons/file";
 export { default as Folder } from "lucide-solid/icons/folder";
 export { default as FolderInput } from "lucide-solid/icons/folder-input";

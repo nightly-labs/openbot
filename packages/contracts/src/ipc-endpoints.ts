@@ -262,6 +262,7 @@ export const IPC_ENDPOINTS = {
     select: request(IPC_CHANNELS.serversSelect),
     reorder: request(IPC_CHANNELS.serversReorder),
     setMuted: request(IPC_CHANNELS.serversSetMuted),
+    setNotchHidden: request(IPC_CHANNELS.serversSetNotchHidden),
     join: request(IPC_CHANNELS.serversJoin),
     previewInvite: request(IPC_CHANNELS.serversPreviewInvite),
     takePendingInvite: request(IPC_CHANNELS.serversTakePendingInvite),

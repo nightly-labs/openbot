@@ -178,6 +178,7 @@ export const IPC_CHANNELS = {
   serversList: "servers:list",
   serversSelect: "servers:select",
   serversSetMuted: "servers:set-muted",
+  serversSetNotchHidden: "servers:set-notch-hidden",
   serversReorder: "servers:reorder",
   serversJoin: "servers:join",
   serversPreviewInvite: "servers:preview-invite",

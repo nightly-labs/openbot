@@ -62,6 +62,7 @@ import {
   parseMarkDirectRead,
   parseReorderServers,
   parseSetServerMuted,
+  parseSetServerNotchHidden,
   parseUpdateTeamMember,
 } from "./server-inputs";
 import { nullishPayload, optionalPayload, requireString } from "./validation";
@@ -915,6 +916,26 @@ it("validates the server mute request", () => {
     { serverId: 1, muted: true },
   ]) {
     expect(() => parseSetServerMuted(input)).toThrow();
+  }
+});
+
+it("validates the server notch visibility request", () => {
+  expect(parseSetServerNotchHidden({ serverId: "local", hidden: true })).toEqual({
+    serverId: "local",
+    hidden: true,
+  });
+  expect(parseSetServerNotchHidden({ serverId: "remote", hidden: false })).toEqual({
+    serverId: "remote",
+    hidden: false,
+  });
+  for (const input of [
+    null,
+    {},
+    { serverId: "local", hidden: "true" },
+    { serverId: "", hidden: true },
+    { serverId: 1, hidden: true },
+  ]) {
+    expect(() => parseSetServerNotchHidden(input)).toThrow();
   }
 });
 

@@ -77,6 +77,7 @@ export const ja = {
   "settings.notch.displays.description": "接続された外部ディスプレイにも Dynamic Island を表示します。",
   "settings.notch.haptics.title": "触覚フィードバック",
   "settings.notch.haptics.description": "Force Touch トラックパッドで Dynamic Island の操作を確認します。",
+  "settings.notch.servers.muted": "通知はミュート中",
   "settings.privacy.title": "プライバシー",
   "settings.analytics.title": "製品分析データを共有する",
   "settings.analytics.description":

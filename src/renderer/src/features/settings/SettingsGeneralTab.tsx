@@ -4,9 +4,10 @@ import type {
   CustomProviderRestart,
   CustomProviderSummary,
   SaveCustomProviderInput,
+  ServerSummary,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { ProviderPicker } from "../../components/ProviderPicker";
 import {
   Item,
@@ -56,6 +57,12 @@ interface SettingsGeneralTabProps {
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   /**
+   * The servers the notch section lists one switch per. Omitted where no
+   * server list exists, which hides the per-server group.
+   */
+  notchServers?: readonly ServerSummary[];
+  onSetServerNotchHidden?: (serverId: string, hidden: boolean) => void;
+  /**
    * Accepts a described endpoint. Without it the section offers no custom provider at all, which is
    * how a remote server hides the whole feature: these endpoints merge into the OpenCode process on
    * this computer.
@@ -70,6 +77,7 @@ interface SettingsGeneralTabProps {
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
+  const notchServers = () => props.notchServers ?? [];
   const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
     value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
   const customProviders = () => props.customProviders ?? [];
@@ -253,6 +261,21 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               description={i18n.t("settings.notch.haptics.description")}
             />
           </ItemGroup>
+          <Show when={props.notchServers !== undefined}>
+            <ItemGroup class="settings-modal-card">
+              <For each={notchServers()}>
+                {(server) => (
+                  <SwitchField
+                    checked={!server.notchHidden}
+                    disabled={!props.value.macBookNotch}
+                    onChange={(checked) => props.onSetServerNotchHidden?.(server.id, !checked)}
+                    label={server.name}
+                    description={server.notificationsMuted ? i18n.t("settings.notch.servers.muted") : undefined}
+                  />
+                )}
+              </For>
+            </ItemGroup>
+          </Show>
         </SettingsSection>
       </Show>
 

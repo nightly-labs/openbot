@@ -269,6 +269,7 @@ export function testServer(id: string, active: boolean): ServerSummary {
     name: local ? "Local" : "Studio Mac",
     logoUrl: null,
     notificationsMuted: false,
+    notchHidden: false,
     kind: local ? "local" : "remote",
     state: "online",
     apiUrl: local ? null : "https://studio.example.com",
@@ -801,12 +802,16 @@ export function installOpenbotStub(): void {
           .mockImplementation(async ({ serverId, muted }) => [
             { ...testServer(serverId, true), notificationsMuted: muted },
           ]),
+        setNotchHidden: vi
+          .fn()
+          .mockImplementation(async ({ serverId, hidden }) => [{ ...testServer(serverId, true), notchHidden: hidden }]),
         list: vi.fn().mockResolvedValue([
           {
             id: "local",
             name: "Local",
             logoUrl: null,
             notificationsMuted: false,
+            notchHidden: false,
             kind: "local",
             state: "online",
             apiUrl: null,
@@ -821,6 +826,7 @@ export function installOpenbotStub(): void {
             name: "Local",
             logoUrl: null,
             notificationsMuted: false,
+            notchHidden: false,
             kind: "local",
             state: "online",
             apiUrl: null,

@@ -184,6 +184,16 @@ const Servers = createSimpleContext({
       }
     }
 
+    async function setServerNotchHidden(serverId: string, hidden: boolean): Promise<void> {
+      try {
+        applyServerSummaries(await window.openbot.servers.setNotchHidden({ serverId, hidden }));
+      } catch (error) {
+        toast.error("Could not change notch visibility", {
+          description: errorMessage(error, "Could not save the setting. Try again."),
+        });
+      }
+    }
+
     async function reorderServers(serverIds: string[]): Promise<void> {
       const previous = servers();
       const serversById = new Map(previous.map((server) => [server.id, server]));
@@ -214,6 +224,7 @@ const Servers = createSimpleContext({
       setJoinServerOpen,
       reorderServers,
       setServerMuted,
+      setServerNotchHidden,
       retryServerConnection,
       serverLoadRequest,
       initialServersReady,

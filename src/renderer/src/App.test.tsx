@@ -241,6 +241,7 @@ describe("OpenBot connected desktop shell", () => {
         name: "Studio Mac",
         logoUrl: null,
         notificationsMuted: false,
+        notchHidden: false,
         kind: "remote",
         state: "online",
         apiUrl: "https://studio.example.com",

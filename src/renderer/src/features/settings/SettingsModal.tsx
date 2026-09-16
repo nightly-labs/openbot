@@ -13,6 +13,7 @@ import type {
   ProviderApiKeyStatus,
   ProviderRuntimeStatus,
   SaveCustomProviderInput,
+  ServerSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -80,6 +81,12 @@ export interface SettingsModalProps {
   providerKeys?: ProviderKeyApi;
   hostedSitesApi?: HostedSitesDesktopApi;
   restoreFocusTarget?: HTMLElement | null;
+  /**
+   * The servers the General tab lists one notch switch per. Omitted where no
+   * server list exists, which hides the per-server notch group.
+   */
+  notchServers?: readonly ServerSummary[];
+  onSetServerNotchHidden?: (serverId: string, hidden: boolean) => void;
 }
 
 type SettingsTab = "general" | "computer-use" | "profile" | "mobile-connect" | "updates" | "hosted-sites";
@@ -320,6 +327,8 @@ export function SettingsModal(props: SettingsModalProps) {
             onAddCustomProvider={props.onAddCustomProvider}
             customProviders={props.customProviders}
             onDeleteCustomProvider={props.onDeleteCustomProvider}
+            notchServers={props.notchServers}
+            onSetServerNotchHidden={props.onSetServerNotchHidden}
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
           />
         </Tabs.Content>

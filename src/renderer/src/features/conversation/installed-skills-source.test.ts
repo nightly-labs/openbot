@@ -8,6 +8,7 @@ describe("installed skills request source", () => {
       id: "local",
       name: "OpenBot",
       notificationsMuted: false,
+      notchHidden: false,
       kind: "local",
       state: "online",
       apiUrl: null,

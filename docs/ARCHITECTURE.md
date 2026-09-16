@@ -759,7 +759,10 @@ reconciliation. The server context menu controls mute for local and remote serve
 `renderer-forwarders.ts` continues to deliver live events for muted servers, but suppresses
 system notifications. The Dynamic Island projection drops muted servers from its order
 so they never reach the notch, while still applying their events to keep coordinator
-state current for unmute. Remote notification content uses the source server's agent list. Both
+state current for unmute. Each server also carries an independent notch visibility flag
+(`notchHiddenServerIds` in `servers.json`, `servers:set-notch-hidden` over IPC): either
+mute or the notch flag hides a server from the notch. The rail menu and the Settings
+notch section both toggle it. Remote notification content uses the source server's agent list. Both
 server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
 not yet deliver system notifications; mute settings are not synchronized between devices.
 
