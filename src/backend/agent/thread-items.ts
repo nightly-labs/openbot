@@ -51,9 +51,9 @@ export function toThreadItem(value: DynamicRecord): ThreadItem | null {
 }
 
 export function providerActivityText(text: string): string | null {
-  const normalized = text.replace(/\s+/gu, " ").trim();
+  const normalized = text.slice(0, 160).replace(/\s+/gu, " ").trim();
   if (!normalized) return null;
-  return normalized.length <= 160 ? normalized : `${normalized.slice(0, 157).trimEnd()}…`;
+  return normalized;
 }
 
 export function providerForAgent(agent: { provider: AgentProvider }): AgentProvider {

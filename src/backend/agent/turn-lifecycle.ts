@@ -90,6 +90,8 @@ export class TurnLifecycle {
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   readonly #turnAssociations = new Map<string, Promise<void>>();
+  readonly #pendingProgress = new Map<string, { agentId: string; threadId: string; turnId: string; detail: string }>();
+  readonly #progressTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -127,6 +129,9 @@ export class TurnLifecycle {
   dispose(): void {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
+    for (const timer of this.#progressTimers.values()) clearTimeout(timer);
+    this.#pendingProgress.clear();
+    this.#progressTimers.clear();
   }
 
   handleNotification(notification: AppServerNotification, source: AgentClient): void {
@@ -231,7 +236,7 @@ export class TurnLifecycle {
         message.status = "streaming";
         if (message.itemType === "commentary") {
           const activity = providerActivityText(message.text);
-          if (activity) this.#emitTurnProgress(agentId, publicThreadId, turnId, activity);
+          if (activity) this.#queueTurnProgress(agentId, publicThreadId, turnId, activity);
         }
         this.#deltas.buffer({
           agentId,
@@ -294,6 +299,7 @@ export class TurnLifecycle {
   }
 
   async #completeTurn(agentId: string, threadId: string, turnId: string, status: string): Promise<void> {
+    this.#flushTurnProgress(turnId);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);
@@ -426,5 +432,33 @@ export class TurnLifecycle {
       turnId,
       detail: text,
     });
+  }
+
+  #queueTurnProgress(agentId: string, threadId: string, turnId: string, detail: string): void {
+    const key = `${agentId}:${turnId}`;
+    const previous = this.#pendingProgress.get(key);
+    if (previous?.detail === detail) return;
+    this.#pendingProgress.set(key, { agentId, threadId, turnId, detail });
+    if (this.#progressTimers.has(key)) return;
+    this.#progressTimers.set(
+      key,
+      setTimeout(() => this.#flushTurnProgressByKey(key), 100),
+    );
+  }
+
+  #flushTurnProgress(turnId: string): void {
+    for (const [key, pending] of this.#pendingProgress) {
+      if (pending.turnId === turnId) this.#flushTurnProgressByKey(key);
+    }
+  }
+
+  #flushTurnProgressByKey(key: string): void {
+    const pending = this.#pendingProgress.get(key);
+    if (!pending) return;
+    const timer = this.#progressTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.#progressTimers.delete(key);
+    this.#pendingProgress.delete(key);
+    this.#emitTurnProgress(pending.agentId, pending.threadId, pending.turnId, pending.detail);
   }
 }
