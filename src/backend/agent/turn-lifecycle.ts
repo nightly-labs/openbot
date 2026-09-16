@@ -27,7 +27,7 @@ import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
-import { isNonActionableCodexWarning, toolProgressLanguage, toolProgressText, toThreadItem } from "./thread-items";
+import { isNonActionableCodexWarning, providerActivityText, toThreadItem } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -229,6 +229,10 @@ export class TurnLifecycle {
         }
         message.text += delta;
         message.status = "streaming";
+        if (message.itemType === "commentary") {
+          const activity = providerActivityText(message.text);
+          if (activity) this.#emitTurnProgress(agentId, publicThreadId, turnId, activity);
+        }
         this.#deltas.buffer({
           agentId,
           externalThreadId: threadId,
@@ -400,12 +404,6 @@ export class TurnLifecycle {
 
   #applyItem(agentId: string, threadId: string, turnId: string, item: ThreadItem, completed: boolean): void {
     if (this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    const toolProgress = toolProgressText(item, completed, toolProgressLanguage(agent?.description ?? ""));
-    if (toolProgress) {
-      this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
-      return;
-    }
     if (item.type !== "agentMessage" || !isString(item.id)) return;
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     let message = snapshot.messages.find((candidate) => candidate.id === item.id);

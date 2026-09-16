@@ -25,16 +25,6 @@ export function isRequestTimeout(error: unknown, method: string): boolean {
   return error instanceof Error && error.message === `Codex request timed out: ${method}`;
 }
 
-export type ToolProgressLanguage = "en" | "pl";
-
-export function toolProgressLanguage(instructions: string): ToolProgressLanguage {
-  const normalized = instructions
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLocaleLowerCase();
-  return /(?:po polsku|polsku|jezyku polskim|polish)/u.test(normalized) ? "pl" : "en";
-}
-
 export function isDynamicToolCall(value: unknown): value is DynamicToolCallParams {
   return (
     isRecord(value) &&
@@ -60,75 +50,10 @@ export function toThreadItem(value: DynamicRecord): ThreadItem | null {
   return type ? { ...value, type } : null;
 }
 
-export function toolProgressText(
-  item: ThreadItem,
-  completed: boolean,
-  language: ToolProgressLanguage = "en",
-): string | null {
-  const type = item.type.toLowerCase();
-  if (!/(tool.*call|commandexecution|filechange|websearch|computeraction)/u.test(type)) return null;
-  if (completed && getString(item, "status") === "failed") {
-    return language === "pl"
-      ? "Krok narzędzia nie powiódł się; analizuję wynik i decyduję, co spróbować dalej…"
-      : "A tool step failed; reviewing the result and deciding what to try next…";
-  }
-
-  const descriptor = [item.type, getString(item, "name"), getString(item, "title"), getString(item, "tool")]
-    .filter(isString)
-    .join(" ")
-    .toLowerCase();
-  if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
-    return language === "pl"
-      ? completed
-        ? "Przeglądam znalezione źródła i informacje…"
-        : "Szukam aktualnych informacji…"
-      : completed
-        ? "Reviewing the sources and information I found…"
-        : "Searching for current information…";
-  }
-  if (/(read|find|list|get|inspect|snapshot)/u.test(descriptor)) {
-    return language === "pl"
-      ? completed
-        ? "Przeglądam zebrane informacje…"
-        : "Zbieram istotne informacje…"
-      : completed
-        ? "Reviewing the information I gathered…"
-        : "Gathering the relevant information…";
-  }
-  if (/(test|check|lint|build|verify)/u.test(descriptor)) {
-    return language === "pl"
-      ? completed
-        ? "Przeglądam wyniki weryfikacji…"
-        : "Sprawdzam pracę…"
-      : completed
-        ? "Reviewing the verification results…"
-        : "Checking the work…";
-  }
-  if (/(write|edit|patch|create|update|delete|move|filechange)/u.test(descriptor)) {
-    return language === "pl"
-      ? completed
-        ? "Przeglądam wprowadzone zmiany…"
-        : "Wprowadzam żądane zmiany…"
-      : completed
-        ? "Reviewing the changes I made…"
-        : "Making the requested changes…";
-  }
-  if (/(agent|delegate|message|send)/u.test(descriptor)) {
-    return language === "pl"
-      ? completed
-        ? "Przeglądam odpowiedź innego agenta…"
-        : "Koordynuję pracę z innym agentem…"
-      : completed
-        ? "Reviewing the other agent’s response…"
-        : "Coordinating with another agent…";
-  }
-  return language === "pl"
-    ? completed
-      ? "Przeglądam najnowszy wynik narzędzia…"
-      : "Wykonuję kolejny krok z użyciem narzędzia…"
-    : completed
-      ? "Reviewing the latest tool result…"
-      : "Working through the next tool-assisted step…";
+export function providerActivityText(text: string): string | null {
+  const normalized = text.replace(/\s+/gu, " ").trim();
+  if (!normalized) return null;
+  return normalized.length <= 160 ? normalized : `${normalized.slice(0, 157).trimEnd()}…`;
 }
 
 export function providerForAgent(agent: { provider: AgentProvider }): AgentProvider {

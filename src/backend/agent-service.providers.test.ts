@@ -1693,7 +1693,7 @@ describe.sequential("AgentService: providers", () => {
         item: { id: "tool-1", type: "toolCall", name: "web_search", status: "in_progress" },
       }),
     );
-    await waitFor(() => progress().at(-1)?.detail === "Szukam aktualnych informacji…");
+    await waitFor(() => progress().at(-1)?.detail === "Inspecting the sources. Comparing the results.");
 
     client.emit(
       "notification",
@@ -1703,7 +1703,7 @@ describe.sequential("AgentService: providers", () => {
         item: { id: "tool-1", type: "toolCall", name: "web_search", status: "completed" },
       }),
     );
-    await waitFor(() => progress().at(-1)?.detail === "Przeglądam znalezione źródła i informacje…");
+    expect(progress().at(-1)?.detail).toBe("Inspecting the sources. Comparing the results.");
     expect(conversationEventCount()).toBe(persistedBeforeTools);
 
     client.emit(
