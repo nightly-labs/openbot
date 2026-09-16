@@ -336,42 +336,63 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         .filter((attachment) => !originalAttachmentIds.has(attachment.id))
         .map((attachment) => attachment.id);
       if (!text.trim() && keepAttachmentIds.length === 0 && attachmentDraftIds.length === 0) return false;
-      if (editId) {
-        const pendingSave = {
-          action: "save" as const,
-          deliveryId,
-          editId,
-          text,
-          keepAttachmentIds,
-          attachmentDraftIds,
-        };
-        // Persist the exact request before sending: a lost response must stay retryable.
-        deps.setEditingPendingSave(pendingSave);
-        try {
-          window.localStorage.setItem(
-            QUEUE_EDIT_STORAGE_KEY,
-            JSON.stringify({
-              agentId,
-              serverId,
-              deliveryId,
-              editId,
-              originalAttachmentIds: target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds(),
-              backup: deps.editingDraftBackup() ?? EMPTY_DRAFT,
-              draft,
-              pendingSave,
-            }),
-          );
-        } catch {
-          deps.setEditingPendingSave(null);
-          deps.setComposerError("Could not save this edit on this computer. Try again.", { agentId, serverId });
-          return false;
-        }
-      }
     }
 
     stopTeamTyping();
     deps.setSubmitting(true);
     deps.setComposerError(null, { agentId, serverId });
+    // A Begin that never reached the host leaves an identity with no hold. Saving it
+    // would be rejected and then lock the editor behind pendingSave with no recovery,
+    // so confirm the hold with the same identity first. Retries skip this: the host
+    // answers the stored request from its finished-save record without needing Begin.
+    if (editId && !hasPending) {
+      try {
+        const held = await window.openbot.agent.editQueuedMessage(
+          { agentId, action: "begin", deliveryId, editId },
+          serverId,
+        );
+        if (!held.deliveries.some((item) => item.id === deliveryId))
+          throw new Error("This queued message is no longer available.");
+      } catch (error) {
+        deps.setSubmitting(false);
+        deps.setComposerError(errorMessage(error, "Could not hold the queued message for editing."), {
+          agentId,
+          serverId,
+        });
+        return false;
+      }
+      const pendingSave = {
+        action: "save" as const,
+        deliveryId,
+        editId,
+        text,
+        keepAttachmentIds,
+        attachmentDraftIds,
+      };
+      // Persist the exact request before sending: a lost response must stay retryable.
+      deps.setEditingPendingSave(pendingSave);
+      try {
+        window.localStorage.setItem(
+          QUEUE_EDIT_STORAGE_KEY,
+          JSON.stringify({
+            agentId,
+            serverId,
+            deliveryId,
+            editId,
+            originalAttachmentIds: target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds(),
+            backup: deps.editingDraftBackup() ?? EMPTY_DRAFT,
+            draft,
+            pendingSave,
+          }),
+        );
+      } catch {
+        deps.setEditingPendingSave(null);
+        deps.setSubmitting(false);
+        deps.setComposerError("Could not save this edit on this computer. Try again.", { agentId, serverId });
+        return false;
+      }
+    }
+
     let saved = false;
     try {
       if (editId) {

@@ -1145,7 +1145,8 @@ it("acquires a host hold before editing and uses its identity for save and cance
   await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
   await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
   await screen.findByRole("button", { name: "Save queued message" });
-  const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[2][0];
+  // Save confirms the hold with the same identity first, so the second hold is calls[3].
+  const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[3][0];
   await fireEvent.keyDown(document, { key: "Escape" });
   await waitFor(() =>
     expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
@@ -1171,7 +1172,12 @@ it("reuses the durable Save request after a lost response and blocks edits until
   const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
   composer.textContent = "First save";
   await fireEvent.input(composer);
-  vi.mocked(window.openbot.agent.editQueuedMessage).mockRejectedValueOnce(new Error("Connection lost"));
+  // The hold confirm succeeds; only the Save response is lost.
+  let saveAttempts = 0;
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockImplementation(async (input) => {
+    if (input.action === "save" && saveAttempts++ === 0) throw new Error("Connection lost");
+    return { agentId: "chief", deliveries: [delivery] };
+  });
   await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
   await screen.findByText("Connection lost");
   // The exact Save request stays durable for retry, including after a restart.
@@ -1273,6 +1279,13 @@ it("keeps the edit identity after a lost begin response and blocks replacement u
   vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [first] });
   await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
   await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  // Save confirms the lost hold with the same identity before sending the request.
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith({ ...begin, action: "begin" }, "local"),
+  );
+  expect(
+    vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls.filter(([input]) => input.action === "begin"),
+  ).toHaveLength(2);
   await waitFor(() =>
     expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
       expect.objectContaining({ action: "save", editId: begin.editId, deliveryId: first.id }),

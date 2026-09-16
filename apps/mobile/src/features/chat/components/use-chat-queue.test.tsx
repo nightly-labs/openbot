@@ -205,6 +205,42 @@ it("keeps the finished notice hidden while an edit request is in flight", async 
   await waitFor(() => expect(view.state().confirmed).toBe(true));
   await waitFor(() => expect(view.state().editUnavailable).toBe(false));
 });
+it("keeps an unconfirmed save retryable when the host already started the delivery", async () => {
+  // A lost Save response can leave the host running the saved message while the
+  // phone still holds its pending request. The edit must keep Save for retry
+  // instead of reporting the message as finished and offering only Close.
+  const pendingSave = {
+    action: "save" as const,
+    deliveryId: delivery.id,
+    editId: "edit-phone-1",
+    text: "Saved text",
+    keepAttachmentIds: [],
+    attachmentDraftIds: [],
+  };
+  boundary.storage.set(
+    "queue-edit.member.host.agent",
+    JSON.stringify({
+      editId: "edit-phone-1",
+      initialized: true,
+      delivery,
+      text: "Saved text",
+      keepAttachmentIds: [],
+      pendingSave,
+    }),
+  );
+  boundary.loadQueue.mockResolvedValue({
+    agentId: "agent",
+    deliveries: [{ ...delivery, status: "running", position: null }],
+  });
+  const view = mount();
+  // The host reports the delivery as started, so the raw list holds it while
+  // the queued list no longer does.
+  await waitFor(() => expect(view.state().deliveries).toHaveLength(1));
+  expect(view.state().queued).toHaveLength(0);
+  expect(view.state().edit?.pendingSave).toEqual(pendingSave);
+  expect(view.state().confirmed).toBe(true);
+  expect(view.state().editUnavailable).toBe(false);
+});
 it("routes steer, delete and reorder to the original host and expected turn", async () => {
   const view = mount();
   await waitFor(() => expect(view.state().queued).toHaveLength(1));

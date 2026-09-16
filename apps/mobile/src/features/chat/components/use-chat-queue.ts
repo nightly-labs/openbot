@@ -51,9 +51,14 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   // An edit request in flight still owns the outcome: the queue can report the
   // delivery as started before the host answers, which flashes the finished
   // notice on every edit. Settle the request first; a genuinely gone delivery
-  // marks the edit unavailable after the request completes.
+  // marks the edit unavailable after the request completes. An unconfirmed Save
+  // owns the outcome the same way: keep it retryable until the host confirms
+  // or rejects it, instead of replacing Save with Close and deleting it.
   const editUnavailable = Boolean(
-    edit && !busy && query.data?.deliveries.some((item) => item.id === edit.delivery.id && item.status !== "queued"),
+    edit &&
+      !edit.pendingSave &&
+      !busy &&
+      query.data?.deliveries.some((item) => item.id === edit.delivery.id && item.status !== "queued"),
   );
   const queued = useMemo(() => orderedQueue(query.data?.deliveries ?? []), [query.data]);
   // Persist typing after a pause, without blocking each key event. The edit identity is
