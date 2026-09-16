@@ -6,7 +6,8 @@ const MAX_ROWS = 500;
 const MAX_COLUMNS = 50;
 const MAX_ZIP_ENTRY_BYTES = 8 * 1024 * 1024;
 const MAX_ZIP_EXPANDED_BYTES = 32 * 1024 * 1024;
-const XLSX_XML_ENTRY = /^xl\/(?:workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|worksheets\/[^/]+\.xml)$/u;
+const XLSX_XML_ENTRY =
+  /^xl\/(?:workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|styles\.xml|worksheets\/[^/]+\.xml)$/u;
 
 interface SpreadsheetSheet {
   name: string;
@@ -50,16 +51,79 @@ function columnIndex(reference: string | null): number | null {
   return result - 1;
 }
 
-function cellValue(cell: Element, sharedStrings: string[]): string {
+const BUILTIN_NUMBER_FORMATS = new Map<number, string>([
+  [0, "General"],
+  [1, "0"],
+  [2, "0.00"],
+  [3, "#,##0"],
+  [4, "#,##0.00"],
+  [9, "0%"],
+  [10, "0.00%"],
+  [14, "m/d/yy"],
+  [15, "d-mmm-yy"],
+  [16, "d-mmm"],
+  [17, "mmm-yy"],
+  [18, "h:mm AM/PM"],
+  [19, "h:mm:ss AM/PM"],
+  [20, "h:mm"],
+  [21, "h:mm:ss"],
+  [22, "m/d/yy h:mm"],
+  [49, "@"],
+]);
+
+function parseNumberFormats(bytes: Uint8Array | undefined): string[] {
+  if (!bytes) return [];
+  const document = xmlDocument(bytes, "xl/styles.xml");
+  const formats = new Map(BUILTIN_NUMBER_FORMATS);
+  for (const format of Array.from(document.getElementsByTagNameNS("*", "numFmt"))) {
+    const id = Number(format.getAttribute("numFmtId"));
+    const code = format.getAttribute("formatCode");
+    if (Number.isInteger(id) && code) formats.set(id, code);
+  }
+  const cellFormats = document.getElementsByTagNameNS("*", "cellXfs")[0];
+  return Array.from(cellFormats?.getElementsByTagNameNS("*", "xf") ?? [], (format) => {
+    const id = Number(format.getAttribute("numFmtId"));
+    return formats.get(id) ?? "General";
+  });
+}
+
+function formatExcelDate(value: number, format: string): string {
+  const date = new Date(Date.UTC(1899, 11, 30) + value * 86_400_000);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  const day = `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  if (!/[hms]/iu.test(format)) return day;
+  return `${day} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+}
+
+function formatExcelNumber(value: string, format: string): string {
+  const number = Number(value);
+  if (!Number.isFinite(number) || format === "General" || format === "@") return value;
+  if (/[dy]/iu.test(format) && !/\[[^\]]+\]/u.test(format)) return formatExcelDate(number, format);
+  if (format.includes("%")) {
+    const decimals = format.match(/\.(0+)/u)?.[1].length ?? 0;
+    return `${(number * 100).toFixed(decimals)}%`;
+  }
+  const decimals = format.match(/\.(0+)/u)?.[1].length ?? 0;
+  return number.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function cellValue(cell: Element, sharedStrings: string[], numberFormats: string[]): string {
   const type = cell.getAttribute("t");
   if (type === "inlineStr") return cell.getElementsByTagNameNS("*", "is")[0]?.textContent ?? "";
   const value = cell.getElementsByTagNameNS("*", "v")[0]?.textContent ?? "";
   if (type === "s") return sharedStrings[Number(value)] ?? "";
   if (type === "b") return value === "1" ? "TRUE" : "FALSE";
-  return value;
+  const style = Number(cell.getAttribute("s"));
+  return formatExcelNumber(value, numberFormats[style] ?? "General");
 }
 
-function parseSheet(bytes: Uint8Array, sharedStrings: string[], name: string): SpreadsheetSheet {
+function parseSheet(
+  bytes: Uint8Array,
+  sharedStrings: string[],
+  numberFormats: string[],
+  name: string,
+): SpreadsheetSheet {
   const document = xmlDocument(bytes, "a worksheet");
   const rows: string[][] = [];
   const rowElements = Array.from(document.getElementsByTagNameNS("*", "row")).slice(0, MAX_ROWS);
@@ -69,7 +133,7 @@ function parseSheet(bytes: Uint8Array, sharedStrings: string[], name: string): S
     for (const cell of Array.from(rowElement.getElementsByTagNameNS("*", "c"))) {
       const index = columnIndex(cell.getAttribute("r"));
       if (index === null || index >= MAX_COLUMNS) continue;
-      row[index] = cellValue(cell, sharedStrings);
+      row[index] = cellValue(cell, sharedStrings, numberFormats);
       maxColumns = Math.max(maxColumns, index + 1);
     }
     row.length = Math.min(maxColumns, MAX_COLUMNS);
@@ -112,6 +176,7 @@ export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
         (item) => item.textContent ?? "",
       )
     : [];
+  const numberFormats = parseNumberFormats(files["xl/styles.xml"]);
   const sheets = Array.from(workbook.getElementsByTagNameNS("*", "sheet"))
     .map((sheet) => {
       const id =
@@ -119,7 +184,7 @@ export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
         sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
       const target = id ? relationshipTargets.get(id) : undefined;
       if (!target || !files[target]) return null;
-      return parseSheet(files[target], sharedStrings, sheet.getAttribute("name") ?? "Sheet");
+      return parseSheet(files[target], sharedStrings, numberFormats, sheet.getAttribute("name") ?? "Sheet");
     })
     .filter((sheet): sheet is SpreadsheetSheet => sheet !== null);
   if (sheets.length === 0) throw new Error("The workbook contains no readable sheets.");

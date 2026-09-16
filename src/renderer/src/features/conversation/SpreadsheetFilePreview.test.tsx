@@ -11,11 +11,14 @@ function workbook(): Uint8Array {
     "xl/_rels/workbook.xml.rels": strToU8(
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>',
     ),
+    "xl/styles.xml": strToU8(
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="165" formatCode="0.0%"/></numFmts><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="165"/></cellXfs></styleSheet>',
+    ),
     "xl/worksheets/sheet1.xml": strToU8(
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>Task</t></is></c><c r="B1" t="inlineStr"><is><t>Status</t></is></c></row><row><c r="A2" t="inlineStr"><is><t>Preview</t></is></c><c r="B2" t="inlineStr"><is><t>Ready</t></is></c></row></sheetData></worksheet>',
     ),
     "xl/worksheets/sheet2.xml": strToU8(
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1"><v>Activation</v></c></row><row><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2"><v>55</v></c></row></sheetData></worksheet>',
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1" t="inlineStr"><is><t>Activation</t></is></c></row><row><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2" s="1"><v>0.55</v></c></row></sheetData></worksheet>',
     ),
   });
 }
@@ -31,7 +34,7 @@ describe("SpreadsheetFilePreview", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Regions" }));
     expect(screen.getByRole("columnheader", { name: "Region" })).toBeInTheDocument();
     expect(screen.getByText("North")).toBeInTheDocument();
-    expect(screen.getByText("55")).toBeInTheDocument();
+    expect(screen.getByText("55.0%")).toBeInTheDocument();
   });
 
   it("rejects a file that is not a readable workbook", () => {
