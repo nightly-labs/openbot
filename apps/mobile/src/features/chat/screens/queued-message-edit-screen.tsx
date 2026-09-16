@@ -42,6 +42,9 @@ export function QueuedMessageEditScreen() {
   // The host hold is taken once per visit. `busy` only turns on once the controller
   // starts the request, so track it here as well and keep the failure copy until then.
   const [holding, setHolding] = useState(false);
+  // Attachment reads run in the attachments section below. Save must wait for them,
+  // or it sends the file list from before the new selection.
+  const [attachmentsPreparing, setAttachmentsPreparing] = useState(false);
   const requested = useRef(false);
   const hold = useCallback(() => {
     if (!queue || !delivery) return;
@@ -182,7 +185,11 @@ export function QueuedMessageEditScreen() {
       />
       <SheetSaveAction
         dirty={dirty || Boolean(edit.pendingSave)}
-        canSave={!queue.busy && (Boolean(text.trim()) || edit.keepAttachmentIds.length > 0 || added > 0)}
+        canSave={
+          !queue.busy &&
+          !attachmentsPreparing &&
+          (Boolean(text.trim()) || edit.keepAttachmentIds.length > 0 || added > 0)
+        }
         pending={queue.busy}
         label="Save queued message"
         onSave={() => {
@@ -195,7 +202,7 @@ export function QueuedMessageEditScreen() {
         }}
       />
 
-      <QueuedEditAttachments queue={queue} kept={kept} />
+      <QueuedEditAttachments queue={queue} kept={kept} onPreparingChange={setAttachmentsPreparing} />
 
       <SettingsSection>
         <SettingsRow disclosure={false} disabled={queue.busy} onPress={() => releaseThenExit(() => router.back())}>
@@ -242,10 +249,21 @@ function AttachmentRemoveButton({
  * The controller keeps added files on the device, so the list survives navigation and a restart
  * until the edit is saved or cancelled.
  */
-function QueuedEditAttachments({ queue, kept }: { queue: ChatQueueController; kept: AttachmentSummary[] }) {
+function QueuedEditAttachments({
+  queue,
+  kept,
+  onPreparingChange,
+}: {
+  queue: ChatQueueController;
+  kept: AttachmentSummary[];
+  onPreparingChange?: (preparing: boolean) => void;
+}) {
   const muted = useThemeColor("muted");
   const attachments = useChatAttachments(queue.attachments, queue.changeAttachments);
   const busy = queue.busy || attachments.preparing || Boolean(queue.edit?.pendingSave);
+  useEffect(() => {
+    onPreparingChange?.(attachments.preparing);
+  }, [attachments.preparing, onPreparingChange]);
   return (
     <SettingsSection title="Attachments">
       {kept.map((file) => (

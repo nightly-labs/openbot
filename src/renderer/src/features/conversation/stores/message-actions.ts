@@ -17,6 +17,9 @@ export interface MessageActionsDeps {
   currentDraft: () => ComposerDraft;
   updateCurrentDraft: (patch: Partial<ComposerDraft>) => void;
   currentTarget: () => { agentId: string; serverId: string } | undefined;
+  editingAgentId: () => string | null;
+  editingServerId: () => string | null;
+  editingDeliveryId: () => string | null;
   editingPendingSave: () => StoredQueueEdit["pendingSave"] | null;
   setOpenReactionMessageId: (id: string | null) => void;
   setOpenMoreMessageId: (id: string | null) => void;
@@ -98,9 +101,18 @@ export function createMessageActions(deps: MessageActionsDeps) {
   }
 
   function removeAttachment(id: string) {
-    // A pending Save keeps its attachment IDs for retry. Do not change or discard them.
-    if (deps.editingPendingSave()) return;
-    const serverId = deps.currentTarget()?.serverId;
+    // A pending Save keeps its attachment IDs for retry. Do not change or discard them,
+    // but only in the edited conversation: the pending state survives agent/server switches.
+    const target = deps.currentTarget();
+    if (
+      target &&
+      deps.editingPendingSave() &&
+      deps.editingAgentId() === target.agentId &&
+      deps.editingServerId() === target.serverId &&
+      deps.editingDeliveryId()
+    )
+      return;
+    const serverId = target?.serverId;
     deps.updateCurrentDraft({
       attachments: deps.currentDraft().attachments.filter((attachment) => attachment.id !== id),
       text: removeAttachmentReferences(deps.currentDraft().text, id),

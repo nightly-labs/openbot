@@ -16,6 +16,7 @@ const native = vi.hoisted(() => {
     callback: null,
   };
   const context: { queue: ChatQueueController | null; pending: QueuedUpload | null } = { queue: null, pending: null };
+  const attachments: { preparing: boolean } = { preparing: false };
   return {
     push: vi.fn(),
     back: vi.fn(),
@@ -25,6 +26,7 @@ const native = vi.hoisted(() => {
     notification: vi.fn(async () => {}),
     params,
     context,
+    attachments,
     guard,
     dispatch: vi.fn(),
     chooseFiles: vi.fn(),
@@ -66,7 +68,7 @@ vi.mock("../components/attachment-preview", () => ({
 vi.mock("../components/use-chat-attachments", () => ({
   useChatAttachments: (initial: { id: string; name: string }[]) => ({
     items: initial,
-    preparing: false,
+    preparing: native.attachments.preparing,
     chooseFiles: native.chooseFiles,
     choosePhotos: native.choosePhotos,
     remove: native.removeAttachment,
@@ -196,6 +198,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   native.context.queue = null;
   native.context.pending = null;
+  native.attachments.preparing = false;
   native.params = { chat: "host:agent", deliveryId: "one" };
   native.guard.prevent = false;
   native.guard.callback = null;
@@ -424,6 +427,17 @@ it("saves the edited text without new uploads", async () => {
   await act(async () => {});
   expect(queue.save).toHaveBeenCalledWith("Changed request", []);
   expect(native.back).toHaveBeenCalled();
+});
+
+it("blocks Save while an attachment is still preparing", () => {
+  // The file read finishes before the controller sees the new file. Saving in
+  // that window would send the previous file list without the selected file.
+  native.attachments.preparing = true;
+  native.context.queue = stubQueue({ edit: heldEdit, confirmed: true });
+  mount(() => <QueuedMessageEditScreen />);
+  const input = screen.getByRole("textbox", { name: "Message" });
+  act(() => fireEvent.change(input, { target: { value: "Changed request" } }));
+  expect(screen.getByRole("button", { name: "Save queued message" }).hasAttribute("disabled")).toBe(true);
 });
 
 it("shows typed text at once, without waiting for the controller behind the sheet", () => {
