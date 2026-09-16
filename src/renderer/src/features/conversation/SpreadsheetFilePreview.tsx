@@ -118,6 +118,13 @@ function formatLiteralSuffix(format: string): string {
   return format.match(/"([^"]*)"\s*$/u)?.[1]?.trim() ?? "";
 }
 
+function isSupportedNumberFormat(format: string): boolean {
+  const unquoted = unquotedFormat(format);
+  if (unquoted.includes(";") || /e[+-]?\d/iu.test(unquoted)) return false;
+  if (hasDateFormat(format) || hasTimeFormat(format)) return true;
+  return unquoted.replace(/[%#,0.]/gu, "").trim() === "";
+}
+
 function formatExcelTime(value: number, format: string): string {
   const totalSeconds = Math.max(0, Math.round(value * 86_400));
   const hours = format.includes("[h]") ? Math.floor(totalSeconds / 3_600) : Math.floor(totalSeconds / 3_600) % 24;
@@ -131,6 +138,7 @@ function formatExcelTime(value: number, format: string): string {
 function formatExcelNumber(value: string, format: string, date1904: boolean): string {
   const number = Number(value);
   if (!Number.isFinite(number) || format === "General" || format === "@") return value;
+  if (!isSupportedNumberFormat(format)) return value;
   const hasDate = hasDateFormat(format);
   if (hasDate) return formatExcelDate(number, format, date1904);
   if (hasTimeFormat(format)) return formatExcelTime(number, format);
