@@ -23,6 +23,24 @@ function workbook(): Uint8Array {
   });
 }
 
+function unsupportedFormatsWorkbook(): Uint8Array {
+  const longFormat = `0.${"0".repeat(101)}`;
+  return zipSync({
+    "xl/workbook.xml": strToU8(
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Formats" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+    ),
+    "xl/styles.xml": strToU8(
+      `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="176" formatCode="[$USD-409]0.00"/><numFmt numFmtId="177" formatCode="${longFormat}"/></numFmts><cellXfs count="3"><xf numFmtId="0"/><xf numFmtId="176"/><xf numFmtId="177"/></cellXfs></styleSheet>`,
+    ),
+    "xl/worksheets/sheet1.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>CurrencyMetadata</t></is></c><c r="B1" t="inlineStr"><is><t>LongFraction</t></is></c></row><row><c r="A2" s="1"><v>1.25</v></c><c r="B2" s="2"><v>1.5</v></c></row></sheetData></worksheet>',
+    ),
+  });
+}
+
 describe("SpreadsheetFilePreview", () => {
   it("renders workbook cells and switches between sheets", async () => {
     render(() => <SpreadsheetFilePreview bytes={workbook()} />);
@@ -53,6 +71,10 @@ describe("SpreadsheetFilePreview", () => {
 
   it("rejects a file that is not a readable workbook", () => {
     expect(() => parseSpreadsheet(new Uint8Array([1, 2, 3]))).toThrow();
+  });
+
+  it("preserves values for unsupported metadata and fractional formats", () => {
+    expect(parseSpreadsheet(unsupportedFormatsWorkbook()).sheets[0]?.rows[1]).toEqual(["1.25", "1.5"]);
   });
 
   it("rejects an oversized expanded XML entry before parsing it", () => {

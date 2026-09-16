@@ -111,7 +111,8 @@ function hasDateFormat(format: string): boolean {
 }
 
 function hasTimeFormat(format: string): boolean {
-  return /h|s|am\/pm/iu.test(unquotedFormat(format));
+  const withoutMetadata = unquotedFormat(format).replace(/\[(?!h+\]|m+\]|s+\])[^\]]+\]/giu, "");
+  return /h|s|am\/pm/iu.test(withoutMetadata);
 }
 
 function formatLiteralSuffix(format: string): string {
@@ -139,18 +140,18 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   const number = Number(value);
   if (!Number.isFinite(number) || format === "General" || format === "@") return value;
   if (!isSupportedNumberFormat(format)) return value;
+  const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
+  if (decimals.length > 100) return value;
   const hasDate = hasDateFormat(format);
   if (hasDate) return formatExcelDate(number, format, date1904);
   if (hasTimeFormat(format)) return formatExcelTime(number, format);
   const suffix = formatLiteralSuffix(format);
   const hasPercentScaling = unquotedFormat(format).includes("%");
   if (hasPercentScaling) {
-    const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
     const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
     const maximumFractionDigits = decimals.length;
     return `${(number * 100).toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits })}%${suffix ? ` ${suffix}` : ""}`;
   }
-  const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
   const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
   const integerFormat = unquotedFormat(format).split(".")[0] ?? "";
   const minimumIntegerDigits = Math.max(1, (integerFormat.match(/0/gu) ?? []).length);
