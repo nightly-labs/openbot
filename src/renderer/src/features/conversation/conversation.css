@@ -442,14 +442,47 @@
   background: var(--openbot-bg-canvas);
 }
 
+.markdown-file-preview {
+  min-width: 0;
+}
+
+.markdown-file-preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: var(--openbot-space-3);
+}
+
+.markdown-file-preview-source-action {
+  flex: 0 0 auto;
+}
+
 .file-preview-markdown {
   max-width: 760px;
   margin: 0 auto;
   padding: 24px 26px 48px;
   color: var(--openbot-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.file-preview-markdown > .message-markdown {
   font-size: var(--openbot-text-md);
   line-height: 1.6;
+}
+
+.file-preview-markdown-source,
+.file-preview-markdown-status {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: 18px 20px;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .file-preview-text {
@@ -540,6 +573,47 @@
   border-top: 1px solid var(--openbot-border);
   background: var(--openbot-bg-control);
   padding: 7px 12px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}
+
+.media-markdown-preview {
+  width: min(860px, calc(100vw - 78px));
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-canvas);
+  padding: 20px;
+  color: var(--openbot-text-primary);
+}
+
+.media-markdown-preview .markdown-file-preview-toolbar {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  margin: -20px -20px var(--openbot-space-3);
+  background: var(--openbot-bg-canvas);
+  padding: 12px 20px;
+}
+
+.media-markdown {
+  overflow-wrap: anywhere;
+}
+
+.media-markdown-source {
+  min-width: 0;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.media-markdown-truncated {
+  margin: var(--openbot-space-3) 0 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   text-align: center;

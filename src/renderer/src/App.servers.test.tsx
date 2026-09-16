@@ -1152,6 +1152,63 @@ describe("OpenBot connected desktop shell", () => {
     });
   });
 
+  it("renders Markdown attachments and switches back to the source", async () => {
+    const markdown = [
+      "# Release notes",
+      "",
+      "Use **bold** text.",
+      "",
+      "| Kind | Status |",
+      "| --- | --- |",
+      "| Markdown | Ready |",
+      "",
+      "<script>alert('xss')</script>",
+    ].join("\n");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(markdown));
+    render(() => <App />);
+
+    emitAgentEvent?.({
+      type: "conversation",
+      snapshot: {
+        agentId: "chief",
+        threadId: null,
+        activeTurnId: null,
+        revision: 2,
+        messages: [
+          {
+            id: "markdown-file-message",
+            author: "user",
+            text: "",
+            createdAt: new Date().toISOString(),
+            status: "completed",
+            attachments: [
+              {
+                id: "markdown-file",
+                name: "release-notes.md",
+                size: markdown.length,
+                kind: "file",
+                mimeType: "text/markdown",
+                previewKind: "text",
+                previewUrl: "openbot-attachment://file/markdown-file",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Preview release-notes.md" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Release notes" })).toBeInTheDocument();
+    expect(screen.getByText("bold").tagName).toBe("STRONG");
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("script")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "View source" }));
+    expect(screen.getByRole("button", { name: "View rendered Markdown" })).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === markdown)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Release notes" })).not.toBeInTheDocument();
+  });
+
   it("duplicates an agent from its context menu and opens its empty conversation", async () => {
     localStorage.setItem(
       SIDEBAR_PINS_STORAGE_KEY,

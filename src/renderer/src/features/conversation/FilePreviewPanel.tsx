@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-j
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
 import { Button, ExternalLink, File, X } from "../../components/ui";
 import type { AgentProfile } from "../../data";
-import { MarkdownMessageText } from "./MarkdownMessageText";
+import { MarkdownFilePreview } from "./MarkdownFilePreview";
 
 const PANEL_STORAGE_KEY = "openbot:browser-panel-width";
 const PANEL_MIN = 220;
@@ -129,19 +129,21 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       </header>
       <div class="file-preview-content">
         <Show when={props.preview.previewKind === "markdown"}>
-          <article class="file-preview-markdown message-markdown">
-            <MarkdownMessageText
-              body={text().value}
-              agents={props.agents}
-              attachments={[]}
-              citations={[]}
-              showCitationFooter={false}
-              onSelectAgent={() => undefined}
-              onOpenLink={props.onOpenLink}
-              onOpenSharedFile={props.onOpenSharedFile}
-              onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-            />
-          </article>
+          <MarkdownFilePreview
+            class="file-preview-markdown"
+            renderedClass="message-markdown"
+            sourceClass="file-preview-markdown-source"
+            statusClass="file-preview-markdown-status"
+            truncatedClass="file-preview-truncated"
+            resetKey={props.preview.name}
+            body={text().value}
+            truncated={text().truncated}
+            agents={props.agents}
+            onSelectAgent={() => undefined}
+            onOpenLink={props.onOpenLink}
+            onOpenSharedFile={props.onOpenSharedFile}
+            onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+          />
         </Show>
         <Show when={props.preview.previewKind === "text"}>
           <pre class="file-preview-text">{text().value}</pre>
@@ -175,9 +177,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
               Open externally
             </Button>
           </div>
-        </Show>
-        <Show when={text().truncated}>
-          <p class="file-preview-truncated">Preview truncated after 1,000,000 characters.</p>
         </Show>
       </div>
     </aside>
