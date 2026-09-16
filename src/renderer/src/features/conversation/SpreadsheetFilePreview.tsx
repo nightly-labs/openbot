@@ -120,7 +120,7 @@ function formatLiteralSuffix(format: string): string {
 
 function isSupportedNumberFormat(format: string): boolean {
   const unquoted = unquotedFormat(format);
-  if (unquoted.includes(";") || /e[+-]?\d/iu.test(unquoted)) return false;
+  if (unquoted.includes(";") || /e[+-]?\d/iu.test(unquoted) || /,+\s*$/u.test(unquoted.trim())) return false;
   if (hasDateFormat(format) || hasTimeFormat(format)) return true;
   return unquoted.replace(/[%#,0.]/gu, "").trim() === "";
 }
@@ -143,7 +143,8 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   if (hasDate) return formatExcelDate(number, format, date1904);
   if (hasTimeFormat(format)) return formatExcelTime(number, format);
   const suffix = formatLiteralSuffix(format);
-  if (format.includes("%")) {
+  const hasPercentScaling = unquotedFormat(format).includes("%");
+  if (hasPercentScaling) {
     const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
     const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
     const maximumFractionDigits = decimals.length;
@@ -152,7 +153,8 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
   const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
   const formatted = number.toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits: decimals.length });
-  return suffix ? `${formatted} ${suffix}` : formatted;
+  if (suffix) return suffix === "%" ? `${formatted}%` : `${formatted} ${suffix}`;
+  return /"[^"]*%[^"]*"|\\%/u.test(format) ? `${formatted}%` : formatted;
 }
 
 function cellValue(cell: Element, sharedStrings: string[], numberFormats: string[], date1904: boolean): string {
