@@ -1,17 +1,4 @@
-import { googleAuthBlockedMessage, isGoogleAuthUrl, isGoogleBlockUrl } from "./browser-google-auth";
-
-describe("isGoogleAuthUrl", () => {
-  it("names Google account pages", () => {
-    expect(isGoogleAuthUrl("https://accounts.google.com/ServiceLogin?hl=en")).toBe(true);
-  });
-
-  it("ignores other pages", () => {
-    expect(isGoogleAuthUrl("https://www.google.com/search?q=hello")).toBe(false);
-    expect(isGoogleAuthUrl("https://chatgpt.com/")).toBe(false);
-    expect(isGoogleAuthUrl("about:blank")).toBe(false);
-    expect(isGoogleAuthUrl("not a url")).toBe(false);
-  });
-});
+import { googleAuthBlockedMessage, isGoogleBlockUrl } from "./browser-google-auth";
 
 describe("isGoogleBlockUrl", () => {
   it("names the rejected login page", () => {

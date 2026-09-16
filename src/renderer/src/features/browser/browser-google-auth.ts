@@ -8,15 +8,6 @@
 export const GOOGLE_AUTH_BLOCKED_MESSAGE =
   "Google blocked this login step. Log in at accounts.google.com in this browser first. Then return here and reload the page.";
 
-export function isGoogleAuthUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname === "accounts.google.com";
-  } catch {
-    return false;
-  }
-}
-
 export function isGoogleBlockUrl(url: string): boolean {
   let parsed: URL | null = null;
   try {
