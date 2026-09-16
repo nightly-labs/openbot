@@ -580,28 +580,40 @@
 
 .media-markdown-preview {
   width: min(860px, calc(100vw - 78px));
-  max-height: calc(100vh - 150px);
-  overflow: auto;
+  height: min(720px, calc(100dvh - 120px));
+  min-height: min(360px, calc(100dvh - 120px));
+  max-height: calc(100dvh - 120px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-canvas);
-  padding: 20px;
   color: var(--openbot-text-primary);
 }
 
 .media-markdown-preview .markdown-file-preview-toolbar {
-  position: sticky;
-  z-index: 1;
-  top: 0;
-  margin: -20px -20px var(--openbot-space-3);
+  position: static;
+  flex: 0 0 auto;
+  margin: 0;
   background: var(--openbot-bg-canvas);
-  padding: 12px 20px;
+  padding: 12px 20px var(--openbot-space-3);
 }
 
 .media-markdown {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 20px 28px 40px;
   overflow-wrap: anywhere;
 }
 
 .media-markdown-source {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 20px 28px 40px;
   min-width: 0;
   margin: 0;
   color: var(--openbot-text-primary);
@@ -613,7 +625,9 @@
 }
 
 .media-markdown-truncated {
-  margin: var(--openbot-space-3) 0 0;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 20px var(--openbot-space-3);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   text-align: center;
@@ -6517,12 +6531,14 @@ button.chat-action-target:active,
 
 .media-backdrop {
   position: fixed;
-  z-index: 30;
+  z-index: var(--openbot-layer-dialog);
   inset: 0;
   width: 100vw;
   height: 100vh;
   display: grid;
   place-items: center;
+  box-sizing: border-box;
+  padding: 24px;
   background: var(--openbot-bg-overlay);
   backdrop-filter: blur(3px);
   animation: fade-in var(--openbot-duration-normal) ease both;
@@ -6539,10 +6555,11 @@ button.chat-action-target:active,
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 24px;
+  padding: 0;
   pointer-events: none;
   box-shadow: none;
   animation: modal-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -8380,7 +8397,9 @@ button.chat-action-target:active,
 
 .media-caption {
   display: flex;
-  width: 100%;
+  width: min(860px, calc(100vw - 78px));
+  max-width: 100%;
+  box-sizing: border-box;
   align-items: center;
   gap: 6px;
   padding: 8px 2px 0;
