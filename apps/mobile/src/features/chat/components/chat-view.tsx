@@ -23,7 +23,7 @@ import { type ChatAttachment, useChatAttachments } from "@/features/chat/compone
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { type ChatBubbleMessage, useMessageActions } from "@/features/chat/context/message-actions-context";
-import { useQueuedMessages } from "@/features/chat/context/queued-messages-context";
+import { usePublishedQueuedChat } from "@/features/chat/context/queued-messages-context";
 import { type ChatMessage, type PendingChatMessage, presentChatMessages } from "@/features/chat/model/chat-messages";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -143,11 +143,6 @@ export function ChatView({
   const queryClient = useQueryClient();
   const composerAttachments = useChatAttachments();
   const attachments = composerAttachments;
-  const { setQueue, setPending } = useQueuedMessages();
-  useEffect(() => {
-    setQueue(queue ?? null);
-  }, [queue, setQueue]);
-  useEffect(() => () => setQueue(null), [setQueue]);
   const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
@@ -168,10 +163,7 @@ export function ChatView({
         : null,
     [pendingInQueue, sending, pendingMessage, uploadProgress],
   );
-  useEffect(() => {
-    setPending(queuePending);
-  }, [queuePending, setPending]);
-  useEffect(() => () => setPending(null), [setPending]);
+  usePublishedQueuedChat(queue?.chatId ?? `${target.serverId}:${target.id}`, queue ?? null, queuePending);
   const queuedMessageIds = useMemo(
     () =>
       new Set(

@@ -387,8 +387,11 @@ export class MailboxStore {
     const positions = this.#queuedPositions();
     return {
       agentId,
-      deliveries: this.#state.deliveries
+      // Queue order, not storage order: a restart reads the deliveries back sorted by their
+      // creation time and identity, which would otherwise reorder rows a client already saw.
+      deliveries: [...this.#state.deliveries]
         .filter((delivery) => delivery.recipientAgentId === agentId && !channelMessageIds.has(delivery.messageId))
+        .sort(compareQueueOrder)
         .map((delivery) => this.#publicDelivery(delivery, positions)),
     };
   }

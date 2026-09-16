@@ -42,7 +42,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
         liquidGlassAvailable={liquidGlassAvailable}
         onPress={() => {
           void haptics.selection();
-          router.push("/queued-messages");
+          router.push({ pathname: "/queued-messages", params: { chat: queue.chatId } });
         }}
       >
         {failed ? (

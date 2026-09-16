@@ -874,3 +874,11 @@ follows a completed cancel is rejected instead of reporting success for text the
 no timeout that could send a message while someone is still editing it. Older hosts retain queue
 view, steer, delete and reorder, but mobile disables editing without the capability.
 
+The mobile queue is a route, not a panel. Each chat publishes its live queue controller under its
+own identity, and the sheet reads the identity it was opened with, so a chat that the native stack
+keeps mounted cannot answer for another chat's open sheet. Queued files are listed as rows: an
+image shows its own thumbnail, every other file shows the file icon, and the message options open
+a file in the share sheet. The thumbnail reads the attachment through the query key the chat uses,
+so a file already read in a message is not fetched again. The editor changes the text, removes the
+files the message already has, and adds new ones.
+

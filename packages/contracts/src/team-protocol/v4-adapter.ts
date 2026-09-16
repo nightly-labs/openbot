@@ -35,14 +35,19 @@ import {
  * `editing` rides beside the frozen queue projection: the shipped key lists drop it, so a client on
  * protocol 1-3 reads the queue exactly as it did before, and only the current protocol carries the
  * mark that another editor holds a message.
+ *
+ * A present mark must be a boolean. The projection removes the key, so an unchecked value would
+ * reach the client as a message nobody holds, and enable the edit actions the hold disables.
+ * Fail closed instead; an absent mark still means an older host that never sends one.
  */
 function withQueueEditing(projected: TeamProtocolV4BaseJsonValue, source: unknown): TeamProtocolV4BaseJsonValue {
   if (!isDynamicRecord(projected) || !Array.isArray(projected.deliveries)) return projected;
   if (!isDynamicRecord(source) || !Array.isArray(source.deliveries)) return projected;
   const marks = new Map<string, boolean>();
   for (const delivery of source.deliveries) {
-    if (isDynamicRecord(delivery) && isString(delivery.id) && isBoolean(delivery.editing))
-      marks.set(delivery.id, delivery.editing);
+    if (!isDynamicRecord(delivery) || delivery.editing === undefined) continue;
+    if (!isBoolean(delivery.editing)) throw new Error("Invalid queue edit mark.");
+    if (isString(delivery.id)) marks.set(delivery.id, delivery.editing);
   }
   if (marks.size === 0) return projected;
   return {

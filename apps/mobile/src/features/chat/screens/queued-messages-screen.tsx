@@ -1,5 +1,5 @@
 import type { QueueDelivery } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { X } from "lucide-react-native";
 import { useMemo } from "react";
@@ -8,7 +8,7 @@ import { useCSSVariable } from "uniwind";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
-import { type QueuedUpload, useQueuedMessages } from "../context/queued-messages-context";
+import { type QueuedUpload, useQueuedChat } from "../context/queued-messages-context";
 import { queueRowsWithHeldEdit } from "../model/queue-edit-draft";
 import { queuedMessagePreview } from "../model/queued-message-view";
 
@@ -45,14 +45,15 @@ function UploadRow({ pending }: { pending: QueuedUpload }) {
 }
 
 export function QueuedMessagesScreen() {
-  const { queue, pending } = useQueuedMessages();
+  const { chat } = useLocalSearchParams<{ chat: string }>();
+  const { queue, pending } = useQueuedChat(chat);
   const queued = queue?.queued;
   const held = queue?.edit?.delivery ?? null;
   const rows = useMemo(() => queueRowsWithHeldEdit(queued ?? [], held), [queued, held]);
   const count = rows.length + (pending ? 1 : 0);
   const open = (delivery: QueueDelivery) => {
     void haptics.selection();
-    router.push({ pathname: "/queued-messages/actions", params: { deliveryId: delivery.id } });
+    router.push({ pathname: "/queued-messages/actions", params: { chat, deliveryId: delivery.id } });
   };
   return (
     <SettingsContent>

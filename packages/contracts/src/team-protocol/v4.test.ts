@@ -68,6 +68,34 @@ describe("Team protocol v4", () => {
     expect(frozen.deliveries[0]).not.toHaveProperty("editing");
   });
 
+  it("rejects a queue snapshot whose edit mark is not a boolean", () => {
+    const queuePath = "/v1/agents/chief/queue";
+    const delivery = {
+      id: "delivery-1",
+      messageId: "message-1",
+      recipientAgentId: "chief",
+      sender: { kind: "user" },
+      text: "Read the report",
+      attachments: [],
+      replyToMessageId: null,
+      status: "queued",
+      position: 1,
+      turnId: null,
+      error: null,
+      createdAt: "2026-09-16T10:00:00.000Z",
+    };
+    const snapshot = { agentId: "chief", deliveries: [{ ...delivery, editing: "true" }] };
+    // The projection drops the key, so a mark that survived unchecked would read as a message
+    // nobody holds. The frozen response validator rejects the snapshot, and the encoder refuses
+    // to write one, so neither side turns a malformed mark into an editable row.
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot)).toThrow();
+    expect(() => encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot)).toThrow("edit mark");
+    // A host that never sends the mark still passes.
+    const unmarked = { agentId: "chief", deliveries: [delivery] };
+    const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, unmarked));
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, wire)).toEqual(unmarked);
+  });
+
   it("carries OpenCode agent events through HTTP events and WebRTC", () => {
     const agent = response[0];
     if (!isAgentSummary(agent)) throw new Error("Invalid v4 fixture.");

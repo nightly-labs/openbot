@@ -121,15 +121,7 @@ const MobileWorkspaceContext = createContext<MobileWorkspaceContextValue | null>
 export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const { session, sessionScope } = useMobileSession();
   const queryClient = useQueryClient();
-  useEffect(
-    () => () => {
-      for (const kind of ["chat-queue", "queue-edit-attachments"]) queryClient.removeQueries({ queryKey: [kind] });
-    },
-    [queryClient],
-  );
-  useEffect(() => {
-    queryClient.setQueryDefaults(["queue-edit-attachments"], { gcTime: Infinity });
-  }, [queryClient]);
+  useEffect(() => () => queryClient.removeQueries({ queryKey: ["chat-queue"] }), [queryClient]);
   const presenceSignatures = useRef(new Map<string, string>());
   if (!session) throw new Error("MobileWorkspaceProvider requires a signed-in mobile session.");
 
@@ -202,8 +194,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const id of serverAgentIds.current.get(server.id) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(server.id);
         presenceSignatures.current.delete(server.id);
-        for (const kind of ["chat-queue", "queue-edit-attachments"])
-          queryClient.removeQueries({ queryKey: [kind, server.id] });
+        queryClient.removeQueries({ queryKey: ["chat-queue", server.id] });
         for (const kind of ["server-members", "server-invites", "agent-avatar"]) {
           queryClient.removeQueries({ queryKey: [kind, session.apiUrl, session.user.id, sessionScope, server.id] });
         }

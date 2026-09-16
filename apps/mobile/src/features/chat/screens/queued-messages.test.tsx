@@ -10,7 +10,7 @@ import { QueuedMessageEditScreen } from "./queued-message-edit-screen";
 import { QueuedMessagesScreen } from "./queued-messages-screen";
 
 const native = vi.hoisted(() => {
-  const params: { deliveryId: string } = { deliveryId: "one" };
+  const params: { chat: string; deliveryId: string } = { chat: "host:agent", deliveryId: "one" };
   const guard: { prevent: boolean; callback: ((event: { data: { action: string } }) => void) | null } = {
     prevent: false,
     callback: null,
@@ -27,6 +27,10 @@ const native = vi.hoisted(() => {
     context,
     guard,
     dispatch: vi.fn(),
+    chooseFiles: vi.fn(),
+    share: vi.fn(),
+    choosePhotos: vi.fn(),
+    removeAttachment: vi.fn(),
   };
 });
 
@@ -41,7 +45,33 @@ vi.mock("expo-router/react-navigation", () => ({
     native.guard.callback = callback;
   },
 }));
-vi.mock("../context/queued-messages-context", () => ({ useQueuedMessages: () => native.context }));
+// The sheet reads the chat it was opened for, so an unrelated identity finds no queue.
+vi.mock("../context/queued-messages-context", () => ({
+  useQueuedChat: (chatId?: string) => (chatId === "host:agent" ? native.context : { queue: null, pending: null }),
+}));
+// The preview downloads from the host; the rows under test only need to say which one they show.
+vi.mock("../components/attachment-preview", () => ({
+  AttachmentThumbnail: ({ name, uri }: { name: string; uri: string | null }) => (
+    <span>{uri ? `image ${name}` : `file ${name}`}</span>
+  ),
+  localAttachmentPreview: (file: { mimeType: string; uri?: string }) =>
+    file.mimeType.startsWith("image/") ? (file.uri ?? null) : null,
+  useAttachmentFile: (_serverId: string, attachment: { previewUrl: string | null }, preview: boolean) => ({
+    uri: preview ? attachment.previewUrl : null,
+    busy: false,
+    share: native.share,
+  }),
+  formatFileSize: (bytes: number) => `${bytes} B`,
+}));
+vi.mock("../components/use-chat-attachments", () => ({
+  useChatAttachments: (initial: { id: string; name: string }[]) => ({
+    items: initial,
+    preparing: false,
+    chooseFiles: native.chooseFiles,
+    choosePhotos: native.choosePhotos,
+    remove: native.removeAttachment,
+  }),
+}));
 vi.mock("@/shared/lib/haptics", () => ({
   haptics: { selection: native.selection, impact: native.impact, notification: native.notification },
 }));
@@ -50,7 +80,10 @@ vi.mock("uniwind", () => ({ useCSSVariable: () => "red" }));
 vi.mock("lucide-react-native", () => ({
   ArrowUpToLine: () => null,
   CornerDownRight: () => null,
+  ExternalLink: () => null,
   FileText: () => null,
+  ImagePlus: () => null,
+  Paperclip: () => null,
   Pencil: () => null,
   Trash2: () => null,
   X: () => null,
@@ -163,7 +196,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   native.context.queue = null;
   native.context.pending = null;
-  native.params = { deliveryId: "one" };
+  native.params = { chat: "host:agent", deliveryId: "one" };
   native.guard.prevent = false;
   native.guard.callback = null;
   vi.clearAllMocks();
@@ -188,6 +221,8 @@ const second: QueueDelivery = { ...first, id: "two", messageId: "message-two", t
 function stubQueue(overrides: Partial<ChatQueueController> = {}): ChatQueueController {
   const queued = [first, second];
   return {
+    chatId: "host:agent",
+    agentId: "agent",
     serverId: "host",
     attachments: [],
     changeAttachments: async () => {},
@@ -239,7 +274,7 @@ it("lists the queue and opens the options of one message", () => {
   act(() => fireEvent.click(screen.getByRole("button", { name: /Second request/ })));
   expect(native.push).toHaveBeenCalledWith({
     pathname: "/queued-messages/actions",
-    params: { deliveryId: "two" },
+    params: { chat: "host:agent", deliveryId: "two" },
   });
 });
 
@@ -327,7 +362,7 @@ it("disables move to first on the first message", () => {
   native.context.queue = stubQueue();
   mount(() => <QueuedMessageActionsScreen />);
   expect(screen.getByRole("button", { name: "Move to first" }).hasAttribute("disabled")).toBe(true);
-  native.params = { deliveryId: "two" };
+  native.params = { chat: "host:agent", deliveryId: "two" };
   mount(() => <QueuedMessageActionsScreen />);
   expect(screen.getAllByRole("button", { name: "Move to first" }).at(-1)?.hasAttribute("disabled")).toBe(false);
 });
@@ -349,7 +384,10 @@ it("opens the edit page for the selected message", () => {
   native.context.queue = stubQueue();
   mount(() => <QueuedMessageActionsScreen />);
   act(() => fireEvent.click(screen.getByRole("button", { name: "Edit" })));
-  expect(native.push).toHaveBeenCalledWith({ pathname: "/queued-messages/edit", params: { deliveryId: "one" } });
+  expect(native.push).toHaveBeenCalledWith({
+    pathname: "/queued-messages/edit",
+    params: { chat: "host:agent", deliveryId: "one" },
+  });
 });
 
 it("holds the message on the host when the edit page opens", () => {
@@ -431,6 +469,61 @@ it("offers only a close action when the queued message is gone", async () => {
   expect(queue.discardFinishedEdit).toHaveBeenCalled();
   await act(async () => {});
   expect(native.back).toHaveBeenCalled();
+});
+
+it("shows a thumbnail for a queued image and the file icon for other files", () => {
+  const sheet = {
+    id: "file-1",
+    name: "test_csv_file.csv",
+    kind: "file" as const,
+    mimeType: "text/csv",
+    size: 82,
+    previewKind: "none" as const,
+    previewUrl: null,
+  };
+  const photo = {
+    ...sheet,
+    id: "file-2",
+    name: "test_png_photo.png",
+    kind: "image" as const,
+    mimeType: "image/png",
+    previewUrl: "file:///photo.png",
+  };
+  const withFiles = { ...first, attachments: [sheet, photo] };
+  native.context.queue = stubQueue({ queued: [withFiles, second], deliveries: [withFiles, second] });
+  mount(() => <QueuedMessageActionsScreen />);
+  expect(screen.getByText("file test_csv_file.csv")).toBeTruthy();
+  expect(screen.getByText("image test_png_photo.png")).toBeTruthy();
+  act(() => fireEvent.click(screen.getByRole("button", { name: /test_csv_file\.csv/ })));
+  expect(native.share).toHaveBeenCalled();
+});
+
+it("opens the queue of the chat the sheet was opened for", () => {
+  native.context.queue = stubQueue();
+  native.params = { chat: "host:another-agent", deliveryId: "one" };
+  mount(() => <QueuedMessageActionsScreen />);
+  // A second chat that the native stack keeps mounted must not answer for this sheet.
+  expect(screen.getByText("This message is no longer queued.")).toBeTruthy();
+});
+
+it("adds a file to the edit and sends it with the saved message", async () => {
+  const added = {
+    id: "mobile-draft-attachment-1",
+    name: "notes.txt",
+    mimeType: "text/plain",
+    base64: "",
+    size: 12,
+    uri: "file:///notes.txt",
+  };
+  const queue = stubQueue({ edit: heldEdit, confirmed: true, attachments: [added] });
+  native.context.queue = queue;
+  mount(() => <QueuedMessageEditScreen />);
+  expect(screen.getByText("notes.txt")).toBeTruthy();
+  act(() => fireEvent.click(screen.getByRole("button", { name: /Add files/ })));
+  expect(native.chooseFiles).toHaveBeenCalled();
+  act(() => fireEvent.click(screen.getByRole("button", { name: "Save queued message" })));
+  await act(async () => {});
+  expect(queue.save).toHaveBeenCalledWith("First request", [added]);
 });
 
 it("keeps the editor open when the host hold cannot be released", async () => {

@@ -1,15 +1,11 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { useQuery } from "@tanstack/react-query";
-import { File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
-import * as Sharing from "expo-sharing";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ExternalLink, FileText } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, useWindowDimensions, View } from "react-native";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { useWindowDimensions, View } from "react-native";
+import { formatFileSize, useAttachmentFile } from "./attachment-preview";
 
 export function ChatAttachmentView({
   attachment,
@@ -21,54 +17,15 @@ export function ChatAttachmentView({
   alignment?: "left" | "right";
 }) {
   const [fileColor, muted] = useThemeColor(["success", "muted"]);
-  const { downloadAttachment } = useMobileWorkspace();
   const [ratio, setRatio] = useState(1);
-  const [sharing, setSharing] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const { width } = useWindowDimensions();
-  const pending = attachment.id.startsWith("mobile-draft-attachment-");
   const image = attachment.kind === "image";
-  const local =
-    attachment.previewUrl?.startsWith("data:image/") || (pending && attachment.previewUrl?.startsWith("file://"))
-      ? attachment.previewUrl
-      : null;
-  const query = useQuery({
-    queryKey: ["chat-attachment", serverId, attachment.id],
-    queryFn: (): Promise<RemoteFileUpload & { localUri?: string }> => {
-      if (attachment.size > MOBILE_ATTACHMENT_BYTES)
-        throw new Error("This file exceeds the mobile 10 MB limit. Open it on desktop.");
-      return downloadAttachment(serverId, attachment.id);
-    },
-    enabled: image && !local && !pending,
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 5 * 60 * 1000,
-  });
-  const localUri = local ?? query.data?.localUri;
-  const uri = localUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
+  const { pending, localUri, uri, query, sharing, share } = useAttachmentFile(serverId, attachment, image);
   // Keep the message footprint independent of dimensions received after image decoding.
   const frameSize = Math.min(280, width - 80);
   const imageHeight = Math.min(frameSize, frameSize / ratio);
   const imageWidth = imageHeight * ratio;
-  async function share() {
-    setSharing(true);
-    let file: File | null = null;
-    try {
-      if (!(await Sharing.isAvailableAsync())) throw new Error("File sharing is unavailable on this device.");
-      const result = query.data ? { data: query.data, error: null } : await query.refetch();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error("The attachment is unavailable. Try again.");
-      const name = attachment.name.replace(/[/\\\p{Cc}]/gu, "_");
-      file = new File(Paths.cache, `${Date.now()}-${name}`);
-      file.write(result.data.base64, { encoding: "base64" });
-      await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
-    } catch (error) {
-      Alert.alert("Could not open attachment", error instanceof Error ? error.message : "Try again.");
-    } finally {
-      if (file?.exists) file.delete();
-      setSharing(false);
-    }
-  }
   return (
     <View className="max-w-full gap-2">
       {image ? (
@@ -81,7 +38,7 @@ export function ChatAttachmentView({
             className="min-h-0 min-w-0 overflow-hidden p-0"
             isDisabled={pending || sharing || query.isFetching || !uri || imageFailed}
             accessibilityLabel={`Open or save ${attachment.name}`}
-            onPress={() => void share()}
+            onPress={share}
             style={{
               width: imageWidth,
               height: imageHeight,
@@ -113,7 +70,7 @@ export function ChatAttachmentView({
           style={{ width: Math.min(280, width - 80), maxWidth: "100%" }}
           isDisabled={pending || sharing || query.isFetching}
           accessibilityLabel={`Open or save ${attachment.name}`}
-          onPress={() => void share()}
+          onPress={share}
         >
           <View className="size-11 items-center justify-center rounded-xl bg-success/15">
             <FileText size={23} color={fileColor} />
@@ -148,10 +105,4 @@ export function ChatAttachmentView({
       ) : null}
     </View>
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

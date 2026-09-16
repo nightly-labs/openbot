@@ -245,6 +245,10 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   );
   return useMemo(
     () => ({
+      // The identity the queue sheet is opened with: one chat's controller never answers
+      // for another chat that the native stack keeps mounted behind it.
+      chatId: `${serverId}:${agentId}`,
+      agentId,
       serverId,
       attachments,
       changeAttachments,

@@ -1,7 +1,8 @@
+import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { ArrowUpToLine, CornerDownRight, FileText, Pencil, Trash2 } from "lucide-react-native";
+import { ArrowUpToLine, CornerDownRight, ExternalLink, Pencil, Trash2 } from "lucide-react-native";
 import { Alert } from "react-native";
 import { useCSSVariable } from "uniwind";
 import {
@@ -12,12 +13,13 @@ import {
 } from "@/features/settings/components/settings-content";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
-import { useQueuedMessages } from "../context/queued-messages-context";
+import { AttachmentThumbnail, formatFileSize, useAttachmentFile } from "../components/attachment-preview";
+import { useQueuedChat } from "../context/queued-messages-context";
 import { queuedMessagePreview } from "../model/queued-message-view";
 
 export function QueuedMessageActionsScreen() {
-  const { deliveryId } = useLocalSearchParams<{ deliveryId: string }>();
-  const { queue } = useQueuedMessages();
+  const { chat, deliveryId } = useLocalSearchParams<{ chat: string; deliveryId: string }>();
+  const { queue } = useQueuedChat(chat);
   const foreground = useThemeColor("foreground");
   const danger = String(useCSSVariable("--openbot-danger-text"));
   const held = queue?.edit?.delivery ?? null;
@@ -51,12 +53,15 @@ export function QueuedMessageActionsScreen() {
         <SettingsRow>
           <Typography>{queuedMessagePreview(delivery)}</Typography>
         </SettingsRow>
-        {delivery.attachments.map((file) => (
-          <SettingsRow key={file.id} leading={<FileText color={foreground} size={22} />}>
-            <Typography numberOfLines={1}>{file.name}</Typography>
-          </SettingsRow>
-        ))}
       </SettingsSection>
+
+      {delivery.attachments.length > 0 ? (
+        <SettingsSection title="Attachments">
+          {delivery.attachments.map((file) => (
+            <QueuedAttachmentRow key={file.id} attachment={file} serverId={queue.serverId} />
+          ))}
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection>
         <SettingsRow
@@ -64,7 +69,7 @@ export function QueuedMessageActionsScreen() {
           disabled={locked || editedElsewhere || !queue.canEdit}
           onPress={() => {
             void haptics.selection();
-            router.push({ pathname: "/queued-messages/edit", params: { deliveryId: delivery.id } });
+            router.push({ pathname: "/queued-messages/edit", params: { chat, deliveryId: delivery.id } });
           }}
         >
           <Typography>Edit</Typography>
@@ -111,5 +116,23 @@ export function QueuedMessageActionsScreen() {
         </Typography.Paragraph>
       ) : null}
     </SettingsContent>
+  );
+}
+
+/** A queued file: an image shows its own thumbnail, and every file opens in the share sheet. */
+function QueuedAttachmentRow({ attachment, serverId }: { attachment: AttachmentSummary; serverId: string }) {
+  const muted = useThemeColor("muted");
+  const image = attachment.kind === "image";
+  const file = useAttachmentFile(serverId, attachment, image);
+  return (
+    <SettingsRow
+      disclosure={false}
+      leading={<AttachmentThumbnail name={attachment.name} uri={image ? file.uri : null} />}
+      supportingText={file.busy ? "Downloading…" : formatFileSize(attachment.size)}
+      trailing={<ExternalLink size={18} color={String(muted)} />}
+      onPress={file.share}
+    >
+      <Typography numberOfLines={1}>{attachment.name}</Typography>
+    </SettingsRow>
   );
 }

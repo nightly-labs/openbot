@@ -325,8 +325,10 @@ not store channel chats or make routing decisions. This feature adds no mobile c
 ## Mobile queue drafts
 
 A phone stores the text and attachment references of an active queue edit in its secure local
-storage so it can recover the edit after navigation or restart. The host keeps the original
-message and a persistent edit hold until the edit is saved, cancelled, or the message is deleted.
+storage, and keeps a copy of each file the edit adds in its own application storage, so it can
+recover the edit after navigation or restart. These copies stay on the phone and are removed when
+the edit is saved or cancelled. The host keeps the original message and a persistent edit hold
+until the edit is saved, cancelled, or the message is deleted.
 
 The desktop editor also keeps its active queue edit, attachment references, and edit identity in
 local application storage. This lets it recover the held draft after restart. Neither client

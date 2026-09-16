@@ -53,6 +53,8 @@ const first: QueueDelivery = {
 
 function stubQueue(queued: QueueDelivery[], error: string | null = null): ChatQueueController {
   return {
+    chatId: "host:agent",
+    agentId: "agent",
     serverId: "host",
     attachments: [],
     changeAttachments: async () => {},
@@ -131,7 +133,7 @@ it("shows the queued count and opens the sheet on press", () => {
   expect(button.textContent).toContain("2 queued");
   act(() => fireEvent.click(button));
   expect(native.selection).toHaveBeenCalled();
-  expect(native.push).toHaveBeenCalledWith("/queued-messages");
+  expect(native.push).toHaveBeenCalledWith({ pathname: "/queued-messages", params: { chat: "host:agent" } });
 });
 
 it("counts an uploading message toward the badge", () => {
@@ -146,5 +148,5 @@ it("keeps the entry reachable when the queue did not load", () => {
   const button = screen.getByRole("button", { name: "The queued messages did not load. Show queued messages" });
   expect(button.textContent).toContain("Queue unavailable");
   act(() => fireEvent.click(button));
-  expect(native.push).toHaveBeenCalledWith("/queued-messages");
+  expect(native.push).toHaveBeenCalledWith({ pathname: "/queued-messages", params: { chat: "host:agent" } });
 });
