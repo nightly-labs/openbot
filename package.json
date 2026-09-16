@@ -157,6 +157,7 @@
     "test:backend": "vitest run src/backend",
     "test:browser": "bun scripts/browser-smoke.ts",
     "test:browser:google-live": "bun scripts/browser-smoke.ts --google-live",
+    "test:browser:whatsapp-live": "bun scripts/browser-smoke.ts --whatsapp-live",
     "test:codex": "bun scripts/codex-doctor.ts --strict",
     "test:filesystem": "bun scripts/filesystem-smoke.ts",
     "test:imagegen": "bun scripts/filesystem-smoke.ts --provider codex --imagegen",

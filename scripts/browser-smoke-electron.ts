@@ -266,6 +266,7 @@ async function main(): Promise<void> {
   }
   const googleLive = process.argv.includes("--google-live");
   const xLive = process.argv.includes("--x-live");
+  const whatsappLive = process.argv.includes("--whatsapp-live");
   const configuredRoot = argumentValue("--smoke-root=");
   const persistencePhase = argumentValue("--persistence-phase=");
   const persistenceOrigin = argumentValue("--persistence-origin=");
@@ -1647,6 +1648,7 @@ async function main(): Promise<void> {
     await runIdentityFrameProbe(browser, origin);
     if (googleLive) await runGoogleLiveProbe(browser);
     if (xLive) await runXLiveProbe(browser);
+    if (whatsappLive) await runWhatsAppLiveProbe(browser);
     await expectFailure(() => browser.act(tab.id, first.revision, { type: "click", ref: save.ref }));
 
     const child = result.elements.find((element) => element.name === "Child");
@@ -2726,6 +2728,40 @@ async function runXLiveProbe(browser: BrowserHost): Promise<void> {
   const identifier = loginPage.elements.find((element) => element.tag === "input" && !element.disabled);
   if (!identifier) throw new Error("X did not show an account identifier field.");
   process.stdout.write("BrowserHost: X login identifier step loaded.\n");
+}
+
+async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
+  // No credentials needed: the allowlist refusal renders before any login, while the real
+  // login page shows the phone-linking controls instead.
+  const whatsappTab = await browser.open(
+    "https://web.whatsapp.com/",
+    "whatsapp-live-smoke",
+    "whatsapp-live-smoke",
+    true,
+  );
+  const deadline = Date.now() + 30_000;
+  let page = await browser.snapshot(whatsappTab.id);
+  while (Date.now() < deadline) {
+    const normalized = page.text.toLowerCase();
+    if (
+      normalized.includes("works with google chrome") ||
+      normalized.includes("update google chrome") ||
+      normalized.includes("phone number") ||
+      normalized.includes("scan")
+    ) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    page = await browser.snapshot(whatsappTab.id);
+  }
+  const normalized = page.text.toLowerCase();
+  if (normalized.includes("works with google chrome") || normalized.includes("update google chrome")) {
+    throw new Error(`WhatsApp rejected the embedded browser: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  if (!normalized.includes("phone number") && !normalized.includes("scan")) {
+    throw new Error(`WhatsApp returned an unexpected page: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  process.stdout.write("BrowserHost: WhatsApp login page loaded without a browser block.\n");
 }
 
 async function waitForXSnapshot(

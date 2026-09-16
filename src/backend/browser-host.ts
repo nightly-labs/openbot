@@ -34,6 +34,7 @@ import {
 } from "electron";
 import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult } from "./browser-cdp";
 import { BrowserDiagnostics } from "./browser-diagnostics";
+import { requiresScrubbedIdentity, scrubbedBrowserUserAgent } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import { isCloseBrowserTabShortcut, isGlobalSearchShortcut, isToggleDevToolsShortcut } from "./browser-shortcuts";
 import {
@@ -944,7 +945,7 @@ export class BrowserHost {
     this.#session.setUserAgent(this.#session.getUserAgent(), preferredBrowserLanguageCodes());
     this.#session.webRequest.onBeforeSendHeaders((details, callback) => {
       callback({
-        requestHeaders: browserRequestHeaders(details.requestHeaders),
+        requestHeaders: browserRequestHeaders(details.url, details.requestHeaders),
       });
     });
     this.#session.webRequest.onCompleted((details) => {
@@ -1716,8 +1717,16 @@ function browserLoadOptions(): { extraHeaders: string } {
   return { extraHeaders: "Cache-Control: no-cache\nPragma: no-cache" };
 }
 
-function browserRequestHeaders(requestHeaders: Record<string, string>): Record<string, string> {
+function browserRequestHeaders(url: string, requestHeaders: Record<string, string>): Record<string, string> {
   const headers = { ...requestHeaders };
+  if (requiresScrubbedIdentity(url)) {
+    const userAgentName = Object.keys(headers).find((candidate) => candidate.toLowerCase() === "user-agent");
+    if (userAgentName !== undefined) {
+      const scrubbed = scrubbedBrowserUserAgent(headers[userAgentName]);
+      if (userAgentName !== "User-Agent") delete headers[userAgentName];
+      headers["User-Agent"] = scrubbed;
+    }
+  }
   setRequestHeader(headers, "Accept-Language", preferredBrowserLanguages());
   return headers;
 }
