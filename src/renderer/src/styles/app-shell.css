@@ -651,6 +651,7 @@ textarea {
   flex-direction: column;
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
+  container-type: inline-size;
 }
 
 .sidebar-topbar {
@@ -2143,6 +2144,17 @@ textarea {
   font-size: var(--openbot-text-sm);
   line-height: 16px;
   white-space: nowrap;
+}
+
+/* Narrow panel: name and badge win over time and date. The time element keeps
+   no reserved width, so long names get the space instead of truncating to a
+   few characters beside a date. */
+@container (max-width: 210px) {
+  .agent-row-time,
+  .person-row .agent-row-heading > span,
+  .channel-row .agent-row-time {
+    display: none;
+  }
 }
 
 .agent-row-preview {
