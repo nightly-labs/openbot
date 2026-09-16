@@ -41,6 +41,19 @@ export function useChatAttachments(
   const [cameraOrigin, setCameraOrigin] = useState<ChatCameraOrigin>();
   const [items, setItems] = useState<ChatAttachment[]>(initialItems);
   const itemsRef = useRef<ChatAttachment[]>(initialItems);
+  // Selection reads files one by one while persistence runs per file. A plain
+  // flag cleared by an inner persist would report idle during the next read,
+  // so count nested preparation instead.
+  const preparingCount = useRef(0);
+  const [preparing, setPreparing] = useState(false);
+  function beginPreparing() {
+    preparingCount.current += 1;
+    if (preparingCount.current === 1) setPreparing(true);
+  }
+  function endPreparing() {
+    preparingCount.current = Math.max(0, preparingCount.current - 1);
+    if (preparingCount.current === 0) setPreparing(false);
+  }
   const sequence = useRef(initialItems.reduce((max, item) => Math.max(max, Number(item.id.split("-").at(-1)) || 0), 0));
   function replace(next: ChatAttachment[]) {
     itemsRef.current = next;
@@ -48,11 +61,11 @@ export function useChatAttachments(
   }
   async function persistItems(next: ChatAttachment[]) {
     if (persist) {
-      setPreparing(true);
+      beginPreparing();
       try {
         await persist(next);
       } finally {
-        setPreparing(false);
+        endPreparing();
       }
     }
     replace(next);
@@ -134,11 +147,10 @@ export function useChatAttachments(
     else onText(data.text);
   }
   const busyRef = useRef(false);
-  const [preparing, setPreparing] = useState(false);
   function report(operation: () => Promise<void>) {
     if (busyRef.current) return;
     busyRef.current = true;
-    setPreparing(true);
+    beginPreparing();
     return operation()
       .catch((error) => {
         mobileAnalytics.track("attachment_action", {
@@ -150,7 +162,7 @@ export function useChatAttachments(
       })
       .finally(() => {
         busyRef.current = false;
-        setPreparing(false);
+        endPreparing();
       });
   }
   return {

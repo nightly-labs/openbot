@@ -12,6 +12,7 @@ const native = vi.hoisted(() => ({
   permission: vi.fn(),
   alert: vi.fn(),
   size: 5,
+  base64Impl: async (_uri: string) => btoa("hello"),
 }));
 vi.mock("react-native", () => ({ Alert: { alert: native.alert }, Keyboard: { dismiss: () => {} } }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: native.documents }));
@@ -24,8 +25,12 @@ vi.mock("expo-image-picker", () => ({
 vi.mock("expo-file-system", () => ({
   File: class {
     size = native.size;
+    uri: string;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
     async base64() {
-      return btoa("hello");
+      return native.base64Impl(this.uri);
     }
   },
 }));
@@ -33,6 +38,7 @@ const cleanups: (() => void)[] = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   native.size = 5;
+  native.base64Impl = async (_uri: string) => btoa("hello");
   vi.clearAllMocks();
 });
 function mount(persist?: Parameters<typeof useChatAttachments>[1]) {
@@ -166,4 +172,42 @@ it("accepts a paste only after persistence succeeds and leaves existing items on
   });
   expect(state().items).toHaveLength(1);
   expect(state().preparing).toBe(false);
+});
+
+it("keeps preparing true while later files of one selection are still reading", async () => {
+  // The first persist finishes before the second read. Clearing the flag there
+  // would report idle while the selection is still running.
+  const persist = vi.fn(async () => {});
+  const state = mount(persist);
+  native.documents.mockResolvedValue({
+    canceled: false,
+    assets: [
+      { name: "a.txt", uri: "file:///a.txt" },
+      { name: "b.txt", uri: "file:///b.txt" },
+    ],
+  });
+  let releaseSecond: () => void = () => {};
+  const secondGate = new Promise<void>((resolve) => {
+    releaseSecond = resolve;
+  });
+  native.base64Impl = async (uri: string) => {
+    if (uri.endsWith("b.txt")) await secondGate;
+    return btoa("hello");
+  };
+  let selecting: Promise<void> | undefined;
+  act(() => {
+    selecting = state().chooseFiles();
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(state().items.map((item) => item.name)).toEqual(["a.txt"]);
+  expect(state().preparing).toBe(true);
+  await act(async () => {
+    releaseSecond();
+    await selecting;
+  });
+  expect(state().items.map((item) => item.name)).toEqual(["a.txt", "b.txt"]);
+  expect(state().preparing).toBe(false);
+  expect(persist).toHaveBeenCalledTimes(2);
 });
