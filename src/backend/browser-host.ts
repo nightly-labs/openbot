@@ -34,7 +34,6 @@ import {
 } from "electron";
 import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult } from "./browser-cdp";
 import { BrowserDiagnostics } from "./browser-diagnostics";
-import { embeddedBrowserUserAgent } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import { isCloseBrowserTabShortcut, isGlobalSearchShortcut, isToggleDevToolsShortcut } from "./browser-shortcuts";
 import {
@@ -939,8 +938,10 @@ export class BrowserHost {
   }
 
   #configureSession(): void {
-    const userAgent = embeddedBrowserUserAgent(this.#session.getUserAgent());
-    this.#session.setUserAgent(userAgent, preferredBrowserLanguageCodes());
+    // The embedded browser keeps its native identity everywhere: scrubbing the build and
+    // product tokens made Google read it as an unknown client and refuse sign-in, while
+    // workers leaked the tokens anyway. Only the languages are rewritten, from the system.
+    this.#session.setUserAgent(this.#session.getUserAgent(), preferredBrowserLanguageCodes());
     this.#session.webRequest.onBeforeSendHeaders((details, callback) => {
       callback({
         requestHeaders: browserRequestHeaders(details.requestHeaders),
@@ -1096,7 +1097,9 @@ export class BrowserHost {
       if (!isAllowedMainUrl(event.url)) event.preventDefault();
     });
     contents.setWindowOpenHandler(({ url }) => {
-      if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerAgentId);
+      // Auth popups (for example Continue with Google) start from a user click.
+      // Open the new tab in front with keyboard focus so the user can log in at once.
+      if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerAgentId, true);
       return { action: "deny" };
     });
   }

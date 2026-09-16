@@ -230,7 +230,7 @@ async function measureCpu(target: AutomationTarget): Promise<void> {
   // reads and the usual call passes the path an earlier run printed.
   const out = flagValue("--out");
   const outPath = out === null || out === "" ? null : resolveWritablePath(CPU_ROOT, out, ".json", "CPU reports");
-  const browser = await openDevBrowser(target.port, logger);
+  const browser = await openDevBrowser(target.port, logger, { trustedPort: target.pid !== null });
   let profile: Awaited<ReturnType<typeof profileCpu>>;
   try {
     logger.info(`sampling for ${durationMs} ms every ${intervalMs} ms`);
@@ -278,7 +278,7 @@ async function main(): Promise<void> {
   const target = resolveTarget(readDevInstanceRecords(), readService());
   logger.info(`target ${target.description}`);
   if (command === "pages") {
-    const browser = await openDevBrowser(target.port, logger);
+    const browser = await openDevBrowser(target.port, logger, { trustedPort: target.pid !== null });
     try {
       const pages = await describeDevPages(devBrowserPages(browser), readTargetId);
       process.stdout.write(`${JSON.stringify({ pages }, null, 2)}\n`);
@@ -314,6 +314,7 @@ async function main(): Promise<void> {
   const session = await connectToDevApp(target.port, logger, {
     expectedRendererPort: target.expectedRendererPort,
     pageSelector: readPageSelector(),
+    trustedPort: target.pid !== null,
   });
   try {
     const settle = async (): Promise<void> => {

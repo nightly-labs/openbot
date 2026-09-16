@@ -118,19 +118,13 @@ export async function findRendererPages<T extends RendererCandidate>(
   return confirmed;
 }
 
-async function describeBrowser(port: number): Promise<{ targets: string; userAgent: string }> {
+async function describeBrowser(port: number): Promise<{ targets: string; branded: boolean }> {
   const version = await fetch(`http://127.0.0.1:${port}/json/version`, {
     signal: AbortSignal.timeout(5_000),
   });
   if (!version.ok) throw new Error(`CDP answered ${version.status}.`);
   const info = await version.json();
   const userAgent = isDynamicRecord(info) && isString(info["User-Agent"]) ? info["User-Agent"] : "";
-  if (!isOpenBotBrowser(userAgent)) {
-    throw new ForeignBrowserError(
-      `Port ${port} does not belong to OpenBot (User-Agent: ${userAgent || "unknown"}). ` +
-        "Pass --port=<OPENBOT_DEV_REMOTE_DEBUGGING_PORT> of the instance you mean to drive.",
-    );
-  }
   const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
     signal: AbortSignal.timeout(5_000),
   });
@@ -142,12 +136,12 @@ async function describeBrowser(port: number): Promise<{ targets: string; userAge
     .filter((target) => target.type === "page")
     .map((target) => `- ${describeTarget(isString(target.url) ? target.url : "")}`)
     .join("\n");
-  return { targets, userAgent };
+  return { targets, branded: isOpenBotBrowser(userAgent) };
 }
 
 export interface ConnectOptions {
   // Set from the instance registry. Null means nothing published this port, so
-  // the only check left is the OpenBot User-Agent.
+  // the port answers for itself through the build-token check.
   expectedRendererPort?: number | null;
   // A `--page=` selector. This is dev: every window is fair game, including a
   // Dynamic Island surface and an embedded browser view showing a real site,
@@ -156,6 +150,8 @@ export interface ConnectOptions {
   // accident; naming a target overrides both the route filter and the preload
   // bridge probe.
   pageSelector?: string | null;
+  // True when a live registry record owns the port. See OpenDevBrowserOptions.
+  trustedPort?: boolean;
 }
 
 export interface PageChoice {
@@ -218,10 +214,22 @@ export async function matchPages<T extends { url: () => string }>(
   return pages.filter((page) => page.url().toLowerCase().includes(needle));
 }
 
-export async function openDevBrowser(port: number, logger: Logger): Promise<Browser> {
-  let targets: string;
+export interface OpenDevBrowserOptions {
+  // True when a live registry record owns the port. The embedded browser no
+  // longer sends the build token that used to brand this check, so attribution
+  // comes from the record instead. Page selection still probes the preload
+  // bridge, and mutations still need their flag and a named instance.
+  trustedPort?: boolean;
+}
+
+export async function openDevBrowser(
+  port: number,
+  logger: Logger,
+  options: OpenDevBrowserOptions = {},
+): Promise<Browser> {
+  let described: { targets: string; branded: boolean };
   try {
-    targets = (await describeBrowser(port)).targets;
+    described = await describeBrowser(port);
   } catch (error) {
     if (error instanceof ForeignBrowserError) throw error;
     throw new Error(
@@ -230,6 +238,12 @@ export async function openDevBrowser(port: number, logger: Logger): Promise<Brow
         "it owns the API, the seed and the dev profile.",
     );
   }
+  if (!described.branded && !options.trustedPort) {
+    throw new ForeignBrowserError(
+      `Port ${port} does not belong to OpenBot. Pass --port=<OPENBOT_DEV_REMOTE_DEBUGGING_PORT> of the instance you mean to drive.`,
+    );
+  }
+  const targets = described.targets;
   logger.info(`CDP targets on :${port}`, targets || "(no pages yet)");
   return chromium.connectOverCDP(`http://127.0.0.1:${port}`);
 }
@@ -243,7 +257,7 @@ export async function connectToDevApp(
   logger: Logger,
   options: ConnectOptions = {},
 ): Promise<AutomationSession> {
-  const browser = await openDevBrowser(port, logger);
+  const browser = await openDevBrowser(port, logger, { trustedPort: options.trustedPort });
   const expectedRendererPort = options.expectedRendererPort ?? null;
   const selector = options.pageSelector ?? null;
   const pages = devBrowserPages(browser);
