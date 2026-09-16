@@ -134,7 +134,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_routine",
     description:
-      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default and uses the host timezone by default. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
+      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. Use for time-based work only: fixed times, days, or intervals with no outside trigger. When the user wants watching, monitoring, or notify-me-when on a mailbox, page, price, or feed, build a watcher instead. It is active by default and uses the host timezone by default. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       name: z.string().min(1).max(INPUT_LIMITS.routineName),
@@ -187,7 +187,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_watcher",
     description:
-      "Create an event watcher that polls one source and fires a routine only on real change. Link routineId from openbot.list_routines. Gmail source needs a Gmail search query. Web source needs an https URL. Interval must be 3 to 1440 minutes; use 15 when the user gives none.",
+      "Create an event watcher that polls one outside source and fires a routine only on real change. Use for change-based work only: watch, monitor, or notify-me-when on Gmail, a web page, a price, or a feed. Time-based work with no outside trigger is a routine, not a watcher. Link routineId from openbot.list_routines; create the routine first when none fits. Gmail source needs a Gmail search query. Web source needs an https URL. Interval must be 3 to 1440 minutes; use 15 when the user gives none.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
