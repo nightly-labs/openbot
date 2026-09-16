@@ -98,8 +98,24 @@ function formatExcelDate(value: number, format: string, date1904: boolean): stri
   if (Number.isNaN(date.getTime())) return String(value);
   const pad = (part: number) => String(part).padStart(2, "0");
   const day = `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
-  if (!/[hs]/iu.test(format)) return day;
+  if (!hasTimeFormat(format)) return day;
   return `${day} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+}
+
+function unquotedFormat(format: string): string {
+  return format.replace(/"[^"]*"/gu, "").replace(/\\./gu, "");
+}
+
+function hasDateFormat(format: string): boolean {
+  return /[dy]/iu.test(unquotedFormat(format).replace(/\[[^\]]+\]/gu, ""));
+}
+
+function hasTimeFormat(format: string): boolean {
+  return /h|s|am\/pm/iu.test(unquotedFormat(format));
+}
+
+function formatLiteralSuffix(format: string): string {
+  return format.match(/"([^"]*)"\s*$/u)?.[1]?.trim() ?? "";
 }
 
 function formatExcelTime(value: number, format: string): string {
@@ -115,18 +131,20 @@ function formatExcelTime(value: number, format: string): string {
 function formatExcelNumber(value: string, format: string, date1904: boolean): string {
   const number = Number(value);
   if (!Number.isFinite(number) || format === "General" || format === "@") return value;
-  const hasDate = /[dy]/iu.test(format) && !/\[[^\]]+\]/u.test(format);
+  const hasDate = hasDateFormat(format);
   if (hasDate) return formatExcelDate(number, format, date1904);
-  if (/h|s|am\/pm/iu.test(format)) return formatExcelTime(number, format);
+  if (hasTimeFormat(format)) return formatExcelTime(number, format);
+  const suffix = formatLiteralSuffix(format);
   if (format.includes("%")) {
     const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
     const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
     const maximumFractionDigits = decimals.length;
-    return `${(number * 100).toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits })}%`;
+    return `${(number * 100).toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits })}%${suffix ? ` ${suffix}` : ""}`;
   }
   const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
   const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
-  return number.toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits: decimals.length });
+  const formatted = number.toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits: decimals.length });
+  return suffix ? `${formatted} ${suffix}` : formatted;
 }
 
 function cellValue(cell: Element, sharedStrings: string[], numberFormats: string[], date1904: boolean): string {
@@ -193,7 +211,8 @@ function unzipSpreadsheet(bytes: Uint8Array) {
 export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
   const files = unzipSpreadsheet(bytes);
   const workbook = xmlDocument(files["xl/workbook.xml"], "xl/workbook.xml");
-  const date1904 = workbook.getElementsByTagNameNS("*", "workbookPr")[0]?.getAttribute("date1904") === "1";
+  const dateSystem = workbook.getElementsByTagNameNS("*", "workbookPr")[0]?.getAttribute("date1904");
+  const date1904 = dateSystem === "1" || dateSystem === "true";
   const relationships = xmlDocument(files["xl/_rels/workbook.xml.rels"], "xl/_rels/workbook.xml.rels");
   const relationshipTargets = new Map(
     Array.from(relationships.getElementsByTagNameNS("*", "Relationship")).map((relationship) => [
