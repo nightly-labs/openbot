@@ -85,7 +85,7 @@ describe.sequential("AgentService: queue", () => {
     await restored.initialize();
     expect(restored.matchesFinishedQueueSave("chief", deliveryId, save.editId, save.text, [], [])).toBe(true);
     expect(restored.matchesFinishedQueueSave("chief", deliveryId, save.editId, "Changed", [], [])).toBe(false);
-    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditSaveHash");
+    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditOutcomes");
 
     await waitFor(() => mailbox.listQueue("chief").deliveries[0]?.status === "completed");
     const starts = client.requests.filter((request) => request.method === "turn/start");
@@ -111,6 +111,47 @@ describe.sequential("AgentService: queue", () => {
     expect(mailbox.listQueue("chief").deliveries.find((item) => item.id === removed.deliveries[0].id)?.status).toBe(
       "cancelled",
     );
+  });
+
+  it("confirms an earlier save retry after another device saves the same message", async () => {
+    const { store, mailbox } = stores(root);
+    // The active turn never completes, so the edited message waits queued behind it.
+    const client = new FakeAgentClient("codex", "CODEX_DONE", false);
+    service = createTestService({ store, mailbox, clientFactory: () => client });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.sendMessage({ agentId: "chief", text: "Active task" });
+    const first = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const deliveryId = first.deliveries[0].id;
+    const saveA = {
+      action: "save" as const,
+      deliveryId,
+      editId: "device-a-edit",
+      text: "Edited on A",
+      keepAttachmentIds: [],
+      attachmentDraftIds: [],
+    };
+    await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "device-a-edit" });
+    await service.editQueuedMessage("chief", saveA);
+    // The message stays queued, so a second device edits and saves it again. That
+    // must not forget the first save: its exact retry still confirms.
+    await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "device-b-edit" });
+    const saveB = { ...saveA, editId: "device-b-edit", text: "Edited on B" };
+    await service.editQueuedMessage("chief", saveB);
+    await service.editQueuedMessage("chief", saveA);
+    // The retry confirms without re-applying superseded text over the newer save.
+    const queued = service.listQueue("chief").deliveries.find((item) => item.id === deliveryId);
+    expect(queued).toMatchObject({ text: "Edited on B" });
+    // A cancel reports the recorded save instead of overwriting its outcome,
+    // so the second device keeps its own confirmation.
+    await expect(
+      service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "device-a-edit" }),
+    ).rejects.toThrow("already saved");
+    await service.editQueuedMessage("chief", saveB);
+    const restored = new MailboxStore(join(root, "user-data"), store.sharedRoot, store.database);
+    await restored.initialize();
+    expect(restored.matchesFinishedQueueSave("chief", deliveryId, "device-a-edit", "Edited on A", [], [])).toBe(true);
+    expect(restored.matchesFinishedQueueSave("chief", deliveryId, "device-b-edit", "Edited on B", [], [])).toBe(true);
   });
 
   it("rejects a save that repeats a finished cancellation and keeps the original message", async () => {

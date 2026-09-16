@@ -110,10 +110,22 @@ describe("MailboxStore", () => {
     expect(restored.finishedQueueEditAction("chief", id, "phone-edit")).toBe("save");
     expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Edited", position: 1 });
     expect(restored.finishedQueueEditAction("chief", id, "phone-edit")).toBe("save");
-    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditId");
-    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditAction");
+    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditOutcomes");
     await restored.markStarting(id);
     expect(restored.nextQueued("chief")).toBeNull();
+  });
+
+  it("keeps finished edit outcomes bounded per delivery", async () => {
+    const receipt = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const id = receipt.deliveries[0].id;
+    for (let index = 0; index < 25; index += 1) {
+      const editId = `edit-${index}`;
+      store.beginQueueEdit("chief", id, editId);
+      store.finishQueueEdit("chief", id, editId);
+    }
+    expect(store.finishedQueueEditAction("chief", id, "edit-0")).toBeUndefined();
+    expect(store.finishedQueueEditAction("chief", id, "edit-5")).toBe("cancel");
+    expect(store.finishedQueueEditAction("chief", id, "edit-24")).toBe("cancel");
   });
 
   it("keeps files and order through edit cancellation and permits remote deletion of a held item", async () => {
