@@ -1664,6 +1664,7 @@ it("hides and shows a server in the notch without changing other servers", async
 });
 
 it("keeps notch-hidden servers out of Dynamic Island updates", async () => {
+  installOpenbotStub();
   const local: ServerSummary = {
     id: "local",
     name: "Local",
