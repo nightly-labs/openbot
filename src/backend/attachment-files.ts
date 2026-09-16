@@ -139,11 +139,11 @@ export class AttachmentFiles {
     await Promise.allSettled(roots.map((path) => this.remove(path)));
   }
 
-  resolveDraft(attachment: StoredAttachment): Promise<{ path: string; mimeType: string } | null> {
+  resolveDraft(attachment: StoredAttachment): Promise<{ path: string; mimeType: string; name: string } | null> {
     return resolveManagedAttachment(this.#draftsRoot, attachment);
   }
 
-  resolveTransfer(attachment: StoredAttachment): Promise<{ path: string; mimeType: string } | null> {
+  resolveTransfer(attachment: StoredAttachment): Promise<{ path: string; mimeType: string; name: string } | null> {
     return resolveManagedAttachment(this.#transfersRoot, attachment);
   }
 
@@ -379,14 +379,14 @@ export class AttachmentFiles {
 async function resolveManagedAttachment(
   root: string,
   attachment: StoredAttachment,
-): Promise<{ path: string; mimeType: string } | null> {
+): Promise<{ path: string; mimeType: string; name: string } | null> {
   try {
     const [canonicalRoot, canonicalPath] = await Promise.all([realpath(root), realpath(attachment.path)]);
     if (!isWithin(canonicalRoot, canonicalPath)) return null;
     const metadata = await stat(canonicalPath);
     if (!metadata.isFile() || metadata.size !== attachment.size) return null;
     if ((await sha256(canonicalPath)) !== attachment.sha256) return null;
-    return { path: canonicalPath, mimeType: attachment.mimeType };
+    return { path: canonicalPath, mimeType: attachment.mimeType, name: attachment.name };
   } catch {
     return null;
   }

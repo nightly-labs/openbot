@@ -143,8 +143,7 @@ export function attachmentIpcHandlers({
             if (!attachment) throw new Error("Attachment was not found.");
             if (parsed.action === "download") {
               const safeId = basename(parsed.attachmentId).replace(/[^a-z0-9_-]/gi, "-") || "attachment";
-              const mimeExtension = attachment.mimeType.split("/")[1]?.replace(/[^a-z0-9]/gi, "");
-              const suggestedName = `attachment-${safeId}${mimeExtension ? `.${mimeExtension}` : ""}`;
+              const suggestedName = basename(attachment.name) || `attachment-${safeId}`;
               const filePath = await chooseSavePath(getMainWindow(), suggestedName);
               if (!filePath) return;
               await copyFile(attachment.path, filePath);

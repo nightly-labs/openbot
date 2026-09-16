@@ -1152,7 +1152,7 @@ export class MailboxStore {
     });
   }
 
-  async resolveAttachment(id: string): Promise<{ path: string; mimeType: string } | null> {
+  async resolveAttachment(id: string): Promise<{ path: string; mimeType: string; name: string } | null> {
     const draft = this.#state.drafts.find((candidate) => candidate.id === id);
     if (draft) return this.#files.resolveDraft(draft);
     for (const message of this.#state.messages) {

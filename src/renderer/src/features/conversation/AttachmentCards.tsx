@@ -52,7 +52,7 @@ export function AttachmentDownloadAll(props: { count: number; pending: boolean; 
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
   onPreview: (attachment: AttachmentSummary) => void;
-  onAction: (attachment: AttachmentSummary, action: "open" | "reveal") => void;
+  onAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
 }) {
   const tooltipId = `attachment-action-tooltip-${createUniqueId()}`;
   const [tooltip, setTooltip] = createSignal<{ anchor: HTMLElement; content: string } | null>(null);
@@ -104,6 +104,18 @@ export function AttachmentCards(props: {
                   <strong>{attachment.name}</strong>
                   <small>{formatFileSize(attachment.size)}</small>
                 </span>
+              </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                class="attachment-open-button"
+                aria-label={`Download ${attachment.name}`}
+                onClick={() => {
+                  setTooltip(null);
+                  props.onAction(attachment, "download");
+                }}
+              >
+                <Download />
               </Button>
               <Button
                 variant="ghost"
