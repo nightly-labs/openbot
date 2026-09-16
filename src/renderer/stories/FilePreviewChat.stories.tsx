@@ -47,6 +47,7 @@ const MESSAGES: AgentMessage[] = [
       "",
       `- [provider-session.log](${WORKSPACE}/provider-session.log)`,
       `- [current-agent-keys.ts](${WORKSPACE}/current-agent-keys.ts)`,
+      `- [evidence-map.json](${WORKSPACE}/evidence-map.json)`,
     ].join("\n"),
     time: "10:06",
   },
@@ -168,7 +169,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Click a file in a message to open it on the right side. The panel stays while you click others. */
+/** A chat with Markdown, CSV, JSON, plain text, SVG, PDF, audio, image, and unsupported files. */
 export const Chat: Story = {};
 
 /** The same chat with the markdown file already open, as after a click. */

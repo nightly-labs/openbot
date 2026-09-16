@@ -71,6 +71,13 @@ export function toWireAgent(agent: AgentSummary) {
 }
 `;
 
+const JSON_DATA = `{
+  "sources": 8,
+  "verified": 7,
+  "needsReview": 1
+}
+`;
+
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200">
   <rect width="320" height="200" rx="12" fill="#12141a" />
   <rect x="24" y="32" width="120" height="56" rx="10" fill="#2f6df6" />
@@ -135,6 +142,8 @@ export const TEXT_PREVIEW = filePreview("provider-session.log", "text/plain", "t
 
 export const SOURCE_PREVIEW = filePreview("current-agent-keys.ts", "text/typescript", "text", SOURCE);
 
+export const JSON_PREVIEW = filePreview("evidence-map.json", "application/json", "text", JSON_DATA);
+
 export const IMAGE_PREVIEW = filePreview("trust-boundary.svg", "image/svg+xml", "image", SVG);
 
 export const PDF_PREVIEW = filePreview("invoice-2026-09.pdf", "application/pdf", "pdf", buildPdf());
@@ -161,6 +170,7 @@ export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   MARKDOWN_PREVIEW,
   TEXT_PREVIEW,
   SOURCE_PREVIEW,
+  JSON_PREVIEW,
   IMAGE_PREVIEW,
   PDF_PREVIEW,
   AUDIO_PREVIEW,
