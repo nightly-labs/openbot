@@ -208,6 +208,28 @@ describe("DynamicIslandSurface", () => {
     mock.dispose();
   });
 
+  it("closes a critical presentation when its server is hidden from the notch", async () => {
+    const mock = createQuestionMock(questionPresentation("question-hidden", [sourceQuestion()]));
+    let publish: ((presentation: DynamicIslandPresentation) => void) | undefined;
+    mock.api.dynamicIsland.onPresentation = (listener) => {
+      publish = listener;
+      return () => {
+        publish = undefined;
+      };
+    };
+    render(() => <DynamicIslandSurface />);
+
+    const island = await screen.findByRole("region", { name: "OpenBot question from AI" });
+    await fireEvent.mouseOver(island);
+    flush(() => publish?.({ serverId: "local", mode: "idle", visible: false }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "OpenBot question from AI" })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: "Expand Open OpenBot" })).not.toBeInTheDocument();
+    mock.dispose();
+  });
+
   it("keeps a critical panel open when its direct action fails", async () => {
     const mock = createQuestionMock(questionPresentation("question-failed", [sourceQuestion()]));
     mock.performAction.mockRejectedValueOnce(new Error("The request is no longer active."));

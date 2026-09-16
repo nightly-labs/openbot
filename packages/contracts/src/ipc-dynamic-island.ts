@@ -87,6 +87,8 @@ export interface DynamicIslandFailureItem {
 
 interface DynamicIslandPresentationBase {
   serverId: string;
+  /** False when no configured server is allowed to render the idle island. */
+  visible?: boolean;
 }
 
 export type DynamicIslandPresentation =
@@ -160,6 +162,7 @@ export function isDynamicIslandNotchSize(value: unknown): value is DynamicIsland
 
 export function isDynamicIslandPresentation(value: unknown): value is DynamicIslandPresentation {
   if (!isDynamicRecord(value) || !isShortString(value.serverId, 160)) return false;
+  if (value.visible !== undefined && !isBoolean(value.visible)) return false;
   if (value.mode === "idle") return true;
   if (value.mode === "working") {
     return Array.isArray(value.working) && value.working.length <= 3 && value.working.every(isWorkingItem);

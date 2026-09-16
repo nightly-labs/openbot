@@ -62,7 +62,7 @@ export function selectDynamicIslandPresentation(
       !current || presentationPriority(presentation.mode) < presentationPriority(current.mode) ? presentation : current,
     undefined,
   );
-  if (!selected) return { serverId: "local", mode: "idle" };
+  if (!selected) return { serverId: "local", mode: "idle", visible: false };
   if (selected.mode !== "approval" && selected.mode !== "question") return selected;
   return { ...selected, remainingCount: Math.max(0, attentionCount - 1) };
 }

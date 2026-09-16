@@ -190,6 +190,8 @@ describe("app IPC input parsing", () => {
     );
     expect(parseDynamicIslandInteractive({ interactive: false })).toEqual({ interactive: false });
     expect(parseDynamicIslandPresentation(presentation)).toEqual(presentation);
+    const hiddenPresentation = { serverId: "local", mode: "idle", visible: false } as const;
+    expect(parseDynamicIslandPresentation(hiddenPresentation)).toEqual(hiddenPresentation);
     const takeoverPresentation = {
       serverId: "local",
       mode: "takeover",

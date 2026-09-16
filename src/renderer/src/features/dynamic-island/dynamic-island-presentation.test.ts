@@ -53,6 +53,10 @@ function state(): DynamicIslandPresentationInput {
 }
 
 describe("createDynamicIslandPresentation", () => {
+  it("hides the island when no server is eligible to render it", () => {
+    expect(selectDynamicIslandPresentation([])).toEqual({ serverId: "local", mode: "idle", visible: false });
+  });
+
   it("selects the complete production priority order", () => {
     const identity = {
       id: agent.id,

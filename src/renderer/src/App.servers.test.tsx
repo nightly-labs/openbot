@@ -1717,6 +1717,7 @@ it("keeps notch-hidden servers out of Dynamic Island updates", async () => {
     expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
       serverId: "local",
       mode: "idle",
+      visible: false,
     }),
   );
 

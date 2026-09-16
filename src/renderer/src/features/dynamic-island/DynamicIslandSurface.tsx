@@ -32,6 +32,11 @@ export function DynamicIslandSurface() {
   let queuedPresentation: DynamicIslandPresentation | undefined;
 
   function applyPresentation(next: DynamicIslandPresentation): void {
+    if (next.visible === false) {
+      queuedPresentation = undefined;
+      commitPresentation(next);
+      return;
+    }
     if (
       interactionLocksPresentation(presentation(), next, pointerInside || focusInside || viewState() === "expanded")
     ) {
@@ -45,7 +50,7 @@ export function DynamicIslandSurface() {
     setPresentation(next);
     if (next.mode === "idle") {
       setViewState("compact");
-      if (!preference().idleVisible) closeInteraction();
+      if (next.visible === false || !preference().idleVisible) closeInteraction();
     }
   }
 
@@ -165,7 +170,7 @@ export function DynamicIslandSurface() {
   });
   return (
     <main class="dynamic-island-surface" aria-label="OpenBot MacBook notch">
-      <Show when={presentation().mode !== "idle" || preference().idleVisible}>
+      <Show when={presentation().visible !== false && (presentation().mode !== "idle" || preference().idleVisible)}>
         <fieldset
           class="dynamic-island-surface-anchor"
           aria-label="Dynamic Island interaction area"
