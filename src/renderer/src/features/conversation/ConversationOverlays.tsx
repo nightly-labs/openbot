@@ -1,9 +1,10 @@
-import { playableMediaKind } from "@openbot/contracts/attachment-files";
+import { isXlsxMimeType, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { Show } from "solid-js";
 import { Button, Dialog } from "../../components/ui";
 import { CloseIcon } from "./ConversationIcons";
 import { useConversationViewScope } from "./conversation-scope";
 import { isMarkdownFileName, MarkdownFilePreview } from "./MarkdownFilePreview";
+import { SpreadsheetFilePreview } from "./SpreadsheetFilePreview";
 
 /** @internal Stable HMR boundary for conversation overlays. */
 export function ConversationOverlays() {
@@ -47,9 +48,9 @@ export function ConversationOverlays() {
                     src={preview().attachment.previewUrl ?? ""}
                   />
                 </Show>
-                {/* Media keeps `previewKind: "none"` on the wire, because the frozen Team API
-                    attachment validators accept only image, pdf, text, and none. The MIME type
-                    carries the kind instead. */}
+                {/* Media and XLSX keep `previewKind: "none"` on the wire, because the frozen Team
+                    API attachment validators accept only image, pdf, text, and none. The MIME type
+                    carries the local preview kind instead. */}
                 <Show when={playableMediaKind(preview().attachment.mimeType) === "audio"}>
                   <audio class="media-audio" controls src={preview().attachment.previewUrl ?? ""}>
                     <track kind="captions" />
@@ -59,6 +60,14 @@ export function ConversationOverlays() {
                   <video class="media-video" controls src={preview().attachment.previewUrl ?? ""}>
                     <track kind="captions" />
                   </video>
+                </Show>
+                <Show when={isXlsxMimeType(preview().attachment.mimeType)}>
+                  <SpreadsheetFilePreview
+                    class="media-spreadsheet-preview"
+                    bytes={preview().bytes}
+                    loading={preview().loading}
+                    error={preview().error}
+                  />
                 </Show>
                 <Show
                   when={preview().attachment.previewKind === "text" && isMarkdownFileName(preview().attachment.name)}

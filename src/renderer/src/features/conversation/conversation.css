@@ -534,6 +534,89 @@
   object-fit: contain;
 }
 
+.file-preview-spreadsheet,
+.media-spreadsheet-preview {
+  min-width: 0;
+  min-height: 100%;
+  padding: 20px;
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-status {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-mono);
+  white-space: pre-wrap;
+}
+
+.file-preview-spreadsheet-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.file-preview-spreadsheet-tabs button {
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-control);
+  padding: 6px 10px;
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.file-preview-spreadsheet-tabs button[aria-pressed="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.file-preview-spreadsheet-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--openbot-text-sm);
+}
+
+.file-preview-spreadsheet-table caption {
+  padding: 10px 12px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xs);
+  text-align: left;
+}
+
+.file-preview-spreadsheet-table th,
+.file-preview-spreadsheet-table td {
+  border-top: 1px solid var(--openbot-border);
+  border-right: 1px solid var(--openbot-border);
+  padding: 8px 12px;
+  text-align: left;
+  white-space: pre;
+}
+
+.file-preview-spreadsheet-table th {
+  background: var(--openbot-bg-control);
+  font-weight: 600;
+}
+
+.file-preview-spreadsheet-table td:last-child,
+.file-preview-spreadsheet-table th:last-child {
+  border-right: 0;
+}
+
+.file-preview-spreadsheet-note {
+  margin: 10px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xs);
+}
+
 .file-preview-unsupported {
   display: grid;
   min-height: 100%;

@@ -11,6 +11,7 @@ import {
   SOURCE_PREVIEW,
   TEXT_PREVIEW,
   UNSUPPORTED_PREVIEW,
+  XLSX_PREVIEW,
 } from "./file-previews";
 import { STORY_AGENTS } from "./fixtures";
 
@@ -103,6 +104,11 @@ export const Pdf: Story = {
 /** An audio file, played by the built-in controls of the browser. */
 export const Audio: Story = {
   args: { preview: AUDIO_PREVIEW },
+};
+
+/** An XLSX workbook rendered as a scrollable table with sheet tabs. */
+export const Spreadsheet: Story = {
+  args: { preview: XLSX_PREVIEW },
 };
 
 /** A kind that the panel cannot show. The user opens the file externally. */

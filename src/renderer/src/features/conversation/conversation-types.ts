@@ -142,6 +142,7 @@ export interface ComposerDraft {
 
 export interface MediaPreview {
   attachment: AttachmentSummary;
+  bytes: Uint8Array | null;
   text: string | null;
   loading: boolean;
   error: string | null;

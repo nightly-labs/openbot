@@ -1,3 +1,4 @@
+import { isXlsxMimeType } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
 import { errorMessage } from "../../../error-message";
@@ -111,14 +112,22 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!attachment.previewUrl || !canPreviewAttachment(attachment)) return;
     deps.setMediaPreview({
       attachment,
+      bytes: null,
       text: null,
-      loading: attachment.previewKind === "text",
+      loading: attachment.previewKind === "text" || isXlsxMimeType(attachment.mimeType),
       error: null,
     });
-    if (attachment.previewKind !== "text") return;
+    if (attachment.previewKind !== "text" && !isXlsxMimeType(attachment.mimeType)) return;
     try {
       const response = await fetch(attachment.previewUrl);
       if (!response.ok) throw new Error("Preview is unavailable.");
+      if (isXlsxMimeType(attachment.mimeType)) {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        deps.setMediaPreview((current) =>
+          current?.attachment.id === attachment.id ? { ...current, bytes, loading: false } : current,
+        );
+        return;
+      }
       const text = await response.text();
       deps.setMediaPreview((current) =>
         current?.attachment.id === attachment.id

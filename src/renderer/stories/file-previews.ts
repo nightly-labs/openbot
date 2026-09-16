@@ -1,4 +1,5 @@
 import type { FilePreview } from "@openbot/contracts/ipc";
+import { strToU8, zipSync } from "fflate";
 
 /**
  * File previews for the Storybook stories of the file preview panel. The panel takes
@@ -129,6 +130,22 @@ const buildMp3 = (): Uint8Array => {
   return bytes;
 };
 
+const buildXlsx = (): Uint8Array =>
+  zipSync({
+    "xl/workbook.xml": strToU8(
+      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Operating plan" sheetId="1" r:id="rId1"/><sheet name="Regional view" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>',
+    ),
+    "xl/worksheets/sheet1.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Workstream</t></is></c><c r="B1" t="inlineStr"><is><t>Owner</t></is></c><c r="C1" t="inlineStr"><is><t>Status</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Product QA</t></is></c><c r="B2" t="inlineStr"><is><t>Builder</t></is></c><c r="C2" t="inlineStr"><is><t>Ready</t></is></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>Evidence</t></is></c><c r="B3" t="inlineStr"><is><t>Research</t></is></c><c r="C3" t="inlineStr"><is><t>In review</t></is></c></row></sheetData></worksheet>',
+    ),
+    "xl/worksheets/sheet2.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1" t="inlineStr"><is><t>Activation</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2"><v>55</v></c></row></sheetData></worksheet>',
+    ),
+  });
+
 export const MARKDOWN_PREVIEW = filePreview("RELEASE-NOTES.md", "text/markdown", "markdown", MARKDOWN);
 
 export const MARKDOWN_SHORT_PREVIEW = filePreview(
@@ -156,11 +173,19 @@ export const AUDIO_PREVIEW: FilePreview = {
   size: buildMp3().byteLength,
 };
 
-/** A kind that the panel cannot show. The card asks the user to open the file externally. */
-export const UNSUPPORTED_PREVIEW: FilePreview = {
+export const XLSX_PREVIEW: FilePreview = {
   name: "operating-plan.xlsx",
-  size: 68 * 1024,
+  size: buildXlsx().byteLength,
   mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  previewKind: "spreadsheet",
+  bytes: buildXlsx(),
+};
+
+/** A kind that the panel cannot show. The user opens the file externally. */
+export const UNSUPPORTED_PREVIEW: FilePreview = {
+  name: "archive.zip",
+  size: 68 * 1024,
+  mimeType: "application/zip",
   previewKind: "none",
   bytes: null,
 };
@@ -174,7 +199,7 @@ export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   IMAGE_PREVIEW,
   PDF_PREVIEW,
   AUDIO_PREVIEW,
-  UNSUPPORTED_PREVIEW,
+  XLSX_PREVIEW,
 ];
 
 /** Find the preview for a file path, as the main process does for a file link in a message. */

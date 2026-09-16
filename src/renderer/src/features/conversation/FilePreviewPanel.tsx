@@ -4,6 +4,7 @@ import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/P
 import { Button, ExternalLink, File, X } from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import { MarkdownFilePreview } from "./MarkdownFilePreview";
+import { SpreadsheetFilePreview } from "./SpreadsheetFilePreview";
 
 const PANEL_STORAGE_KEY = "openbot:browser-panel-width";
 const PANEL_MIN = 220;
@@ -170,6 +171,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           <video class="file-preview-video" controls src={previewUrl() ?? ""}>
             <track kind="captions" />
           </video>
+        </Show>
+        <Show when={props.preview.previewKind === "spreadsheet"}>
+          <SpreadsheetFilePreview class="file-preview-spreadsheet" bytes={props.preview.bytes} />
         </Show>
         <Show when={props.preview.previewKind === "none"}>
           <div class="file-preview-unsupported">

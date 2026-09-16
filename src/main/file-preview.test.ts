@@ -47,6 +47,15 @@ describe("file previews", () => {
     });
   });
 
+  it("classifies XLSX workbooks as spreadsheet previews", () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    expect(filePreviewFromBytes("plan.xlsx", bytes)).toMatchObject({
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      previewKind: "spreadsheet",
+      bytes,
+    });
+  });
+
   it("keeps the bytes for every kind it can show", () => {
     for (const name of ["interview.mp3", "demo.mov", "diagram.svg", "thread.eml"]) {
       expect(filePreviewFromBytes(name, new Uint8Array([1])).bytes).not.toBeNull();
