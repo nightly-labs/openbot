@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { userErrorMessage } from "@openbot/user-errors";
@@ -224,6 +225,8 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
           await clearEdit();
           return;
         }
+        if (edit.keepAttachmentIds.length + files.length > INPUT_LIMITS.attachments)
+          throw new Error(`You can attach up to ${INPUT_LIMITS.attachments} files.`);
         await uploadChatAttachments(files, {
           upload: async (file) => {
             const stored = edit.addedAttachments.find((item) => item.id === file.id);

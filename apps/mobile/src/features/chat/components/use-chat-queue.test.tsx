@@ -246,6 +246,59 @@ const pastedFiles = [
   { id: "image", name: "pasted-image.png", mimeType: "image/png", size: 3, base64: "YWJj" },
   { id: "text", name: "pasted-text.txt", mimeType: "text/plain", size: 3, base64: "ZGVm" },
 ];
+it("keeps an over-limit edit recoverable and saves after a retained attachment is removed", async () => {
+  const fullDelivery: QueueDelivery = {
+    ...delivery,
+    attachments: Array.from({ length: 10 }, (_, index) => ({
+      id: `file-${index}`,
+      name: `file-${index}.txt`,
+      mimeType: "text/plain",
+      size: 3,
+      kind: "file",
+      previewKind: "none",
+      previewUrl: null,
+    })),
+  };
+  const snapshot = { agentId: "agent", deliveries: [fullDelivery] };
+  boundary.loadQueue.mockResolvedValue(snapshot);
+  boundary.editQueue.mockResolvedValue(snapshot);
+  const view = mount();
+  await act(async () => {
+    await view.state().begin(fullDelivery);
+    await view.state().changeAttachments(pastedFiles.slice(0, 1));
+  });
+  await act(async () => {
+    expect(await view.state().save("Changed", view.state().attachments)).toBe(false);
+  });
+  expect(view.state().error).toBe("You can attach up to 10 files.");
+  expect(view.state().edit?.pendingSave).toBeUndefined();
+  expect(boundary.uploadAttachment).not.toHaveBeenCalled();
+  expect(boundary.editQueue.mock.calls.map((call) => call[2].action)).toEqual(["begin"]);
+  cleanups.pop();
+  view.close();
+  const restored = mount();
+  expect(restored.state().edit?.keepAttachmentIds).toHaveLength(10);
+  expect(restored.state().attachments).toHaveLength(1);
+  await act(async () => {
+    await restored.state().begin(fullDelivery);
+  });
+  act(() => restored.state().removeAttachment("file-0"));
+  expect(restored.state().edit?.keepAttachmentIds).toHaveLength(9);
+  boundary.uploadAttachment.mockResolvedValue({ id: "uploaded-image" });
+  await act(async () => {
+    expect(await restored.state().save("Changed", restored.state().attachments)).toBe(true);
+  });
+  expect(boundary.editQueue).toHaveBeenLastCalledWith("agent", "host", {
+    action: "save",
+    deliveryId: delivery.id,
+    editId: "edit-phone-1",
+    text: "Changed",
+    keepAttachmentIds: fullDelivery.attachments.slice(1).map((file) => file.id),
+    attachmentDraftIds: ["uploaded-image"],
+  });
+  expect(restored.state().edit).toBeNull();
+  expect(boundary.storage.size).toBe(0);
+});
 it("restores added image and text bytes after a fresh query cache and sends them once", async () => {
   const first = mount();
   await act(async () => {
