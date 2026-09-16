@@ -6515,7 +6515,7 @@ button.chat-action-target:active,
 
 .message-attachment {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
   min-width: 0;
   min-height: 56px;
   align-items: center;
