@@ -165,6 +165,7 @@ function cellValue(cell: Element, sharedStrings: string[], numberFormats: string
   const value = valueElement.textContent ?? "";
   if (!value) return "";
   if (type === "s") return sharedStrings[Number(value)] ?? "";
+  if (type === "str") return value;
   if (type === "b") return value === "1" ? "TRUE" : "FALSE";
   const style = Number(cell.getAttribute("s"));
   return formatExcelNumber(value, numberFormats[style] ?? "General", date1904);
