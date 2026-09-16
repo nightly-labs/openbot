@@ -861,14 +861,18 @@ transition that respects reduced motion. Its fixed list viewport stays mounted, 
 composer inset changes once per toggle. Streaming does not change the panel's inputs.
 
 The optional `queue-edit-v1` capability and desktop edit IPC provide the same host edit hold.
-Held deliveries are omitted from public queue snapshots, including on older connected clients.
-The edit response returns the original delivery only to the editor with the matching identity.
+Held deliveries remain in public queue snapshots with an editing marker. The private edit
+identity is not exposed. Only the matching editor can change the held message.
 Desktop and mobile write the edit identity before requesting the hold. Each client enables
-its editor only after confirmation. The mailbox stores
+saving only after confirmation. A failed attachment-retention request keeps the desktop edit
+identity and backup available for retry. The mailbox stores
 the hold in the existing delivery JSON. The first held delivery blocks automatic queue dispatch;
 steer and an update without that edit identity are rejected. Saving commits the replacement
 message and releases the hold in one mailbox transaction. Cancel restores normal dispatch without
-changing the message. Delete cancels the delivery. A finished edit identity records the action that
+changing the message. Delete cancels the delivery, finishes its edit, and releases attachment
+ownership in the same mailbox transaction. Released edit drafts survive restart until sent or
+discarded, so a lost cancellation response cannot destroy a saved composer backup. Ordinary
+unretained drafts still expire at host startup. A finished edit identity records the action that
 finished it, so a repeat of that same action stays safe after a lost response, while a save that
 follows a completed cancel is rejected instead of reporting success for text the host never took. Holds and locally saved edit drafts survive host restart and client navigation; they have
 no timeout that could send a message while someone is still editing it. Older hosts retain queue

@@ -92,6 +92,58 @@ describe("MailboxStore", () => {
     expect(savedReuse.deliveries[0]).toBeDefined();
   });
 
+  it.each(["cancel-edit", "delete-message"] as const)(
+    "preserves released backup bytes after %s, rollback, and restart",
+    async (action) => {
+      const database = new OpenBotDatabase(join(root, "user-data"));
+      const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
+      await mailbox.initialize();
+      const file = join(root, "backup.txt");
+      await writeFile(file, "Recover my backup");
+      const [backup] = await mailbox.prepareImportedAttachments([file], []);
+      const receipt = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Queued" });
+      const id = receipt.deliveries[0].id;
+      mailbox.beginQueueEdit("chief", id, "recover-edit");
+      mailbox.retainQueueEditAttachments("chief", id, "recover-edit", [backup.id]);
+      const cancel = () =>
+        action === "delete-message"
+          ? mailbox.cancelNow("chief", id)
+          : mailbox.finishQueueEdit("chief", id, "recover-edit");
+      vi.spyOn(database, "replaceMailboxState").mockImplementationOnce(() => {
+        throw new Error("Disk full");
+      });
+      expect(cancel).toThrow("Disk full");
+      expect(mailbox.listQueue("chief").deliveries[0]).toMatchObject({ status: "queued", editing: true });
+      expect(mailbox.finishedQueueEditAction("chief", id, "recover-edit")).toBeUndefined();
+      await expect(
+        mailbox.enqueue({
+          sender: { kind: "user" },
+          recipientAgentIds: ["chief"],
+          text: "Backup",
+          draftIds: [backup.id],
+        }),
+      ).rejects.toThrow("belongs to a queue edit");
+      cancel();
+      // The response can be lost. Restart must preserve both the outcome and unlocked bytes.
+      const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+      await restored.initialize();
+      expect(restored.finishedQueueEditAction("chief", id, "recover-edit")).toBe("cancel");
+      expect(restored.listQueue("chief").deliveries[0]).toMatchObject({
+        status: action === "delete-message" ? "cancelled" : "queued",
+        editing: false,
+      });
+      const reuse = await restored.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Recovered backup",
+        draftIds: [backup.id],
+      });
+      const sent = restored.getDelivery(reuse.deliveries[0].id);
+      const saved = await restored.resolveAttachment(sent?.delivery.attachments[0].id ?? "");
+      await expect(readFile(saved?.path ?? "", "utf8")).resolves.toBe("Recover my backup");
+    },
+  );
+
   it("rolls back failed hold, save and release writes without changing the message", async () => {
     const database = new OpenBotDatabase(join(root, "user-data"));
     const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
@@ -195,7 +247,7 @@ describe("MailboxStore", () => {
     await expect(store.updateQueuedMessage("chief", id, "Must not return", [], [], "edit-delete")).rejects.toThrow(
       "Only queued messages",
     );
-    store.finishQueueEdit("chief", id, "edit-delete");
+    expect(store.finishedQueueEditAction("chief", id, "edit-delete")).toBe("cancel");
     expect(store.listQueue("chief").deliveries[0].status).toBe("cancelled");
     expect(store.nextQueued("chief")).toBeNull();
   });

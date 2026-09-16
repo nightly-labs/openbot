@@ -332,4 +332,6 @@ until the edit is saved, cancelled, or the message is deleted.
 
 The desktop editor also keeps its active queue edit, attachment references, and edit identity in
 local application storage. This lets it recover the held draft after restart. Neither client
-releases the host hold merely because the editor closes or disconnects.
+releases the host hold merely because the editor closes or disconnects. The host also preserves
+attachment drafts released by edit cancellation or message deletion until they are sent or
+discarded. This lets a disconnected desktop recover its saved composer backup after host restart.

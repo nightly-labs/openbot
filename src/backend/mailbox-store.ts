@@ -157,7 +157,7 @@ export class MailboxStore {
         .map((delivery) => delivery.editId),
     );
     const retainedDrafts = this.#state.drafts.filter(
-      (draft) => draft.ownerEditId && activeEdits.has(draft.ownerEditId),
+      (draft) => draft.preserveOnRestart || (draft.ownerEditId && activeEdits.has(draft.ownerEditId)),
     );
     if (retainedDrafts.length !== this.#state.drafts.length) {
       this.#state.drafts = retainedDrafts;
@@ -876,13 +876,7 @@ export class MailboxStore {
     );
     if (!delivery) throw new Error("Queued message was not found.");
     if (delivery.status !== "queued") throw new Error("Only queued messages can be cancelled.");
-    delivery.status = "cancelled";
-    try {
-      this.#persist("delivery.cancelled");
-    } catch (error) {
-      delivery.status = "queued";
-      throw error;
-    }
+    this.#finishCancellation(delivery, true);
   }
 
   restorePersistedState(): void {
@@ -970,18 +964,34 @@ export class MailboxStore {
     this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
     if (!delivery || delivery.editId !== editId) throw new QueueEditRejectedError("This edit is no longer available.");
-    const previousOutcomes = delivery.finishedEditOutcomes ? { ...delivery.finishedEditOutcomes } : undefined;
-    const released = this.#state.drafts.filter((draft) => draft.ownerEditId === editId);
-    recordFinishedQueueEdit(delivery, editId, { action: "cancel" });
+    this.#finishCancellation(delivery, false);
+  }
+
+  #finishCancellation(delivery: StoredDelivery, cancelDelivery: boolean): void {
+    const editId = delivery.editId;
+    const previousStatus = delivery.status;
+    const previousOutcomes = delivery.finishedEditOutcomes;
+    const released = editId ? this.#state.drafts.filter((draft) => draft.ownerEditId === editId) : [];
+    const previousRetention = released.map((draft) => draft.preserveOnRestart);
+    if (cancelDelivery) delivery.status = "cancelled";
+    if (editId) recordFinishedQueueEdit(delivery, editId, { action: "cancel" });
     delete delivery.editId;
-    for (const draft of released) delete draft.ownerEditId;
+    for (const draft of released) {
+      delete draft.ownerEditId;
+      // Release the lock, not the bytes: a disconnected editor can still restore its
+      // backup, including after a lost cancellation response and host restart.
+      draft.preserveOnRestart = true;
+    }
     try {
-      this.#persist("delivery.edit-finished");
+      this.#persist(cancelDelivery ? "delivery.cancelled" : "delivery.edit-finished");
     } catch (error) {
+      delivery.status = previousStatus;
       delivery.editId = editId;
-      if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
-      else delete delivery.finishedEditOutcomes;
-      for (const draft of released) draft.ownerEditId = editId;
+      delivery.finishedEditOutcomes = previousOutcomes;
+      released.forEach((draft, index) => {
+        draft.ownerEditId = editId;
+        draft.preserveOnRestart = previousRetention[index];
+      });
       throw error;
     }
   }
@@ -1567,6 +1577,7 @@ function isStoredDraft(value: unknown): value is StoredDraft {
     isRecord(value) &&
     isString(value.createdAt) &&
     (value.ownerEditId === undefined || isString(value.ownerEditId)) &&
+    (value.preserveOnRestart === undefined || typeof value.preserveOnRestart === "boolean") &&
     isStoredAttachment(value)
   );
 }

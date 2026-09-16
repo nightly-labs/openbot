@@ -103,6 +103,17 @@ describe.sequential("AgentService: queue", () => {
     });
     const next = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Continue" });
     await service.cancelQueuedMessage("chief", removed.deliveries[0].id);
+    // Deletion finishes the edit too: cancellation retries confirm, but Save cannot revive it.
+    const cancelRemoved = { action: "cancel" as const, deliveryId: removed.deliveries[0].id, editId: "removed-edit" };
+    await service.editQueuedMessage("chief", cancelRemoved);
+    await service.editQueuedMessage("chief", cancelRemoved);
+    await expect(
+      service.editQueuedMessage("chief", {
+        ...save,
+        deliveryId: cancelRemoved.deliveryId,
+        editId: cancelRemoved.editId,
+      }),
+    ).rejects.toThrow("cancelled");
     await waitFor(
       () =>
         mailbox.listQueue("chief").deliveries.find((item) => item.id === next.deliveries[0].id)?.status === "completed",
