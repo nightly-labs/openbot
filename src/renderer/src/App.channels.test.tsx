@@ -767,5 +767,5 @@ it("keeps the working indicator while the coordinator chooses an owner", async (
   const chat = await openChannelWhileRouting("queued");
   // The lead is the coordinator. Its routing turn holds the task and posts nothing until it
   // decides, so the indicator is the only sign that the request is alive.
-  expect(await within(chat).findByRole("status", { name: "Chief" })).toBeInTheDocument();
+  expect(await within(chat).findByRole("status", { name: /^Chief: / })).toBeInTheDocument();
 });

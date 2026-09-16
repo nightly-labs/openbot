@@ -52,10 +52,26 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     if (current?.agent?.id === agentId) return current.activityId;
     return `${agentId}:message:${streamingMessage.id}`;
   });
+  const latestActiveCommentary = createMemo(() => {
+    const activeTurnId = deps.props.activeTurnId;
+    if (!activeTurnId) return null;
+    const streamingMessage = streamingAgentMessage();
+    if (streamingMessage && streamingMessage.itemType !== "commentary") return null;
+    for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
+      const message = deps.props.messages[index];
+      if (message?.turnId !== activeTurnId || message.itemType !== "commentary") continue;
+      const items = message.items ?? [message.body];
+      for (let itemIndex = items.length - 1; itemIndex >= 0; itemIndex -= 1) {
+        const detail = items[itemIndex]?.trim();
+        if (detail) return detail;
+      }
+    }
+    return null;
+  });
   const activeActivityDetail = createMemo(() => {
     const hold = heldByOwnChannelWork();
-    if (hold) return hold.channelName;
-    return deps.props.activityDetail?.trim() || null;
+    if (hold) return `Working in ${hold.channelName}`;
+    return latestActiveCommentary() ?? (deps.props.activityDetail?.trim() || null);
   });
   const agentActivity = createMemo<"Working" | null>(() => (activeActivityId() ? "Working" : null));
   const activityPresentation = createMemo<AgentActivityPresentation | null>(() => {

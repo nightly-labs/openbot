@@ -561,7 +561,7 @@ describe("OpenBot connected desktop shell", () => {
     emitAgentEvent?.({ type: "queue-changed", snapshot: { agentId: "chief", deliveries: [waiting], hold } });
     const queue = await screen.findByRole("region", { name: "Message queue" });
     within(queue).getByRole("group", { name: "Queued message 1: Read the report" });
-    expect(await screen.findByRole("status", { name: "Chief: Project launch" })).toBeInTheDocument();
+    expect(await screen.findByRole("status", { name: "Chief: Working in Project launch" })).toBeInTheDocument();
 
     // The same assignment reserves the host for every agent, but only the one it belongs to is
     // working. The others are waiting, and their chat has to say what for.
@@ -575,7 +575,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: /Chief, Chief of staff/ }));
     const reloaded = await screen.findByRole("region", { name: "Message queue" });
     within(reloaded).getByRole("group", { name: "Queued message 1: Read the report" });
-    expect(await screen.findByRole("status", { name: "Chief: Project launch" })).toBeInTheDocument();
+    expect(await screen.findByRole("status", { name: "Chief: Working in Project launch" })).toBeInTheDocument();
 
     // The channel work ended: the delivery is the agent's own running turn now, and nothing waits.
     emitAgentEvent?.({
@@ -586,7 +586,7 @@ describe("OpenBot connected desktop shell", () => {
       },
     });
     await waitFor(() =>
-      expect(screen.queryByRole("status", { name: "Chief: Project launch" })).not.toBeInTheDocument(),
+      expect(screen.queryByRole("status", { name: "Chief: Working in Project launch" })).not.toBeInTheDocument(),
     );
   });
 

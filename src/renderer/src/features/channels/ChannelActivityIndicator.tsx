@@ -41,8 +41,14 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
   const sentence = () => channelActivitySentence(props.workers.map((worker) => worker.name));
   return (
     <div class="agent-activity-entry" data-state="active">
-      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true" aria-label={sentence()} />
-      <section class="agent-activity-content channel-activity-content" aria-label={sentence()}>
+      <span
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`${sentence()}: ${presentation().label}`}
+      />
+      <section class="agent-activity-content channel-activity-content" aria-label={presentation().label}>
         <div class="channel-activity-faces">
           <For each={props.workers}>
             {(worker) => (
@@ -57,6 +63,7 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
             )}
           </For>
         </div>
+        <span class="agent-activity-label">{presentation().label}</span>
       </section>
     </div>
   );

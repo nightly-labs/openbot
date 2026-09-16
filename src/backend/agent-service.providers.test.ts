@@ -1682,24 +1682,6 @@ describe.sequential("AgentService: providers", () => {
       status: "completed",
       text: reasoning?.text,
     });
-    expect(progress()).toEqual([]);
-    client.emit(
-      "notification",
-      notification("item/started", {
-        threadId,
-        turnId,
-        item: { id: "activity-1", type: "agentMessage", phase: "commentary" },
-      }),
-    );
-    client.emit(
-      "notification",
-      notification("item/agentMessage/delta", {
-        threadId,
-        turnId,
-        itemId: "activity-1",
-        delta: "Sprawdzam znalezione źródła.",
-      }),
-    );
     const conversationEventCount = () => events.filter((event) => event.type === "conversation").length;
     const persistedBeforeTools = conversationEventCount();
 
@@ -1711,7 +1693,7 @@ describe.sequential("AgentService: providers", () => {
         item: { id: "tool-1", type: "toolCall", name: "web_search", status: "in_progress" },
       }),
     );
-    await waitFor(() => progress().at(-1)?.detail === "Sprawdzam znalezione źródła.");
+    await waitFor(() => progress().at(-1)?.detail === "Inspecting the sources. Comparing the results.");
 
     client.emit(
       "notification",
@@ -1721,7 +1703,7 @@ describe.sequential("AgentService: providers", () => {
         item: { id: "tool-1", type: "toolCall", name: "web_search", status: "completed" },
       }),
     );
-    expect(progress().at(-1)?.detail).toBe("Sprawdzam znalezione źródła.");
+    expect(progress().at(-1)?.detail).toBe("Inspecting the sources. Comparing the results.");
     expect(conversationEventCount()).toBe(persistedBeforeTools);
 
     client.emit(

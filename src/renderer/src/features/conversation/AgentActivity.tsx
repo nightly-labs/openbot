@@ -1,5 +1,4 @@
 import type { StateId } from "@norbert_bodziony/bloub";
-import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
@@ -49,12 +48,17 @@ export function AgentActivityIndicator(props: {
   presentation: AgentActivityPresentation;
   phase?: "active" | "exiting";
 }) {
-  const detail = () => props.detail?.trim() || null;
-  const accessibleName = () => [props.agent?.name, detail()].filter(Boolean).join(": ");
+  const label = () => props.detail ?? props.presentation.label;
   return (
     <div class="agent-activity-entry" data-state={props.phase ?? "active"}>
-      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true" aria-label={accessibleName()} />
-      <section class="agent-activity-content" aria-label={accessibleName()}>
+      <span
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`${props.agent?.name ?? ""}: ${label()}`.trim()}
+      />
+      <section class="agent-activity-content" aria-label={label()}>
         <AgentAvatar
           agent={props.agent}
           url={null}
@@ -62,7 +66,7 @@ export function AgentActivityIndicator(props: {
           animationState={props.presentation.animation}
           class="agent-activity-avatar"
         />
-        <Show when={detail()}>{(value) => <span class="agent-activity-label">{value()}</span>}</Show>
+        <span class="agent-activity-label">{label()}</span>
       </section>
     </div>
   );
