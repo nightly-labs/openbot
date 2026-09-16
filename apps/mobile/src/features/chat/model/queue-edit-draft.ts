@@ -80,6 +80,16 @@ export function orderedQueue(deliveries: QueueDelivery[]): QueueDelivery[] {
     );
 }
 
+/**
+ * The host hides a held-for-edit delivery from a fresh queue snapshot: listQueue only
+ * returns it to the holder. Keep the held copy in the list, so an edit in progress still
+ * has its row after the snapshot refreshes.
+ */
+export function queueRowsWithHeldEdit(queued: QueueDelivery[], held: QueueDelivery | null): QueueDelivery[] {
+  if (!held) return queued;
+  return orderedQueue([held, ...queued.filter((item) => item.id !== held.id)]);
+}
+
 /** Conversation rows and send receipts use delivery IDs, not the shared mailbox message ID. */
 export function queueReceiptMessages(deliveries: QueueDelivery[]): ChatMessage[] {
   return [...deliveries]

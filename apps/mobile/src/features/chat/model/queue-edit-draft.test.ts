@@ -1,7 +1,7 @@
 import type { ConversationMessage, QueueDelivery } from "@openbot/contracts/ipc";
 import { expect, it } from "vitest";
 import { projectChatMessages } from "./chat-messages";
-import { decodeQueueEditDraft, orderedQueue, queueReceiptMessages } from "./queue-edit-draft";
+import { decodeQueueEditDraft, orderedQueue, queueReceiptMessages, queueRowsWithHeldEdit } from "./queue-edit-draft";
 import { retainConfirmedAttachments } from "./upload-chat-attachments";
 
 const delivery: QueueDelivery = {
@@ -47,6 +47,12 @@ it("orders queued deliveries by host position without mutating the received snap
   ];
   expect(orderedQueue(rows).map((item) => item.id)).toEqual(["delivery-1", "second"]);
   expect(rows[0].id).toBe("second");
+});
+it("keeps the held delivery in the list the host no longer reports", () => {
+  const second = { ...delivery, id: "second", position: 2 };
+  expect(queueRowsWithHeldEdit([second], delivery).map((item) => item.id)).toEqual(["delivery-1", "second"]);
+  expect(queueRowsWithHeldEdit([delivery, second], delivery).map((item) => item.id)).toEqual(["delivery-1", "second"]);
+  expect(queueRowsWithHeldEdit([second], null).map((item) => item.id)).toEqual(["second"]);
 });
 it("breaks queue ties by arrival so receipts keep the host order", () => {
   const rows = [

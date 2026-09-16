@@ -23,6 +23,7 @@ import { type ChatAttachment, useChatAttachments } from "@/features/chat/compone
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { type ChatBubbleMessage, useMessageActions } from "@/features/chat/context/message-actions-context";
+import { useQueuedMessages } from "@/features/chat/context/queued-messages-context";
 import { type ChatMessage, type PendingChatMessage, presentChatMessages } from "@/features/chat/model/chat-messages";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -36,7 +37,7 @@ import type { ChatTarget } from "../model/chat-target";
 import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { ChatCameraPanel } from "./chat-camera-panel";
-import { ChatQueuePanel } from "./chat-queue-panel";
+import { ChatQueueButton } from "./chat-queue-button";
 import type { ChatQueueController } from "./use-chat-queue";
 
 export interface ChatViewProps {
@@ -141,21 +142,36 @@ export function ChatView({
   const [pendingInQueue, setPendingInQueue] = useState(false);
   const queryClient = useQueryClient();
   const composerAttachments = useChatAttachments();
-  const editAttachments = useChatAttachments(queue?.attachments, queue?.changeAttachments);
-  const attachments = queue?.edit ? editAttachments : composerAttachments;
-  const previousEditId = useRef(queue?.edit?.editId);
+  const attachments = composerAttachments;
+  const { setQueue, setPending } = useQueuedMessages();
   useEffect(() => {
-    if (previousEditId.current && !queue?.edit) {
-      editAttachments.clear();
-    }
-    previousEditId.current = queue?.edit?.editId;
-  }, [queue?.edit, editAttachments.clear]);
+    setQueue(queue ?? null);
+  }, [queue, setQueue]);
+  useEffect(() => () => setQueue(null), [setQueue]);
   const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
   const sendSequence = useRef(0);
   const [showStarter, setShowStarter] = useState(true);
   const { servers } = useMobileWorkspace();
+  const queuePending = useMemo(
+    () =>
+      pendingInQueue && sending && pendingMessage
+        ? {
+            message: pendingMessage.message,
+            progress: uploadProgress,
+            total: submittedFiles.current.length,
+            cancel: () => {
+              uploadCancelled.current = true;
+            },
+          }
+        : null,
+    [pendingInQueue, sending, pendingMessage, uploadProgress],
+  );
+  useEffect(() => {
+    setPending(queuePending);
+  }, [queuePending, setPending]);
+  useEffect(() => () => setPending(null), [setPending]);
   const queuedMessageIds = useMemo(
     () =>
       new Set(
@@ -273,14 +289,6 @@ export function ChatView({
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
     const body = value.trim();
-    if (queue?.edit) {
-      if (!queue.confirmed || queue.busy || queue.editUnavailable) return;
-      void queue.save(body, attachments.items).then((saved) => {
-        if (saved) attachments.clear();
-        else setSendRetryVersion((version) => version + 1);
-      });
-      return;
-    }
     if (!body && attachments.items.length === 0) return;
 
     setSendError(null);
@@ -502,38 +510,23 @@ export function ChatView({
                 </Typography.Paragraph>
               ) : null}
               {queue ? (
-                <ChatQueuePanel
+                <ChatQueueButton
                   queue={queue}
-                  pending={
-                    pendingInQueue && sending && pendingMessage
-                      ? {
-                          message: pendingMessage.message,
-                          progress: uploadProgress,
-                          total: submittedFiles.current.length,
-                          cancel: () => {
-                            uploadCancelled.current = true;
-                          },
-                        }
-                      : undefined
-                  }
+                  pending={queuePending}
                   liquidGlassAvailable={liquidGlassAvailable}
                   fallbackBackground={fieldBackground}
-                  disabled={sending || attachments.preparing || Boolean(questionForm?.question)}
                 />
               ) : null}
               {!readOnly ? (
                 <ChatComposer
                   sendRetryVersion={sendRetryVersion}
-                  editFocusId={queue?.confirmed ? queue.edit?.editId : undefined}
-                  retainedAttachmentCount={queue?.edit?.keepAttachmentIds.length ?? 0}
-                  sendLabel={queue?.edit ? "Save queued message" : "Send message"}
-                  replyTarget={queue?.edit || questionForm?.question ? null : replyTarget}
+                  sendLabel="Send message"
+                  replyTarget={questionForm?.question ? null : replyTarget}
                   replyFocusVersion={replyFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}
                   mentionAgents={mentionAgents}
                   key={JSON.stringify([
                     target.id,
-                    queue?.edit?.editId,
                     questionForm?.question ? questionForm.messageId : null,
                     questionForm?.question?.id,
                   ])}
@@ -541,24 +534,17 @@ export function ChatView({
                   actionForeground={actionForeground}
                   agentName={target.name}
                   bottomInset={insets.bottom}
-                  disabled={
-                    !serverOnline ||
-                    !canSend ||
-                    Boolean(questionForm?.pending) ||
-                    Boolean(queue?.edit && (!queue.confirmed || queue.editUnavailable))
-                  }
-                  sending={sending || Boolean(pendingMessage) || Boolean(queue?.busy)}
+                  disabled={!serverOnline || !canSend || Boolean(questionForm?.pending)}
+                  sending={sending || Boolean(pendingMessage)}
                   attachments={attachments}
-                  answerQuestion={queue?.edit ? undefined : questionForm?.question}
-                  draft={queue?.edit ? queue.edit.text : questionForm?.question ? questionForm.draft : draft}
+                  answerQuestion={questionForm?.question}
+                  draft={questionForm?.question ? questionForm.draft : draft}
                   fallbackBackground={fieldBackground}
                   foreground={foreground}
                   liquidGlassAvailable={liquidGlassAvailable}
                   muted={muted}
                   raised={raised}
-                  onChangeDraft={
-                    queue?.edit ? queue.changeText : questionForm?.question ? questionForm.setDraft : setDraft
-                  }
+                  onChangeDraft={questionForm?.question ? questionForm.setDraft : setDraft}
                   onSend={sendMessage}
                 />
               ) : null}
