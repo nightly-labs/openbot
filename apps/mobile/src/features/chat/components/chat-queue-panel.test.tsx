@@ -1,6 +1,6 @@
 import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, screen } from "@testing-library/dom";
+import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { act, type PropsWithChildren } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
@@ -169,7 +169,7 @@ function mount(overrides: Partial<ChatQueueController> = {}) {
     client.clear();
     container.remove();
   });
-  return { queue, render };
+  return { queue, render, client };
 }
 it("keeps collapse accessible, restores row actions and sends the selected delivery to each action", () => {
   const view = mount();
@@ -209,4 +209,39 @@ it("shows only a text Close edit when the queued message is gone", () => {
   expect(screen.queryByRole("button", { name: "Resume edit" })).toBeNull();
   act(() => fireEvent.click(close));
   expect(view.queue.discardFinishedEdit).toHaveBeenCalled();
+});
+
+it("observes cached queue attachments without a missing query function error or a full-file fetch", async () => {
+  const error = vi.spyOn(console, "error");
+  try {
+    const file = {
+      id: "image-1",
+      name: "photo.png",
+      mimeType: "image/png",
+      size: 3,
+      kind: "image" as const,
+      previewKind: "image" as const,
+      previewUrl: null,
+    };
+    const view = mount({ queued: [{ ...first, attachments: [file] }] });
+    await waitFor(() => expect(native.thumbnail).toHaveBeenCalledWith("host", file.id));
+    const key = ["chat-attachment", "host", file.id];
+    expect(view.client.getQueryState(key)?.fetchStatus).toBe("idle");
+    act(() =>
+      view.client.setQueryData(key, {
+        name: file.name,
+        mimeType: file.mimeType,
+        base64: "YWJj",
+        localUri: "file:///photo.png",
+      }),
+    );
+    await waitFor(() => expect(native.image).toHaveBeenCalledWith("file:///photo.png"));
+    expect(
+      error.mock.calls.some((args) =>
+        args.some((value) => typeof value === "string" && value.includes("No queryFn was passed")),
+      ),
+    ).toBe(false);
+  } finally {
+    error.mockRestore();
+  }
 });

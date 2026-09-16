@@ -1,7 +1,7 @@
 import { MenuView } from "@expo/ui/community/menu";
 import type { AttachmentSummary, QueueDelivery } from "@openbot/contracts/ipc";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { GlassView } from "expo-glass-effect";
 import { Image } from "expo-image";
 import { Button, Typography } from "heroui-native";
@@ -26,15 +26,17 @@ const AttachmentStack = memo(function AttachmentStack({
   serverId: string;
 }) {
   const [muted, background] = useThemeColor(["muted", "default"]);
+  const visibleAttachments = attachments.slice(0, 3);
+  const stackSize = 28 + Math.max(0, visibleAttachments.length - 1) * 3;
   return (
     <View style={{ width: 34, height: 36 }} accessibilityLabel={attachments.map((file) => file.name).join(", ")}>
-      {attachments.slice(0, 3).map((file, index) => (
+      {visibleAttachments.map((file, index) => (
         <View
           key={file.id}
           style={{
             position: "absolute",
-            left: index * 3,
-            top: index * 3,
+            left: (34 - stackSize) / 2 + index * 3,
+            top: (36 - stackSize) / 2 + index * 3,
             width: 28,
             height: 28,
             borderRadius: 6,
@@ -53,7 +55,7 @@ const AttachmentStack = memo(function AttachmentStack({
 function QueueThumbnail({ file, serverId, color }: { file: AttachmentSummary; serverId: string; color: string }) {
   const cached = useQuery<RemoteFileUpload & { localUri?: string }>({
     queryKey: ["chat-attachment", serverId, file.id],
-    enabled: false,
+    queryFn: skipToken,
   });
   const { loadAttachmentThumbnail } = useMobileWorkspace();
   const [failed, setFailed] = useState(false);
