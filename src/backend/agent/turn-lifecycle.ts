@@ -92,6 +92,7 @@ export class TurnLifecycle {
   readonly #turnAssociations = new Map<string, Promise<void>>();
   readonly #pendingProgress = new Map<string, { agentId: string; threadId: string; turnId: string; detail: string }>();
   readonly #progressTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #lastProgress = new Map<string, { turnId: string; detail: string }>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -132,6 +133,7 @@ export class TurnLifecycle {
     for (const timer of this.#progressTimers.values()) clearTimeout(timer);
     this.#pendingProgress.clear();
     this.#progressTimers.clear();
+    this.#lastProgress.clear();
   }
 
   handleNotification(notification: AppServerNotification, source: AgentClient): void {
@@ -300,6 +302,7 @@ export class TurnLifecycle {
 
   async #completeTurn(agentId: string, threadId: string, turnId: string, status: string): Promise<void> {
     this.#flushTurnProgress(turnId);
+    this.#clearTurnProgress(turnId);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);
@@ -437,7 +440,7 @@ export class TurnLifecycle {
   #queueTurnProgress(agentId: string, threadId: string, turnId: string, detail: string): void {
     const key = `${agentId}:${turnId}`;
     const previous = this.#pendingProgress.get(key);
-    if (previous?.detail === detail) return;
+    if (previous?.detail === detail || this.#lastProgress.get(key)?.detail === detail) return;
     this.#pendingProgress.set(key, { agentId, threadId, turnId, detail });
     if (this.#progressTimers.has(key)) return;
     this.#progressTimers.set(
@@ -459,6 +462,16 @@ export class TurnLifecycle {
     if (timer) clearTimeout(timer);
     this.#progressTimers.delete(key);
     this.#pendingProgress.delete(key);
+    this.#lastProgress.set(key, { turnId: pending.turnId, detail: pending.detail });
     this.#emitTurnProgress(pending.agentId, pending.threadId, pending.turnId, pending.detail);
+  }
+
+  #clearTurnProgress(turnId: string): void {
+    for (const [key, pending] of this.#pendingProgress) {
+      if (pending.turnId === turnId) this.#pendingProgress.delete(key);
+    }
+    for (const [key, pending] of this.#lastProgress) {
+      if (pending.turnId === turnId) this.#lastProgress.delete(key);
+    }
   }
 }
