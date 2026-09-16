@@ -153,7 +153,8 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   const decimals = format.match(/\.([0#]+)/u)?.[1] ?? "";
   const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
   const integerFormat = unquotedFormat(format).split(".")[0] ?? "";
-  const minimumIntegerDigits = (integerFormat.match(/0/gu) ?? []).length;
+  const minimumIntegerDigits = Math.max(1, (integerFormat.match(/0/gu) ?? []).length);
+  if (minimumIntegerDigits > 21) return value;
   const formatted = number.toLocaleString("en-US", {
     minimumFractionDigits,
     maximumFractionDigits: decimals.length,
