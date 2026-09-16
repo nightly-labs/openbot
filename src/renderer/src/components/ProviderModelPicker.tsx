@@ -315,6 +315,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   if (runtime()?.phase === "ready") return "Connect" as const;
                   if (runtime()?.phase === "download-error") return "Retry" as const;
                   if (runtime()?.phase === "not-downloaded") return "Download" as const;
+                  // No runtime snapshot on this surface, but the provider still names its own way back:
+                  // a signed-out or failed provider offers Connect when a handler exists.
+                  if (status().state === "sign-in-required" || status().state === "error") {
+                    return props.onConnectProvider ? ("Connect" as const) : undefined;
+                  }
                   return undefined;
                 };
                 const runtimeMessage = () => {

@@ -44,6 +44,10 @@ export const IPC_ENDPOINTS = {
     // Dynamic Island overlay has no Settings of its own and would otherwise stay in the old
     // language until it was next recreated.
     appLanguagePreference: event(IPC_CHANNELS.appLanguagePreference),
+    // The native Preferences menu item and its shortcut live in main, while the dialog lives in
+    // the renderer, so the menu click is broadcast rather than handled: every window opens its
+    // own Settings.
+    openSettings: event(IPC_CHANNELS.openSettings),
     openExternal: request(IPC_CHANNELS.openExternal),
     openUrl: request(IPC_CHANNELS.openUrl),
   },
@@ -229,6 +233,7 @@ export const IPC_ENDPOINTS = {
     chooseAttachments: request(IPC_CHANNELS.agentChooseAttachments),
     importAttachments: request(IPC_CHANNELS.agentImportAttachments),
     discardDraftAttachment: request(IPC_CHANNELS.agentDiscardDraftAttachment),
+    downloadAttachments: request(IPC_CHANNELS.agentDownloadAttachments),
     openAttachment: request(IPC_CHANNELS.agentOpenAttachment),
     openSharedFile: request(IPC_CHANNELS.agentOpenSharedFile),
     openWorkspaceFile: request(IPC_CHANNELS.agentOpenWorkspaceFile),

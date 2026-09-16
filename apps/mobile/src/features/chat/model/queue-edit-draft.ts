@@ -1,6 +1,30 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isQueueSnapshot, type QueueDelivery } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { ChatMessage } from "./chat-messages";
+
+export interface StoredQueueAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  fileName: string;
+}
+
+function isStoredQueueAttachment(value: unknown): value is StoredQueueAttachment {
+  return (
+    isDynamicRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.mimeType) &&
+    typeof value.size === "number" &&
+    Number.isFinite(value.size) &&
+    value.size >= 0 &&
+    isString(value.fileName) &&
+    /^[a-zA-Z0-9][a-zA-Z0-9.-]*$/u.test(value.fileName) &&
+    !value.fileName.includes("..")
+  );
+}
 
 export interface QueueEditDraft {
   editId: string;
@@ -8,6 +32,7 @@ export interface QueueEditDraft {
   delivery: QueueDelivery;
   text: string;
   keepAttachmentIds: string[];
+  addedAttachments: StoredQueueAttachment[];
 }
 
 export function decodeQueueEditDraft(raw: string | null): QueueEditDraft | null {
@@ -26,6 +51,13 @@ function parseQueueEditDraft(value: unknown): QueueEditDraft {
     !isDynamicRecord(value.delivery)
   )
     throw new Error("Could not read the saved queue edit.");
+  const addedAttachments = value.addedAttachments ?? [];
+  if (
+    !Array.isArray(addedAttachments) ||
+    addedAttachments.length > INPUT_LIMITS.attachments ||
+    !addedAttachments.every(isStoredQueueAttachment)
+  )
+    throw new Error("Could not read the saved edit attachments.");
   const snapshot = { agentId: value.delivery.recipientAgentId, deliveries: [value.delivery] };
   if (!isQueueSnapshot(snapshot)) throw new Error("Could not read the saved queue edit.");
   return {
@@ -34,6 +66,7 @@ function parseQueueEditDraft(value: unknown): QueueEditDraft {
     delivery: snapshot.deliveries[0],
     text: value.text,
     keepAttachmentIds: value.keepAttachmentIds,
+    addedAttachments,
   };
 }
 

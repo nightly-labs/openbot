@@ -438,17 +438,23 @@ export function ChatComposer({
                   sendGate.edit();
                   const pasted = !answerQuestion && !sending ? largePastedText(latestTextRef.current, text) : null;
                   if (pasted) {
-                    try {
-                      attachments.paste({ type: "text", text: pasted.text }, () => {});
-                      latestTextRef.current = pasted.draft;
-                      onChangeDraft(pasted.draft);
-                      return;
-                    } catch (error) {
-                      Alert.alert(
-                        "Could not attach pasted text",
-                        error instanceof Error ? error.message : "Try again.",
-                      );
-                    }
+                    // Keep the pasted text until its attachment is durable. A failed write must not lose it.
+                    latestTextRef.current = text;
+                    onChangeDraft(text);
+                    void Promise.resolve()
+                      .then(() => attachments.paste({ type: "text", text: pasted.text }, () => {}))
+                      .then(() => {
+                        if (latestTextRef.current !== text) return;
+                        latestTextRef.current = pasted.draft;
+                        onChangeDraft(pasted.draft);
+                      })
+                      .catch((error) => {
+                        Alert.alert(
+                          "Could not attach pasted text",
+                          error instanceof Error ? error.message : "Try again.",
+                        );
+                      });
+                    return;
                   }
                   const next = answerQuestion ? text : editMentionDraft(latestTextRef.current, text);
                   latestTextRef.current = next;

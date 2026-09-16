@@ -171,7 +171,10 @@ when displaying a conversation. Link destinations are contacted only when you ch
 Mobile chat can send selected files to the conversation's desktop host through the existing encrypted
 team connection. Text pasted into the input is processed only after the user pastes it. A text paste
 longer than 4,000 characters becomes a text attachment. Selected documents can also have a temporary
-copy in the phone's system cache. Uploads are limited to 10 MB per file on mobile; successful uploads
+copy in the phone's system cache. Attachments added while editing a queued message are saved in the
+phone's app document storage, with references in the saved edit, so they survive an app restart.
+Those draft copies are removed when the attachment is removed or the edit is saved or cancelled.
+Uploads are limited to 10 MB per file on mobile; successful uploads
 become managed attachments on the host. Camera capture uses an in-chat preview. Photo selection uses the phone's system interface.
 Image attachment previews are downloaded from the desktop host through the same encrypted connection.
 Other attachments are downloaded when you choose Open or save. The phone creates a temporary file for
@@ -291,10 +294,10 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 OpenBot downloads the pinned OpenCode CLI from `registry.npmjs.org` and its license from
 `github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
 results go to that local process. OpenCode can send them to the model provider selected in its
-configuration. OpenCode's free models are the default, and they reach OpenCode Zen with no account,
+configuration. OpenCode's free models are the default, and they reach OpenCode Go with no account,
 so a first OpenCode turn leaves this computer without a sign-in.
 
-An OpenCode Zen key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
+An OpenCode Go key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
 system's secret storage, writes it to a file that only your user account can read, and passes it
 only to the local OpenCode process. No screen, log, data export, or diagnostics report contains it;
 the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or

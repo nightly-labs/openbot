@@ -5,6 +5,29 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-15
+
+### Added
+
+- Download all files from a message with three or more attachments as one ZIP file.
+- Enter an OpenCode key for paid OpenCode models, with refresh and status in the provider row.
+- Choose provider, model, and reasoning effort when you create an agent, where the host supports it.
+- Read the WTF Is OpenBot guide under `/guides`.
+- Open Settings from the application menu with a keyboard shortcut.
+
+### Changed
+
+- Show provider errors on one composer card instead of in the transcript.
+- Write only the streamed message on each flush, and cut idle CPU and per-frame render work.
+- Anchor the stopped task banner above the composer.
+- Fix dismissible chat-scoped error banners so they stay dismissed in their chat.
+
+### Fixed
+
+- Fix OpenCode model list, agent setup picker, permissions text, and chat copy.
+- Fix folder listening setup that failed on routine interval validation.
+- Handle dynamic channel tools with no active assignment.
+
 ## [0.10.0] - 2026-09-15
 
 ### Added

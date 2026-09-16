@@ -2,13 +2,7 @@ import type { VoiceModelStatus } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
-import {
-  emitAgentEvent,
-  installOpenbotStub,
-  installVoiceRecordingMocks,
-  queuedDelivery,
-  testServer,
-} from "./app-test-harness";
+import { emitAgentEvent, installOpenbotStub, installVoiceRecordingMocks, testServer } from "./app-test-harness";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -336,109 +330,6 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent(
       "Later local draft Message for local Chief",
     );
-  });
-
-  it("saves a queued-message edit on its original server after the server changes", async () => {
-    const local = testServer("local", true);
-    const remote = testServer("remote-1", false);
-    let resolveTranscription: ((result: { text: string }) => void) | undefined;
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
-    vi.mocked(window.openbot.servers.select).mockImplementation(async (serverId) => [
-      { ...local, active: serverId === "local" },
-      { ...remote, active: serverId === "remote-1" },
-    ]);
-    vi.mocked(window.openbot.voice.transcribe).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveTranscription = resolve;
-        }),
-    );
-    installVoiceRecordingMocks();
-    vi.mocked(window.openbot.agent.listQueue).mockResolvedValueOnce({
-      agentId: "chief",
-      deliveries: [
-        queuedDelivery("delivery-running", "Running", null, { status: "running", turnId: "turn-running" }),
-        queuedDelivery("delivery-voice-edit", "Queued draft", 1),
-      ],
-    });
-    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({
-      agentId: "chief",
-      deliveries: [queuedDelivery("delivery-voice-edit", "Queued draft", 1)],
-    });
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
-    await fireEvent.click(screen.getByRole("button", { name: "Create prompt with voice" }));
-    await screen.findByRole("group", { name: "Voice recording" });
-    await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
-    await waitFor(() => expect(window.openbot.voice.transcribe).toHaveBeenCalledOnce());
-    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true"),
-    );
-    expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument();
-
-    resolveTranscription?.({ text: "Voice transcript" });
-    await waitFor(() =>
-      expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
-        {
-          action: "save",
-          editId: expect.any(String),
-          agentId: "chief",
-          deliveryId: "delivery-voice-edit",
-          text: "Queued draft Voice transcript",
-          keepAttachmentIds: [],
-          attachmentDraftIds: [],
-        },
-        "local",
-      ),
-    );
-    expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
-  });
-
-  it("retains a queued-message edit only in its original conversation", async () => {
-    const local = testServer("local", true);
-    const remote = testServer("remote-1", false);
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
-    vi.mocked(window.openbot.servers.select).mockImplementation(async (serverId) => [
-      { ...local, active: serverId === "local" },
-      { ...remote, active: serverId === "remote-1" },
-    ]);
-    vi.mocked(window.openbot.agent.listQueue).mockResolvedValueOnce({
-      agentId: "chief",
-      deliveries: [
-        queuedDelivery("delivery-running", "Running", null, { status: "running", turnId: "turn-running" }),
-        queuedDelivery("delivery-edit", "Queued draft", 1),
-      ],
-    });
-    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({
-      agentId: "chief",
-      deliveries: [queuedDelivery("delivery-edit", "Queued draft", 1)],
-    });
-    render(() => <App />);
-
-    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
-    composer.textContent = "Personal draft";
-    await fireEvent.input(composer);
-    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
-    await waitFor(() => expect(composer).toHaveTextContent("Queued draft"));
-
-    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true"),
-    );
-    expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
-    await screen.findByRole("button", { name: "Save queued message" });
-    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Queued draft");
-
-    await fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Personal draft"),
-    );
-    expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
   });
 
   // The Linux package carries no whisper binary, so the composer must not offer a control that

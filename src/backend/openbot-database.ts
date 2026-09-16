@@ -210,6 +210,17 @@ export class OpenBotDatabase {
     return this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId);
   }
 
+  /** Writes one message of a thread, for a caller that knows only that message changed. */
+  persistStreamingMessage(input: {
+    snapshot: ConversationSnapshot;
+    messageId: string;
+    eventType: string;
+    detail?: unknown;
+    commandId?: string;
+  }): number {
+    return this.#conversationWrites.persistStreamingMessage(input);
+  }
+
   appendConversationMessage(input: {
     agentId: string;
     threadId: string;

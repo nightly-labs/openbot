@@ -10,12 +10,17 @@
  */
 
 import { join } from "node:path";
-import { type AgentEvent, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
+import { type AgentEvent, IPC_CHANNELS, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { app, BrowserWindow, type Display, Menu, type Rectangle, screen } from "electron";
+import { app, BrowserWindow, clipboard, type Display, Menu, type Rectangle, screen } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
-import { isCloseBrowserTabShortcut, isSelectAllShortcut, isToggleDevToolsShortcut } from "../backend/browser-shortcuts";
+import {
+  chatContextMenuItems,
+  isCloseBrowserTabShortcut,
+  isSelectAllShortcut,
+  isToggleDevToolsShortcut,
+} from "../backend/browser-shortcuts";
 import type { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
@@ -27,6 +32,7 @@ import {
   writeMainWindowBounds,
 } from "./main-window-state";
 import type { RemoteServerManager } from "./remote-server-manager";
+import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
 
@@ -205,9 +211,32 @@ export function createMainWindowController({
       setImmediate(() => void services.browser.close(tabId).catch(() => undefined));
     });
     window.webContents.on("context-menu", (event, params) => {
-      if (!inspectElementModifierPressed) return;
+      if (inspectElementModifierPressed) {
+        event.preventDefault();
+        window.webContents.inspectElement(params.x, params.y);
+        return;
+      }
+      // The chat has no custom menu, so selected text would have no way to reach the clipboard.
+      // The native edit menu covers copy, select-all and link copying; anything else keeps no menu.
+      const items = chatContextMenuItems({
+        selectionText: params.selectionText,
+        isEditable: params.isEditable,
+        linkURL: params.linkURL,
+      });
+      if (items.length === 0) return;
       event.preventDefault();
-      window.webContents.inspectElement(params.x, params.y);
+      Menu.buildFromTemplate(
+        items.map((item) => {
+          if (item === "separator") return { type: "separator" } as const;
+          if (item === "copy-link")
+            return {
+              label: "Copy Link",
+              click: () => clipboard.writeText(params.linkURL),
+            };
+          if (item === "copy") return { role: "copy" } as const;
+          return { role: "selectAll" } as const;
+        }),
+      ).popup({ window });
     });
     window.on("blur", () => {
       inspectElementModifierPressed = false;
@@ -375,8 +404,11 @@ export function loadComputerUseMacSetupRenderer(window: BrowserWindow, permissio
  * The native application menu.
  *
  * Electron gives no way to relabel a built-in role, so the roles below stay in the system language
- * macOS and Windows draw them in, and only the two custom items follow the app language. The caller
+ * macOS and Windows draw them in, and only the custom items follow the app language. The caller
  * builds the menu again on a language change, because a `MenuItem` label cannot be changed in place.
+ *
+ * The custom `appMenu` replaces the default one, so the standard Preferences item with `Cmd + ,`
+ * must be declared here: without it macOS has no Settings shortcut.
  */
 export function configureApplicationMenu(service: AgentService, updater: UpdateService, translate: AppTranslate): void {
   Menu.setApplicationMenu(
@@ -393,6 +425,16 @@ export function configureApplicationMenu(service: AgentService, updater: UpdateS
           {
             label: translate("menu.checkForUpdates"),
             click: () => void updater.checkForUpdates(),
+          },
+          { type: "separator" },
+          {
+            label: translate("menu.preferences"),
+            accelerator: "CommandOrControl+,",
+            click: (_item, focusedWindow) => {
+              const candidate = focusedWindow ?? BrowserWindow.getFocusedWindow();
+              if (!(candidate instanceof BrowserWindow)) return;
+              sendToRenderer(candidate, IPC_CHANNELS.openSettings);
+            },
           },
           { type: "separator" },
           { role: "hide" },

@@ -1542,6 +1542,12 @@
   gap: 10px;
 }
 
+.agent-routine-schedule-hint {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 .agent-routine-field {
   display: grid;
   min-width: 0;
@@ -2334,6 +2340,19 @@
 
 .agent-settings-model .agent-settings-thinking-row {
   border-top: 0;
+}
+
+.agent-settings-model .agent-settings-workspace-row > span:last-child {
+  overflow-wrap: anywhere;
+}
+
+.agent-settings-access-note {
+  margin: 0;
+  background: var(--openbot-hover);
+  padding: 6px 8px 8px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
 }
 
 .agent-settings-save-error {
@@ -4239,6 +4258,7 @@ button.chat-action-target:active,
   line-height: 20px;
   overflow-wrap: anywhere;
   white-space: pre-line;
+  user-select: text;
 }
 
 .message-markdown {
@@ -6515,9 +6535,208 @@ button.chat-action-target:active,
 
 [data-slot="bubble"]:not([data-variant="ghost"])
   > [data-slot="bubble-content"]
+  > .message-attachments-group:last-child {
+  margin-bottom: var(--openbot-space-1);
+}
+
+[data-slot="bubble"]:not([data-variant="ghost"])
+  > [data-slot="bubble-content"]
   > .message-attachments:last-child
   .message-attachment {
   border-radius: var(--openbot-radius-bubble-inset);
+}
+
+.message-attachments-group {
+  display: grid;
+  width: min(100%, 256px);
+  margin-top: var(--openbot-space-2);
+  gap: var(--openbot-space-1-5);
+}
+
+/* The cards paint over the island's tucked bottom edge, so they need to sit in
+   the positioned layer the island's own `z-index` puts it in. */
+.message-attachments-group .message-attachments {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: 0;
+}
+
+/* The island tucks its lower corners under the attachment stack, so the gap the
+   group would otherwise add is cancelled by the same amount the island pads. */
+.message-attachments-group:has(.attachment-download-island) {
+  gap: 0;
+}
+
+.attachment-download-island {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  min-height: var(--openbot-control-xl);
+  align-items: center;
+  border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
+  background: var(--openbot-accent-strong);
+  box-shadow: 0 0 0 1px var(--openbot-accent-soft);
+  -webkit-backdrop-filter: blur(var(--openbot-space-3));
+  backdrop-filter: blur(var(--openbot-space-3));
+  padding: calc(var(--openbot-space-1) + 1px) var(--openbot-space-1-5)
+    calc(var(--openbot-space-4) + var(--openbot-space-1) - 1px);
+  margin-bottom: calc(var(--openbot-space-4) * -1);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-accent-text);
+}
+
+.attachment-download-island__copy {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--openbot-accent-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-download-island__action-shell {
+  display: grid;
+  flex-shrink: 0;
+}
+
+.attachment-download-island__action.ui-button {
+  width: 100%;
+  height: var(--openbot-control-sm);
+  min-height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-surface-light);
+  box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
+  padding: 0 var(--openbot-space-3) 0 var(--openbot-space-2);
+  color: var(--openbot-text-on-light);
+  transition:
+    box-shadow var(--openbot-duration-normal) var(--openbot-ease-out),
+    transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.attachment-download-island__action.ui-button:disabled {
+  cursor: progress;
+  opacity: 1;
+}
+
+.attachment-download-island__action.ui-button:active:not(:disabled):not([data-disabled]) {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attachment-download-island__action.ui-button:hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-surface-light);
+    box-shadow:
+      0 0 0 1px var(--openbot-text-dim-on-light),
+      0 1px 2px var(--openbot-shadow-popover-ambient);
+    color: var(--openbot-text-on-light);
+  }
+}
+
+.attachment-download-island__action-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.attachment-download-island__action-label {
+  --text-swap-dur: var(--openbot-duration-normal);
+  --text-swap-translate-y: var(--openbot-space-1);
+  --text-swap-blur: var(--openbot-space-0-5);
+  --text-swap-ease: var(--openbot-ease-in-out);
+
+  display: inline-grid;
+  min-width: calc(var(--openbot-control-xl) + var(--openbot-space-3));
+  color: var(--openbot-text-on-light);
+  font-weight: var(--openbot-weight-semibold);
+  text-align: left;
+}
+
+.attachment-download-island__action-label > [data-text] {
+  transform: translateY(0);
+  opacity: 1;
+  filter: blur(0);
+  grid-area: 1 / 1;
+  transition:
+    transform var(--text-swap-dur) var(--text-swap-ease),
+    filter var(--text-swap-dur) var(--text-swap-ease),
+    opacity var(--text-swap-dur) var(--text-swap-ease);
+}
+
+.attachment-download-island__action-label[data-state="action"] > [data-text="pending"] {
+  transform: translateY(var(--text-swap-translate-y));
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+}
+
+.attachment-download-island__action-label[data-state="pending"] > [data-text="action"] {
+  transform: translateY(calc(var(--text-swap-translate-y) * -1));
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+}
+
+.attachment-download-island__icon.t-icon-swap {
+  --icon-swap-dur: var(--openbot-duration-overlay);
+  --icon-swap-blur: var(--openbot-space-0-5);
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: var(--openbot-ease-in-out);
+
+  position: relative;
+  display: inline-grid;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.attachment-download-island__icon.t-icon-swap .t-icon {
+  position: relative;
+  top: 1px;
+  display: grid;
+  grid-area: 1 / 1;
+  place-items: center;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease);
+}
+
+.attachment-download-island__icon.t-icon-swap svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.attachment-download-island__icon.t-icon-swap .ui-spinner {
+  border-color: var(--openbot-text-dim-on-light);
+  border-top-color: currentColor;
+}
+
+.attachment-download-island__icon.t-icon-swap[data-state="a"] .t-icon[data-icon="a"],
+.attachment-download-island__icon.t-icon-swap[data-state="b"] .t-icon[data-icon="b"] {
+  transform: scale(1);
+  opacity: 1;
+  filter: blur(0);
+}
+
+.attachment-download-island__icon.t-icon-swap[data-state="a"] .t-icon[data-icon="b"],
+.attachment-download-island__icon.t-icon-swap[data-state="b"] .t-icon[data-icon="a"] {
+  transform: scale(var(--icon-swap-start-scale));
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attachment-download-island__action.ui-button,
+  .attachment-download-island__icon.t-icon-swap .t-icon,
+  .attachment-download-island__action-label > [data-text] {
+    transition: none;
+  }
 }
 
 .ui-button.attachment-preview-button {
@@ -7231,15 +7450,25 @@ button.chat-action-target:active,
   line-height: 1.35;
 }
 
-.composer-error {
-  max-width: 560px;
-  margin: 0 auto 6px;
-  padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
-  border-radius: var(--openbot-radius-md);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-sm);
+/*
+ * The close button reads as a control, not as the action the card offers: the tinted fill above
+ * belongs to the one button that resolves a state (Sign in), and an X that carried the same fill
+ * would compete with it wherever both appear. It takes the accent only under the pointer.
+ */
+.composer-notice-dismiss {
+  flex: none;
+  align-self: flex-start;
+}
+
+.composer-notice .composer-notice-dismiss {
+  background: transparent;
+  color: var(--notice-accent);
+}
+
+@media (hover: hover) {
+  .composer-notice .composer-notice-dismiss:hover:not(:disabled):not([data-disabled]) {
+    background: color-mix(in srgb, var(--notice-accent) 18%, transparent);
+  }
 }
 
 .agent-setup-card {

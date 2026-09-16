@@ -102,11 +102,10 @@ authenticate with `grok login` or set `XAI_API_KEY` in the environment used to l
 
 OpenBot downloads and pins the OpenCode CLI, like Codex, Claude, and Grok. OpenCode's free models
 need no account and no sign-in: select OpenCode, click Connect, and OpenBot reads the models that
-the CLI advertises. To use the paid OpenCode Zen models, click Sign in on the OpenCode row and
-paste a key from [opencode.ai/auth](https://opencode.ai/auth). OpenBot encrypts the key on this
-computer and gives it only to the local CLI. OpenCode Go is a separate subscription that a Zen key
-does not buy, so OpenBot leaves the `opencode-go/` models out of the picker unless you signed in to
-Go in OpenCode itself. If you installed OpenCode yourself, OpenBot
+the CLI advertises. To use the paid OpenCode Go models, click Sign in on the OpenCode row and
+paste a Go key from [opencode.ai/auth](https://opencode.ai/auth). OpenBot encrypts the key on this
+computer and gives it only to the local CLI. OpenBot supports OpenCode Go only: the Zen models a
+Go key does not buy stay out of the picker. If you installed OpenCode yourself, OpenBot
 keeps that install and offers no download. Set `OPENBOT_OPENCODE_PATH` to select an executable
 outside your shell's search path. Remote OpenCode agents require Team API v4; older clients do not
 show these agents.
@@ -158,12 +157,18 @@ The command deletes the app and test-client development profiles plus the legacy
 including `openbot.db` and its WAL files. It does not change the production profile, agent
 workspaces, `~/.codex`, or `~/.claude`.
 
-To replace only the app development profile with a durable UI showcase, quit the dev app, then run:
+`bun run dev` seeds a development profile it creates, so a first start already shows this data.
+To replace a profile that exists, quit the dev app, then run:
 
 ```bash
 bun run dev:seed
 bun run dev
 ```
+
+The seeded agents run on `opencode-go/muse-spark-1.3-contributor` at medium effort while this
+computer's OpenCode CLI lists it, and on `gpt-5.6-luna` at low effort otherwise. A dev build starts a
+new agent on the same pair, so a seeded agent and one you create agree; a packaged build always uses
+`gpt-5.6-luna`.
 
 The seed adds agents, rich conversations, managed files and references, reactions, completed
 agent exchanges, two channels with a delegated task run, channel memories and routines, and local
@@ -198,7 +203,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 
 | Command | Purpose |
 | --- | --- |
-| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
+| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
 | `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
@@ -218,7 +223,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run remote:update` | Update Signal, then drain and update the single coturn instance. |
 | `bun run dev:all` | Start the Auth API, Signal service, and single local Electron instance. |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
-| `bun run dev:seed` | Replace only the app development profile with durable showcase data. |
+| `bun run dev:seed` | Replace only the app development profile with durable showcase data. `--if-missing` keeps an existing profile, which is how `bun run dev` seeds a first start. |
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
 | `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. |
 | `bun run dev:verify` | Print a stable JSON verification plan for this worktree: `ready`/`reasons` for safe checks, setup state, changed files and affected surfaces, nearby tests, runtime state, `qa.required`/`qa.ready`/`qa.reasons`, the renderer QA loop, safe `runnableCommands`, and all suggested `commands`. Add `--run` to execute only the safe non-mutating checks in the plan. Renderer QA follows `snapshot → action with --wait-for → snapshot → screenshot` when appearance matters. |

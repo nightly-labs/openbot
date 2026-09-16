@@ -10,7 +10,7 @@ import type {
   AgentSummary,
   CustomProviderRestart,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor, isFreeOpencodeModelName, isReasoningEffort } from "@openbot/contracts/ipc";
+import { agentProviderDescriptor, isFreeOpencodeModel, isReasoningEffort } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -181,7 +181,7 @@ const INITIAL_STATUS: AgentStatus = {
  * `gpt-reserve` are Codex picks for its own use -- a review pass and spare capacity -- and
  * `gpt-5.5` and `gpt-5.4-mini` are older models this product does not offer. Everything else the
  * CLI reports reaches the picker, the models it marks hidden included, so this list and
- * CREDENTIAL_ONLY_MODEL_PREFIXES below are the only things that keep a model out, and adding to
+ * the stored-key drop in `#refreshModelCatalog` are the only things that keep a model out, and adding to
  * either is a product decision, not a guess about a flag.
  */
 const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
@@ -198,17 +198,25 @@ function modelDisplayName(name: string): string {
 }
 
 /**
- * Model families a CLI advertises because OpenBot supplied a key, which that key does not buy.
+ * OpenCode models a stored key does not buy, dropped while OpenBot supplies the key.
  *
- * OpenCode reports OpenCode Zen and OpenCode Go as one catalog although they are two products on
- * two endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- and one `OPENCODE_API_KEY`
- * turns both on. A Zen key from `opencode.ai/auth` does not buy Go, so a stored key adds about two
- * dozen `opencode-go/` models that answer every prompt with "Invalid API key.".
+ * The stored key is an OpenCode Go key: it buys `opencode-go/` and the free tier, not OpenCode
+ * Zen. OpenCode reports both products as one catalog although they are two products on two
+ * endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- so a stored key also lists
+ * Zen models that answer every prompt with "Invalid API key.".
  *
- * The prefix is dropped only while OpenBot is the one supplying the key. With no key stored, a Go
+ * The drop applies only while OpenBot is the one supplying the key. With no key stored, a Zen
  * model can only come from the user's own OpenCode sign-in, and that one does buy it.
+ *
+ * Free is decided by id and display name, after the name is resolved: `isFreeOpencodeModel`
+ * is what the picker badges a model with, so the badge and the catalog cannot disagree about
+ * what costs money.
  */
-const CREDENTIAL_ONLY_MODEL_PREFIXES: ReadonlyMap<AgentProvider, string> = new Map([["opencode", "opencode-go/"]]);
+function isOpencodeModelUnusableWithStoredKey(id: string, name: string): boolean {
+  const lower = id.toLowerCase();
+  if (lower.startsWith("opencode-go/")) return false;
+  return lower.startsWith("opencode/") && !isFreeOpencodeModel(id, name);
+}
 
 /**
  * Which OpenCode model a new agent runs, as the tier its catalog leads with.
@@ -219,17 +227,18 @@ const CREDENTIAL_ONLY_MODEL_PREFIXES: ReadonlyMap<AgentProvider, string> = new M
  * message failed with "Token refresh failed: 401" although the free models needed no account.
  *
  * The order is free first, Muse ahead of the rest of the free tier, so nobody is billed for a model
- * they did not choose. Below the free tier come OpenCode's own paid models -- OpenBot supplies the
- * key for those and can say why one failed -- and last the models behind a separate sign-in, whose
- * token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
+ * they did not choose. Below the free tier come OpenCode's own paid models -- the `opencode-go/`
+ * family the stored key buys, and any `opencode/` model behind the user's own OpenCode sign-in --
+ * and last the models behind a separate sign-in, whose token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
  * at all; it is the difference between a bad default and an unusable one.
  */
 function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
-  // Names, not ids, because the price is a naming convention and `isFreeOpencodeModelName` is what
+  // Names, not ids, because the price is a naming convention and `isFreeOpencodeModel` is what
   // the picker badges a model with. An id reaches here as the name anyway when the CLI sends no
   // display name, and both spellings carry the same two words.
-  if (isFreeOpencodeModelName(model.name)) return /\bmuse\b/i.test(model.name) ? 0 : 1;
-  return model.id.toLowerCase().startsWith("opencode/") ? 2 : 3;
+  if (isFreeOpencodeModel(model.id, model.name)) return /\bmuse\b/i.test(model.name) ? 0 : 1;
+  const id = model.id.toLowerCase();
+  return id.startsWith("opencode/") || id.startsWith("opencode-go/") ? 2 : 3;
 }
 
 const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentModelOption) => number> = new Map([
@@ -1560,10 +1569,8 @@ export class ProviderRuntime implements ProviderPort {
           if (!client) return { provider, models: previous, fresh: false };
           const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
           // Read once per pass, not per model: a stored key cannot change inside one refresh, and
-          // the prefix is unusable only because OpenBot is what put that key in the environment.
-          const unusablePrefix = this.#credentials.apiKey(provider)
-            ? CREDENTIAL_ONLY_MODEL_PREFIXES.get(provider)
-            : undefined;
+          // a model is unusable only because OpenBot is what put that key in the environment.
+          const hasStoredKey = Boolean(this.#credentials.apiKey(provider));
           try {
             const serverModels = new Map<string, ModelListResponse["data"][number]>();
             const cursors = new Set<string>();
@@ -1586,7 +1593,6 @@ export class ProviderRuntime implements ProviderPort {
                 // id would fail the contract guard downstream and take the whole list with it.
                 const id = item.model?.trim();
                 if (!id || suppressed.has(id.toLowerCase())) continue;
-                if (unusablePrefix && id.toLowerCase().startsWith(unusablePrefix)) continue;
                 serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;
@@ -1602,23 +1608,31 @@ export class ProviderRuntime implements ProviderPort {
               const efforts = (server?.supportedReasoningEfforts ?? [])
                 .map((item) => item.reasoningEffort)
                 .filter(isReasoningEffort);
+              // The name the provider CLI gives, whole: a model is easier to recognise as
+              // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
+              // Claude Code is the exception, and `claudeModelName` says why.
+              // Clamped, because a name over the limit is not a long name downstream: it fails
+              // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
+              // whole array, so one over-long name empties the picker. OpenCode is the CLI that
+              // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
+              // 160 characters passes 160 - but the clamp protects every CLI.
+              const name = modelDisplayName(
+                (client.provider === "claude" ? claudeModelName(server.model) : null) ||
+                  server.displayName?.trim() ||
+                  fallback?.name ||
+                  server.model,
+              );
+              // The stored key is an OpenCode Go key, so the Zen models the key also lists never
+              // reach the picker. With no key stored the same models can only come from the user's
+              // own OpenCode sign-in, which does buy them. Decided here, on the resolved name, so
+              // the catalog and the picker's Free badge cannot disagree about what costs money.
+              if (provider === "opencode" && hasStoredKey && isOpencodeModelUnusableWithStoredKey(server.model, name)) {
+                continue;
+              }
               models.push({
                 provider: client.provider,
                 id: server.model,
-                // The name the provider CLI gives, whole: a model is easier to recognise as
-                // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
-                // Claude Code is the exception, and `claudeModelName` says why.
-                // Clamped, because a name over the limit is not a long name downstream: it fails
-                // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
-                // whole array, so one over-long name empties the picker. OpenCode is the CLI that
-                // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
-                // 160 characters passes 160 - but the clamp protects every CLI.
-                name: modelDisplayName(
-                  (client.provider === "claude" ? claudeModelName(server.model) : null) ||
-                    server.displayName?.trim() ||
-                    fallback?.name ||
-                    server.model,
-                ),
+                name,
                 description:
                   fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
                 defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)

@@ -49,6 +49,7 @@ export function ConversationTimeline() {
     agentActivitySpaceReserved,
     agentReady,
     attachmentAction,
+    downloadAttachments,
     browserTakeoverPreview,
     browserTakeoverResolution,
     browserTakeoverTab,
@@ -176,13 +177,15 @@ export function ConversationTimeline() {
                 <Button
                   variant="outline"
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    const agentId = props.agent?.id;
+                    const target = agentId ? { agentId, serverId: props.server?.id ?? "local" } : undefined;
                     void props
                       .onOpenAgentSetup()
                       .catch((error) =>
-                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again.")),
-                      )
-                  }
+                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again."), target),
+                      );
+                  }}
                 >
                   Setup guide
                 </Button>
@@ -381,6 +384,7 @@ export function ConversationTimeline() {
                             onAttachmentAction={attachmentAction}
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={openWorkspaceFile}
+                            onDownloadAttachments={downloadAttachments}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             actions={
                               <MessageActions

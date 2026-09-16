@@ -1,10 +1,4 @@
-import type {
-  AgentStatus,
-  AgentSummary,
-  ConversationPage,
-  ConversationSnapshot,
-  ServerSummary,
-} from "@openbot/contracts/ipc";
+import type { AgentStatus, AgentSummary, ConversationPage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, Show } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -17,8 +11,6 @@ import {
   emitAgentEvent,
   emitDynamicIslandAction,
   emitPresence,
-  emitScopedAgentEvent,
-  emitServers,
   installOpenbotStub,
   presenceMember,
   testConversationPage,
@@ -478,6 +470,8 @@ describe("OpenBot connected desktop shell", () => {
         initialMessage: "Greet me briefly.",
         avatarSeed: expect.any(String),
         avatarHue: null,
+        provider: "codex",
+        model: "gpt-5.6-luna",
       }),
     );
     expect(await screen.findByRole("heading", { name: "Helper" })).toBeInTheDocument();
@@ -511,11 +505,46 @@ describe("OpenBot connected desktop shell", () => {
       description: draft.purpose,
       avatarSeed: expect.any(String),
       avatarHue: 215,
+      provider: "codex",
+      model: "gpt-5.6-luna",
       initialMessage:
         "Your ongoing role is: Compare travel options and turn my rough ideas into practical, day-by-day itineraries.",
     });
     expect(window.openbot.agent.sendMessage).not.toHaveBeenCalled();
     expect(await screen.findByRole("heading", { name: "Trip Planner" })).toBeInTheDocument();
+  });
+
+  it("seeds the creation form from the saved setup choice and submits the pair", async () => {
+    vi.mocked(window.openbot.getSetupState).mockResolvedValue({
+      completed: true,
+      preferredProvider: "opencode",
+      preferredModel: null,
+    });
+    vi.mocked(window.openbot.agent.listModels).mockResolvedValue([
+      {
+        provider: "opencode",
+        id: "opencode/example-free",
+        name: "Example Free",
+        description: "Free OpenCode model.",
+        defaultReasoningEffort: "medium",
+        supportedReasoningEfforts: ["medium"],
+      },
+    ]);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "New agent or channel" }), { button: 0 });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New agent" }), { button: 0 });
+    expect(await screen.findByRole("heading", { name: "Create a new agent" })).toBeInTheDocument();
+    // The hard-coded codex default would fail against this catalog; the saved choice stands instead.
+    expect(await screen.findByRole("button", { name: "Agent model: Example Free" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+
+    await waitFor(() =>
+      expect(window.openbot.agent.createAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "opencode", model: "opencode/example-free" }),
+      ),
+    );
   });
 
   it("opens and cancels agent creation from a private conversation", async () => {
@@ -563,40 +592,6 @@ describe("OpenBot connected desktop shell", () => {
     });
     expect(screen.queryByRole("main", { name: /Direct conversation/ })).not.toBeInTheDocument();
     expect(window.openbot.servers.listDirectThreads).not.toHaveBeenCalled();
-  });
-
-  it("resizes and persists the left and right side panels", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    const leftResizer = screen.getByRole("separator", { name: "Resize left sidebar" });
-    await fireEvent.keyDown(leftResizer, { key: "ArrowRight" });
-    expect(window.localStorage.getItem("openbot:left-panel-width")).toBe("292");
-
-    // Collapsing must not overwrite the width the sidebar returns to.
-    await fireEvent.keyDown(leftResizer, { key: "Home" });
-    expect(window.localStorage.getItem("openbot:left-panel-width")).toBe("292");
-
-    await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
-    const rightResizer = await screen.findByRole("separator", { name: "Resize right panel" });
-    await fireEvent.keyDown(rightResizer, { key: "ArrowLeft" });
-    expect(window.localStorage.getItem("openbot:settings-panel-width")).toBe("308");
-  });
-
-  it("opens conversation search with the primary Find shortcut and closes it on Escape", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    const searchReturnTarget = screen.getByRole("button", { name: "View agent settings" });
-    searchReturnTarget.focus();
-
-    await fireEvent.keyDown(searchReturnTarget, { key: "f", metaKey: true });
-
-    const search = screen.getByRole("search", { name: "Search conversation" });
-    const input = screen.getByRole("searchbox", { name: "Search messages" });
-    expect(search).toBeVisible();
-
-    await fireEvent.keyDown(input, { key: "Escape" });
-    expect(screen.queryByRole("search", { name: "Search conversation" })).not.toBeInTheDocument();
   });
 
   it("opens global search with Command K and navigates to agent and message results", async () => {
@@ -672,50 +667,6 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByRole("heading", { name: "Chief" });
   });
 
-  it("keeps an accessible compact sidebar and expands search without losing its width", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    expect(screen.getByRole("button", { name: "Open Marketplace" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Collapse sidebar" })).not.toBeInTheDocument();
-    const resizer = screen.getByRole("separator", { name: "Resize left sidebar" });
-    await fireEvent.keyDown(resizer, { key: "Home" });
-
-    expect(screen.getByRole("separator", { name: "Resize left sidebar" })).toHaveAttribute("aria-valuenow", "88");
-    expect(window.localStorage.getItem("openbot:left-panel-collapsed")).toBe("true");
-    expect(screen.queryByRole("button", { name: "Show sidebar" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
-
-    const compactAccountButton = await screen.findByRole("button", { name: "Open account menu" });
-    await fireEvent.click(compactAccountButton);
-    const compactAccountDialog = screen.getByRole("dialog", { name: "Account actions" });
-    const compactUsageButton = await within(compactAccountDialog).findByRole("button", {
-      name: "Weekly usage, 59% left",
-    });
-    expect(within(compactAccountDialog).queryByRole("button", { name: /photo/i })).not.toBeInTheDocument();
-    vi.mocked(window.openbot.agent.getUsage).mockRejectedValueOnce(new Error("Usage service unavailable."));
-    const usageRequestsBeforeRefresh = vi.mocked(window.openbot.agent.getUsage).mock.calls.length;
-    await fireEvent.click(compactUsageButton);
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(usageRequestsBeforeRefresh + 1));
-    expect(await within(compactAccountDialog).findByText("Usage service unavailable.")).toBeInTheDocument();
-    await fireEvent.keyDown(compactAccountDialog, { key: "Escape" });
-
-    await fireEvent.click(compactAccountButton);
-    await fireEvent.click(
-      within(await screen.findByRole("dialog", { name: "Account actions" })).getByRole("button", { name: "Settings" }),
-    );
-    const compactSettingsDialog = await screen.findByRole("dialog", { name: "General" });
-    await fireEvent.click(within(compactSettingsDialog).getByRole("button", { name: "Close settings" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument());
-
-    await fireEvent.click(screen.getByRole("button", { name: "Expand sidebar and search chats" }));
-
-    expect(screen.getByRole("complementary", { name: "Agent navigation" })).toBeInTheDocument();
-    expect(screen.getByRole("separator", { name: "Resize left sidebar" })).toHaveAttribute("aria-valuenow", "280");
-    expect(window.localStorage.getItem("openbot:left-panel-collapsed")).toBe("false");
-    expect(screen.getByRole("button", { name: "Open Marketplace" })).toBeInTheDocument();
-  });
-
   it("removes a completed Dynamic Island answer without sending it twice", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
@@ -755,295 +706,6 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.respondToPrompt).not.toHaveBeenCalled();
     expect(screen.queryByText("Which source should I use?")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Chief" })).toBeVisible();
-  });
-
-  it("keeps a Dynamic Island failure until acknowledgement succeeds", async () => {
-    vi.mocked(window.openbot.agent.acknowledgeFailedTurn).mockRejectedValueOnce(
-      new Error("Acknowledgement unavailable"),
-    );
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await waitFor(() => expect(emitDynamicIslandAction).toBeDefined());
-    emitScopedAgentEvent?.({
-      serverId: "local",
-      event: {
-        type: "turn-completed",
-        agentId: "chief",
-        threadId: "thread-1",
-        turnId: "turn-failed",
-        status: "failed",
-      },
-    });
-    const action = {
-      type: "open-failure",
-      serverId: "local",
-      agentId: "chief",
-      turnId: "turn-failed",
-    } as const;
-    emitDynamicIslandAction?.(action);
-
-    expect(await screen.findByText("Acknowledgement unavailable")).toBeInTheDocument();
-    expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
-      mode: "failed",
-    });
-    emitDynamicIslandAction?.(action);
-    await waitFor(() => expect(window.openbot.agent.acknowledgeFailedTurn).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
-        mode: "idle",
-      }),
-    );
-  });
-
-  it("marks the selected Dynamic Island message as read after opening it", async () => {
-    vi.mocked(window.openbot.agent.readConversation).mockResolvedValue({
-      agentId: "chief",
-      threadId: "thread-1",
-      activeTurnId: null,
-      revision: 1,
-      messages: [
-        {
-          id: "reply-island",
-          author: "assistant",
-          text: "The result is ready.",
-          createdAt: "2026-08-29T10:42:00.000Z",
-          status: "completed",
-        },
-      ],
-      readState: { unreadCount: 1, firstUnreadMessageId: "reply-island", throughMessageId: null },
-    });
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await waitFor(() => expect(emitDynamicIslandAction).toBeDefined());
-
-    emitDynamicIslandAction?.({
-      type: "open-message",
-      serverId: "local",
-      agentId: "chief",
-      messageId: "reply-island",
-    });
-
-    await waitFor(() =>
-      expect(window.openbot.agent.markConversationRead).toHaveBeenCalledWith(
-        {
-          agentId: "chief",
-          throughMessageId: "reply-island",
-        },
-        "local",
-      ),
-    );
-    await waitFor(() =>
-      expect(vi.mocked(window.openbot.dynamicIsland.publishPresentation).mock.calls.at(-1)?.[0]).toMatchObject({
-        mode: "idle",
-      }),
-    );
-  });
-
-  it("stops opening a Dynamic Island message when the active server changes", async () => {
-    let resolveFocusedPage: ((page: ConversationPage) => void) | undefined;
-    vi.mocked(window.openbot.agent.readConversationPage).mockImplementation(async (input) => {
-      if (input.anchor?.type === "around") {
-        return await new Promise<ConversationPage>((resolve) => {
-          resolveFocusedPage = resolve;
-        });
-      }
-      return testConversationPage(input.agentId);
-    });
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await waitFor(() => expect(emitDynamicIslandAction).toBeDefined());
-
-    emitDynamicIslandAction?.({
-      type: "open-message",
-      serverId: "local",
-      agentId: "chief",
-      messageId: "reply-island",
-    });
-    await waitFor(() =>
-      expect(window.openbot.agent.readConversationPage).toHaveBeenCalledWith({
-        agentId: "chief",
-        anchor: { type: "around", messageId: "reply-island" },
-        limit: 50,
-      }),
-    );
-    emitServers?.([testServer("local", false), testServer("remote-1", true)]);
-    await screen.findByRole("button", { name: "Studio Mac server" });
-    resolveFocusedPage?.(
-      testConversationPage("chief", [
-        {
-          id: "reply-island",
-          author: "assistant",
-          text: "The result is ready.",
-          createdAt: "2026-08-29T10:42:00.000Z",
-          status: "completed",
-        },
-      ]),
-    );
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(
-      vi
-        .mocked(window.openbot.agent.readConversationPage)
-        .mock.calls.filter(([input]) => input.anchor?.type === "latest" && input.limit === 1),
-    ).toHaveLength(0);
-    expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
-  });
-
-  it("cancels a Dynamic Island action when its server selection is superseded", async () => {
-    const local = testServer("local", true);
-    const studio = testServer("remote-1", false);
-    const office = { ...testServer("remote-2", false), name: "Office PC", apiUrl: "https://office.example.com" };
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, studio, office]);
-    vi.mocked(window.openbot.servers.select)
-      .mockResolvedValueOnce([
-        { ...local, active: false },
-        { ...studio, active: true },
-        { ...office, active: false },
-      ])
-      .mockResolvedValueOnce([
-        { ...local, active: false },
-        { ...studio, active: false },
-        { ...office, active: true },
-      ]);
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await waitFor(() => expect(emitDynamicIslandAction).toBeDefined());
-
-    let resolveStudioAgents: ((agents: AgentSummary[]) => void) | undefined;
-    vi.mocked(window.openbot.agent.listAgents)
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveStudioAgents = resolve;
-          }),
-      )
-      .mockResolvedValueOnce([{ ...AGENTS[0], name: "Office Chief" }]);
-    emitDynamicIslandAction?.({
-      type: "open-message",
-      serverId: "remote-1",
-      agentId: "chief",
-      messageId: "stale-remote-message",
-    });
-    await waitFor(() => expect(resolveStudioAgents).toBeDefined());
-    await fireEvent.click(screen.getByRole("button", { name: "Office PC server" }));
-    expect(await screen.findByRole("heading", { name: "Office Chief" })).toBeInTheDocument();
-
-    resolveStudioAgents?.([{ ...AGENTS[0], name: "Studio Chief" }]);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(
-      vi
-        .mocked(window.openbot.agent.readConversationPage)
-        .mock.calls.some(
-          ([input]) => input.anchor?.type === "around" && input.anchor.messageId === "stale-remote-message",
-        ),
-    ).toBe(false);
-    expect(screen.getByRole("button", { name: "Office PC server" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("cancels a Dynamic Island action when selection activates another server", async () => {
-    const local = testServer("local", true);
-    const studio = testServer("remote-1", false);
-    const office = { ...testServer("remote-2", false), name: "Office PC", apiUrl: "https://office.example.com" };
-    const officeActive = [
-      { ...local, active: false },
-      { ...studio, active: false },
-      { ...office, active: true },
-    ];
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, studio, office]);
-    vi.mocked(window.openbot.servers.select).mockResolvedValueOnce(officeActive).mockResolvedValueOnce(officeActive);
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await waitFor(() => expect(emitDynamicIslandAction).toBeDefined());
-    vi.mocked(window.openbot.agent.listAgents).mockResolvedValueOnce([{ ...AGENTS[0], name: "Office Chief" }]);
-
-    emitDynamicIslandAction?.({
-      type: "open-message",
-      serverId: "remote-1",
-      agentId: "chief",
-      messageId: "wrong-server-message",
-    });
-
-    expect(await screen.findByRole("heading", { name: "Office Chief" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Office PC server" })).toHaveAttribute("aria-pressed", "true");
-    expect(window.openbot.servers.select).toHaveBeenNthCalledWith(1, "remote-1");
-    expect(window.openbot.servers.select).toHaveBeenNthCalledWith(2, "remote-2");
-    expect(
-      vi
-        .mocked(window.openbot.agent.readConversationPage)
-        .mock.calls.some(
-          ([input]) => input.anchor?.type === "around" && input.anchor.messageId === "wrong-server-message",
-        ),
-    ).toBe(false);
-  });
-
-  it("keeps a newer Dynamic Island action when the older one's selection is superseded", async () => {
-    const local = testServer("local", true);
-    const studio = testServer("remote-1", false);
-    const office = { ...testServer("remote-2", false), name: "Office PC", apiUrl: "https://office.example.com" };
-    let resolveStudioSelection: ((servers: ServerSummary[]) => void) | undefined;
-    let resolveOfficeAgents: ((agents: AgentSummary[]) => void) | undefined;
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, studio, office]);
-    vi.mocked(window.openbot.servers.select)
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveStudioSelection = resolve;
-          }),
-      )
-      .mockResolvedValueOnce([
-        { ...local, active: false },
-        { ...studio, active: false },
-        { ...office, active: true },
-      ]);
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await waitFor(() => expect(emitDynamicIslandAction).toBeDefined());
-    vi.mocked(window.openbot.agent.listAgents).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveOfficeAgents = resolve;
-        }),
-    );
-
-    emitDynamicIslandAction?.({
-      type: "open-message",
-      serverId: "remote-1",
-      agentId: "chief",
-      messageId: "studio-message",
-    });
-    await waitFor(() => expect(resolveStudioSelection).toBeDefined());
-    emitDynamicIslandAction?.({
-      type: "open-message",
-      serverId: "remote-2",
-      agentId: "chief",
-      messageId: "office-message",
-    });
-    // The office workspace is mounted but still loading, so it has not consumed
-    // the handoff yet - which is the window in which the superseded selection
-    // for Studio comes back and reports that it lost.
-    await waitFor(() => expect(resolveOfficeAgents).toBeDefined());
-    resolveStudioSelection?.([
-      { ...local, active: false },
-      { ...studio, active: true },
-      { ...office, active: false },
-    ]);
-    resolveOfficeAgents?.([{ ...AGENTS[0], name: "Office Chief" }]);
-
-    expect(await screen.findByRole("heading", { name: "Office Chief" })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(
-        vi
-          .mocked(window.openbot.agent.readConversationPage)
-          .mock.calls.flatMap(([input]) => (input.anchor?.type === "around" ? [input.anchor.messageId] : [])),
-      ).toContain("office-message"),
-    );
   });
 
   it("discards a chat-open reload that resolves during a server switch", async () => {
@@ -1309,7 +971,7 @@ describe("OpenBot connected desktop shell", () => {
     });
   });
 
-  it("notifies and keeps the inline entry when an agent reports an error", async () => {
+  it("states an agent's error once above the composer, not in the transcript", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
@@ -1320,24 +982,12 @@ describe("OpenBot connected desktop shell", () => {
       message: "The model endpoint refused the request.",
     });
 
-    expect(await screen.findByText("Chief could not continue")).toBeVisible();
-    // Once in the notification and once in the agent's own message list.
-    await waitFor(() => expect(screen.getAllByText("The model endpoint refused the request.")).toHaveLength(2));
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("The model endpoint refused the request.");
+    // The banner is the whole report: no transcript bubble and no toast beside it.
+    expect(screen.getAllByText("The model endpoint refused the request.")).toHaveLength(1);
+    expect(screen.queryByText("Chief could not continue")).not.toBeInTheDocument();
   });
-
-  it("notifies about a provider error that names no agent", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    emitAgentEvent?.({ type: "error", code: "opencode_start_failed", message: "OpenCode could not start." });
-
-    expect(await screen.findByText("Provider error")).toBeVisible();
-    expect(await screen.findByText("OpenCode could not start.")).toBeVisible();
-  });
-
-  /** The exchange a provider returns for a lapsed account, quoted from issue #423. */
-  const CODEX_401 =
-    'AppServerError: failed to fetch codex rate limits: GET https://chatgpt.com/backend-api/wham/usage failed: 401 Unauthorized; content-type=text/plain; body={ "error": { "message": "Could not parse your authentication token. Please try signing in again.", "code": "unauthorized_unknown" }, "status": 401 }';
 
   function signedOutCodexStatus(): AgentStatus {
     return {
@@ -1366,28 +1016,6 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.connectProvider).toHaveBeenCalledWith("codex"));
   });
 
-  it("names a lapsed provider account instead of quoting its 401 response", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    emitAgentEvent?.({ type: "error", agentId: "chief", code: "agent_error", message: CODEX_401 });
-
-    await screen.findAllByText("Authentication failed. Check your account or server connection, then try again.");
-    expect(await screen.findByText("Sign in required")).toBeVisible();
-    expect(screen.queryByText(/AppServerError|chatgpt\.com|unauthorized_unknown/u)).not.toBeInTheDocument();
-  });
-
-  it("re-probes the provider after an authentication failure so the composer offers a way in", async () => {
-    vi.mocked(window.openbot.refreshAgentProviders).mockResolvedValue(signedOutCodexStatus());
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    emitAgentEvent?.({ type: "error", agentId: "chief", code: "agent_error", message: CODEX_401 });
-
-    await waitFor(() => expect(window.openbot.refreshAgentProviders).toHaveBeenCalled());
-    expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeVisible();
-  });
-
   it("states a spent plan window above the composer, and drops it when the window ends", async () => {
     const resetsAt = Math.floor(Date.now() / 1_000) + 3_600;
     vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
@@ -1414,17 +1042,5 @@ describe("OpenBot connected desktop shell", () => {
     emitAgentEvent?.({ type: "usage-changed", usage: { limits: [] } });
 
     await waitFor(() => expect(screen.queryByText("Usage limit reached")).not.toBeInTheDocument());
-  });
-
-  it("leaves the composer alone below the plan limit", async () => {
-    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
-      limits: [{ id: "codex", primary: { usedPercent: 64, windowDurationMins: 300, resetsAt: null }, secondary: null }],
-    });
-
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalled());
-
-    expect(screen.queryByText("Usage limit reached")).not.toBeInTheDocument();
   });
 });

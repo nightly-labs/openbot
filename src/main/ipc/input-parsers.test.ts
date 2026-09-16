@@ -1,3 +1,4 @@
+import { parseDownloadAttachments } from "./agent-inputs";
 // @vitest-environment node
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -411,6 +412,27 @@ describe("agent IPC input parsing", () => {
       avatarHue: 215,
       initialMessage: "Help me plan a trip.",
     });
+    expect(
+      parseCreateAgent({
+        name: "Trip Planner",
+        description: "Builds practical itineraries.",
+        avatarSeed: "setup:trip",
+        avatarHue: 215,
+        provider: "opencode",
+        model: "opencode/example-model",
+        reasoningEffort: "high",
+        initialMessage: "Help me plan a trip.",
+      }),
+    ).toEqual({
+      name: "Trip Planner",
+      description: "Builds practical itineraries.",
+      avatarSeed: "setup:trip",
+      avatarHue: 215,
+      provider: "opencode",
+      model: "opencode/example-model",
+      reasoningEffort: "high",
+      initialMessage: "Help me plan a trip.",
+    });
     expect(parseUpdateAgent({ agentId: "bot-1", name: "Ada", title: "Coordinator", notifications: true })).toEqual({
       agentId: "bot-1",
       name: "Ada",
@@ -507,6 +529,26 @@ describe("agent IPC input parsing", () => {
         initialMessage: " ",
       }),
     ).toThrowError("initialMessage is required.");
+    expect(() =>
+      parseCreateAgent({
+        name: "Trip Planner",
+        description: "Builds practical itineraries.",
+        avatarSeed: "setup:trip",
+        avatarHue: 215,
+        provider: "unknown",
+        initialMessage: "Help me plan a trip.",
+      }),
+    ).toThrowError("Invalid agent provider.");
+    expect(() =>
+      parseCreateAgent({
+        name: "Trip Planner",
+        description: "Builds practical itineraries.",
+        avatarSeed: "setup:trip",
+        avatarHue: 215,
+        model: "not a model id!",
+        initialMessage: "Help me plan a trip.",
+      }),
+    ).toThrowError("Invalid agent model.");
     expect(() => parseUpdateAgent({ agentId: "bot-1", role: "Coordinator" })).toThrowError("Invalid role.");
     expect(() => parseAgentRequest(null)).toThrowError("Invalid agent request.");
     expect(() => parseSendMessage({ agentId: "bot-1", text: " " })).toThrowError(
@@ -885,4 +927,22 @@ it("validates the queue editor identity and host-scoped agent before a hold can 
   expect(() =>
     parseQueueEdit({ ...input, action: "save", text: "Edit", keepAttachmentIds: [42], attachmentDraftIds: [] }),
   ).toThrow();
+});
+
+describe("ZIP download inputs", () => {
+  const attachments = ["first", "second", "third"].map((id) => ({ id, name: `${id}.txt` }));
+  it("preserves attachment order and names", () => {
+    expect(parseDownloadAttachments({ attachments })).toEqual({ attachments });
+  });
+  it.each([
+    null,
+    {},
+    { attachments: [] },
+    { attachments: attachments.slice(0, 2) },
+    { attachments: [attachments[0], attachments[0], attachments[1]] },
+    { attachments: [...attachments, { id: "fourth", name: "" }] },
+    { attachments: Array.from({ length: 1000 }, (_, index) => ({ id: String(index), name: "file" })) },
+  ])("rejects an invalid archive request", (value) => {
+    expect(() => parseDownloadAttachments(value)).toThrow();
+  });
 });

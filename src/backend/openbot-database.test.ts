@@ -687,6 +687,136 @@ describe("OpenBotDatabase", () => {
     database.close();
   });
 
+  it("writes only the streamed message and keeps one event for the whole run", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    const snapshot = streamingSnapshot(agent, 40);
+    database.persistConversation(snapshot, "turn.started", { turnId: "turn-1" });
+    const settledSequences = messageSequences(database, agent.threadId);
+
+    const streamed = snapshot.messages[snapshot.messages.length - 1];
+    if (!streamed) throw new Error("The streaming message is missing.");
+    let revision = snapshot.revision;
+    for (let index = 0; index < 100; index += 1) {
+      streamed.text += "token ";
+      revision = database.persistStreamingMessage({
+        snapshot,
+        messageId: streamed.id,
+        eventType: "response.delta-flushed",
+        detail: { turnId: "turn-1" },
+      });
+    }
+
+    const conversation = database.readConversation(agent.id, agent.threadId);
+    expect(conversation.revision).toBe(revision);
+    expect(conversation.messages.at(-1)).toMatchObject({ id: "assistant-live", text: "token ".repeat(100) });
+    // The settled history keeps the sequence it was written at, so the streamed message is the only
+    // row a flush touched. A flush that rewrote the whole thread would stamp every row with its own
+    // sequence, which is the cost this write path exists to avoid.
+    const rewritten = Object.entries(messageSequences(database, agent.threadId))
+      .filter(([messageId, sequence]) => settledSequences[messageId] !== sequence)
+      .map(([messageId]) => messageId);
+    expect(rewritten).toEqual(["assistant-live"]);
+    // One hundred flushes, one event and one receipt: each flush drops the one it supersedes.
+    expect(streamedMessageEventCount(database, agent.threadId)).toBe(1);
+    expect(
+      database.connection
+        .prepare(
+          `SELECT COUNT(*) AS count FROM orchestration_command_receipts
+           WHERE command_id LIKE 'conversation:response.delta-flushed:%'`,
+        )
+        .get(),
+    ).toMatchObject({ count: 1 });
+    database.close();
+  });
+
+  it("replays a thread whose streamed text was replaced rather than appended", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    const snapshot = streamingSnapshot(agent, 3);
+    database.persistConversation(snapshot, "turn.started", { turnId: "turn-1" });
+    const streamed = snapshot.messages[snapshot.messages.length - 1];
+    if (!streamed) throw new Error("The streaming message is missing.");
+
+    streamed.text = "partial answ";
+    database.persistStreamingMessage({ snapshot, messageId: streamed.id, eventType: "response.delta-flushed" });
+    // `item/completed` replaces the text instead of adding to it, so a replay that summed the
+    // flushes would rebuild "partial answ" plus the whole answer.
+    streamed.text = "The complete answer.";
+    streamed.status = "completed";
+    const revision = database.persistStreamingMessage({
+      snapshot,
+      messageId: streamed.id,
+      eventType: "response.delta-flushed",
+    });
+
+    database.connection.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(agent.threadId);
+    expect(database.rebuildThreadProjection(agent.threadId)).toMatchObject({
+      revision,
+      activeTurnId: "turn-1",
+    });
+    expect(database.readConversation(agent.id, agent.threadId).messages.at(-1)).toMatchObject({
+      id: "assistant-live",
+      text: "The complete answer.",
+      status: "completed",
+    });
+    database.close();
+  });
+
+  it("drops the streamed message events once a whole snapshot supersedes them", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    const snapshot = streamingSnapshot(agent, 3);
+    database.persistConversation(snapshot, "turn.started", { turnId: "turn-1" });
+    const streamed = snapshot.messages[snapshot.messages.length - 1];
+    if (!streamed) throw new Error("The streaming message is missing.");
+    streamed.text = "An answer that streamed in.";
+    database.persistStreamingMessage({ snapshot, messageId: streamed.id, eventType: "response.delta-flushed" });
+    expect(streamedMessageEventCount(database, agent.threadId)).toBe(1);
+
+    streamed.status = "completed";
+    snapshot.activeTurnId = null;
+    database.persistConversation(snapshot, "turn.completed", { turnId: "turn-1", status: "completed" });
+
+    expect(streamedMessageEventCount(database, agent.threadId)).toBe(0);
+    expect(snapshotEventCount(database, agent.threadId)).toBe(1);
+    // The whole snapshot carries the streamed text, so dropping the flushes loses nothing.
+    database.connection.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(agent.threadId);
+    expect(database.rebuildThreadProjection(agent.threadId).messages.at(-1)).toMatchObject({
+      text: "An answer that streamed in.",
+      status: "completed",
+    });
+    database.close();
+  });
+
+  it("falls back to a whole snapshot when the streamed message left the thread", async () => {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("agents-import", [agent], "agents.imported");
+    if (!agent.threadId) throw new Error("The test agent has no thread.");
+    const snapshot = streamingSnapshot(agent, 2);
+    database.persistConversation(snapshot, "turn.started", { turnId: "turn-1" });
+    // A thread reset between the buffer and its flush leaves the message unknown to the snapshot.
+    snapshot.messages = snapshot.messages.slice(0, 1);
+
+    const revision = database.persistStreamingMessage({
+      snapshot,
+      messageId: "assistant-live",
+      eventType: "response.delta-flushed",
+    });
+
+    const conversation = database.readConversation(agent.id, agent.threadId);
+    expect(conversation.revision).toBe(revision);
+    expect(conversation.messages.map((message) => message.id)).toEqual(["settled-0"]);
+    database.close();
+  });
+
   it("rolls back mailbox attachments when the matching conversation projection fails", async () => {
     const database = await createDatabase();
     const mailboxState = {
@@ -2119,6 +2249,62 @@ function snapshotEventCount(database: OpenBotDatabase, threadId: string | null):
     .get(threadId);
   if (!isDynamicRecord(row) || !isNumber(row.count)) throw new Error("Invalid snapshot count row.");
   return row.count;
+}
+
+function streamedMessageEventCount(database: OpenBotDatabase, threadId: string | null): number {
+  if (!threadId) throw new Error("The test agent has no thread.");
+  const row = database.connection
+    .prepare(
+      `SELECT COUNT(*) AS count FROM orchestration_events
+       WHERE aggregate_type = 'thread' AND aggregate_id = ?
+         AND json_type(payload_json, '$.streamedMessage') = 'object'`,
+    )
+    .get(threadId);
+  if (!isDynamicRecord(row) || !isNumber(row.count)) throw new Error("Invalid streamed message count row.");
+  return row.count;
+}
+
+/** The sequence each projected message was last written at, by message id. */
+function messageSequences(database: OpenBotDatabase, threadId: string): Record<string, number> {
+  const sequences: Record<string, number> = {};
+  for (const row of database.connection
+    .prepare("SELECT message_id, last_event_sequence FROM projection_thread_messages WHERE thread_id = ?")
+    .all(threadId)) {
+    if (!isDynamicRecord(row) || !isString(row.message_id) || !isNumber(row.last_event_sequence)) {
+      throw new Error("Invalid message sequence row.");
+    }
+    sequences[row.message_id] = row.last_event_sequence;
+  }
+  return sequences;
+}
+
+/** A settled history with one message still streaming at the end of it. */
+function streamingSnapshot(agent: AgentSummary, settled: number): ConversationSnapshot {
+  const settledMessages: ConversationMessage[] = Array.from({ length: settled }, (_, index) => ({
+    id: `settled-${index}`,
+    turnId: "turn-0",
+    author: index % 2 === 0 ? "user" : "assistant",
+    text: `Settled message ${index}`,
+    createdAt: new Date(Date.UTC(2026, 7, 20, 10, 0, index)).toISOString(),
+    status: "completed",
+  }));
+  return {
+    agentId: agent.id,
+    threadId: agent.threadId,
+    activeTurnId: "turn-1",
+    revision: 0,
+    messages: [
+      ...settledMessages,
+      {
+        id: "assistant-live",
+        turnId: "turn-1",
+        author: "assistant",
+        text: "",
+        createdAt: "2026-08-20T11:00:00.000Z",
+        status: "streaming",
+      },
+    ],
+  };
 }
 
 function conversationSnapshot(agent: AgentSummary, text: string): ConversationSnapshot {

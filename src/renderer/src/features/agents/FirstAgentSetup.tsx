@@ -1,7 +1,16 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import type {
+  AgentModelId,
+  AgentModelOption,
+  AgentProviderId,
+  AgentStatus,
+  AvatarHue,
+  CustomProviderSummary,
+  ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHeadColor, avatarHueSwatch } from "../../bloub-avatar";
+import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { Button, Field, Input, Textarea } from "../../components/ui";
 import { AgentAvatar } from "./AgentAvatar";
 
@@ -11,6 +20,8 @@ export interface FirstAgentDraft {
   avatarSeed: string;
   avatarHue: AvatarHue | null;
   suggestionId: string | null;
+  provider: AgentProviderId;
+  model: AgentModelId;
 }
 
 export interface FirstAgentSuggestion {
@@ -30,6 +41,14 @@ export interface FirstAgentSetupProps {
   mode?: "first" | "additional";
   submitting?: boolean;
   error?: string | null;
+  /** The live catalog behind the model picker. Absent, the form keeps no model choice. */
+  modelOptions?: AgentModelOption[];
+  agentStatus?: AgentStatus;
+  runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  customProviders?: readonly CustomProviderSummary[];
+  onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
+  onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onChange: (value: FirstAgentDraft) => void;
   onSubmit: (value: FirstAgentDraft) => void | Promise<void>;
   onCancel?: () => void;
@@ -50,6 +69,8 @@ export const DEFAULT_FIRST_AGENT_DRAFT: FirstAgentDraft = {
   avatarSeed: FIRST_AGENT_AVATAR_SEEDS[0] ?? "first-bot",
   avatarHue: null,
   suggestionId: null,
+  provider: "codex",
+  model: "gpt-5.6-luna",
 };
 
 export function createFirstAgentDraft(random: () => number = Math.random): FirstAgentDraft {
@@ -275,6 +296,8 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
       avatarSeed: suggestion.avatarSeed,
       avatarHue: suggestion.avatarHue,
       suggestionId: suggestion.id,
+      provider: props.value.provider,
+      model: props.value.model,
     });
   }
 
@@ -409,6 +432,29 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                 onValueChange={(purpose) => updateDraft({ purpose })}
               />
             </Field>
+            <Show when={props.modelOptions}>
+              {(options) => (
+                <Show when={props.agentStatus}>
+                  {(status) => (
+                    <ProviderModelPicker
+                      variant="field"
+                      ariaLabel="Agent model"
+                      provider={props.value.provider}
+                      value={props.value.model}
+                      modelOptions={options()}
+                      agentStatus={status()}
+                      runtimeStatuses={props.runtimeStatuses}
+                      customProviders={props.customProviders}
+                      onDownloadProvider={props.onDownloadProvider}
+                      onCancelProviderDownload={props.onCancelProviderDownload}
+                      onConnectProvider={props.onConnectProvider}
+                      disabled={props.submitting}
+                      onChange={(model, provider) => updateDraft({ model, provider })}
+                    />
+                  )}
+                </Show>
+              )}
+            </Show>
           </div>
 
           <Show when={props.error}>

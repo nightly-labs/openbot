@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createOpenBotLogger } from "@openbot/logging";
+import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 const logger = createOpenBotLogger("preview");
 
@@ -14,7 +15,10 @@ const executable = join(
 );
 const child = spawn(executable, ["preview", ...process.argv.slice(2)], {
   cwd: projectRoot,
-  env: { ...process.env, OPENBOT_APP_VARIANT: "preview" },
+  // The parent shell may run inside an Electron harness with
+  // ELECTRON_RUN_AS_NODE=1, which would make the spawned Electron run as
+  // plain Node instead of opening the preview app.
+  env: { ...withoutElectronRuntimeFlags(process.env), OPENBOT_APP_VARIANT: "preview" },
   stdio: "inherit",
   shell: false,
 });

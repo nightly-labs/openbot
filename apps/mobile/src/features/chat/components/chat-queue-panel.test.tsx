@@ -124,6 +124,8 @@ function mount(overrides: Partial<ChatQueueController> = {}) {
   const queued = [first, { ...first, id: "two", messageId: "message-two", text: "Second request", position: 2 }];
   const queue: ChatQueueController = {
     serverId: "host",
+    attachments: [],
+    changeAttachments: async () => {},
     queued,
     deliveries: queued,
     edit: null,
@@ -191,7 +193,14 @@ it("keeps collapse accessible, restores row actions and sends the selected deliv
 });
 it("shows only a text Close edit when the queued message is gone", () => {
   const view = mount({
-    edit: { editId: "edit-1", initialized: true, delivery: first, text: "First request", keepAttachmentIds: [] },
+    edit: {
+      editId: "edit-1",
+      initialized: true,
+      delivery: first,
+      text: "First request",
+      keepAttachmentIds: [],
+      addedAttachments: [],
+    },
     editUnavailable: true,
   });
   expect(screen.getByText("This message is no longer queued")).toBeTruthy();

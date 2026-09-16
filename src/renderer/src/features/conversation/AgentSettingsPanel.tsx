@@ -811,6 +811,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   <SelectContent />
                 </Select>
               </div>
+              <div class="agent-settings-model-row agent-settings-workspace-row">
+                <span>Working directory</span>
+                <span>{props.agent.workspacePath ?? "Not available yet"}</span>
+              </div>
+              <p class="agent-settings-access-note">
+                The agent runs with full computer access from its workspace and the shared folder.{" "}
+                {draft.runtime.provider === "claude"
+                  ? "Claude acts without asking for approval, except for questions it puts to you."
+                  : "Depending on the provider, sensitive commands may ask for approval first."}
+              </p>
             </div>
           </section>
           <Show when={draft.saveError}>

@@ -7,7 +7,18 @@ import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { decodeQueueEditDraft, orderedQueue, type QueueEditDraft } from "../model/queue-edit-draft";
+import {
+  readQueueAttachment,
+  removeQueueAttachment,
+  restoredQueueAttachments,
+  writeQueueAttachment,
+} from "../model/queue-edit-attachment-files";
+import {
+  decodeQueueEditDraft,
+  orderedQueue,
+  type QueueEditDraft,
+  type StoredQueueAttachment,
+} from "../model/queue-edit-draft";
 import { uploadChatAttachments } from "../model/upload-chat-attachments";
 import type { ChatAttachment } from "./use-chat-attachments";
 
@@ -100,12 +111,13 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   );
   const clearEdit = useCallback(async () => {
     await SecureStore.deleteItemAsync(storageKey);
-    if (editRef.current)
-      queryClient.removeQueries({ queryKey: ["queue-edit-attachments", serverId, agentId, editRef.current.editId] });
+    const previous = editRef.current;
     editRef.current = null;
     setEdit(null);
     setConfirmed(false);
-  }, [storageKey, queryClient, serverId, agentId]);
+    if (previous)
+      await Promise.allSettled(previous.addedAttachments.map((file) => removeQueueAttachment(previous.editId, file)));
+  }, [storageKey]);
   const begin = useCallback(
     async (delivery: QueueDelivery) => {
       if (edit && edit.delivery.id !== delivery.id) return;
@@ -115,6 +127,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
         delivery,
         text: delivery.text,
         keepAttachmentIds: delivery.attachments.map((item) => item.id),
+        addedAttachments: [],
       };
       await run(async () => {
         SecureStore.setItem(storageKey, JSON.stringify(next));
@@ -149,6 +162,45 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
     },
     [edit, run, storageKey, editQueue, agentId, serverId, clearEdit],
   );
+  const changeAttachments = useCallback(
+    async (files: ChatAttachment[]) => {
+      const current = editRef.current;
+      if (!current || busyRef.current) throw new Error("The edit is busy. Try again.");
+      busyRef.current = true;
+      setBusy(true);
+      const created: StoredQueueAttachment[] = [];
+      try {
+        const addedAttachments: StoredQueueAttachment[] = [];
+        for (const file of files) {
+          const existing = current.addedAttachments.find((item) => item.id === file.id);
+          if (existing) addedAttachments.push(existing);
+          else {
+            const stored = await writeQueueAttachment(current.editId, file);
+            created.push(stored);
+            addedAttachments.push(stored);
+          }
+        }
+        if (editRef.current?.editId !== current.editId) throw new Error("The queue edit has ended.");
+        const next = { ...editRef.current, addedAttachments };
+        SecureStore.setItem(storageKey, JSON.stringify(next));
+        editRef.current = next;
+        setEdit(next);
+        await Promise.allSettled(
+          current.addedAttachments
+            .filter((file) => !addedAttachments.some((item) => item.id === file.id))
+            .map((file) => removeQueueAttachment(current.editId, file)),
+        );
+      } catch (cause) {
+        await Promise.allSettled(created.map((file) => removeQueueAttachment(current.editId, file)));
+        throw cause;
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    },
+    [storageKey],
+  );
+  const attachments = useMemo(() => (edit ? restoredQueueAttachments(edit.editId, edit.addedAttachments) : []), [edit]);
   const save = useCallback(
     async (text: string, files: ChatAttachment[]) => {
       if (!edit || !confirmed) return false;
@@ -156,7 +208,14 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       cancelled.current = false;
       const saved = await run(async () => {
         await uploadChatAttachments(files, {
-          upload: (file) => uploadAttachment(agentId, file, serverId),
+          upload: async (file) => {
+            const stored = edit.addedAttachments.find((item) => item.id === file.id);
+            return uploadAttachment(
+              agentId,
+              stored ? { ...file, base64: await readQueueAttachment(edit.editId, stored) } : file,
+              serverId,
+            );
+          },
           discard: (id) => discardAttachment(agentId, id, serverId),
           cancelled: () => cancelled.current,
           progress: files.length ? setProgress : undefined,
@@ -182,6 +241,8 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   return useMemo(
     () => ({
       serverId,
+      attachments,
+      changeAttachments,
       editUnavailable,
       discardFinishedEdit: () =>
         run(async () => {
@@ -236,6 +297,8 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
         }),
     }),
     [
+      attachments,
+      changeAttachments,
       queued,
       editUnavailable,
       query.data,

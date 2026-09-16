@@ -104,6 +104,19 @@ export function isSupportedAttachmentName(name: string): boolean {
   return EXTENSIONLESS_TEXT_FILES.has(basename) || (extension !== null && SUPPORTED_EXTENSIONS.has(extension));
 }
 
+/**
+ * The one rejection message for an unsupported attachment. Both import paths throw it: the renderer
+ * drop and file-picker handlers in `src/main/ipc/attachment-handlers.ts`, and the draft and transfer
+ * operations in `src/backend/attachment-files.ts`. A user must not read two different sentences for
+ * the same refused file.
+ */
+export function assertSupportedAttachmentName(name: string): void {
+  if (isSupportedAttachmentName(name)) return;
+  throw new Error(
+    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
+  );
+}
+
 export function attachmentMimeTypeForName(name: string) {
   switch (attachmentFileExtension(name)) {
     case "png":

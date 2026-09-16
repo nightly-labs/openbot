@@ -465,15 +465,19 @@
   margin-left: calc(-1 * var(--openbot-space-2));
 }
 
-/* Reserve space outside the transcript. Only the panel's padded lower edge sits behind the composer. */
+/* Reserve space outside the transcript. Only the panel's padded lower edge sits behind the composer.
+   The top edge is pulled over the transcript's own bottom padding, so messages pass behind the glass
+   as the reader scrolls while that padding still clears the last one at rest. */
 .channel-paused-tasks {
   position: relative;
   max-height: 35dvh;
   overflow-y: auto;
-  margin: 1px var(--openbot-space-3) calc(-1 * var(--openbot-radius-lg));
+  margin: calc(-1 * var(--openbot-space-6)) var(--openbot-space-3) calc(-1 * var(--openbot-radius-lg));
   border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
   background: var(--openbot-accent-strong);
   box-shadow: 0 0 0 1px var(--openbot-accent-soft);
+  -webkit-backdrop-filter: blur(var(--openbot-space-3));
+  backdrop-filter: blur(var(--openbot-space-3));
   padding-bottom: var(--openbot-radius-lg);
   color: var(--openbot-accent-text);
 }

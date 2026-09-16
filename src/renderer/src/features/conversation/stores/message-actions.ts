@@ -8,7 +8,7 @@ import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { desktopAnalytics } from "../../../analytics";
 import type { AgentMessage } from "../../../data";
 import { errorMessage } from "../../../error-message";
-import type { ComposerDraft, ConversationProps } from "../conversation-types";
+import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
 export interface MessageActionsDeps {
   props: ConversationProps;
@@ -21,7 +21,7 @@ export interface MessageActionsDeps {
   setExpandedEmojiMessageId: (id: string | null) => void;
   copiedMessageId: () => string | null;
   setCopiedMessageId: (id: string | null) => void;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
 }
 
 export function createMessageActions(deps: MessageActionsDeps) {
@@ -34,6 +34,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
   async function reactToMessage(message: AgentMessage, emoji: MessageReaction | null) {
     const agentId = deps.props.agent?.id;
     if (!agentId) return;
+    const target = { agentId, serverId: deps.props.server?.id ?? "local" };
     const analytics = desktopAnalytics.scope();
     deps.setOpenReactionMessageId(null);
     deps.setExpandedEmojiMessageId(null);
@@ -50,7 +51,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
         result: "failed",
         failure_code: "reaction_failed",
       });
-      deps.setComposerError(errorMessage(error, "Could not update the reaction. Try again."));
+      deps.setComposerError(errorMessage(error, "Could not update the reaction. Try again."), target);
     }
   }
 
@@ -70,6 +71,8 @@ export function createMessageActions(deps: MessageActionsDeps) {
       (reference) => attachmentNames.get(reference.attachmentId),
     );
     if (!text) return;
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -88,7 +91,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
         if (deps.copiedMessageId() === message.id) deps.setCopiedMessageId(null);
       }, 1_400);
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not copy the message."));
+      deps.setComposerError(errorMessage(error, "Could not copy the message."), target);
     }
   }
 

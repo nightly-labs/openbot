@@ -351,8 +351,35 @@ describe("AgentSettingsPanel", () => {
     expect(await screen.findByText("Could not save agent settings.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Agent reasoning level/ })).toHaveTextContent("Extra high");
+    expect(screen.getByText("/mock/OpenBot/Agents/chief")).toBeInTheDocument();
+    expect(screen.getByText(/full computer access/)).toBeInTheDocument();
+    expect(screen.getByText(/may ask for approval first/)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Usage" }));
     expect(onOpenUsage).toHaveBeenCalledWith(screen.getByRole("button", { name: "Usage" }));
     expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
+  });
+
+  it("states that Claude acts without approval prompts", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    render(() => (
+      <AgentSettingsPanel
+        onOpenUsage={vi.fn()}
+        agent={{ ...STORY_AGENTS[1], provider: "claude", model: "claude-sonnet-5", reasoningEffort: "high" }}
+        runtimeSettings={{ provider: "claude", model: "claude-sonnet-5", reasoningEffort: "high" }}
+        agentStatus={STORY_AGENT_STATUS}
+        modelOptions={STORY_MODELS}
+        working={false}
+        maxWidth={() => 640}
+        onClose={vi.fn()}
+        onWidthChange={vi.fn()}
+        onUpdateAgent={vi.fn(async () => undefined)}
+        onUpdateRuntimeSettings={vi.fn(async () => true)}
+        onSetAgentAvatar={vi.fn(async () => undefined)}
+      />
+    ));
+
+    expect(await screen.findByText(/Claude acts without asking for approval/)).toBeInTheDocument();
+    expect(screen.queryByText(/may ask for approval first/)).not.toBeInTheDocument();
   });
 });

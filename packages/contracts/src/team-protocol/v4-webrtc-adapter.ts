@@ -18,7 +18,7 @@ export function encodeTeamProtocolV4WebRtcHttpRequest(
   method: string,
   path: string,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ) {
   if (method === "GET" || method === "DELETE" || isRoutineTestRequest(method, path) || isRemoteViewerRoute(path))
     return encodeTeamProtocolV3WebRtcHttpRequest(method, path, value, options);
@@ -30,7 +30,7 @@ export function decodeTeamProtocolV4WebRtcHttpRequest(
   method: string,
   path: string,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ) {
   if (method === "GET" || method === "DELETE" || isRoutineTestRequest(method, path) || isRemoteViewerRoute(path))
     return decodeTeamProtocolV3WebRtcHttpRequest(method, path, value, options);

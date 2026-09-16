@@ -1,7 +1,7 @@
 import type { BrowserControlSession, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import type { ConversationProps, RightPanelMode } from "../conversation-types";
+import type { ConversationProps, ConversationTarget, RightPanelMode } from "../conversation-types";
 
 export interface BrowserTakeoverPreviewState {
   status: "idle" | "loading" | "ready" | "failed";
@@ -62,7 +62,7 @@ export interface BrowserStoreDeps {
   browserAddress: () => string;
   setBrowserAddress: (address: string) => void;
   setBrowserAddressEditing: (editing: boolean) => void;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   panels: BrowserPanels;
 }
 
@@ -265,6 +265,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const value = address.trim();
     if (!value) return;
     deps.setBrowserAddressEditing(false);
+    const targetAgentId = deps.props.agent?.id;
+    const target = targetAgentId ? { agentId: targetAgentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
     const url = browserAddressUrl(value);
     const currentTab = newTab || deps.props.server?.kind === "remote" ? undefined : activeBrowserTab();
@@ -273,7 +275,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       try {
         await window.openbot.browser.navigate({ tabId: currentTab.id, url });
       } catch {
-        deps.setComposerError("Could not open the address in this tab.");
+        deps.setComposerError("Could not open the address in this tab.", target);
       }
       return;
     }
@@ -327,11 +329,13 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     ) {
       return;
     }
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     closingBrowserTabIds.add(tabId);
     try {
       await deps.props.onCloseBrowserTab(tabId);
     } catch {
-      deps.setComposerError("Could not close the browser tab.");
+      deps.setComposerError("Could not close the browser tab.", target);
     } finally {
       closingBrowserTabIds.delete(tabId);
     }
@@ -356,12 +360,14 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     ) {
       return;
     }
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
     try {
       await window.openbot.browser.reload(tabId);
       analytics.track("browser_action", { action: "reload", result: "succeeded" });
     } catch {
-      deps.setComposerError("Could not reload the browser tab.");
+      deps.setComposerError("Could not reload the browser tab.", target);
       analytics.track("browser_action", {
         action: "reload",
         result: "failed",
@@ -378,10 +384,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     ) {
       return;
     }
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
       await window.openbot.browser.navigate({ tabId, direction });
     } catch {
-      deps.setComposerError(`Could not navigate ${direction}.`);
+      deps.setComposerError(`Could not navigate ${direction}.`, target);
     }
   }
 

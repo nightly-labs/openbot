@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { isRoutineSchedule, type RoutineSchedule } from "@openbot/contracts/ipc";
+import { isRoutineSchedule, ROUTINE_MINIMUM_INTERVAL_MINUTES, type RoutineSchedule } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isRecord } from "../protocol";
 
@@ -30,7 +30,28 @@ export function siteToolString(value: unknown, field: string, limit: number): st
 
 export function routineToolSchedule(value: unknown): RoutineSchedule {
   if (!isRoutineSchedule(value)) throw new Error("The routine schedule is invalid.");
+  // Validate the polling floor before the store runs so the provider gets a clear,
+  // actionable error instead of a raw failure after the request. Custom cron schedules
+  // still need a timezone and are checked by the routine store.
+  if (value.kind === "interval" && intervalMinutes(value.amount, value.unit) < ROUTINE_MINIMUM_INTERVAL_MINUTES) {
+    throw new Error(
+      `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a daily, weekly, or cron schedule.`,
+    );
+  }
+  if (
+    value.kind === "advanced" &&
+    value.time.kind === "every" &&
+    intervalMinutes(value.time.amount, value.time.unit) < ROUTINE_MINIMUM_INTERVAL_MINUTES
+  ) {
+    throw new Error(
+      `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a fixed time.`,
+    );
+  }
   return structuredClone(value);
+}
+
+function intervalMinutes(amount: number, unit: "minutes" | "hours" | "days"): number {
+  return unit === "minutes" ? amount : unit === "hours" ? amount * 60 : amount * 1440;
 }
 
 export function localTimezone(): string {

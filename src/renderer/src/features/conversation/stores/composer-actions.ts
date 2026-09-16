@@ -29,7 +29,7 @@ export interface ComposerActionsDeps {
   selectionSending: () => boolean;
   setSelectionSending: (sending: boolean) => void;
   voicePhase: () => string;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   setComposerFocusRequest: (update: (current: number) => number) => void;
   setShowComposerActions: (show: boolean) => void;
   orderedQueuedDeliveries: () => QueueDelivery[];
@@ -129,13 +129,13 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         attachments: [...currentDraft.attachments, ...accepted],
       },
     }));
-    if (selected.length > accepted.length) deps.setComposerError("You can attach at most 10 files.");
+    if (selected.length > accepted.length) deps.setComposerError("You can attach at most 10 files.", target);
     deps.setShowComposerActions(false);
   }
 
   function openAttachmentPicker(filter: "all" | "images") {
     deps.setShowComposerActions(false);
-    deps.setComposerError(null);
+    deps.setComposerError(null, deps.currentTarget());
     const picker = filter === "images" ? deps.imageAttachmentPicker() : deps.contextAttachmentPicker();
     if (!picker) return;
     picker.value = "";
@@ -203,7 +203,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         setEditingDraft(original);
       }
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not hold the queued message for editing."));
+      deps.setComposerError(errorMessage(error, "Could not hold the queued message for editing."), {
+        agentId,
+        serverId,
+      });
       return;
     } finally {
       deps.setSubmitting(false);
@@ -211,7 +214,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.clearConversationError({ agentId, serverId });
     deps.setComposerFocusRequest((current) => current + 1);
     deps.setShowComposerActions(false);
-    deps.setComposerError(null);
+    deps.setComposerError(null, { agentId, serverId });
   }
 
   async function cancelQueuedMessageEdit() {
@@ -230,7 +233,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         );
       } catch (error) {
         if (!isQueueEditRejected(error)) {
-          deps.setComposerError(errorMessage(error, "Could not cancel the queue edit. Try again."));
+          deps.setComposerError(errorMessage(error, "Could not cancel the queue edit. Try again."), target);
           return false;
         }
       } finally {
@@ -277,7 +280,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       !target &&
       deps.props.queue?.deliveries.find((item) => item.id === deliveryId)?.status !== "queued"
     ) {
-      deps.setComposerError("This queued message is no longer available.");
+      deps.setComposerError("This queued message is no longer available.", { agentId, serverId });
       return false;
     }
     const text = expandComposerMentions(draft.text);
@@ -292,7 +295,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
 
     stopTeamTyping();
     deps.setSubmitting(true);
-    deps.setComposerError(null);
+    deps.setComposerError(null, { agentId, serverId });
     let saved = false;
     try {
       if (editId) {
@@ -308,7 +311,10 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         });
       }
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not update the queued message. Try again."));
+      deps.setComposerError(errorMessage(error, "Could not update the queued message. Try again."), {
+        agentId,
+        serverId,
+      });
     } finally {
       deps.setSubmitting(false);
     }
@@ -371,7 +377,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     stopTeamTyping();
     deps.setStickToLatest(true);
     deps.setSubmitting(true);
-    deps.setComposerError(null);
+    deps.setComposerError(null, target);
     const sent = await deps.props.onSendMessage(
       text,
       attachments.map((item) => item.id),
@@ -403,7 +409,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       const delivery =
         deliveryId && targetIsActive ? deps.props.queue?.deliveries.find((item) => item.id === deliveryId) : undefined;
       if (deliveryId && targetIsActive && !deps.editingEditId() && delivery?.status !== "queued") {
-        deps.setComposerError("This queued message is no longer available.");
+        deps.setComposerError("This queued message is no longer available.", target);
         cancelQueuedMessageEdit();
         return;
       }

@@ -6,10 +6,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
+  createTestService,
   FakeAgentClient,
-  fakeBrowser,
   openBotToolPayload,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -52,21 +52,18 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),
     };
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => {
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
         clients.set(provider, client);
         return client;
       },
-      undefined,
-      async () => undefined,
+      prepareAgentWorkspace: async () => undefined,
       hostedSites,
-    );
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -239,21 +236,18 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       }),
       delete: vi.fn(async () => undefined),
     };
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => {
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
         clients.set(provider, client);
         return client;
       },
-      undefined,
-      async () => undefined,
+      prepareAgentWorkspace: async () => undefined,
       hostedSites,
-    );
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -340,21 +334,18 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),
     };
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => {
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
         clients.set(provider, client);
         return client;
       },
-      undefined,
-      async () => undefined,
+      prepareAgentWorkspace: async () => undefined,
       hostedSites,
-    );
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -413,7 +404,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
 
     appendSpy.mockRestore();
     await service.stop();
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
 
     expect(hostedSites.publish).toHaveBeenCalledTimes(1);
@@ -448,21 +439,18 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),
     };
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => {
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
         clients.set(provider, client);
         return client;
       },
-      undefined,
-      async () => undefined,
+      prepareAgentWorkspace: async () => undefined,
       hostedSites,
-    );
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -504,7 +492,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
 
   it("interrupts an unfinished hosted site marker after restart", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
     const threadId = store.ensureThreadIdNow(agent.id);
@@ -535,7 +523,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
     });
 
     await service.stop();
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const markers = (await service.readConversation(agent.id)).messages.flatMap(
       (message) => hostedSiteConversationEvent(message) ?? [],
@@ -566,21 +554,18 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       replace: vi.fn(async () => hostedSite),
       delete: vi.fn(async () => undefined),
     };
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => {
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", false);
         clients.set(provider, client);
         return client;
       },
-      undefined,
-      async () => undefined,
+      prepareAgentWorkspace: async () => undefined,
       hostedSites,
-    );
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();

@@ -13,6 +13,7 @@ import {
   type DeleteChannelMemoryInput,
   type DeleteChannelRoutineInput,
   type DeleteRoutineInput,
+  type DownloadAttachmentsInput,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
   isAgentModel,
@@ -136,13 +137,26 @@ export function parseCreateAgent(value: unknown): CreateAgentInput {
   const avatarHue = value.avatarHue;
   if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");
   if (avatarHue !== null && !isAvatarHue(avatarHue)) throw new Error("Invalid avatar hue.");
-  return {
+  const result: CreateAgentInput = {
     name: requireString(value.name, "name", INPUT_LIMITS.agentName),
     description: requireString(value.description, "description", INPUT_LIMITS.agentDescription),
     avatarSeed: value.avatarSeed,
     avatarHue,
     initialMessage: requireString(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
   };
+  if (value.provider !== undefined) {
+    if (!isAgentProvider(value.provider)) throw new Error("Invalid agent provider.");
+    result.provider = value.provider;
+  }
+  if (value.model !== undefined) {
+    if (!isAgentModel(value.model)) throw new Error("Invalid agent model.");
+    result.model = value.model;
+  }
+  if (value.reasoningEffort !== undefined) {
+    if (!isReasoningEffort(value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
+    result.reasoningEffort = value.reasoningEffort;
+  }
+  return result;
 }
 
 export function parseCreateAgentMemory(value: unknown): CreateAgentMemoryInput {
@@ -497,6 +511,27 @@ export function parseChooseAttachments(value: unknown): ChooseAttachmentsInput {
     throw new Error("Invalid attachment picker filter.");
   }
   return { filter: value.filter };
+}
+
+export function parseDownloadAttachments(value: unknown): DownloadAttachmentsInput {
+  if (
+    !isObject(value) ||
+    !Array.isArray(value.attachments) ||
+    value.attachments.length < 3 ||
+    value.attachments.length > INPUT_LIMITS.attachments
+  ) {
+    throw new Error("Invalid attachment list.");
+  }
+  const attachments = value.attachments.map((item) => {
+    if (!isObject(item)) throw new Error("Invalid attachment.");
+    return {
+      id: requireString(item.id, "attachmentId"),
+      name: requireString(item.name, "attachment name", INPUT_LIMITS.attachmentName),
+    };
+  });
+  if (new Set(attachments.map((item) => item.id)).size !== attachments.length)
+    throw new Error("Duplicate attachments.");
+  return { attachments };
 }
 
 export function parseOpenAttachment(value: unknown): OpenAttachmentInput {

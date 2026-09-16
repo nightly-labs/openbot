@@ -64,6 +64,7 @@ export interface ChatMessageRowProps {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
+  onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
   onDownload?: (attachment: AttachmentSummary) => void;
 }
 
@@ -164,6 +165,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                 onAttachmentAction={props.onAttachmentAction}
                 onOpenSharedFile={props.onOpenSharedFile}
                 onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                onDownloadAttachments={props.onDownloadAttachments}
                 onDownload={props.onDownload}
               />
               {props.children}

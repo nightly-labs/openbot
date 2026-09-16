@@ -12,6 +12,7 @@ import type { AppMessages } from "./en";
 export const ja = {
   "menu.stopAllAgents": "すべてのエージェントを停止",
   "menu.checkForUpdates": "アップデートを確認…",
+  "menu.preferences": "設定…",
 
   "notification.needsInput": "入力が必要です。",
   "notification.needsApproval": "承認が必要です。",
@@ -123,6 +124,8 @@ export const ja = {
   "provider.status.updateRequired": "アップデートが必要",
   "provider.status.unavailable": "利用できません",
   "provider.status.checking": "確認中",
+
+  "provider.key.free": "無料",
 
   "provider.action.download": "ダウンロード",
   "provider.action.cancel": "キャンセル",

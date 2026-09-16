@@ -5,6 +5,7 @@ import {
   createDevelopmentServiceSpec,
   createDevStackRecord,
   developmentEnvironmentForTarget,
+  developmentProfileToSeed,
   findAvailablePort,
   parseDevelopmentTarget,
   projectRoot,
@@ -23,6 +24,36 @@ describe("development service runner", () => {
   it("starts a complete isolated two-client harness on demand", () => {
     expect(servicesForTarget("test-client")).toEqual(["api", "remote", "app", "test-client"]);
     expect(servicesForTarget("api")).toEqual(["api"]);
+  });
+
+  it("seeds the app profile the start is about to create", () => {
+    const missing = () => false;
+    const specs = (environment: NodeJS.ProcessEnv) => [
+      createDevelopmentServiceSpec("api", environment),
+      createDevelopmentServiceSpec("app", environment),
+      createDevelopmentServiceSpec("test-client", environment),
+    ];
+
+    expect(developmentProfileToSeed(specs({}), missing)?.profile).toMatch(/OpenBot Dev$/u);
+    expect(
+      developmentProfileToSeed(specs({ OPENBOT_DEV_INSTANCE_ID: `wt-${"a".repeat(64)}` }), missing)?.profile,
+    ).toMatch(/OpenBot Dev wt-a{64}$/u);
+  });
+
+  it("seeds the profile the app child opens, not the one the shared environment names", () => {
+    // A busy default renderer port makes the app take the port as its instance id. Reading the
+    // shared environment here would seed `OpenBot Dev` and start the app on an empty profile.
+    const app = createDevelopmentServiceSpec("app", { OPENBOT_DEV_INSTANCE_ID: "5174" });
+
+    const seed = developmentProfileToSeed([app], () => false);
+
+    expect(seed?.profile).toMatch(/OpenBot Dev 5174$/u);
+    expect(seed?.env.OPENBOT_DEV_INSTANCE_ID).toBe("5174");
+  });
+
+  it("leaves an existing profile and an app-less target alone", () => {
+    expect(developmentProfileToSeed([createDevelopmentServiceSpec("app", {})], () => true)).toBeNull();
+    expect(developmentProfileToSeed([createDevelopmentServiceSpec("api", {})], () => false)).toBeNull();
   });
 
   it("provisions the technical remote member only for the test-client harness", () => {
@@ -72,6 +103,20 @@ describe("development service runner", () => {
     expect(app.env.OPENBOT_AUTH_API_URL).toBe("http://127.0.0.1:3110");
     expect(app.env.OPENBOT_DEV_RENDERER_PORT).toBe("5180");
     expect(app.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT).toBe("9340");
+  });
+
+  it("strips Electron runtime flags from every child environment", () => {
+    const environment: NodeJS.ProcessEnv = {
+      ELECTRON_RUN_AS_NODE: "1",
+      ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox",
+    };
+
+    for (const service of ["api", "remote", "app", "test-client"] as const) {
+      const spec = createDevelopmentServiceSpec(service, environment);
+      expect(spec.env.ELECTRON_RUN_AS_NODE).toBeUndefined();
+      expect(spec.env.ELECTRON_EXTRA_LAUNCH_ARGS).toBeUndefined();
+    }
+    expect(environment.ELECTRON_RUN_AS_NODE).toBe("1");
   });
 
   it("enables hosted sites in the development environment", () => {

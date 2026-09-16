@@ -141,34 +141,15 @@ export function ChatView({
   const [pendingInQueue, setPendingInQueue] = useState(false);
   const queryClient = useQueryClient();
   const composerAttachments = useChatAttachments();
-  const editAttachments = useChatAttachments(
-    queue?.edit
-      ? queryClient.getQueryData<ChatAttachment[]>([
-          "queue-edit-attachments",
-          target.serverId,
-          target.id,
-          queue.edit.editId,
-        ])
-      : undefined,
-  );
+  const editAttachments = useChatAttachments(queue?.attachments, queue?.changeAttachments);
   const attachments = queue?.edit ? editAttachments : composerAttachments;
-  useEffect(() => {
-    if (queue?.edit)
-      queryClient.setQueryData(
-        ["queue-edit-attachments", target.serverId, target.id, queue.edit.editId],
-        editAttachments.items,
-      );
-  }, [queue?.edit, editAttachments.items, queryClient, target.serverId, target.id]);
   const previousEditId = useRef(queue?.edit?.editId);
   useEffect(() => {
     if (previousEditId.current && !queue?.edit) {
-      queryClient.removeQueries({
-        queryKey: ["queue-edit-attachments", target.serverId, target.id, previousEditId.current],
-      });
       editAttachments.clear();
     }
     previousEditId.current = queue?.edit?.editId;
-  }, [queue?.edit, editAttachments.clear, queryClient, target.serverId, target.id]);
+  }, [queue?.edit, editAttachments.clear]);
   const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());

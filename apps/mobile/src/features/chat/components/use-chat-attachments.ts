@@ -33,7 +33,10 @@ function base64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-export function useChatAttachments(initialItems: ChatAttachment[] = []) {
+export function useChatAttachments(
+  initialItems: ChatAttachment[] = [],
+  persist?: (items: ChatAttachment[]) => Promise<void>,
+) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraOrigin, setCameraOrigin] = useState<ChatCameraOrigin>();
   const [items, setItems] = useState<ChatAttachment[]>(initialItems);
@@ -42,6 +45,17 @@ export function useChatAttachments(initialItems: ChatAttachment[] = []) {
   function replace(next: ChatAttachment[]) {
     itemsRef.current = next;
     setItems(next);
+  }
+  async function persistItems(next: ChatAttachment[]) {
+    if (persist) {
+      setPreparing(true);
+      try {
+        await persist(next);
+      } finally {
+        setPreparing(false);
+      }
+    }
+    replace(next);
   }
   function add(input: RemoteFileUpload & { uri?: string }) {
     if (!isSupportedAttachmentName(input.name)) throw new Error(`Choose ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
@@ -55,13 +69,14 @@ export function useChatAttachments(initialItems: ChatAttachment[] = []) {
     if (size > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
     const item = { ...input, size, id: `mobile-draft-attachment-${++sequence.current}` };
-    replace([...itemsRef.current, item]);
+    const saved = persistItems([...itemsRef.current, item]);
     mobileAnalytics.track("attachment_action", {
       action: "select",
       result: "succeeded",
       attachment_count: 1,
       size_bucket: attachmentSizeBucket(size),
     });
+    return saved;
   }
   async function addFile(uri: string, name: string) {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
@@ -69,7 +84,7 @@ export function useChatAttachments(initialItems: ChatAttachment[] = []) {
     if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
     const safeName = name.replace(/[/\\]/gu, "_");
     if (!isSupportedAttachmentName(safeName)) throw new Error(`Choose ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
-    add({ name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await file.base64(), uri });
+    await add({ name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await file.base64(), uri });
   }
   async function chooseFiles() {
     const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
@@ -105,9 +120,17 @@ export function useChatAttachments(initialItems: ChatAttachment[] = []) {
   }
   function paste(data: Clipboard.PasteEventPayload, onText: (text: string) => void) {
     if (data.type === "image")
-      add({ name: "pasted-image.png", mimeType: "image/png", base64: data.data.slice(data.data.indexOf(",") + 1) });
+      return add({
+        name: "pasted-image.png",
+        mimeType: "image/png",
+        base64: data.data.slice(data.data.indexOf(",") + 1),
+      });
     else if (data.text.length > 4_000)
-      add({ name: "pasted-text.txt", mimeType: "text/plain", base64: base64(new TextEncoder().encode(data.text)) });
+      return add({
+        name: "pasted-text.txt",
+        mimeType: "text/plain",
+        base64: base64(new TextEncoder().encode(data.text)),
+      });
     else onText(data.text);
   }
   const busyRef = useRef(false);
@@ -145,7 +168,7 @@ export function useChatAttachments(initialItems: ChatAttachment[] = []) {
     chooseFiles: () => report(chooseFiles),
     paste,
     remove: (id: string) => {
-      replace(itemsRef.current.filter((item) => item.id !== id));
+      void report(() => persistItems(itemsRef.current.filter((item) => item.id !== id)));
       mobileAnalytics.track("attachment_action", { action: "remove", result: "succeeded", attachment_count: 1 });
     },
     clear: () => replace([]),

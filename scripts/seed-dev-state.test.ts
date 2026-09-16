@@ -16,7 +16,12 @@ import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName } from "../src/main/development-profile";
 import { readSetupState } from "../src/main/setup-store";
 import { TeamStore } from "../src/main/team-store";
-import { cleanupSeedOwnedTransfers, DEVELOPMENT_SEED_MANIFEST_FILE, seedDevelopmentState } from "./seed-dev-state";
+import {
+  cleanupSeedOwnedTransfers,
+  DEVELOPMENT_SEED_MANIFEST_FILE,
+  SEED_FALLBACK_AGENT,
+  seedDevelopmentState,
+} from "./seed-dev-state";
 
 const temporaryDirectories: string[] = [];
 
@@ -34,7 +39,7 @@ describe("development state seed", () => {
       writeSentinel(testClientSentinel, "test client"),
     ]);
 
-    const result = await seedDevelopmentState({ appDataRoot, homeDirectory });
+    const result = await seedDevelopmentState({ appDataRoot, homeDirectory, agentModel: SEED_FALLBACK_AGENT });
     const profilePath = join(appDataRoot, developmentUserDataName("app"));
 
     expect(result).toMatchObject({
@@ -71,7 +76,14 @@ describe("development state seed", () => {
     const summaries = agents.list();
     expect(summaries).toHaveLength(4);
     expect(summaries.every((agent) => agent.threadId !== null)).toBe(true);
-    expect(summaries.every((agent) => agent.model === "gpt-5.6-luna" && agent.reasoningEffort === "low")).toBe(true);
+    expect(
+      summaries.every(
+        (agent) =>
+          agent.provider === SEED_FALLBACK_AGENT.provider &&
+          agent.model === SEED_FALLBACK_AGENT.model &&
+          agent.reasoningEffort === SEED_FALLBACK_AGENT.reasoningEffort,
+      ),
+    ).toBe(true);
 
     const persistedMessages = summaries.flatMap(
       (agent) => agents.database.readConversation(agent.id, agent.threadId).messages,
@@ -252,12 +264,12 @@ describe("development state seed", () => {
 
   it("replaces the app profile and removes only files from the previous seed", async () => {
     const { appDataRoot, homeDirectory } = await createRoots();
-    await seedDevelopmentState({ appDataRoot, homeDirectory });
+    await seedDevelopmentState({ appDataRoot, homeDirectory, agentModel: SEED_FALLBACK_AGENT });
     const generatedRoot = join(homeDirectory, "OpenBot", "Shared", "Transfers", "generated");
     const firstDirectories = await readdir(generatedRoot);
     expect(firstDirectories).toHaveLength(5);
 
-    await seedDevelopmentState({ appDataRoot, homeDirectory });
+    await seedDevelopmentState({ appDataRoot, homeDirectory, agentModel: SEED_FALLBACK_AGENT });
 
     const secondDirectories = await readdir(generatedRoot);
     expect(secondDirectories).toHaveLength(5);
@@ -274,7 +286,9 @@ describe("development state seed", () => {
     await writeSentinel(sentinel, "keep");
     await symlink(`test-host-${process.pid}`, join(profilePath, "SingletonLock"));
 
-    await expect(seedDevelopmentState({ appDataRoot, homeDirectory })).rejects.toThrow("Quit the OpenBot dev app");
+    await expect(seedDevelopmentState({ appDataRoot, homeDirectory, agentModel: SEED_FALLBACK_AGENT })).rejects.toThrow(
+      "Quit the OpenBot dev app",
+    );
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
   });
 
@@ -284,7 +298,9 @@ describe("development state seed", () => {
     const sentinel = join(profilePath, "keep.txt");
     await writeSentinel(sentinel, "keep");
 
-    await expect(seedDevelopmentState({ appDataRoot, homeDirectory, dryRun: true })).resolves.toMatchObject({
+    await expect(
+      seedDevelopmentState({ appDataRoot, homeDirectory, dryRun: true, agentModel: SEED_FALLBACK_AGENT }),
+    ).resolves.toMatchObject({
       dryRun: true,
       targetProfile: profilePath,
     });
@@ -298,7 +314,13 @@ describe("development state seed", () => {
     await writeSentinel(sentinel, "keep");
 
     await expect(
-      seedDevelopmentState({ appDataRoot, homeDirectory, ifMissing: true, instanceId: "5197" }),
+      seedDevelopmentState({
+        appDataRoot,
+        homeDirectory,
+        ifMissing: true,
+        instanceId: "5197",
+        agentModel: SEED_FALLBACK_AGENT,
+      }),
     ).resolves.toMatchObject({ targetProfile: profilePath });
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
   });
@@ -308,7 +330,13 @@ describe("development state seed", () => {
     const profilePath = join(appDataRoot, developmentUserDataName("app", "5197"));
     const sentinel = join(profilePath, "keep.txt");
 
-    const seeding = seedDevelopmentState({ appDataRoot, homeDirectory, ifMissing: true, instanceId: "5197" });
+    const seeding = seedDevelopmentState({
+      appDataRoot,
+      homeDirectory,
+      ifMissing: true,
+      instanceId: "5197",
+      agentModel: SEED_FALLBACK_AGENT,
+    });
     while (!(await readdir(appDataRoot)).some((entry) => entry.startsWith(".openbot-dev-seed-"))) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
@@ -325,7 +353,12 @@ describe("development state seed", () => {
     const defaultSentinel = join(appDataRoot, developmentUserDataName("app"), "keep.txt");
     await writeSentinel(defaultSentinel, "keep");
 
-    const result = await seedDevelopmentState({ appDataRoot, homeDirectory, instanceId: "5197" });
+    const result = await seedDevelopmentState({
+      appDataRoot,
+      homeDirectory,
+      instanceId: "5197",
+      agentModel: SEED_FALLBACK_AGENT,
+    });
 
     expect(result.targetProfile).toBe(join(appDataRoot, developmentUserDataName("app", "5197")));
     await expect(readFile(defaultSentinel, "utf8")).resolves.toBe("keep");

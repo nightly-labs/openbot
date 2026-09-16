@@ -21,6 +21,7 @@ export function toAgentProfile(stored: AgentSummary): AgentProfile {
     model: stored.model,
     reasoningEffort: stored.reasoningEffort,
     threadId: stored.threadId,
+    workspacePath: stored.workspacePath,
     avatarSeed: stored.avatarSeed,
     avatarHue: stored.avatarHue,
     avatarUrl: stored.avatarUrl,

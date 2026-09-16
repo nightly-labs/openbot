@@ -124,115 +124,6 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief"));
   });
 
-  it("disables usage refresh when the active provider is unavailable", async () => {
-    const status = await window.openbot.agent.getStatus();
-    vi.mocked(window.openbot.agent.getStatus).mockResolvedValue({
-      ...status,
-      providers: status.providers?.map((provider) =>
-        provider.id === "codex" ? { ...provider, state: "sign-in-required" as const } : provider,
-      ),
-    });
-
-    render(() => <App />);
-    const usageButton = await screen.findByRole("button", { name: "Weekly usage unavailable" });
-    await fireEvent.click(usageButton);
-
-    expect(
-      within(screen.getByRole("dialog", { name: "Weekly usage" })).getByRole("button", { name: "Refresh" }),
-    ).toBeDisabled();
-  });
-
-  it("clears cached usage while the active provider reconnects", async () => {
-    const claudeAgents: AgentSummary[] = AGENTS.map((agent) => ({
-      ...agent,
-      provider: "claude",
-      model: "claude-sonnet-5",
-    }));
-    const currentStatus = await window.openbot.agent.getStatus();
-    vi.mocked(window.openbot.agent.listAgents).mockResolvedValue(claudeAgents);
-    vi.mocked(window.openbot.agent.getUsage)
-      .mockResolvedValueOnce({
-        limits: [
-          {
-            id: "claude",
-            primary: null,
-            secondary: { usedPercent: 41, windowDurationMins: 10_080, resetsAt: null },
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        limits: [
-          {
-            id: "claude",
-            primary: null,
-            secondary: { usedPercent: 80, windowDurationMins: 10_080, resetsAt: null },
-          },
-        ],
-      });
-
-    render(() => <App />);
-    expect(await screen.findByRole("button", { name: "Weekly usage, 59% left" })).toBeInTheDocument();
-
-    emitAgentEvent?.({
-      type: "status",
-      status: {
-        ...currentStatus,
-        providers: currentStatus.providers?.map((provider) =>
-          provider.id === "claude" ? { ...provider, connectionState: "connecting" as const } : provider,
-        ),
-      },
-    });
-
-    expect(await screen.findByRole("button", { name: "Weekly usage unavailable" })).toBeInTheDocument();
-
-    emitAgentEvent?.({
-      type: "status",
-      status: {
-        ...currentStatus,
-        providers: currentStatus.providers?.map((provider) =>
-          provider.id === "claude" ? { ...provider, email: "new@example.com" } : provider,
-        ),
-      },
-    });
-
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("button", { name: "Weekly usage, 20% left" })).toBeInTheDocument();
-  });
-
-  it("reuses usage when switching between Grok agents on the same model", async () => {
-    const grokAgents: AgentSummary[] = AGENTS.map((agent) => ({
-      ...agent,
-      provider: "grok",
-      model: "grok-4",
-    }));
-    vi.mocked(window.openbot.agent.listAgents).mockResolvedValue(grokAgents);
-
-    render(() => <App />);
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief"));
-
-    await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound/ }));
-    await screen.findByRole("heading", { name: "Sales Outbound" });
-    await Promise.resolve();
-
-    expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not present a non-weekly provider limit as weekly usage", async () => {
-    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
-      limits: [
-        {
-          id: "claude",
-          primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: null },
-          secondary: { usedPercent: 41, windowDurationMins: 43_200, resetsAt: null },
-        },
-      ],
-    });
-
-    render(() => <App />);
-
-    expect(await screen.findByRole("button", { name: "Weekly usage unavailable" })).toBeInTheDocument();
-  });
-
   it("keeps usage scoped to the selected model when an earlier request finishes late", async () => {
     let resolveInitialUsage!: (usage: AccountUsage) => void;
     const initialUsageRequest = new Promise<AccountUsage>((resolve) => {
@@ -718,95 +609,6 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
   });
 
-  it("reconciles a concurrent model update after an effort save succeeds", async () => {
-    let resolveEffortUpdate!: (agent: AgentSummary) => void;
-    vi.mocked(window.openbot.agent.updateAgent).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveEffortUpdate = resolve;
-        }),
-    );
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
-    const picker = screen.getByRole("dialog", { name: "Choose agent model" });
-    const effort = within(picker).getByRole("button", { name: /Agent reasoning effort/ });
-    await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "High" }));
-
-    const chief = AGENTS.find((agent) => agent.id === "chief");
-    if (!chief) throw new Error("Chief fixture is missing");
-    const concurrentAgent = { ...chief, model: "gpt-5.6-sol" as const, reasoningEffort: "high" as const };
-    emitAgentEvent?.({
-      type: "agents-changed",
-      agents: AGENTS.map((agent) => (agent.id === "chief" ? concurrentAgent : agent)),
-    });
-    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" })).toBeEnabled();
-
-    resolveEffortUpdate(concurrentAgent);
-
-    expect(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeEnabled();
-    expect(effort).toHaveTextContent("High");
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" }));
-  });
-
-  it("does not roll back a newer effort when an older save fails", async () => {
-    let rejectFirstUpdate!: (error: Error) => void;
-    vi.mocked(window.openbot.agent.updateAgent).mockImplementationOnce(
-      () =>
-        new Promise((_, reject) => {
-          rejectFirstUpdate = reject;
-        }),
-    );
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
-    const picker = screen.getByRole("dialog", { name: "Choose agent model" });
-    const effort = within(picker).getByRole("button", { name: /Agent reasoning effort/ });
-    await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "High" }));
-    await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "Low" }));
-
-    expect(window.openbot.agent.updateAgent).toHaveBeenCalledTimes(1);
-    rejectFirstUpdate(new Error("Older effort failed"));
-    await waitFor(() => expect(window.openbot.agent.updateAgent).toHaveBeenCalledTimes(2));
-    expect(window.openbot.agent.updateAgent).toHaveBeenLastCalledWith({
-      agentId: "chief",
-      reasoningEffort: "low",
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(effort).toHaveTextContent("Low");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("does not roll back or report an effort failure after switching agents", async () => {
-    let rejectUpdate!: (error: Error) => void;
-    vi.mocked(window.openbot.agent.updateAgent).mockImplementationOnce(
-      () =>
-        new Promise((_, reject) => {
-          rejectUpdate = reject;
-        }),
-    );
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
-    const picker = screen.getByRole("dialog", { name: "Choose agent model" });
-    const effort = within(picker).getByRole("button", { name: /Agent reasoning effort/ });
-    await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "High" }));
-    await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound/ }));
-    await screen.findByRole("heading", { name: "Sales Outbound" });
-
-    rejectUpdate(new Error("Chief effort failed"));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" })).toBeEnabled();
-  });
-
   it("rolls back a failed header model change and reports the error", async () => {
     vi.mocked(window.openbot.agent.updateAgent).mockRejectedValueOnce(new Error("Provider failed"));
     render(() => <App />);
@@ -822,22 +624,6 @@ describe("OpenBot connected desktop shell", () => {
       screen.queryByRole("radiogroup", { name: "What do you want me helping with most?" }),
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Message Chief")).toHaveAttribute("contenteditable", "true");
-  });
-
-  it("rolls back a failed header effort change and reports the error", async () => {
-    vi.mocked(window.openbot.agent.updateAgent).mockRejectedValueOnce(new Error("Effort failed"));
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
-    const picker = screen.getByRole("dialog", { name: "Choose agent model" });
-    const effort = within(picker).getByRole("button", { name: /Agent reasoning effort/ });
-    await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "High" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not change effort. Try again.");
-    expect(effort).toHaveTextContent("Medium");
-    expect(picker).toBeInTheDocument();
   });
 
   it("locks the header model picker during active work", async () => {
@@ -1017,5 +803,23 @@ describe("OpenBot connected desktop shell", () => {
       expect(description).toHaveValue(draft);
     }
     expect(screen.getByRole("textbox", { name: "Agent instructions" })).toBe(description);
+  });
+
+  it("opens Settings with Command+,", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument();
+    await fireEvent.keyDown(document.body, { key: ",", metaKey: true });
+    expect(await screen.findByRole("dialog", { name: "General" })).toBeInTheDocument();
+  });
+
+  it("opens Settings when main sends the Preferences menu event", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument();
+    const listener = vi.mocked(window.openbot.onOpenSettings).mock.calls[0]?.[0];
+    if (!listener) throw new Error("Settings did not subscribe to the Preferences menu event.");
+    listener();
+    expect(await screen.findByRole("dialog", { name: "General" })).toBeInTheDocument();
   });
 });

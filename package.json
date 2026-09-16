@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -177,7 +177,8 @@
     "release:minor": "bun scripts/prepare-release.ts minor",
     "release:major": "bun scripts/prepare-release.ts major",
     "check": "bun run --parallel check:desktop check:api test:sites && bun run test:desktop",
-    "check:desktop": "bun run check:ui && bun run lint && bun run desktop:typecheck && bun run test:browser && bun run build",
+    "check:desktop": "bun run check:desktop:static && bun run test:browser",
+    "check:desktop:static": "bun run check:ui && bun run lint && bun run desktop:typecheck && bun run build",
     "check:api": "bun run typecheck:api && bun run test:api && bun run api:build:check",
     "desktop:typecheck": "bun run --parallel typecheck:node typecheck:renderer typecheck:contracts typecheck:brand typecheck:storybook",
     "api:build:check": "CLOUDFLARE_ENV=preview bun run api:build",

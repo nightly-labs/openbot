@@ -2,10 +2,10 @@ import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { ChatMessage } from "./chat-messages";
 
 /** Keep the ordered draft IDs together until send commits them to one message. */
-export async function uploadChatAttachments(
-  files: RemoteFileUpload[],
+export async function uploadChatAttachments<T extends RemoteFileUpload>(
+  files: T[],
   actions: {
-    upload: (file: RemoteFileUpload) => Promise<{ id: string }>;
+    upload: (file: T) => Promise<{ id: string }>;
     discard: (id: string) => Promise<void>;
     send: (ids: string[]) => Promise<string>;
     cancelled?: () => boolean;

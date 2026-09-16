@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 const scriptsRoot = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(scriptsRoot);
@@ -48,7 +49,10 @@ try {
     });
     try {
       const persistenceOrigin = await listen(persistenceServer);
-      for (const phase of ["write", "read", "clear", "verify-cleared"]) {
+      // Three Electron boots prove cross-process persistence both ways: write
+      // in one process and read in the next, then clear and verify-cleared in
+      // a last process. Four boots cost one extra start on macOS for no cover.
+      for (const phase of ["write", "read-clear", "verify-cleared"]) {
         const phaseExitCode = await run(
           electron,
           [
@@ -155,7 +159,10 @@ function run(executable: string, arguments_: string[], filterExpectedElectronNoi
   return new Promise((resolve, reject) => {
     const child = spawn(executable, arguments_, {
       stdio: filterExpectedElectronNoise ? ["inherit", "inherit", "pipe"] : "inherit",
-      env: process.env,
+      // The parent shell may run inside an Electron harness with
+      // ELECTRON_RUN_AS_NODE=1, which would make the spawned Electron run as
+      // plain Node instead of opening the smoke window.
+      env: withoutElectronRuntimeFlags(process.env),
     });
     if (child.stderr) {
       let pending = "";

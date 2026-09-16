@@ -35,12 +35,12 @@ afterEach(() => {
   native.size = 5;
   vi.clearAllMocks();
 });
-function mount() {
+function mount(persist?: Parameters<typeof useChatAttachments>[1]) {
   const container = document.createElement("div");
   const root = createRoot(container);
   let attachments: ReturnType<typeof useChatAttachments> | null = null;
   function Harness() {
-    attachments = useChatAttachments();
+    attachments = useChatAttachments([], persist);
     return null;
   }
   act(() => root.render(<Harness />));
@@ -138,4 +138,32 @@ describe("mobile attachment selection", () => {
     expect(state().items).toHaveLength(10);
     expect(native.alert).toHaveBeenCalledWith("Could not add attachment", "You can attach up to 10 files.");
   });
+});
+
+it("accepts a paste only after persistence succeeds and leaves existing items on failure", async () => {
+  let complete = () => {};
+  const persist = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const state = mount(persist);
+  let saving: Promise<void> | undefined;
+  act(() => {
+    saving = state().paste({ type: "text", text: "a".repeat(4001) }, () => {});
+  });
+  expect(state().preparing).toBe(true);
+  expect(state().items).toEqual([]);
+  await act(async () => {
+    complete();
+    await saving;
+  });
+  expect(state().items).toHaveLength(1);
+  persist.mockRejectedValueOnce(new Error("Disk full"));
+  await act(async () => {
+    await expect(state().paste({ type: "text", text: "b".repeat(4001) }, () => {})).rejects.toThrow("Disk full");
+  });
+  expect(state().items).toHaveLength(1);
+  expect(state().preparing).toBe(false);
 });

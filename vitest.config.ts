@@ -8,6 +8,10 @@ export default defineConfig({
   test: {
     execArgv: ["--disable-warning=ExperimentalWarning"],
     globals: true,
+    // The worker count is left to vitest, which uses one less than the machine
+    // reports: the CI runner reports four vCPUs, so it runs three. Asking that
+    // runner for a fourth was measured and is slower, not faster - 125.7s
+    // against 100.6s - because the workers then contend with the main process.
     // Every spy, global patch and fake timer a test file installs is undone
     // after each test, in both projects, so nothing depends on file order.
     restoreMocks: true,
@@ -23,6 +27,7 @@ export default defineConfig({
         test: {
           name: "mobile-ui",
           environment: "jsdom",
+          pool: "vmThreads",
           include: ["apps/mobile/src/**/*.test.tsx"],
           restoreMocks: true,
           setupFiles: ["./apps/mobile/src/test-setup.ts"],
@@ -63,6 +68,13 @@ export default defineConfig({
         extends: true,
         test: {
           name: "renderer",
+          // jsdom is the cost here, not the tests: a fresh environment per file
+          // was 14.6s of a 32.6s run. `vmThreads` builds the jsdom once per
+          // worker and gives each file its own module registry inside a VM
+          // context, so isolation is unchanged - `--sequence.shuffle.files`
+          // passes, and it fails under `isolate: false`, which is why that
+          // faster option is not used here.
+          pool: "vmThreads",
           environment: "jsdom",
           include: ["src/renderer/**/*.test.tsx", "src/renderer/**/*.dom.test.ts"],
           setupFiles: ["./src/renderer/src/setupTests.ts"],

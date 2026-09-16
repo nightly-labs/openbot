@@ -217,7 +217,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   async request(
     hostId: string,
     path: string,
-    init: { method?: string; body?: unknown; preserveSemanticTags?: boolean } = {},
+    init: { method?: string; body?: unknown; preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
   ): Promise<TeamProtocolV2Json | undefined> {
     const response = await this.requestResponse(hostId, path, init);
     return response.status === 204 ? undefined : response.body;
@@ -226,7 +226,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   async requestResponse(
     hostId: string,
     path: string,
-    init: { method?: string; body?: unknown; contentType?: string; preserveSemanticTags?: boolean } = {},
+    init: {
+      method?: string;
+      body?: unknown;
+      contentType?: string;
+      preserveSemanticTags?: boolean;
+      agentCreateModel?: boolean;
+    } = {},
   ): Promise<{
     status: number;
     body: TeamProtocolV2Json;
@@ -259,6 +265,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               ? mcpRequest(path, init.body)
               : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
                   preserveSemanticTags: init.preserveSemanticTags,
+                  agentCreateModel: init.agentCreateModel,
                 }),
         capabilities: [...TEAM_CURRENT_CAPABILITIES],
         ...(bodyTransferId ? { bodyTransferId } : {}),

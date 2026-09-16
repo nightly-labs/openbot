@@ -35,7 +35,7 @@ it("restores the edit identity, text and attachment order without creating a sec
     text: "Changed",
     keepAttachmentIds: files.map((item) => item.id).reverse(),
   };
-  expect(decodeQueueEditDraft(JSON.stringify(draft))).toEqual(draft);
+  expect(decodeQueueEditDraft(JSON.stringify(draft))).toEqual({ ...draft, addedAttachments: [] });
   expect(decodeQueueEditDraft(null)).toBeNull();
   expect(() => decodeQueueEditDraft('{"editId": "wrong"}')).toThrow("saved queue edit");
 });

@@ -22,6 +22,7 @@ import { usePlatform } from "../../platform";
 import { fileBadge, formatFileSize } from "./AttachmentCards";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { ComposerEditor } from "./ComposerEditor";
+import { ComposerErrorBanner } from "./ComposerErrorBanner";
 import { ComposerSignInNotice, ComposerUsageLimitNotice } from "./ComposerNotice";
 import { CloseIcon, MoreIcon, StopIcon } from "./ConversationIcons";
 import { useConversationViewScope } from "./conversation-scope";
@@ -34,11 +35,12 @@ export function ConversationComposer() {
     agentReady,
     attachmentAction,
     attachmentBusy,
-    composerError,
     composerFocusRequest,
     composerHasContent,
+    currentChatConversationKey,
+    currentChatError,
     currentDraft,
-    currentConversationError,
+    dismissCurrentChatErrors,
     installedSkills,
     editQueuedMessage,
     editingDeliveryId,
@@ -199,10 +201,17 @@ export function ConversationComposer() {
         <Show when={usageExhausted()}>
           {(spent) => <ComposerUsageLimitNotice provider={spent().provider} resetsAt={spent().resetsAt} />}
         </Show>
-        <Show when={composerError() ?? currentConversationError()}>
-          <div class="composer-error" role="alert">
-            {composerError() ?? currentConversationError()}
-          </div>
+        <Show when={currentChatError()}>
+          {(message) => (
+            <ComposerErrorBanner
+              message={message()}
+              conversationKey={currentChatConversationKey()}
+              onDismiss={() => {
+                dismissCurrentChatErrors();
+                setComposerFocusRequest((current) => current + 1);
+              }}
+            />
+          )}
         </Show>
         <div
           class={`composer${voicePhase() === "recording" ? " composer-recording" : ""}`}

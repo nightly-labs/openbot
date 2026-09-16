@@ -1,13 +1,22 @@
 import type { UpdateAgentInput } from "@openbot/contracts/ipc";
-import { createContext, createEffect, createSignal, onCleanup, onSettled, untrack, useContext } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onSettled,
+  untrack,
+  useContext,
+} from "solid-js";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
-import type { ComposerDraft, ConversationProps } from "./conversation-types";
+import type { ComposerDraft, ConversationProps, ConversationTarget } from "./conversation-types";
 import { createActivityStore } from "./stores/activity-store";
 import { createBrowserStore } from "./stores/browser-store";
 import { createComposerActions } from "./stores/composer-actions";
-import { createComposerStore } from "./stores/composer-store";
+import { createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMessageActions } from "./stores/message-actions";
 import { createPanelsStore } from "./stores/panels-store";
 import { createQueueStore } from "./stores/queue-store";
@@ -45,8 +54,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setShowComposerActions,
     attachmentBusy,
     setAttachmentBusy,
-    composerError,
-    setComposerError,
+    composerErrors,
+    setComposerErrors,
     conversationErrors,
     setConversationErrors,
     voicePhase,
@@ -107,6 +116,32 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserPanelWidth,
     resources,
   } = controller;
+  /**
+   * Chat-scoped composer errors, keyed by conversation.
+   *
+   * The previous server-scoped `composerError` string leaked one chat's banner
+   * into unrelated chats on the same server. Every write is keyed by
+   * `composerDraftKey(target)` so navigating between chats never carries stale
+   * state, and dismissal removes only the current chat's entry.
+   *
+   * Async completions must pass an explicit target captured at operation start;
+   * reading `currentConversationTarget(props)` at completion time would
+   * attribute the failure to whichever chat the user has since opened.
+   */
+  const setScopedComposerError = (error: string | null, targetOverride?: ConversationTarget): void => {
+    const target = targetOverride ?? currentConversationTarget(props);
+    if (!target) return;
+    const key = composerDraftKey(target);
+    if (error === null) {
+      setComposerErrors((current) => {
+        if (!(key in current)) return current;
+        const { [key]: _removed, ...next } = current;
+        return next;
+      });
+      return;
+    }
+    setComposerErrors((current) => (current[key] === error ? current : { ...current, [key]: error }));
+  };
   const panels = createPanelsStore({
     props,
     rightPanels,
@@ -119,7 +154,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setMediaPreview,
     sidebarFilePreview,
     setSidebarFilePreview,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     nextFilePreviewGeneration: () => {
       resources.filePreviewRequestGeneration += 1;
       return resources.filePreviewRequestGeneration;
@@ -146,6 +181,7 @@ export function createConversationViewScope(props: ConversationProps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
+    downloadAttachments,
     openSharedFile,
     openWorkspaceFile,
     openSidebarFileExternally,
@@ -159,6 +195,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setDrafts,
     conversationErrors,
     setConversationErrors,
+    composerErrors,
+    setComposerErrors,
     editingAgentId,
     editingServerId,
     editingDeliveryId,
@@ -169,6 +207,8 @@ export function createConversationViewScope(props: ConversationProps) {
     currentEditingDeliveryId,
     currentDraft,
     currentConversationError,
+    currentComposerError,
+    currentChatError,
     unreferencedDraftAttachments,
     composerHasContent,
     replyTarget,
@@ -177,6 +217,9 @@ export function createConversationViewScope(props: ConversationProps) {
     clearSubmittedDraft,
     clearConversationError,
     setConversationError,
+    clearComposerError,
+    setComposerErrorForTarget,
+    clearChatErrors,
   } = composer;
   const queue = createQueueStore({ props });
   const { activeDeliveries, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } = queue;
@@ -192,7 +235,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserAddress,
     setBrowserAddress,
     setBrowserAddressEditing,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     panels: { setActiveRightPanel, screenOpen: () => screenOpen() },
   });
   const {
@@ -229,7 +272,7 @@ export function createConversationViewScope(props: ConversationProps) {
     props,
     markingRead,
     setMarkingRead,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     elements: {
       scrollElement: () => scrollElement,
       virtualRoot: () => virtualRoot,
@@ -289,7 +332,7 @@ export function createConversationViewScope(props: ConversationProps) {
     drafts,
     setDrafts,
     setConversationErrors,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     setComposerFocusRequest,
     clearConversationError,
     setConversationError,
@@ -324,7 +367,7 @@ export function createConversationViewScope(props: ConversationProps) {
     selectionSending,
     setSelectionSending,
     voicePhase,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     setComposerFocusRequest,
     setShowComposerActions,
     orderedQueuedDeliveries,
@@ -400,7 +443,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setExpandedEmojiMessageId,
     copiedMessageId,
     setCopiedMessageId,
-    setComposerError,
+    setComposerError: setScopedComposerError,
   });
   const { replyToMessage, reactToMessage, copyMessage, removeAttachment } = messageActions;
   const settings = createSettingsStore({
@@ -413,7 +456,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setSettingsModel,
     settingsReasoning,
     setSettingsReasoning,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     viewIsMounted,
     saveAgentPatch,
   });
@@ -462,7 +505,7 @@ export function createConversationViewScope(props: ConversationProps) {
           clearConversationError(target);
         }
         setAttachmentBusy(true);
-        setComposerError(null);
+        setScopedComposerError(null);
       } else if (event.type === "error") {
         const target = resources.importTargetAgents.get(event.requestId);
         resources.importTargetAgents.delete(event.requestId);
@@ -857,12 +900,30 @@ export function createConversationViewScope(props: ConversationProps) {
   });
 
   async function openExternalMessageUrl(url: string) {
+    const target = currentTarget();
     try {
       await window.openbot.openUrl(url);
     } catch {
-      setComposerError("Could not open the link in the external browser.");
+      setScopedComposerError("Could not open the link in the external browser.", target);
     }
   }
+
+  /**
+   * Dismiss the current chat's banner. Removes both the transient composer
+   * error and the keyed conversation error for this chat only, so dismissal
+   * never clears another chat and a dismissed banner does not reappear on
+   * rerender, navigation, or reconnect unless a new error is recorded.
+   */
+  function dismissCurrentChatErrors(): void {
+    const target = currentTarget();
+    if (!target) return;
+    clearChatErrors(target);
+  }
+
+  const currentChatConversationKey = createMemo(() => {
+    const target = currentTarget();
+    return target ? composerDraftKey(target) : null;
+  });
 
   const setConversationPanelElement = (element: HTMLElement) => {
     conversationPanel = element;
@@ -923,6 +984,7 @@ export function createConversationViewScope(props: ConversationProps) {
     agentActivitySpaceReserved,
     activateBrowserTab,
     attachmentAction,
+    downloadAttachments,
     attachmentBusy,
     browserAddress,
     browserSidebarOpen,
@@ -940,7 +1002,14 @@ export function createConversationViewScope(props: ConversationProps) {
     closeChatSearch,
     clearNewMessages,
     closeSidebarFilePreview,
-    composerError,
+    composerError: currentComposerError,
+    currentComposerError,
+    currentChatError,
+    currentChatConversationKey,
+    dismissCurrentChatErrors,
+    clearComposerError,
+    setComposerErrorForTarget,
+    clearChatErrors,
     composerFocusRequest,
     composerHasContent,
     copiedMessageId,
@@ -1004,7 +1073,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddressEditing,
     setBrowserPanelWidth,
     setChatSearchQuery,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,

@@ -2422,7 +2422,7 @@ async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Pr
 }
 
 async function runPersistencePhase(root: string, origin: string, phase: string): Promise<void> {
-  if (!new Set(["write", "read", "clear", "verify-cleared"]).has(phase)) {
+  if (!new Set(["write", "read", "clear", "verify-cleared", "read-clear"]).has(phase)) {
     throw new Error(`Unknown persistence phase: ${phase}`);
   }
   await app.whenReady();
@@ -2430,9 +2430,35 @@ async function runPersistencePhase(root: string, origin: string, phase: string):
   const browser = new BrowserHost(window, join(root, "downloads"), join(root, "browser-tabs.json"));
   await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
   try {
-    const tab = await browser.open(`${origin}/persistence?phase=${encodeURIComponent(phase)}`, "persistence-thread");
+    if (phase === "read-clear") {
+      // Read proves write persists across restart. Clear runs in the same
+      // boot. A later boot must verify that clear persists across restart.
+      await checkOnePersistencePage(browser, origin, "read", true);
+      await checkOnePersistencePage(browser, origin, "clear", false);
+      await browser.flushPersistentStorage();
+    } else {
+      await checkOnePersistencePage(browser, origin, phase, phase === "write" || phase === "read");
+      await browser.flushPersistentStorage();
+    }
+  } finally {
+    try {
+      await browser.destroy();
+    } finally {
+      window.destroy();
+    }
+  }
+  process.stdout.write(`BrowserHost: persistence ${phase} phase passed.\n`);
+}
+
+async function checkOnePersistencePage(
+  browser: BrowserHost,
+  origin: string,
+  phase: string,
+  expectedStored: boolean,
+): Promise<void> {
+  const tab = await browser.open(`${origin}/persistence?phase=${encodeURIComponent(phase)}`, "persistence-thread");
+  try {
     const snapshot = await waitForPersistenceSnapshot(browser, tab.id);
-    const expectedStored = phase === "write" || phase === "read";
     const cookie = getString(snapshot, "cookie") ?? "";
     const localStorageValue = getString(snapshot, "localStorage");
     const indexedDbValue = getString(snapshot, "indexedDb");
@@ -2452,15 +2478,9 @@ async function runPersistencePhase(root: string, origin: string, phase: string):
     if (expectedStored && !requireCrossProcessCookie && !cookie.includes("openbot_persistence=kept")) {
       process.stdout.write("BrowserHost: signed macOS app must verify encrypted cookie persistence.\n");
     }
-    await browser.flushPersistentStorage();
   } finally {
-    try {
-      await browser.destroy();
-    } finally {
-      window.destroy();
-    }
+    await browser.close(tab.id);
   }
-  process.stdout.write(`BrowserHost: persistence ${phase} phase passed.\n`);
 }
 
 async function waitForPersistenceSnapshot(browser: BrowserHost, tabId: string): Promise<PersistenceSnapshot> {

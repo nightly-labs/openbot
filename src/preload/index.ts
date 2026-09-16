@@ -767,6 +767,11 @@ const openbotApi: OpenBotDesktopApi = {
     ipcRenderer.on(IPC_CHANNELS.appLanguagePreference, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.appLanguagePreference, handler);
   },
+  onOpenSettings: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IPC_CHANNELS.openSettings, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.openSettings, handler);
+  },
   dynamicIsland: {
     getPreference: () =>
       ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandGetPreference).then(decodeDynamicIslandPreference),
@@ -997,6 +1002,7 @@ const openbotApi: OpenBotDesktopApi = {
     },
     discardDraftAttachment: (attachmentId, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentDiscardDraftAttachment, attachmentId, decodeVoid),
+    downloadAttachments: (input) => invokeAgent(IPC_CHANNELS.agentDownloadAttachments, input, decodeVoid),
     openAttachment: (input) => invokeAgent(IPC_CHANNELS.agentOpenAttachment, input, decodeVoid),
     openSharedFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenSharedFile, input, decodeVoid),
     openWorkspaceFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenWorkspaceFile, input, decodeVoid),

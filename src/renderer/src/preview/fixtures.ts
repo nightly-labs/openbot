@@ -99,6 +99,7 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   model: agent.model,
   reasoningEffort: agent.reasoningEffort,
   threadId: agent.threadId,
+  workspacePath: agent.workspacePath,
   avatarSeed: agent.avatarSeed,
   avatarHue: agent.avatarHue,
   avatarUrl: agent.avatarUrl,
