@@ -27,7 +27,7 @@ import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
-import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
+import { isNonActionableCodexWarning, toolProgressLanguage, toolProgressText, toThreadItem } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -400,7 +400,8 @@ export class TurnLifecycle {
 
   #applyItem(agentId: string, threadId: string, turnId: string, item: ThreadItem, completed: boolean): void {
     if (this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
-    const toolProgress = toolProgressText(item, completed);
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const toolProgress = toolProgressText(item, completed, toolProgressLanguage(agent?.description ?? ""));
     if (toolProgress) {
       this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
       return;

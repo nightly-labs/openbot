@@ -1597,6 +1597,8 @@ describe.sequential("AgentService: providers", () => {
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", description: "Odpowiadaj wyłącznie po polsku." });
     await service.sendMessage({ agentId: "chief", text: "Check the latest result" });
     await waitFor(() => events.some((event) => event.type === "turn-started"));
     const started = events.find((event) => event.type === "turn-started");
@@ -1691,7 +1693,7 @@ describe.sequential("AgentService: providers", () => {
         item: { id: "tool-1", type: "toolCall", name: "web_search", status: "in_progress" },
       }),
     );
-    await waitFor(() => progress().at(-1)?.detail === "Searching for current information…");
+    await waitFor(() => progress().at(-1)?.detail === "Szukam aktualnych informacji…");
 
     client.emit(
       "notification",
@@ -1701,7 +1703,7 @@ describe.sequential("AgentService: providers", () => {
         item: { id: "tool-1", type: "toolCall", name: "web_search", status: "completed" },
       }),
     );
-    await waitFor(() => progress().at(-1)?.detail === "Reviewing the sources and information I found…");
+    await waitFor(() => progress().at(-1)?.detail === "Przeglądam znalezione źródła i informacje…");
     expect(conversationEventCount()).toBe(persistedBeforeTools);
 
     client.emit(
