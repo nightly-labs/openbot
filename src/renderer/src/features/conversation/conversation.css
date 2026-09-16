@@ -572,6 +572,7 @@
 }
 
 .file-preview-spreadsheet-table-wrap {
+  min-height: 0;
   overflow: auto;
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-md);
@@ -615,6 +616,33 @@
   margin: 10px 0 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-xs);
+}
+
+.media-spreadsheet-preview {
+  display: flex;
+  width: min(860px, calc(100vw - 78px));
+  height: min(720px, calc(100dvh - 120px));
+  max-width: 100%;
+  max-height: calc(100dvh - 120px);
+  min-height: 0;
+  box-sizing: border-box;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-canvas);
+}
+
+.media-spreadsheet-preview .file-preview-spreadsheet-tabs {
+  flex: 0 0 auto;
+}
+
+.media-spreadsheet-preview .file-preview-spreadsheet-table-wrap {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.media-spreadsheet-preview .file-preview-spreadsheet-note {
+  flex: 0 0 auto;
 }
 
 .file-preview-unsupported {

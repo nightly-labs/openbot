@@ -37,4 +37,11 @@ describe("SpreadsheetFilePreview", () => {
   it("rejects a file that is not a readable workbook", () => {
     expect(() => parseSpreadsheet(new Uint8Array([1, 2, 3]))).toThrow();
   });
+
+  it("rejects an oversized expanded XML entry before parsing it", () => {
+    const oversized = zipSync({
+      "xl/worksheets/sheet1.xml": strToU8("x".repeat(8 * 1024 * 1024 + 1)),
+    });
+    expect(() => parseSpreadsheet(oversized)).toThrow("read safely");
+  });
 });

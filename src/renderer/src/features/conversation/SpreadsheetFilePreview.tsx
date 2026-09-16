@@ -4,6 +4,9 @@ import { Button } from "../../components/ui";
 
 const MAX_ROWS = 500;
 const MAX_COLUMNS = 50;
+const MAX_ZIP_ENTRY_BYTES = 8 * 1024 * 1024;
+const MAX_ZIP_EXPANDED_BYTES = 32 * 1024 * 1024;
+const XLSX_XML_ENTRY = /^xl\/(?:workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|worksheets\/[^/]+\.xml)$/u;
 
 interface SpreadsheetSheet {
   name: string;
@@ -76,8 +79,25 @@ function parseSheet(bytes: Uint8Array, sharedStrings: string[], name: string): S
   return { name, rows };
 }
 
+function unzipSpreadsheet(bytes: Uint8Array) {
+  let expandedBytes = 0;
+  return unzipSync(bytes, {
+    filter: (file) => {
+      if (!XLSX_XML_ENTRY.test(file.name)) return false;
+      if (file.originalSize > MAX_ZIP_ENTRY_BYTES) {
+        throw new Error("The spreadsheet preview is too large to read safely.");
+      }
+      expandedBytes += file.originalSize;
+      if (expandedBytes > MAX_ZIP_EXPANDED_BYTES) {
+        throw new Error("The spreadsheet preview is too large to read safely.");
+      }
+      return true;
+    },
+  });
+}
+
 export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
-  const files = unzipSync(bytes);
+  const files = unzipSpreadsheet(bytes);
   const workbook = xmlDocument(files["xl/workbook.xml"], "xl/workbook.xml");
   const relationships = xmlDocument(files["xl/_rels/workbook.xml.rels"], "xl/_rels/workbook.xml.rels");
   const relationshipTargets = new Map(
