@@ -1452,10 +1452,15 @@ it.each(["save", "cancel"] as const)(
     await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
     expect(window.localStorage.getItem("openbot:queue-edit")).toContain(begin.editId);
     // A renderer restart must restore the same edit and its backup, not allocate another hold.
+    composer.textContent = "Still editing after connection loss";
+    await fireEvent.input(composer);
     view.unmount();
     vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
     render(() => <App />);
     const save = await screen.findByRole("button", { name: "Save queued message" });
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent(
+      "Still editing after connection loss",
+    );
     if (action === "save") await fireEvent.click(save);
     else await fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
