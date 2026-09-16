@@ -44,6 +44,7 @@ export function ConversationComposer() {
     installedSkills,
     editQueuedMessage,
     editingDeliveryId,
+    editingPendingSave,
     openAttachmentPicker,
     openAttachmentPickerFromKey,
     openExternalMessageUrl,
@@ -73,6 +74,8 @@ export function ConversationComposer() {
   } = useConversationViewScope();
   const platform = usePlatform();
   const [pickerOpen, setPickerOpen] = createSignal(false);
+  // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
+  const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
   // The mention picker grows out of the same edge as the queue, so only one of them holds it.
   const queueVisible = () => queuePanelVisible() && !pickerOpen();
   const voiceAvailable = () => voiceSupported(platform.appInfo()?.platform);
@@ -247,7 +250,7 @@ export function ConversationComposer() {
                     </Show>
                     <ImageRemoveButton
                       label={`Remove ${attachment.name}`}
-                      disabled={voicePhase() === "transcribing"}
+                      disabled={voicePhase() === "transcribing" || savePending()}
                       onClick={() => removeAttachment(attachment.id)}
                     />
                   </div>
@@ -262,7 +265,9 @@ export function ConversationComposer() {
               skills={installedSkills()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
-              disabled={submitting() || selectionSending() || voicePhase() === "transcribing" || !agentReady()}
+              disabled={
+                submitting() || selectionSending() || voicePhase() === "transcribing" || !agentReady() || savePending()
+              }
               placeholder={
                 !agentReady()
                   ? "Complete agent CLI setup to start"
@@ -319,7 +324,8 @@ export function ConversationComposer() {
                   submitting() ||
                   selectionSending() ||
                   voicePhase() === "transcribing" ||
-                  !agentReady()
+                  !agentReady() ||
+                  savePending()
                 }
               >
                 <Plus aria-hidden="true" />

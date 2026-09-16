@@ -92,6 +92,7 @@ function setup(
     const [editingAgentId] = createSignal<string | null>(null);
     const [editingServerId] = createSignal<string | null>(null);
     const [editingDeliveryId] = createSignal<string | null>(null);
+    const [editingPendingSave] = createSignal<null>(null);
     const store = createComposerStore({
       props: testProps(agentId),
       drafts,
@@ -103,6 +104,7 @@ function setup(
       editingAgentId,
       editingServerId,
       editingDeliveryId,
+      editingPendingSave,
       seenMessageIds: new Set<string>(),
     });
     return { store, composerErrors, conversationErrors, dispose };

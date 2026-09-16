@@ -1,6 +1,7 @@
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { isAttachmentSummary, type MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { decodeQueueEditRequest, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { ComposerDraft } from "./conversation-types";
 
 export const EMPTY_DRAFT: ComposerDraft = {
@@ -32,6 +33,7 @@ export function appendSkillCreationRequest(draft: ComposerDraft): ComposerDraft 
 }
 
 export const QUEUE_EDIT_STORAGE_KEY = "openbot:queue-edit";
+export type StoredQueueSave = Extract<QueueEditRequest, { action: "save" }>;
 export interface StoredQueueEdit {
   agentId: string;
   serverId: string;
@@ -40,6 +42,7 @@ export interface StoredQueueEdit {
   originalAttachmentIds: string[];
   draft: ComposerDraft;
   backup: ComposerDraft;
+  pendingSave?: StoredQueueSave;
 }
 function isComposerDraft(value: unknown): value is ComposerDraft {
   return (
@@ -71,6 +74,17 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
     !isComposerDraft(value.backup)
   )
     return null;
+  let pendingSave: StoredQueueSave | undefined;
+  if (value.pendingSave !== undefined) {
+    try {
+      const decoded = decodeQueueEditRequest(value.pendingSave);
+      if (decoded.action !== "save" || decoded.editId !== value.editId || decoded.deliveryId !== value.deliveryId)
+        return null;
+      pendingSave = decoded;
+    } catch {
+      return null;
+    }
+  }
   return {
     agentId: value.agentId,
     serverId: value.serverId,
@@ -79,5 +93,6 @@ function decodeStoredQueueEdit(value: unknown): StoredQueueEdit | null {
     originalAttachmentIds: value.originalAttachmentIds,
     draft: value.draft,
     backup: value.backup,
+    ...(pendingSave ? { pendingSave } : {}),
   };
 }

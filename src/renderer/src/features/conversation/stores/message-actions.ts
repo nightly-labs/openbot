@@ -8,6 +8,7 @@ import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { desktopAnalytics } from "../../../analytics";
 import type { AgentMessage } from "../../../data";
 import { errorMessage } from "../../../error-message";
+import type { StoredQueueEdit } from "../composer-draft";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
 export interface MessageActionsDeps {
@@ -16,6 +17,7 @@ export interface MessageActionsDeps {
   currentDraft: () => ComposerDraft;
   updateCurrentDraft: (patch: Partial<ComposerDraft>) => void;
   currentTarget: () => { agentId: string; serverId: string } | undefined;
+  editingPendingSave: () => StoredQueueEdit["pendingSave"] | null;
   setOpenReactionMessageId: (id: string | null) => void;
   setOpenMoreMessageId: (id: string | null) => void;
   setExpandedEmojiMessageId: (id: string | null) => void;
@@ -96,6 +98,8 @@ export function createMessageActions(deps: MessageActionsDeps) {
   }
 
   function removeAttachment(id: string) {
+    // A pending Save keeps its attachment IDs for retry. Do not change or discard them.
+    if (deps.editingPendingSave()) return;
     const serverId = deps.currentTarget()?.serverId;
     deps.updateCurrentDraft({
       attachments: deps.currentDraft().attachments.filter((attachment) => attachment.id !== id),

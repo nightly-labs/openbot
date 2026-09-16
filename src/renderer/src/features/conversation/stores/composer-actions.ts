@@ -2,7 +2,7 @@ import type { DraftAttachment, QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { errorMessage } from "../../../error-message";
 import { expandComposerMentions } from "../ComposerEditor";
-import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY } from "../composer-draft";
+import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
@@ -24,6 +24,8 @@ export interface ComposerActionsDeps {
   setEditingDraftBackup: (draft: ComposerDraft | null) => void;
   editingOriginalAttachmentIds: () => string[];
   setEditingOriginalAttachmentIds: (ids: string[]) => void;
+  editingPendingSave: () => StoredQueueEdit["pendingSave"] | null;
+  setEditingPendingSave: (save: StoredQueueEdit["pendingSave"] | null) => void;
   submitting: () => boolean;
   setSubmitting: (submitting: boolean) => void;
   selectionSending: () => boolean;
@@ -83,6 +85,19 @@ export function createComposerActions(deps: ComposerActionsDeps) {
 
   async function addAttachments(selected: DraftAttachment[], target = deps.currentTarget()) {
     if (!target) return;
+    const pendingSave = deps.editingPendingSave();
+    if (
+      pendingSave &&
+      deps.editingAgentId() === target.agentId &&
+      deps.editingServerId() === target.serverId &&
+      pendingSave.deliveryId === deps.editingDeliveryId() &&
+      pendingSave.editId === deps.editingEditId()
+    ) {
+      for (const attachment of selected)
+        void window.openbot.agent.discardDraftAttachment(attachment.id, target.serverId);
+      deps.setComposerError("Save is not confirmed. Retry Save to check the result.", target);
+      return;
+    }
     deps.clearConversationError(target);
     const key = composerDraftKey(target);
     const draft = deps.drafts()[key] ?? EMPTY_DRAFT;
@@ -150,6 +165,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const agentId = deps.props.agent?.id;
     const serverId = deps.props.server?.id ?? "local";
     if (!agentId || delivery.status !== "queued" || deps.submitting()) return;
+    // A pending Save owns the outcome: keep it for retry instead of replacing it.
+    if (deps.editingPendingSave()) return;
     if (deps.editingDeliveryId() && !(await cancelQueuedMessageEdit())) return;
     const backup = copyComposerDraft(deps.currentDraft());
     const supportsHold =
@@ -163,6 +180,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.setEditingOriginalAttachmentIds(original.attachments.map((attachment) => attachment.id));
       deps.setEditingDeliveryId(original.id);
       deps.setEditingEditId(editId);
+      deps.setEditingPendingSave(null);
       deps.setDrafts((current) => ({
         ...current,
         [composerDraftKey({ agentId, serverId })]: {
@@ -265,6 +283,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     deps.setEditingServerId(null);
     deps.setEditingDeliveryId(null);
     deps.setEditingEditId(null);
+    deps.setEditingPendingSave(null);
     window.localStorage.removeItem(QUEUE_EDIT_STORAGE_KEY);
     deps.setEditingDraftBackup(null);
     deps.setEditingOriginalAttachmentIds([]);
@@ -290,15 +309,65 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.setComposerError("This queued message is no longer available.", { agentId, serverId });
       return false;
     }
-    const text = expandComposerMentions(draft.text);
-    const originalAttachmentIds = new Set(target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds());
-    const keepAttachmentIds = draft.attachments
-      .filter((attachment) => originalAttachmentIds.has(attachment.id))
-      .map((attachment) => attachment.id);
-    const attachmentDraftIds = draft.attachments
-      .filter((attachment) => !originalAttachmentIds.has(attachment.id))
-      .map((attachment) => attachment.id);
-    if (!text.trim() && keepAttachmentIds.length === 0 && attachmentDraftIds.length === 0) return false;
+    // A lost Save response leaves the exact request durable. Retry it instead of
+    // rebuilding from the draft, so a changed text cannot fail the host check.
+    const storedPending = deps.editingPendingSave();
+    const hasPending =
+      Boolean(editId) &&
+      storedPending?.action === "save" &&
+      storedPending.deliveryId === deliveryId &&
+      storedPending.editId === editId &&
+      deps.editingAgentId() === agentId &&
+      deps.editingServerId() === serverId;
+    let text: string;
+    let keepAttachmentIds: string[];
+    let attachmentDraftIds: string[];
+    if (hasPending && storedPending?.action === "save") {
+      text = storedPending.text;
+      keepAttachmentIds = storedPending.keepAttachmentIds;
+      attachmentDraftIds = storedPending.attachmentDraftIds;
+    } else {
+      text = expandComposerMentions(draft.text);
+      const originalAttachmentIds = new Set(target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds());
+      keepAttachmentIds = draft.attachments
+        .filter((attachment) => originalAttachmentIds.has(attachment.id))
+        .map((attachment) => attachment.id);
+      attachmentDraftIds = draft.attachments
+        .filter((attachment) => !originalAttachmentIds.has(attachment.id))
+        .map((attachment) => attachment.id);
+      if (!text.trim() && keepAttachmentIds.length === 0 && attachmentDraftIds.length === 0) return false;
+      if (editId) {
+        const pendingSave = {
+          action: "save" as const,
+          deliveryId,
+          editId,
+          text,
+          keepAttachmentIds,
+          attachmentDraftIds,
+        };
+        // Persist the exact request before sending: a lost response must stay retryable.
+        deps.setEditingPendingSave(pendingSave);
+        try {
+          window.localStorage.setItem(
+            QUEUE_EDIT_STORAGE_KEY,
+            JSON.stringify({
+              agentId,
+              serverId,
+              deliveryId,
+              editId,
+              originalAttachmentIds: target?.originalAttachmentIds ?? deps.editingOriginalAttachmentIds(),
+              backup: deps.editingDraftBackup() ?? EMPTY_DRAFT,
+              draft,
+              pendingSave,
+            }),
+          );
+        } catch {
+          deps.setEditingPendingSave(null);
+          deps.setComposerError("Could not save this edit on this computer. Try again.", { agentId, serverId });
+          return false;
+        }
+      }
+    }
 
     stopTeamTyping();
     deps.setSubmitting(true);
@@ -339,6 +408,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.setEditingServerId(null);
       deps.setEditingDeliveryId(null);
       deps.setEditingEditId(null);
+      deps.setEditingPendingSave(null);
       window.localStorage.removeItem(QUEUE_EDIT_STORAGE_KEY);
       deps.setEditingDraftBackup(null);
       deps.setEditingOriginalAttachmentIds([]);

@@ -1155,6 +1155,61 @@ it("acquires a host hold before editing and uses its identity for save and cance
   );
 });
 
+it("reuses the durable Save request after a lost response and blocks edits until retry", async () => {
+  installOpenbotStub();
+  const delivery = queuedDelivery("durable-save", "Original queue message", 1);
+  const snapshot = {
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  };
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue(snapshot);
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+  render(() => <App />);
+  const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  composer.textContent = "First save";
+  await fireEvent.input(composer);
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockRejectedValueOnce(new Error("Connection lost"));
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  await screen.findByText("Connection lost");
+  // The exact Save request stays durable for retry, including after a restart.
+  const stored = window.localStorage.getItem("openbot:queue-edit");
+  expect(stored).toContain(begin.editId);
+  expect(stored).toContain("First save");
+  expect(stored).toContain("pendingSave");
+  // Changes stay blocked until the pending Save resolves, so a retry cannot fail the host check.
+  // The editor is disabled while the Save is pending; a programmatic input must not
+  // change the durable draft or the retry payload.
+  composer.textContent = "Changed after lost response";
+  await fireEvent.input(composer);
+  expect(window.localStorage.getItem("openbot:queue-edit")).toContain("First save");
+  expect(window.localStorage.getItem("openbot:queue-edit")).not.toContain("Changed after lost response");
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      {
+        agentId: "chief",
+        deliveryId: delivery.id,
+        editId: begin.editId,
+        action: "save",
+        text: "First save",
+        keepAttachmentIds: [],
+        attachmentDraftIds: [],
+      },
+      "local",
+    ),
+  );
+  const saves = vi
+    .mocked(window.openbot.agent.editQueuedMessage)
+    .mock.calls.filter(([input]) => input.action === "save");
+  expect(saves).toHaveLength(2);
+  expect(saves[0][0]).toEqual(saves[1][0]);
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
+  expect(window.localStorage.getItem("openbot:queue-edit")).toBeNull();
+});
+
 it.each(["cancelled", "missing"] as const)(
   "releases a desktop edit when its delivery is %s on another device",
   async (state) => {

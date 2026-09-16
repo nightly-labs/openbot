@@ -51,7 +51,11 @@ const first: QueueDelivery = {
   createdAt: "2026-09-15T00:00:00Z",
 };
 
-function stubQueue(queued: QueueDelivery[], error: string | null = null): ChatQueueController {
+function stubQueue(
+  queued: QueueDelivery[],
+  error: string | null = null,
+  edit: ChatQueueController["edit"] = null,
+): ChatQueueController {
   return {
     chatId: "host:agent",
     agentId: "agent",
@@ -60,7 +64,7 @@ function stubQueue(queued: QueueDelivery[], error: string | null = null): ChatQu
     changeAttachments: async () => {},
     queued,
     deliveries: queued,
-    edit: null,
+    edit,
     editUnavailable: false,
     confirmed: false,
     busy: false,
@@ -149,4 +153,19 @@ it("keeps the entry reachable when the queue did not load", () => {
   expect(button.textContent).toContain("Queue unavailable");
   act(() => fireEvent.click(button));
   expect(native.push).toHaveBeenCalledWith({ pathname: "/queued-messages", params: { chat: "host:agent" } });
+});
+
+it("counts a held edit whose delivery is missing from the queue", () => {
+  // A lost Save response can leave the host queue empty while the phone restores its
+  // pending edit. The button must stay, so the saved edit stays reachable.
+  const held = {
+    editId: "edit-held",
+    initialized: true,
+    delivery: first,
+    text: first.text,
+    keepAttachmentIds: [],
+    addedAttachments: [],
+  };
+  mount(stubQueue([], null, held));
+  expect(screen.getByRole("button", { name: "1 queued message. Show queued messages" })).toBeTruthy();
 });

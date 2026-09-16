@@ -14,6 +14,7 @@ import {
   EMPTY_DRAFT,
   QUEUE_EDIT_STORAGE_KEY,
   readStoredQueueEdit,
+  type StoredQueueEdit,
 } from "./composer-draft";
 import { composerDraftKey } from "./conversation-keys";
 import type {
@@ -110,6 +111,9 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
   const [editingOriginalAttachmentIds, setEditingOriginalAttachmentIds] = createSignal<string[]>(
     restoredEdit?.originalAttachmentIds ?? [],
   );
+  const [editingPendingSave, setEditingPendingSave] = createSignal<StoredQueueEdit["pendingSave"] | null>(
+    restoredEdit?.pendingSave ?? null,
+  );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   createEffect(
@@ -127,19 +131,36 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
             originalAttachmentIds: editingOriginalAttachmentIds(),
             backup: editingDraftBackup() ?? EMPTY_DRAFT,
             draft: drafts()[composerDraftKey({ agentId, serverId })] ?? EMPTY_DRAFT,
+            pendingSave: editingPendingSave() ?? undefined,
           }
         : null;
     },
     (edit) => {
       if (!edit) return;
       const persist = () => {
-        if (editingEditId() !== edit.editId) return;
+        // Read fresh state: a pending Save set after this effect ran must not be
+        // overwritten by the previous snapshot without it.
+        const agentId = editingAgentId();
+        const serverId = editingServerId();
+        const deliveryId = editingDeliveryId();
+        const editId = editingEditId();
+        if (!agentId || !serverId || !deliveryId || !editId || editId !== edit.editId) return;
+        const current = {
+          agentId,
+          serverId,
+          deliveryId,
+          editId,
+          originalAttachmentIds: editingOriginalAttachmentIds(),
+          backup: editingDraftBackup() ?? EMPTY_DRAFT,
+          draft: drafts()[composerDraftKey({ agentId, serverId })] ?? EMPTY_DRAFT,
+          pendingSave: editingPendingSave() ?? undefined,
+        };
         try {
-          window.localStorage.setItem(QUEUE_EDIT_STORAGE_KEY, JSON.stringify(edit));
+          window.localStorage.setItem(QUEUE_EDIT_STORAGE_KEY, JSON.stringify(current));
         } catch {
-          setConversationErrors((current) => ({
-            ...current,
-            [composerDraftKey(edit)]: "Could not save this edit on this computer.",
+          setConversationErrors((currentErrors) => ({
+            ...currentErrors,
+            [composerDraftKey(current)]: "Could not save this edit on this computer.",
           }));
         }
       };
@@ -234,6 +255,8 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     setEditingDraftBackup,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
+    editingPendingSave,
+    setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
     conversationErrors,
