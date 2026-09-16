@@ -10,7 +10,7 @@ const native = vi.hoisted(() => ({ push: vi.fn(), selection: vi.fn(async () => {
 vi.mock("expo-router", () => ({ router: { push: native.push } }));
 vi.mock("@/shared/lib/haptics", () => ({ haptics: { selection: native.selection } }));
 vi.mock("expo-glass-effect", () => ({ GlassView: ({ children }: PropsWithChildren) => <div>{children}</div> }));
-vi.mock("lucide-react-native", () => ({ ChevronUp: () => null, Clock: () => null }));
+vi.mock("lucide-react-native", () => ({ ChevronUp: () => null, Clock: () => null, TriangleAlert: () => null }));
 vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => "gray" }));
 vi.mock("heroui-native", () => {
   const Text = ({ children }: PropsWithChildren) => <span>{children}</span>;
@@ -51,7 +51,7 @@ const first: QueueDelivery = {
   createdAt: "2026-09-15T00:00:00Z",
 };
 
-function stubQueue(queued: QueueDelivery[]): ChatQueueController {
+function stubQueue(queued: QueueDelivery[], error: string | null = null): ChatQueueController {
   return {
     serverId: "host",
     attachments: [],
@@ -63,7 +63,7 @@ function stubQueue(queued: QueueDelivery[]): ChatQueueController {
     confirmed: false,
     busy: false,
     progress: null,
-    error: null,
+    error,
     loading: false,
     canEdit: true,
     online: true,
@@ -137,4 +137,14 @@ it("shows the queued count and opens the sheet on press", () => {
 it("counts an uploading message toward the badge", () => {
   mount(stubQueue([first]), "Uploading now");
   expect(screen.getByRole("button", { name: "2 queued messages. Show queued messages" })).toBeTruthy();
+});
+
+it("keeps the entry reachable when the queue did not load", () => {
+  // A failed load reports no messages. Without the entry, the failure and its retry would
+  // stay hidden behind a button the chat never shows.
+  mount(stubQueue([], "Could not load the queue."));
+  const button = screen.getByRole("button", { name: "The queued messages did not load. Show queued messages" });
+  expect(button.textContent).toContain("Queue unavailable");
+  act(() => fireEvent.click(button));
+  expect(native.push).toHaveBeenCalledWith("/queued-messages");
 });

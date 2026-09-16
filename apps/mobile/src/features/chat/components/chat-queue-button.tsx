@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { ChevronUp, Clock } from "lucide-react-native";
+import { ChevronUp, Clock, TriangleAlert } from "lucide-react-native";
 import { memo } from "react";
 import { View, type ViewStyle } from "react-native";
 import { haptics } from "@/shared/lib/haptics";
@@ -24,11 +24,18 @@ export const ChatQueueButton = memo(function ChatQueueButton({
 }: ChatQueueButtonProps) {
   const muted = useThemeColor("muted");
   const count = queue.queued.length + (pending ? 1 : 0);
-  if (count === 0) return null;
+  // A queue that failed to load reports no messages. Keep the entry, so the failure and its
+  // retry stay reachable instead of leaving the chat with nothing to press.
+  const failed = count === 0 && Boolean(queue.error);
+  if (count === 0 && !failed) return null;
   return (
     <View className="mb-2 items-center">
       <ChatGlassButton
-        accessibilityLabel={`${count} queued message${count === 1 ? "" : "s"}. Show queued messages`}
+        accessibilityLabel={
+          failed
+            ? "The queued messages did not load. Show queued messages"
+            : `${count} queued message${count === 1 ? "" : "s"}. Show queued messages`
+        }
         className="h-11 flex-row items-center gap-2 px-4"
         fallbackBackground={fallbackBackground}
         height={44}
@@ -38,9 +45,13 @@ export const ChatQueueButton = memo(function ChatQueueButton({
           router.push("/queued-messages");
         }}
       >
-        <Clock color={String(muted)} size={16} strokeWidth={2} />
+        {failed ? (
+          <TriangleAlert color={String(muted)} size={16} strokeWidth={2} />
+        ) : (
+          <Clock color={String(muted)} size={16} strokeWidth={2} />
+        )}
         <Typography.Paragraph type="body-sm" weight="semibold">
-          {count} queued
+          {failed ? "Queue unavailable" : `${count} queued`}
         </Typography.Paragraph>
         <ChevronUp color={String(muted)} size={16} strokeWidth={2} />
       </ChatGlassButton>

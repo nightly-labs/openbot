@@ -18,10 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import {
-  TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY,
-  TEAM_CONVERSATION_UNREAD_CAPABILITY,
-} from "@openbot/contracts/team-protocol/current";
+import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -126,8 +123,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   useEffect(
     () => () => {
-      for (const kind of ["chat-queue", "queue-thumbnail", "queue-edit-attachments"])
-        queryClient.removeQueries({ queryKey: [kind] });
+      for (const kind of ["chat-queue", "queue-edit-attachments"]) queryClient.removeQueries({ queryKey: [kind] });
     },
     [queryClient],
   );
@@ -206,7 +202,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const id of serverAgentIds.current.get(server.id) ?? []) removedAgentIds.add(id);
         serverAgentIds.current.delete(server.id);
         presenceSignatures.current.delete(server.id);
-        for (const kind of ["chat-queue", "queue-thumbnail", "queue-edit-attachments"])
+        for (const kind of ["chat-queue", "queue-edit-attachments"])
           queryClient.removeQueries({ queryKey: [kind, server.id] });
         for (const kind of ["server-members", "server-invites", "agent-avatar"]) {
           queryClient.removeQueries({ queryKey: [kind, session.apiUrl, session.user.id, sessionScope, server.id] });
@@ -933,25 +929,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), ignoreResponse, {
           operationId: Crypto.randomUUID(),
         });
-      },
-      loadAttachmentThumbnail: async (serverId, attachmentId) => {
-        if (!serverCapabilities.current.get(serverId)?.includes(TEAM_ATTACHMENT_THUMBNAILS_CAPABILITY)) return null;
-        return request(
-          "GET",
-          `${TEAM_API_ROUTES.attachment(attachmentId)}?thumbnail=64`,
-          (value) => {
-            if (
-              !isDynamicRecord(value) ||
-              value.mimeType !== "image/png" ||
-              !isString(value.base64) ||
-              value.base64.length > 86_000
-            )
-              throw new Error("The host returned an invalid thumbnail.");
-            return `data:image/png;base64,${value.base64}`;
-          },
-          undefined,
-          serverId,
-        );
       },
       loadQueue: (agentId, serverId) =>
         request(

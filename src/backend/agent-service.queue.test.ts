@@ -91,6 +91,41 @@ describe.sequential("AgentService: queue", () => {
     );
   });
 
+  it("rejects a save that repeats a finished cancellation and keeps the original message", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = createTestService({ store, mailbox, clientFactory: () => client });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const first = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
+    const deliveryId = first.deliveries[0].id;
+    await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" });
+    await service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "phone-edit" });
+    const file = join(root, "late-upload.txt");
+    await writeFile(file, "Late upload");
+    const [draft] = await mailbox.prepareImportedAttachments([file], []);
+    // A cancel whose response was lost leaves the editor open. The save that follows it
+    // must report the rejection instead of success, so the client keeps the typed text.
+    await expect(
+      service.editQueuedMessage("chief", {
+        action: "save",
+        deliveryId,
+        editId: "phone-edit",
+        text: "Edited on phone",
+        keepAttachmentIds: [],
+        attachmentDraftIds: [draft.id],
+      }),
+    ).rejects.toThrow("cancelled");
+    // The upload belonged to the finished edit, so the host keeps no orphan draft.
+    await expect(
+      mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Reuse", draftIds: [draft.id] }),
+    ).rejects.toThrow("no longer exists");
+    await waitFor(() => mailbox.listQueue("chief").deliveries[0]?.status === "completed");
+    const starts = client.requests.filter((request) => request.method === "turn/start");
+    expect(starts).toHaveLength(1);
+    expect(firstInputText(starts[0].params)).toContain("Original");
+  });
+
   it("starts a new agent in a development build on the OpenCode development model", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);

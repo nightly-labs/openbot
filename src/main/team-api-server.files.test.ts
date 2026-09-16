@@ -11,19 +11,19 @@ import { createAgents, createTeamApiFixture, stopTeamApiFixtures } from "./team-
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer files", () => {
-  it("rejects unsupported thumbnail requests without sending the full attachment", async () => {
-    const { root, start, signIn } = await createTeamApiFixture("attachment-thumbnail", { configure: true });
+  it("sends an attachment only to an authenticated member", async () => {
+    const { root, start, signIn } = await createTeamApiFixture("attachment-read", { configure: true });
     const path = join(root, "private-image.png");
     await writeFile(path, "full attachment bytes");
-    const { base } = await start({ mailbox: { resolveAttachment: async () => ({ path, mimeType: "image/png" }) } });
-    const token = await signIn();
-    const headers = { Authorization: `Bearer ${token}` };
-    const unauthorized = await fetch(`${base}/v1/attachments/image?thumbnail=64`);
+    const { base } = await start({
+      mailbox: { resolveAttachment: async () => ({ path, mimeType: "image/png", name: "private-image.png" }) },
+    });
+    const unauthorized = await fetch(`${base}/v1/attachments/image`);
     expect(unauthorized.status).toBe(401);
-    const unsupported = await fetch(`${base}/v1/attachments/image?thumbnail=64`, { headers });
-    expect(unsupported.status).toBe(400);
-    expect(await unsupported.text()).not.toContain("full attachment bytes");
-    const original = await fetch(`${base}/v1/attachments/image`, { headers });
+    expect(await unauthorized.text()).not.toContain("full attachment bytes");
+    const original = await fetch(`${base}/v1/attachments/image`, {
+      headers: { Authorization: `Bearer ${await signIn()}` },
+    });
     expect(original.status).toBe(200);
     expect(await original.text()).toBe("full attachment bytes");
   });

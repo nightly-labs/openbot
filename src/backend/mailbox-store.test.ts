@@ -80,7 +80,7 @@ describe("MailboxStore", () => {
     const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
     await restored.initialize();
     expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Changed", position: 1 });
-    expect(restored.queueEditFinished("chief", id, "edit-rollback")).toBe(true);
+    expect(restored.finishedQueueEditAction("chief", id, "edit-rollback")).toBe("save");
   });
 
   it("holds an edit across a restart and rejects dispatch, steer and a second editor", async () => {
@@ -107,10 +107,11 @@ describe("MailboxStore", () => {
     await restored.reorderQueue("chief", [id, second.deliveries[0].id]);
     expect(restored.listQueue("chief").deliveries.map((item) => item.id)).toEqual([id, second.deliveries[0].id]);
     await restored.updateQueuedMessage("chief", id, "Edited", [], [], "phone-edit");
-    expect(restored.queueEditFinished("chief", id, "phone-edit")).toBe(true);
+    expect(restored.finishedQueueEditAction("chief", id, "phone-edit")).toBe("save");
     expect(restored.nextQueued("chief")?.delivery).toMatchObject({ id, text: "Edited", position: 1 });
-    expect(restored.queueEditFinished("chief", id, "phone-edit")).toBe(true);
+    expect(restored.finishedQueueEditAction("chief", id, "phone-edit")).toBe("save");
     expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditId");
+    expect(restored.listQueue("chief").deliveries[0]).not.toHaveProperty("finishedEditAction");
     await restored.markStarting(id);
     expect(restored.nextQueued("chief")).toBeNull();
   });
@@ -131,6 +132,9 @@ describe("MailboxStore", () => {
     await expect(store.updateQueuedMessage("chief", id, "", [], [], "edit-cancel")).rejects.toThrow("empty");
     expect(store.nextQueued("chief")).toBeNull();
     store.finishQueueEdit("chief", id, "edit-cancel");
+    // A cancelled edit is remembered as a cancellation, so a lost Save response cannot
+    // later report success for text the message never received.
+    expect(store.finishedQueueEditAction("chief", id, "edit-cancel")).toBe("cancel");
     expect(store.listQueue("chief").deliveries[0]).toEqual(before);
     store.beginQueueEdit("chief", id, "edit-delete");
     await store.cancel("chief", id);

@@ -868,13 +868,9 @@ its editor only after confirmation. The mailbox stores
 the hold in the existing delivery JSON. The first held delivery blocks automatic queue dispatch;
 steer and an update without that edit identity are rejected. Saving commits the replacement
 message and releases the hold in one mailbox transaction. Cancel restores normal dispatch without
-changing the message. Delete cancels the delivery. A finished edit identity makes a repeated save
-or cancel safe after a lost response. Holds and locally saved edit drafts survive host restart and client navigation; they have
+changing the message. Delete cancels the delivery. A finished edit identity records the action that
+finished it, so a repeat of that same action stays safe after a lost response, while a save that
+follows a completed cancel is rejected instead of reporting success for text the host never took. Holds and locally saved edit drafts survive host restart and client navigation; they have
 no timeout that could send a message while someone is still editing it. Older hosts retain queue
 view, steer, delete and reorder, but mobile disables editing without the capability.
 
-The optional `attachment-thumbnails-v1` capability adds `thumbnail=64` to attachment reads. The
-host first resolves the managed attachment, then creates a native thumbnail. It serializes native
-thumbnail work and keeps at most 64 cached results. Mobile requests previews only for mounted
-queue rows and uses local cached image URIs when available. Unsupported thumbnail formats or
-host platforms use a file-type icon; they never trigger a full-file download for the queue.

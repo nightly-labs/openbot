@@ -91,7 +91,12 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
 
   const run = useCallback(
     async (action: () => Promise<void>) => {
-      if (busyRef.current || !online) return false;
+      if (busyRef.current) return false;
+      // A silent refusal leaves a screen that waits for this result with nothing to show.
+      if (!online) {
+        setError("Reconnect to change the queue.");
+        return false;
+      }
       busyRef.current = true;
       setBusy(true);
       setError(null);
@@ -273,12 +278,27 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       cancelUpload: () => {
         cancelled.current = true;
       },
-      cancelEdit: () =>
-        run(async () => {
-          if (!edit) return;
-          await editQueue(agentId, serverId, { action: "cancel", deliveryId: edit.delivery.id, editId: edit.editId });
+      // Reports whether the host hold is gone. A rejection means the host already finished
+      // this edit, so the local hold goes as well; any other failure keeps the edit for a retry.
+      cancelEdit: async () => {
+        if (!edit) return true;
+        let rejected = false;
+        const released = await run(async () => {
+          try {
+            await editQueue(agentId, serverId, {
+              action: "cancel",
+              deliveryId: edit.delivery.id,
+              editId: edit.editId,
+            });
+          } catch (cause) {
+            rejected = isQueueEditRejected(cause);
+            throw cause;
+          }
           await clearEdit();
-        }),
+        });
+        if (!released && rejected) await clearEdit();
+        return released || rejected;
+      },
       remove: (delivery: QueueDelivery) =>
         run(async () => {
           await changeQueue(agentId, serverId, "cancel", { deliveryId: delivery.id });

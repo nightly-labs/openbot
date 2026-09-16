@@ -304,6 +304,15 @@ it("shows an uploading message with its progress and cancels it", () => {
   expect(cancel).toHaveBeenCalled();
 });
 
+it("offers a retry when the queue did not load", () => {
+  const queue = stubQueue({ queued: [], deliveries: [], error: "Could not load the queue." });
+  native.context.queue = queue;
+  mount(() => <QueuedMessagesScreen />);
+  expect(screen.getByText("Could not load the queue.")).toBeTruthy();
+  act(() => fireEvent.click(screen.getByRole("button", { name: "Try again" })));
+  expect(queue.refresh).toHaveBeenCalled();
+});
+
 it("steers a queued message and returns to the list", async () => {
   const queue = stubQueue();
   native.context.queue = queue;
@@ -422,4 +431,34 @@ it("offers only a close action when the queued message is gone", async () => {
   expect(queue.discardFinishedEdit).toHaveBeenCalled();
   await act(async () => {});
   expect(native.back).toHaveBeenCalled();
+});
+
+it("keeps the editor open when the host hold cannot be released", async () => {
+  const queue = stubQueue({
+    edit: heldEdit,
+    confirmed: true,
+    cancelEdit: vi.fn(async () => false),
+    error: "Reconnect to change the queue.",
+  });
+  native.context.queue = queue;
+  mount(() => <QueuedMessageEditScreen />);
+  act(() => fireEvent.click(screen.getByRole("button", { name: "Cancel edit" })));
+  await act(async () => {});
+  expect(queue.cancelEdit).toHaveBeenCalled();
+  // The host still holds the message, so a closed editor would leave the queue blocked.
+  expect(native.back).not.toHaveBeenCalled();
+  expect(screen.getByText("Reconnect to change the queue.")).toBeTruthy();
+});
+
+it("asks before it leaves a message the host still holds", async () => {
+  const queue = stubQueue({ edit: heldEdit, confirmed: true, cancelEdit: vi.fn(async () => false) });
+  native.context.queue = queue;
+  mount(() => <QueuedMessageEditScreen />);
+  act(() => native.guard.callback?.({ data: { action: "pop" } }));
+  await act(async () => {});
+  expect(native.dispatch).not.toHaveBeenCalled();
+  const buttons: { text: string; onPress?: () => void }[] = native.alert.mock.calls[0][2];
+  act(() => buttons.find((button) => button.text === "Leave anyway")?.onPress?.());
+  await act(async () => {});
+  expect(native.dispatch).toHaveBeenCalledWith("pop");
 });

@@ -66,7 +66,6 @@ interface AddRemoteServerInput {
 }
 
 export interface MobileWorkspaceContextValue {
-  loadAttachmentThumbnail: (serverId: string, attachmentId: string) => Promise<string | null>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   changeQueue: (

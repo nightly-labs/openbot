@@ -57,9 +57,23 @@ export function QueuedMessagesScreen() {
   return (
     <SettingsContent>
       {queue?.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">
-          {queue.error}
-        </Typography.Paragraph>
+        <>
+          <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">
+            {queue.error}
+          </Typography.Paragraph>
+          <SettingsSection>
+            <SettingsRow
+              disclosure={false}
+              disabled={queue.busy || queue.loading}
+              onPress={() => {
+                void haptics.selection();
+                queue.refresh();
+              }}
+            >
+              <Typography>Try again</Typography>
+            </SettingsRow>
+          </SettingsSection>
+        </>
       ) : null}
       {count > 0 ? (
         <SettingsSection title="Waiting for the agent">

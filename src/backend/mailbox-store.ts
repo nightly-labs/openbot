@@ -57,9 +57,12 @@ interface StoredMessage {
   createdAt: string;
 }
 
+type QueueEditOutcome = "save" | "cancel";
+
 interface StoredDelivery {
   editId?: string;
   finishedEditId?: string;
+  finishedEditAction?: QueueEditOutcome;
   id: string;
   messageId: string;
   recipientAgentId: string;
@@ -929,10 +932,16 @@ export class MailboxStore {
     }
   }
 
-  queueEditFinished(agentId: string, deliveryId: string, editId: string): boolean {
-    return this.#state.deliveries.some(
+  /**
+   * Reports which action completed an edit, so a retry that lost its response can tell a
+   * finished Save from a finished Cancel. A Save that repeats a Cancel must not report
+   * success: the host never applied that text.
+   */
+  finishedQueueEditAction(agentId: string, deliveryId: string, editId: string): QueueEditOutcome | undefined {
+    const delivery = this.#state.deliveries.find(
       (item) => item.id === deliveryId && item.recipientAgentId === agentId && item.finishedEditId === editId,
     );
+    return delivery?.finishedEditAction;
   }
 
   finishQueueEdit(agentId: string, deliveryId: string, editId: string): void {
@@ -940,13 +949,16 @@ export class MailboxStore {
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
     if (!delivery || delivery.editId !== editId) throw new QueueEditRejectedError("This edit is no longer available.");
     const previousFinished = delivery.finishedEditId;
+    const previousFinishedAction = delivery.finishedEditAction;
     delivery.finishedEditId = editId;
+    delivery.finishedEditAction = "cancel";
     delete delivery.editId;
     try {
       this.#persist("delivery.edit-finished");
     } catch (error) {
       delivery.editId = editId;
       delivery.finishedEditId = previousFinished;
+      delivery.finishedEditAction = previousFinishedAction;
       throw error;
     }
   }
@@ -1014,6 +1026,7 @@ export class MailboxStore {
 
     const previous = structuredClone(message);
     const previousFinishedEditId = delivery.finishedEditId;
+    const previousFinishedEditAction = delivery.finishedEditAction;
     const oldAttachmentPaths = message.attachments
       .filter((attachment) => !keepIds.has(attachment.id))
       .map((attachment) => attachment.path);
@@ -1051,6 +1064,7 @@ export class MailboxStore {
       if (editId) {
         delete delivery.editId;
         delivery.finishedEditId = editId;
+        delivery.finishedEditAction = "save";
       }
       this.#state.drafts = this.#state.drafts.filter((draft) => !draftIds.has(draft.id));
       await this.#persist(
@@ -1064,6 +1078,7 @@ export class MailboxStore {
       if (editId) {
         delivery.editId = editId;
         delivery.finishedEditId = previousFinishedEditId;
+        delivery.finishedEditAction = previousFinishedEditAction;
       }
       for (const draft of drafts) {
         if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
@@ -1284,7 +1299,12 @@ export class MailboxStore {
     positions = this.#queuedPositions(),
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
-    const { editId: _editId, finishedEditId: _finishedEditId, ...publicDelivery } = delivery;
+    const {
+      editId: _editId,
+      finishedEditId: _finishedEditId,
+      finishedEditAction: _finishedEditAction,
+      ...publicDelivery
+    } = delivery;
     return {
       ...publicDelivery,
       sender: structuredClone(message.sender),
@@ -1552,6 +1572,9 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     isString(value.recipientAgentId) &&
     (value.editId === undefined || isString(value.editId)) &&
     (value.finishedEditId === undefined || isString(value.finishedEditId)) &&
+    (value.finishedEditAction === undefined ||
+      value.finishedEditAction === "save" ||
+      value.finishedEditAction === "cancel") &&
     (value.queueOrder === undefined || (isNumber(value.queueOrder) && Number.isFinite(value.queueOrder))) &&
     (value.status === "queued" ||
       value.status === "starting" ||

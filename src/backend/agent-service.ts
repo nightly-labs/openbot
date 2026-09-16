@@ -1678,11 +1678,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async editQueuedMessage(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {
-    if (this.#mailbox.queueEditFinished(agentId, input.deliveryId, input.editId)) {
+    const finished = this.#mailbox.finishedQueueEditAction(agentId, input.deliveryId, input.editId);
+    if (finished) {
       if (input.action === "begin" || input.action === "retain-attachments")
         throw new QueueEditRejectedError("This edit has already finished.");
+      // The uploads belong to an edit that is over, so they never stay behind.
       if (input.action === "save")
         await Promise.all(input.attachmentDraftIds.map((id) => this.#mailbox.discardDraft(id)));
+      // Only a retry of the action that finished can report success. A Save that follows a
+      // finished Cancel never reached the message, so the client must keep its text.
+      if (input.action !== finished)
+        throw new QueueEditRejectedError(
+          finished === "cancel"
+            ? "This edit was cancelled, so the message keeps its original text."
+            : "This edit was already saved.",
+        );
       this.#drain.scheduleDrain(agentId);
       this.#mailboxSync.emitQueue(agentId);
       return this.listQueue(agentId);

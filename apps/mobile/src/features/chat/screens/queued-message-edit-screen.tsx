@@ -70,8 +70,35 @@ export function QueuedMessageEditScreen() {
     if (work) void work.finally(finish);
     else finish();
   }, []);
+  // The editor closes only after the host lets the message go. A failed release keeps the
+  // message held, so the agent would wait for a phone that no longer shows the editor.
+  const releaseThenExit = useCallback(
+    (go: () => void, onFailure?: () => void) => {
+      const work = queue?.cancelEdit();
+      if (!work) {
+        exitAfter(null, go);
+        return;
+      }
+      void work.then((released) => {
+        if (released) exitAfter(null, go);
+        else onFailure?.();
+      });
+    },
+    [queue, exitAfter],
+  );
   usePreventRemove(Boolean(edit) && !leaving, ({ data }) => {
-    const release = () => exitAfter(queue?.cancelEdit() ?? null, () => navigation.dispatch(data.action));
+    const go = () => navigation.dispatch(data.action);
+    const release = () =>
+      releaseThenExit(go, () => {
+        Alert.alert(
+          "Still holding the message",
+          "OpenBot could not release this message, so the agent keeps waiting for it. Try again after the phone reconnects.",
+          [
+            { text: "Keep editing", style: "cancel" },
+            { text: "Leave anyway", onPress: () => exitAfter(null, go) },
+          ],
+        );
+      });
     if (!dirty) {
       release();
       return;
@@ -189,11 +216,7 @@ export function QueuedMessageEditScreen() {
       ) : null}
 
       <SettingsSection>
-        <SettingsRow
-          disclosure={false}
-          disabled={queue.busy}
-          onPress={() => exitAfter(queue.cancelEdit(), () => router.back())}
-        >
+        <SettingsRow disclosure={false} disabled={queue.busy} onPress={() => releaseThenExit(() => router.back())}>
           <Typography className="text-danger-text">Cancel edit</Typography>
         </SettingsRow>
       </SettingsSection>
