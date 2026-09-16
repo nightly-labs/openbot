@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 type Invoke = (event: { senderFrame: { url: string } }, payload: unknown) => Promise<void>;
 const { bound, saveDialog } = vi.hoisted(() => ({
   bound: new Map<string, Invoke>(),
-  saveDialog: vi.fn<() => Promise<{ canceled: boolean; filePath?: string }>>(),
+  saveDialog: vi.fn<(options?: unknown) => Promise<{ canceled: boolean; filePath?: string }>>(),
 }));
 vi.mock("electron", () => ({
   app: { getPath: () => tmpdir() },
@@ -96,7 +96,7 @@ describe("ZIP attachment IPC", () => {
         resolveSharedFile: vi.fn(),
         resolveWorkspaceFile: vi.fn(),
       },
-      mailbox: { resolveAttachment: async () => ({ path: sourcePath, mimeType: "text/plain" }) },
+      mailbox: { resolveAttachment: async () => ({ path: sourcePath, mimeType: "text/plain", name: "source.txt" }) },
       remoteServers: {
         supportsCapability: vi.fn(),
         request: vi.fn(),
@@ -134,5 +134,51 @@ describe("ZIP attachment IPC", () => {
       invoke({ senderFrame: { url: "https://example.com" } }, { serverId: "local", payload: input }),
     ).toThrow("Rejected IPC request from an untrusted renderer.");
     expect(saveDialog).not.toHaveBeenCalled();
+  });
+});
+
+describe("single attachment download", () => {
+  function registerSingle(resolved: { path: string; mimeType: string; name: string }) {
+    const handlers = attachmentIpcHandlers({
+      getMainWindow: () => null,
+      service: {
+        prepareAttachments: vi.fn(),
+        prepareImportedAttachments: vi.fn(),
+        discardDraftAttachment: vi.fn(),
+        resolveSharedFile: vi.fn(),
+        resolveWorkspaceFile: vi.fn(),
+      },
+      mailbox: { resolveAttachment: async () => resolved },
+      remoteServers: {
+        supportsCapability: vi.fn(),
+        request: vi.fn(),
+        downloadSharedFile: vi.fn(),
+        downloadWorkspaceFile: vi.fn(),
+        uploadAttachment: vi.fn(),
+        downloadAttachment: vi.fn(),
+      },
+    });
+    handlers.agentAttachments.openAttachment("single-download");
+    const invoke = bound.get("single-download");
+    if (!invoke) throw new Error("Open handler was not registered.");
+    return invoke;
+  }
+
+  it("suggests the original file name instead of a mime-derived name", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "attachment-single-"));
+    directories.push(directory);
+    const sourcePath = join(directory, "launch-brief.md");
+    await writeFile(sourcePath, "brief");
+    const targetPath = join(directory, "saved.md");
+    saveDialog.mockClear();
+    saveDialog.mockResolvedValue({ canceled: false, filePath: targetPath });
+    const invoke = registerSingle({ path: sourcePath, mimeType: "text/markdown", name: "launch-brief.md" });
+    await invoke(
+      { senderFrame: { url: "openbot-app://app/index.html" } },
+      { serverId: "local", payload: { attachmentId: "some-id", action: "download" } },
+    );
+    expect(saveDialog).toHaveBeenCalledOnce();
+    expect(saveDialog.mock.calls[0]?.[0]).toMatchObject({ defaultPath: expect.stringMatching(/launch-brief\.md$/) });
+    expect(await readFile(targetPath, "utf8")).toBe("brief");
   });
 });
