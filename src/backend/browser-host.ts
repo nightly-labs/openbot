@@ -34,7 +34,7 @@ import {
 } from "electron";
 import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult } from "./browser-cdp";
 import { BrowserDiagnostics } from "./browser-diagnostics";
-import { requiresScrubbedIdentity, scrubbedBrowserUserAgent } from "./browser-identity";
+import { scrubbedBrowserUserAgent, siteIdentityForUrl } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import { isCloseBrowserTabShortcut, isGlobalSearchShortcut, isToggleDevToolsShortcut } from "./browser-shortcuts";
 import {
@@ -1719,7 +1719,7 @@ function browserLoadOptions(): { extraHeaders: string } {
 
 function browserRequestHeaders(url: string, requestHeaders: Record<string, string>): Record<string, string> {
   const headers = { ...requestHeaders };
-  if (requiresScrubbedIdentity(url)) {
+  if (siteIdentityForUrl(url) === "scrubbed") {
     const userAgentName = Object.keys(headers).find((candidate) => candidate.toLowerCase() === "user-agent");
     if (userAgentName !== undefined) {
       const scrubbed = scrubbedBrowserUserAgent(headers[userAgentName]);

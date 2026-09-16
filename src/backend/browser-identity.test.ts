@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requiresScrubbedIdentity, scrubbedBrowserUserAgent } from "./browser-identity";
+import { scrubbedBrowserUserAgent, siteIdentityForUrl } from "./browser-identity";
 
 describe("scrubbedBrowserUserAgent", () => {
   it("removes the build and product tokens for gated hosts", () => {
@@ -16,20 +16,24 @@ describe("scrubbedBrowserUserAgent", () => {
   });
 });
 
-describe("requiresScrubbedIdentity", () => {
-  it("names WhatsApp hosts including subdomains and media hosts", () => {
-    expect(requiresScrubbedIdentity("https://web.whatsapp.com/")).toBe(true);
-    expect(requiresScrubbedIdentity("https://www.whatsapp.com/download")).toBe(true);
-    expect(requiresScrubbedIdentity("https://mmg.whatsapp.net/media")).toBe(true);
-    expect(requiresScrubbedIdentity("https://whatsapp.com/")).toBe(true);
+describe("siteIdentityForUrl", () => {
+  it("scrubs WhatsApp hosts including subdomains and media hosts", () => {
+    expect(siteIdentityForUrl("https://web.whatsapp.com/")).toBe("scrubbed");
+    expect(siteIdentityForUrl("https://www.whatsapp.com/download")).toBe("scrubbed");
+    expect(siteIdentityForUrl("https://mmg.whatsapp.net/media")).toBe("scrubbed");
+    expect(siteIdentityForUrl("https://whatsapp.com/")).toBe("scrubbed");
   });
 
-  it("ignores lookalike hosts and anything unparsable", () => {
-    expect(requiresScrubbedIdentity("https://evilwhatsapp.com/")).toBe(false);
-    expect(requiresScrubbedIdentity("https://whatsapp.com.evil.test/")).toBe(false);
-    expect(requiresScrubbedIdentity("https://accounts.google.com/")).toBe(false);
-    expect(requiresScrubbedIdentity("https://www.google.com/")).toBe(false);
-    expect(requiresScrubbedIdentity("about:blank")).toBe(false);
-    expect(requiresScrubbedIdentity("not a url")).toBe(false);
+  it("keeps native identity for lookalikes and everything else", () => {
+    expect(siteIdentityForUrl("https://evilwhatsapp.com/")).toBe("native");
+    expect(siteIdentityForUrl("https://whatsapp.com.evil.test/")).toBe("native");
+    expect(siteIdentityForUrl("https://accounts.google.com/")).toBe("native");
+    expect(siteIdentityForUrl("https://www.google.com/")).toBe("native");
+    expect(siteIdentityForUrl("https://x.com/")).toBe("native");
+  });
+
+  it("falls back to native when no host can be read", () => {
+    expect(siteIdentityForUrl("about:blank")).toBe("native");
+    expect(siteIdentityForUrl("not a url")).toBe("native");
   });
 });
