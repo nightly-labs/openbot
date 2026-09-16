@@ -70,20 +70,29 @@ describe.sequential("AgentService: restart", () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
     await service.initialize();
+    await store.getOrCreate("chief");
+    const languageInstruction = "Respond only in English unless the user explicitly asks for another language.";
+    await service.updateAgent({ agentId: "chief", description: languageInstruction });
     await service.sendMessage({ agentId: "chief", text: "Remember this" });
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    const start = (await protocolMessages(logPath)).find((message) => message.method === "thread/start");
+    const startInstructions = getString(start?.params, "developerInstructions") ?? "";
+    expect(startInstructions).toContain(languageInstruction);
+    expect(startInstructions).toContain("Treat explicit response-language requirements in the profile description");
     const threadId = (await store.getOrCreate("chief")).threadId;
     await service.stop();
 
     service = createTestService({ store, mailbox });
     await service.initialize();
     expect(service.listQueue("chief").deliveries[0]?.status).toBe("interrupted");
-    await service.sendMessage({ agentId: "chief", text: "Continue" });
+    await service.sendMessage({ agentId: "chief", text: "Kontynuuj" });
     await waitFor(async () => (await protocolMessages(logPath)).some((message) => message.method === "thread/resume"));
     const resume = (await protocolMessages(logPath)).find((message) => message.method === "thread/resume");
     expect(resume?.params).toMatchObject({ threadId: store.activeProviderSession("chief")?.externalSessionId });
+    const resumeInstructions = getString(resume?.params, "developerInstructions") ?? "";
+    expect(resumeInstructions).toContain(languageInstruction);
+    expect(resumeInstructions).toContain("Do not switch languages to match the user's message or system locale");
     // Codex fixes tools at session creation; resume ignores a dynamicTools field.
-    const start = (await protocolMessages(logPath)).find((message) => message.method === "thread/start");
     expect(start?.params).toMatchObject({
       dynamicTools: expect.arrayContaining([
         expect.objectContaining({ type: "namespace", name: "openbot_browser" }),
