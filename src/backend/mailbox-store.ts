@@ -971,14 +971,17 @@ export class MailboxStore {
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
     if (!delivery || delivery.editId !== editId) throw new QueueEditRejectedError("This edit is no longer available.");
     const previousOutcomes = delivery.finishedEditOutcomes ? { ...delivery.finishedEditOutcomes } : undefined;
+    const released = this.#state.drafts.filter((draft) => draft.ownerEditId === editId);
     recordFinishedQueueEdit(delivery, editId, { action: "cancel" });
     delete delivery.editId;
+    for (const draft of released) delete draft.ownerEditId;
     try {
       this.#persist("delivery.edit-finished");
     } catch (error) {
       delivery.editId = editId;
       if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
       else delete delivery.finishedEditOutcomes;
+      for (const draft of released) draft.ownerEditId = editId;
       throw error;
     }
   }
@@ -1051,6 +1054,7 @@ export class MailboxStore {
       .map((attachment) => attachment.path);
     const draftAttachmentPaths = drafts.map((draft) => draft.path);
     let newAttachmentPaths: string[] = [];
+    let releasedOwned: StoredDraft[] = [];
     try {
       const keptAttachments = keepAttachmentIds.flatMap((id) =>
         message.attachments.filter((attachment) => attachment.id === id),
@@ -1088,6 +1092,13 @@ export class MailboxStore {
         });
       }
       this.#state.drafts = this.#state.drafts.filter((draft) => !draftIds.has(draft.id));
+      if (editId) {
+        // A durable composer backup retained for this edit is no longer owned by it:
+        // a save discards the backup, a cancel restores it, and in both cases the
+        // remaining drafts return to normal lifetime instead of staying edit-owned.
+        releasedOwned = this.#state.drafts.filter((draft) => draft.ownerEditId === editId);
+        for (const draft of releasedOwned) delete draft.ownerEditId;
+      }
       await this.#persist(
         "message.updated",
         `mailbox:message-updated:${deliveryId}:${randomUUID()}`,
@@ -1100,6 +1111,7 @@ export class MailboxStore {
         delivery.editId = editId;
         if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
         else delete delivery.finishedEditOutcomes;
+        for (const draft of releasedOwned) draft.ownerEditId = editId;
       }
       for (const draft of drafts) {
         if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
@@ -1654,14 +1666,11 @@ function queueSaveHash(text: string, keepAttachmentIds: string[], attachmentDraf
  * Completed edit outcomes live on by edit identity, so a lost Save response stays
  * confirmable after another device edits and saves the same message again. A single
  * latest-only record would forget the first save the moment the second one commits.
- * The map is capped to bound the persisted blob; entries only matter while their
- * client may still retry, so the oldest go first.
+ * Entries are kept while the delivery stays queued: both clients retain `pendingSave`
+ * without an expiry, so the host cannot assume an older result is unused. Each entry
+ * is one edit id plus one action and hash, so the map grows only with human edits of
+ * one queued message.
  */
-const MAX_FINISHED_QUEUE_EDITS = 20;
-
 function recordFinishedQueueEdit(delivery: StoredDelivery, editId: string, outcome: StoredFinishedEdit): void {
-  const outcomes: Record<string, StoredFinishedEdit> = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
-  const ids = Object.keys(outcomes);
-  for (const stale of ids.slice(0, Math.max(0, ids.length - MAX_FINISHED_QUEUE_EDITS))) delete outcomes[stale];
-  delivery.finishedEditOutcomes = outcomes;
+  delivery.finishedEditOutcomes = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
 }

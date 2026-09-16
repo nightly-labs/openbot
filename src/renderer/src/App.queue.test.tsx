@@ -1367,3 +1367,40 @@ it("keeps an imported edit attachment busy until the host retains it", async () 
     ),
   );
 });
+
+it("retains the composer backup attachments with the queue edit", async () => {
+  installOpenbotStub();
+  const delivery = queuedDelivery("backup-edit", "Original queue message", 1);
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  });
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+  render(() => <App />);
+  await screen.findByRole("heading", { name: "Chief" });
+  emitAttachmentImport?.({ type: "started", requestId: "backup-paste", serverId: "local" });
+  emitAttachmentImport?.({
+    type: "completed",
+    requestId: "backup-paste",
+    serverId: "local",
+    attachments: [attachment("backup-1", "backup.pdf", "pdf")],
+  });
+  await screen.findByRole("button", { name: "Remove backup.pdf" });
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      { ...begin, action: "retain-attachments", attachmentDraftIds: ["backup-1"] },
+      "local",
+    ),
+  );
+  await fireEvent.keyDown(document, { key: "Escape" });
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      { agentId: "chief", deliveryId: delivery.id, editId: begin.editId, action: "cancel" },
+      "local",
+    ),
+  );
+  expect(await screen.findByRole("button", { name: "Remove backup.pdf" })).toBeInTheDocument();
+});

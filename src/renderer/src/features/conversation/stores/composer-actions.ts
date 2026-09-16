@@ -218,6 +218,43 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         );
         const original = held.deliveries.find((item) => item.id === delivery.id);
         if (!original) throw new Error("This queued message is no longer available.");
+        if (backup.attachments.length) {
+          try {
+            await window.openbot.agent.editQueuedMessage(
+              {
+                agentId,
+                action: "retain-attachments",
+                deliveryId: delivery.id,
+                editId,
+                attachmentDraftIds: backup.attachments.map((attachment) => attachment.id),
+              },
+              serverId,
+            );
+            if (deps.editingEditId() !== editId) throw new Error("The queue edit has ended.");
+          } catch (retainError) {
+            try {
+              await window.openbot.agent.editQueuedMessage(
+                { agentId, action: "cancel", deliveryId: delivery.id, editId },
+                serverId,
+              );
+            } catch {
+              // The hold release is best effort: the outer catch still reports the failure.
+            }
+            deps.setDrafts((current) => ({
+              ...current,
+              [composerDraftKey({ agentId, serverId })]: backup,
+            }));
+            deps.setEditingAgentId(null);
+            deps.setEditingServerId(null);
+            deps.setEditingDeliveryId(null);
+            deps.setEditingEditId(null);
+            deps.setEditingPendingSave(null);
+            window.localStorage.removeItem(QUEUE_EDIT_STORAGE_KEY);
+            deps.setEditingDraftBackup(null);
+            deps.setEditingOriginalAttachmentIds([]);
+            throw retainError;
+          }
+        }
         setEditingDraft(original);
       }
     } catch (error) {
@@ -353,6 +390,13 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         );
         if (!held.deliveries.some((item) => item.id === deliveryId))
           throw new Error("This queued message is no longer available.");
+        const backupAttachments = (deps.editingDraftBackup()?.attachments ?? []).map((attachment) => attachment.id);
+        if (backupAttachments.length) {
+          await window.openbot.agent.editQueuedMessage(
+            { agentId, action: "retain-attachments", deliveryId, editId, attachmentDraftIds: backupAttachments },
+            serverId,
+          );
+        }
       } catch (error) {
         deps.setSubmitting(false);
         deps.setComposerError(errorMessage(error, "Could not hold the queued message for editing."), {
