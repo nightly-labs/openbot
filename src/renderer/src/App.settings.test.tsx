@@ -124,7 +124,6 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief"));
     await screen.findByRole("button", { name: "ChatGPT weekly usage, 59% left" });
     const dialog = screen.getByRole("dialog", { name: "Account actions" });
-    expect(dialog).toHaveTextContent("Chief · gpt-5.6-luna");
     expect(within(dialog).getByRole("region", { name: "5-hour limit" })).toHaveTextContent("72% left");
   });
 
@@ -143,7 +142,6 @@ describe("OpenBot connected desktop shell", () => {
     const trigger = await screen.findByRole("button", { name: "ChatGPT weekly usage unavailable" });
     if (platform === "darwin") await fireEvent.click(trigger);
     const dialog = screen.getByRole("dialog", { name: platform === "darwin" ? "ChatGPT usage" : "Account actions" });
-    expect(dialog).toHaveTextContent("Chief · gpt-5.6-luna");
     expect(within(dialog).getByRole("progressbar", { name: "ChatGPT weekly usage remaining" })).toHaveAttribute(
       "aria-valuetext",
       "Unavailable",
@@ -185,7 +183,6 @@ describe("OpenBot connected desktop shell", () => {
       "85",
     );
     expect(within(dialog).getByText("left this week")).toBeInTheDocument();
-    expect(dialog).toHaveTextContent("Chief · claude-opus-5");
     const shortLimit = within(dialog).getByRole("region", { name: "5-hour limit" });
     expect(shortLimit).toHaveTextContent("0% left");
     expect(shortLimit).toHaveTextContent("Resets at an unknown time");
@@ -234,7 +231,7 @@ describe("OpenBot connected desktop shell", () => {
 
     const trigger = screen.getByRole("button", { name: "Claude weekly usage, 18% left" });
     await fireEvent.click(trigger);
-    expect(screen.getByRole("dialog", { name: "Claude usage" })).toHaveTextContent("Chief · claude-opus-5");
+    expect(screen.getByRole("dialog", { name: "Claude usage" })).toBeInTheDocument();
   });
 
   it("replaces an in-flight usage request after usage is invalidated", async () => {

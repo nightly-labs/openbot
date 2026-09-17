@@ -295,16 +295,6 @@ export function AccountDock(props: AccountDockProps) {
   function usageDetails() {
     return (
       <>
-        <Show
-          when={props.usageAgent}
-          fallback={<p class="account-usage-description">Select an agent to see provider limits.</p>}
-        >
-          {(agent) => (
-            <p class="account-usage-description">
-              {agent().name} · {agent().model}
-            </p>
-          )}
-        </Show>
         <div class="account-usage-popover-meter">
           <RadialProgress
             value={usageValue()}
