@@ -36,7 +36,12 @@ import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import { applySiteIdentity } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
-import { isCloseBrowserTabShortcut, isGlobalSearchShortcut, isToggleDevToolsShortcut } from "./browser-shortcuts";
+import {
+  isCloseBrowserTabShortcut,
+  isCollapseBrowserShortcut,
+  isGlobalSearchShortcut,
+  isToggleDevToolsShortcut,
+} from "./browser-shortcuts";
 import {
   type BrowserTabOwner,
   defaultBrowserEnvironment,
@@ -1039,6 +1044,13 @@ export class BrowserHost {
         this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode: "K", modifiers });
         return;
       }
+      if (isCollapseBrowserShortcut(input)) {
+        // Deliberately no `preventDefault()`: `before-input-event` is synchronous and says nothing
+        // about what has focus, so the page keeps the key and the decision is made after asking it.
+        // A page that closes its own dialog on Escape does that as well as collapsing the panel.
+        this.#collapseOnEscape(contents);
+        return;
+      }
       if (!isCloseBrowserTabShortcut(input)) return;
       event.preventDefault();
       setImmediate(() => void this.close(tab.id).catch(() => undefined));
@@ -1103,6 +1115,34 @@ export class BrowserHost {
       if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerAgentId, true);
       return { action: "deny" };
     });
+  }
+
+  /**
+   * Forward Escape from an embedded page to the renderer, which collapses the expanded browser back
+   * to the preview sidebar. A text field in the page keeps the key instead, so Escape still clears a
+   * combo box or cancels an inline edit. The focused element is read with `executeJavaScript`, which
+   * gives the page no capability it does not already have; a preload or a permanent debugger attach
+   * would answer synchronously but weaken the sandboxed view or fight the automation recorder.
+   */
+  #collapseOnEscape(contents: WebContents): void {
+    void contents
+      .executeJavaScript(
+        `(() => {
+          const node = document.activeElement;
+          if (!node) return false;
+          if (node.isContentEditable) return true;
+          const name = node.tagName;
+          return name === "INPUT" || name === "TEXTAREA" || name === "SELECT";
+        })()`,
+        true,
+      )
+      .then((editable) => {
+        if (editable === true || this.#window.isDestroyed()) return;
+        this.#window.webContents.focus();
+        this.#window.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+        this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+      })
+      .catch(() => undefined);
   }
 
   async #syncViewBackground(tab: InternalTab): Promise<void> {
@@ -1409,8 +1449,10 @@ export class BrowserHost {
     } else {
       this.#mountView(tab.view, targetWindow);
     }
-    // Native views are not clipped by the renderer. Match --openbot-radius-xl.
-    tab.view.setBorderRadius(this.#target === "picture-in-picture" ? 0 : 20);
+    // Native views are not clipped by the renderer, so the radius has to be set here. Every
+    // surface the page can occupy is square: the expanded panel is full bleed against the window
+    // edges, and Picture in Picture has always been square.
+    tab.view.setBorderRadius(0);
     // Renderer bounds are CSS pixels; native child views use device-independent window pixels.
     const zoomFactor = targetWindow.webContents.getZoomFactor();
     tab.view.setBounds(

@@ -7,6 +7,17 @@ interface BrowserShortcutInput {
   shift: boolean;
 }
 
+/**
+ * A bare Escape, which collapses the expanded browser back to the preview sidebar. The expanded
+ * panel covers the whole window, so the page holds focus almost all the time and the renderer
+ * never sees the key unless the host forwards it.
+ */
+export function isCollapseBrowserShortcut(input: BrowserShortcutInput): boolean {
+  return (
+    input.type === "keyDown" && input.key === "Escape" && !input.control && !input.meta && !input.alt && !input.shift
+  );
+}
+
 export function isCloseBrowserTabShortcut(input: BrowserShortcutInput): boolean {
   return (
     input.type === "keyDown" &&

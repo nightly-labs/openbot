@@ -73,6 +73,12 @@ interface BrowserPanelProps {
   onSurface: (element: HTMLDivElement | undefined) => void;
   onBack: () => void;
   onEnterPip: () => void;
+  /**
+   * Whether the window draws the macOS traffic lights over this panel. The panel is portaled to
+   * `document.body`, so it sits outside `.app-frame` and cannot read `app-frame-platform-darwin`
+   * from an ancestor; the platform has to arrive as a value.
+   */
+  macWindowControls?: boolean;
 }
 
 function diagnosticErrorLabel(count: number): string {
@@ -145,7 +151,13 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       aria-hidden={props.open ? undefined : "true"}
       inert={!props.open}
       id="browser-expanded-panel"
-      class={["browser-panel browser-panel-expanded", { "browser-panel-controlled": Boolean(actingControl()) }]}
+      class={[
+        "browser-panel browser-panel-expanded",
+        {
+          "browser-panel-controlled": Boolean(actingControl()),
+          "browser-panel-mac-controls": props.macWindowControls === true,
+        },
+      ]}
       aria-label="Browser"
       value={props.activeTab?.id ?? "__empty"}
       activationMode="automatic"

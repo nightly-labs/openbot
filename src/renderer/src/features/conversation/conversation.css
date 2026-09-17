@@ -8610,50 +8610,34 @@ body:has(.browser-panel-expanded) .app-frame {
   position: fixed;
   inset: 0;
   z-index: calc(var(--openbot-layer-dropdown) - 2);
-  opacity: 1;
-  transition:
-    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
-    display var(--openbot-duration-overlay) allow-discrete;
 }
 
+/*
+ * The expanded browser fills the window edge to edge. `border: 0` is not redundant: the shared
+ * `.browser-panel` rule above gives every browser surface a `border-left`, which would otherwise
+ * draw a seam down the left edge of a panel that has nothing beside it.
+ *
+ * The panel appears and disappears in one frame, with no transition. The page inside it is a native
+ * view that the renderer cannot animate: it can only be attached once the panel has stopped moving
+ * (`BrowserPanel.tsx`), so any opening transition is time spent looking at an empty panel before the
+ * page arrives.
+ */
 .browser-panel-expanded {
   position: fixed;
-  inset: 5% 2.5%;
-  width: 95%;
-  height: 90%;
+  inset: 0;
+  /* The shared `.browser-panel` rule sizes the sidebar with `--browser-panel-width`; a set width
+   * wins over `inset`, so the panel has to give it up to reach the right window edge. */
+  width: auto;
   z-index: calc(var(--openbot-layer-dropdown) - 1);
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-xl);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: var(--openbot-shadow-overlay);
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  transition:
-    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
-    transform var(--openbot-duration-overlay) var(--openbot-ease-out),
-    display var(--openbot-duration-overlay) allow-discrete;
+  box-shadow: none;
 }
 
 .browser-panel-expanded[hidden],
 .browser-expanded-backdrop[hidden] {
   display: none;
-  opacity: 0;
-  pointer-events: none;
-  transition-duration: var(--openbot-duration-normal);
-}
-
-.browser-panel-expanded[hidden] {
-  transform: translateY(var(--openbot-space-2)) scale(0.96);
-}
-
-@starting-style {
-  .browser-panel-expanded {
-    opacity: 0;
-    transform: translateY(var(--openbot-space-2)) scale(0.96);
-  }
-  .browser-expanded-backdrop {
-    opacity: 0;
-  }
 }
 
 .browser-hide {
@@ -8663,18 +8647,36 @@ body:has(.browser-panel-expanded) .app-frame {
   z-index: calc(var(--openbot-layer-dropdown) - 1);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .browser-panel-expanded,
-  .browser-expanded-backdrop {
-    transition: none;
-  }
+/*
+ * The button is portaled next to the panel rather than inside it, so it cannot inherit the mac class
+ * and `:has` on the body is what reaches it. The offset puts its 24px box on the same centre line as
+ * the traffic lights and the tabs, so the whole strip reads as one row.
+ */
+body:has(.browser-panel-mac-controls) .browser-hide {
+  top: var(--openbot-space-2);
 }
 
 .browser-panel-expanded .browser-panel-header {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-3);
-  padding-inline: var(--openbot-space-2);
+  /* The inline end reserves the corner `.browser-hide` sits in, which is fixed to the window rather
+   * than to this header, so the tab strip would otherwise scroll underneath it. */
+  padding-inline: var(--openbot-space-2) var(--openbot-space-8);
+}
+
+/*
+ * On macOS the window is `titleBarStyle: "hidden"` and the traffic lights are drawn over the page.
+ * `trafficLightPosition: { x: 12, y: 13 }` (`src/main/main-window.ts`) is the top left of the group,
+ * not of one dot: macOS spaces the three 13px dots 23px apart, so they cover x 12..71 and y 13..26,
+ * centre line y 19.5. A full-bleed panel puts this header under them, so the inset clears the whole
+ * group rather than one dot, and it is the same 82px where the app frame's top row starts beside
+ * those dots - one gutter width across the app instead of a second, tighter one here. The header
+ * keeps its default height, which leaves the tab row's centre line on the dots'. The inset stays
+ * part of the drag region, which keeps the window movable at full bleed.
+ */
+.browser-panel-expanded.browser-panel-mac-controls .browser-panel-header {
+  padding-inline-start: 82px;
 }
 
 .browser-panel-expanded .browser-tabs {
