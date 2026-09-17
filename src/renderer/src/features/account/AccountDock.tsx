@@ -1,11 +1,14 @@
 import type {
   AccountUsage,
+  AccountUsageWindow,
   AgentStatus,
+  AgentSummary,
   AppInfo,
   CentralAuthUser,
   ExternalDestination,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { agentProviderName } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { TypingDots } from "../../components/TypingDots";
 import {
@@ -37,6 +40,7 @@ interface AccountDockProps {
   appInfo: AppInfo | null;
   agentStatus: AgentStatus;
   accountUsage: AccountUsage | null;
+  usageAgent: Pick<AgentSummary, "name" | "provider" | "model"> | null;
   usageTargetKey: string | null;
   usageRefreshRevision: number;
   usageReady: boolean;
@@ -110,6 +114,10 @@ export function AccountDock(props: AccountDockProps) {
   const accountName = createMemo(
     () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email,
   );
+  const usageProviderName = createMemo(() =>
+    props.usageAgent ? agentProviderName(props.usageAgent.provider) : "Provider",
+  );
+  const usageTitle = createMemo(() => `${usageProviderName()} usage`);
   const weeklyUsage = createMemo(() => {
     for (const limit of props.accountUsage?.limits ?? []) {
       const weekly = [limit.primary, limit.secondary].find((window) => isWeeklyWindow(window?.windowDurationMins));
@@ -133,24 +141,28 @@ export function AccountDock(props: AccountDockProps) {
     return tone === "warning" ? "warning" : "accent";
   });
   const usageButtonLabel = createMemo(() => {
-    if (usageLoading() && weeklyUsageRemaining() === null) return "Weekly usage is loading";
-    if (weeklyUsageRemaining() === null) return "Weekly usage unavailable";
-    return `Weekly usage, ${weeklyUsageRemaining()}% left`;
+    const label = `${usageProviderName()} weekly usage`;
+    if (usageLoading() && weeklyUsageRemaining() === null) return `${label} is loading`;
+    if (weeklyUsageRemaining() === null) return `${label} unavailable`;
+    return `${label}, ${weeklyUsageRemaining()}% left`;
   });
   const usageRefreshActive = createMemo(() => usageLoading() || usageRefreshAcknowledging());
   const usageRefreshDisabled = createMemo(() => usageRefreshActive() || !props.usageReady || !props.usageTargetKey);
-  const weeklyUsageReset = createMemo(() => {
-    const resetsAt = weeklyUsage()?.resetsAt;
-    if (resetsAt === null || resetsAt === undefined) return null;
-    const date = new Date(resetsAt * 1_000);
-    if (Number.isNaN(date.getTime())) return null;
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(date);
-  });
+  const weeklyUsageReset = createMemo(() => formatUsageReset(weeklyUsage()?.resetsAt));
+  const otherUsageWindows = createMemo(() =>
+    (props.accountUsage?.limits ?? []).flatMap((limit) =>
+      [limit.primary, limit.secondary]
+        .filter((window): window is AccountUsageWindow => window !== null && window !== weeklyUsage())
+        .map((window) => ({
+          label:
+            props.accountUsage && props.accountUsage.limits.length > 1
+              ? `${limit.id} · ${usageWindowLabel(window.windowDurationMins)}`
+              : usageWindowLabel(window.windowDurationMins),
+          remaining: Math.max(0, Math.round(100 - window.usedPercent)),
+          reset: formatUsageReset(window.resetsAt),
+        })),
+    ),
+  );
   const updatePresentation = createMemo(() => presentUpdateStatus(props.updateStatus));
   const accountMenuError = createMemo(
     () =>
@@ -280,6 +292,66 @@ export function AccountDock(props: AccountDockProps) {
     return <UserAvatar user={props.account} class={className} decorative />;
   }
 
+  function usageDetails() {
+    return (
+      <>
+        <Show
+          when={props.usageAgent}
+          fallback={<p class="account-usage-description">Select an agent to see provider limits.</p>}
+        >
+          {(agent) => (
+            <p class="account-usage-description">
+              Limits reported by {usageProviderName()} for {agent().name} ({agent().model}).
+            </p>
+          )}
+        </Show>
+        <div class="account-usage-popover-meter">
+          <RadialProgress
+            value={usageValue()}
+            tone={usageRadialTone()}
+            aria-label={`${usageProviderName()} weekly usage remaining`}
+            aria-valuetext={
+              usageLoading() && weeklyUsageRemaining() === null
+                ? "Loading"
+                : weeklyUsageRemaining() === null
+                  ? "Unavailable"
+                  : `${weeklyUsageRemaining()}% left`
+            }
+          >
+            <strong>
+              {usageLoading() && weeklyUsageRemaining() === null
+                ? "…"
+                : weeklyUsageRemaining() === null
+                  ? "—"
+                  : `${weeklyUsageRemaining()}%`}
+            </strong>
+          </RadialProgress>
+          <span class="account-usage-description">left this week</span>
+        </div>
+        <div class="account-usage-popover-reset">
+          <CalendarClock aria-hidden="true" />
+          <span>Weekly reset</span>
+          <strong>{weeklyUsageReset() ? weeklyUsageReset() : usageLoading() ? "Checking…" : "Unavailable"}</strong>
+        </div>
+        <For each={otherUsageWindows()}>
+          {(window) => (
+            <section class="account-usage-window" aria-label={window.label}>
+              <div class="account-usage-window-summary">
+                <span>{window.label}</span>
+                <strong>{window.remaining}% left</strong>
+              </div>
+              <span class="account-usage-description">Resets {window.reset ?? "at an unknown time"}</span>
+            </section>
+          )}
+        </For>
+        <p class="account-usage-description">
+          These limits follow the selected agent, not the default provider in Settings. They are not combined across
+          providers. Other limits can stop requests before the weekly limit is reached.
+        </p>
+      </>
+    );
+  }
+
   function accountMenu(includeDockActions = false) {
     return (
       <>
@@ -294,9 +366,10 @@ export function AccountDock(props: AccountDockProps) {
               disabled={usageRefreshDisabled()}
             >
               <Gauge class="account-menu-icon" aria-hidden="true" />
-              <span>Weekly usage</span>
-              <small>{weeklyUsageRemaining() === null ? "—" : `${weeklyUsageRemaining()}%`}</small>
+              <span>{usageProviderName()} weekly usage</span>
+              <small>{weeklyUsageRemaining() === null ? "—" : `${weeklyUsageRemaining()}% left`}</small>
             </Button>
+            {usageDetails()}
             <Button
               variant="ghost"
               type="button"
@@ -558,7 +631,7 @@ export function AccountDock(props: AccountDockProps) {
                   <header class="account-usage-popover-header">
                     <div class="account-usage-popover-heading">
                       <Gauge aria-hidden="true" />
-                      <Popover.Title class="account-usage-popover-title">Weekly usage</Popover.Title>
+                      <Popover.Title class="account-usage-popover-title">{usageTitle()}</Popover.Title>
                     </div>
                     <Button
                       variant="ghost"
@@ -576,42 +649,14 @@ export function AccountDock(props: AccountDockProps) {
                       />
                     </Button>
                   </header>
-                  <div class="account-usage-popover-meter">
-                    <RadialProgress
-                      value={usageValue()}
-                      tone={usageRadialTone()}
-                      aria-label="Weekly usage remaining"
-                      aria-valuetext={
-                        usageLoading() && weeklyUsageRemaining() === null
-                          ? "Loading"
-                          : weeklyUsageRemaining() === null
-                            ? "Unavailable"
-                            : `${weeklyUsageRemaining()}% left`
-                      }
-                    >
-                      <strong>
-                        {usageLoading() && weeklyUsageRemaining() === null
-                          ? "…"
-                          : weeklyUsageRemaining() === null
-                            ? "—"
-                            : `${weeklyUsageRemaining()}%`}
-                      </strong>
-                    </RadialProgress>
-                  </div>
-                  <div class="account-usage-popover-reset">
-                    <CalendarClock aria-hidden="true" />
-                    <span>Resets</span>
-                    <strong>
-                      {weeklyUsageReset() ? weeklyUsageReset() : usageLoading() ? "Checking…" : "Unavailable"}
-                    </strong>
-                  </div>
+                  {usageDetails()}
                   <Show when={usageError()}>{(message) => <p class="account-usage-popover-error">{message()}</p>}</Show>
                 </Popover.Content>
               </Popover.Portal>
             </Popover.Root>
           </Tooltip.Trigger>
           <Tooltip.Portal>
-            <Tooltip.Content class="ui-tooltip">Weekly usage</Tooltip.Content>
+            <Tooltip.Content class="ui-tooltip">{usageButtonLabel()}</Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
 
@@ -661,6 +706,26 @@ export function AccountDock(props: AccountDockProps) {
       </Show>
     </div>
   );
+}
+
+function formatUsageReset(resetsAt: number | null | undefined): string | null {
+  if (resetsAt === null || resetsAt === undefined) return null;
+  const date = new Date(resetsAt * 1_000);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function usageWindowLabel(durationMins: number | null): string {
+  if (isWeeklyWindow(durationMins)) return "Weekly limit";
+  if (durationMins === null || durationMins <= 0) return "Other limit";
+  if (durationMins % 1_440 === 0) return `${durationMins / 1_440}-day limit`;
+  if (durationMins % 60 === 0) return `${durationMins / 60}-hour limit`;
+  return `${durationMins}-minute limit`;
 }
 
 function isWeeklyWindow(durationMins: number | null | undefined): boolean {

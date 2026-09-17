@@ -69,16 +69,16 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1));
     expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief");
 
-    const usageButton = await screen.findByRole("button", { name: "Weekly usage, 59% left" });
+    const usageButton = await screen.findByRole("button", { name: "ChatGPT weekly usage, 59% left" });
     await fireEvent.click(usageButton);
-    const usageDialog = screen.getByRole("dialog", { name: "Weekly usage" });
-    const usageProgress = within(usageDialog).getByRole("progressbar", { name: "Weekly usage remaining" });
+    const usageDialog = screen.getByRole("dialog", { name: "ChatGPT usage" });
+    const usageProgress = within(usageDialog).getByRole("progressbar", { name: "ChatGPT weekly usage remaining" });
     expect(usageProgress).toHaveAttribute("aria-valuenow", "59");
     expect(usageProgress).toHaveAttribute("aria-valuetext", "59% left");
     await fireEvent.click(within(usageDialog).getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
     await fireEvent.keyDown(usageDialog, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Weekly usage" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "ChatGPT usage" })).not.toBeInTheDocument());
 
     const accountButton = screen.getByRole("button", { name: "Open account actions" });
     await fireEvent.click(accountButton);
@@ -122,6 +122,76 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.agent.getUsage).not.toHaveBeenCalled();
     await fireEvent.click(accountButton);
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief"));
+    await screen.findByRole("button", { name: "ChatGPT weekly usage, 59% left" });
+    const dialog = screen.getByRole("dialog", { name: "Account actions" });
+    expect(dialog).toHaveTextContent("Limits reported by ChatGPT for Chief (gpt-5.6-luna).");
+    expect(within(dialog).getByRole("region", { name: "5-hour limit" })).toHaveTextContent("72% left");
+  });
+
+  it.each(["darwin", "win32"] as const)("shows unavailable usage without a false balance on %s", async (platform) => {
+    vi.mocked(window.openbot.getAppInfo).mockResolvedValue({
+      name: "OpenBot",
+      version: "0.1.0",
+      platform,
+      variant: "production",
+    });
+    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({ limits: [] });
+    render(() => <App />);
+    if (platform === "win32") {
+      await fireEvent.click(await screen.findByRole("button", { name: "Open account menu" }));
+    }
+    const trigger = await screen.findByRole("button", { name: "ChatGPT weekly usage unavailable" });
+    if (platform === "darwin") await fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: platform === "darwin" ? "ChatGPT usage" : "Account actions" });
+    expect(dialog).toHaveTextContent("Limits reported by ChatGPT for Chief (gpt-5.6-luna).");
+    expect(within(dialog).getByRole("progressbar", { name: "ChatGPT weekly usage remaining" })).toHaveAttribute(
+      "aria-valuetext",
+      "Unavailable",
+    );
+    expect(dialog).not.toHaveTextContent(/\d+%/);
+  });
+
+  it("names the selected provider and shows a reached short limit beside the weekly balance", async () => {
+    vi.mocked(window.openbot.agent.getUsage)
+      .mockResolvedValueOnce({
+        limits: [
+          {
+            id: "codex",
+            primary: null,
+            secondary: { usedPercent: 41, windowDurationMins: 10_080, resetsAt: null },
+          },
+        ],
+      })
+      .mockResolvedValue({
+        limits: [
+          {
+            id: "claude",
+            primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: null },
+            secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: null },
+          },
+        ],
+      });
+    render(() => <App />);
+    await screen.findByRole("button", { name: "ChatGPT weekly usage, 59% left" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const picker = screen.getByRole("dialog", { name: "Choose agent model" });
+    await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Claude weekly usage, 85% left" }));
+    const dialog = screen.getByRole("dialog", { name: "Claude usage" });
+    expect(within(dialog).getByRole("progressbar", { name: "Claude weekly usage remaining" })).toHaveAttribute(
+      "aria-valuenow",
+      "85",
+    );
+    expect(within(dialog).getByText("left this week")).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("Limits reported by Claude for Chief (claude-opus-5).");
+    const shortLimit = within(dialog).getByRole("region", { name: "5-hour limit" });
+    expect(shortLimit).toHaveTextContent("0% left");
+    expect(shortLimit).toHaveTextContent("Resets at an unknown time");
+    expect(dialog).toHaveTextContent("not the default provider in Settings");
+    expect(dialog).toHaveTextContent("not combined across providers");
+    expect(screen.queryByRole("dialog", { name: "ChatGPT usage" })).not.toBeInTheDocument();
   });
 
   it("keeps usage scoped to the selected model when an earlier request finishes late", async () => {
@@ -150,7 +220,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
 
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("button", { name: "Weekly usage, 18% left" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Claude weekly usage, 18% left" })).toBeInTheDocument();
 
     resolveInitialUsage({
       limits: [
@@ -164,7 +234,11 @@ describe("OpenBot connected desktop shell", () => {
     await initialUsageRequest;
     await Promise.resolve();
 
-    expect(screen.getByRole("button", { name: "Weekly usage, 18% left" })).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Claude weekly usage, 18% left" });
+    await fireEvent.click(trigger);
+    expect(screen.getByRole("dialog", { name: "Claude usage" })).toHaveTextContent(
+      "Limits reported by Claude for Chief (claude-opus-5).",
+    );
   });
 
   it("replaces an in-flight usage request after usage is invalidated", async () => {
@@ -190,7 +264,7 @@ describe("OpenBot connected desktop shell", () => {
     emitAgentEvent?.({ type: "usage-changed", usage: { limits: [] } });
 
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("button", { name: "Weekly usage, 28% left" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "ChatGPT weekly usage, 28% left" })).toBeInTheDocument();
 
     resolveInitialUsage({
       limits: [
@@ -202,7 +276,7 @@ describe("OpenBot connected desktop shell", () => {
       ],
     });
     await initialUsageRequest;
-    expect(screen.getByRole("button", { name: "Weekly usage, 28% left" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ChatGPT weekly usage, 28% left" })).toBeInTheDocument();
   });
 
   it("persists every settings preference through its own IPC channel", async () => {

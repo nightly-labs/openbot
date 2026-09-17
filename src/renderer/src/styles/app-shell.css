@@ -2541,6 +2541,29 @@ textarea {
   line-height: var(--openbot-leading-md);
 }
 
+.account-usage-description {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+}
+
+.account-usage-window {
+  display: grid;
+  gap: var(--openbot-space-1);
+  border-top: 1px solid var(--openbot-border);
+  padding-top: var(--openbot-space-2);
+}
+
+.account-usage-window-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
 .account-usage-popover-meter {
   display: grid;
   place-items: center;

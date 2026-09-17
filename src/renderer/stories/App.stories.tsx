@@ -182,12 +182,39 @@ export const Channel: Story = {
   },
 };
 
+export const UsageLimitReached: Story = {
+  render: () => (
+    <SidebarStatePlayground
+      compact={false}
+      options={{
+        agents: STORY_AGENT_SUMMARIES.map((agent, index) =>
+          index === 0 ? { ...agent, provider: "claude", model: "claude-opus-5" } : agent,
+        ),
+        usage: {
+          limits: [
+            {
+              id: "claude",
+              primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: null },
+              secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: null },
+            },
+          ],
+        },
+      }}
+    />
+  ),
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(await canvas.findByRole("button", { name: "Claude weekly usage, 85% left" }));
+    const dialog = await within(canvasElement.ownerDocument.body).findByRole("dialog", { name: "Claude usage" });
+    await expect(within(dialog).getByRole("region", { name: "5-hour limit" })).toHaveTextContent("0% left");
+  },
+};
+
 export const AccountMenu: Story = {
   render: () => <SidebarStatePlayground compact={false} />,
   play: async ({ canvas, canvasElement, userEvent }) => {
     await canvas.findByRole("heading", { name: "Chief" });
     const trigger = await canvas.findByRole("button", { name: "Open account actions" });
-    const usageTrigger = await canvas.findByRole("button", { name: /Weekly usage/ });
+    const usageTrigger = await canvas.findByRole("button", { name: /ChatGPT weekly usage/ });
     const settingsTrigger = await canvas.findByRole("button", { name: "Settings" });
     const dock = canvasElement.querySelector<HTMLElement>(".account-dock");
     const rail = canvasElement.querySelector<HTMLElement>(".server-rail");
@@ -202,7 +229,7 @@ export const AccountMenu: Story = {
 
     await userEvent.click(usageTrigger);
     const usagePopover = await within(canvasElement.ownerDocument.body).findByRole("dialog", {
-      name: "Weekly usage",
+      name: "ChatGPT usage",
     });
     await expect(within(usagePopover).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
