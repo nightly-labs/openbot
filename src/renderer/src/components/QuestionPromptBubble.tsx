@@ -27,6 +27,7 @@ export interface QuestionPromptBubbleProps {
   pending?: boolean;
   readOnly?: boolean;
   resolution?: AgentPromptResolution | null;
+  elementRef?: (element: HTMLDivElement | undefined) => void;
   onSubmit: (answers: Record<string, string[]>) => Promise<boolean>;
   onResolutionPresented?: () => void;
 }
@@ -113,7 +114,6 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     return props.questions.length > 0 ? { kind: "question", index: 0 } : null;
   };
   const initialPage = untrack(initialContent);
-  const initialQuestion = untrack(() => (props.resolution ? undefined : props.questions[0]));
   const [step, setStep] = createSignal(0);
   const [answers, setAnswers] = createSignal<QuestionAnswers>({});
   const [customAnswers, setCustomAnswers] = createSignal<QuestionFlags>({});
@@ -142,10 +142,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
     if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
     queuedInteraction = undefined;
     if (resolutionPresentationPending) presentResolution();
-  });
-
-  queueMicrotask(() => {
-    if (initialQuestion && !initialQuestion.options?.length) customInputs.get(initialQuestion.id)?.focus();
+    props.elementRef?.(undefined);
   });
 
   createEffect(
@@ -469,7 +466,12 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   }
 
   return (
-    <Bubble variant="muted" class="question-prompt-bubble" data-state={busy() ? "pending" : "idle"}>
+    <Bubble
+      ref={(element) => props.elementRef?.(element)}
+      variant="muted"
+      class="question-prompt-bubble"
+      data-state={busy() ? "pending" : "idle"}
+    >
       <BubbleContent class="conversation-interaction-card">
         <Show
           when={initialContent()}

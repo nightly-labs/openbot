@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Keyboard, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
 import type Animated from "react-native-reanimated";
@@ -23,7 +23,13 @@ import {
   chatSendOffset,
 } from "../model/chat-layout";
 
-export function useChatMotion(header: number, keyboardOffset: number, ready: boolean, lastUserId: string | null) {
+export function useChatMotion(
+  header: number,
+  keyboardOffset: number,
+  ready: boolean,
+  lastUserId: string | null,
+  requiredInputId: string | null = null,
+) {
   const ref = useAnimatedRef<Animated.ScrollView>();
   const setScrollRef = useCallback(
     (instance: Animated.ScrollView | null) => {
@@ -74,6 +80,9 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
   const [historyVisible, setHistoryVisible] = useState(false);
   const [responseVisible, setResponseVisible] = useState(true);
   const pending = useRef<{ baseline: string | null; first: boolean } | null>(null);
+  const followLatest = useRef(true);
+  const pendingRequiredInput = useRef<{ id: string; contentRevision: number } | null>(null);
+  const lastRequiredInputId = useRef(requiredInputId);
   const frame = useRef<number | null>(null);
   const measurements = useRef<{
     layout: ChatLayout;
@@ -81,6 +90,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     composer: number;
     userHeight: number;
     tailId: string | null;
+    contentRevision: number;
     initialized: boolean;
     virtualized: boolean;
   }>({
@@ -89,11 +99,12 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     composer: 0,
     userHeight: 0,
     tailId: null,
+    contentRevision: 0,
     initialized: false,
     virtualized: false,
   });
-  const current = useRef({ ready, lastUserId });
-  current.current = { ready, lastUserId };
+  const current = useRef({ ready, lastUserId, requiredInputId });
+  current.current = { ready, lastUserId, requiredInputId };
 
   const finishFirstMessage = useCallback(() => setResponseVisible(true), []);
   const revealHistory = useCallback(() => setHistoryVisible(true), []);
@@ -108,6 +119,17 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
       const floor = current.current.lastUserId ? chatBlankSpace(m.layout) : 0;
       // Wait for the native inset commit; Android otherwise clamps to the old range.
       if (m.inset + 2 < Math.max(floor, m.composer)) return;
+      const requiredInput = pendingRequiredInput.current;
+      if (requiredInput && m.contentRevision <= requiredInput.contentRevision) return;
+      if (requiredInput) {
+        pendingRequiredInput.current = null;
+        pending.current = null;
+        m.initialized = true;
+        revealed.set(true);
+        setHistoryVisible(true);
+        ref.current?.scrollTo({ y: chatEndOffset(m.layout, m.inset), animated: !reducedMotion });
+        return;
+      }
       const send = pending.current;
       if (send && current.current.lastUserId === send.baseline) return;
       if (send) {
@@ -130,7 +152,12 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
         }
         return;
       }
-      if (m.initialized) return;
+      if (m.initialized) {
+        if (current.current.requiredInputId && followLatest.current) {
+          ref.current?.scrollTo({ y: chatEndOffset(m.layout, m.inset), animated: false });
+        }
+        return;
+      }
       const target = chatEndOffset(m.layout, m.inset);
       ref.current?.scrollTo({ y: target, animated: false });
       // Repeat after layout/inset commits, then reveal without showing the top of history.
@@ -156,10 +183,17 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     revealed,
   ]);
 
-  useEffect(() => {
-    current.current = { ready, lastUserId };
+  useLayoutEffect(() => {
+    current.current = { ready, lastUserId, requiredInputId };
+    if (requiredInputId !== lastRequiredInputId.current) {
+      pendingRequiredInput.current =
+        requiredInputId && followLatest.current
+          ? { id: requiredInputId, contentRevision: measurements.current.contentRevision }
+          : null;
+    }
+    lastRequiredInputId.current = requiredInputId;
     position();
-  }, [position, ready, lastUserId]);
+  }, [position, ready, lastUserId, requiredInputId]);
   useEffect(
     () => () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
@@ -181,6 +215,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
   );
   const onContentSizeChange = useCallback(
     (_width: number, height: number) => {
+      measurements.current.contentRevision += 1;
       measurements.current.layout = {
         ...measurements.current.layout,
         content: height,
@@ -249,6 +284,10 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     },
     [scrollY],
   );
+  const updateAtLatest = useCallback((visible: boolean) => {
+    if (visible) followLatest.current = true;
+    setAtLatest(visible);
+  }, []);
   useAnimatedReaction(
     () =>
       revealed.get() &&
@@ -258,7 +297,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
         composerHeight.get() + Math.max(0, keyboardHeight.get() - keyboardOffset),
       ),
     (visible, previous) => {
-      if (visible !== previous) scheduleOnRN(setAtLatest, visible);
+      if (visible !== previous) scheduleOnRN(updateAtLatest, visible);
     },
   );
   const historyStyle = useAnimatedStyle(() => ({
@@ -289,8 +328,14 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     responseOpacity.set(1);
     setResponseVisible(true);
   }
+  function onScrollBeginDrag() {
+    followLatest.current = false;
+    pendingRequiredInput.current = null;
+    cancelSend();
+  }
   function scrollToLatest() {
     const m = measurements.current;
+    followLatest.current = true;
     ref.current?.scrollTo({ y: chatEndOffset(m.layout, m.inset), animated: !reducedMotion });
   }
 
@@ -314,6 +359,7 @@ export function useChatMotion(header: number, keyboardOffset: number, ready: boo
     onComposerLayout,
     onContentInsetChange,
     onScroll,
+    onScrollBeginDrag,
     beginSend,
     needsSendPosition,
     cancelSend,

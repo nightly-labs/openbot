@@ -92,6 +92,7 @@ export function ConversationTimeline() {
     setExpandedEmojiMessageId,
     setOpenMoreMessageId,
     setOpenReactionMessageId,
+    setRequiredInteractionElement,
     showScrollToLatest,
     unreadDividerVisible,
     updateScrollFade,
@@ -118,6 +119,9 @@ export function ConversationTimeline() {
   });
   return (
     <>
+      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {keyedPrompt() ? `Input required. ${keyedPrompt()?.prompt.questions[0]?.question ?? ""}` : ""}
+      </span>
       <Show when={chatSearchOpen()}>
         <ChatSearch
           query={chatSearchQuery()}
@@ -471,6 +475,7 @@ export function ConversationTimeline() {
               <Loading>
                 <QuestionPromptBubble
                   questions={entry.prompt.questions}
+                  elementRef={setRequiredInteractionElement}
                   onSubmit={props.onAnswerPrompt}
                   onResolutionPresented={() =>
                     props.onPromptResolutionPresented?.(

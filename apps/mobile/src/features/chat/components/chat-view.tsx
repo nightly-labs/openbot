@@ -202,7 +202,13 @@ export function ChatView({
   }, [pendingMessage, projectedMessages, queue?.deliveries, queryClient, target.serverId]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
-  const motion = useChatMotion(insets.top + 84, keyboardOffset, ready, lastUserId);
+  const motion = useChatMotion(
+    insets.top + 84,
+    keyboardOffset,
+    ready,
+    lastUserId,
+    questionForm?.question ? (questionForm.messageId ?? null) : null,
+  );
   const atLatest = motion.atLatest;
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
   const server = servers.find((server) => server.id === target.serverId);

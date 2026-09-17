@@ -168,6 +168,13 @@ export function ChatMessageList({
       subscription.remove();
     };
   }, []);
+  const announcedPromptId = useRef<string | null>(null);
+  useEffect(() => {
+    const promptId = questionForm?.messageId ?? null;
+    if (!questionForm?.question || !promptId || announcedPromptId.current === promptId) return;
+    announcedPromptId.current = promptId;
+    AccessibilityInfo.announceForAccessibility(`Input required. ${questionForm.question.question}`);
+  }, [questionForm?.messageId, questionForm?.question]);
   const [userForeground, themeForeground, themeMuted] = useCSSVariable([
     "--openbot-text-on-light",
     "--openbot-text-primary",
@@ -538,7 +545,7 @@ export function ChatMessageList({
             seekLatest();
           }}
           onScroll={motion.onScroll}
-          onScrollBeginDrag={motion.cancelSend}
+          onScrollBeginDrag={motion.onScrollBeginDrag}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={

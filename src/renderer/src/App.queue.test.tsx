@@ -18,6 +18,7 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
+import { TestResizeObserver } from "./setupTests";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -746,6 +747,81 @@ describe("OpenBot connected desktop shell", () => {
     });
     await waitFor(() => expect(screen.getByRole("region", { name: "Answers sent" })).toBeVisible());
     expect(screen.queryByRole("textbox", { name: "Custom answer for: Which account?" })).not.toBeInTheDocument();
+  });
+
+  it("keeps required input visible without taking over a reader's manual scroll", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await confirmOnboardingModel();
+    const scrollElement = document.querySelector<HTMLElement>(".conversation-scroll");
+    if (!scrollElement) throw new Error("Conversation scroll element is missing.");
+    let scrollHeight = 1_200;
+    Object.defineProperties(scrollElement, {
+      clientHeight: { configurable: true, value: 600 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      scrollTop: { configurable: true, value: 600, writable: true },
+    });
+    scrollElement.dispatchEvent(new Event("scroll"));
+
+    emitAgentEvent?.({
+      type: "prompt",
+      requestId: "prompt-follow",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-follow",
+      questions: [
+        {
+          id: "account",
+          header: "Account",
+          question: "Which account should continue?",
+          isSecret: false,
+          options: null,
+        },
+      ],
+    });
+    const firstAnswer = await screen.findByRole("textbox", {
+      name: "Custom answer for: Which account should continue?",
+    });
+    expect(firstAnswer).not.toHaveFocus();
+    const announcement = screen.getByText("Input required. Which account should continue?");
+    expect(announcement).toHaveAttribute("role", "status");
+    expect(announcement).toHaveAttribute("aria-live", "polite");
+
+    scrollHeight = 1_500;
+    const firstPrompt = firstAnswer.closest<HTMLDivElement>("[data-slot='bubble']");
+    if (!firstPrompt) throw new Error("Question prompt bubble is missing.");
+    TestResizeObserver.resize(firstPrompt, "content-box");
+    expect(scrollElement.scrollTop).toBe(1_500);
+
+    scrollElement.scrollTop = 200;
+    scrollElement.dispatchEvent(new Event("scroll"));
+    emitAgentEvent?.({
+      type: "prompt",
+      requestId: "prompt-preserve-scroll",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-preserve-scroll",
+      questions: [
+        {
+          id: "workspace",
+          header: "Workspace",
+          question: "Which workspace should continue?",
+          isSecret: false,
+          options: null,
+        },
+      ],
+    });
+    const secondAnswer = await screen.findByRole("textbox", {
+      name: "Custom answer for: Which workspace should continue?",
+    });
+    scrollHeight = 1_800;
+    const secondPrompt = secondAnswer.closest<HTMLDivElement>("[data-slot='bubble']");
+    if (!secondPrompt) throw new Error("Replacement question prompt bubble is missing.");
+    TestResizeObserver.resize(secondPrompt, "content-box");
+
+    expect(scrollElement.scrollTop).toBe(200);
+    expect(screen.getByRole("button", { name: "Scroll to latest message" })).toBeVisible();
+    expect(secondAnswer).not.toHaveFocus();
   });
 
   it("keeps the prompt active and reports a delivery failure", async () => {
