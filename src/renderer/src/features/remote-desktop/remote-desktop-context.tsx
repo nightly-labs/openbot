@@ -1,4 +1,4 @@
-import type { RemoteDesktopSession } from "@openbot/contracts/ipc";
+import type { RemoteDesktopConnectResult, RemoteDesktopErrorCode, RemoteDesktopSession } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { errorMessage } from "../../error-message";
@@ -41,23 +41,39 @@ const RemoteDesktop = createSimpleContext({
     const [remoteDesktopWorkspaceVisible, setRemoteDesktopWorkspaceVisible] = createSignal(false);
     const [remoteDesktopConnectingServerId, setRemoteDesktopConnectingServerId] = createSignal<string | null>(null);
     const [remoteDesktopConnectionError, setRemoteDesktopConnectionError] = createSignal<string | null>(null);
+    const [remoteDesktopConnectionErrorCode, setRemoteDesktopConnectionErrorCode] =
+      createSignal<RemoteDesktopErrorCode | null>(null);
     const [remoteDesktopSessionEstablished, setRemoteDesktopSessionEstablished] = createSignal(false);
     let remoteDesktopRestoreTarget: HTMLElement | null = null;
     let remoteDesktopConnectPromise: Promise<RemoteDesktopSession | undefined> | null = null;
     /** Bumped by every open, retry and disconnect, so a late connect cannot revive a closed workspace. */
     let remoteDesktopConnectionRequest = 0;
 
-    async function connectRemoteDesktop(serverId: string): Promise<RemoteDesktopSession> {
+    function clearRemoteDesktopConnectionError(): void {
+      setRemoteDesktopConnectionError(null);
+      setRemoteDesktopConnectionErrorCode(null);
+    }
+
+    async function connectRemoteDesktop(serverId: string): Promise<RemoteDesktopConnectResult> {
       const analytics = desktopAnalytics.scope();
       try {
-        const session = await window.openbot.remoteDesktop.connect({ serverId });
+        const result = await window.openbot.remoteDesktop.connect({ serverId });
+        if (result.status === "refused") {
+          analytics.track("remote_desktop_action", {
+            action: "connect",
+            result: "failed",
+            failure_code: result.errorCode,
+          });
+          return result;
+        }
+        const session = result.session;
         setRemoteDesktopSessions((current) => [...current.filter((item) => item.id !== session.id), session]);
         analytics.track("remote_desktop_action", {
           action: "connect",
           result: "succeeded",
           transport: session.transport,
         });
-        return session;
+        return result;
       } catch (error) {
         analytics.track("remote_desktop_action", {
           action: "connect",
@@ -125,17 +141,26 @@ const RemoteDesktop = createSimpleContext({
       serverId: string,
       request: number,
     ): Promise<RemoteDesktopSession | undefined> {
+      const current = () => request === remoteDesktopConnectionRequest && remoteDesktopWorkspaceServerId() === serverId;
       try {
-        const session = await connectRemoteDesktop(serverId);
-        if (request !== remoteDesktopConnectionRequest || remoteDesktopWorkspaceServerId() !== serverId) {
-          await disconnectRemoteDesktop(session.id);
+        const result = await connectRemoteDesktop(serverId);
+        if (result.status === "refused") {
+          if (current()) {
+            setRemoteDesktopConnectionError(errorMessage(result.message, "Could not start remote control."));
+            setRemoteDesktopConnectionErrorCode(result.errorCode);
+          }
+          return undefined;
+        }
+        if (!current()) {
+          await disconnectRemoteDesktop(result.session.id);
           return undefined;
         }
         setRemoteDesktopSessionEstablished(true);
-        return session;
+        return result.session;
       } catch (error) {
-        if (request === remoteDesktopConnectionRequest && remoteDesktopWorkspaceServerId() === serverId) {
+        if (current()) {
           setRemoteDesktopConnectionError(errorMessage(error, "Could not start remote control."));
+          setRemoteDesktopConnectionErrorCode(null);
         }
         return undefined;
       } finally {
@@ -159,7 +184,7 @@ const RemoteDesktop = createSimpleContext({
       remoteDesktopRestoreTarget = trigger;
       setRemoteDesktopWorkspaceServerId(serverId);
       setRemoteDesktopWorkspaceVisible(true);
-      setRemoteDesktopConnectionError(null);
+      clearRemoteDesktopConnectionError();
       if (existingSession) {
         setRemoteDesktopSessionEstablished(true);
         return;
@@ -183,7 +208,7 @@ const RemoteDesktop = createSimpleContext({
       if (!serverId) return;
       const existingSession = latestRemoteDesktopSession(serverId);
       const request = ++remoteDesktopConnectionRequest;
-      setRemoteDesktopConnectionError(null);
+      clearRemoteDesktopConnectionError();
       setRemoteDesktopSessionEstablished(false);
       setRemoteDesktopConnectingServerId(serverId);
       if (existingSession) await disconnectRemoteDesktop(existingSession.id);
@@ -197,7 +222,7 @@ const RemoteDesktop = createSimpleContext({
       const serverId = remoteDesktopWorkspaceServerId();
       if (!serverId) return;
       ++remoteDesktopConnectionRequest;
-      setRemoteDesktopConnectionError(null);
+      clearRemoteDesktopConnectionError();
       setRemoteDesktopSessionEstablished(false);
       const session = latestRemoteDesktopSession(serverId);
       if (session) await disconnectRemoteDesktop(session.id);
@@ -269,6 +294,7 @@ const RemoteDesktop = createSimpleContext({
       remoteDesktopWorkspaceVisible,
       remoteDesktopConnectingServerId,
       remoteDesktopConnectionError,
+      remoteDesktopConnectionErrorCode,
       openRemoteDesktopWorkspace,
       hideRemoteDesktopWorkspace,
       retryRemoteDesktopWorkspace,

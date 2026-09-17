@@ -206,6 +206,59 @@ it.each(["owner", "admin", "member"] as const)("limits remote channel deletion f
   }
 });
 
+it("opens the channel creation dialog from both sidebar context menus", async () => {
+  await openSavedChannel();
+  await fireEvent.contextMenu(channelRow("Project room"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New channel" }), { button: 0 });
+  const dialog = await screen.findByRole("dialog", { name: "New channel" });
+  await fireEvent.click(within(dialog).getByRole("button", { name: "Close new channel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "New channel" })).not.toBeInTheDocument());
+
+  await fireEvent.contextMenu(screen.getByLabelText("Sidebar free area"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New channel" }), { button: 0 });
+  await screen.findByRole("dialog", { name: "New channel" });
+});
+
+it("keeps the section editor open past menu focus restoration", async () => {
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  // Hold the trigger: the open menu hides the background from role queries.
+  const trigger = await screen.findByRole("button", { name: "New agent or channel" });
+  await fireEvent.pointerDown(trigger, { button: 0 });
+  const item = await screen.findByRole("menuitem", { name: "New section" });
+  // Frames are a fake modeling animation-frame timing, not a sleep: each step runs exactly
+  // the callbacks the production code scheduled.
+  const pendingFrames: FrameRequestCallback[] = [];
+  const restore = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    pendingFrames.push(callback);
+    return pendingFrames.length;
+  });
+  const runFrame = async () => {
+    // Browsers checkpoint microtasks between callbacks in the same frame.
+    for (const callback of pendingFrames.splice(0)) {
+      callback(performance.now());
+      await Promise.resolve();
+    }
+  };
+  try {
+    await fireEvent.pointerUp(item, { button: 0 });
+    // The menu hands focus back to its trigger two frames after closing (focusRestoreHandler
+    // in components/ui/complex.tsx); the editor must open only after that. Keep the counts
+    // in step with complex.tsx.
+    await runFrame();
+    await runFrame();
+    // This is exactly what that restoration does: focus the trigger. An editor that opened
+    // too early loses its input to this steal and cancels on blur.
+    trigger.focus();
+    await runFrame();
+    await runFrame();
+    expect(screen.getByLabelText("New section")).toBeInTheDocument();
+    expect(screen.getByLabelText("New section name")).toHaveFocus();
+  } finally {
+    restore.mockRestore();
+  }
+});
+
 it("creates a channel from a searchable member dialog and keeps the chat open beside settings", async () => {
   const save = vi.spyOn(window.openbot.agent, "channelCommand");
   render(() => <App />);

@@ -2,7 +2,7 @@
 
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Show } from "solid-js";
-import { ContextMenu, Pin, PinOff } from "../../components/ui";
+import { ContextMenu, Hash, Pin, PinOff } from "../../components/ui";
 import { DeleteIcon, EditIcon } from "./SidebarIcons";
 import { SidebarMoveToSubmenu } from "./SidebarMoveToSubmenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
@@ -14,6 +14,12 @@ export function SidebarChannelContextMenu(menuProps: { channel: ChannelSummary; 
   return (
     <ContextMenu.Portal>
       <ContextMenu.Content class="agent-context-menu" aria-label="Channel actions">
+        <Show when={props.onCreateChannel}>
+          <ContextMenu.Item onSelect={() => props.onCreateChannel?.()}>
+            <Hash class="agent-context-icon size-4" aria-hidden="true" />
+            <span>New channel</span>
+          </ContextMenu.Item>
+        </Show>
         <ContextMenu.Item onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}>
           <Show when={menuProps.pinned} fallback={<Pin class="agent-context-icon size-4" aria-hidden="true" />}>
             <PinOff class="agent-context-icon size-4" aria-hidden="true" />

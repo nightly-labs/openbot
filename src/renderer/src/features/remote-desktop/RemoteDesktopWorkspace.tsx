@@ -1,4 +1,4 @@
-import type { RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
+import type { RemoteDesktopErrorCode, RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
 import { Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { z } from "zod";
@@ -22,6 +22,7 @@ interface RemoteDesktopWorkspaceProps {
   session: RemoteDesktopSession | undefined;
   connecting: boolean;
   connectionError: string | null;
+  connectionErrorCode: RemoteDesktopErrorCode | null;
   onHide: () => void;
   onDisconnect: () => Promise<void>;
   onRetry: () => Promise<void>;
@@ -56,6 +57,12 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     if (props.connecting) return "connecting";
     return viewerState();
   });
+  // The host's own word for why it refused, when it gave one. It decides which failure the overlay
+  // describes: a missing screen recording grant is a setup step on the host that no retry reaches on
+  // its own, unlike a connection that failed or a host that is too old to share a screen at all.
+  const failureCode = createMemo<RemoteDesktopErrorCode | null>(
+    () => props.connectionErrorCode ?? props.session?.errorCode ?? null,
+  );
   const displays = createMemo(() => props.session?.displays ?? []);
   const selectedDisplay = createMemo(() =>
     displays().find((display) => display.id === props.session?.selectedDisplayId),
@@ -239,13 +246,26 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
           </Show>
           <Show when={effectiveState() === "error" || props.session?.errorCode}>
             <div class="remote-desktop-overlay remote-desktop-error" role="alert">
-              <strong>Could not open the desktop</strong>
-              <span>
-                {errorMessage(
-                  viewerError() ?? props.connectionError ?? props.session?.message,
-                  "Remote control failed. Reconnect and try again.",
-                )}
-              </span>
+              <Show
+                when={failureCode() === "host_permissions_required"}
+                fallback={
+                  <>
+                    <strong>Could not open the desktop</strong>
+                    <span>
+                      {errorMessage(
+                        viewerError() ?? props.connectionError ?? props.session?.message,
+                        "Remote control failed. Reconnect and try again.",
+                      )}
+                    </span>
+                  </>
+                }
+              >
+                <strong>{props.server.name} is not sharing its screen</strong>
+                <span>
+                  The host blocks OpenBot from recording its screen. On that computer, open System Settings → Privacy
+                  &amp; Security → Screen Recording, turn on OpenBot, then try again here.
+                </span>
+              </Show>
               <Button variant="outline" type="button" loading={actionBusy() === "retry"} onClick={() => void retry()}>
                 Try again
               </Button>
