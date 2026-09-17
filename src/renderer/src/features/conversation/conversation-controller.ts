@@ -17,13 +17,7 @@ import {
   type StoredQueueEdit,
 } from "./composer-draft";
 import { composerDraftKey } from "./conversation-keys";
-import type {
-  ComposerDraft,
-  ConversationProps,
-  MediaPreview,
-  RightPanelMode,
-  SidebarFilePreview,
-} from "./conversation-types";
+import type { ComposerDraft, ConversationProps, RightPanelMode, SidebarFilePreview } from "./conversation-types";
 
 const SETTINGS_PANEL_DEFAULT = 296;
 const BROWSER_PANEL_DEFAULT = 380;
@@ -314,7 +308,6 @@ export function createServerConversationState() {
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
   const [browserAddress, setBrowserAddress] = createSignal("https://www.google.com");
   const [browserAddressEditing, setBrowserAddressEditing] = createSignal(false);
-  const [mediaPreview, setMediaPreview] = createSignal<MediaPreview | null>(null);
   const [sidebarFilePreview, setSidebarFilePreview] = createSignal<SidebarFilePreview | null>(null);
   const [openReactionMessageId, setOpenReactionMessageId] = createSignal<string | null>(null);
   const [openMoreMessageId, setOpenMoreMessageId] = createSignal<string | null>(null);
@@ -352,8 +345,6 @@ export function createServerConversationState() {
     setBrowserAddress,
     browserAddressEditing,
     setBrowserAddressEditing,
-    mediaPreview,
-    setMediaPreview,
     sidebarFilePreview,
     setSidebarFilePreview,
     openReactionMessageId,

@@ -1,7 +1,23 @@
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { DraftAttachment } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
+import {
+  type AttachmentSummary,
+  canPreviewAttachment,
+  type DraftAttachment,
+  type FilePreview,
+} from "@openbot/contracts/ipc";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  Loading,
+  lazy,
+  onCleanup,
+  Show,
+  untrack,
+} from "solid-js";
 import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import {
   createSettingsPanelWidth,
@@ -19,6 +35,7 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
+import { attachmentFilePreview } from "../conversation/attachment-preview";
 import { ChatActionMarker } from "../conversation/ChatActionMarker";
 import { ChatMessageRow } from "../conversation/ChatMessageRow";
 import { ComposerEditor, expandComposerMentions } from "../conversation/ComposerEditor";
@@ -48,6 +65,8 @@ import { ChannelEditor } from "./ChannelEditor";
 import { ChannelStoppedTasks } from "./ChannelStoppedTasks";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 import { useChannels } from "./channels-context";
+
+const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
 export function ChannelConversation() {
   const channels = useChannels();
@@ -80,6 +99,7 @@ export function ChannelConversation() {
   };
   const openSettings = () => {
     resetPanel();
+    setFilePreview(null);
     channels.edit();
   };
   const closePanel = () => {
@@ -165,6 +185,31 @@ export function ChannelConversation() {
      panel covers are written against the conversation panel, not against the panel itself. */
   let conversationPanel: HTMLElement | undefined;
   const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
+  /* An attachment opens in the same right slot the channel settings use, so opening one closes the
+     other. It is the file preview panel the agent chat opens, not a second surface. */
+  type ChannelFilePreview = { attachment: AttachmentSummary; preview: FilePreview };
+  const [filePreview, setFilePreview] = createSignal<ChannelFilePreview | null>(null);
+  const previewChannelAttachment = async (attachment: AttachmentSummary) => {
+    if (!canPreviewAttachment(attachment)) {
+      void channels.perform(() => window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }));
+      return;
+    }
+    channels.closeEditor();
+    await channels.perform(async (): Promise<void> => {
+      const preview = await attachmentFilePreview(attachment);
+      setFilePreview({ attachment, preview });
+    });
+  };
+  const channelAttachmentAction = (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => {
+    void channels.perform(() => window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }));
+  };
+  // The preview belongs to the channel it was opened from, and the settings panel takes the slot back.
+  createEffect(
+    () => ({ id: channelId(), editing: channels.state.editing }),
+    () => {
+      setFilePreview(null);
+    },
+  );
   const [showScrollToLatest, setShowScrollToLatest] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
@@ -579,11 +624,7 @@ export function ChannelConversation() {
                             onOpenLink={(url) => {
                               void window.openbot.openUrl(url);
                             }}
-                            onPreview={(attachment) => {
-                              void channels.perform(() =>
-                                window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }),
-                              );
-                            }}
+                            onPreview={(attachment) => void previewChannelAttachment(attachment)}
                             onDownloadAttachments={async (attachments) => {
                               await channels.perform(() =>
                                 window.openbot.agent.downloadAttachments({
@@ -591,11 +632,7 @@ export function ChannelConversation() {
                                 }),
                               );
                             }}
-                            onAttachmentAction={(attachment, action) => {
-                              void channels.perform(() =>
-                                window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }),
-                              );
-                            }}
+                            onAttachmentAction={channelAttachmentAction}
                             actions={
                               <MessageActions
                                 message={entry()?.message ?? initialEntry.message}
@@ -851,6 +888,31 @@ export function ChannelConversation() {
                   </div>
                 </form>
               </div>
+            </Show>
+            <Show when={filePreview()}>
+              {(file) => (
+                <Loading>
+                  <ChannelFilePreviewPanel
+                    preview={file().preview}
+                    agents={agentList()}
+                    defaultWidth={panelWidth}
+                    maxWidth={() => settingsPanelMaxWidth(conversationPanel)}
+                    onWidthChange={setPanelWidth}
+                    onOpenLink={(url) => {
+                      void window.openbot.openUrl(url);
+                    }}
+                    /* A channel transcript has no agent workspace of its own, so a path in a
+                       previewed file cannot be resolved here. Only attachments open in this slot. */
+                    onOpenSharedFile={() => undefined}
+                    onOpenWorkspaceFile={() => undefined}
+                    sourceUrl={file().attachment.previewUrl}
+                    onOpenExternally={() => channelAttachmentAction(file().attachment, "open")}
+                    onDownload={() => channelAttachmentAction(file().attachment, "download")}
+                    onReveal={() => channelAttachmentAction(file().attachment, "reveal")}
+                    onClose={() => setFilePreview(null)}
+                  />
+                </Loading>
+              )}
             </Show>
             <Show when={!page().channel.archived && channels.state.editing === "settings"}>
               <SettingsPanel

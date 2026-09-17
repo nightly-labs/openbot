@@ -34,6 +34,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     browserTabs,
     closeSidebarFilePreview,
     closeBrowserTab,
+    downloadSidebarFile,
+    revealSidebarFile,
     conversationPanelElement,
     filePreviewOpen,
     openBrowserAddress,
@@ -82,32 +84,41 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
   return (
     <>
       <Show when={filePreviewOpen() && sidebarFilePreview()}>
-        {(file) => (
-          <Loading>
-            <FilePreviewPanel
-              preview={file().preview}
-              agents={props.agents}
-              defaultWidth={() =>
-                (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
-              }
-              maxWidth={() =>
-                Math.min(
-                  BROWSER_PANEL_MAX,
-                  Math.max(
-                    BROWSER_PANEL_MIN,
-                    (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
-                  ),
-                )
-              }
-              onWidthChange={setBrowserPanelWidth}
-              onOpenLink={(url) => void openExternalMessageUrl(url)}
-              onOpenSharedFile={openSharedFile}
-              onOpenWorkspaceFile={openWorkspaceFile}
-              onOpenExternally={openSidebarFileExternally}
-              onClose={closeSidebarFilePreview}
-            />
-          </Loading>
-        )}
+        {(file) => {
+          const attached = () => {
+            const source = file().source;
+            return source.kind === "attachment" ? source.attachment : null;
+          };
+          return (
+            <Loading>
+              <FilePreviewPanel
+                preview={file().preview}
+                agents={props.agents}
+                defaultWidth={() =>
+                  (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
+                }
+                maxWidth={() =>
+                  Math.min(
+                    BROWSER_PANEL_MAX,
+                    Math.max(
+                      BROWSER_PANEL_MIN,
+                      (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
+                    ),
+                  )
+                }
+                onWidthChange={setBrowserPanelWidth}
+                onOpenLink={(url) => void openExternalMessageUrl(url)}
+                onOpenSharedFile={openSharedFile}
+                onOpenWorkspaceFile={openWorkspaceFile}
+                sourceUrl={attached()?.previewUrl ?? null}
+                onOpenExternally={openSidebarFileExternally}
+                onDownload={attached() ? downloadSidebarFile : undefined}
+                onReveal={attached() ? revealSidebarFile : undefined}
+                onClose={closeSidebarFilePreview}
+              />
+            </Loading>
+          );
+        }}
       </Show>
 
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>

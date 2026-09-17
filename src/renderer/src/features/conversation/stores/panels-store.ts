@@ -1,14 +1,8 @@
-import { isXlsxMimeType } from "@openbot/contracts/attachment-files";
 import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
 import { errorMessage } from "../../../error-message";
-import type {
-  ConversationProps,
-  ConversationTarget,
-  MediaPreview,
-  RightPanelMode,
-  SidebarFilePreview,
-} from "../conversation-types";
+import { attachmentFilePreview } from "../attachment-preview";
+import type { ConversationProps, ConversationTarget, RightPanelMode, SidebarFilePreview } from "../conversation-types";
 
 export interface RoutineSettingsRequest {
   agentId: string;
@@ -25,8 +19,6 @@ export interface PanelsStoreDeps {
   settingsModel: () => import("@openbot/contracts/ipc").AgentModelId;
   settingsReasoning: () => import("@openbot/contracts/ipc").AgentReasoningEffort;
   setBrowserPipBounds: (bounds: BrowserBounds | null) => void;
-  mediaPreview: () => MediaPreview | null;
-  setMediaPreview: (update: MediaPreview | null | ((current: MediaPreview | null) => MediaPreview | null)) => void;
   sidebarFilePreview: () => SidebarFilePreview | null;
   setSidebarFilePreview: (preview: SidebarFilePreview | null) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
@@ -108,42 +100,25 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (deps.props.browserEnabled !== false) void window.openbot.browser.setVisible({ visible: false });
   }
 
+  /**
+   * Opens an attachment in the file preview panel, the same surface a shared or workspace file
+   * uses. The bytes come from `previewUrl` rather than the preview IPC, because an attachment is
+   * named by its id and has no path on the agent's computer.
+   */
   async function previewAttachment(attachment: AttachmentSummary) {
-    if (!attachment.previewUrl || !canPreviewAttachment(attachment)) return;
-    deps.setMediaPreview({
-      attachment,
-      bytes: null,
-      text: null,
-      loading: attachment.previewKind === "text" || isXlsxMimeType(attachment.mimeType),
-      error: null,
-    });
-    if (attachment.previewKind !== "text" && !isXlsxMimeType(attachment.mimeType)) return;
+    const ownerAgentId = deps.props.agent?.id;
+    if (!ownerAgentId || !canPreviewAttachment(attachment)) return;
+    const target = { agentId: ownerAgentId, serverId: deps.props.server?.id ?? "local" };
+    const generation = deps.nextFilePreviewGeneration();
+    deps.setComposerError(null, target);
     try {
-      const response = await fetch(attachment.previewUrl);
-      if (!response.ok) throw new Error("Preview is unavailable.");
-      if (isXlsxMimeType(attachment.mimeType)) {
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        deps.setMediaPreview((current) =>
-          current?.attachment.id === attachment.id ? { ...current, bytes, loading: false } : current,
-        );
-        return;
-      }
-      const text = await response.text();
-      deps.setMediaPreview((current) =>
-        current?.attachment.id === attachment.id
-          ? { ...current, text: text.slice(0, 1_000_000), loading: false }
-          : current,
-      );
+      const preview = await attachmentFilePreview(attachment);
+      if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
+      deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "attachment", attachment }, preview });
+      setActiveRightPanel("file-preview", ownerAgentId);
     } catch (error) {
-      deps.setMediaPreview((current) =>
-        current?.attachment.id === attachment.id
-          ? {
-              ...current,
-              loading: false,
-              error: errorMessage(error, "Could not preview this attachment. Try again."),
-            }
-          : current,
-      );
+      if (generation !== deps.currentFilePreviewGeneration()) return;
+      deps.setComposerError(errorMessage(error, `Could not preview ${attachment.name}. Try again.`), target);
     }
   }
 
@@ -179,7 +154,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     void window.openbot.agent.previewSharedFile({ path }).then(
       (preview) => {
         if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
-        deps.setSidebarFilePreview({ ownerAgentId, source: "shared", path, preview });
+        deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "shared", path }, preview });
         setActiveRightPanel("file-preview", ownerAgentId);
       },
       (error) => {
@@ -199,7 +174,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     void window.openbot.agent.previewWorkspaceFile({ agentId, path }).then(
       (preview) => {
         if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
-        deps.setSidebarFilePreview({ ownerAgentId: agentId, source: "workspace", path, preview });
+        deps.setSidebarFilePreview({ ownerAgentId: agentId, source: { kind: "workspace", path }, preview });
         setActiveRightPanel("file-preview", agentId);
       },
       (error) => {
@@ -213,13 +188,28 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const file = deps.sidebarFilePreview();
     if (!file) return;
     const target = { agentId: file.ownerAgentId, serverId: deps.props.server?.id ?? "local" };
+    const source = file.source;
     const request =
-      file.source === "shared"
-        ? window.openbot.agent.openSharedFile({ path: file.path })
-        : window.openbot.agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: file.path });
+      source.kind === "attachment"
+        ? window.openbot.agent.openAttachment({ attachmentId: source.attachment.id, action: "open" })
+        : source.kind === "shared"
+          ? window.openbot.agent.openSharedFile({ path: source.path })
+          : window.openbot.agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: source.path });
     void request.catch((error) =>
       deps.setComposerError(errorMessage(error, "Could not open this file. Try again."), target),
     );
+  }
+
+  function downloadSidebarFile() {
+    const source = deps.sidebarFilePreview()?.source;
+    if (source?.kind !== "attachment") return;
+    attachmentAction(source.attachment, "download");
+  }
+
+  function revealSidebarFile() {
+    const source = deps.sidebarFilePreview()?.source;
+    if (source?.kind !== "attachment") return;
+    attachmentAction(source.attachment, "reveal");
   }
 
   function closeSidebarFilePreview() {
@@ -249,6 +239,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openSharedFile,
     openWorkspaceFile,
     openSidebarFileExternally,
+    downloadSidebarFile,
+    revealSidebarFile,
     closeSidebarFilePreview,
   };
 }

@@ -110,3 +110,20 @@ export interface FilePreview {
   previewKind: FilePreviewKind;
   bytes: Uint8Array | null;
 }
+
+/**
+ * The preview kind a file gets from its name and MIME type. Both sides of the IPC boundary read it:
+ * `src/main/file-preview.ts` for a file it reads from disk, and the renderer for an attachment it
+ * fetches through `previewUrl`. One function keeps the two from drifting apart.
+ */
+export function filePreviewKindForFile(name: string, mimeType: string): FilePreviewKind {
+  if (/\.(md|markdown)$/iu.test(name)) return "markdown";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType === "application/pdf") return "pdf";
+  if (isXlsxMimeType(mimeType)) return "spreadsheet";
+  const media = playableMediaKind(mimeType);
+  if (media) return media;
+  // An email is RFC 822 text. The panel shows the headers and the body without a parser.
+  if (mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "message/rfc822") return "text";
+  return "none";
+}

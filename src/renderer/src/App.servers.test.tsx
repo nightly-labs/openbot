@@ -1209,8 +1209,8 @@ describe("OpenBot connected desktop shell", () => {
       },
     });
     await fireEvent.click(await screen.findByRole("button", { name: "Preview brief.pdf" }));
-    expect(screen.getByRole("dialog", { name: "brief.pdf" })).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Show in Finder" }));
+    expect(await screen.findByRole("complementary", { name: "File preview" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Show file in Finder" }));
     expect(window.openbot.agent.openAttachment).toHaveBeenCalledWith({
       attachmentId: "file-1",
       action: "reveal",
