@@ -296,12 +296,6 @@ export function ChatView({
     Keyboard.dismiss();
 
     void haptics.impact();
-    if (questionForm?.question) {
-      questionForm.answer([body]);
-      motion.cancelSend();
-      motion.scrollToLatest();
-      return;
-    }
     setShowStarter(false);
     setDraft("");
     sendingRef.current = true;
@@ -375,13 +369,12 @@ export function ChatView({
     })();
   }
 
-  const replyToMessage =
-    !readOnly && !questionForm?.question
-      ? (message: ChatBubbleMessage) => {
-          setReplyTarget(message);
-          setReplyFocusVersion((version) => version + 1);
-        }
-      : undefined;
+  const replyToMessage = !readOnly
+    ? (message: ChatBubbleMessage) => {
+        setReplyTarget(message);
+        setReplyFocusVersion((version) => version + 1);
+      }
+    : undefined;
 
   return (
     <GestureDetector gesture={edgeBackGesture}>
@@ -519,30 +512,25 @@ export function ChatView({
                 <ChatComposer
                   sendRetryVersion={sendRetryVersion}
                   sendLabel="Send message"
-                  replyTarget={questionForm?.question ? null : replyTarget}
+                  replyTarget={replyTarget}
                   replyFocusVersion={replyFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}
                   mentionAgents={mentionAgents}
-                  key={JSON.stringify([
-                    target.id,
-                    questionForm?.question ? questionForm.messageId : null,
-                    questionForm?.question?.id,
-                  ])}
+                  key={target.id}
                   action={action}
                   actionForeground={actionForeground}
                   agentName={target.name}
                   bottomInset={insets.bottom}
-                  disabled={!serverOnline || !canSend || Boolean(questionForm?.pending)}
+                  disabled={!serverOnline || !canSend}
                   sending={sending || Boolean(pendingMessage)}
                   attachments={attachments}
-                  answerQuestion={questionForm?.question}
-                  draft={questionForm?.question ? questionForm.draft : draft}
+                  draft={draft}
                   fallbackBackground={fieldBackground}
                   foreground={foreground}
                   liquidGlassAvailable={liquidGlassAvailable}
                   muted={muted}
                   raised={raised}
-                  onChangeDraft={questionForm?.question ? questionForm.setDraft : setDraft}
+                  onChangeDraft={setDraft}
                   onSend={sendMessage}
                 />
               ) : null}

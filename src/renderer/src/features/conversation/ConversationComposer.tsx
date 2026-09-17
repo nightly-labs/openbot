@@ -133,7 +133,7 @@ export function ConversationComposer() {
       .join(",");
   };
   return (
-    <Show when={!props.prompt && !props.approval && !props.browserTakeover}>
+    <Show when={!props.approval && !props.browserTakeover}>
       <div class="composer-wrap">
         <div
           class="agent-queue-slot"

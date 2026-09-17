@@ -700,6 +700,16 @@ describe("OpenBot connected desktop shell", () => {
     const answer = await screen.findByRole("textbox", {
       name: "Custom answer for: Which account?",
     });
+    const composer = screen.getByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "Queue this while you wait";
+    await fireEvent.input(composer);
+    await fireEvent.keyDown(composer, { key: "Enter" });
+    await waitFor(() =>
+      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
+        { agentId: "chief", text: "Queue this while you wait", attachmentDraftIds: [] },
+        "local",
+      ),
+    );
     await fireEvent.input(answer, { target: { value: "Acme" } });
     await fireEvent.keyDown(answer, { key: "Enter" });
     await waitFor(() =>
