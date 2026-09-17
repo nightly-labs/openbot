@@ -219,16 +219,31 @@ it("opens the channel creation dialog from both sidebar context menus", async ()
   await screen.findByRole("dialog", { name: "New channel" });
 });
 
-it("offers New section from the sidebar topbar menu", async () => {
+it("keeps the section editor open past menu focus restoration", async () => {
   render(() => <App />);
   await screen.findByRole("button", { name: /Open account (actions|menu)/ });
   await fireEvent.pointerDown(await screen.findByRole("button", { name: "New agent or channel" }), { button: 0 });
-  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New section" }), { button: 0 });
-  // The closed dropdown leaves its aria-hidden background guard in place under jsdom, so the
-  // editor is reached by accessible name instead of role: the draft section only renders while
-  // the section editor is open.
-  await screen.findByLabelText("New section");
-  await screen.findByLabelText("New section name");
+  const item = await screen.findByRole("menuitem", { name: "New section" });
+  // Frames are a fake modeling the menu's two-frame focus restoration, not a sleep: each run
+  // step executes exactly the callbacks the production code scheduled.
+  const pendingFrames: FrameRequestCallback[] = [];
+  const restore = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    pendingFrames.push(callback);
+    return pendingFrames.length;
+  });
+  try {
+    await fireEvent.pointerUp(item, { button: 0 });
+    // The editor opens only after the menu's deferred focus restoration runs.
+    expect(screen.queryByLabelText("New section")).not.toBeInTheDocument();
+    for (let frame = 0; frame < 3; frame += 1) {
+      for (const callback of pendingFrames.splice(0)) callback(performance.now());
+      await Promise.resolve();
+    }
+    expect(screen.getByLabelText("New section")).toBeInTheDocument();
+    expect(screen.getByLabelText("New section name")).toHaveFocus();
+  } finally {
+    restore.mockRestore();
+  }
 });
 
 it("creates a channel from a searchable member dialog and keeps the chat open beside settings", async () => {

@@ -62,7 +62,14 @@ export function SidebarTopbar() {
                 </DropdownMenu.Item>
               </Show>
               <Show when={layoutMutable()}>
-                <DropdownMenu.Item onSelect={() => startCreateSection()}>
+                <DropdownMenu.Item
+                  onSelect={() => {
+                    // The menu restores focus to this trigger after two animation frames
+                    // (focusRestoreHandler in components/ui/complex.tsx), which would blur the
+                    // new input and cancel the editor. Open it after the restore runs.
+                    window.requestAnimationFrame(() => window.requestAnimationFrame(() => startCreateSection()));
+                  }}
+                >
                   <FolderPlus aria-hidden="true" />
                   New section
                 </DropdownMenu.Item>
