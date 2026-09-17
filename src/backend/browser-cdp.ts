@@ -5,6 +5,7 @@ import type {
   BrowserDiagnosticEntry,
   BrowserElement,
   BrowserEnvironment,
+  BrowserFocus,
   BrowserJsonValue,
   BrowserSnapshot,
   BrowserTarget,
@@ -138,9 +139,10 @@ export class BrowserCdpEngine {
   async snapshot(context: SnapshotContext): Promise<SnapshotReadResult> {
     return this.#lease(async (send) => {
       const navigationGeneration = this.#navigationGeneration;
-      const [metrics, parsed] = await Promise.all([
+      const [metrics, parsed, focus] = await Promise.all([
         send("Page.getLayoutMetrics"),
         collectBoundedSnapshot(send, this.#snapshotTargets(), context.revision, true),
+        collectFocus(send).catch(() => null),
       ]);
       if (navigationGeneration !== this.#navigationGeneration) {
         throw new Error("Page navigated during the browser snapshot. Take a fresh snapshot.");
@@ -155,6 +157,7 @@ export class BrowserCdpEngine {
         viewport,
         text: parsed.text,
         elements: parsed.elements,
+        focus,
         diagnostics: context.diagnostics,
         actions: context.actions,
       };
@@ -214,13 +217,14 @@ export class BrowserCdpEngine {
   }
 
   async type(
-    target: BrowserTarget,
+    target: BrowserTarget | undefined,
     text: string,
     options: { mode?: "replace" | "append"; submit?: boolean } = {},
     deadline?: number,
     onDispatch?: ActionDispatch,
   ): Promise<void> {
     const mode = options.mode ?? "replace";
+    if (!target) return this.#typeFocused(text, options.submit === true, deadline, onDispatch);
     await this.#lease(async (send) => {
       const resolved = await this.#resolveTarget(send, target, deadline);
       if (!resolved.backendNodeId) throw new Error("Typing requires an element target.");
@@ -263,6 +267,35 @@ export class BrowserCdpEngine {
       if (options.submit === true) {
         assertBeforeDeadline(deadline);
         await dispatchShortcut(send, "Enter", resolved.sessionId);
+      }
+    });
+  }
+
+  // An application that draws its own surface -- a spreadsheet grid on a canvas, a code editor, a
+  // map -- has no element to focus and no value to set: it reads the keystrokes the page already
+  // has focus for. So this path sends the key events a person produces rather than an insertion
+  // into a node, and keeps tab and newline as the keys that move between a grid's columns and rows
+  // instead of inserting them as characters. Selection has no meaning without a node, so `mode` is
+  // rejected at the tool boundary rather than silently ignored here.
+  async #typeFocused(text: string, submit: boolean, deadline?: number, onDispatch?: ActionDispatch): Promise<void> {
+    const characters = [...text.replace(/\r\n?/g, "\n")];
+    await this.#lease(async (send) => {
+      assertBeforeDeadline(deadline);
+      onDispatch?.();
+      let sent = 0;
+      for (const character of characters) {
+        // Each keystroke is its own event, so a deadline reached part way through leaves what the
+        // page already took. Reporting only that the action timed out would let a caller repeat a
+        // send that half happened, which in a spreadsheet writes the data twice.
+        assertTypingProgressBeforeDeadline(deadline, sent, characters.length);
+        if (character === "\n") await dispatchShortcut(send, "Enter");
+        else if (character === "\t") await dispatchShortcut(send, "Tab");
+        else await dispatchTextKey(send, character);
+        sent += 1;
+      }
+      if (submit) {
+        assertTypingProgressBeforeDeadline(deadline, sent, characters.length);
+        await dispatchShortcut(send, "Enter");
       }
     });
   }
@@ -1519,6 +1552,54 @@ async function collectPageSummary(
   };
 }
 
+// Focus is what `type` writes to when it has no target, and an application that draws its own
+// surface keeps it on a node no semantic target names -- Google Sheets parks it on a hidden editor
+// beside the grid, and on its Name box the moment that box was used. Without this a caller cannot
+// tell the two apart until the data lands in the wrong place.
+async function collectFocus(send: SendCommand, sessionId?: string): Promise<BrowserFocus | null> {
+  const contextId = await automationContextId(send, sessionId);
+  const result = await send(
+    "Runtime.evaluate",
+    {
+      expression: `(() => {
+        let node = document.activeElement;
+        let inFrame = false;
+        for (let depth = 0; depth < 10 && node; depth += 1) {
+          const shadowed = node.shadowRoot?.activeElement;
+          if (shadowed) { node = shadowed; continue; }
+          let nested = null;
+          try { nested = node.contentDocument?.activeElement ?? null; } catch {}
+          if (!nested) break;
+          inFrame = true;
+          node = nested;
+        }
+        if (!node) return null;
+        const tag = node.localName || '';
+        const label = node.getAttribute?.('aria-label') || node.getAttribute?.('placeholder') || node.id || '';
+        return {
+          tag,
+          role: node.getAttribute?.('role') || null,
+          name: String(label).slice(0, 500),
+          editable: node.isContentEditable === true || ['input', 'textarea', 'select'].includes(tag),
+          inFrame,
+        };
+      })()`,
+      contextId,
+      returnByValue: true,
+    },
+    sessionId,
+  );
+  const value = recordValue(recordValue(result.result)?.value);
+  if (!value) return null;
+  return {
+    tag: stringValue(value.tag),
+    role: stringValue(value.role) || null,
+    name: stringValue(value.name),
+    editable: value.editable === true,
+    inFrame: value.inFrame === true,
+  };
+}
+
 async function pageContainsText(
   send: SendCommand,
   captures: SnapshotTarget[],
@@ -1996,6 +2077,13 @@ function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
     else throw new Error("Browser snapshot exceeds its serialized size limit.");
     bytes = Buffer.byteLength(JSON.stringify(snapshot));
   }
+}
+
+function assertTypingProgressBeforeDeadline(deadline: number | undefined, sent: number, total: number): void {
+  if (deadline === undefined || Date.now() < deadline) return;
+  throw new Error(
+    `Browser typing timed out after ${sent} of ${total} characters reached the page. The page kept them. Read the page before sending the rest, or the repeated part is entered twice.`,
+  );
 }
 
 function assertBeforeDeadline(deadline: number | undefined): void {

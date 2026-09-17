@@ -138,6 +138,50 @@ const server = createServer((request, response) => {
   }
   // Its own page rather than more markup on `/v2`: that page's height and width are asserted against
   // a 220x560 panel, and a block form plus a default-sized iframe put a scrollbar in it.
+  // A canvas application: the grid is painted, so it has no element to focus, no value to set, and
+  // nothing for a semantic target to find. It reads keystrokes from the page the way a spreadsheet
+  // does -- characters build the pending cell, Tab commits it and moves a column right, Enter
+  // commits it and moves a row down.
+  if (url.pathname === "/grid") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html><body style="margin:0">
+      <canvas id="grid" width="400" height="200"></canvas>
+      <input aria-label="Grid filter" />
+      <output id="grid-state">{}</output>
+      <script>
+        const cells = {};
+        const canvas = document.getElementById('grid');
+        const state = document.getElementById('grid-state');
+        let row = 0;
+        let column = 0;
+        let pending = '';
+        const commit = () => {
+          if (pending) cells[String.fromCharCode(65 + column) + (row + 1)] = pending;
+          pending = '';
+          state.textContent = JSON.stringify(cells);
+        };
+        canvas.addEventListener('mousedown', (event) => {
+          const bounds = canvas.getBoundingClientRect();
+          commit();
+          column = Math.floor((event.clientX - bounds.left) / 100);
+          row = Math.floor((event.clientY - bounds.top) / 40);
+        });
+        window.addEventListener('keydown', (event) => {
+          if (event.key !== 'Tab' && event.key !== 'Enter') return;
+          event.preventDefault();
+          commit();
+          if (event.key === 'Tab') column += 1;
+          else {
+            row += 1;
+            column = 0;
+          }
+        });
+        window.addEventListener('keypress', (event) => {
+          if (event.key.length === 1) pending += event.key;
+        });
+      </script>`);
+    return;
+  }
   if (url.pathname === "/keys") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
@@ -329,6 +373,7 @@ async function main(): Promise<void> {
               await runDragAction(browser, tab.id, contents);
               await runDoubleClickScenario(browser, origin);
               await runKeyboardScenario(browser, origin, temporaryRoot);
+              await runCanvasGridScenario(browser, origin);
             } else if (scenario === "wait-deadlines") {
               await runWaitDeadlines(browser, tab.id, contents);
             } else {
@@ -758,6 +803,7 @@ async function main(): Promise<void> {
     if (noDomRefs !== true) throw new Error("V2 snapshot mutated the page DOM.");
     await runControlActions(browser, v2Tab.id, v2Contents);
     await runKeyboardScenario(browser, origin, temporaryRoot);
+    await runCanvasGridScenario(browser, origin);
     // A snapshot walks every frame, and Electron's `sendCommand` has no timeout of its own, so a frame
     // whose process is spinning never answers the walk. The timeout returns an error to the caller
     // either way; what it also has to do is cancel the command, or the promise the tab's queue was told
@@ -2291,6 +2337,117 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
   } finally {
     unsubscribe();
     await browser.close(keysTab.id);
+  }
+}
+
+async function expectSnapshot(browser: BrowserHost, tabId: string): Promise<DynamicRecord> {
+  const result = await callBrowserTool(browser, "snapshot", { tabId });
+  const payload = toolTextPayload(result);
+  if (!result.success || !payload) throw new Error(`Snapshot failed: ${toolError(result)}`);
+  return payload;
+}
+
+function snapshotFocus(snapshot: DynamicRecord): { tag: string; name: string; editable: boolean } | null {
+  const focus = snapshot.focus;
+  if (!isDynamicRecord(focus)) return null;
+  return {
+    tag: isString(focus.tag) ? focus.tag : "",
+    name: isString(focus.name) ? focus.name : "",
+    editable: focus.editable === true,
+  };
+}
+
+async function runCanvasGridScenario(browser: BrowserHost, origin: string): Promise<void> {
+  // A spreadsheet, a code editor and a map all paint their own surface, so `type` had no element to
+  // resolve, no `value` to write and no contenteditable to select: every attempt to enter data in
+  // one failed with "Typing requires an element target". Without a target the text has to arrive as
+  // the key events a person produces, which is also the only way the page's own keydown handlers
+  // see the tab and newline that move between columns and rows.
+  const { tab: gridTab, contents: gridContents } = await openTabWithContents(
+    browser,
+    `${origin}/grid`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const cellState = () => gridContents.executeJavaScript("document.querySelector('#grid-state').textContent", true);
+  try {
+    const selected = await callBrowserTool(browser, "click", {
+      tabId: gridTab.id,
+      target: { kind: "point", x: 50, y: 20 },
+    });
+    if (!selected.success) throw new Error(`Canvas cell selection failed: ${toolError(selected)}`);
+    const filledRow = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "12\tDone\n",
+    });
+    if (!filledRow.success) throw new Error(`Canvas grid typing failed: ${toolError(filledRow)}`);
+    const afterRow = await cellState();
+    if (afterRow !== '{"A1":"12","B1":"Done"}') {
+      throw new Error(`Canvas grid did not take the row: ${afterRow}`);
+    }
+    // Enter returned to the first column of the next row, so the second call proves the page kept
+    // the focus the first one left it with, without any element to re-target.
+    const committed = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "next",
+      submit: true,
+    });
+    if (!committed.success) throw new Error(`Canvas grid submit failed: ${toolError(committed)}`);
+    const afterSubmit = await cellState();
+    if (afterSubmit !== '{"A1":"12","B1":"Done","A2":"next"}') {
+      throw new Error(`Canvas grid did not commit the submitted cell: ${afterSubmit}`);
+    }
+    // Keystrokes with no target land wherever the page put the focus, and a caller that cannot see
+    // where that is finds out only when the data appears in the wrong place. The canvas leaves it on
+    // the document, which is what tells a caller the page interprets the keys itself.
+    const canvasFocus = snapshotFocus(await expectSnapshot(browser, gridTab.id));
+    if (canvasFocus?.tag !== "body" || canvasFocus.editable !== false) {
+      throw new Error(`Canvas grid snapshot misreported the focus: ${JSON.stringify(canvasFocus)}`);
+    }
+    const focusedField = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      target: { kind: "role", role: "textbox", name: "Grid filter", exact: true },
+      text: "filter",
+    });
+    if (!focusedField.success) throw new Error(`Grid field typing failed: ${toolError(focusedField)}`);
+    const fieldFocus = snapshotFocus(await expectSnapshot(browser, gridTab.id));
+    if (fieldFocus?.tag !== "input" || fieldFocus.name !== "Grid filter" || fieldFocus.editable !== true) {
+      throw new Error(`Grid field snapshot misreported the focus: ${JSON.stringify(fieldFocus)}`);
+    }
+
+    // Every keystroke is its own event, so a deadline reached part way through leaves what the page
+    // already took. A caller told only that the action timed out repeats a send that half happened,
+    // which in a spreadsheet enters the same data twice -- so the error has to carry how far it got,
+    // and that number has to be the truth rather than a guess.
+    const timedOut = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "y".repeat(4_000),
+      timeoutMs: 20,
+    });
+    const reported = /timed out after (\d+) of 4000 characters/.exec(toolError(timedOut));
+    if (timedOut.success || !reported) {
+      throw new Error(`Canvas grid typing hid its progress past the deadline: ${toolError(timedOut)}`);
+    }
+    const sent = Number(reported[1]);
+    const partialCommit = await callBrowserTool(browser, "press", { tabId: gridTab.id, key: "Enter" });
+    if (!partialCommit.success) throw new Error(`Canvas grid commit failed: ${toolError(partialCommit)}`);
+    const partial = JSON.parse(await cellState()).A3;
+    if (partial?.length !== sent || sent === 0 || sent >= 4_000) {
+      throw new Error(`Canvas grid kept ${partial?.length} characters but the error reported ${sent}.`);
+    }
+
+    // Replacing and appending are properties of a node's value. Reporting either one for keystrokes
+    // the page interprets itself would claim an edit that never happened.
+    const modeWithoutTarget = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "ignored",
+      mode: "replace",
+    });
+    if (modeWithoutTarget.success || !toolError(modeWithoutTarget).includes("type mode requires a target")) {
+      throw new Error(`Canvas grid accepted a mode without a target: ${toolError(modeWithoutTarget)}`);
+    }
+  } finally {
+    await browser.close(gridTab.id);
   }
 }
 
