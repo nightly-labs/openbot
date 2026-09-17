@@ -301,7 +301,7 @@ export function AccountDock(props: AccountDockProps) {
         >
           {(agent) => (
             <p class="account-usage-description">
-              Limits reported by {usageProviderName()} for {agent().name} ({agent().model}).
+              {agent().name} · {agent().model}
             </p>
           )}
         </Show>
@@ -344,10 +344,6 @@ export function AccountDock(props: AccountDockProps) {
             </section>
           )}
         </For>
-        <p class="account-usage-description">
-          These limits follow the selected agent, not the default provider in Settings. They are not combined across
-          providers. Other limits can stop requests before the weekly limit is reached.
-        </p>
       </>
     );
   }
