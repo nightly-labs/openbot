@@ -1,7 +1,7 @@
 import type { FilePreview } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { PanelResizer, readPanelWidth, savePanelWidth } from "../../components/PanelResizer";
-import { Button, ExternalLink, File, X } from "../../components/ui";
+import { Button, Download, ExternalLink, File, FolderOpen, X } from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import { MarkdownFilePreview } from "./MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "./SpreadsheetFilePreview";
@@ -22,7 +22,12 @@ interface FilePreviewPanelProps {
   onOpenLink: (url: string) => void;
   onOpenSharedFile: (path: string) => void;
   onOpenWorkspaceFile: (path: string) => void;
+  /** Set when the file already has a URL the panel can point at, as an attachment does. */
+  sourceUrl?: string | null;
   onOpenExternally: () => void;
+  /** Present for an attachment, which the user can also save or locate. A file already has a path. */
+  onDownload?: () => void;
+  onReveal?: () => void;
   onClose: () => void;
 }
 
@@ -51,10 +56,14 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     },
   );
   createEffect(
-    () => props.preview,
-    (preview) => {
+    () => ({ preview: props.preview, sourceUrl: props.sourceUrl }),
+    ({ preview, sourceUrl }) => {
       if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
       currentPreviewUrl = null;
+      if (sourceUrl && BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
+        setPreviewUrl(sourceUrl);
+        return;
+      }
       if (!preview.bytes || !BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
         setPreviewUrl(null);
         return;
@@ -118,6 +127,32 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         >
           <ExternalLink class="browser-toolbar-icon" />
         </Button>
+        <Show when={props.onDownload}>
+          {(download) => (
+            <Button
+              variant="ghost"
+              type="button"
+              class="browser-toolbar-button"
+              aria-label="Download file"
+              onClick={() => download()()}
+            >
+              <Download class="browser-toolbar-icon" />
+            </Button>
+          )}
+        </Show>
+        <Show when={props.onReveal}>
+          {(reveal) => (
+            <Button
+              variant="ghost"
+              type="button"
+              class="browser-toolbar-button"
+              aria-label="Show file in Finder"
+              onClick={() => reveal()()}
+            >
+              <FolderOpen class="browser-toolbar-icon" />
+            </Button>
+          )}
+        </Show>
         <Button
           variant="ghost"
           type="button"

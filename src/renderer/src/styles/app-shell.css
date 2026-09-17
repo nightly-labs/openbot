@@ -3113,7 +3113,6 @@ textarea {
 .reaction-picker-row button[aria-checked="true"],
 .message-more-menu button:hover,
 .message-more-menu button:focus-visible,
-.media-close:hover,
 .composer-button:hover,
 .composer-attachment > button:hover,
 .account-menu-row:hover,
@@ -3166,11 +3165,6 @@ textarea {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-secondary);
 }
-
-.media-backdrop {
-  background: var(--openbot-bg-overlay);
-}
-
 .agent-delete-dialog {
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-surface);

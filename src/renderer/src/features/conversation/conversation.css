@@ -534,8 +534,7 @@
   object-fit: contain;
 }
 
-.file-preview-spreadsheet,
-.media-spreadsheet-preview {
+.file-preview-spreadsheet {
   min-width: 0;
   min-height: 100%;
   padding: 20px;
@@ -617,34 +616,6 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
 }
-
-.media-spreadsheet-preview {
-  display: flex;
-  width: min(860px, calc(100vw - 78px));
-  height: min(720px, calc(100dvh - 120px));
-  max-width: 100%;
-  max-height: calc(100dvh - 120px);
-  min-height: 0;
-  box-sizing: border-box;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-canvas);
-}
-
-.media-spreadsheet-preview .file-preview-spreadsheet-tabs {
-  flex: 0 0 auto;
-}
-
-.media-spreadsheet-preview .file-preview-spreadsheet-table-wrap {
-  width: 100%;
-  flex: 1 1 auto;
-}
-
-.media-spreadsheet-preview .file-preview-spreadsheet-note {
-  flex: 0 0 auto;
-}
-
 .file-preview-unsupported {
   display: grid;
   min-height: 100%;
@@ -688,62 +659,6 @@
   font-size: var(--openbot-text-sm);
   text-align: center;
 }
-
-.media-markdown-preview {
-  width: min(860px, calc(100vw - 78px));
-  height: min(720px, calc(100dvh - 120px));
-  min-height: min(360px, calc(100dvh - 120px));
-  max-height: calc(100dvh - 120px);
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-canvas);
-  color: var(--openbot-text-primary);
-}
-
-.media-markdown-preview .markdown-file-preview-toolbar {
-  position: static;
-  flex: 0 0 auto;
-  margin: 0;
-  background: var(--openbot-bg-canvas);
-  padding: 12px 20px var(--openbot-space-3);
-}
-
-.media-markdown {
-  min-height: 0;
-  flex: 1 1 auto;
-  overflow: auto;
-  padding: 20px 28px 40px;
-  overflow-wrap: anywhere;
-}
-
-.media-markdown-source {
-  min-height: 0;
-  flex: 1 1 auto;
-  overflow: auto;
-  box-sizing: border-box;
-  padding: 20px 28px 40px;
-  min-width: 0;
-  margin: 0;
-  color: var(--openbot-text-primary);
-  font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-sm);
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.media-markdown-truncated {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0 20px var(--openbot-space-3);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  text-align: center;
-}
-
 .browser-pip-window {
   width: 100%;
   height: 100%;
@@ -5884,24 +5799,6 @@ button.chat-action-target:active,
   line-height: var(--openbot-leading-lg);
   overflow-wrap: anywhere;
 }
-
-.media-close {
-  display: grid;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 0;
-  border-radius: var(--openbot-radius-pill);
-  background: transparent;
-  color: var(--openbot-text-muted);
-}
-
-.media-close:hover {
-  background: var(--openbot-border);
-  color: var(--openbot-text-primary);
-}
-
 .choice-options {
   min-width: 0;
   overflow: hidden;
@@ -6636,75 +6533,6 @@ button.chat-action-target:active,
   height: 100%;
   object-fit: cover;
 }
-
-.media-backdrop {
-  position: fixed;
-  z-index: var(--openbot-layer-dialog);
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  padding: 24px;
-  background: var(--openbot-bg-overlay);
-  backdrop-filter: blur(3px);
-  animation: fade-in var(--openbot-duration-normal) ease both;
-}
-
-.media-modal {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  box-sizing: border-box;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  pointer-events: none;
-  box-shadow: none;
-  animation: modal-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.media-modal > * {
-  pointer-events: auto;
-}
-
-.media-close {
-  position: absolute;
-  z-index: 2;
-  top: 12px;
-  right: 12px;
-  background: var(--openbot-bg-overlay);
-  color: var(--openbot-text-primary);
-}
-
-.media-image {
-  display: block;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 96px);
-  border-radius: var(--openbot-radius-md);
-  object-fit: contain;
-}
-
-.media-caption {
-  display: flex;
-  width: min(100%, 860px);
-  align-items: center;
-  gap: 6px;
-  padding: 8px 0 2px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  text-align: left;
-}
-
 .message-attachments {
   display: grid;
   width: min(100%, 256px);
@@ -8466,76 +8294,6 @@ button.chat-action-target:active,
     transform: translateY(0) scale(1);
   }
 }
-
-.media-caption button {
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: transparent;
-  padding: 4px 6px;
-  color: var(--text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.media-caption button:hover {
-  background: var(--openbot-border);
-  color: var(--text-primary);
-}
-
-.media-document {
-  width: min(860px, calc(100vw - 78px));
-  height: calc(100vh - 140px);
-  border: 0;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-surface-light);
-}
-
-.media-audio {
-  width: min(560px, calc(100vw - 78px));
-}
-
-.media-video {
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 140px);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-canvas);
-  object-fit: contain;
-}
-
-.media-text {
-  width: min(820px, calc(100vw - 90px));
-  max-height: calc(100vh - 150px);
-  overflow: auto;
-  margin: 0;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-canvas);
-  padding: 20px;
-  color: var(--openbot-text-primary);
-  font:
-    12px / 1.6 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  white-space: pre-wrap;
-}
-
-.media-caption {
-  display: flex;
-  width: min(860px, calc(100vw - 78px));
-  max-width: 100%;
-  box-sizing: border-box;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 2px 0;
-}
-
-.media-caption > span {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 800px) {
   .direct-private-label {
     display: none;
@@ -8597,8 +8355,7 @@ button.chat-action-target:active,
 }
 
 .remote-desktop-stage,
-.remote-desktop-viewer,
-.media-text {
+.remote-desktop-viewer {
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-secondary);
 }
