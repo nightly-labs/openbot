@@ -127,6 +127,10 @@ export interface ConversationProps {
    * because standing consent the user cannot see is consent they cannot take back.
    */
   agentAutoApproves?: boolean;
+  /** Turbo mode covers every agent, so the per-agent switch is read-only while it is on. */
+  agentAutoApproveLocked?: boolean;
+  /** Absent for a remote agent: its own computer holds that choice. */
+  onSetAgentAutoApprove?: (autoApprove: boolean) => Promise<void>;
   onReviewAutoApprove?: (trigger: HTMLElement | null) => void;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel") => Promise<boolean>;
   onCancelQueuedMessage: (deliveryId: string) => void;

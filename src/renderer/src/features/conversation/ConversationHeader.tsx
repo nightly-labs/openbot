@@ -80,6 +80,9 @@ export function ConversationHeader() {
             }
             onChange={(model, provider) => void selectAndConfirmModel(model, provider)}
             onReasoningEffortChange={(effort) => void selectAndConfirmReasoning(effort)}
+            autoApprove={props.agentAutoApproves}
+            autoApproveLocked={props.agentAutoApproveLocked}
+            onAutoApproveChange={props.onSetAgentAutoApprove && ((next) => void props.onSetAgentAutoApprove?.(next))}
           />
         </Show>
         <Show when={props.remoteDesktopEnabled !== false && props.server?.kind === "remote" ? props.server : undefined}>

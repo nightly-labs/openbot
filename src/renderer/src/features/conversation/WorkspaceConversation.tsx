@@ -34,8 +34,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const platform = usePlatform();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
-  const { appSettingsOpen, skillsMarketplaceOpen, setAgentAutoApprove, agentAutoApproves, openAppSettings } =
-    useSettings();
+  const {
+    appSettingsOpen,
+    skillsMarketplaceOpen,
+    setAgentAutoApprove,
+    agentAutoApproves,
+    openAppSettings,
+    generalSettings,
+  } = useSettings();
   const {
     providerRuntimeStatuses,
     providerRuntimeDownloadsAvailable,
@@ -132,6 +138,16 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     };
   });
 
+  /**
+   * The same grant as the approval card's, offered before an approval rather than during one, so an
+   * agent can be trusted without waiting for it to ask. Local agents only, for the reason above.
+   */
+  const setAgentAutoApproveForActiveAgent = createMemo(() => {
+    const agent = activeAgent();
+    if (!agent || activeServer()?.kind !== "local") return undefined;
+    return (autoApprove: boolean) => setAgentAutoApprove(agent.id, autoApprove);
+  });
+
   /** Provider downloads are the local machine's business, never a remote host's. */
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
@@ -216,6 +232,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       onRespondToApproval={respondToApproval}
       onAlwaysAllowApproval={alwaysAllowApproval()}
       agentAutoApproves={activeServer()?.kind === "local" && agentAutoApproves(activeAgent()?.id ?? "")}
+      agentAutoApproveLocked={generalSettings().turboMode}
+      onSetAgentAutoApprove={setAgentAutoApproveForActiveAgent()}
       onReviewAutoApprove={openAppSettings}
       onRespondToBrowserTakeover={respondToBrowserTakeover}
       onCancelQueuedMessage={cancelQueuedMessage}

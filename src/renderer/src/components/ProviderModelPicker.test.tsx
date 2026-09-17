@@ -80,6 +80,75 @@ describe("ProviderModelPicker", () => {
     expect(dialog).toBeInTheDocument();
   });
 
+  it("offers the standing grant below Effort, and only where the caller gives one", async () => {
+    const onAutoApproveChange = vi.fn();
+    const [granted, setGranted] = createSignal(false);
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        autoApprove={granted()}
+        onAutoApproveChange={(next) => {
+          setGranted(next);
+          onAutoApproveChange(next);
+        }}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    const grant = within(dialog).getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(grant).not.toBeChecked();
+
+    await fireEvent.click(grant);
+    expect(onAutoApproveChange).toHaveBeenCalledWith(true);
+    await vi.waitFor(() => expect(grant).toBeChecked());
+    // Changing it is not a reason to lose the picker, the same way choosing an effort is not.
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it("reads the grant as on and read-only while Turbo mode covers every agent", async () => {
+    const onAutoApproveChange = vi.fn();
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        autoApprove
+        autoApproveLocked
+        onAutoApproveChange={onAutoApproveChange}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    const grant = within(dialog).getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(grant).toBeChecked();
+    await fireEvent.click(grant);
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+  });
+
+  it("shows no standing grant for an agent this computer does not run", async () => {
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    expect(within(dialog).queryByRole("switch", { name: "Auto approve this agent's actions" })).not.toBeInTheDocument();
+  });
+
   it("shows an unavailable provider without allowing its models", async () => {
     const onChange = vi.fn();
     const view = render(() => (
