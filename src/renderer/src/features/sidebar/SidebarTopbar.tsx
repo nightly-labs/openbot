@@ -64,10 +64,14 @@ export function SidebarTopbar() {
               <Show when={layoutMutable()}>
                 <DropdownMenu.Item
                   onSelect={() => {
-                    // The menu restores focus to this trigger after two animation frames
-                    // (focusRestoreHandler in components/ui/complex.tsx), which would blur the
-                    // new input and cancel the editor. Open it after the restore runs.
-                    window.requestAnimationFrame(() => window.requestAnimationFrame(() => startCreateSection()));
+                    // Kobalte selects before it closes the menu, so a callback deferred by the
+                    // same two frames as the restore would still run first: the editor would open,
+                    // take focus in a microtask, then lose it to the trigger and cancel on blur.
+                    // Three frames land strictly after the two-frame restore in
+                    // focusRestoreHandler (components/ui/complex.tsx). Keep the counts in step.
+                    window.requestAnimationFrame(() =>
+                      window.requestAnimationFrame(() => window.requestAnimationFrame(() => startCreateSection())),
+                    );
                   }}
                 >
                   <FolderPlus aria-hidden="true" />
