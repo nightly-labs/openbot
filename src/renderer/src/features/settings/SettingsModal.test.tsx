@@ -996,6 +996,37 @@ describe("SettingsModal", () => {
     await waitFor(() => expect(revoke).toHaveBeenCalledWith("agent-1"));
   });
 
+  it("revokes every grant at once, and offers that only when there is more than one", async () => {
+    const revoke = vi.fn(async () => undefined);
+    const [agents, setAgents] = createSignal([
+      { id: "agent-1", name: "Chief" },
+      { id: "agent-2", name: "Scout" },
+    ]);
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+        autoApprovedAgents={agents()}
+        onRevokeAutoApprove={revoke}
+      />
+    ));
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Revoke all" }));
+    await waitFor(() => expect(revoke.mock.calls).toEqual([["agent-1"], ["agent-2"]]));
+
+    // One grant is revoked from its own row; the bulk action would be a second button for one agent.
+    setAgents([{ id: "agent-1", name: "Chief" }]);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Revoke all" })).not.toBeInTheDocument());
+  });
+
   it("says so when no agent has a standing approval", async () => {
     render(() => (
       <SettingsModal

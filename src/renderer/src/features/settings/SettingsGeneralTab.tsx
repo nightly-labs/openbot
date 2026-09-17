@@ -250,6 +250,34 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               </Item>
             )}
           </For>
+          <Show when={(props.autoApprovedAgents ?? []).length > 1 && props.onRevokeAutoApprove}>
+            {(revoke) => (
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{i18n.t("settings.autoApprove.resetTitle")}</ItemTitle>
+                  <ItemDescription>{i18n.t("settings.autoApprove.resetDescription")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      // One call per agent, in order, because one grant is what the contract writes.
+                      // The list is bounded by the agent roster, so this is never a long queue.
+                      const revokeOne = revoke();
+                      void (props.autoApprovedAgents ?? []).reduce(
+                        (queue, agent) => queue.then(() => revokeOne(agent.id)),
+                        Promise.resolve(),
+                      );
+                    }}
+                  >
+                    {i18n.t("settings.autoApprove.reset")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            )}
+          </Show>
           <Show when={(props.autoApprovedAgents ?? []).length === 0}>
             <Item class="settings-modal-row">
               <ItemContent>
