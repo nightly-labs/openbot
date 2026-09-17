@@ -808,8 +808,19 @@ it("opens each detail page on the same host without sending or losing main form 
 
 it("saves a supported model and reasoning level on the original host", async () => {
   workspace.agents = [{ ...original, provider: "codex", model: "old-model", reasoningEffort: "low" }];
+  workspace.loadAgentModels.mockResolvedValueOnce([
+    {
+      provider: "codex",
+      id: "model-one",
+      name: "A model with a name longer than the row",
+      description: "",
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: ["medium", "high"],
+    },
+  ]);
   await renderSheet("runtime");
   await waitFor(() => expect(screen.getByDisplayValue("old-model")).toHaveProperty("disabled", false));
+  expect(screen.getByRole("option", { name: "A model with a name longer t…" })).toBeTruthy();
   await act(() => fireEvent.change(screen.getByDisplayValue("old-model"), { target: { value: "model-one" } }));
   await act(() => fireEvent.change(screen.getByDisplayValue("Medium"), { target: { value: "high" } }));
   await click("Save changes");
@@ -846,10 +857,19 @@ it("changes provider together with a compatible model and reasoning", async () =
       defaultReasoningEffort: "medium",
       supportedReasoningEfforts: ["medium"],
     },
+    {
+      provider: "opencode",
+      id: "opencode-model",
+      name: "OpenCode Model",
+      description: "",
+      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts: ["medium"],
+    },
   ]);
   await renderSheet("runtime");
-  await waitFor(() => expect(screen.getByDisplayValue("Codex")).toHaveProperty("disabled", false));
-  await act(() => fireEvent.change(screen.getByDisplayValue("Codex"), { target: { value: "claude" } }));
+  await waitFor(() => expect(screen.getByDisplayValue("ChatGPT")).toHaveProperty("disabled", false));
+  expect(screen.getByRole("option", { name: "OpenCode" })).toBeTruthy();
+  await act(() => fireEvent.change(screen.getByDisplayValue("ChatGPT"), { target: { value: "claude" } }));
   await click("Save changes");
   expect(workspace.updateAgent).toHaveBeenCalledWith(
     { agentId: original.id, provider: "claude", model: "claude-model", reasoningEffort: "medium" },
