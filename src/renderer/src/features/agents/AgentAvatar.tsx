@@ -38,6 +38,11 @@ const CONNECTING_CYCLE: Block[] = [makeBlock("orbit"), makeBlock("swirl")];
 // the only sidebar signal that an agent runs.
 const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
 
+// Read from the avatar upwards: the first of these is its hover group. A `[tabindex]` element that
+// matches none of them, such as the dialog or a scroll region, is too wide to be one. An item of a
+// composite widget states its own group with `data-avatar-hover`.
+const HOVER_GROUP = "[data-avatar-hover], button, a, [role='button'], [role='link'], [role='menuitem']";
+
 function slowerBlock(state: StateId): Block {
   const block = makeBlock(state);
   return { ...block, duration: block.duration * SIDEBAR_MOTION_HOLD_FACTOR };
@@ -263,7 +268,11 @@ function GeneratedAvatar(props: {
     syncReducedMotion();
     media?.addEventListener?.("change", syncReducedMotion);
 
-    const interactionTarget = element?.closest<HTMLElement>("button, a, [role='button'], [tabindex]") ?? element;
+    // What must be hovered or focused for a resting avatar to move: the control the avatar sits in or
+    // beside, marked with `data-avatar-hover` when the avatar is only a neighbour of it. A dialog and a
+    // scroll region are focusable as well, and taking one of those would start every avatar on it at once.
+    const group = element?.closest<HTMLElement>(`${HOVER_GROUP}, [tabindex]`);
+    const interactionTarget = group?.matches(HOVER_GROUP) ? group : element;
     const startInteraction = () => setInteracting(true);
     const stopInteraction = () => setInteracting(false);
     const stopFocusInteraction = (event: FocusEvent) => {

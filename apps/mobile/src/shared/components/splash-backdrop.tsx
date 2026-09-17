@@ -3,8 +3,9 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
 
 import logo from "@/assets/icons/app-icon.png";
-import backgroundDark from "@/assets/splash/background-dark.png";
-import backgroundLight from "@/assets/splash/background-light.png";
+import backgroundDark from "@/assets/splash/background-dark.webp";
+import backgroundLight from "@/assets/splash/background-light.webp";
+import type { SplashArtwork } from "@/shared/lib/use-splash-gate";
 
 // Native splash screens cannot layer a wallpaper behind a centered mark: iOS and
 // Android paint one centered image on a solid color, and Android 12 and later
@@ -21,7 +22,14 @@ const LOGO_SIZE = 112;
 const LOADER_GAP = 32;
 const LOADER_COLOR = { light: "#2C2C2C", dark: "#E6C5FA" } as const;
 
-export function SplashBackdrop() {
+interface SplashBackdropProps {
+  // Reports each image the moment it is rendered on screen, not merely loaded.
+  // useSplashGate holds the native splash until every source has reported, so
+  // the handoff never exposes a backdrop that is still only its base color.
+  onArtworkDisplay?: (artwork: SplashArtwork) => void;
+}
+
+export function SplashBackdrop({ onArtworkDisplay }: SplashBackdropProps) {
   const { theme } = useUniwind();
   const dark = theme === "dark";
 
@@ -41,10 +49,17 @@ export function SplashBackdrop() {
       <Image
         accessible={false}
         contentFit="cover"
+        onDisplay={() => onArtworkDisplay?.("wallpaper")}
         source={dark ? backgroundDark : backgroundLight}
         style={StyleSheet.absoluteFill}
       />
-      <Image accessible={false} contentFit="contain" source={logo} style={{ height: LOGO_SIZE, width: LOGO_SIZE }} />
+      <Image
+        accessible={false}
+        contentFit="contain"
+        onDisplay={() => onArtworkDisplay?.("mark")}
+        source={logo}
+        style={{ height: LOGO_SIZE, width: LOGO_SIZE }}
+      />
       <View
         accessible={false}
         style={{
