@@ -8640,20 +8640,22 @@ body:has(.browser-panel-expanded) .app-frame {
   display: none;
 }
 
+/*
+ * The button is portaled beside the panel rather than laid out inside the header, so it is placed
+ * against the window instead of against the row it belongs to. These values put it on that row: the
+ * tabs and the new-tab button are 28px boxes at y 5, so the button takes the same box on the same
+ * line rather than a smaller one floating above it, and the 8px right inset matches the header's own
+ * inline padding on the opposite side. The header reserves this width so the strip cannot scroll
+ * underneath.
+ */
 .browser-hide {
   position: fixed;
-  top: var(--openbot-space-1);
-  right: var(--openbot-space-1);
+  top: 5px;
+  right: var(--openbot-space-2);
+  width: 24px;
+  height: 28px;
+  border-radius: var(--openbot-radius-xs);
   z-index: calc(var(--openbot-layer-dropdown) - 1);
-}
-
-/*
- * The button is portaled next to the panel rather than inside it, so it cannot inherit the mac class
- * and `:has` on the body is what reaches it. The offset puts its 24px box on the same centre line as
- * the traffic lights and the tabs, so the whole strip reads as one row.
- */
-body:has(.browser-panel-mac-controls) .browser-hide {
-  top: var(--openbot-space-2);
 }
 
 .browser-panel-expanded .browser-panel-header {
@@ -8661,8 +8663,9 @@ body:has(.browser-panel-mac-controls) .browser-hide {
   align-items: center;
   gap: var(--openbot-space-3);
   /* The inline end reserves the corner `.browser-hide` sits in, which is fixed to the window rather
-   * than to this header, so the tab strip would otherwise scroll underneath it. */
-  padding-inline: var(--openbot-space-2) var(--openbot-space-8);
+   * than to this header, so the tab strip would otherwise scroll underneath it: the button's own
+   * 8px inset and 24px box, and 8px between it and the last tab. */
+  padding-inline: var(--openbot-space-2) calc(var(--openbot-space-8) + var(--openbot-space-2));
 }
 
 /*
