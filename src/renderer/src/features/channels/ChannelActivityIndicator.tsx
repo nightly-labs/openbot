@@ -10,19 +10,9 @@ export interface ChannelWorker {
   agent?: AgentProfile;
 }
 
-/**
- * Who the channel is waiting on, for the announcement only.
- *
- * A channel runs several agents at once, and a row for each would push the transcript off the
- * screen every time work started. The names read as a list, so the listener counts the workers in
- * one line. It takes the subject of the agent chat's announcement - `<name> is working` - so both
- * chats announce work the same way.
- */
+/** The worker names identify the active agents without adding a fixed-language sentence. */
 export function channelActivitySentence(names: string[]): string {
-  if (names.length === 0) return "";
-  if (names.length === 1) return `${names[0]} is working`;
-  const last = names[names.length - 1];
-  return `${names.slice(0, -1).join(", ")} and ${last} are working`;
+  return names.join(", ");
 }
 
 /**
@@ -58,7 +48,7 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
         aria-atomic="true"
         aria-label={`${sentence()}: ${presentation().label}`}
       />
-      <section class="agent-activity-content channel-activity-content" aria-label="Current activity">
+      <section class="agent-activity-content channel-activity-content" aria-label={presentation().label}>
         <div class="channel-activity-faces">
           <For each={props.workers}>
             {(worker) => (

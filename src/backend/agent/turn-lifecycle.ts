@@ -27,7 +27,7 @@ import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
-import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
+import { isNonActionableCodexWarning, providerActivityText, toThreadItem } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -90,6 +90,9 @@ export class TurnLifecycle {
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   readonly #turnAssociations = new Map<string, Promise<void>>();
+  readonly #pendingProgress = new Map<string, { agentId: string; threadId: string; turnId: string; detail: string }>();
+  readonly #progressTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #lastProgress = new Map<string, { turnId: string; detail: string }>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -127,6 +130,10 @@ export class TurnLifecycle {
   dispose(): void {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
+    for (const timer of this.#progressTimers.values()) clearTimeout(timer);
+    this.#pendingProgress.clear();
+    this.#progressTimers.clear();
+    this.#lastProgress.clear();
   }
 
   handleNotification(notification: AppServerNotification, source: AgentClient): void {
@@ -229,6 +236,10 @@ export class TurnLifecycle {
         }
         message.text += delta;
         message.status = "streaming";
+        if (message.itemType === "commentary") {
+          const activity = providerActivityText(message.text);
+          if (activity) this.#queueTurnProgress(agentId, publicThreadId, turnId, activity);
+        }
         this.#deltas.buffer({
           agentId,
           externalThreadId: threadId,
@@ -290,6 +301,8 @@ export class TurnLifecycle {
   }
 
   async #completeTurn(agentId: string, threadId: string, turnId: string, status: string): Promise<void> {
+    this.#flushTurnProgress(turnId);
+    this.#clearTurnProgress(turnId);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);
@@ -400,11 +413,6 @@ export class TurnLifecycle {
 
   #applyItem(agentId: string, threadId: string, turnId: string, item: ThreadItem, completed: boolean): void {
     if (this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
-    const toolProgress = toolProgressText(item, completed);
-    if (toolProgress) {
-      this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
-      return;
-    }
     if (item.type !== "agentMessage" || !isString(item.id)) return;
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     let message = snapshot.messages.find((candidate) => candidate.id === item.id);
@@ -427,5 +435,43 @@ export class TurnLifecycle {
       turnId,
       detail: text,
     });
+  }
+
+  #queueTurnProgress(agentId: string, threadId: string, turnId: string, detail: string): void {
+    const key = `${agentId}:${turnId}`;
+    const previous = this.#pendingProgress.get(key);
+    if (previous?.detail === detail || this.#lastProgress.get(key)?.detail === detail) return;
+    this.#pendingProgress.set(key, { agentId, threadId, turnId, detail });
+    if (this.#progressTimers.has(key)) return;
+    this.#progressTimers.set(
+      key,
+      setTimeout(() => this.#flushTurnProgressByKey(key), 100),
+    );
+  }
+
+  #flushTurnProgress(turnId: string): void {
+    for (const [key, pending] of this.#pendingProgress) {
+      if (pending.turnId === turnId) this.#flushTurnProgressByKey(key);
+    }
+  }
+
+  #flushTurnProgressByKey(key: string): void {
+    const pending = this.#pendingProgress.get(key);
+    if (!pending) return;
+    const timer = this.#progressTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.#progressTimers.delete(key);
+    this.#pendingProgress.delete(key);
+    this.#lastProgress.set(key, { turnId: pending.turnId, detail: pending.detail });
+    this.#emitTurnProgress(pending.agentId, pending.threadId, pending.turnId, pending.detail);
+  }
+
+  #clearTurnProgress(turnId: string): void {
+    for (const [key, pending] of this.#pendingProgress) {
+      if (pending.turnId === turnId) this.#pendingProgress.delete(key);
+    }
+    for (const [key, pending] of this.#lastProgress) {
+      if (pending.turnId === turnId) this.#lastProgress.delete(key);
+    }
   }
 }

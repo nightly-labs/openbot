@@ -802,7 +802,7 @@ describe("OpenBot connected desktop shell", () => {
       ],
     });
 
-    expect(await screen.findByRole("status", { name: /^Chief is working:/ })).toBeInTheDocument();
+    expect(await screen.findByRole("status", { name: /^Chief:/ })).toBeInTheDocument();
     expect(await screen.findByRole("textbox", { name: "Custom answer for: Which scope?" })).toBeInTheDocument();
 
     const runtimeSnapshot: AgentEvent = {
@@ -821,7 +821,7 @@ describe("OpenBot connected desktop shell", () => {
     };
     emitAgentEvent?.(runtimeSnapshot);
 
-    expect(screen.getByRole("status", { name: /^Chief is working:/ })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /^Chief:/ })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Custom answer for: Which scope?" })).toBeInTheDocument();
 
     emitAgentEvent?.({
@@ -831,7 +831,7 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() =>
       expect(screen.queryByRole("textbox", { name: "Custom answer for: Which scope?" })).not.toBeInTheDocument(),
     );
-    await waitFor(() => expect(screen.queryByRole("status", { name: /^Chief is working:/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /^Chief:/ })).not.toBeInTheDocument());
   });
 
   it("merges compact runtime attention into the active server", async () => {

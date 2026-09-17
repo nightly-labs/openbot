@@ -56,9 +56,9 @@ export function AgentActivityIndicator(props: {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        aria-label={`${props.agent?.name ?? "Agent"} is working: ${label()}`}
+        aria-label={`${props.agent?.name ?? ""}: ${label()}`.trim()}
       />
-      <section class="agent-activity-content" aria-label="Current activity">
+      <section class="agent-activity-content" aria-label={label()}>
         <AgentAvatar
           agent={props.agent}
           motion="working"
