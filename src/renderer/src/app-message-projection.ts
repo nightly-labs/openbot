@@ -206,6 +206,7 @@ function chatActionMarker(
       timestamp: message.createdAt,
       messageId: message.exchange.messageId,
       replyToMessageId: message.exchange.replyToMessageId,
+      expectsReply: message.exchange.expectsReply !== false,
     };
   }
   const skillEvent = skillConversationEvent(message);

@@ -901,6 +901,21 @@ async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
     await mailbox.markTerminal(delivery.id, "completed");
   }
 
+  // A teammate passing information on without asking for an answer: the state the marker reads as
+  // "Informed" for the sender and "Update from" for the recipient.
+  const notice = await mailbox.enqueue({
+    sender: { kind: "agent", agentId: "builder" },
+    recipientAgentIds: ["chief"],
+    text: "The staging build is live. I am continuing with the checklist; no answer needed.",
+    expectsReply: false,
+    idempotencyKey: "dev-seed:exchange:notice",
+  });
+  const noticeDelivery = notice.deliveries[0];
+  if (!noticeDelivery) throw new Error("The seeded notice exchange did not create a delivery.");
+  await mailbox.markStarting(noticeDelivery.id);
+  await mailbox.markRunning(noticeDelivery.id, "dev-seed-turn-notice");
+  await mailbox.markTerminal(noticeDelivery.id, "completed");
+
   const failed = await mailbox.enqueue({
     sender: { kind: "agent", agentId: "research" },
     recipientAgentIds: ["launch"],

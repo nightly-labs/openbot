@@ -267,12 +267,18 @@ export class DrainScheduler {
               "Surface or summarize the result naturally for the user.",
               "Reply to the teammate only when the message requests another action or reports blocked/failed work; otherwise do not send an acknowledgement and avoid reply loops.",
             ]
-          : [
-              `After completing the request, send a concise result back to ${sender?.name ?? senderAgentId} with openbot.send_message.`,
-              `Use recipientAgentIds ["${senderAgentId}"] and replyToMessageId "${delivery.messageId}".`,
-              "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.",
-              "Do not acknowledge without a Status line. Do not leave the sender waiting for a result.",
-            ];
+          : delivery.expectsReply === false
+            ? [
+                "The sender does not want an answer. This message passes information to you.",
+                "Use it if it changes your work, and continue with what you were doing.",
+                "Do not send a reply, an acknowledgement, or a result for it. OpenBot sends the sender nothing back.",
+              ]
+            : [
+                `After completing the request, send a concise result back to ${sender?.name ?? senderAgentId} with openbot.send_message.`,
+                `Use recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", and expectsReply false.`,
+                "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.",
+                "Do not acknowledge without a Status line. Do not leave the sender waiting for a result.",
+              ];
         text = [
           `Message from OpenBot teammate ${sender?.name ?? senderAgentId} (${senderAgentId}).`,
           `Message ID: ${delivery.messageId}`,
