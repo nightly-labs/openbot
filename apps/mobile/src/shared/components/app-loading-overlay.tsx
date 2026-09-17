@@ -8,6 +8,12 @@ interface AppLoadingOverlayContextValue {
 }
 
 const AppLoadingOverlayContext = createContext<AppLoadingOverlayContextValue | null>(null);
+// The exit animation reports its own end, and that report blocks the app until it
+// arrives. A lost animation callback, or a loader unmounted part way through its
+// exit, left the loader over the conversation with no way back. Longer than the
+// whole exit takes, so a healthy exit still owns its own timing.
+const EXIT_DEADLINE_MS = 2000;
+
 export function AppLoadingOverlayProvider({ children }: PropsWithChildren) {
   const [{ label, present }, setOverlay] = useState<{ label: string | null; present: boolean }>({
     label: "Loading account",
@@ -34,6 +40,12 @@ export function AppLoadingOverlayProvider({ children }: PropsWithChildren) {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => true);
     return () => subscription.remove();
   }, [present]);
+
+  useEffect(() => {
+    if (visible || !present) return;
+    const deadline = setTimeout(handleExitComplete, EXIT_DEADLINE_MS);
+    return () => clearTimeout(deadline);
+  }, [handleExitComplete, present, visible]);
 
   return (
     <AppLoadingOverlayContext.Provider value={value}>

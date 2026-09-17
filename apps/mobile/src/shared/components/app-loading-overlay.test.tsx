@@ -51,6 +51,7 @@ document.body.append(container);
 let root = createRoot(container);
 afterEach(async () => {
   await act(() => root.unmount());
+  vi.useRealTimers();
   root = createRoot(container);
 });
 
@@ -115,5 +116,36 @@ describe("app loading interaction boundary", () => {
     expect(screen.queryByRole("button", { name: "Open sidebar" })).toBeNull();
     expect(screen.getByRole("progressbar", { name: "Connecting to server" })).toBeTruthy();
     expect([...native.back].some((listener) => listener())).toBe(true);
+  });
+});
+
+describe("app loading recovery", () => {
+  it("releases the app when the exit is never reported", async () => {
+    vi.useFakeTimers();
+    const app = await renderApp();
+    await app.setLoadingLabel(null);
+    expect(screen.getByRole("progressbar", { name: "Loading", hidden: true })).toBeTruthy();
+
+    await act(() => vi.advanceTimersByTime(2000));
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    await act(() => fireEvent.click(screen.getByRole("button", { name: "Open sidebar" })));
+    expect(app.navigate).toHaveBeenCalledOnce();
+    expect(native.back.size).toBe(0);
+  });
+
+  it("leaves no loader behind across repeated chat entries", async () => {
+    const app = await renderApp();
+    await app.setLoadingLabel(null);
+    await act(() => native.finishExit());
+
+    for (let entry = 0; entry < 3; entry += 1) {
+      await app.setLoadingLabel("Connecting to server");
+      expect(screen.getByRole("progressbar", { name: "Connecting to server", hidden: true })).toBeTruthy();
+      await app.setLoadingLabel(null);
+      await act(() => native.finishExit());
+      expect(screen.queryByRole("progressbar")).toBeNull();
+      await act(() => fireEvent.click(screen.getByRole("button", { name: "Open sidebar" })));
+    }
+    expect(app.navigate).toHaveBeenCalledTimes(3);
   });
 });

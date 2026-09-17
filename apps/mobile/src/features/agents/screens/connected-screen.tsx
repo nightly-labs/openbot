@@ -1,6 +1,6 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
-import { router, Stack, useIsFocused } from "expo-router";
+import { router, Stack, useIsFocused, usePathname } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Bot, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
@@ -78,6 +78,7 @@ function HeaderIconButton({
 
 export function ConnectedScreen() {
   const isFocused = useIsFocused();
+  const pathname = usePathname();
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const { openDrawer } = useAppDrawer();
   const {
@@ -106,11 +107,15 @@ export function ConnectedScreen() {
     (serverDirectoryState === "loading" && servers.length === 0) ||
     (hasSelectedServer && activeServer.initialConnectionPending);
   const listReady = !showLoader && !isLoaderPresent;
+  // The overlay is the whole app's, and connecting to a server continues while the
+  // user reads a chat. Require the route as well as focus, so a late focus event
+  // cannot raise a blocking loader over the screen that is actually on top.
+  const ownsOverlay = isFocused && pathname === "/connected";
   useLayoutEffect(() => {
-    if (!isFocused) return;
+    if (!ownsOverlay) return;
     setLoadingLabel(showLoader ? (hasSelectedServer ? "Connecting to server" : "Loading your servers") : null);
     return () => setLoadingLabel(null);
-  }, [hasSelectedServer, isFocused, setLoadingLabel, showLoader]);
+  }, [hasSelectedServer, ownsOverlay, setLoadingLabel, showLoader]);
   const pinnedAgents = pinnedAgentIds
     .map((agentId) => activeAgents.find((agent) => agent.id === agentId))
     .filter((agent): agent is (typeof activeAgents)[number] => Boolean(agent));
