@@ -1,7 +1,7 @@
 import { type MarketplaceSkillQuery, SKILL_CATEGORIES, type SkillCategory } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, For, onCleanup, Show } from "solid-js";
-import { Button, ChevronDown, DropdownMenu, Input, Search, Skeleton, UserAvatar } from "../../components/ui";
+import { createEffect, createStore, For, onCleanup, onSettled, Show } from "solid-js";
+import { Button, Skeleton, UserAvatar } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 
 export const CATEGORY_LABELS: Record<SkillCategory, string> = {
@@ -14,6 +14,18 @@ export const CATEGORY_LABELS: Record<SkillCategory, string> = {
   automation: "Automation",
   other: "Other",
 };
+
+/** Whether an answer's row is the row already on screen, so the list can keep the element it has. */
+function same(a: CatalogItem, b: CatalogItem) {
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.description === b.description &&
+    a.creatorName === b.creatorName &&
+    a.creatorAvatarUrl === b.creatorAvatarUrl &&
+    a.category === b.category
+  );
+}
 
 interface CatalogItem {
   id: string;
@@ -39,6 +51,8 @@ export function MarketplaceIdentity(props: { item: CatalogItem; children: JSX.El
 
 export function MarketplaceCatalog<T extends CatalogItem>(props: {
   kind: "skills" | "agents";
+  /** The search text, held by the dialog chrome that shows the field next to the kind switch. */
+  query: string;
   refreshVersion: number;
   list: (query: MarketplaceSkillQuery) => Promise<{ items: T[]; nextCursor: string | null }>;
   icon: (item: T) => JSX.Element;
@@ -46,36 +60,39 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
 }) {
   const [state, setState] = createStore<{
     query: string;
+    /** The trimmed query `items` came back for, so a newer keystroke knows it must filter them itself. */
+    loadedQuery: string;
     category: SkillCategory | null;
+    /** The overview categories that hold more than the rows on screen, so only those offer a way in. */
+    moreCategories: SkillCategory[];
     items: T[];
-    featured: T[];
-    featuredLoaded: boolean;
     nextCursor: string | null;
     loading: boolean;
     loadingMore: boolean;
     error: string | null;
   }>({
     query: "",
+    loadedQuery: "",
     category: null,
+    moreCategories: [],
     items: [],
-    featured: [],
-    featuredLoaded: false,
     nextCursor: null,
     loading: true,
     loadingMore: false,
     error: null,
   });
   let requestVersion = 0;
-  let featuredRequest: Promise<{ items: T[]; nextCursor: string | null }> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const overview = () => !state.category && !state.query.trim();
   async function load(category = state.category, query = state.query, cursor?: string) {
     const version = ++requestVersion;
+    /* A search keeps the rows it already has and filters them below, so typing never flashes a skeleton. */
+    const keepVisible = !cursor && Boolean(query.trim()) && state.items.length > 0;
     setState((s) => {
-      s.loading = !cursor;
+      s.loading = !cursor && !keepVisible;
       s.loadingMore = Boolean(cursor);
       s.error = null;
-      if (!cursor) {
+      if (!cursor && !keepVisible) {
         s.items = [];
         s.nextCursor = null;
       }
@@ -87,32 +104,26 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
         sort: "installs" as const,
       };
       const home = !category && !query.trim();
-      if (!state.featuredLoaded && !featuredRequest) {
-        featuredRequest = props.list({ featured: true, limit: 4 }).catch((error) => {
-          featuredRequest = undefined;
-          throw error;
-        });
-      }
-      const [pages, featured] = await Promise.all([
-        home
-          ? Promise.all(SKILL_CATEGORIES.map((category) => props.list({ category, sort: "installs", limit: 6 })))
-          : Promise.all([props.list({ ...filters, limit: 50, ...(cursor ? { cursor } : {}) })]),
-        state.featuredLoaded ? null : featuredRequest,
-      ]);
+      const pages = home
+        ? await Promise.all(SKILL_CATEGORIES.map((category) => props.list({ category, sort: "installs", limit: 6 })))
+        : [await props.list({ ...filters, limit: 50, ...(cursor ? { cursor } : {}) })];
       if (version !== requestVersion) return;
       setState((s) => {
         const allItems = pages.flatMap((page) => page.items);
-        const items = allItems.filter(
-          (item, index) => allItems.findIndex((current) => current.id === item.id) === index,
-        );
+        const items = allItems
+          .filter((item, index) => allItems.findIndex((current) => current.id === item.id) === index)
+          /*
+           * An answer arrives as new objects, even for a row that is already on screen. Keeping the
+           * object the row was built from lets the list keep that row's element instead of building
+           * it again, which is what made every keystroke blink the whole listing.
+           */
+          .map((item) => s.items.find((current) => same(current, item)) ?? item);
         s.items = cursor
           ? [...s.items, ...items.filter((item) => !s.items.some((current) => current.id === item.id))]
           : items;
-        if (featured && !s.featuredLoaded) {
-          s.featured = featured.items;
-          s.featuredLoaded = true;
-        }
         s.nextCursor = home ? null : (pages[0]?.nextCursor ?? null);
+        if (home) s.moreCategories = SKILL_CATEGORIES.filter((_, index) => pages[index]?.nextCursor);
+        s.loadedQuery = query.trim();
       });
     } catch (error) {
       if (version === requestVersion)
@@ -130,19 +141,43 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
   createEffect(
     () => props.refreshVersion,
     () => {
-      if (state.featuredLoaded) {
-        featuredRequest = undefined;
-        setState((s) => {
-          s.featuredLoaded = false;
-        });
-      }
       void load();
+    },
+  );
+  /* Typing waits before it reaches the network; the first run matches the empty state and loads nothing. */
+  createEffect(
+    () => props.query,
+    (query) => {
+      if (query === state.query) return;
+      clearTimeout(timer);
+      requestVersion++;
+      setState((s) => {
+        s.query = query;
+      });
+      timer = setTimeout(() => void load(state.category, query), 220);
     },
   );
   onCleanup(() => {
     requestVersion++;
     clearTimeout(timer);
   });
+  /** True between a keystroke and the answer for it, when `items` still belongs to an older query. */
+  const searchPending = () => Boolean(state.query.trim()) && state.loadedQuery !== state.query.trim();
+  /**
+   * What the rows show: the answer to the current query once it arrives, and the loaded rows narrowed by
+   * the query until then. Narrowing only ever removes rows, so the list never keeps a wrong match on
+   * screen while the request runs.
+   */
+  const items = () => {
+    const query = state.query.trim().toLowerCase();
+    if (!searchPending()) return state.items;
+    return state.items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(query) ||
+        item.creatorName.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query),
+    );
+  };
   function selectCategory(category: SkillCategory | null) {
     clearTimeout(timer);
     setState((s) => {
@@ -150,20 +185,22 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
     });
     void load(category);
   }
-  function search(query: string) {
-    clearTimeout(timer);
-    requestVersion++;
-    setState((s) => {
-      s.query = query;
-    });
-    timer = setTimeout(() => void load(state.category, query), 500);
-  }
-  function rows(items: T[]) {
+  /*
+   * The rows take the list as a function, not as a value. Read as a value, the read would belong to
+   * the JSX around the call, and every answer would build the grid again; inside `For` it belongs to
+   * the list, which then keeps the rows it already has.
+   */
+  function rows(items: () => T[]) {
     return (
       <div class="skills-marketplace-grid">
-        <For each={items}>
+        <For each={items()}>
           {(item) => (
-            <article class="skills-marketplace-card">
+            <article
+              class="skills-marketplace-card"
+              /* The hit area covers the card, so an avatar in it never sees the pointer itself. This marks
+                 the card as the group whose hover starts the avatar's motion. */
+              data-avatar-hover
+            >
               <Button
                 class="skills-marketplace-card-hitarea"
                 variant="ghost"
@@ -184,170 +221,134 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
       </div>
     );
   }
+  let viewport: HTMLDivElement | undefined;
+  let listing: HTMLDivElement | undefined;
+  /*
+   * Card resize (transitions.dev 01): a search adds and removes rows, and the listing's own height
+   * follows the rows at once. Writing that height on the box around it lets the change travel between
+   * the two sizes instead of snapping, which is what made typing feel like a jump. The first write is
+   * the resting size, so it is made with the transition off.
+   */
+  onSettled(() => {
+    const box = viewport;
+    if (!box || !listing) return;
+    let resting = true;
+    const observer = new ResizeObserver((entries) => {
+      const height = entries[0]?.contentRect.height;
+      if (height === undefined) return;
+      if (resting) {
+        resting = false;
+        box.style.transition = "none";
+        box.style.height = `${height}px`;
+        void box.offsetHeight;
+        box.style.transition = "";
+        return;
+      }
+      box.style.height = `${height}px`;
+    });
+    observer.observe(listing);
+    return () => observer.disconnect();
+  });
   return (
-    <section class="marketplace-catalog" aria-label={`Discover ${props.kind}`}>
-      <Show when={state.loading && !state.featuredLoaded && state.featured.length === 0}>
-        <div class="marketplace-featured marketplace-featured-placeholder" aria-hidden="true">
-          <h2>Featured</h2>
-          <div class="marketplace-featured-grid">
-            <For each={[0, 1, 2, 3]}>
-              {() => (
-                <div class="marketplace-featured-card">
-                  <Skeleton class="marketplace-placeholder-avatar" />
-                  <div class="marketplace-placeholder-copy">
-                    <Skeleton />
-                    <Skeleton />
-                  </div>
-                </div>
-              )}
-            </For>
-          </div>
-        </div>
-      </Show>
-      <Show when={state.featured.length > 0}>
-        <section class="marketplace-featured" aria-label="Featured">
-          <h2>Featured</h2>
-          <div class="marketplace-featured-grid">
-            <For each={state.featured}>
-              {(item) => (
-                <Button
-                  variant="ghost"
-                  class="marketplace-featured-card"
-                  aria-label={`View featured ${item.name}`}
-                  onClick={() => void props.onOpen(item)}
-                >
-                  <MarketplaceIdentity item={item}>{props.icon(item)}</MarketplaceIdentity>
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.creatorName}</small>
-                  </span>
+    <section
+      class="marketplace-catalog"
+      aria-label={`Discover ${props.kind}`}
+      data-search={state.query.trim() ? "" : undefined}
+      data-pending={searchPending() ? "" : undefined}
+    >
+      <div class="marketplace-catalog-viewport" ref={viewport}>
+        <div ref={listing}>
+          <Show when={state.category} keyed>
+            {(category) => (
+              <div class="skills-marketplace-section-title">
+                <h2>{CATEGORY_LABELS[category]}</h2>
+                <Button variant="ghost" size="sm" onClick={() => selectCategory(null)}>
+                  All {props.kind}
                 </Button>
-              )}
-            </For>
-          </div>
-        </section>
-      </Show>
-      <div class="skills-marketplace-search">
-        <Search aria-hidden="true" />
-        <Input
-          aria-label={`Search ${props.kind}`}
-          placeholder={`Search by creator or ${props.kind === "skills" ? "skill" : "agent"} name`}
-          value={state.query}
-          onValueChange={search}
-        />
-      </div>
-      <nav class="skills-marketplace-categories" aria-label="Categories">
-        <Button
-          size="sm"
-          data-active={state.category === null ? "" : undefined}
-          aria-pressed={state.category === null ? "true" : "false"}
-          onClick={() => selectCategory(null)}
-        >
-          All
-        </Button>
-        <For each={SKILL_CATEGORIES.slice(0, 4)}>
-          {(category) => (
-            <Button
-              size="sm"
-              data-active={state.category === category ? "" : undefined}
-              aria-pressed={state.category === category ? "true" : "false"}
-              onClick={() => selectCategory(category)}
-            >
-              {CATEGORY_LABELS[category]}
-            </Button>
-          )}
-        </For>
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger class="marketplace-more" aria-label="More categories">
-            {state.category && SKILL_CATEGORIES.indexOf(state.category) >= 4 ? CATEGORY_LABELS[state.category] : "More"}
-            <ChevronDown />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content class="marketplace-menu">
-              <For each={SKILL_CATEGORIES.slice(4)}>
-                {(category) => (
-                  <DropdownMenu.Item onSelect={() => selectCategory(category)}>
-                    {CATEGORY_LABELS[category]}
-                  </DropdownMenu.Item>
-                )}
-              </For>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
-      </nav>
-      <Show when={state.error}>
-        {(message) => (
-          <div role="alert" class="skills-marketplace-state">
-            {message()}
-            <Button variant="ghost" onClick={() => void load()}>
-              Retry
-            </Button>
-          </div>
-        )}
-      </Show>
-      <Show
-        when={!state.loading}
-        fallback={
-          <div role="status" aria-label={`Loading ${props.kind}`} class="marketplace-catalog-skeleton">
-            <For each={[0, 1, 2, 3, 4, 5]}>
-              {() => (
-                <div class="marketplace-row-skeleton" aria-hidden="true">
-                  <Skeleton class="marketplace-placeholder-avatar" />
-                  <div class="marketplace-placeholder-copy">
-                    <Skeleton />
-                    <Skeleton />
-                  </div>
-                </div>
-              )}
-            </For>
-          </div>
-        }
-      >
-        <Show
-          when={state.items.length || state.error}
-          fallback={<div class="skills-marketplace-state">No {props.kind} match this search.</div>}
-        >
+              </div>
+            )}
+          </Show>
+          <Show when={state.error}>
+            {(message) => (
+              <div role="alert" class="skills-marketplace-state">
+                {message()}
+                <Button variant="ghost" onClick={() => void load()}>
+                  Retry
+                </Button>
+              </div>
+            )}
+          </Show>
           <Show
-            when={overview()}
+            when={!state.loading}
             fallback={
-              <section class="skills-marketplace-category-section">
-                <h2>{state.category ? CATEGORY_LABELS[state.category] : "Search results"}</h2>
-                {rows(state.items)}
-              </section>
+              <div role="status" aria-label={`Loading ${props.kind}`} class="marketplace-catalog-skeleton">
+                <For each={[0, 1, 2, 3, 4, 5]}>
+                  {() => (
+                    <div class="marketplace-row-skeleton" aria-hidden="true">
+                      <Skeleton class="marketplace-placeholder-avatar" />
+                      <div class="marketplace-placeholder-copy">
+                        <Skeleton />
+                        <Skeleton />
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
             }
           >
-            <For each={SKILL_CATEGORIES}>
-              {(category) => (
-                <Show when={state.items.filter((item) => (item.category ?? "other") === category).length}>
+            {/* The loaded rows hold only the first few of each category, so a query with no match among
+            them waits for the answer rather than saying at once that nothing matches. */}
+            <Show
+              when={items().length || state.error || searchPending()}
+              fallback={<div class="skills-marketplace-state">No {props.kind} match this search.</div>}
+            >
+              <Show
+                when={overview()}
+                fallback={
                   <section class="skills-marketplace-category-section">
-                    <div class="skills-marketplace-section-title">
-                      <h2>{CATEGORY_LABELS[category]}</h2>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`View all ${CATEGORY_LABELS[category]} ${props.kind}`}
-                        onClick={() => selectCategory(category)}
-                      >
-                        View all
-                      </Button>
-                    </div>
-                    {rows(state.items.filter((item) => (item.category ?? "other") === category))}
+                    <Show when={!state.category}>
+                      <h2>Search results</h2>
+                    </Show>
+                    {rows(items)}
                   </section>
-                </Show>
-              )}
-            </For>
+                }
+              >
+                <For each={SKILL_CATEGORIES}>
+                  {(category) => (
+                    <Show when={items().filter((item) => (item.category ?? "other") === category).length}>
+                      <section class="skills-marketplace-category-section">
+                        <div class="skills-marketplace-section-title">
+                          <h2>{CATEGORY_LABELS[category]}</h2>
+                          <Show when={state.moreCategories.includes(category)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              aria-label={`View all ${CATEGORY_LABELS[category]} ${props.kind}`}
+                              onClick={() => selectCategory(category)}
+                            >
+                              View all
+                            </Button>
+                          </Show>
+                        </div>
+                        {rows(() => items().filter((item) => (item.category ?? "other") === category))}
+                      </section>
+                    </Show>
+                  )}
+                </For>
+              </Show>
+            </Show>
+            <Show when={state.nextCursor}>
+              <Button
+                variant="ghost"
+                loading={state.loadingMore}
+                onClick={() => void load(state.category, state.query, state.nextCursor ?? undefined)}
+              >
+                Load more
+              </Button>
+            </Show>
           </Show>
-        </Show>
-        <Show when={state.nextCursor}>
-          <Button
-            variant="ghost"
-            loading={state.loadingMore}
-            onClick={() => void load(state.category, state.query, state.nextCursor ?? undefined)}
-          >
-            Load more
-          </Button>
-        </Show>
-      </Show>
+        </div>
+      </div>
     </section>
   );
 }

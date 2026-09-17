@@ -1,4 +1,5 @@
 import type { MarketplaceSkillDetail } from "@openbot/contracts/ipc";
+import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
 import { MarkdownMessageText } from "../features/conversation/MarkdownMessageText";
 import { safeBrowserUrl } from "../features/conversation/RichMessageText";
@@ -16,7 +17,15 @@ function skillInstructions(skill: MarketplaceSkillDetail): string {
   return first?.replace(/^#\s+/u, "").trim() === skill.name ? rest.join("\n").trim() : instructions;
 }
 
-export function SkillPreview(props: { skill: MarketplaceSkillDetail; onTry?: () => void; unavailableReason?: string }) {
+export function SkillPreview(props: {
+  skill: MarketplaceSkillDetail;
+  onTry?: () => void;
+  unavailableReason?: string;
+  /** The creator line under the name, where the page that shows the preview names one. */
+  creatorName?: string;
+  /** What the page offers for this skill, on the name's line. */
+  action?: JSX.Element;
+}) {
   const [linkError, setLinkError] = createSignal<string | null>(null);
   const [iconTint, setIconTint] = createSignal<{ url: string; color: string } | null>(null);
   const [failedIcon, setFailedIcon] = createSignal<string | null>(null);
@@ -71,8 +80,12 @@ export function SkillPreview(props: { skill: MarketplaceSkillDetail; onTry?: () 
             )}
           </Show>
         </span>
-        <h2>{props.skill.name}</h2>
-        <p>{props.skill.description}</p>
+        <div class="skill-preview-name">
+          <h2>{props.skill.name}</h2>
+          <Show when={props.creatorName}>{(name) => <p class="skill-preview-creator">By {name()}</p>}</Show>
+        </div>
+        <Show when={props.action}>{(action) => <div class="skill-preview-action">{action()}</div>}</Show>
+        <p class="skill-preview-summary">{props.skill.description}</p>
       </header>
       <div class="skill-preview-card t-stagger-line t-stagger-line--2">
         <SkillGradient name={props.skill.name} />

@@ -64,7 +64,7 @@ describe("production catalog publication", () => {
     };
 
     expect(sql).toContain("'openbot-production-catalog'");
-    expect(sql).toContain("'OpenBot Team'");
+    expect(sql).toContain("'OpenBot'");
     expect(sql.match(/'approved'/gu)).toHaveLength(2);
     expect(sql).toContain("ON CONFLICT(id) DO NOTHING");
     expect(sql).not.toMatch(/DO UPDATE SET[^;]*(?:installs|featured)/u);
@@ -79,7 +79,7 @@ describe("production catalog publication", () => {
     expect(verification.status).toBe(0);
     expect(JSON.parse(verification.stdout)).toEqual([
       {
-        owner: "OpenBot Team",
+        owner: "OpenBot",
         owner_avatar: "https://openbot.run/icon-192x192.png",
         skill_creator_avatar: 1,
         agent_creator_avatar: 1,

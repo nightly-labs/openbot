@@ -5,24 +5,56 @@
 }
 .skill-preview-heading {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   column-gap: var(--openbot-space-3);
-  row-gap: var(--openbot-space-1);
-  align-items: start;
+  row-gap: var(--openbot-space-3);
+  align-items: center;
 }
 .skill-preview-heading .agent-skill-icon {
   grid-column: 1;
-  grid-row: 1 / 3;
   align-self: center;
 }
-.skill-preview-heading h2,
-.skill-preview-heading p {
+.skill-preview-name {
   grid-column: 2;
+  min-width: 0;
+}
+.skill-preview-action {
+  grid-column: 3;
+  justify-self: end;
+}
+/* The one-line summary reads under the whole row, as the lead of the page. */
+.skill-preview-summary {
+  grid-column: 1 / -1;
 }
 .skill-preview-heading h2,
 .skill-preview-heading p,
 .skill-preview-request p {
   margin: 0;
+}
+/* The target and the install button read as one control: the picker is its quiet half. */
+.marketplace-install-control {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  box-shadow: inset 0 0 0 1px var(--openbot-border-grouped);
+}
+.marketplace-install-control .ui-select-trigger {
+  max-width: 180px;
+  height: var(--openbot-control-md);
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  color: var(--openbot-text-secondary);
+}
+.marketplace-install-control > .ui-button {
+  height: var(--openbot-control-md);
+  padding-inline: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-sidebar);
 }
 .skill-preview-heading h2 {
   font-size: var(--openbot-text-2xl);
@@ -35,6 +67,11 @@
   font-size: var(--openbot-text-lg);
   line-height: 1.6;
   overflow-wrap: anywhere;
+}
+.skill-preview-heading .skill-preview-creator {
+  margin-top: var(--openbot-space-1);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-md);
 }
 .skill-preview-card {
   position: relative;
@@ -53,6 +90,11 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+  /* The canvas composites on its own layer. Firefox does not apply an ancestor's rounded
+     overflow clip to such a layer, so each level clips itself with clip-path, which does hold. */
+  overflow: hidden;
+  border-radius: inherit;
+  clip-path: inset(0 round var(--openbot-radius-xl));
 }
 .skill-preview-gradient {
   z-index: -1;
@@ -100,15 +142,6 @@
 .agent-skills-modal:has(.agent-skill-detail) {
   width: min(760px, calc(100vw - 32px));
   height: min(640px, calc(100dvh - 48px));
-}
-
-.skill-preview-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-3);
-  margin-bottom: var(--openbot-space-4);
 }
 
 :root {

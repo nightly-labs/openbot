@@ -20,7 +20,7 @@ const owner = {
   id: "openbot-production-catalog",
   identityKey: "openbot-production-catalog",
   email: "catalog@openbot.run",
-  name: "OpenBot Team",
+  name: "OpenBot",
   avatarUrl: "https://openbot.run/icon-192x192.png",
 } as const;
 
