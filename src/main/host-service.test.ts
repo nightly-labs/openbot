@@ -8,7 +8,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEVELOPMENT_REMOTE_CLIENT_USERNAME, HostService } from "./host-service";
 import { createAgents, createBrowser, createMailbox, unimplemented } from "./team-api-server-test-harness";
 import { TeamStore } from "./team-store";
@@ -37,6 +37,8 @@ async function createHostService(
       | "sendTeamInviteEmail"
     >
   > = {},
+  /** Supplied only by the screen recording cases, which need a runtime to hold an answer. */
+  screenCaptureDenied?: () => boolean,
 ): Promise<{
   service: HostService;
   /** Reports an account exactly as `forwardCentralAuth` does, sign-out included. */
@@ -75,6 +77,29 @@ async function createHostService(
     },
     redeemCentralTicket: unimplemented,
     sendTeamInviteEmail: unimplemented,
+    ...(screenCaptureDenied
+      ? {
+          platform: "darwin" as const,
+          remoteDesktopRuntimePaths: {
+            sunshine: "/sunshine",
+            moonlightWebServer: "/web",
+            moonlightStreamer: "/stream",
+          },
+          createRemoteDesktopRuntime: () => ({
+            start: async () => ({
+              baseUrl: "http://127.0.0.1:9",
+              hostId: 1,
+              hostIds: [1],
+              desktopAppId: 1,
+              displays: [],
+              selectedDisplayId: null,
+            }),
+            selectDisplay: async () => undefined,
+            stop: async () => undefined,
+            screenCaptureDenied,
+          }),
+        }
+      : {}),
     ...remote,
   };
   const service = new HostService(options);
@@ -99,6 +124,30 @@ afterEach(async () => {
 type RemoteInvites = Awaited<ReturnType<NonNullable<HostOptions["listRemoteInvites"]>>>;
 type RemoteMembers = Awaited<ReturnType<NonNullable<HostOptions["listRemoteMembers"]>>>;
 type RemoteInvite = Awaited<ReturnType<NonNullable<HostOptions["createRemoteInvite"]>>>;
+
+// The gateway holds the refusal, and this status is the only way it reaches the host owner's screen.
+// A member who is refused cannot grant anything: they are on the other computer.
+describe("HostService screen recording", () => {
+  it("reports the refusal the gateway holds, and says the status changed", async () => {
+    let denied = true;
+    const { service } = await createHostService({}, () => denied);
+    expect(service.getStatus().remoteDesktopScreenRecordingDenied).toBe(false);
+    const changed = vi.fn();
+    service.on("changed", changed);
+
+    await expect(service.recheckScreenRecording()).resolves.toMatchObject({
+      remoteDesktopScreenRecordingDenied: true,
+    });
+    expect(service.getStatus().remoteDesktopScreenRecordingDenied).toBe(true);
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ remoteDesktopScreenRecordingDenied: true }));
+
+    denied = false;
+    await expect(service.recheckScreenRecording()).resolves.toMatchObject({
+      remoteDesktopScreenRecordingDenied: false,
+    });
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ remoteDesktopScreenRecordingDenied: false }));
+  });
+});
 
 describe("HostService account binding", () => {
   const first = { id: "account-a", email: "a@example.com", name: "A", avatarUrl: null };

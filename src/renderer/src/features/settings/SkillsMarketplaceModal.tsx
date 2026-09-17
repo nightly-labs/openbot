@@ -13,16 +13,17 @@ import type {
   SkillSubmission,
 } from "@openbot/contracts/ipc";
 import { isSkillCategory, SKILL_CATEGORIES } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, createStore, For, Show, snapshot } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, snapshot } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { normalizeAvatarFile } from "../../avatar-image";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
+import { createScrollFades } from "../../components/createScrollFades";
 import { SkillPreview } from "../../components/SkillPreview";
 import {
-  ArrowLeft,
   Button,
   Check,
   ChevronDown,
+  ChevronRight,
   Dialog,
   DropdownMenu,
   Ellipsis,
@@ -32,7 +33,14 @@ import {
   Plus,
   Puzzle,
   RefreshCw,
+  Search,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
+  SlidingTabs,
   Upload,
   X,
 } from "../../components/ui";
@@ -52,7 +60,12 @@ interface SkillsMarketplaceModalProps {
 }
 
 type Tab = "discover" | "mine";
-type MarketplaceKind = "skills" | "agents";
+type MarketplaceKind = "agents" | "plugins" | "skills";
+
+function isMarketplaceKind(value: string): value is MarketplaceKind {
+  return value === "agents" || value === "plugins" || value === "skills";
+}
+
 /**
  * What the detail layer shows. Three signals allowed a combination the product does not have - a
  * loaded skill and a loaded submission at once - and turned "is anything open" into a chain of
@@ -117,10 +130,22 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   const [agentAddVersion, setAgentAddVersion] = createSignal(0);
   const { panel, run, setBusy, setError, setLoading } = createAsyncPanel(marketplaceErrorMessage);
   let marketplaceBody: HTMLDivElement | undefined;
+  const bodyFades = createScrollFades();
+  onSettled(() => bodyFades.stop);
+  /** A scroll set from code raises no scroll event on an unchanged height, so the edges are read again. */
+  function scrollBodyTo(top: number) {
+    if (marketplaceBody) marketplaceBody.scrollTop = top;
+    bodyFades.remeasure();
+  }
   let listScrollTop = 0;
   const [skillRefreshVersion, setSkillRefreshVersion] = createSignal(0);
-  const [detailActive, setDetailActive] = createSignal(false);
+  /** The search text sits in the chrome next to the kind switch, so the catalog below reads it. */
+  const [searchQuery, setSearchQuery] = createSignal("");
+  /** The page open over the listing: what the header crumb names, and the way back out of it. */
+  const [detail, setDetail] = createSignal<{ name: string; close: () => void } | null>(null);
+  const detailActive = () => detail() !== null;
   let detailTrigger: HTMLElement | null = null;
+  let detailRequest = 0;
 
   let installedRequest = 0;
   const installedById = createMemo(
@@ -176,7 +201,12 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       : market.installedLoad;
 
   function closeDetail(): void {
-    setDetailActive(false);
+    /*
+     * A detail page that is still loading must not come back after the reader left it. The counter
+     * moves on here, so a late answer for the closed page is dropped instead of applied.
+     */
+    detailRequest += 1;
+    setDetail(null);
     setMarket((state) => {
       state.detail = { kind: "none" };
     });
@@ -231,12 +261,12 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   function selectTab(next: Tab) {
-    setDetailActive(false);
+    closeDetail();
     const marketplaceKind = market.browse.kind;
-    if (marketplaceBody) marketplaceBody.scrollTop = 0;
+    setSearchQuery("");
+    scrollBodyTo(0);
     setMarket((state) => {
       state.browse.tab = next;
-      state.detail = { kind: "none" };
       state.publication.preview = null;
       state.publication.icon = null;
       state.publication.iconPreviewUrl = null;
@@ -246,38 +276,52 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   function selectKind(next: MarketplaceKind) {
-    setDetailActive(false);
-    if (marketplaceBody) marketplaceBody.scrollTop = 0;
+    closeDetail();
+    setSearchQuery("");
+    scrollBodyTo(0);
     setMarket((state) => {
       state.browse.kind = next;
       state.browse.tab = "discover";
-      state.detail = { kind: "none" };
       state.publication.preview = null;
     });
     setError(null);
     if (next === "skills") void loadSkills();
   }
 
-  function enterDetails() {
+  function enterDetails(name: string, close: () => void) {
     detailTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setDetailActive(true);
+    setDetail({ name, close });
     if (!detailOpen()) {
       listScrollTop = marketplaceBody?.scrollTop ?? 0;
     }
-    if (marketplaceBody) marketplaceBody.scrollTop = 0;
+    scrollBodyTo(0);
+  }
+
+  /*
+   * The management menu is reachable from a detail page, and a tab change or a refresh does not
+   * always reach the panel that owns that page. Closing the open detail through its own handler
+   * first leaves the crumb and the panel on the listing together.
+   */
+  function leaveActiveDetail(): void {
+    const open = detail();
+    if (!open) return;
+    // The menu goes to a fresh listing, so the offset saved for the old one is dropped.
+    listScrollTop = 0;
+    open.close();
   }
 
   function leaveDetails() {
     closeDetail();
     queueMicrotask(() => {
-      if (marketplaceBody) marketplaceBody.scrollTop = listScrollTop;
+      scrollBodyTo(listScrollTop);
       if (detailTrigger?.isConnected) detailTrigger.focus();
     });
   }
 
   async function openDetails(skill: MarketplaceSkillSummary) {
     const analytics = desktopAnalytics.scope();
-    enterDetails();
+    enterDetails(skill.name, leaveDetails);
+    const request = ++detailRequest;
     setMarket((state) => {
       state.detail = { kind: "loading" };
     });
@@ -288,6 +332,8 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
+    // The reader left this page while it loaded, so neither its content nor its exit applies now.
+    if (request !== detailRequest) return;
     if (!value) {
       leaveDetails();
       return;
@@ -297,8 +343,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     });
   }
 
-  async function openDetailsById(skillId: string) {
-    enterDetails();
+  async function openDetailsById(skillId: string, name: string) {
+    enterDetails(name, leaveDetails);
+    const request = ++detailRequest;
     const analytics = desktopAnalytics.scope();
     setMarket((state) => {
       state.detail = { kind: "loading" };
@@ -310,6 +357,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
+    if (request !== detailRequest) return;
     if (!value) {
       leaveDetails();
       return;
@@ -321,10 +369,10 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
 
   function openSubmissionDetails(submission: SkillSubmission) {
     if (submission.status === "approved") {
-      void openDetailsById(submission.skillId);
+      void openDetailsById(submission.skillId, submission.name);
       return;
     }
-    enterDetails();
+    enterDetails(submission.name, leaveDetails);
     setMarket((state) => {
       state.detail = { kind: "submission", submission };
     });
@@ -427,322 +475,375 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
         <Dialog.Overlay class="skills-marketplace-backdrop">
           <Dialog.Content class="skills-marketplace" onOpenAutoFocus={(event) => event.preventDefault()}>
             <header class="skills-marketplace-topbar" data-detail={detailActive() ? "" : undefined}>
-              <Dialog.Title class="marketplace-title">Marketplace</Dialog.Title>
-              <nav class="skills-marketplace-kind-tabs" aria-label="Marketplace content types">
-                <Button
-                  class="skills-marketplace-kind-tab"
-                  variant="ghost"
-                  size="sm"
-                  data-active={market.browse.kind === "skills" ? "" : undefined}
-                  aria-current={market.browse.kind === "skills" ? "page" : undefined}
-                  onClick={() => selectKind("skills")}
-                >
-                  <Puzzle /> Skills
-                </Button>
-                <Button
-                  class="skills-marketplace-kind-tab"
-                  variant="ghost"
-                  size="sm"
-                  data-active={market.browse.kind === "agents" ? "" : undefined}
-                  aria-current={market.browse.kind === "agents" ? "page" : undefined}
-                  onClick={() => selectKind("agents")}
-                >
-                  <AgentAvatar seed="marketplace-agents" hue={280} /> Agents
-                </Button>
-              </nav>
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger class="marketplace-management" aria-label="Marketplace menu">
-                  <Ellipsis />
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content class="marketplace-menu">
-                    <DropdownMenu.Item onSelect={() => selectTab("discover")}>Discover</DropdownMenu.Item>
-                    <DropdownMenu.Item onSelect={() => selectTab("mine")}>My submissions</DropdownMenu.Item>
-                    <DropdownMenu.Separator />
-                    <DropdownMenu.Item
-                      onSelect={() => {
-                        selectTab("mine");
-                        if (market.browse.kind === "agents") setAgentAddVersion((version) => version + 1);
-                      }}
-                    >
-                      <Plus /> Add {market.browse.kind === "skills" ? "skill" : "agent"}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      onSelect={() =>
-                        market.browse.kind === "skills" ? refresh() : setAgentRefreshVersion((version) => version + 1)
-                      }
-                    >
-                      <RefreshCw /> Refresh
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-              <IconButton label="Close marketplace" variant="ghost" onClick={() => props.onOpenChange(false)}>
-                <X />
-              </IconButton>
+              <div class="marketplace-crumbs">
+                <Show when={detail()} fallback={<Dialog.Title class="marketplace-title">Marketplace</Dialog.Title>}>
+                  {(open) => (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        class="marketplace-crumb-parent"
+                        onClick={() => open().close()}
+                      >
+                        Marketplace
+                      </Button>
+                      <ChevronRight class="marketplace-crumb-separator" aria-hidden="true" />
+                      <Dialog.Title class="marketplace-title">{open().name}</Dialog.Title>
+                    </>
+                  )}
+                </Show>
+              </div>
+              <div class="skills-marketplace-topbar-actions">
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger class="marketplace-management" aria-label="Marketplace menu">
+                    <Ellipsis />
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content class="marketplace-menu">
+                      <DropdownMenu.Item
+                        onSelect={() => {
+                          leaveActiveDetail();
+                          selectTab("discover");
+                        }}
+                      >
+                        Discover
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        onSelect={() => {
+                          leaveActiveDetail();
+                          selectTab("mine");
+                        }}
+                      >
+                        My submissions
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Separator />
+                      <DropdownMenu.Item
+                        onSelect={() => {
+                          leaveActiveDetail();
+                          selectTab("mine");
+                          if (market.browse.kind === "agents") setAgentAddVersion((version) => version + 1);
+                        }}
+                      >
+                        <Plus /> Add {market.browse.kind === "agents" ? "agent" : "skill"}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        onSelect={() => {
+                          leaveActiveDetail();
+                          if (market.browse.kind === "skills") refresh();
+                          else setAgentRefreshVersion((version) => version + 1);
+                        }}
+                      >
+                        <RefreshCw /> Refresh
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+                <IconButton label="Close marketplace" variant="ghost" onClick={() => props.onOpenChange(false)}>
+                  <X />
+                </IconButton>
+              </div>
             </header>
 
             <div
-              class="skills-marketplace-body"
+              class={["skills-marketplace-body", bodyFades.classes()]}
               data-detail-open={detailOpen() ? "" : undefined}
-              ref={(element) => (marketplaceBody = element)}
+              onScroll={bodyFades.measure}
+              ref={(element) => {
+                marketplaceBody = element;
+                bodyFades.bind(element);
+              }}
             >
-              <Show when={market.browse.kind === "skills"}>
-                <Show when={market.browse.tab === "discover"}>
-                  <div class="skills-marketplace-discover" hidden={detailOpen()} inert={detailOpen()}>
-                    <MarketplaceCatalog
-                      kind="skills"
-                      refreshVersion={skillRefreshVersion()}
-                      list={async (query) => {
-                        const page = await window.openbot.skills.list(query);
-                        return { items: page.skills, nextCursor: page.nextCursor };
-                      }}
-                      icon={(skill) => <SkillIcon skill={skill} />}
-                      onOpen={openDetails}
-                    />
-                  </div>
-                </Show>
-
-                <Show when={market.browse.tab === "mine"}>
-                  <section class="skills-marketplace-panel">
-                    <div class="skills-marketplace-heading">
-                      <div>
-                        <h1>My submissions</h1>
-                        <p>Package a focused, safe skill and submit it for marketplace review.</p>
-                      </div>
-                      <Button onClick={() => void choosePackage()}>
-                        <Upload /> Choose folder or ZIP
-                      </Button>
+              <SlidingTabs.Root
+                value={market.browse.kind}
+                onChange={(value) => {
+                  if (isMarketplaceKind(value)) selectKind(value);
+                }}
+              >
+                <div class="skills-marketplace-toolbar" hidden={detailActive()}>
+                  <SlidingTabs.List aria-label="Marketplace content types">
+                    <SlidingTabs.Trigger value="agents">Agents</SlidingTabs.Trigger>
+                    <SlidingTabs.Trigger value="plugins">Plugins</SlidingTabs.Trigger>
+                    <SlidingTabs.Trigger value="skills">Skills</SlidingTabs.Trigger>
+                  </SlidingTabs.List>
+                  <Show when={market.browse.kind !== "plugins" && market.browse.tab === "discover"}>
+                    <label class="search-field skills-marketplace-search">
+                      <span class="sr-only">{`Search ${market.browse.kind}`}</span>
+                      <Search aria-hidden="true" />
+                      <Input
+                        type="search"
+                        aria-label={`Search ${market.browse.kind}`}
+                        placeholder={`Search by creator or ${market.browse.kind === "skills" ? "skill" : "agent"} name`}
+                        value={searchQuery()}
+                        onValueChange={setSearchQuery}
+                      />
+                    </label>
+                  </Show>
+                </div>
+                <Show when={market.browse.kind === "skills"}>
+                  <Show when={market.browse.tab === "discover"}>
+                    <div class="skills-marketplace-discover" hidden={detailOpen()} inert={detailOpen()}>
+                      <MarketplaceCatalog
+                        kind="skills"
+                        query={searchQuery()}
+                        refreshVersion={skillRefreshVersion()}
+                        list={async (query) => {
+                          const page = await window.openbot.skills.list(query);
+                          return { items: page.skills, nextCursor: page.nextCursor };
+                        }}
+                        icon={(skill) => <SkillIcon skill={skill} />}
+                        onOpen={openDetails}
+                      />
                     </div>
-                    <section class="skills-submission-guide" aria-labelledby="skills-submission-guide-title">
-                      <div class="skills-submission-guide-heading">
-                        <h2 id="skills-submission-guide-title">Submission requirements</h2>
-                        <p>Your skill is validated before it can be sent for review.</p>
+                  </Show>
+
+                  <Show when={market.browse.tab === "mine"}>
+                    <section class="skills-marketplace-panel">
+                      <div class="skills-marketplace-heading">
+                        <div>
+                          <h1>My submissions</h1>
+                          <p>Package a focused, safe skill and submit it for marketplace review.</p>
+                        </div>
+                        <Button onClick={() => void choosePackage()}>
+                          <Upload /> Choose folder or ZIP
+                        </Button>
                       </div>
-                      <div class="skills-submission-guide-grid">
-                        <div>
-                          <h3>Package</h3>
-                          <ul>
-                            <li>
-                              <Check />
-                              <span>
-                                Choose a folder or ZIP with <code>SKILL.md</code> at its root.
-                              </span>
-                            </li>
-                            <li>
-                              <Check />
-                              <span>
-                                Include no more than 200 files and keep both packaged and expanded size under 10 MB.
-                              </span>
-                            </li>
-                            <li>
-                              <Check />
-                              <span>Include only the scripts, references, and assets the skill needs.</span>
-                            </li>
-                          </ul>
+                      <section class="skills-submission-guide" aria-labelledby="skills-submission-guide-title">
+                        <div class="skills-submission-guide-heading">
+                          <h2 id="skills-submission-guide-title">Submission requirements</h2>
+                          <p>Your skill is validated before it can be sent for review.</p>
                         </div>
-                        <div>
-                          <h3>Safety and review</h3>
-                          <ul>
-                            <li>
-                              <Check />
-                              <span>Explain when to use the skill, its workflow, and the expected output.</span>
-                            </li>
-                            <li>
-                              <Check />
-                              <span>
-                                Never include secrets, <code>.env</code> files, private keys, or user data.
-                              </span>
-                            </li>
-                            <li>
-                              <Check />
-                              <span>
-                                Exclude <code>.git</code>, <code>node_modules</code>, symlinks, and nested archives.
-                              </span>
-                            </li>
-                          </ul>
+                        <div class="skills-submission-guide-grid">
+                          <div>
+                            <h3>Package</h3>
+                            <ul>
+                              <li>
+                                <Check />
+                                <span>
+                                  Choose a folder or ZIP with <code>SKILL.md</code> at its root.
+                                </span>
+                              </li>
+                              <li>
+                                <Check />
+                                <span>
+                                  Include no more than 200 files and keep both packaged and expanded size under 10 MB.
+                                </span>
+                              </li>
+                              <li>
+                                <Check />
+                                <span>Include only the scripts, references, and assets the skill needs.</span>
+                              </li>
+                            </ul>
+                          </div>
+                          <div>
+                            <h3>Safety and review</h3>
+                            <ul>
+                              <li>
+                                <Check />
+                                <span>Explain when to use the skill, its workflow, and the expected output.</span>
+                              </li>
+                              <li>
+                                <Check />
+                                <span>
+                                  Never include secrets, <code>.env</code> files, private keys, or user data.
+                                </span>
+                              </li>
+                              <li>
+                                <Check />
+                                <span>
+                                  Exclude <code>.git</code>, <code>node_modules</code>, symlinks, and nested archives.
+                                </span>
+                              </li>
+                            </ul>
+                          </div>
                         </div>
-                      </div>
-                      <div class="skills-submission-example">
-                        <div>
-                          <h3>Required SKILL.md metadata</h3>
-                          <p>Name: 80 characters maximum · Description: 500 characters maximum</p>
-                        </div>
-                        <pre>{`---
+                        <div class="skills-submission-example">
+                          <div>
+                            <h3>Required SKILL.md metadata</h3>
+                            <p>Name: 80 characters maximum · Description: 500 characters maximum</p>
+                          </div>
+                          <pre>{`---
 name: Release Notes
 description: Turn merged work into clear, consistent release notes.
 ---`}</pre>
-                      </div>
-                      <p class="skills-submission-limit">
-                        Limits: 5 skills total · 5 submitted versions per skill · 10 submitted versions per 24 hours
-                      </p>
-                    </section>
-                    <Show when={market.publication.preview}>
-                      {(value) => (
-                        <div class="skills-publish-card">
-                          <div class="skills-publish-summary">
-                            <Show
-                              when={market.publication.iconPreviewUrl}
-                              fallback={
-                                <span class="skills-marketplace-default-icon">
-                                  <Puzzle />
-                                </span>
-                              }
-                              keyed
-                            >
-                              {(url) => (
-                                <span class="skills-marketplace-icon">
-                                  <img src={url} alt="Skill icon preview" />
-                                </span>
-                              )}
-                            </Show>
-                            <div>
-                              <h2>{value().name}</h2>
-                              <p>{value().description}</p>
-                              <small>
-                                {value().files.length} files · {(value().size / 1024).toFixed(1)} KB
-                              </small>
+                        </div>
+                        <p class="skills-submission-limit">
+                          Limits: 5 skills total · 5 submitted versions per skill · 10 submitted versions per 24 hours
+                        </p>
+                      </section>
+                      <Show when={market.publication.preview}>
+                        {(value) => (
+                          <div class="skills-publish-card">
+                            <div class="skills-publish-summary">
+                              <Show
+                                when={market.publication.iconPreviewUrl}
+                                fallback={
+                                  <span class="skills-marketplace-default-icon">
+                                    <Puzzle />
+                                  </span>
+                                }
+                                keyed
+                              >
+                                {(url) => (
+                                  <span class="skills-marketplace-icon">
+                                    <img src={url} alt="Skill icon preview" />
+                                  </span>
+                                )}
+                              </Show>
+                              <div>
+                                <h2>{value().name}</h2>
+                                <p>{value().description}</p>
+                                <small>
+                                  {value().files.length} files · {(value().size / 1024).toFixed(1)} KB
+                                </small>
+                              </div>
+                            </div>
+                            <div class="skills-publish-fields">
+                              <label class="skills-publish-category">
+                                Category
+                                <NativeSelect
+                                  value={market.publication.category}
+                                  onChange={(event) => {
+                                    const category = event.currentTarget.value;
+                                    if (isSkillCategory(category)) {
+                                      setMarket((state) => {
+                                        state.publication.category = category;
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <For each={SKILL_CATEGORIES}>
+                                    {(item) => <option value={item}>{CATEGORY_LABELS[item]}</option>}
+                                  </For>
+                                </NativeSelect>
+                                <ChevronDown aria-hidden="true" />
+                              </label>
+                              <label>
+                                Icon (optional)
+                                <Input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  onChange={(event) => void chooseIcon(event.currentTarget.files?.[0])}
+                                />
+                              </label>
+                            </div>
+                            <div class="skills-publish-actions">
+                              <Button variant="ghost" onClick={discardPublication}>
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="default"
+                                loading={panel.busy === "publish"}
+                                loadingLabel="Submitting…"
+                                onClick={() => void submit()}
+                              >
+                                Submit for review
+                              </Button>
                             </div>
                           </div>
-                          <div class="skills-publish-fields">
-                            <label class="skills-publish-category">
-                              Category
-                              <NativeSelect
-                                value={market.publication.category}
-                                onChange={(event) => {
-                                  const category = event.currentTarget.value;
-                                  if (isSkillCategory(category)) {
-                                    setMarket((state) => {
-                                      state.publication.category = category;
-                                    });
-                                  }
-                                }}
-                              >
-                                <For each={SKILL_CATEGORIES}>
-                                  {(item) => <option value={item}>{CATEGORY_LABELS[item]}</option>}
-                                </For>
-                              </NativeSelect>
-                              <ChevronDown aria-hidden="true" />
-                            </label>
-                            <label>
-                              Icon (optional)
-                              <Input
-                                type="file"
-                                accept="image/png,image/jpeg,image/webp"
-                                onChange={(event) => void chooseIcon(event.currentTarget.files?.[0])}
-                              />
-                            </label>
-                          </div>
-                          <div class="skills-publish-actions">
-                            <Button variant="ghost" onClick={discardPublication}>
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="default"
-                              loading={panel.busy === "publish"}
-                              loadingLabel="Submitting…"
-                              onClick={() => void submit()}
-                            >
-                              Submit for review
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </Show>
-                    <Show when={!market.publication.preview}>
-                      <Show
-                        when={market.submissions.length}
-                        fallback={
-                          <div class="skills-marketplace-state">
-                            No submissions yet. Choose a skill folder or ZIP to publish.
-                          </div>
-                        }
-                      >
-                        <div class="skills-submission-list">
-                          <For each={market.submissions}>
-                            {(item) => (
-                              <article class="skills-submission-row">
-                                <Button
-                                  variant="ghost"
-                                  type="button"
-                                  class="skills-marketplace-row-hitarea"
-                                  aria-label={`View ${item.name} submission details`}
-                                  onClick={() => openSubmissionDetails(item)}
-                                />
-                                <SkillIcon skill={item} />
-                                <div>
-                                  <h3>{item.name}</h3>
-                                  <p>
-                                    {CATEGORY_LABELS[item.category]} · version {item.version}
-                                  </p>
-                                  <Show when={item.rejectionNote}>
-                                    <small>{item.rejectionNote}</small>
-                                  </Show>
-                                </div>
-                                <span class="skills-submission-status" data-status={item.status}>
-                                  {item.status}
-                                </span>
-                                <Show when={item.status === "approved" || item.status === "rejected"}>
-                                  <Button size="sm" onClick={() => void choosePackage(item.skillId)}>
-                                    <Plus /> New version
-                                  </Button>
-                                </Show>
-                              </article>
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                    </Show>
-                  </section>
-                </Show>
-                <Show when={detailOpen()}>
-                  <div class="skills-marketplace-detail-layer">
-                    <Show when={!detailLoading()} fallback={<SkillDetailSkeleton />}>
-                      <Show when={skillDetail()} keyed>
-                        {(skill) => (
-                          <SkillDetailView
-                            skill={skill}
-                            installed={installedById().get(skill.id)}
-                            installedLoad={installedLoadForTarget()}
-                            busy={panel.busy === skill.id}
-                            onBack={leaveDetails}
-                            onTrySkill={props.onTrySkill}
-                            onInstall={install}
-                            agents={props.agents}
-                            targetAgentId={market.browse.targetAgentId}
-                            onTargetChange={(id) =>
-                              setMarket((state) => {
-                                state.browse.targetAgentId = id;
-                              })
-                            }
-                          />
                         )}
                       </Show>
-                      <Show when={submissionDetail()} keyed>
-                        {(submission) => <SkillSubmissionDetailView submission={submission} onBack={leaveDetails} />}
+                      <Show when={!market.publication.preview}>
+                        <Show
+                          when={market.submissions.length}
+                          fallback={
+                            <div class="skills-marketplace-state">
+                              No submissions yet. Choose a skill folder or ZIP to publish.
+                            </div>
+                          }
+                        >
+                          <div class="skills-submission-list">
+                            <For each={market.submissions}>
+                              {(item) => (
+                                <article class="skills-submission-row">
+                                  <Button
+                                    variant="ghost"
+                                    type="button"
+                                    class="skills-marketplace-row-hitarea"
+                                    aria-label={`View ${item.name} submission details`}
+                                    onClick={() => openSubmissionDetails(item)}
+                                  />
+                                  <SkillIcon skill={item} />
+                                  <div>
+                                    <h3>{item.name}</h3>
+                                    <p>
+                                      {CATEGORY_LABELS[item.category]} · version {item.version}
+                                    </p>
+                                    <Show when={item.rejectionNote}>
+                                      <small>{item.rejectionNote}</small>
+                                    </Show>
+                                  </div>
+                                  <span class="skills-submission-status" data-status={item.status}>
+                                    {item.status}
+                                  </span>
+                                  <Show when={item.status === "approved" || item.status === "rejected"}>
+                                    <Button size="sm" onClick={() => void choosePackage(item.skillId)}>
+                                      <Plus /> New version
+                                    </Button>
+                                  </Show>
+                                </article>
+                              )}
+                            </For>
+                          </div>
+                        </Show>
                       </Show>
-                    </Show>
+                    </section>
+                  </Show>
+                  <Show when={detailOpen()}>
+                    <div class="skills-marketplace-detail-layer">
+                      <Show when={!detailLoading()} fallback={<SkillDetailSkeleton />}>
+                        <Show when={skillDetail()} keyed>
+                          {(skill) => (
+                            <SkillDetailView
+                              skill={skill}
+                              installed={installedById().get(skill.id)}
+                              installedLoad={installedLoadForTarget()}
+                              busy={panel.busy === skill.id}
+                              onTrySkill={props.onTrySkill}
+                              onInstall={install}
+                              agents={props.agents}
+                              targetAgentId={market.browse.targetAgentId}
+                              onTargetChange={(id) =>
+                                setMarket((state) => {
+                                  state.browse.targetAgentId = id;
+                                })
+                              }
+                            />
+                          )}
+                        </Show>
+                        <Show when={submissionDetail()} keyed>
+                          {(submission) => <SkillSubmissionDetailView submission={submission} />}
+                        </Show>
+                      </Show>
+                    </div>
+                  </Show>
+                  <Show when={panel.error}>
+                    {(message) => (
+                      <div class="skills-marketplace-error" role="alert">
+                        {message()}
+                      </div>
+                    )}
+                  </Show>
+                </Show>
+                <Show when={market.browse.kind === "plugins"}>
+                  <div class="skills-marketplace-panel">
+                    <div class="skills-marketplace-state" role="status">
+                      Plugins are not in the marketplace yet.
+                    </div>
                   </div>
                 </Show>
-                <Show when={panel.error}>
-                  {(message) => (
-                    <div class="skills-marketplace-error" role="alert">
-                      {message()}
-                    </div>
-                  )}
+                <Show when={market.browse.kind === "agents"}>
+                  <AgentMarketplacePanel
+                    agents={props.agents}
+                    view={market.browse.tab}
+                    query={searchQuery()}
+                    refreshVersion={agentRefreshVersion()}
+                    addVersion={agentAddVersion()}
+                    onInstalled={props.onAgentInstalled}
+                    onEnterDetail={enterDetails}
+                    onLeaveDetail={leaveDetails}
+                  />
                 </Show>
-              </Show>
-              <Show when={market.browse.kind === "agents"}>
-                <AgentMarketplacePanel
-                  agents={props.agents}
-                  view={market.browse.tab}
-                  refreshVersion={agentRefreshVersion()}
-                  addVersion={agentAddVersion()}
-                  onInstalled={props.onAgentInstalled}
-                  onEnterDetail={enterDetails}
-                  onLeaveDetail={leaveDetails}
-                />
-              </Show>
+              </SlidingTabs.Root>
             </div>
           </Dialog.Content>
         </Dialog.Overlay>
@@ -767,10 +868,11 @@ interface AgentsMarketplace {
 function AgentMarketplacePanel(props: {
   agents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">>;
   view: Tab;
+  query: string;
   refreshVersion: number;
   addVersion: number;
   onInstalled?: (agent: AgentSummary) => void | Promise<void>;
-  onEnterDetail: () => void;
+  onEnterDetail: (name: string, close: () => void) => void;
   onLeaveDetail: () => void;
 }) {
   const [market, setMarket] = createStore<AgentsMarketplace>({
@@ -789,11 +891,14 @@ function AgentMarketplacePanel(props: {
   let handledAddVersion = 0;
   let openingAgent = false;
   let publicationRequest = 0;
+  let detailRequest = 0;
 
   createEffect(
     () => [props.view, props.refreshVersion] as const,
     ([view]) => {
       publicationRequest += 1;
+      // A detail answer that arrives after the panel moved on belongs to a page that is gone.
+      detailRequest += 1;
       setBusy(null);
       setMarket((state) => {
         state.detail = null;
@@ -834,7 +939,8 @@ function AgentMarketplacePanel(props: {
     if (openingAgent) return;
     openingAgent = true;
     const analytics = desktopAnalytics.scope();
-    props.onEnterDetail();
+    props.onEnterDetail(agent.name, closeAgent);
+    const request = ++detailRequest;
     setLoading(true);
     const value = await run(() => window.openbot.marketplaceAgents.get(agent.id));
     analytics.track("marketplace_action", {
@@ -843,16 +949,18 @@ function AgentMarketplacePanel(props: {
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
+    openingAgent = false;
+    setLoading(false);
+    if (request !== detailRequest) return;
     if (value) {
       setMarket((state) => {
         state.detail = value;
       });
     } else props.onLeaveDetail();
-    openingAgent = false;
-    setLoading(false);
   }
 
   function closeAgent() {
+    detailRequest += 1;
     setMarket((state) => {
       state.detail = null;
     });
@@ -972,6 +1080,7 @@ function AgentMarketplacePanel(props: {
         <div hidden={Boolean(market.detail) || panel.loading} inert={Boolean(market.detail) || panel.loading}>
           <MarketplaceCatalog
             kind="agents"
+            query={props.query}
             refreshVersion={catalogRefresh()}
             list={async (query) => {
               const page = await window.openbot.marketplaceAgents.list(query);
@@ -992,12 +1101,11 @@ function AgentMarketplacePanel(props: {
           {(agent) => (
             <MarketplaceDetail
               name={agent.name}
-              description={agent.description}
+              /* The heading carries the one-line title; the long text is the instructions below. */
+              description={agent.title}
               creatorName={agent.creatorName}
               creatorAvatarUrl={agent.creatorAvatarUrl}
               icon={<AgentAvatar seed={agent.avatarSeed} hue={agent.avatarHue} url={agent.avatarUrl} motion="hover" />}
-              backLabel="Back to agents"
-              onBack={closeAgent}
               action={
                 <>
                   <Show when={agentAction(agent) === "Update"}>
@@ -1020,52 +1128,58 @@ function AgentMarketplacePanel(props: {
                   </Button>
                 </>
               }
+              /* A section is offered only when it carries data, so an agent without routines does
+                 not open an empty panel. */
               sections={[
                 {
                   title: "Instructions",
                   subtitle: "How this agent should work",
                   content: () => <p>{agent.description}</p>,
                 },
-                {
-                  title: "Skills",
-                  subtitle: "Playbooks it can run",
-                  content: () => (
-                    <Show when={agent.skills.length} fallback={<p>No marketplace skills included.</p>}>
-                      <ul class="agent-marketplace-dependency-list">
-                        <For each={agent.skills}>
-                          {(skill) => (
-                            <li>
-                              <span>{skill.name}</span>
-                              <small>v{skill.version}</small>
-                            </li>
-                          )}
-                        </For>
-                      </ul>
-                    </Show>
-                  ),
-                },
-                {
-                  title: "Routines",
-                  subtitle: "Jobs that run on their own",
-                  content: () => (
-                    <Show when={agent.routines.length} fallback={<p>No routines included.</p>}>
-                      <ul class="agent-marketplace-routine-list">
-                        <For each={agent.routines}>
-                          {(routine) => (
-                            <li>
-                              <span>
-                                {routine.name}
-                                <small>{routineScheduleSummary(routine.schedule)}</small>
-                                <p>{routine.instruction}</p>
-                              </span>
-                              <small>{routine.active ? "Active" : "Inactive"}</small>
-                            </li>
-                          )}
-                        </For>
-                      </ul>
-                    </Show>
-                  ),
-                },
+                ...(agent.skills.length
+                  ? [
+                      {
+                        title: "Skills",
+                        subtitle: "Playbooks it can run",
+                        content: () => (
+                          <ul class="agent-marketplace-dependency-list">
+                            <For each={agent.skills}>
+                              {(skill) => (
+                                <li>
+                                  <span>{skill.name}</span>
+                                  <small>Version {skill.version}</small>
+                                </li>
+                              )}
+                            </For>
+                          </ul>
+                        ),
+                      },
+                    ]
+                  : []),
+                ...(agent.routines.length
+                  ? [
+                      {
+                        title: "Routines",
+                        subtitle: "Jobs that run on their own",
+                        content: () => (
+                          <ul class="agent-marketplace-routine-list">
+                            <For each={agent.routines}>
+                              {(routine) => (
+                                <li>
+                                  <span>{routine.name}</span>
+                                  <p>{routine.instruction}</p>
+                                  <small>
+                                    {routineScheduleSummary(routine.schedule)} ·{" "}
+                                    {routine.active ? "Active" : "Inactive"}
+                                  </small>
+                                </li>
+                              )}
+                            </For>
+                          </ul>
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           )}
@@ -1252,7 +1366,6 @@ function SkillDetailView(props: {
   installed: InstalledSkill | undefined;
   installedLoad: "idle" | "loading" | "loaded" | "failed";
   busy: boolean;
-  onBack: () => void;
   onInstall: (skill: MarketplaceSkillSummary) => Promise<void>;
   agents: Array<Pick<AgentSummary, "id" | "name">>;
   targetAgentId: string;
@@ -1289,38 +1402,33 @@ function SkillDetailView(props: {
   };
   return (
     <section class="skills-marketplace-detail marketplace-detail-page" aria-label={`${props.skill.name} details`}>
-      <div class="skill-preview-toolbar">
-        <Button variant="ghost" onClick={props.onBack}>
-          <ArrowLeft />
-          Back to skills
-        </Button>
-        <div class="marketplace-detail-action">
-          <AgentSelect agents={props.agents} value={props.targetAgentId} onChange={props.onTargetChange} />
-          <Button
-            loading={props.busy}
-            disabled={!props.targetAgentId || current()}
-            onClick={() => void props.onInstall(props.skill)}
-          >
-            {current() ? "Installed" : props.installed ? "Update skill" : "Install skill"}
-          </Button>
-        </div>
-      </div>
       <SkillPreview
         skill={props.skill}
+        creatorName={props.skill.creatorName}
+        /* The target and the install share one control, so the page states where a skill goes
+           and sends it there in the same place. */
+        action={
+          <div class="marketplace-install-control">
+            <AgentSelect agents={props.agents} value={props.targetAgentId} onChange={props.onTargetChange} />
+            <Button
+              loading={props.busy}
+              disabled={!props.targetAgentId || current()}
+              onClick={() => void props.onInstall(props.skill)}
+            >
+              {current() ? "Installed" : props.installed ? "Update skill" : "Install skill"}
+            </Button>
+          </div>
+        }
         onTry={canTry() ? () => props.onTrySkill?.(props.targetAgentId, props.skill) : undefined}
         unavailableReason={unavailableReason()}
       />
-      <p class="marketplace-detail-creator">By {props.skill.creatorName}</p>
     </section>
   );
 }
 
-function SkillSubmissionDetailView(props: { submission: SkillSubmission; onBack: () => void }) {
+function SkillSubmissionDetailView(props: { submission: SkillSubmission }) {
   return (
     <section class="skills-marketplace-detail" aria-label={`${props.submission.name} submission details`}>
-      <Button class="skills-marketplace-detail-back" variant="ghost" size="sm" onClick={props.onBack}>
-        <ArrowLeft /> Back to submissions
-      </Button>
       <div class="skills-marketplace-detail-hero skills-submission-detail-hero">
         <SkillIcon skill={props.submission} />
         <div>
@@ -1375,22 +1483,39 @@ function AgentSelect(props: {
   value: string;
   onChange: (value: string) => void;
 }) {
+  const selected = () => props.agents.find((agent) => agent.id === props.value) ?? null;
+  /* The list belongs to the dialog, as in the settings modal: outside it the dialog hides it from
+     assistive technology. */
+  const [mount, setMount] = createSignal<HTMLElement | undefined>();
+  let root: HTMLElement | undefined;
   return (
-    <label class="skills-agent-select">
-      <span>Install to</span>
-      <span class="skills-agent-select-control">
-        <NativeSelect
-          value={props.value}
-          onChange={(event) => props.onChange(event.currentTarget.value)}
-          disabled={!props.agents.length}
-        >
-          <Show when={props.agents.length} fallback={<option value="">No local agents</option>}>
-            <For each={props.agents}>{(agent) => <option value={agent.id}>{agent.name}</option>}</For>
-          </Show>
-        </NativeSelect>
-        <ChevronDown aria-hidden="true" />
-      </span>
-    </label>
+    <Select<{ id: string; name: string }>
+      ref={(element: HTMLElement) => {
+        root = element;
+      }}
+      // The dialog is in the tree only once the control is, so the list finds it as it opens.
+      onOpenChange={(open) => {
+        if (open) setMount(root?.closest<HTMLElement>(".skills-marketplace") ?? undefined);
+      }}
+      class="skills-agent-select"
+      options={props.agents}
+      value={selected()}
+      optionValue="id"
+      optionTextValue="name"
+      disabled={!props.agents.length}
+      onChange={(option) => {
+        if (option) props.onChange(option.id);
+      }}
+      itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
+    >
+      {/* The control sits beside the install button, which says what the target is for. */}
+      <SelectTrigger size="sm" aria-label="Install to">
+        <SelectValue<{ id: string; name: string }>>
+          {(state) => state.selectedOption()?.name ?? "No local agents"}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent mount={mount()} />
+    </Select>
   );
 }
 

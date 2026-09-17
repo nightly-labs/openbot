@@ -8,10 +8,18 @@
 }
 
 .skills-marketplace {
-  width: min(800px, calc(100vw - 32px));
+  /* One inset for the whole dialog, on the agent Skills dialog's value: the chrome's title starts
+     on it, and the columns below keep the same distance from the edge, so the two line up whatever
+     the scrollbar gutter takes. */
+  --marketplace-inset: var(--openbot-space-6);
+  width: min(1040px, calc(100vw - 32px));
   border: 1px solid var(--openbot-border-grouped);
   border-radius: var(--openbot-radius-card);
   height: min(704px, calc(100vh - 32px));
+  /* Chrome, switch, listing: the body is the only row that scrolls, and it is the only one whose
+     height is not its content's - so no row has to know another row's height in pixels. */
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
@@ -21,53 +29,37 @@
   z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover) + 1);
 }
 
+/* Dialog chrome, on the agent Skills dialog's own values: a 48px row, a rule under it, the title on
+   the dialog inset and the actions grouped at the end. */
 .skills-marketplace-topbar {
-  height: 88px;
+  min-height: 48px;
   display: flex;
   align-items: center;
-  gap: var(--openbot-space-2);
-  padding: 0 var(--openbot-space-6) 0 var(--openbot-space-8);
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--marketplace-inset);
+  border-bottom: 1px solid var(--openbot-border);
+}
+.skills-marketplace-topbar-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+/* Inside the scrolling body rather than a row of its own: the chrome is the only fixed row, and the
+   switch scrolls away with the listing it filters. It also puts the switch in the same column as
+   the listing, which `scrollbar-gutter` shifts off the dialog's own centre. */
+.skills-marketplace-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  width: calc(100% - 2 * var(--marketplace-inset));
+  margin: 0 auto;
+  padding: var(--openbot-space-6) 0 var(--openbot-space-3);
 }
 
-.skills-marketplace-kind-tabs {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 2px;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-control);
-}
-.skills-marketplace-kind-tab {
-  min-width: 68px;
-  height: 26px;
-  padding-inline: var(--openbot-space-3);
-  border-radius: var(--openbot-radius-md);
-  color: var(--openbot-text-muted);
-}
-.skills-marketplace-kind-tab svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-}
-.skills-marketplace-kind-tab .agent-avatar {
-  width: var(--openbot-space-6);
-  height: var(--openbot-space-6);
-}
-.skills-marketplace-kind-tab .agent-avatar > svg {
-  width: 100%;
-  height: 100%;
-}
-.skills-marketplace-kind-tab:disabled {
-  color: var(--openbot-text-muted);
-  opacity: 0.58;
-}
-.skills-marketplace-card button svg {
-  width: 15px;
-  height: 15px;
-}
 .skills-marketplace-body {
   position: relative;
-  height: calc(100% - 88px);
   overflow: auto;
   scrollbar-gutter: stable;
 }
@@ -76,7 +68,7 @@
 }
 .skills-marketplace-discover,
 .skills-marketplace-panel {
-  width: min(1020px, calc(100% - 64px));
+  width: calc(100% - 2 * var(--marketplace-inset));
   margin: 0 auto;
   padding: var(--openbot-space-3) 0 var(--openbot-space-8);
 }
@@ -100,16 +92,6 @@
   margin: var(--openbot-space-1) 0 0;
   color: var(--openbot-text-muted);
 }
-.skills-agent-select {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-.skills-agent-select > span:first-child {
-  white-space: nowrap;
-}
 .skills-agent-select-control {
   position: relative;
   display: block;
@@ -128,7 +110,6 @@
   pointer-events: none;
   transform: translateY(-50%);
 }
-.skills-agent-select select,
 .skills-publish-fields select {
   min-width: 160px;
   height: var(--openbot-control-md);
@@ -138,51 +119,29 @@
   background: var(--openbot-bg-control);
   color: var(--openbot-text-primary);
 }
+/*
+ * The shared `.search-field` row from `app-shell.css`, which the sidebar and the channel dialog also
+ * use: it carries the borderless input and the calm focus treatment. Only the placing is local - the
+ * field takes the toolbar's free width, and stops before it dwarfs the switch beside it.
+ */
 .skills-marketplace-search {
-  position: relative;
+  flex: 1 1 auto;
+  /* The row's height is the switch's, so the field takes it rather than naming it again. */
+  align-self: stretch;
+  height: auto;
+  min-width: 0;
+  max-width: 320px;
+  margin-left: auto;
+  border-radius: var(--openbot-radius-md);
 }
 .skills-marketplace-search > svg {
-  position: absolute;
-  z-index: 1;
-  left: 13px;
-  top: 50%;
-  width: 17px;
-  transform: translateY(-50%);
+  flex: none;
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
   color: var(--openbot-text-muted);
-  pointer-events: none;
 }
-.skills-marketplace-search input {
-  width: 100%;
-  height: var(--openbot-control-md);
-  border-radius: var(--openbot-radius-pill);
-  padding-left: var(--openbot-space-8);
-  border-color: var(--openbot-border-strong);
-  background: var(--openbot-bg-surface);
-}
-.skills-marketplace-search input::placeholder {
-  font-size: var(--openbot-text-sm);
-}
-.skills-marketplace-categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-2);
-  padding: var(--openbot-space-3) 0 var(--openbot-space-8);
-}
-.skills-marketplace-categories button {
-  border: 1px solid var(--openbot-border-grouped);
-  background: transparent;
-  color: var(--openbot-text-secondary);
-}
-.skills-marketplace-categories button[data-active] {
-  border-color: var(--openbot-accent-strong);
-  background: var(--openbot-accent-soft);
-  color: var(--openbot-accent-text);
-}
-@media (hover: hover) and (pointer: fine) {
-  .skills-marketplace-categories button:hover:not([data-active]) {
-    background: var(--openbot-bg-control-hover);
-    color: var(--openbot-text-primary);
-  }
+.skills-marketplace-search input::-webkit-search-cancel-button {
+  display: none;
 }
 .skills-marketplace-section-title {
   display: flex;
@@ -200,9 +159,6 @@
 }
 .skills-marketplace-category-section + .skills-marketplace-category-section {
   margin-top: var(--openbot-space-8);
-}
-.agent-marketplace-panel .skills-marketplace-search + .skills-marketplace-category-section {
-  margin-top: var(--openbot-space-4);
 }
 .skills-marketplace-grid {
   display: grid;
@@ -293,11 +249,11 @@
   text-overflow: ellipsis;
 }
 .skills-marketplace-card-copy p {
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   overflow: hidden;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-md);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -323,35 +279,32 @@
 .agent-marketplace-publish-picker select {
   min-width: 160px;
 }
+/* Each entry is a name with its own line under it, not a row with a value at the far edge. */
 .agent-marketplace-dependency-list,
 .agent-marketplace-routine-list {
   display: grid;
-  gap: 0;
+  gap: var(--openbot-space-4);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .agent-marketplace-dependency-list li,
 .agent-marketplace-routine-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--openbot-space-3);
-  min-height: 44px;
-  padding-block: var(--openbot-space-2);
-  border-bottom: 1px solid var(--openbot-border);
-}
-.agent-marketplace-dependency-list li:last-child,
-.agent-marketplace-routine-list li:last-child {
-  border-bottom: 0;
-}
-.agent-marketplace-routine-list li > span {
   display: grid;
   gap: 2px;
 }
+.agent-marketplace-dependency-list li > span,
+.agent-marketplace-routine-list li > span {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-xl);
+}
 .agent-marketplace-dependency-list small,
-.agent-marketplace-routine-list small {
+.agent-marketplace-routine-list small,
+.agent-marketplace-routine-list li > p {
   color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-lg);
 }
 .agent-publish-card > p {
   margin: var(--openbot-space-4) 0 0;
@@ -371,13 +324,10 @@
   background: var(--openbot-bg-sidebar);
 }
 .skills-marketplace-detail {
-  width: min(920px, calc(100% - 64px));
+  /* The skill page keeps the listing's own inset, so the two pages start on the same column. */
+  width: calc(100% - 2 * var(--marketplace-inset));
   margin: 0 auto;
-  padding: var(--openbot-space-4) 0 var(--openbot-space-8);
-}
-.skills-marketplace-detail-back {
-  margin-left: calc(var(--openbot-space-2) * -1);
-  color: var(--openbot-text-muted);
+  padding: var(--openbot-space-6) 0 var(--openbot-space-8);
 }
 .skills-marketplace-detail-hero {
   display: grid;
@@ -411,7 +361,9 @@
   max-width: 650px;
   margin: var(--openbot-space-2) 0 0;
   color: var(--openbot-text-secondary);
-  line-height: var(--openbot-leading-lg);
+  /* Reading text on the Skills dialog's own body scale. Under it, 12px is for labels only. */
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-xl);
 }
 .skills-marketplace-detail-meta {
   display: flex;
@@ -419,7 +371,7 @@
   gap: var(--openbot-space-2) var(--openbot-space-4);
   margin-top: var(--openbot-space-3);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
+  font-size: var(--openbot-text-md);
 }
 .skills-marketplace-detail-content {
   display: grid;
@@ -429,14 +381,16 @@
 }
 .skills-marketplace-detail-content h2 {
   margin: 0;
-  font-size: var(--openbot-text-lg);
+  /* A step above the body under it. */
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
 }
 .skills-marketplace-detail-instructions > div {
   margin-top: var(--openbot-space-4);
   color: var(--openbot-text-secondary);
   font-family: var(--openbot-font-sans);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-lg);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-xl);
   white-space: pre-wrap;
 }
 .skills-marketplace-detail-package {
@@ -448,7 +402,7 @@
 .skills-marketplace-detail-package p {
   margin: var(--openbot-space-1) 0 var(--openbot-space-3);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
+  font-size: var(--openbot-text-md);
 }
 .skills-marketplace-detail-package ul {
   display: grid;
@@ -461,7 +415,7 @@
   overflow: hidden;
   color: var(--openbot-text-secondary);
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-sm);
+  font-size: var(--openbot-text-md);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -840,7 +794,6 @@
 @media (max-width: 800px) {
   .skills-marketplace-discover,
   .skills-marketplace-panel {
-    width: calc(100% - 32px);
     padding-top: 28px;
   }
   .skills-submission-guide-grid,
@@ -867,32 +820,65 @@
 
 /* The marketplace uses the shared dark palette in every app theme. */
 .marketplace-title {
+  min-width: 0;
   margin: 0;
   margin-right: auto;
-  font-size: var(--openbot-text-xl);
-  font-weight: var(--openbot-weight-medium);
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-lg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.skills-marketplace-kind-tabs {
-  gap: var(--openbot-space-2);
+/*
+ * The header names the page open over the listing, as the agent Skills dialog does with
+ * `.agent-skills-parent` and the settings dialog with `.settings-modal-crumb-parent`.
+ */
+.marketplace-crumbs {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+/*
+ * The parent crumb is a ghost button, so `.ui-button` would otherwise win the type properties and
+ * draw it smaller than the title beside it. The shell class takes those back. The negative margins
+ * cancel the hover chip's own padding, so the row keeps its height and the text keeps the title's
+ * left edge.
+ */
+.skills-marketplace .marketplace-crumb-parent {
+  min-width: 0;
+  height: auto;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--openbot-radius-md);
   background: transparent;
-  border: 0;
+  color: var(--openbot-text-muted);
+  margin-block: calc(-1 * var(--openbot-space-1));
+  margin-inline-start: calc(-1 * var(--openbot-space-2));
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-lg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.skills-marketplace-kind-tab {
-  border: 1px solid var(--openbot-border-grouped);
-  border-radius: var(--openbot-radius-pill);
-  background: transparent;
-  transition: none;
+@media (hover: hover) and (pointer: fine) {
+  .skills-marketplace .marketplace-crumb-parent:hover:not(:disabled) {
+    border-color: var(--openbot-border-strong);
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
 }
-.skills-marketplace-kind-tab[data-active] {
-  border-color: var(--openbot-text-primary);
+.marketplace-crumb-separator {
+  flex: 0 0 auto;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
 }
-.skills-marketplace-categories button[data-active] {
-  background: var(--openbot-text-primary);
-  color: var(--openbot-bg-sidebar);
-  border-color: var(--openbot-text-primary);
-}
-.marketplace-management,
-.marketplace-more {
+.marketplace-management {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -905,70 +891,47 @@
   font: inherit;
   cursor: pointer;
 }
-.marketplace-management svg,
-.marketplace-more svg {
+.marketplace-management svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
 }
-.skills-marketplace-categories button {
-  border: 0;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-control-active);
+.skills-marketplace-card button svg {
+  width: 15px;
+  height: 15px;
 }
-.skills-marketplace-categories {
-  padding-bottom: var(--openbot-space-6);
+/*
+ * Card resize (transitions.dev 01). The catalog writes the listing's height here, so a search that
+ * removes or restores rows travels between the two sizes. `clip` keeps the rows inside the box while
+ * it shrinks; the margin leaves room for a focus ring on the row at the edge.
+ */
+.marketplace-catalog-viewport {
+  --resize-dur: var(--openbot-duration-overlay);
+  --resize-ease: var(--openbot-ease-out);
+
+  overflow: clip;
+  overflow-clip-margin: var(--openbot-space-1);
+  transition:
+    height var(--resize-dur) var(--resize-ease),
+    opacity var(--reveal-dur) var(--reveal-ease),
+    filter var(--reveal-dur) var(--reveal-ease);
+  will-change: height;
 }
-.marketplace-featured {
-  margin-bottom: var(--openbot-space-4);
+@media (prefers-reduced-motion: reduce) {
+  /* The height still follows the rows; it just arrives at once. The rule needs no `!important`: it
+     carries the same specificity as the one above and comes after it. */
+  .marketplace-catalog-viewport {
+    transition: none;
+  }
+}
+.marketplace-catalog {
+  --reveal-dur: var(--openbot-duration-slow);
+  --reveal-ease: var(--openbot-ease-in-out);
+  --reveal-blur: 2px;
 }
 .marketplace-catalog h2 {
   margin: 0 0 var(--openbot-space-3);
   font-size: var(--openbot-text-xl);
   font-weight: var(--openbot-weight-medium);
-}
-.marketplace-featured-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--openbot-space-4);
-}
-.marketplace-featured-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--openbot-space-4);
-  height: calc(var(--openbot-space-8) * 6);
-  padding: var(--openbot-space-4);
-  border: 1px solid var(--openbot-border-grouped);
-  border-radius: var(--openbot-radius-lg);
-  white-space: normal;
-  text-align: center;
-  color: var(--openbot-text-primary);
-}
-.marketplace-featured-card > span {
-  display: grid;
-  grid-template-rows: calc(var(--openbot-leading-lg) * 2) var(--openbot-leading-sm);
-  gap: var(--openbot-space-1);
-  width: 100%;
-  min-width: 0;
-}
-.marketplace-featured-card strong {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  align-self: end;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  line-height: var(--openbot-leading-lg);
-  font-weight: var(--openbot-weight-medium);
-}
-.marketplace-featured-card small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-  font-weight: var(--openbot-weight-regular);
-  color: var(--openbot-text-muted);
 }
 .marketplace-identity {
   position: relative;
@@ -1007,19 +970,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--openbot-text-sm);
+  /* The row's own scale, as in the agent Skills dialog: the name is a step above the line under it,
+     so the two do not read as one block of 12px. */
   font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
 }
 .skills-marketplace-card-copy > div {
   gap: var(--openbot-space-1);
 }
 .skills-marketplace-card > .agent-avatar {
+  /* The face art overflows its box by design, so it needs the same -0.14 of the box that the
+     channel rows use to sit on the row's centre. */
+  --agent-avatar-optical-offset: calc(42px * -0.14);
+
   width: 42px;
   height: 42px;
 }
 .skills-marketplace-section-title > .ui-button {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
 }
 .marketplace-catalog-skeleton {
   display: grid;
@@ -1038,10 +1007,6 @@
   height: calc(var(--openbot-space-8) + var(--openbot-space-2));
   border-radius: var(--openbot-radius-pill);
 }
-.marketplace-featured-placeholder .marketplace-placeholder-avatar {
-  width: 72px;
-  height: 72px;
-}
 .marketplace-placeholder-copy {
   display: grid;
   gap: var(--openbot-space-2);
@@ -1053,9 +1018,6 @@
 .marketplace-placeholder-copy > .ui-skeleton:first-child {
   width: 65%;
 }
-.marketplace-featured-placeholder .marketplace-placeholder-copy > .ui-skeleton {
-  margin-inline: auto;
-}
 @keyframes marketplace-content-enter {
   from {
     opacity: 0;
@@ -1064,6 +1026,28 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+@keyframes marketplace-content-reveal {
+  from {
+    opacity: 0;
+    filter: blur(var(--reveal-blur));
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@keyframes marketplace-section-swap {
+  from {
+    opacity: 0;
+    transform: translateY(var(--openbot-space-1));
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
   }
 }
 @keyframes marketplace-placeholder-enter {
@@ -1076,74 +1060,99 @@
 }
 @media (prefers-reduced-motion: no-preference) {
   .marketplace-catalog .skills-marketplace-card,
-  .marketplace-featured:not(.marketplace-featured-placeholder) .marketplace-featured-card,
   .marketplace-detail-heading,
   .marketplace-detail-sections {
     animation: marketplace-content-enter var(--openbot-duration-slow) var(--openbot-ease-out) both;
   }
-  .marketplace-catalog .skills-marketplace-card:nth-child(2),
-  .marketplace-featured-card:nth-child(2) {
+  .marketplace-catalog .skills-marketplace-card:nth-child(2) {
     animation-delay: calc(var(--openbot-duration-fast) / 6);
   }
-  .marketplace-catalog .skills-marketplace-card:nth-child(3),
-  .marketplace-featured-card:nth-child(3) {
+  .marketplace-catalog .skills-marketplace-card:nth-child(3) {
     animation-delay: calc(var(--openbot-duration-fast) / 3);
   }
   .marketplace-catalog .skills-marketplace-card:nth-child(n + 4),
-  .marketplace-featured-card:nth-child(n + 4),
   .marketplace-detail-sections {
     animation-delay: calc(var(--openbot-duration-fast) / 2);
   }
-  .marketplace-featured-placeholder,
+  /*
+   * While a search runs, the rows change at typing speed. A rise with a per-row delay reads as a jump
+   * at that rate, so the rows resolve in place through the cross-blur of the skeleton reveal
+   * (transitions.dev 14) instead.
+   */
+  .marketplace-catalog[data-search] .skills-marketplace-card {
+    animation: marketplace-content-reveal var(--reveal-dur) var(--reveal-ease) both;
+  }
+  /*
+   * Skeleton reveal (transitions.dev 14), on the listing rather than on a placeholder layer. Between a
+   * keystroke and the answer for it the rows on screen belong to an older query, so they step back
+   * through the cross-blur and come forward again when the answer lands. This holds the listing still
+   * where a swap to a placeholder would blink it.
+   */
+  .marketplace-catalog[data-pending] .marketplace-catalog-viewport {
+    opacity: 0.6;
+    filter: blur(var(--reveal-blur));
+  }
   .marketplace-catalog-skeleton,
   .skills-marketplace-detail-skeleton {
     animation: marketplace-placeholder-enter var(--openbot-duration-normal) var(--openbot-ease-out)
       var(--openbot-duration-dialog) both;
   }
-}
-.skills-marketplace-topbar[data-detail] {
-  height: 40px;
-  justify-content: flex-end;
-}
-.skills-marketplace-topbar[data-detail] > :not(:last-child) {
-  display: none;
-}
-.skills-marketplace-topbar[data-detail] + .skills-marketplace-body {
-  height: calc(100% - 40px);
+  /*
+   * Text states swap (transitions.dev 04). Picking another section replaces the panel's whole
+   * content at once, so the new content rises through a cross-blur inside the box the panel keeps.
+   */
+  .marketplace-detail-section-body {
+    animation: marketplace-section-swap var(--openbot-duration-normal) var(--openbot-ease-out) both;
+  }
 }
 .marketplace-detail-page {
   position: relative;
-  width: calc(100% - 64px);
-  padding-top: calc(var(--openbot-space-8) + var(--openbot-space-4));
+  width: 100%;
+  padding: var(--openbot-space-6) var(--openbot-space-6) var(--openbot-space-8);
+}
+/* The page takes the focus the row gave up, but it is not a control: it shows no ring. */
+.marketplace-detail-page:focus-visible {
+  outline: none;
 }
 .agent-marketplace-panel:has(.marketplace-detail-page) {
   width: 100%;
   padding: 0;
 }
-.marketplace-detail-back {
-  position: absolute;
-  top: 0;
-  left: calc(var(--openbot-space-4) * -1);
-}
 .marketplace-detail-heading {
   display: grid;
-  grid-template-columns: 1fr auto;
   gap: var(--openbot-space-4);
-  padding: 0 var(--openbot-space-4) var(--openbot-space-6);
+  padding-bottom: var(--openbot-space-6);
   border-bottom: 1px solid var(--openbot-border-strong);
 }
+/* Icon, name with its creator line, and the action, all on one line. */
+.marketplace-detail-main {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-4);
+}
 .marketplace-detail-copy {
-  grid-column: 1 / -1;
+  flex: 1;
+  min-width: 0;
+}
+/* The skill page prints the creator under the preview, on its own rather than inside the heading
+   block, so the line needs the sub-line treatment without that block around it. */
+.marketplace-detail-creator {
+  margin: var(--openbot-space-3) 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
 }
 .marketplace-detail-copy h1 {
   margin: 0;
   font-size: var(--openbot-text-3xl);
   font-weight: var(--openbot-weight-medium);
 }
-.marketplace-detail-copy p {
-  margin: var(--openbot-space-3) 0 0;
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-lg);
+.marketplace-detail-lead {
+  margin: 0;
+  /* The lead reads on the same body scale as the sections under it, as the skill preview in the
+     agent Skills dialog does. Below it, 12px is for labels only. */
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-xl);
   white-space: pre-wrap;
 }
 .marketplace-detail-copy .marketplace-detail-creator {
@@ -1153,7 +1162,8 @@
 }
 .marketplace-detail-action {
   display: flex;
-  align-items: start;
+  flex: 0 0 auto;
+  align-items: center;
   gap: var(--openbot-space-2);
 }
 .marketplace-detail-action > .ui-button {
@@ -1161,22 +1171,17 @@
   background: var(--openbot-text-primary);
   color: var(--openbot-bg-sidebar);
 }
-.marketplace-detail-action:has(.skills-agent-select) {
-  gap: var(--openbot-space-3);
-}
-.marketplace-detail-action:has(.skills-agent-select) > .ui-button {
-  height: var(--openbot-control-md);
-  padding-inline: var(--openbot-space-6);
-}
 .marketplace-detail-sections {
   display: grid;
   grid-template-columns: 192px minmax(0, 1fr);
   gap: var(--openbot-space-6);
   padding-top: var(--openbot-space-6);
-  align-items: start;
+  align-items: stretch;
 }
 .marketplace-detail-sections nav {
   display: grid;
+  /* The rows keep their own height, so a taller panel does not stretch the buttons or move them. */
+  align-content: start;
   gap: var(--openbot-space-1);
 }
 .marketplace-detail-sections nav button {
@@ -1198,7 +1203,8 @@
   font-weight: var(--openbot-weight-regular);
 }
 .marketplace-detail-section {
-  padding: var(--openbot-space-4);
+  /* The height comes from the measured content, so the padding sits on the content it measures. */
+  overflow: hidden;
   border-radius: var(--openbot-radius-xl);
   background: var(--openbot-marketplace-detail-bg);
   color: var(--openbot-text-secondary);
@@ -1206,18 +1212,19 @@
   line-height: var(--openbot-leading-xl);
   overflow-wrap: anywhere;
 }
+.marketplace-detail-section-body {
+  padding: var(--openbot-space-6);
+}
 .marketplace-detail-section p {
   margin: 0;
   white-space: pre-wrap;
 }
-.marketplace-detail-section ul {
+/* The entry lists below carry their own layout; only a plain list in prose needs the indent. */
+.marketplace-detail-section ul:not(.agent-marketplace-dependency-list, .agent-marketplace-routine-list) {
   margin: var(--openbot-space-3) 0 0;
   padding-left: var(--openbot-space-4);
 }
 @media (max-width: 600px) {
-  .marketplace-featured-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .marketplace-detail-sections,
   .skills-marketplace-grid {
     grid-template-columns: 1fr;
@@ -1225,11 +1232,12 @@
   .marketplace-detail-sections nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .marketplace-detail-main {
+    flex-wrap: wrap;
+  }
   .marketplace-detail-action {
     flex-direction: column;
-  }
-  .skills-marketplace-topbar {
-    padding-inline: var(--openbot-space-3);
+    align-items: stretch;
   }
 }
 

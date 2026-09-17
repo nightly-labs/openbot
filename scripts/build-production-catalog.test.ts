@@ -42,6 +42,26 @@ describe("production marketplace catalog", () => {
     }
   });
 
+  it("gives every skill the artwork of its category", async () => {
+    const root = await temporaryRoot();
+    const output = join(root, "catalog");
+    await buildProductionCatalog(output);
+    const catalog = await readCatalog(join(output, "catalog.json"));
+    const artwork = new Map<string, string>();
+    for (const skill of catalog.skills) {
+      const icon = await readFile(join(output, skill.icon), "utf8");
+      expect(icon).toContain("<svg");
+      const previous = artwork.get(skill.category);
+      // Skills of one category share their mark, and no two categories carry the same one.
+      if (previous) expect(icon).toBe(previous);
+      else {
+        expect([...artwork.values()]).not.toContain(icon);
+        artwork.set(skill.category, icon);
+      }
+    }
+    expect(artwork.size).toBeGreaterThan(1);
+  });
+
   it("emits agents whose skill references resolve and whose routines are empty", async () => {
     const root = await temporaryRoot();
     const output = join(root, "catalog");
@@ -75,6 +95,8 @@ interface GeneratedSkill {
   id: string;
   versionId: string;
   bundle: string;
+  icon: string;
+  category: string;
   slug: string;
 }
 
@@ -95,12 +117,21 @@ function parseGeneratedSkill(value: unknown): GeneratedSkill {
     !isString(value.id) ||
     !isString(value.versionId) ||
     !isString(value.bundle) ||
+    !isString(value.icon) ||
+    !isString(value.category) ||
     !isString(value.slug)
   ) {
     throw new Error("Generated catalog contains an invalid skill.");
   }
   expect(value.versionId).toMatch(/^openbot-curated-version-.+-v2-[a-f0-9]{16}$/u);
-  return { id: value.id, versionId: value.versionId, bundle: value.bundle, slug: value.slug };
+  return {
+    id: value.id,
+    versionId: value.versionId,
+    bundle: value.bundle,
+    icon: value.icon,
+    category: value.category,
+    slug: value.slug,
+  };
 }
 
 async function readAgents(path: string): Promise<GeneratedAgent[]> {

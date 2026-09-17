@@ -43,7 +43,7 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
-import { RemoteScreenGateway } from "./remote-screen-gateway";
+import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
 import { TeamApiServer } from "./team-api-server";
 import type { AuthenticatedMember, RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -92,6 +92,8 @@ interface HostServiceOptions {
   }) => Promise<void>;
   remoteDesktopRuntimePaths?: RemoteDesktopRuntimePaths | null;
   remoteDesktopStateDirectory?: string;
+  /** Only a test supplies this. The gateway builds the real Sunshine and Moonlight runtime itself. */
+  createRemoteDesktopRuntime?: RemoteScreenGatewayCreateRuntime;
   getRemoteDesktopRuntimeCredentials?: () => Promise<{ username: string; password: string }>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
   getRemoteDesktopIceServers?: () => Promise<RemoteDesktopIceServer[]>;
@@ -174,6 +176,7 @@ export class HostService extends EventEmitter<HostEvents> {
         (async () => {
           throw new Error("Remote Signal has not supplied ICE servers.");
         }),
+      ...(options.createRemoteDesktopRuntime ? { createRuntime: options.createRemoteDesktopRuntime } : {}),
       ...(logDirectory
         ? {
             onDiagnostic: (source: "sunshine" | "moonlight", message: string) => {
@@ -181,6 +184,9 @@ export class HostService extends EventEmitter<HostEvents> {
             },
           }
         : {}),
+      // The gateway owns the answer -- `getStatus` reads it there. This only says it changed, which is
+      // what a member's failed attempt has to do to reach the host owner's open settings panel.
+      onScreenRecordingDenied: () => this.emit("changed", this.getStatus()),
       audit: (event) => {
         if (options.logDirectory) {
           void appendRemoteDiagnosticLog(options.logDirectory, "remote-screen", `${JSON.stringify(event)}\n`);
@@ -244,10 +250,22 @@ export class HostService extends EventEmitter<HostEvents> {
     return {
       ...this.#status,
       remoteDesktopReady: capabilities.ready,
+      remoteDesktopScreenRecordingDenied: this.#remoteScreen.screenRecordingDenied(),
       remoteDesktopUnattended: capabilities.unattended,
       remoteDesktopActiveSessions: capabilities.activeSessions,
       remoteDesktopMaxSessions: capabilities.maxSessions,
     };
+  }
+
+  /**
+   * Asks the screen sharing runtime again whether this computer lets it record the screen.
+   *
+   * The host owner is the only one who can give that grant, and until they can check it here the
+   * warning they are shown outlives the repair that answered it.
+   */
+  async recheckScreenRecording(): Promise<HostStatus> {
+    await this.#remoteScreen.recheckScreenRecording();
+    return this.getStatus();
   }
 
   /**
@@ -1018,6 +1036,7 @@ function initialHostStatus(identity: TeamIdentity | null, unattended: boolean): 
     apiUrl: null,
     apiOnline: false,
     remoteDesktopReady: false,
+    remoteDesktopScreenRecordingDenied: false,
     remoteDesktopUnattended: unattended,
     remoteDesktopActiveSessions: 0,
     remoteDesktopMaxSessions: 4,

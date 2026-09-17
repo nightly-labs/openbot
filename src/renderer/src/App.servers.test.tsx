@@ -907,21 +907,28 @@ describe("OpenBot connected desktop shell", () => {
       ]);
       const setupError = "The host has not allowed OpenBot to record its screen.";
       if (!remoteDesktopAvailable) {
-        vi.mocked(window.openbot.remoteDesktop.connect).mockRejectedValueOnce(new Error(setupError));
+        vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
+          status: "refused",
+          errorCode: "host_permissions_required",
+          message: setupError,
+        });
       }
       vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
-        id: "desktop-1",
-        serverId: "remote-1",
-        viewerUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/v1/remote-screen/sessions/desktop-1/viewer",
-        viewerGrant: "viewer-grant",
-        displays: [],
-        selectedDisplayId: null,
-        phase: "connecting",
-        transport: "unknown",
-        errorCode: null,
-        message: "Connecting…",
-        createdAt: "2026-08-18T12:00:00.000Z",
-        grantExpiresAt: "2026-08-18T12:01:00.000Z",
+        status: "connected",
+        session: {
+          id: "desktop-1",
+          serverId: "remote-1",
+          viewerUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/v1/remote-screen/sessions/desktop-1/viewer",
+          viewerGrant: "viewer-grant",
+          displays: [],
+          selectedDisplayId: null,
+          phase: "connecting",
+          transport: "unknown",
+          errorCode: null,
+          message: "Connecting…",
+          createdAt: "2026-08-18T12:00:00.000Z",
+          grantExpiresAt: "2026-08-18T12:01:00.000Z",
+        },
       });
 
       render(() => <App />);
@@ -939,7 +946,11 @@ describe("OpenBot connected desktop shell", () => {
       await waitFor(() => expect(window.openbot.remoteDesktop.connect).toHaveBeenCalledWith({ serverId: "remote-1" }));
 
       if (!remoteDesktopAvailable) {
-        expect(await screen.findByRole("alert")).toHaveTextContent(setupError);
+        // The host named its refusal, so the member reads the repair step instead of the raw sentence.
+        const refusal = await screen.findByRole("alert");
+        expect(refusal).toHaveTextContent("Studio Mac is not sharing its screen");
+        expect(refusal).toHaveTextContent("System Settings → Privacy & Security → Screen Recording");
+        expect(refusal).not.toHaveTextContent(setupError);
         expect(screen.queryByText("Update required")).not.toBeInTheDocument();
         await fireEvent.click(screen.getByRole("button", { name: "Try again" }));
       }
@@ -992,18 +1003,21 @@ describe("OpenBot connected desktop shell", () => {
       servers.map((server) => ({ ...server, active: server.id === "remote-2" })),
     );
     vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
-      id: "desktop-1",
-      serverId: "remote-1",
-      viewerUrl: "https://studio.example.com/v1/remote-screen/sessions/desktop-1/viewer",
-      viewerGrant: "viewer-grant",
-      displays: [],
-      selectedDisplayId: null,
-      phase: "connected",
-      transport: "p2p",
-      errorCode: null,
-      message: "Connected",
-      createdAt: "2026-08-18T12:00:00.000Z",
-      grantExpiresAt: "2026-08-18T12:01:00.000Z",
+      status: "connected",
+      session: {
+        id: "desktop-1",
+        serverId: "remote-1",
+        viewerUrl: "https://studio.example.com/v1/remote-screen/sessions/desktop-1/viewer",
+        viewerGrant: "viewer-grant",
+        displays: [],
+        selectedDisplayId: null,
+        phase: "connected",
+        transport: "p2p",
+        errorCode: null,
+        message: "Connected",
+        createdAt: "2026-08-18T12:00:00.000Z",
+        grantExpiresAt: "2026-08-18T12:01:00.000Z",
+      },
     });
 
     render(() => <App />);
