@@ -134,7 +134,7 @@ function isSupportedNumberFormat(format: string): boolean {
 
 function formatExcelTime(value: number, format: string): string {
   const totalSeconds = Math.max(0, Math.round(value * 86_400));
-  const hours = format.includes("[h]") ? Math.floor(totalSeconds / 3_600) : Math.floor(totalSeconds / 3_600) % 24;
+  const hours = /\[h+\]/iu.test(format) ? Math.floor(totalSeconds / 3_600) : Math.floor(totalSeconds / 3_600) % 24;
   const minutes = Math.floor(totalSeconds / 60) % 60;
   const seconds = totalSeconds % 60;
   const suffix = /am\/pm/iu.test(format) ? (hours >= 12 ? " PM" : " AM") : "";

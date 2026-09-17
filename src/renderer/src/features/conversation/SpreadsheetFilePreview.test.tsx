@@ -33,10 +33,10 @@ function unsupportedFormatsWorkbook(): Uint8Array {
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
     ),
     "xl/styles.xml": strToU8(
-      `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="176" formatCode="[$USD-409]0.00"/><numFmt numFmtId="177" formatCode="${longFormat}"/><numFmt numFmtId="178" formatCode="[m]:ss"/></numFmts><cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="176"/><xf numFmtId="177"/><xf numFmtId="178"/></cellXfs></styleSheet>`,
+      `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="4"><numFmt numFmtId="176" formatCode="[$USD-409]0.00"/><numFmt numFmtId="177" formatCode="${longFormat}"/><numFmt numFmtId="178" formatCode="[m]:ss"/><numFmt numFmtId="179" formatCode="[hh]:mm"/></numFmts><cellXfs count="5"><xf numFmtId="0"/><xf numFmtId="176"/><xf numFmtId="177"/><xf numFmtId="178"/><xf numFmtId="179"/></cellXfs></styleSheet>`,
     ),
     "xl/worksheets/sheet1.xml": strToU8(
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>CurrencyMetadata</t></is></c><c r="B1" t="inlineStr"><is><t>LongFraction</t></is></c><c r="C1" t="inlineStr"><is><t>ElapsedMinutes</t></is></c></row><row><c r="A2" s="1"><v>1.25</v></c><c r="B2" s="2"><v>1.5</v></c><c r="C2" s="3"><v>1.5</v></c></row></sheetData></worksheet>',
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>CurrencyMetadata</t></is></c><c r="B1" t="inlineStr"><is><t>LongFraction</t></is></c><c r="C1" t="inlineStr"><is><t>ElapsedMinutes</t></is></c><c r="D1" t="inlineStr"><is><t>ElapsedHours</t></is></c></row><row><c r="A2" s="1"><v>1.25</v></c><c r="B2" s="2"><v>1.5</v></c><c r="C2" s="3"><v>1.5</v></c><c r="D2" s="4"><v>1.5</v></c></row></sheetData></worksheet>',
     ),
   });
 }
@@ -74,7 +74,7 @@ describe("SpreadsheetFilePreview", () => {
   });
 
   it("preserves values for unsupported metadata and fractional formats", () => {
-    expect(parseSpreadsheet(unsupportedFormatsWorkbook()).sheets[0]?.rows[1]).toEqual(["1.25", "1.5", "1.5"]);
+    expect(parseSpreadsheet(unsupportedFormatsWorkbook()).sheets[0]?.rows[1]).toEqual(["1.25", "1.5", "1.5", "36:00"]);
   });
 
   it("rejects an oversized expanded XML entry before parsing it", () => {

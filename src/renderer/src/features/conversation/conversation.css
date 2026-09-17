@@ -589,7 +589,7 @@
 .file-preview-spreadsheet-table caption {
   padding: 10px 12px;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   text-align: left;
 }
 
@@ -615,7 +615,7 @@
 .file-preview-spreadsheet-note {
   margin: 10px 0 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
 }
 
 .media-spreadsheet-preview {
