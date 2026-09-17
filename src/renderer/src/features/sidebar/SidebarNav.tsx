@@ -5,7 +5,7 @@
  */
 
 import { For, Show } from "solid-js";
-import { ContextMenu, FolderPlus } from "../../components/ui";
+import { ContextMenu, FolderPlus, Hash } from "../../components/ui";
 import { SidebarChannelRow } from "./SidebarChannelRow";
 import { SidebarEmptyState } from "./SidebarEmptyState";
 import { SidebarPinnedGroup } from "./SidebarPinnedGroup";
@@ -65,11 +65,17 @@ export function SidebarNav() {
           {reorderAnnouncement()}
         </span>
       </div>
-      <Show when={layoutMutable() || props.onToggleArchivedChannels}>
+      <Show when={props.onCreateChannel || layoutMutable() || props.onToggleArchivedChannels}>
         <ContextMenu.Root modal={false}>
           <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label="Sidebar free area" />
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label="Sidebar actions">
+              <Show when={props.onCreateChannel}>
+                <ContextMenu.Item onSelect={() => props.onCreateChannel?.()}>
+                  <Hash class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>New channel</span>
+                </ContextMenu.Item>
+              </Show>
               <Show when={layoutMutable()}>
                 <ContextMenu.Item onSelect={() => startCreateSection()}>
                   <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />

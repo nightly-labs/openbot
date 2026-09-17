@@ -180,6 +180,7 @@ import type {
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
   RemoteDesktopConnectInput,
+  RemoteDesktopConnectResult,
   RemoteDesktopSelectDisplayInput,
   RemoteDesktopSession,
   ReorderServersInput,
@@ -400,6 +401,15 @@ export interface HostDesktopApi {
   getPresence: () => Promise<TeamPresenceSnapshot>;
   start: () => Promise<HostStatus>;
   stop: () => Promise<HostStatus>;
+  /**
+   * Asks the screen sharing runtime again whether the operating system lets it record, and answers
+   * the status that holds the result.
+   *
+   * The refusal is remembered, because the runtime that reported it is dropped so that the next
+   * attempt reads a new grant. Without this call only another member's attempt could clear it, and
+   * the host owner who just gave the grant would keep reading that they had not.
+   */
+  recheckScreenRecording: () => Promise<HostStatus>;
   listMembers: () => Promise<TeamMemberSummary[]>;
   updateMember: (input: UpdateTeamMemberInput) => Promise<TeamMemberSummary>;
   removeMember: (memberId: string) => Promise<void>;
@@ -413,7 +423,7 @@ export interface HostDesktopApi {
 
 export interface RemoteDesktopDesktopApi {
   list: () => Promise<RemoteDesktopSession[]>;
-  connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopSession>;
+  connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopConnectResult>;
   selectDisplay: (input: RemoteDesktopSelectDisplayInput) => Promise<void>;
   disconnect: (sessionId: string) => Promise<void>;
   onEvent: (listener: (sessions: RemoteDesktopSession[]) => void) => () => void;

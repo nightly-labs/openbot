@@ -472,6 +472,7 @@ export const STORY_HOST_STATUS: HostStatus = {
   apiUrl: "https://team.example.com",
   apiOnline: true,
   remoteDesktopReady: true,
+  remoteDesktopScreenRecordingDenied: false,
   remoteDesktopUnattended: true,
   remoteDesktopActiveSessions: 1,
   remoteDesktopMaxSessions: 4,

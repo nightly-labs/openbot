@@ -307,6 +307,7 @@ export const IPC_ENDPOINTS = {
     getPresence: request(IPC_CHANNELS.hostGetPresence),
     start: request(IPC_CHANNELS.hostStart),
     stop: request(IPC_CHANNELS.hostStop),
+    recheckScreenRecording: request(IPC_CHANNELS.hostRecheckScreenRecording),
     listMembers: request(IPC_CHANNELS.hostListMembers),
     createInvite: request(IPC_CHANNELS.hostCreateInvite),
     listInvites: request(IPC_CHANNELS.hostListInvites),

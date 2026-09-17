@@ -95,13 +95,17 @@ describe("RemoteScreenGateway", () => {
   });
 
   it("refuses a session the host may not record, instead of opening one that never shows a frame", async () => {
-    const gateway = createGateway({ screenCaptureDenied: () => true });
+    // The refused member cannot grant anything on this computer, so the host owner is told as well.
+    const onScreenRecordingDenied = vi.fn();
+    const gateway = createGateway({ screenCaptureDenied: () => true, onScreenRecordingDenied });
 
     await expect(createSession(gateway, "https://remote.example")).rejects.toMatchObject({
       status: 503,
       code: "host_permissions_required",
     });
     expect(gateway.list()).toEqual([]);
+    expect(gateway.screenRecordingDenied()).toBe(true);
+    expect(onScreenRecordingDenied).toHaveBeenCalledExactlyOnceWith(true);
   });
 
   // The other half of that refusal, and the reason it is not a dead end: the error tells the member
@@ -110,13 +114,40 @@ describe("RemoteScreenGateway", () => {
   // the next one started.
   it("opens the session a host allows after the refusal that asked it to", async () => {
     let deniedAtStartup = true;
-    const gateway = createGateway({ screenCaptureDenied: () => deniedAtStartup });
+    const onScreenRecordingDenied = vi.fn();
+    const gateway = createGateway({ screenCaptureDenied: () => deniedAtStartup, onScreenRecordingDenied });
     await expect(createSession(gateway, "https://remote.example")).rejects.toMatchObject({
       code: "host_permissions_required",
     });
 
     deniedAtStartup = false;
 
+    await createSession(gateway, "https://remote.example");
+    expect(gateway.list()).toHaveLength(1);
+    // The grant took effect, so the host owner stops being asked to repair anything.
+    expect(gateway.screenRecordingDenied()).toBe(false);
+    expect(onScreenRecordingDenied.mock.calls).toEqual([[true], [false]]);
+  });
+
+  // Without this the host owner has to find a member willing to try again before they can see that
+  // the grant they just gave took effect.
+  it("reads the grant again for the host owner, and stops the runtime it started to read it", async () => {
+    let deniedAtStartup = true;
+    const onScreenRecordingDenied = vi.fn();
+    const gateway = createGateway({ screenCaptureDenied: () => deniedAtStartup, onScreenRecordingDenied });
+    await expect(createSession(gateway, "https://remote.example")).rejects.toMatchObject({
+      code: "host_permissions_required",
+    });
+
+    await expect(gateway.recheckScreenRecording()).resolves.toBe(true);
+    expect(gateway.screenRecordingDenied()).toBe(true);
+
+    deniedAtStartup = false;
+    await expect(gateway.recheckScreenRecording()).resolves.toBe(false);
+    expect(gateway.screenRecordingDenied()).toBe(false);
+    expect(onScreenRecordingDenied.mock.calls).toEqual([[true], [false]]);
+
+    // The check left no runtime behind, so a member still opens a session of their own.
     await createSession(gateway, "https://remote.example");
     expect(gateway.list()).toHaveLength(1);
   });
@@ -347,6 +378,7 @@ function createGateway(
     runtimeBaseUrl?: string;
     selectDisplay?: (displayId: string) => Promise<void>;
     screenCaptureDenied?: () => boolean;
+    onScreenRecordingDenied?: (denied: boolean) => void;
   } = {},
 ): RemoteScreenGateway {
   return new RemoteScreenGateway({
@@ -360,6 +392,7 @@ function createGateway(
     getRuntimeCredentials: async () => ({ username: "openbot", password: "secret" }),
     getDisplays: () => displays,
     getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
+    ...(options.onScreenRecordingDenied ? { onScreenRecordingDenied: options.onScreenRecordingDenied } : {}),
     ...(options.now ? { now: options.now } : {}),
     createRuntime: () => {
       const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay, options.screenCaptureDenied?.());

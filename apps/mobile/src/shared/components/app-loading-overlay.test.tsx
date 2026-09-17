@@ -96,6 +96,7 @@ async function renderApp() {
 describe("app loading interaction boundary", () => {
   it("blocks navigation until exit completes, then restores content and Back access", async () => {
     const app = await renderApp();
+    await app.setLoadingLabel("Loading account");
     await act(() => fireEvent.click(app.sidebar));
     expect(app.navigate).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Open sidebar" })).toBeNull();
@@ -134,6 +135,7 @@ describe("app loading recovery", () => {
   it("releases the app when the exit is never reported", async () => {
     vi.useFakeTimers();
     const app = await renderApp();
+    await app.setLoadingLabel("Loading account");
     await app.setLoadingLabel(null);
     expect(screen.getByRole("progressbar", { name: "Loading", hidden: true })).toBeTruthy();
 

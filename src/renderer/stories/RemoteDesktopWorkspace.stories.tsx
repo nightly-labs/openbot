@@ -37,6 +37,7 @@ const args: Parameters<typeof RemoteDesktopWorkspace>[0] = {
   session,
   connecting: false,
   connectionError: null,
+  connectionErrorCode: null,
   onHide: fn(),
   onRetry: fn(async () => undefined),
   onSelectDisplay: fn(async () => undefined),
@@ -73,6 +74,15 @@ export const ConnectionError: Story = {
   args: {
     session: undefined,
     connectionError: "The direct P2P connection could not start.",
+  },
+};
+
+// The one failure a retry alone never clears: the grant is on the other computer.
+export const ScreenRecordingBlocked: Story = {
+  args: {
+    session: undefined,
+    connectionError: "The host has not allowed OpenBot to record its screen.",
+    connectionErrorCode: "host_permissions_required",
   },
 };
 

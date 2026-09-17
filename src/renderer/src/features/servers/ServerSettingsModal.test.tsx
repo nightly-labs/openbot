@@ -47,6 +47,7 @@ const unconfiguredHost: HostStatus = {
   apiUrl: null,
   apiOnline: false,
   remoteDesktopReady: false,
+  remoteDesktopScreenRecordingDenied: false,
   remoteDesktopUnattended: false,
   remoteDesktopActiveSessions: 0,
   remoteDesktopMaxSessions: 4,
@@ -129,6 +130,8 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
     onUpdateMember: vi.fn(async () => undefined),
     onRemoveMember: vi.fn(async () => undefined),
     onRevokeInvite: vi.fn(async () => undefined),
+    onOpenScreenRecordingSettings: vi.fn(async () => undefined),
+    onRecheckScreenRecording: vi.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -181,6 +184,49 @@ describe("ServerSettingsModal", () => {
       expect(screen.getByText(message)).toBeInTheDocument();
     },
   );
+
+  // The member who is refused cannot fix this: the grant lives on the host, so the host owner is the
+  // one who is told, and only after a member was actually refused.
+  it.each([true, false])("offers the screen recording settings to a refused host: %s", async (denied) => {
+    const onOpenScreenRecordingSettings = vi.fn(async () => undefined);
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          hostStatus: { ...configuredHost, remoteDesktopScreenRecordingDenied: denied },
+          onOpenScreenRecordingSettings,
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+
+    const openSettings = screen.queryByRole("button", { name: "Open System Settings" });
+    if (!denied) {
+      expect(openSettings).not.toBeInTheDocument();
+      return;
+    }
+    expect(await screen.findByText("OpenBot may not record this screen")).toBeInTheDocument();
+    if (!openSettings) throw new Error("The settings action is missing.");
+    await fireEvent.click(openSettings);
+    await waitFor(() => expect(onOpenScreenRecordingSettings).toHaveBeenCalledOnce());
+  });
+
+  // Granting the permission is silent: without this the owner who gave it keeps reading that they
+  // did not, because only another member's attempt could answer.
+  it("reads the grant again for the host owner who just gave it", async () => {
+    const onRecheckScreenRecording = vi.fn(async () => undefined);
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          hostStatus: { ...configuredHost, remoteDesktopScreenRecordingDenied: true },
+          onRecheckScreenRecording,
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(onRecheckScreenRecording).toHaveBeenCalledOnce());
+  });
 
   // `mcpServers` gates the tab and the panel together, so the prop is the whole feature gate: a
   // member of a remote server is never handed one and never sees a tab that would answer 403.

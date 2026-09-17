@@ -173,6 +173,16 @@ const ServerSettings = createSimpleContext({
       }
     }
 
+    /**
+     * Asks the host whether the screen recording grant it was refused is now in place.
+     *
+     * The member who was refused cannot answer this: the grant is given on the host, and the status
+     * that carries the answer is the host's own.
+     */
+    async function recheckScreenRecording(): Promise<void> {
+      setHostStatus(await window.openbot.host.recheckScreenRecording());
+    }
+
     async function setServerPublished(published: boolean): Promise<void> {
       const server = serverSettingsTarget();
       if (server?.kind !== "local") throw new Error("Only the local server can change publication.");
@@ -418,6 +428,7 @@ const ServerSettings = createSimpleContext({
       openServerSettings,
       refreshServerSettings,
       saveServerIdentity,
+      recheckScreenRecording,
       setServerPublished,
       createServerInvite,
       updateServerMember,

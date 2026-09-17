@@ -220,6 +220,7 @@ export const IPC_CHANNELS = {
   hostGetPresence: "host:get-presence",
   hostStart: "host:start",
   hostStop: "host:stop",
+  hostRecheckScreenRecording: "host:recheck-screen-recording",
   hostListMembers: "host:list-members",
   hostCreateInvite: "host:create-invite",
   hostListInvites: "host:list-invites",
