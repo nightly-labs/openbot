@@ -83,6 +83,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
+import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
 import { loadAvatarFile } from "./agent/avatar-file";
@@ -180,6 +181,11 @@ export interface AgentServiceOptions {
    */
   credentials?: ProviderClientContext;
   localSkillTools?: () => LocalSkillTools;
+  /**
+   * Whose approvals are answered without asking. The main process owns the preference, because it
+   * is a property of this computer and never crosses the Team API. Omitted, every approval asks.
+   */
+  approvalAutomation?: ApprovalAutomationPolicy;
   /**
    * Whether a new agent starts on the development default model rather than the built-in one.
    * The main process passes the app variant; only a dev build turns it on.
@@ -420,6 +426,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       browser: this.#browser,
       hostedSites: this.#hostedSites,
       routines: this.#routines,
+      approvalAutomation: options.approvalAutomation,
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),

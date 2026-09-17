@@ -4,7 +4,7 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Show } from "solid-js";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
-import { Button } from "../../components/ui";
+import { Badge, Button } from "../../components/ui";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComputerIcon, RemoteDesktopIcon } from "./ConversationIcons";
 
@@ -44,6 +44,19 @@ export function ConversationHeader() {
               <h1>{agent().name}</h1>
             </Button>
           )}
+        </Show>
+        <Show when={props.agent && props.agentAutoApproves}>
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            class="conversation-auto-approve no-drag"
+            onClick={(event) => props.onReviewAutoApprove?.(event.currentTarget)}
+          >
+            <Badge variant="warning-light" role="status">
+              Auto-approving
+            </Badge>
+          </Button>
         </Show>
       </div>
       <div class="conversation-header-actions no-drag">

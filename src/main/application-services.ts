@@ -48,6 +48,7 @@ import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { HostAnalytics } from "./analytics";
 import { readAnalyticsPreference } from "./analytics-preference-store";
+import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
@@ -105,6 +106,7 @@ import { VoiceTranscriptionService } from "./voice-transcription-service";
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
+const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
@@ -171,6 +173,7 @@ export interface ApplicationServices {
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
+  approvalAutomation: ApprovalAutomation;
   language: LanguageService;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
@@ -368,6 +371,12 @@ export async function createApplicationServices({
   });
   await language.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
+  const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
+  const approvalAutomation = new ApprovalAutomation({
+    path: approvalAutomationFile,
+    initial: await readApprovalAutomation(approvalAutomationFile),
+    knownAgentIds: () => store.list().map((agent) => agent.id),
+  });
   /*
    * The installed CLIs are the computer's, the partial downloads are this profile's.
    *
@@ -451,6 +460,7 @@ export async function createApplicationServices({
       mcpServers: () => service.enabledMcpServers(),
     },
     localSkillTools: () => localSkillTools(skills),
+    approvalAutomation,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
@@ -731,6 +741,7 @@ export async function createApplicationServices({
     setupFile,
     analyticsPreferenceFile,
     updatePreferenceFile,
+    approvalAutomation,
     language,
     agentInitialization: new AgentInitializationGate(() => service.initialize()),
     sidebarLayout,

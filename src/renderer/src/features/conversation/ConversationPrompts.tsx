@@ -1,7 +1,18 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Badge, Button, Check, Input, LoaderCircle, Monitor, RadioGroup, Skeleton, X } from "../../components/ui";
+import {
+  AlertDialog,
+  Badge,
+  Button,
+  Check,
+  Input,
+  LoaderCircle,
+  Monitor,
+  RadioGroup,
+  Skeleton,
+  X,
+} from "../../components/ui";
 
 export function ChoiceCard(props: {
   title: string;
@@ -89,12 +100,31 @@ export function ApprovalCard(props: {
   approval: AgentApproval;
   onApprove: () => Promise<boolean>;
   onReject: () => Promise<boolean>;
+  /**
+   * Grants this agent a standing approval, then accepts the request in hand. Absent where the grant
+   * cannot be given: a `permissions` request, or an agent on a remote server whose own computer
+   * owns that choice. The card then reads exactly as it did before this option existed.
+   */
+  onAlwaysAllow?: () => Promise<boolean>;
+  /** The agent this grant would cover, for the confirmation the grant deserves. */
+  agentName?: string;
 }) {
   const [submitting, setSubmitting] = createSignal(false);
+  const [confirmingAlways, setConfirmingAlways] = createSignal(false);
+  let alwaysAllowButton: HTMLButtonElement | undefined;
+  let cancelAlwaysButton: HTMLButtonElement | undefined;
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
     const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
+    if (!completed) setSubmitting(false);
+  };
+  const alwaysAllow = async () => {
+    const grant = props.onAlwaysAllow;
+    if (!grant || submitting()) return;
+    setConfirmingAlways(false);
+    setSubmitting(true);
+    const completed = await grant();
     if (!completed) setSubmitting(false);
   };
 
@@ -134,6 +164,18 @@ export function ApprovalCard(props: {
         </Show>
       </div>
       <footer class="approval-card-footer">
+        <Show when={props.onAlwaysAllow}>
+          <Button
+            ref={alwaysAllowButton}
+            variant="secondary"
+            type="button"
+            class="approval-button"
+            disabled={submitting()}
+            onClick={() => setConfirmingAlways(true)}
+          >
+            Always allow
+          </Button>
+        </Show>
         <Button
           variant="default"
           type="button"
@@ -153,6 +195,50 @@ export function ApprovalCard(props: {
           {submitting() ? "Waiting…" : "Deny"}
         </Button>
       </footer>
+      <AlertDialog.Root
+        open={confirmingAlways()}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingAlways(false);
+        }}
+      >
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay class="approval-confirm-backdrop">
+            <AlertDialog.Content
+              class="approval-confirm-dialog"
+              onOpenAutoFocus={(event) => {
+                // Focus lands on the way out rather than on the grant, so confirming a standing
+                // approval takes a deliberate move and never one stray Enter.
+                event.preventDefault();
+                cancelAlwaysButton?.focus({ preventScroll: true });
+              }}
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                alwaysAllowButton?.focus({ preventScroll: true });
+              }}
+            >
+              <AlertDialog.Title>Always allow {props.agentName ?? "this agent"}?</AlertDialog.Title>
+              <AlertDialog.Description>
+                {props.agentName ?? "This agent"} will run commands and change files on this computer without asking
+                again. Requests to widen its filesystem or network access, and changes to a published site, still ask.
+                You can take this back in Settings.
+              </AlertDialog.Description>
+              <div class="approval-confirm-actions">
+                <Button
+                  ref={cancelAlwaysButton}
+                  variant="outline"
+                  type="button"
+                  onClick={() => setConfirmingAlways(false)}
+                >
+                  Cancel
+                </Button>
+                <Button variant="default" type="button" onClick={() => void alwaysAllow()}>
+                  Always allow
+                </Button>
+              </div>
+            </AlertDialog.Content>
+          </AlertDialog.Overlay>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </section>
   );
 }

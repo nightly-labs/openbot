@@ -6,9 +6,11 @@ import type {
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { ProviderPicker } from "../../components/ProviderPicker";
 import {
+  AlertDialog,
+  Button,
   Item,
   ItemActions,
   ItemContent,
@@ -66,6 +68,9 @@ interface SettingsGeneralTabProps {
   /** Without it the rows are listed but not removable, which is what a story without the callback shows. */
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /** The agents granted a standing approval. Without the pair the autonomy rows are read-only. */
+  autoApprovedAgents?: readonly { id: string; name: string }[];
+  onRevokeAutoApprove?: (agentId: string) => Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
@@ -79,6 +84,8 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
    * first deciding what a saved default means for the four rows beside it.
    */
   const [customSelected, setCustomSelected] = createSignal(false);
+  const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
+  let cancelTurboButton: HTMLButtonElement | undefined;
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
@@ -204,6 +211,97 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           </Item>
         </ItemGroup>
       </SettingsSection>
+
+      <SettingsSection title={i18n.t("settings.autonomy.title")}>
+        <ItemGroup class="settings-modal-card">
+          <SwitchField
+            checked={props.value.turboMode}
+            onChange={(checked) => {
+              // Turning it on is the move that needs the warning. Turning it off restores asking and
+              // is never something a user needs protecting from, so it is written straight away.
+              if (checked) setConfirmingTurbo(true);
+              else props.onUpdateSetting("turboMode", false);
+            }}
+            label={i18n.t("settings.turbo.title")}
+            description={i18n.t("settings.turbo.description")}
+          />
+          <For each={props.autoApprovedAgents ?? []}>
+            {(agent) => (
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{agent.name}</ItemTitle>
+                  <ItemDescription>{i18n.t("settings.autoApprove.agentDescription")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Show when={props.onRevokeAutoApprove}>
+                    {(revoke) => (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        onClick={() => void revoke()(agent.id)}
+                        aria-label={i18n.t("settings.autoApprove.revokeLabel", { name: agent.name })}
+                      >
+                        {i18n.t("settings.autoApprove.revoke")}
+                      </Button>
+                    )}
+                  </Show>
+                </ItemActions>
+              </Item>
+            )}
+          </For>
+          <Show when={(props.autoApprovedAgents ?? []).length === 0}>
+            <Item class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.autoApprove.emptyTitle")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.autoApprove.emptyDescription")}</ItemDescription>
+              </ItemContent>
+            </Item>
+          </Show>
+        </ItemGroup>
+      </SettingsSection>
+
+      <AlertDialog.Root
+        open={confirmingTurbo()}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingTurbo(false);
+        }}
+      >
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay class="approval-confirm-backdrop">
+            <AlertDialog.Content
+              class="approval-confirm-dialog"
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+                cancelTurboButton?.focus({ preventScroll: true });
+              }}
+            >
+              <AlertDialog.Title>{i18n.t("settings.turbo.confirmTitle")}</AlertDialog.Title>
+              <AlertDialog.Description>{i18n.t("settings.turbo.confirmDescription")}</AlertDialog.Description>
+              <div class="approval-confirm-actions">
+                <Button
+                  ref={cancelTurboButton}
+                  variant="outline"
+                  type="button"
+                  onClick={() => setConfirmingTurbo(false)}
+                >
+                  {i18n.t("settings.turbo.confirmCancel")}
+                </Button>
+                <Button
+                  variant="default"
+                  type="button"
+                  onClick={() => {
+                    setConfirmingTurbo(false);
+                    props.onUpdateSetting("turboMode", true);
+                  }}
+                >
+                  {i18n.t("settings.turbo.confirmAccept")}
+                </Button>
+              </div>
+            </AlertDialog.Content>
+          </AlertDialog.Overlay>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
 
       <SettingsSection title={i18n.t("settings.notifications.title")}>
         <ItemGroup class="settings-modal-card">

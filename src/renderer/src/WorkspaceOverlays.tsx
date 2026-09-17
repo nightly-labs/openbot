@@ -257,10 +257,28 @@ function AppSettings(props: AccountProps) {
   const platform = usePlatform();
   const auth = useAuth();
   const updates = useUpdates();
-  const { agentStatus } = useAgents();
+  const { agentStatus, agentList } = useAgents();
   const { activeServer } = useServers();
-  const { appSettingsOpen, setAppSettingsOpen, generalSettings, updateGeneralSettings, appSettingsRestoreTarget } =
-    useSettings();
+  const {
+    appSettingsOpen,
+    setAppSettingsOpen,
+    generalSettings,
+    updateGeneralSettings,
+    appSettingsRestoreTarget,
+    autoApproveAgentIds,
+    setAgentAutoApprove,
+  } = useSettings();
+  /**
+   * The granted agents, named. Ids the roster does not know are left out rather than shown as an
+   * unnamed row: main prunes them on its next write, and a row the user cannot recognise is not
+   * something they can decide about.
+   */
+  const autoApprovedAgents = createMemo(() => {
+    const granted = new Set(autoApproveAgentIds());
+    return agentList()
+      .filter((agent) => granted.has(agent.id))
+      .map((agent) => ({ id: agent.id, name: agent.name }));
+  });
   const {
     providerRuntimeStatuses,
     providerAvailableVersions,
@@ -315,6 +333,8 @@ function AppSettings(props: AccountProps) {
         onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         hostedSitesApi={window.openbot.hostedSites}
+        autoApprovedAgents={autoApprovedAgents()}
+        onRevokeAutoApprove={(agentId) => setAgentAutoApprove(agentId, false)}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />
     </Loading>

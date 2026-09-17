@@ -36,10 +36,12 @@ const Settings = createSimpleContext({
     const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = createSignal(false);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(DEFAULT_GENERAL_SETTINGS);
+    const [autoApproveAgentIds, setAutoApproveAgentIds] = createSignal<readonly string[]>([]);
     let appSettingsRestoreTarget: HTMLElement | null = null;
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
     let autoDownloadUpdatesChanged = false;
+    let turboModeChanged = false;
 
     createEffect(
       () => ({
@@ -95,6 +97,16 @@ const Settings = createSimpleContext({
             setGeneralSettings((current) => ({ ...current, productAnalytics: previous.productAnalytics }));
           });
       }
+      if (previous.turboMode !== value.turboMode) {
+        turboModeChanged = true;
+        void window.openbot
+          .setApprovalAutomation({ turbo: value.turboMode })
+          .then((preference) => {
+            setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
+            setAutoApproveAgentIds(preference.autoApproveAgentIds);
+          })
+          .catch(() => setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode })));
+      }
       if (previous.autoDownloadUpdates !== value.autoDownloadUpdates) {
         autoDownloadUpdatesChanged = true;
         void window.openbot.update
@@ -140,6 +152,25 @@ const Settings = createSimpleContext({
       }
     }
 
+    /**
+     * Grants or revokes one agent's standing approval.
+     *
+     * Not part of `updateGeneralSettings`: the grant is per agent rather than a field of the one
+     * settings record, and it is written from the approval card as well as from Settings. The
+     * promise is returned so the approval card only accepts the pending request once the grant is
+     * stored - accepting first would leave an agent the user believes is trusted still asking.
+     */
+    async function setAgentAutoApprove(agentId: string, autoApprove: boolean): Promise<void> {
+      const preference = await window.openbot.setApprovalAutomation({ agentId, autoApprove });
+      setAutoApproveAgentIds(preference.autoApproveAgentIds);
+      setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
+    }
+
+    /** Whether this agent acts without asking, by its own grant or because Turbo covers every agent. */
+    function agentAutoApproves(agentId: string): boolean {
+      return generalSettings().turboMode || autoApproveAgentIds().includes(agentId);
+    }
+
     /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
     function openAppSettings(trigger?: HTMLElement | null): void {
       const target = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -174,6 +205,16 @@ const Settings = createSimpleContext({
           setAnalyticsPreferenceLoaded(false);
           setGeneralSettings((current) => ({ ...current, productAnalytics: false }));
         });
+      void window.openbot
+        .getApprovalAutomation()
+        .then((preference) => {
+          setAutoApproveAgentIds(preference.autoApproveAgentIds);
+          // A toggle made before this read resolves has already been persisted, so the older value
+          // must not be painted back over it.
+          if (turboModeChanged) return;
+          setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
+        })
+        .catch(() => undefined);
       void window.openbot.update
         .getPreference()
         .then((preference) => {
@@ -201,6 +242,9 @@ const Settings = createSimpleContext({
       analyticsPreferenceLoaded,
       generalSettings,
       updateGeneralSettings,
+      autoApproveAgentIds,
+      setAgentAutoApprove,
+      agentAutoApproves,
       appSettingsOpen,
       setAppSettingsOpen,
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,

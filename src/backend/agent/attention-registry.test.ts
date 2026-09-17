@@ -756,4 +756,98 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       "This approval is no longer active.",
     );
   });
+  it("answers a granted agent's approvals without surfacing them, and still asks for wider access", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      approvalAutomation: { autoApproves: (agentId) => agentId === "chief" },
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Need an approval" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    if (!client) throw new Error("Codex client was not created.");
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!turnId) throw new Error("Turn did not start.");
+    const externalId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!externalId) throw new Error("External thread did not start.");
+
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "granted-command",
+      params: { threadId: externalId, turnId, command: ["npm", "test"] },
+    });
+    await waitFor(() => client.responses.some((response) => response.id === "granted-command"));
+    expect(client.responses.at(-1)).toEqual({ id: "granted-command", result: { decision: "accept" } });
+    // The whole point of the grant: no card, no notification, nothing left waiting on the user.
+    expect(events.some((event) => event.type === "approval")).toBe(false);
+    expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
+
+    client.emit("request", {
+      method: "execCommandApproval",
+      id: 44,
+      params: { conversationId: externalId, command: "git status" },
+    });
+    await waitFor(() => client.responses.some((response) => response.id === 44));
+    // The legacy method takes its own word for "yes", so the grant has to speak that dialect too.
+    expect(client.responses.at(-1)).toEqual({ id: 44, result: { decision: "approved" } });
+
+    client.emit("request", {
+      method: "item/permissions/requestApproval",
+      id: "granted-permissions",
+      params: {
+        threadId: externalId,
+        turnId,
+        permissions: { fileSystem: { read: ["/tmp/openbot"], write: [] }, network: { enabled: true } },
+      },
+    });
+    await waitFor(() => events.some((event) => event.type === "approval"));
+    expect(client.responses.some((response) => response.id === "granted-permissions")).toBe(false);
+    expect(service.getRuntimeSnapshot().pendingApprovals).toHaveLength(1);
+  });
+  it("keeps asking for an agent that was never granted", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      approvalAutomation: { autoApproves: (agentId) => agentId === "someone-else" },
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Need an approval" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    if (!client) throw new Error("Codex client was not created.");
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    const externalId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!turnId || !externalId) throw new Error("Turn did not start.");
+
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "ungranted-command",
+      params: { threadId: externalId, turnId, command: ["npm", "test"] },
+    });
+    await waitFor(() => events.some((event) => event.type === "approval"));
+    expect(client.responses).toHaveLength(0);
+  });
 });
