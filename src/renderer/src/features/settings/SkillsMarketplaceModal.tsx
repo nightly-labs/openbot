@@ -145,6 +145,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   const [detail, setDetail] = createSignal<{ name: string; close: () => void } | null>(null);
   const detailActive = () => detail() !== null;
   let detailTrigger: HTMLElement | null = null;
+  let detailRequest = 0;
 
   let installedRequest = 0;
   const installedById = createMemo(
@@ -200,6 +201,11 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       : market.installedLoad;
 
   function closeDetail(): void {
+    /*
+     * A detail page that is still loading must not come back after the reader left it. The counter
+     * moves on here, so a late answer for the closed page is dropped instead of applied.
+     */
+    detailRequest += 1;
     setDetail(null);
     setMarket((state) => {
       state.detail = { kind: "none" };
@@ -255,13 +261,12 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   function selectTab(next: Tab) {
-    setDetail(null);
+    closeDetail();
     const marketplaceKind = market.browse.kind;
     setSearchQuery("");
     scrollBodyTo(0);
     setMarket((state) => {
       state.browse.tab = next;
-      state.detail = { kind: "none" };
       state.publication.preview = null;
       state.publication.icon = null;
       state.publication.iconPreviewUrl = null;
@@ -271,13 +276,12 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   function selectKind(next: MarketplaceKind) {
-    setDetail(null);
+    closeDetail();
     setSearchQuery("");
     scrollBodyTo(0);
     setMarket((state) => {
       state.browse.kind = next;
       state.browse.tab = "discover";
-      state.detail = { kind: "none" };
       state.publication.preview = null;
     });
     setError(null);
@@ -293,6 +297,19 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     scrollBodyTo(0);
   }
 
+  /*
+   * The management menu is reachable from a detail page, and a tab change or a refresh does not
+   * always reach the panel that owns that page. Closing the open detail through its own handler
+   * first leaves the crumb and the panel on the listing together.
+   */
+  function leaveActiveDetail(): void {
+    const open = detail();
+    if (!open) return;
+    // The menu goes to a fresh listing, so the offset saved for the old one is dropped.
+    listScrollTop = 0;
+    open.close();
+  }
+
   function leaveDetails() {
     closeDetail();
     queueMicrotask(() => {
@@ -304,6 +321,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   async function openDetails(skill: MarketplaceSkillSummary) {
     const analytics = desktopAnalytics.scope();
     enterDetails(skill.name, leaveDetails);
+    const request = ++detailRequest;
     setMarket((state) => {
       state.detail = { kind: "loading" };
     });
@@ -314,6 +332,8 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
+    // The reader left this page while it loaded, so neither its content nor its exit applies now.
+    if (request !== detailRequest) return;
     if (!value) {
       leaveDetails();
       return;
@@ -325,6 +345,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
 
   async function openDetailsById(skillId: string, name: string) {
     enterDetails(name, leaveDetails);
+    const request = ++detailRequest;
     const analytics = desktopAnalytics.scope();
     setMarket((state) => {
       state.detail = { kind: "loading" };
@@ -336,6 +357,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
+    if (request !== detailRequest) return;
     if (!value) {
       leaveDetails();
       return;
@@ -478,11 +500,26 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content class="marketplace-menu">
-                      <DropdownMenu.Item onSelect={() => selectTab("discover")}>Discover</DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => selectTab("mine")}>My submissions</DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        onSelect={() => {
+                          leaveActiveDetail();
+                          selectTab("discover");
+                        }}
+                      >
+                        Discover
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        onSelect={() => {
+                          leaveActiveDetail();
+                          selectTab("mine");
+                        }}
+                      >
+                        My submissions
+                      </DropdownMenu.Item>
                       <DropdownMenu.Separator />
                       <DropdownMenu.Item
                         onSelect={() => {
+                          leaveActiveDetail();
                           selectTab("mine");
                           if (market.browse.kind === "agents") setAgentAddVersion((version) => version + 1);
                         }}
@@ -490,9 +527,11 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                         <Plus /> Add {market.browse.kind === "agents" ? "agent" : "skill"}
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
-                        onSelect={() =>
-                          market.browse.kind === "skills" ? refresh() : setAgentRefreshVersion((version) => version + 1)
-                        }
+                        onSelect={() => {
+                          leaveActiveDetail();
+                          if (market.browse.kind === "skills") refresh();
+                          else setAgentRefreshVersion((version) => version + 1);
+                        }}
                       >
                         <RefreshCw /> Refresh
                       </DropdownMenu.Item>
@@ -852,11 +891,14 @@ function AgentMarketplacePanel(props: {
   let handledAddVersion = 0;
   let openingAgent = false;
   let publicationRequest = 0;
+  let detailRequest = 0;
 
   createEffect(
     () => [props.view, props.refreshVersion] as const,
     ([view]) => {
       publicationRequest += 1;
+      // A detail answer that arrives after the panel moved on belongs to a page that is gone.
+      detailRequest += 1;
       setBusy(null);
       setMarket((state) => {
         state.detail = null;
@@ -898,6 +940,7 @@ function AgentMarketplacePanel(props: {
     openingAgent = true;
     const analytics = desktopAnalytics.scope();
     props.onEnterDetail(agent.name, closeAgent);
+    const request = ++detailRequest;
     setLoading(true);
     const value = await run(() => window.openbot.marketplaceAgents.get(agent.id));
     analytics.track("marketplace_action", {
@@ -906,16 +949,18 @@ function AgentMarketplacePanel(props: {
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
+    openingAgent = false;
+    setLoading(false);
+    if (request !== detailRequest) return;
     if (value) {
       setMarket((state) => {
         state.detail = value;
       });
     } else props.onLeaveDetail();
-    openingAgent = false;
-    setLoading(false);
   }
 
   function closeAgent() {
+    detailRequest += 1;
     setMarket((state) => {
       state.detail = null;
     });

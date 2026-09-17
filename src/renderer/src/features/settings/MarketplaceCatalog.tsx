@@ -92,9 +92,14 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
       s.loading = !cursor && !keepVisible;
       s.loadingMore = Boolean(cursor);
       s.error = null;
-      if (!cursor && !keepVisible) {
-        s.items = [];
+      /*
+       * A cursor belongs to the search that produced it. A first page therefore drops it, even when
+       * the rows stay on screen: paging on with the old cursor would append a position from the
+       * former query to the rows of the new one.
+       */
+      if (!cursor) {
         s.nextCursor = null;
+        if (!keepVisible) s.items = [];
       }
     });
     try {
@@ -153,6 +158,8 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
       requestVersion++;
       setState((s) => {
         s.query = query;
+        /* Paging stops at the keystroke and starts again from the first page of the new query. */
+        s.nextCursor = null;
       });
       timer = setTimeout(() => void load(state.category, query), 220);
     },

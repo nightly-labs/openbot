@@ -979,4 +979,107 @@ describe("SkillsMarketplaceModal", () => {
       "That skill name is already taken. Choose a different name in SKILL.md, then try again.",
     );
   });
+  it("drops a skill detail answer that arrives after the reader went back", async () => {
+    const detail = await window.openbot.skills.get("release-notes");
+    const pending = Promise.withResolvers<typeof detail>();
+    window.openbot.skills.get = vi.fn(() => pending.promise);
+    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
+    screen.getByRole("tab", { name: "Skills" }).click();
+    fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Marketplace" }));
+    pending.resolve(detail);
+
+    // The answer lands and is reported, and the page it was read for stays closed.
+    await waitFor(() =>
+      expect(trackMarketplaceAnalytics).toHaveBeenCalledWith("marketplace_action", {
+        entity: "skill",
+        action: "view",
+        result: "succeeded",
+      }),
+    );
+    expect(screen.queryByRole("button", { name: "Marketplace" })).toBeNull();
+    expect(screen.queryByText(detail.instructions)).toBeNull();
+    expect(screen.getByRole("button", { name: "View Release Notes details" })).toBeInTheDocument();
+  });
+
+  it("closes an open agent page when the management menu changes the listing", async () => {
+    const detail: MarketplaceAgentDetail = {
+      id: "research-agent",
+      versionId: "research-agent-v1",
+      name: "Research Agent",
+      title: "Finds evidence quickly",
+      description: "Searches sources and produces concise cited findings.",
+      creatorName: "Ada",
+      version: 1,
+      installs: 42,
+      featured: true,
+      avatarSeed: "research-agent",
+      avatarHue: 215,
+      avatarUrl: null,
+      skillCount: 0,
+      routineCount: 0,
+      activeRoutineCount: 0,
+      updatedAt: "2026-08-25T00:00:00.000Z",
+      skills: [],
+      routines: [],
+    };
+    window.openbot.marketplaceAgents.list = vi.fn(async (query) => ({
+      agents: query?.category && query.category !== "other" ? [] : [detail],
+      nextCursor: null,
+    }));
+    window.openbot.marketplaceAgents.get = vi.fn(async () => detail);
+    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
+    fireEvent.click(await screen.findByRole("button", { name: "View Research Agent details" }));
+    await screen.findByRole("button", { name: "Marketplace" });
+
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
+      pointerType: "mouse",
+      button: 0,
+    });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Discover" }), { button: 0 });
+
+    expect(await screen.findByRole("button", { name: "View Research Agent details" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Marketplace" })).toBeNull();
+  });
+
+  it("stops paging when the search changes until the first page of the new query arrives", async () => {
+    const listed = {
+      id: "release-notes",
+      slug: "release-notes",
+      name: "Release Notes",
+      description: "Turns merged work into clear release notes.",
+      category: "documents" as const,
+      creatorName: "Ada",
+      version: 1,
+      installs: 10,
+      featured: false,
+      iconUrl: null,
+      updatedAt: "2026-08-25T00:00:00.000Z",
+    };
+    const search = Promise.withResolvers<MarketplaceSkillPage>();
+    window.openbot.skills.list = vi.fn(async (query) => {
+      if (query?.query) return search.promise;
+      return query?.category === "documents"
+        ? { skills: [listed], nextCursor: "next-page" }
+        : { skills: [], nextCursor: null };
+    });
+    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
+    screen.getByRole("tab", { name: "Skills" }).click();
+    fireEvent.click(await screen.findByRole("button", { name: "View all Documents skills" }));
+    await screen.findByRole("button", { name: "Load more" });
+
+    fireEvent.input(screen.getByLabelText("Search skills"), { target: { value: "release" } });
+
+    // The cursor belongs to the former query, so paging waits for the page of the new one.
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Load more" })).toBeNull());
+    search.resolve({ skills: [listed], nextCursor: "search-page" });
+    expect(await screen.findByRole("button", { name: "Load more" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await waitFor(() =>
+      expect(window.openbot.skills.list).toHaveBeenCalledWith(
+        expect.objectContaining({ query: "release", cursor: "search-page" }),
+      ),
+    );
+  });
 });
