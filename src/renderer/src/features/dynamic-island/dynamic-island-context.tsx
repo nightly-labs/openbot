@@ -38,11 +38,17 @@ const DynamicIsland = createSimpleContext({
     /** Active server first: main renders the head of this list as the leading item. */
     function serverOrder(): string[] {
       const activeId = activeServerId();
-      const ids = servers()
+      const current = servers();
+      const ids = current
         .filter((server) => connectedServers.has(server.id) && (server.kind === "local" || server.state === "online"))
         .map((server) => server.id);
       ids.sort((left, right) => Number(right === activeId) - Number(left === activeId));
-      return ids.length > 0 ? ids : ["local"];
+      const ordered = ids.length > 0 ? ids : ["local"];
+      // A muted server is muted here too: it contributes neither a presentation nor an attention
+      // count. The filter runs after the `["local"]` fallback so that fallback cannot put a muted
+      // local server back. An empty list is fine - the coordinator reads it as idle.
+      const muted = new Set(current.filter((server) => server.notificationsMuted).map((server) => server.id));
+      return ordered.filter((serverId) => !muted.has(serverId));
     }
 
     function publishPresentation(): void {
@@ -58,7 +64,9 @@ const DynamicIsland = createSimpleContext({
     createEffect(
       () =>
         servers()
-          .map((server) => `${server.id}:${server.state}`)
+          // Mute belongs in this key: it changes what `serverOrder` returns, and the user has to
+          // see that without restarting the app.
+          .map((server) => `${server.id}:${server.state}:${server.notificationsMuted}`)
           .join("\u0000"),
       () => {
         const currentServers = servers();

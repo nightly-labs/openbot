@@ -174,7 +174,7 @@ function JoinServer(props: AccountProps) {
  */
 function ServerSettings() {
   const platform = usePlatform();
-  const { hostStatus } = useServers();
+  const { hostStatus, setServerMuted } = useServers();
   const {
     serverSettingsTarget,
     serverSettingsOpen,
@@ -225,6 +225,7 @@ function ServerSettings() {
             onRetry={() => refreshServerSettings(server().id)}
             onSaveIdentity={saveServerIdentity}
             onSetPublished={setServerPublished}
+            onSetMuted={(muted) => setServerMuted(server().id, muted)}
             onCreateInvite={createServerInvite}
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}

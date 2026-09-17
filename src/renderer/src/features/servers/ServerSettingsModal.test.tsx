@@ -117,6 +117,7 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
     onRetry: vi.fn(async () => undefined),
     onSaveIdentity: vi.fn(async () => undefined),
     onSetPublished: vi.fn(async () => undefined),
+    onSetMuted: vi.fn(async () => undefined),
     onCreateInvite: vi.fn(async (input) => ({
       id: "invite-new",
       role: input.role,
@@ -372,6 +373,22 @@ describe("ServerSettingsModal", () => {
     unmount();
     render(() => <ServerSettingsModal {...props({ hostStatus: unconfiguredHost, onSetPublished })} />);
     expect(screen.getByRole("switch", { name: "Publish this server" })).toBeDisabled();
+  });
+
+  it("mutes a server and reflects a server that is already muted", async () => {
+    const onSetMuted = vi.fn(async () => undefined);
+    const { unmount } = render(() => <ServerSettingsModal {...props({ onSetMuted })} />);
+
+    const muteSwitch = screen.getByRole("switch", { name: "Mute notifications" });
+    expect(muteSwitch).not.toBeChecked();
+    await fireEvent.click(muteSwitch);
+    await waitFor(() => expect(onSetMuted).toHaveBeenCalledWith(true));
+
+    unmount();
+    render(() => (
+      <ServerSettingsModal {...props({ server: { ...localServer, notificationsMuted: true }, onSetMuted })} />
+    ));
+    expect(screen.getByRole("switch", { name: "Mute notifications" })).toBeChecked();
   });
 
   it("validates the server name and returns an erased draft to its pristine state", async () => {

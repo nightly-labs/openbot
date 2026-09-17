@@ -85,6 +85,7 @@ export interface ServerSettingsModalProps {
   onRetry: () => Promise<void>;
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
   onSetPublished: (published: boolean) => Promise<void>;
+  onSetMuted: (muted: boolean) => Promise<void>;
   onCreateInvite: (input: { role: "admin" | "member"; email?: string }) => Promise<InviteSummary>;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
@@ -985,6 +986,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 )}
               </Show>
             </Item>
+          </ItemGroup>
+        </SettingsSection>
+        <SettingsSection title="Notifications">
+          <ItemGroup class="settings-modal-card">
+            <SwitchField
+              class="server-settings-mute-setting"
+              size="default"
+              checked={props.server.notificationsMuted}
+              disabled={Boolean(busy())}
+              onChange={(value) => void run("mute", () => props.onSetMuted(value))}
+              label="Mute notifications"
+              description="Stop desktop notifications and MacBook notch updates from this server."
+            />
           </ItemGroup>
         </SettingsSection>
       </>

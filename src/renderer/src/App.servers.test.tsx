@@ -716,6 +716,57 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("keeps muted servers out of the notch and returns one the moment it is unmuted", async () => {
+    const local = testServer("local", true);
+    const office: ServerSummary = { ...testServer("remote-1", false), name: "Office Mac", notificationsMuted: true };
+    const studio: ServerSummary = { ...testServer("remote-2", false), name: "Studio Mac", notificationsMuted: true };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, office, studio]);
+    const approval = (serverId: string, requestId: string) => {
+      emitScopedAgentEvent?.({ serverId, event: { type: "agents-changed", agents: AGENTS } });
+      emitScopedAgentEvent?.({
+        serverId,
+        event: {
+          type: "approval",
+          approval: {
+            requestId,
+            agentId: "chief",
+            threadId: "thread-chief",
+            turnId: `turn-${requestId}`,
+            kind: "command",
+            command: "bun test",
+            cwd: null,
+            reason: null,
+            grantRoot: null,
+            permissions: null,
+          },
+        },
+      });
+    };
+    const published = vi.mocked(window.openbot.dynamicIsland.publishPresentation);
+
+    render(() => <App />);
+    await waitFor(() => expect(emitScopedAgentEvent).toBeTypeOf("function"));
+    const publishedBefore = published.mock.calls.length;
+    approval(office.id, "approval-office");
+    approval(studio.id, "approval-studio");
+
+    await waitFor(() => expect(published.mock.calls.length).toBeGreaterThan(publishedBefore));
+    expect(published.mock.calls.at(-1)?.[0]).toMatchObject({ serverId: "local", mode: "idle" });
+    expect(published.mock.calls.every(([presentation]) => presentation.serverId === "local")).toBe(true);
+
+    emitServers?.([local, { ...office, notificationsMuted: false }, studio]);
+
+    // The still-muted server contributes no attention either, so nothing remains behind this one.
+    await waitFor(() =>
+      expect(published.mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: office.id,
+        mode: "approval",
+        item: { requestId: "approval-office" },
+        remainingCount: 0,
+      }),
+    );
+  });
+
   it("preserves omitted attention only when a compact runtime snapshot is incomplete", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
