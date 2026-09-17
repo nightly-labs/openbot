@@ -1,5 +1,5 @@
 import { BotEngine } from "@norbert_bodziony/bloub";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type BloubActivityFrame,
   bloubActivityGeometry,
@@ -154,6 +154,47 @@ describe("loader frame preparation", () => {
     } finally {
       sample.mockRestore();
     }
+  });
+
+  describe("without idle time", () => {
+    // The loader's exit waits for its settling sequence, and the default scheduler
+    // asks for idle time. Opening a chat and streaming a reply is a thread that
+    // never reports any, so preparation must still finish there.
+    function withoutIdleTime() {
+      const idle = vi.fn(() => 1);
+      vi.stubGlobal("requestIdleCallback", idle);
+      vi.stubGlobal("cancelIdleCallback", vi.fn());
+      return idle;
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it("finishes an exit on a thread that never reports idle time", async () => {
+      vi.useFakeTimers();
+      const idle = withoutIdleTime();
+      const ready = vi.fn();
+
+      prepareReturnToIdleFrames(3, ready);
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(idle).toHaveBeenCalled();
+      expect(ready).toHaveBeenCalledOnce();
+      expect(ready.mock.calls[0][0].length).toBeGreaterThan(1);
+    });
+
+    it("stops the fallback timer of a loader that disappears", async () => {
+      vi.useFakeTimers();
+      withoutIdleTime();
+      const ready = vi.fn();
+
+      prepareLoaderFrames(ready)();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(ready).not.toHaveBeenCalled();
+    });
   });
 
   it("prepares an exit asynchronously from the displayed pose and can cancel a stale exit", () => {

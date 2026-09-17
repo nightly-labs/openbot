@@ -1,4 +1,14 @@
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useIsFocused, usePathname } from "expo-router";
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { BackHandler, View } from "react-native";
 import { BloubLoader } from "@/shared/components/bloub-loader";
 
@@ -75,6 +85,23 @@ export function AppLoadingOverlayProvider({ children }: PropsWithChildren) {
       </View>
     </AppLoadingOverlayContext.Provider>
   );
+}
+
+// Hold the app loading label for one screen, while that screen is the route on top.
+// The overlay blocks the whole app, and a screen stays mounted under a pushed chat,
+// so ownership needs the route as well as focus: a late focus report from the screen
+// below must never raise a blocking loader over the conversation.
+export function useScreenLoadingLabel(route: string, label: string | null) {
+  const { setLoadingLabel } = useAppLoadingOverlay();
+  const isFocused = useIsFocused();
+  const pathname = usePathname();
+  const ownsOverlay = isFocused && pathname === route;
+
+  useLayoutEffect(() => {
+    if (!ownsOverlay) return;
+    setLoadingLabel(label);
+    return () => setLoadingLabel(null);
+  }, [label, ownsOverlay, setLoadingLabel]);
 }
 
 export function useAppLoadingOverlay() {

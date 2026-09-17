@@ -2,11 +2,20 @@ import { fireEvent, screen } from "@testing-library/dom";
 import { act, type PropsWithChildren, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "./app-loading-overlay";
+import { AppLoadingOverlayProvider, useAppLoadingOverlay, useScreenLoadingLabel } from "./app-loading-overlay";
 
 const native = vi.hoisted(() => ({
   back: new Set<() => boolean>(),
   finishExit: () => {},
+}));
+
+// Drive the route and the focus report separately, because the reported failure is
+// the pair disagreeing: a screen below reports focus while a chat owns the route.
+const routing = vi.hoisted(() => ({ isFocused: true, pathname: "/connected" }));
+
+vi.mock("expo-router", () => ({
+  useIsFocused: () => routing.isFocused,
+  usePathname: () => routing.pathname,
 }));
 
 // Model the native View input and accessibility boundary in jsdom. Native hit
@@ -52,6 +61,8 @@ let root = createRoot(container);
 afterEach(async () => {
   await act(() => root.unmount());
   vi.useRealTimers();
+  routing.isFocused = true;
+  routing.pathname = "/connected";
   root = createRoot(container);
 });
 
@@ -147,5 +158,43 @@ describe("app loading recovery", () => {
       await act(() => fireEvent.click(screen.getByRole("button", { name: "Open sidebar" })));
     }
     expect(app.navigate).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("screen ownership of the app loader", () => {
+  it("keeps a chat usable when the screen below reports focus late while connecting", async () => {
+    const navigate = vi.fn();
+    function ConnectedScreenBelow({ label }: { label: string | null }) {
+      useScreenLoadingLabel("/connected", label);
+      return null;
+    }
+    function ChatScreen() {
+      return (
+        <button type="button" onClick={navigate}>
+          Send message
+        </button>
+      );
+    }
+    const render = (label: string | null) =>
+      act(() =>
+        root.render(
+          <AppLoadingOverlayProvider>
+            <ConnectedScreenBelow label={label} />
+            <ChatScreen />
+          </AppLoadingOverlayProvider>,
+        ),
+      );
+
+    await render(null);
+    await act(() => native.finishExit());
+    expect(screen.queryByRole("progressbar")).toBeNull();
+
+    // The user opens a chat, and the connection this screen waits for is still pending.
+    routing.pathname = "/chat/agent-1";
+    await render("Connecting to server");
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    await act(() => fireEvent.click(screen.getByRole("button", { name: "Send message" })));
+    expect(navigate).toHaveBeenCalledOnce();
+    expect(native.back.size).toBe(0);
   });
 });
