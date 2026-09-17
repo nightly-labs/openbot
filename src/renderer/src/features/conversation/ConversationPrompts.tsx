@@ -35,7 +35,7 @@ export function ChoiceCard(props: {
       <header class="conversation-interaction-header">
         <strong>{props.title}</strong>
         <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
           {props.pending ? "Sending…" : "Input required"}
         </Badge>
       </header>
@@ -118,7 +118,7 @@ export function ApprovalCard(props: {
       <header class="approval-card-header conversation-interaction-header">
         <strong>{approvalTitle(props.approval)}</strong>
         <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
           Approval
         </Badge>
       </header>
@@ -222,7 +222,7 @@ export function BrowserTakeoverCard(props: {
           }
         >
           <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-            <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+            <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
             Action required
           </Badge>
         </Show>

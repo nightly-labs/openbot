@@ -7600,6 +7600,18 @@ button.chat-action-target:active,
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/* The badge says the card is waiting on the person, so its loader has to turn: a frozen spinner
+   reads as a stalled step rather than one that is ready for them. */
+.conversation-interaction-spinner {
+  animation: ui-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-interaction-spinner {
+    animation: none;
+  }
+}
+
 .browser-takeover-card {
   display: flex;
   width: min(540px, 100%);
