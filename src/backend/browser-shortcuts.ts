@@ -78,3 +78,23 @@ export function chatContextMenuItems(params: ChatContextMenuParams): ChatContext
   items.push("select-all");
   return items;
 }
+
+/**
+ * Asked of an embedded page before Escape is taken away from it: does the focus hold text the user
+ * is in the middle of typing? The answer decides whether Escape collapses the expanded browser or
+ * stays with the page, so it errs towards the page. Focus can sit anywhere: the search starts at the
+ * top document and follows open shadow roots inward, because `activeElement` at each level is the
+ * host, not the editor inside it. A custom element with no open shadow root is the case the search
+ * cannot enter - a closed root reports `shadowRoot` as `null` - and it counts as editable rather
+ * than as a plain non-editable node, so a page that hides its editor behind one keeps the key. The
+ * caller sends this to the frame that has focus, which is how an editor inside an iframe is reached.
+ */
+export const EDITABLE_FOCUS_SCRIPT = `(() => {
+  let node = document.activeElement;
+  while (node && node.shadowRoot && node.shadowRoot.activeElement) node = node.shadowRoot.activeElement;
+  if (!node) return false;
+  if (node.isContentEditable) return true;
+  if (!node.shadowRoot && node.tagName.includes("-")) return true;
+  const name = node.tagName;
+  return name === "INPUT" || name === "TEXTAREA" || name === "SELECT";
+})()`;

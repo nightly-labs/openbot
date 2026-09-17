@@ -37,6 +37,7 @@ import { BrowserDiagnostics } from "./browser-diagnostics";
 import { applySiteIdentity } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import {
+  EDITABLE_FOCUS_SCRIPT,
   isCloseBrowserTabShortcut,
   isCollapseBrowserShortcut,
   isGlobalSearchShortcut,
@@ -1125,31 +1126,20 @@ export class BrowserHost {
    * that edit added.
    *
    * A text field in the page keeps the key instead, so Escape still clears a combo box or cancels an
-   * inline edit. The question goes to the focused frame rather than to the top document, where
-   * `document.activeElement` is the iframe element and not the editor inside it, and within that
-   * frame it walks open shadow roots for the same reason. Anything but a definite "not editable" -
-   * a closed shadow root, a frame that went away, a page that refuses to answer - leaves the key
-   * with the page, which is the harmless half of the choice. The focused element is read with
-   * `executeJavaScript`, which gives the page no capability it does not already have; a preload or a
-   * permanent debugger attach would answer synchronously but weaken the sandboxed view or fight the
-   * automation recorder.
+   * inline edit. `EDITABLE_FOCUS_SCRIPT` decides that, and it goes to the focused frame rather than
+   * to the top document, where `document.activeElement` is the iframe element and not the editor
+   * inside it. Anything but a definite "not editable" - a frame that went away, a page that refuses
+   * to answer - leaves the key with the page, which is the harmless half of the choice. The focused
+   * element is read with `executeJavaScript`, which gives the page no capability it does not already
+   * have; a preload or a permanent debugger attach would answer synchronously but weaken the
+   * sandboxed view or fight the automation recorder.
    */
   #collapseOnEscape(tab: InternalTab): void {
     if (!this.#collapsesOnEscape(tab)) return;
     const frame = tab.view.webContents.focusedFrame ?? tab.view.webContents.mainFrame;
     if (!frame || frame.isDestroyed()) return;
     void frame
-      .executeJavaScript(
-        `(() => {
-          let node = document.activeElement;
-          while (node?.shadowRoot?.activeElement) node = node.shadowRoot.activeElement;
-          if (!node) return false;
-          if (node.isContentEditable) return true;
-          const name = node.tagName;
-          return name === "INPUT" || name === "TEXTAREA" || name === "SELECT";
-        })()`,
-        true,
-      )
+      .executeJavaScript(EDITABLE_FOCUS_SCRIPT, true)
       .then((editable) => {
         // The page answers a frame later, by which time the panel can have collapsed, changed tab,
         // or moved to Picture in Picture.
