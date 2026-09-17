@@ -922,6 +922,7 @@ export function installOpenbotStub(): void {
         getPresence: vi.fn().mockResolvedValue({ serverId: null, members: [], updatedAt: "" }),
         start: vi.fn().mockResolvedValue(undefined),
         stop: vi.fn().mockResolvedValue(undefined),
+        recheckScreenRecording: vi.fn().mockResolvedValue(undefined),
         listMembers: vi.fn().mockResolvedValue([]),
         updateMember: vi.fn().mockResolvedValue(undefined),
         removeMember: vi.fn().mockResolvedValue(undefined),

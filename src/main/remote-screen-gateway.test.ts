@@ -129,6 +129,29 @@ describe("RemoteScreenGateway", () => {
     expect(onScreenRecordingDenied.mock.calls).toEqual([[true], [false]]);
   });
 
+  // Without this the host owner has to find a member willing to try again before they can see that
+  // the grant they just gave took effect.
+  it("reads the grant again for the host owner, and stops the runtime it started to read it", async () => {
+    let deniedAtStartup = true;
+    const onScreenRecordingDenied = vi.fn();
+    const gateway = createGateway({ screenCaptureDenied: () => deniedAtStartup, onScreenRecordingDenied });
+    await expect(createSession(gateway, "https://remote.example")).rejects.toMatchObject({
+      code: "host_permissions_required",
+    });
+
+    await expect(gateway.recheckScreenRecording()).resolves.toBe(true);
+    expect(gateway.screenRecordingDenied()).toBe(true);
+
+    deniedAtStartup = false;
+    await expect(gateway.recheckScreenRecording()).resolves.toBe(false);
+    expect(gateway.screenRecordingDenied()).toBe(false);
+    expect(onScreenRecordingDenied.mock.calls).toEqual([[true], [false]]);
+
+    // The check left no runtime behind, so a member still opens a session of their own.
+    await createSession(gateway, "https://remote.example");
+    expect(gateway.list()).toHaveLength(1);
+  });
+
   it("limits the host to four active sessions", async () => {
     const gateway = createGateway();
     for (let index = 0; index < 4; index += 1) await createSession(gateway, "https://remote.example");

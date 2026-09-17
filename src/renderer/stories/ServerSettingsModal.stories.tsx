@@ -46,6 +46,7 @@ const meta = {
     onRemoveMember: fn(async () => undefined),
     onRevokeInvite: fn(async () => undefined),
     onOpenScreenRecordingSettings: fn(async () => undefined),
+    onRecheckScreenRecording: fn(async () => undefined),
   },
   parameters: {
     layout: "fullscreen",
@@ -312,6 +313,7 @@ export const HostScreenRecordingBlocked: Story = {
     body.getByRole("tab", { name: "Remote desktop" }).click();
     await expect(body.getByText("OpenBot may not record this screen")).toBeVisible();
     await expect(body.getByRole("button", { name: "Open System Settings" })).toBeVisible();
+    await expect(body.getByRole("button", { name: "Check again" })).toBeVisible();
   },
 };
 

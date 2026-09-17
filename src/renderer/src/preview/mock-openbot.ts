@@ -2032,6 +2032,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitHostStatus(hostStatus);
         return clone(hostStatus);
       },
+      // The preview has no runtime to ask, so the check is what a granted permission looks like.
+      recheckScreenRecording: async () => {
+        hostStatus = { ...hostStatus, remoteDesktopScreenRecordingDenied: false };
+        emitHostStatus(hostStatus);
+        return clone(hostStatus);
+      },
       listMembers: async () => clone(teamMembers),
       updateMember: async (input: UpdateTeamMemberInput) => {
         const member = teamMembers.find((candidate) => candidate.id === input.memberId);

@@ -1160,6 +1160,7 @@ const openbotApi: OpenBotDesktopApi = {
     getPresence: () => ipcRenderer.invoke(IPC_CHANNELS.hostGetPresence),
     start: () => ipcRenderer.invoke(IPC_CHANNELS.hostStart),
     stop: () => ipcRenderer.invoke(IPC_CHANNELS.hostStop),
+    recheckScreenRecording: () => ipcRenderer.invoke(IPC_CHANNELS.hostRecheckScreenRecording),
     listMembers: () => ipcRenderer.invoke(IPC_CHANNELS.hostListMembers),
     updateMember: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostUpdateMember, input),
     removeMember: (memberId) => ipcRenderer.invoke(IPC_CHANNELS.hostRemoveMember, memberId),

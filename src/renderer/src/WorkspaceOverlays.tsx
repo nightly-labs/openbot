@@ -186,6 +186,7 @@ function ServerSettings() {
     serverSettingsError,
     refreshServerSettings,
     saveServerIdentity,
+    recheckScreenRecording,
     setServerPublished,
     createServerInvite,
     updateServerMember,
@@ -231,6 +232,7 @@ function ServerSettings() {
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
             onOpenScreenRecordingSettings={() => window.openbot.openExternal("mac-screen-recording")}
+            onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
             mcpLoadError={serverSettingsMcpError()}
             onMcpSectionShown={() => void refreshMcpServers()}

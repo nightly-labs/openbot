@@ -35,6 +35,10 @@ const viewerStateSchema = z.object({
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 
+export type RemoteScreenGatewayCreateRuntime = (
+  options: ConstructorParameters<typeof SunshineMoonlightRuntime>[0],
+) => RemoteScreenRuntime;
+
 interface RemoteScreenGatewayOptions {
   platform: "darwin" | "win32" | "linux";
   unattended: boolean;
@@ -43,7 +47,7 @@ interface RemoteScreenGatewayOptions {
   getRuntimeCredentials: () => Promise<{ username: string; password: string }>;
   getDisplays?: () => RemoteDesktopDisplay[];
   getIceServers: () => Promise<RemoteDesktopIceServer[]>;
-  createRuntime?: (options: ConstructorParameters<typeof SunshineMoonlightRuntime>[0]) => RemoteScreenRuntime;
+  createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
   now?: () => number;
   onDiagnostic?: (source: "sunshine" | "moonlight", message: string) => void;
@@ -117,6 +121,24 @@ export class RemoteScreenGateway {
   // Whether the last attempt to start a stream was refused screen recording by the operating system.
   screenRecordingDenied(): boolean {
     return this.#screenRecordingDenied;
+  }
+
+  /**
+   * Reads the operating system's answer again, without opening a session.
+   *
+   * The refusal is sticky because the runtime that reported it is dropped, so a member's attempt was
+   * the only thing that could clear it. That is the wrong computer: the grant is given here, and the
+   * host owner who gives it has to be able to see it take effect. Starting the runtime is the answer
+   * itself -- Sunshine reads the grant when it starts -- so this leaves the host as it found it, and
+   * a runtime a live session owns is asked rather than replaced.
+   */
+  async recheckScreenRecording(): Promise<boolean> {
+    if (this.#options.platform === "linux" || !this.#options.runtimePaths) return this.#screenRecordingDenied;
+    await this.#ensureRuntime();
+    const denied = Boolean(this.#runtime?.screenCaptureDenied?.());
+    this.#reportScreenRecordingDenied(denied);
+    if (this.#sessions.size === 0) await this.#stopRuntime();
+    return denied;
   }
 
   capabilities(): RemoteDesktopCapabilities {

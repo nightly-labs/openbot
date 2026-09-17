@@ -132,6 +132,7 @@ export function teamIpcHandlers({
       getPresence: handler(() => host.getPresence()),
       start: handler(() => host.start()),
       stop: handler(() => host.stop()),
+      recheckScreenRecording: handler(() => host.recheckScreenRecording()),
       listMembers: handler(() => host.listMembers()),
       updateMember: payloadHandler(parseUpdateTeamMember, (update) => host.updateMember(update)),
       removeMember: payloadHandler(stringPayload("memberId"), (memberId) => host.removeMember(memberId)),

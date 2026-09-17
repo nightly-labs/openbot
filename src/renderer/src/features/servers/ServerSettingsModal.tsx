@@ -92,6 +92,8 @@ export interface ServerSettingsModalProps {
   onRevokeInvite: (inviteId: string) => Promise<void>;
   /** Opens the macOS pane that grants OpenBot screen recording, for the host that was refused it. */
   onOpenScreenRecordingSettings: () => Promise<void>;
+  /** Asks the host to read the grant again, so the owner who gave it sees the warning go. */
+  onRecheckScreenRecording: () => Promise<void>;
   /**
    * The MCP section appears only when a caller supplies these. A caller that cannot manage MCP
    * servers - a remote host without the capability, or a `member` account - passes nothing, and
@@ -1361,7 +1363,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               <AlertTitle>OpenBot may not record this screen</AlertTitle>
               <AlertDescription>
                 A member asked for this desktop and got nothing to look at. Open System Settings → Privacy &amp;
-                Security → Screen Recording, turn on OpenBot, then have them try again.
+                Security → Screen Recording, turn on OpenBot, then check again.
               </AlertDescription>
             </AlertContent>
             <AlertActions>
@@ -1373,6 +1375,15 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 onClick={() => void run("screen-recording", props.onOpenScreenRecordingSettings)}
               >
                 Open System Settings
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                loading={busy() === "screen-recording-recheck"}
+                onClick={() => void run("screen-recording-recheck", props.onRecheckScreenRecording)}
+              >
+                Check again
               </Button>
             </AlertActions>
           </Alert>

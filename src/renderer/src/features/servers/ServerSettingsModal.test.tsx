@@ -131,6 +131,7 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
     onRemoveMember: vi.fn(async () => undefined),
     onRevokeInvite: vi.fn(async () => undefined),
     onOpenScreenRecordingSettings: vi.fn(async () => undefined),
+    onRecheckScreenRecording: vi.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -207,6 +208,24 @@ describe("ServerSettingsModal", () => {
     if (!openSettings) throw new Error("The settings action is missing.");
     await fireEvent.click(openSettings);
     await waitFor(() => expect(onOpenScreenRecordingSettings).toHaveBeenCalledOnce());
+  });
+
+  // Granting the permission is silent: without this the owner who gave it keeps reading that they
+  // did not, because only another member's attempt could answer.
+  it("reads the grant again for the host owner who just gave it", async () => {
+    const onRecheckScreenRecording = vi.fn(async () => undefined);
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          hostStatus: { ...configuredHost, remoteDesktopScreenRecordingDenied: true },
+          onRecheckScreenRecording,
+        })}
+      />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(onRecheckScreenRecording).toHaveBeenCalledOnce());
   });
 
   // `mcpServers` gates the tab and the panel together, so the prop is the whole feature gate: a
