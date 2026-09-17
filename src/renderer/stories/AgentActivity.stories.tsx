@@ -47,6 +47,18 @@ export const CustomImageThinking: IndicatorStory = {
 };
 
 /**
+ * `wide` carries its motion in the face, and `burst` in the body — the two parts a
+ * photo replaces. Rather than stand still for the whole turn, they borrow the orbit
+ * rings, so this reads like `CustomImage` while the Bloub plays its own pose.
+ */
+export const CustomImageBorrowedRings: IndicatorStory = {
+  args: {
+    agent: { ...STORY_AGENTS[0], avatarUrl: CUSTOM_AVATAR },
+    presentation: { animation: "wide", label: "Putting the answer together…" },
+  },
+};
+
+/**
  * An avatar the renderer cannot resolve — a revoked file, a stale `?v=` version.
  * The Bloub takes over rather than leaving a broken image in the transcript.
  */

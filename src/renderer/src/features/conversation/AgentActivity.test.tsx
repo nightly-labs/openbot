@@ -6,8 +6,11 @@ import { STORY_AGENTS } from "../../preview/fixtures";
 import { AgentActivityIndicator } from "./AgentActivity";
 
 // An avatar is decorative, so it has no accessible name of its own: the agent it
-// belongs to is announced by the indicator's own status text. What it draws is
-// the contract this file guards, and `AgentAvatar` declares that as `data-avatar`.
+// belongs to is announced by the indicator's own status text. Which of the two
+// branches drew it is what this file guards, and `AgentAvatar` declares that as
+// `data-avatar`. The thinking pose is not asserted here: its value follows from
+// the pose alone, so the assertion would hold with the dots deleted. The
+// `CustomImageThinking` story carries it instead.
 const drawnAvatar = (container: HTMLElement) => container.querySelector("[data-avatar]");
 
 function withAvatar(index: number, avatarUrl: string | null): AgentProfile {
@@ -37,16 +40,6 @@ describe("AgentActivityIndicator", () => {
 
     await screen.findByRole("status");
     expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "generated");
-  });
-
-  it("replaces a custom avatar with dots for the thinking pose, as the generated avatar does", async () => {
-    const agent = withAvatar(0, "openbot-avatar://agent/chief?v=image-1");
-    const { container } = render(() => (
-      <AgentActivityIndicator agent={agent} presentation={{ animation: "thinking", label: "Thinking it through…" }} />
-    ));
-
-    await screen.findByRole("status");
-    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "dots");
   });
 
   it("follows the agent it is given, including an avatar that is removed", async () => {
