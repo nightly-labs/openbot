@@ -76,7 +76,10 @@ export default defineConfig({
           // faster option is not used here.
           pool: "vmThreads",
           environment: "jsdom",
-          include: ["src/renderer/**/*.test.tsx", "src/renderer/**/*.dom.test.ts"],
+          // The `*.dom.test.ts` half of the include mirrors the node project's exclude of the same
+          // pattern, so a DOM test lands here wherever it lives: a page script the main process
+          // injects needs a document as much as a renderer module does.
+          include: ["src/renderer/**/*.test.tsx", "**/*.dom.test.ts"],
           setupFiles: ["./src/renderer/src/setupTests.ts"],
         },
       },

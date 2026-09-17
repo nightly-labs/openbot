@@ -65,6 +65,17 @@ export const Idle: Story = {
   },
 };
 
+/**
+ * On macOS the traffic lights are drawn over the top of this full-bleed panel, so the tab strip
+ * starts clear of them. Compare with `Idle`, which starts at the window edge.
+ */
+export const MacWindowControls: Story = {
+  args: {
+    macWindowControls: true,
+    tabs: [tab, { ...tab, id: "tab-changelog", title: "Changelog", url: "https://openbot.run/changelog" }],
+  },
+};
+
 /** A tab with the mobile viewport preset. */
 export const MobileViewport: Story = {
   args: {

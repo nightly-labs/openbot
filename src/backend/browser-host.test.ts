@@ -46,12 +46,21 @@ vi.mock("electron", async () => {
     async executeJavaScript() {
       return null;
     }
+    focusedFrame: { executeJavaScript: () => Promise<unknown>; isDestroyed: () => boolean } | null = null;
+    mainFrame = {
+      async executeJavaScript() {
+        return false;
+      },
+      isDestroyed() {
+        return false;
+      },
+    };
     navigationHistory = { clear() {}, canGoBack: () => false, canGoForward: () => false };
   }
   return {
     app: { getPreferredSystemLanguages: () => ["en-US"] },
     BrowserWindow: class {
-      webContents = { getZoomFactor: () => 1 };
+      webContents = { getZoomFactor: () => 1, focus() {}, sendInputEvent() {} };
       contentView = { addChildView() {}, removeChildView() {} };
       isDestroyed() {
         return false;
@@ -135,6 +144,59 @@ describe.each(["main", "picture-in-picture"] as const)("%s browser view bounds",
       width: Math.ceil(1200 * zoomFactor),
       height: Math.ceil(600 * zoomFactor),
     });
+  });
+});
+
+const escapeInput = { type: "keyDown", key: "Escape", control: false, meta: false, alt: false, shift: false };
+const pageBounds = { x: 0, y: 0, width: 1200, height: 600 };
+
+describe("browser Escape forwarding", () => {
+  const contentsFor = (url: string): WebContents => {
+    const found = webContents.getAllWebContents().find((candidate) => candidate.getURL() === url);
+    if (!found) throw new Error("Browser contents were not created.");
+    return found;
+  };
+
+  it("collapses the expanded browser in the main window", async () => {
+    const tab = await host.open("https://example.com/escape");
+    const page = contentsFor(tab.url);
+    const sendInputEvent = vi.spyOn(browserWindow.webContents, "sendInputEvent");
+    await host.setVisible({ visible: true, target: "main", bounds: pageBounds });
+
+    page.emit("before-input-event", { preventDefault: () => undefined }, escapeInput);
+
+    await vi.waitFor(() => expect(sendInputEvent).toHaveBeenCalledWith({ type: "keyUp", keyCode: "Escape" }));
+    expect(sendInputEvent).toHaveBeenCalledWith({ type: "keyDown", keyCode: "Escape" });
+  });
+
+  it("leaves Escape in Picture in Picture, which has its own window", async () => {
+    const pictureInPictureWindow = new BrowserWindow();
+    host.setPictureInPictureWindow(pictureInPictureWindow);
+    const tab = await host.open("https://example.com/detached");
+    const page = contentsFor(tab.url);
+    const askedPage = vi.spyOn(page.mainFrame, "executeJavaScript");
+    const sendInputEvent = vi.spyOn(browserWindow.webContents, "sendInputEvent");
+    await host.setVisible({ visible: true, target: "picture-in-picture", bounds: pageBounds });
+
+    page.emit("before-input-event", { preventDefault: () => undefined }, escapeInput);
+
+    // The page is never asked, so there is nothing to wait for: the key stays in the detached
+    // window instead of reaching the main renderer, where Escape cancels a queued message edit.
+    expect(askedPage).not.toHaveBeenCalled();
+    expect(sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps Escape in the page while an editable element has focus", async () => {
+    const tab = await host.open("https://example.com/editable");
+    const page = contentsFor(tab.url);
+    const askedPage = vi.spyOn(page.mainFrame, "executeJavaScript").mockResolvedValue(true);
+    const sendInputEvent = vi.spyOn(browserWindow.webContents, "sendInputEvent");
+    await host.setVisible({ visible: true, target: "main", bounds: pageBounds });
+
+    page.emit("before-input-event", { preventDefault: () => undefined }, escapeInput);
+
+    await vi.waitFor(() => expect(askedPage).toHaveBeenCalled());
+    expect(sendInputEvent).not.toHaveBeenCalled();
   });
 });
 
