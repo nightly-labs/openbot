@@ -1,4 +1,4 @@
-import { BotEngine, type BotFrame, COLOR_BY_ID, SHAPE_BY_ID, STATE_BY_ID } from "@norbert_bodziony/bloub";
+import { BotEngine, type BotFrame, SHAPE_BY_ID, STATE_BY_ID } from "@norbert_bodziony/bloub";
 
 // Half the sampled geometry of a 60 fps sequence; playback remains on the UI thread.
 export const FPS = 30;
@@ -7,7 +7,7 @@ const THINKING_SECONDS = 1.7;
 const WIDE_SECONDS = 1;
 export const CYCLE_SECONDS = IDLE_SECONDS + THINKING_SECONDS + WIDE_SECONDS;
 function loaderAppearance() {
-  const color = COLOR_BY_ID.get("rose")?.hex;
+  const color = "#D6ADF2"; // Matches the app icon color
   const radii = SHAPE_BY_ID.get("squircle")?.radii;
   const idleMorph = STATE_BY_ID.get("idle")?.morph;
   if (!color || !radii || idleMorph === undefined) throw new Error("Bloub loader appearance is unavailable.");

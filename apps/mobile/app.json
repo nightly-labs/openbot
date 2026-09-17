@@ -31,9 +31,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#CDADEC",
+          "backgroundColor": "#E6C5FA",
           "image": "./assets/icons/app-icon.png",
-          "imageWidth": 96
+          "imageWidth": 112,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#181818"
+          }
         }
       ],
       [
