@@ -128,9 +128,12 @@ export const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "type",
-    description: "Enter text in a unique target using trusted CDP input and return a fresh snapshot.",
+    description:
+      "Enter text in a unique target using trusted CDP input and return a fresh snapshot. Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column. Mode applies only to an element target.",
     shape: {
-      ...targetAction,
+      tabId,
+      target: browserTargetSchema.optional(),
+      timeoutMs: timeout,
       text: z.string().max(INPUT_LIMITS.browserActionText),
       mode: z.enum(["replace", "append"]).optional(),
       submit: z.boolean().optional(),

@@ -214,13 +214,14 @@ export class BrowserCdpEngine {
   }
 
   async type(
-    target: BrowserTarget,
+    target: BrowserTarget | undefined,
     text: string,
     options: { mode?: "replace" | "append"; submit?: boolean } = {},
     deadline?: number,
     onDispatch?: ActionDispatch,
   ): Promise<void> {
     const mode = options.mode ?? "replace";
+    if (!target) return this.#typeFocused(text, options.submit === true, deadline, onDispatch);
     await this.#lease(async (send) => {
       const resolved = await this.#resolveTarget(send, target, deadline);
       if (!resolved.backendNodeId) throw new Error("Typing requires an element target.");
@@ -263,6 +264,29 @@ export class BrowserCdpEngine {
       if (options.submit === true) {
         assertBeforeDeadline(deadline);
         await dispatchShortcut(send, "Enter", resolved.sessionId);
+      }
+    });
+  }
+
+  // An application that draws its own surface -- a spreadsheet grid on a canvas, a code editor, a
+  // map -- has no element to focus and no value to set: it reads the keystrokes the page already
+  // has focus for. So this path sends the key events a person produces rather than an insertion
+  // into a node, and keeps tab and newline as the keys that move between a grid's columns and rows
+  // instead of inserting them as characters. Selection has no meaning without a node, so `mode` is
+  // rejected at the tool boundary rather than silently ignored here.
+  async #typeFocused(text: string, submit: boolean, deadline?: number, onDispatch?: ActionDispatch): Promise<void> {
+    await this.#lease(async (send) => {
+      assertBeforeDeadline(deadline);
+      onDispatch?.();
+      for (const character of text.replace(/\r\n?/g, "\n")) {
+        assertBeforeDeadline(deadline);
+        if (character === "\n") await dispatchShortcut(send, "Enter");
+        else if (character === "\t") await dispatchShortcut(send, "Tab");
+        else await dispatchTextKey(send, character);
+      }
+      if (submit) {
+        assertBeforeDeadline(deadline);
+        await dispatchShortcut(send, "Enter");
       }
     });
   }
