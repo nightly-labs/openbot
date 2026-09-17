@@ -8,6 +8,7 @@ import { ChatNavigationGateContext } from "@/features/agents/components/chat-lin
 import { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { MessageActionsProvider } from "@/features/chat/context/message-actions-context";
+import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-context";
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
@@ -188,6 +189,17 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="queued-messages"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="settings"
           options={{
             contentStyle: { backgroundColor: sheetBackground },
@@ -212,7 +224,9 @@ export default function AuthenticatedLayout() {
       <AgentPinTransitionProvider>
         <AppDrawerShell>
           <MessageActionsProvider>
-            <AuthenticatedStack />
+            <QueuedMessagesProvider>
+              <AuthenticatedStack />
+            </QueuedMessagesProvider>
           </MessageActionsProvider>
         </AppDrawerShell>
       </AgentPinTransitionProvider>

@@ -171,7 +171,10 @@ when displaying a conversation. Link destinations are contacted only when you ch
 Mobile chat can send selected files to the conversation's desktop host through the existing encrypted
 team connection. Text pasted into the input is processed only after the user pastes it. A text paste
 longer than 4,000 characters becomes a text attachment. Selected documents can also have a temporary
-copy in the phone's system cache. Uploads are limited to 10 MB per file on mobile; successful uploads
+copy in the phone's system cache. Attachments added while editing a queued message are saved in the
+phone's app document storage, with references in the saved edit, so they survive an app restart.
+Those draft copies are removed when the attachment is removed or the edit is saved or cancelled.
+Uploads are limited to 10 MB per file on mobile; successful uploads
 become managed attachments on the host. Camera capture uses an in-chat preview. Photo selection uses the phone's system interface.
 Image attachment previews are downloaded from the desktop host through the same encrypted connection.
 Other attachments are downloaded when you choose Open or save. The phone creates a temporary file for
@@ -318,3 +321,17 @@ Archiving a channel stops its work and retains its transcript. Restore makes the
 These actions do not remove agents, their memories, or linked conversations. Channel traffic between
 desktop clients and a host uses the existing host transport. The account API and Signal service do
 not store channel chats or make routing decisions. This feature adds no mobile chat interface.
+
+## Mobile queue drafts
+
+A phone stores the text and attachment references of an active queue edit in its secure local
+storage, and keeps a copy of each file the edit adds in its own application storage, so it can
+recover the edit after navigation or restart. These copies stay on the phone and are removed when
+the edit is saved or cancelled. The host keeps the original message and a persistent edit hold
+until the edit is saved, cancelled, or the message is deleted.
+
+The desktop editor also keeps its active queue edit, attachment references, and edit identity in
+local application storage. This lets it recover the held draft after restart. Neither client
+releases the host hold merely because the editor closes or disconnects. The host also preserves
+attachment drafts released by edit cancellation or message deletion until they are sent or
+discarded. This lets a disconnected desktop recover its saved composer backup after host restart.

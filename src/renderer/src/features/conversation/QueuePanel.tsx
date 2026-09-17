@@ -2,7 +2,7 @@ import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references"
 import type { InstalledSkill, QueueDelivery, QueueHold } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
-import { Button } from "../../components/ui";
+import { Button, Dialog } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -30,6 +30,7 @@ interface DragSlot {
 }
 
 export function QueuePanel(props: QueuePanelProps) {
+  const [deleteHeldId, setDeleteHeldId] = createSignal<string | null>(null);
   const [draggedId, setDraggedId] = createSignal<string | null>(null);
   const [dragOverId, setDragOverId] = createSignal<string | null>(null);
   const [announcement, setAnnouncement] = createSignal("");
@@ -67,9 +68,15 @@ export function QueuePanel(props: QueuePanelProps) {
   );
   let knownSourceIds = new Set(initialSourceDeliveries.map((delivery) => delivery.id));
 
+  // A message another editor holds keeps its place, so it stays out of the order this panel sends.
+  const editedElsewhere = (delivery: QueueDelivery) =>
+    Boolean(delivery.editing) && delivery.id !== props.editingDeliveryId;
   const queueIds = createMemo(() =>
     visibleDeliveries()
-      .filter((delivery) => delivery.status === "queued" && delivery.id !== props.editingDeliveryId)
+      .filter(
+        (delivery) =>
+          delivery.status === "queued" && delivery.id !== props.editingDeliveryId && !editedElsewhere(delivery),
+      )
       .map((delivery) => delivery.id),
   );
 
@@ -406,6 +413,8 @@ export function QueuePanel(props: QueuePanelProps) {
               {(delivery) => {
                 const firstAttachment = delivery.attachments[0];
                 const removing = () => removingIds().has(delivery.id) || editingExitId() === delivery.id;
+                const editing = editedElsewhere(delivery);
+                const actionable = delivery.status === "queued" && !editing;
                 return (
                   <fieldset
                     class={[
@@ -416,17 +425,18 @@ export function QueuePanel(props: QueuePanelProps) {
                         "agent-queue-item-entering": enteringIds().has(delivery.id),
                         "agent-queue-item-removing": removing(),
                         "agent-queue-item-steering": delivery.status === "starting",
+                        "agent-queue-item-editing": editing,
                         "agent-queue-item-has-attachment": Boolean(firstAttachment),
                       },
                     ]}
                     style={{ "--queue-drag-step": dragStep(delivery.id) }}
                     data-queue-delivery-id={delivery.id}
-                    draggable={delivery.status === "queued" && !removing() ? "true" : "false"}
+                    draggable={actionable && !removing() ? "true" : "false"}
                     disabled={removing()}
                     aria-hidden={removing() ? "true" : undefined}
                     inert={removing() ? true : undefined}
                     onDragStart={(event) => {
-                      if (delivery.status !== "queued") return;
+                      if (!actionable) return;
                       if (event.target instanceof Element && event.target.closest(".agent-queue-actions")) {
                         event.preventDefault();
                         return;
@@ -445,7 +455,7 @@ export function QueuePanel(props: QueuePanelProps) {
                       dragPreview.stop();
                     }}
                     onKeyDown={(event) => {
-                      if (delivery.status !== "queued" || !event.altKey) return;
+                      if (!actionable || !event.altKey) return;
                       if (event.key === "ArrowUp") {
                         event.preventDefault();
                         moveDelivery(delivery.id, -1);
@@ -455,7 +465,7 @@ export function QueuePanel(props: QueuePanelProps) {
                       }
                     }}
                     tabindex={delivery.status === "queued" && !removing() ? 0 : -1}
-                    aria-label={`Queued message ${delivery.position ?? ""}: ${messagePreview(delivery)}`}
+                    aria-label={`Queued message ${delivery.position ?? ""}${editing ? ", editing" : ""}: ${messagePreview(delivery)}`}
                   >
                     <span class="agent-queue-icon" aria-hidden="true">
                       <QueueIcon />
@@ -476,11 +486,14 @@ export function QueuePanel(props: QueuePanelProps) {
                       {messagePreview(delivery)}
                     </span>
                     <div class="agent-queue-actions">
+                      <Show when={editing}>
+                        <span class="agent-queue-editing-badge">Editing</span>
+                      </Show>
                       <Button
                         variant="ghost"
                         type="button"
                         class="agent-queue-steer"
-                        disabled={!props.canSteer || delivery.status !== "queued"}
+                        disabled={!props.canSteer || !actionable}
                         aria-describedby={actionTooltipId}
                         aria-label={`Steer queued message ${delivery.position ?? ""}`}
                         onPointerEnter={(event) => openActionTooltip(event.currentTarget, "Steer message")}
@@ -514,7 +527,8 @@ export function QueuePanel(props: QueuePanelProps) {
                         onKeyDown={closeActionTooltipOnEscape}
                         onClick={() => {
                           setActionTooltip(null);
-                          requestCancel(delivery.id);
+                          if (editing) setDeleteHeldId(delivery.id);
+                          else requestCancel(delivery.id);
                         }}
                       >
                         <TrashIcon />
@@ -523,7 +537,7 @@ export function QueuePanel(props: QueuePanelProps) {
                         variant="ghost"
                         type="button"
                         class="agent-queue-icon-button agent-queue-edit"
-                        disabled={delivery.status !== "queued"}
+                        disabled={!actionable}
                         aria-describedby={actionTooltipId}
                         aria-label={`Edit queued message ${delivery.position ?? ""}`}
                         onPointerEnter={(event) => openActionTooltip(event.currentTarget, "Edit message")}
@@ -551,6 +565,39 @@ export function QueuePanel(props: QueuePanelProps) {
           {announcement()}
         </div>
       </section>
+      <Dialog.Root
+        open={deleteHeldId() !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteHeldId(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay class="agent-memory-confirm-overlay" />
+          <Dialog.Content class="agent-memory-confirm-dialog">
+            <div class="agent-memory-confirm-content">
+              <Dialog.Title>Delete queued message?</Dialog.Title>
+              <Dialog.Description>
+                Another device is editing this message. The agent will not receive it.
+              </Dialog.Description>
+              <div class="agent-memory-confirm-actions">
+                <Button variant="ghost" onClick={() => setDeleteHeldId(null)}>
+                  Keep
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    const id = deleteHeldId();
+                    setDeleteHeldId(null);
+                    if (id) requestCancel(id);
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <Show when={actionTooltip()}>
         {(current) => <AnchoredTooltip id={actionTooltipId} anchor={current().anchor} content={current().content} />}
       </Show>

@@ -849,6 +849,9 @@ describe("renderer-to-main boundary guards", () => {
     };
     expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [delivery] })).toBe(true);
     expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [{ ...delivery, status: "pending" }] })).toBe(false);
+    // `editing` is optional: a released Team API adapter projects a fixed key list and drops it.
+    expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [{ ...delivery, editing: true }] })).toBe(true);
+    expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [{ ...delivery, editing: "yes" }] })).toBe(false);
 
     const receipt = {
       messageId: "message-1",

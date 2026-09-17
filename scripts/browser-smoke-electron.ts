@@ -10,6 +10,9 @@ import { type DynamicToolResult, getString } from "../src/backend/protocol";
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
 let browserToolCall = 0;
+// The user agent each `/headers` hit carried, keyed by `?source=`. A subframe request that
+// bypasses the session identity shows up here under its own source with the raw build string.
+const recordedIdentityAgents: Record<string, string> = {};
 
 interface PersistenceSnapshot {
   ready: true;
@@ -51,6 +54,7 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/headers") {
     response.setHeader("content-type", "text/html; charset=utf-8");
+    recordedIdentityAgents[url.searchParams.get("source") ?? "document"] = String(request.headers["user-agent"] ?? "");
     const requestHeaders = JSON.stringify(request.headers).replaceAll("<", "\\u003c");
     response.end(`<main></main><script>
       document.querySelector("main").textContent = JSON.stringify({
@@ -64,6 +68,33 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/abort") {
     response.destroy();
+    return;
+  }
+  if (url.pathname === "/identity-frame") {
+    // The frame and the worker below are cross-origin to this host on purpose: same-origin
+    // subresources already inherit the session identity, while out-of-process frames and
+    // service workers can fall back to the raw build string instead.
+    const host = request.headers.host ?? "127.0.0.1";
+    const sibling = host.startsWith("127.0.0.1")
+      ? host.replace("127.0.0.1", "localhost")
+      : host.replace("localhost", "127.0.0.1");
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<main>identity frame host</main><iframe title="Identity frame" src="http://${sibling}/headers?source=iframe"></iframe>
+<script>navigator.serviceWorker?.register("/sw-identity.js").catch(() => undefined);</script>`,
+    );
+    return;
+  }
+  if (url.pathname === "/sw-identity.js") {
+    response.setHeader("content-type", "application/javascript; charset=utf-8");
+    response.end(`self.addEventListener("install", (event) => {
+  event.waitUntil(fetch("/headers?source=worker").then(() => self.skipWaiting()).catch(() => undefined));
+});`);
+    return;
+  }
+  if (url.pathname === "/headers-report") {
+    response.setHeader("content-type", "application/json; charset=utf-8");
+    response.end(JSON.stringify(recordedIdentityAgents));
     return;
   }
   if (url.pathname === "/frame") {
@@ -235,6 +266,7 @@ async function main(): Promise<void> {
   }
   const googleLive = process.argv.includes("--google-live");
   const xLive = process.argv.includes("--x-live");
+  const whatsappLive = process.argv.includes("--whatsapp-live");
   const configuredRoot = argumentValue("--smoke-root=");
   const persistencePhase = argumentValue("--persistence-phase=");
   const persistenceOrigin = argumentValue("--persistence-origin=");
@@ -1598,17 +1630,13 @@ async function main(): Promise<void> {
       : [];
     const clientHintBrands = getString(identity.requestHeaders, "sec-ch-ua") ?? "";
     const chromiumMajorVersion = process.versions.chrome.split(".")[0];
-    // The page and its requests present plain Chromium: neither the build token nor the app product
-    // token, which `navigator.userAgentData.brands` never carried either. A site that gates on a
-    // browser allowlist reads a product it does not know as an unsupported browser -- WhatsApp Web
-    // refuses to start on it, which blocks the QR login.
+    // The page and its requests share one honest identity, tokens included: Google reads a
+    // scrubbed Chromium string as an unknown client and refuses sign-in, while workers leaked
+    // the tokens anyway. Only the match between page and request identity is asserted here.
     if (
-      headerSnapshot.text.includes("Electron/") ||
-      headerSnapshot.text.includes("OpenBot/") ||
       !navigatorUserAgent?.includes(`Chrome/${chromiumMajorVersion}`) ||
       getString(identity.requestHeaders, "user-agent") !== navigatorUserAgent ||
       identity.navigatorWebdriver !== false ||
-      headerSnapshot.text.includes("Google Chrome") ||
       (clientHintBrands.length > 0 &&
         navigatorBrands.some(
           (brand) => !clientHintBrands.includes(`"${getString(brand, "brand")}";v="${getString(brand, "version")}"`),
@@ -1616,9 +1644,11 @@ async function main(): Promise<void> {
     ) {
       throw new Error(`Browser identity headers are invalid: ${headerSnapshot.text}`);
     }
-    process.stdout.write("BrowserHost: matching Chromium page and request identity passed.\n");
+    process.stdout.write("BrowserHost: matching page and request identity passed.\n");
+    await runIdentityFrameProbe(browser, origin);
     if (googleLive) await runGoogleLiveProbe(browser);
     if (xLive) await runXLiveProbe(browser);
+    if (whatsappLive) await runWhatsAppLiveProbe(browser);
     await expectFailure(() => browser.act(tab.id, first.revision, { type: "click", ref: save.ref }));
 
     const child = result.elements.find((element) => element.name === "Child");
@@ -2563,6 +2593,41 @@ function toolError(result: DynamicToolResult): string {
   return item?.type === "inputText" ? item.text : "unknown browser tool error";
 }
 
+async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Promise<void> {
+  // Every source must present the same identity the session carries: a subframe or worker that
+  // falls back to a different string reads as a second, unknown client next to the page.
+  const frameTab = await browser.open(`${origin}/identity-frame`, "smoke-thread");
+  try {
+    const deadline = Date.now() + 15_000;
+    let report: Record<string, string> = {};
+    while (Date.now() < deadline) {
+      try {
+        const parsed = await (await fetch(`${origin}/headers-report`)).json();
+        if (isDynamicRecord(parsed)) {
+          report = Object.fromEntries(
+            Object.entries(parsed).map(([source, agent]) => [source, isString(agent) ? agent : ""]),
+          );
+        }
+      } catch {
+        // The frame or worker request may not have arrived yet.
+      }
+      if (report.document && report.iframe && report.worker) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!report.document || !report.iframe || !report.worker) {
+      throw new Error(`Browser identity probe missed a source: ${JSON.stringify(report)}`);
+    }
+    for (const [source, agent] of Object.entries(report)) {
+      if (agent !== report.document) {
+        throw new Error(`Browser identity differs by source (${source}): ${agent} vs ${report.document}`);
+      }
+    }
+    process.stdout.write("BrowserHost: matching frame and worker identity passed.\n");
+  } finally {
+    await browser.close(frameTab.id);
+  }
+}
+
 async function runGoogleLiveProbe(browser: BrowserHost): Promise<void> {
   const googleTab = await browser.open(
     "https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fwww.google.com%2F&hl=en",
@@ -2663,6 +2728,40 @@ async function runXLiveProbe(browser: BrowserHost): Promise<void> {
   const identifier = loginPage.elements.find((element) => element.tag === "input" && !element.disabled);
   if (!identifier) throw new Error("X did not show an account identifier field.");
   process.stdout.write("BrowserHost: X login identifier step loaded.\n");
+}
+
+async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
+  // No credentials needed: the allowlist refusal renders before any login, while the real
+  // login page shows the phone-linking controls instead.
+  const whatsappTab = await browser.open(
+    "https://web.whatsapp.com/",
+    "whatsapp-live-smoke",
+    "whatsapp-live-smoke",
+    true,
+  );
+  const deadline = Date.now() + 30_000;
+  let page = await browser.snapshot(whatsappTab.id);
+  while (Date.now() < deadline) {
+    const normalized = page.text.toLowerCase();
+    if (
+      normalized.includes("works with google chrome") ||
+      normalized.includes("update google chrome") ||
+      normalized.includes("phone number") ||
+      normalized.includes("scan")
+    ) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    page = await browser.snapshot(whatsappTab.id);
+  }
+  const normalized = page.text.toLowerCase();
+  if (normalized.includes("works with google chrome") || normalized.includes("update google chrome")) {
+    throw new Error(`WhatsApp rejected the embedded browser: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  if (!normalized.includes("phone number") && !normalized.includes("scan")) {
+    throw new Error(`WhatsApp returned an unexpected page: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  process.stdout.write("BrowserHost: WhatsApp login page loaded without a browser block.\n");
 }
 
 async function waitForXSnapshot(

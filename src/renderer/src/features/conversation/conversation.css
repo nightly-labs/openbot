@@ -7216,6 +7216,21 @@ button.chat-action-target:active,
   color: var(--openbot-text-muted);
 }
 
+.agent-queue-item-editing {
+  color: var(--openbot-text-muted);
+}
+
+.agent-queue-editing-badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
 .agent-queue-item-has-attachment {
   grid-template-columns: 14px 24px minmax(0, 1fr) auto;
 }

@@ -12,6 +12,7 @@ interface DeliveryOverrides {
   turnId?: string | null;
   position?: number | null;
   createdAt?: string;
+  editing?: boolean;
 }
 
 function delivery(overrides: DeliveryOverrides): QueueDelivery {
@@ -26,6 +27,7 @@ function delivery(overrides: DeliveryOverrides): QueueDelivery {
     status: overrides.status,
     position: overrides.position ?? null,
     turnId: overrides.turnId ?? null,
+    editing: overrides.editing ?? false,
     error: null,
     createdAt: overrides.createdAt ?? "2026-08-12T10:00:00.000Z",
   };
@@ -101,6 +103,16 @@ describe("presentQueueDeliveries", () => {
     );
 
     expect(present(queue, null)).toEqual([]);
+  });
+
+  it("stays open when an edit on another device stops the queue", () => {
+    // Nothing runs while the head is held, so without this the whole panel would close.
+    const queue = snapshot(
+      delivery({ id: "edited", status: "queued", position: 1, editing: true }),
+      delivery({ id: "waiting", status: "queued", position: 2 }),
+    );
+
+    expect(present(queue, null)).toEqual(["edited", "waiting"]);
   });
 
   it("shows what is waiting behind the running turn", () => {

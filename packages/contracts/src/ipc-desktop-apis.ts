@@ -194,6 +194,7 @@ import type {
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
+import type { QueueEditRequest } from "./team-protocol/queue-edit-v1";
 
 export interface AgentDesktopApi {
   listChannels: () => Promise<ChannelSummary[]>;
@@ -266,6 +267,7 @@ export interface AgentDesktopApi {
   acknowledgeFailedTurn: (input: AcknowledgeFailedTurnInput) => Promise<void>;
   cancelQueuedMessage: (input: CancelQueuedMessageInput) => Promise<void>;
   steerQueuedMessage: (input: SteerQueuedMessageInput) => Promise<void>;
+  editQueuedMessage: (input: QueueEditRequest & { agentId: string }, serverId?: string) => Promise<QueueSnapshot>;
   updateQueuedMessage: (input: UpdateQueuedMessageInput, serverId?: string) => Promise<void>;
   reorderQueue: (input: ReorderQueueInput) => Promise<void>;
   interrupt: (input: InterruptTurnInput) => Promise<void>;

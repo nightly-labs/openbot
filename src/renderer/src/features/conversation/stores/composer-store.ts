@@ -1,7 +1,7 @@
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import { createMemo } from "solid-js";
 import { appendVoiceTranscript } from "../../../voice-recording";
-import { EMPTY_DRAFT } from "../composer-draft";
+import { EMPTY_DRAFT, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
@@ -16,6 +16,7 @@ export interface ComposerStoreDeps {
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDeliveryId: () => string | null;
+  editingPendingSave: () => StoredQueueEdit["pendingSave"] | null;
   seenMessageIds: Set<string>;
 }
 
@@ -95,6 +96,14 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   const updateCurrentDraft = (patch: Partial<ComposerDraft>) => {
     const target = currentTarget();
     if (!target) return;
+    // A pending Save owns the outcome: keep the exact request for retry.
+    if (
+      deps.editingPendingSave() &&
+      deps.editingAgentId() === target.agentId &&
+      deps.editingServerId() === target.serverId &&
+      deps.editingDeliveryId()
+    )
+      return;
     clearConversationError(target);
     const key = composerDraftKey(target);
     deps.setDrafts((current) => ({
@@ -125,6 +134,13 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   }
 
   function restoreVoiceTranscript(target: ConversationTarget, transcript: string): void {
+    if (
+      deps.editingPendingSave() &&
+      deps.editingAgentId() === target.agentId &&
+      deps.editingServerId() === target.serverId &&
+      deps.editingDeliveryId()
+    )
+      return;
     const key = composerDraftKey(target);
     deps.setDrafts((current) => {
       const draft = current[key] ?? EMPTY_DRAFT;

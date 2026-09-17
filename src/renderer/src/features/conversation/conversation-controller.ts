@@ -5,10 +5,17 @@ import type {
   BrowserBounds,
   MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 import type { AgentActivityPresentation } from "./AgentActivity";
 import type { ChatSearchMatch } from "./chat-search";
-import { appendSkillCreationRequest, appendSkillExample, EMPTY_DRAFT } from "./composer-draft";
+import {
+  appendSkillCreationRequest,
+  appendSkillExample,
+  EMPTY_DRAFT,
+  QUEUE_EDIT_STORAGE_KEY,
+  readStoredQueueEdit,
+  type StoredQueueEdit,
+} from "./composer-draft";
 import { composerDraftKey } from "./conversation-keys";
 import type {
   ComposerDraft,
@@ -92,14 +99,78 @@ interface ConversationResources {
  * its server in the value, which is what makes the shared lifetime safe.
  */
 export function createStableConversationState(props: Pick<ConversationProps, "onTypingChange">) {
-  const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>({});
-  const [editingAgentId, setEditingAgentId] = createSignal<string | null>(null);
-  const [editingServerId, setEditingServerId] = createSignal<string | null>(null);
-  const [editingDeliveryId, setEditingDeliveryId] = createSignal<string | null>(null);
-  const [editingDraftBackup, setEditingDraftBackup] = createSignal<ComposerDraft | null>(null);
-  const [editingOriginalAttachmentIds, setEditingOriginalAttachmentIds] = createSignal<string[]>([]);
+  const restoredEdit = readStoredQueueEdit();
+  const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>(
+    restoredEdit ? { [composerDraftKey(restoredEdit)]: restoredEdit.draft } : {},
+  );
+  const [editingAgentId, setEditingAgentId] = createSignal<string | null>(restoredEdit?.agentId ?? null);
+  const [editingServerId, setEditingServerId] = createSignal<string | null>(restoredEdit?.serverId ?? null);
+  const [editingEditId, setEditingEditId] = createSignal<string | null>(restoredEdit?.editId ?? null);
+  const [editingDeliveryId, setEditingDeliveryId] = createSignal<string | null>(restoredEdit?.deliveryId ?? null);
+  const [editingDraftBackup, setEditingDraftBackup] = createSignal<ComposerDraft | null>(restoredEdit?.backup ?? null);
+  const [editingOriginalAttachmentIds, setEditingOriginalAttachmentIds] = createSignal<string[]>(
+    restoredEdit?.originalAttachmentIds ?? [],
+  );
+  const [editingPendingSave, setEditingPendingSave] = createSignal<StoredQueueEdit["pendingSave"] | null>(
+    restoredEdit?.pendingSave ?? null,
+  );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
+  createEffect(
+    () => {
+      const agentId = editingAgentId();
+      const serverId = editingServerId();
+      const deliveryId = editingDeliveryId();
+      const editId = editingEditId();
+      return agentId && serverId && deliveryId && editId
+        ? {
+            agentId,
+            serverId,
+            deliveryId,
+            editId,
+            originalAttachmentIds: editingOriginalAttachmentIds(),
+            backup: editingDraftBackup() ?? EMPTY_DRAFT,
+            draft: drafts()[composerDraftKey({ agentId, serverId })] ?? EMPTY_DRAFT,
+            pendingSave: editingPendingSave() ?? undefined,
+          }
+        : null;
+    },
+    (edit) => {
+      if (!edit) return;
+      const persist = () => {
+        // Read fresh state: a pending Save set after this effect ran must not be
+        // overwritten by the previous snapshot without it.
+        const agentId = editingAgentId();
+        const serverId = editingServerId();
+        const deliveryId = editingDeliveryId();
+        const editId = editingEditId();
+        if (!agentId || !serverId || !deliveryId || !editId || editId !== edit.editId) return;
+        const current = {
+          agentId,
+          serverId,
+          deliveryId,
+          editId,
+          originalAttachmentIds: editingOriginalAttachmentIds(),
+          backup: editingDraftBackup() ?? EMPTY_DRAFT,
+          draft: drafts()[composerDraftKey({ agentId, serverId })] ?? EMPTY_DRAFT,
+          pendingSave: editingPendingSave() ?? undefined,
+        };
+        try {
+          window.localStorage.setItem(QUEUE_EDIT_STORAGE_KEY, JSON.stringify(current));
+        } catch {
+          setConversationErrors((currentErrors) => ({
+            ...currentErrors,
+            [composerDraftKey(current)]: "Could not save this edit on this computer.",
+          }));
+        }
+      };
+      const timer = setTimeout(persist, 300);
+      return () => {
+        clearTimeout(timer);
+        persist();
+      };
+    },
+  );
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
   const [voicePhase, setVoicePhase] = createSignal<"idle" | "preparing" | "requesting" | "recording" | "transcribing">(
     "idle",
@@ -176,12 +247,16 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     setEditingAgentId,
     editingServerId,
     setEditingServerId,
+    editingEditId,
+    setEditingEditId,
     editingDeliveryId,
     setEditingDeliveryId,
     editingDraftBackup,
     setEditingDraftBackup,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
+    editingPendingSave,
+    setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
     conversationErrors,

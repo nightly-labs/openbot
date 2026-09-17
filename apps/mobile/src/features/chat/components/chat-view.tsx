@@ -23,6 +23,7 @@ import { type ChatAttachment, useChatAttachments } from "@/features/chat/compone
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { type ChatBubbleMessage, useMessageActions } from "@/features/chat/context/message-actions-context";
+import { usePublishedQueuedChat } from "@/features/chat/context/queued-messages-context";
 import { type ChatMessage, type PendingChatMessage, presentChatMessages } from "@/features/chat/model/chat-messages";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
@@ -33,11 +34,15 @@ import { isIOS } from "@/shared/lib/platform";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
+import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { ChatCameraPanel } from "./chat-camera-panel";
+import { ChatQueueButton } from "./chat-queue-button";
+import type { ChatQueueController } from "./use-chat-queue";
 
 export interface ChatViewProps {
   target: ChatTarget;
+  queue?: ChatQueueController;
   animateAvatarOnExit?: boolean;
   agents: MobileAgent[];
   mentionAgents: MobileAgent[];
@@ -63,6 +68,7 @@ export interface ChatViewProps {
     body: string,
     files: ChatAttachment[],
     replyToMessageId: string | null,
+    upload?: { cancelled: () => boolean; progress: (completed: number) => void },
   ) => Promise<string | null | ChatHistoryReceipt>;
   needsAction?: boolean;
   notice?: string;
@@ -77,6 +83,7 @@ function leaveConversation(): void {
 
 export function ChatView({
   target,
+  queue,
   animateAvatarOnExit = false,
   agents: serverAgents,
   mentionAgents,
@@ -130,29 +137,69 @@ export function ChatView({
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
   const [composerGestureHeight, setComposerGestureHeight] = useState(0);
   const sendingRef = useRef(false);
-  const attachments = useChatAttachments();
+  const uploadCancelled = useRef(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [pendingInQueue, setPendingInQueue] = useState(false);
   const queryClient = useQueryClient();
+  const composerAttachments = useChatAttachments();
+  const attachments = composerAttachments;
   const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
   const [messageAliases, setMessageAliases] = useState<ReadonlyMap<string, string>>(new Map());
   const sendSequence = useRef(0);
   const [showStarter, setShowStarter] = useState(true);
   const { servers } = useMobileWorkspace();
+  const queuePending = useMemo(
+    () =>
+      pendingInQueue && sending && pendingMessage
+        ? {
+            message: pendingMessage.message,
+            progress: uploadProgress,
+            total: submittedFiles.current.length,
+            cancel: () => {
+              uploadCancelled.current = true;
+            },
+          }
+        : null,
+    [pendingInQueue, sending, pendingMessage, uploadProgress],
+  );
+  usePublishedQueuedChat(queue?.chatId ?? `${target.serverId}:${target.id}`, queue ?? null, queuePending);
+  const queuedMessageIds = useMemo(
+    () =>
+      new Set(
+        queue?.deliveries
+          .filter((item) => item.status === "queued" || item.status === "cancelled")
+          .map((item) => item.id) ?? [],
+      ),
+    [queue?.deliveries],
+  );
   const messages = useMemo(
-    () => presentChatMessages(projectedMessages, pendingMessage, messageAliases),
-    [projectedMessages, pendingMessage, messageAliases],
+    () =>
+      presentChatMessages(
+        projectedMessages.filter((item) => !queuedMessageIds.has(item.id)),
+        pendingInQueue || (pendingMessage?.serverId && queuedMessageIds.has(pendingMessage.serverId))
+          ? null
+          : pendingMessage,
+        messageAliases,
+      ),
+    [projectedMessages, pendingMessage, pendingInQueue, messageAliases, queuedMessageIds],
   );
   useEffect(() => {
     if (!pendingMessage?.serverId) return;
     if (
-      retainConfirmedAttachments(projectedMessages, pendingMessage.serverId, submittedFiles.current, (id, file) => {
-        queryClient.setQueryData(["chat-attachment", target.serverId, id], file);
-      })
+      retainConfirmedAttachments(
+        [...projectedMessages, ...queueReceiptMessages(queue?.deliveries ?? [])],
+        pendingMessage.serverId,
+        submittedFiles.current,
+        (id, file) => {
+          queryClient.setQueryData(["chat-attachment", target.serverId, id], file);
+        },
+      )
     ) {
       submittedFiles.current = [];
       setPendingMessage(null);
     }
-  }, [pendingMessage, projectedMessages, queryClient, target.serverId]);
+  }, [pendingMessage, projectedMessages, queue?.deliveries, queryClient, target.serverId]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
   const motion = useChatMotion(insets.top + 84, keyboardOffset, ready, lastUserId);
@@ -237,7 +284,9 @@ export function ChatView({
     if (!body && attachments.items.length === 0) return;
 
     setSendError(null);
-    motion.beginSend();
+    const queueSend = Boolean(queue && (activeTurnId || queue.queued.length));
+    setPendingInQueue(queueSend);
+    if (!queueSend) motion.beginSend();
     Keyboard.dismiss();
 
     void haptics.impact();
@@ -255,6 +304,8 @@ export function ChatView({
     setReplyTarget(null);
     const files = attachments.items;
     submittedFiles.current = files;
+    uploadCancelled.current = false;
+    setUploadProgress(0);
     const localId = `local-message-${++sendSequence.current}`;
     setPendingMessage({
       message: {
@@ -281,7 +332,10 @@ export function ChatView({
     });
     void (async () => {
       try {
-        const serverId = await send(body, files, submittedReply?.id ?? null);
+        const serverId = await send(body, files, submittedReply?.id ?? null, {
+          cancelled: () => uploadCancelled.current,
+          progress: setUploadProgress,
+        });
         if (serverId && typeof serverId === "object") {
           setHistoryReceipt(serverId);
         } else if (serverId) {
@@ -447,9 +501,18 @@ export function ChatView({
                   {notice}
                 </Typography.Paragraph>
               ) : null}
+              {queue ? (
+                <ChatQueueButton
+                  queue={queue}
+                  pending={queuePending}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  fallbackBackground={fieldBackground}
+                />
+              ) : null}
               {!readOnly ? (
                 <ChatComposer
                   sendRetryVersion={sendRetryVersion}
+                  sendLabel="Send message"
                   replyTarget={questionForm?.question ? null : replyTarget}
                   replyFocusVersion={replyFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}

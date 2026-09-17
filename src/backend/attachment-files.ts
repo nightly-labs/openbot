@@ -4,6 +4,7 @@ import {
   type FileHandle,
   mkdir,
   open,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -38,6 +39,9 @@ export interface StoredGeneratedAttachment extends StoredAttachment {
 }
 
 export interface StoredDraft extends StoredAttachment {
+  ownerEditId?: string;
+  /** Released edit drafts can still belong to a durable composer backup. */
+  preserveOnRestart?: boolean;
   createdAt: string;
 }
 
@@ -102,9 +106,12 @@ export class AttachmentFiles {
     ]);
   }
 
-  async resetDrafts(): Promise<void> {
-    await this.remove(this.#draftsRoot);
-    await mkdir(this.#draftsRoot, { recursive: true, mode: 0o700 });
+  async resetDrafts(retainedIds: string[] = []): Promise<void> {
+    const retained = new Set(retainedIds);
+    const entries = await readdir(this.#draftsRoot);
+    await Promise.all(
+      entries.filter((name) => !retained.has(name)).map((name) => this.remove(join(this.#draftsRoot, name))),
+    );
   }
 
   transferRoot(id: string): string {

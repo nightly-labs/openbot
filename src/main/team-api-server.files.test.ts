@@ -11,6 +11,23 @@ import { createAgents, createTeamApiFixture, stopTeamApiFixtures } from "./team-
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer files", () => {
+  it("sends an attachment only to an authenticated member", async () => {
+    const { root, start, signIn } = await createTeamApiFixture("attachment-read", { configure: true });
+    const path = join(root, "private-image.png");
+    await writeFile(path, "full attachment bytes");
+    const { base } = await start({
+      mailbox: { resolveAttachment: async () => ({ path, mimeType: "image/png", name: "private-image.png" }) },
+    });
+    const unauthorized = await fetch(`${base}/v1/attachments/image`);
+    expect(unauthorized.status).toBe(401);
+    expect(await unauthorized.text()).not.toContain("full attachment bytes");
+    const original = await fetch(`${base}/v1/attachments/image`, {
+      headers: { Authorization: `Bearer ${await signIn()}` },
+    });
+    expect(original.status).toBe(200);
+    expect(await original.text()).toBe("full attachment bytes");
+  });
+
   it("downloads authenticated shared files through the remote API", async () => {
     const { root, start, signIn } = await createTeamApiFixture("shared-file", { configure: true });
     const filePath = join(root, "report.csv");

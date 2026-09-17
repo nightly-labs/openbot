@@ -8,6 +8,7 @@ import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { desktopAnalytics } from "../../../analytics";
 import type { AgentMessage } from "../../../data";
 import { errorMessage } from "../../../error-message";
+import type { StoredQueueEdit } from "../composer-draft";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
 export interface MessageActionsDeps {
@@ -16,6 +17,10 @@ export interface MessageActionsDeps {
   currentDraft: () => ComposerDraft;
   updateCurrentDraft: (patch: Partial<ComposerDraft>) => void;
   currentTarget: () => { agentId: string; serverId: string } | undefined;
+  editingAgentId: () => string | null;
+  editingServerId: () => string | null;
+  editingDeliveryId: () => string | null;
+  editingPendingSave: () => StoredQueueEdit["pendingSave"] | null;
   setOpenReactionMessageId: (id: string | null) => void;
   setOpenMoreMessageId: (id: string | null) => void;
   setExpandedEmojiMessageId: (id: string | null) => void;
@@ -96,7 +101,18 @@ export function createMessageActions(deps: MessageActionsDeps) {
   }
 
   function removeAttachment(id: string) {
-    const serverId = deps.currentTarget()?.serverId;
+    // A pending Save keeps its attachment IDs for retry. Do not change or discard them,
+    // but only in the edited conversation: the pending state survives agent/server switches.
+    const target = deps.currentTarget();
+    if (
+      target &&
+      deps.editingPendingSave() &&
+      deps.editingAgentId() === target.agentId &&
+      deps.editingServerId() === target.serverId &&
+      deps.editingDeliveryId()
+    )
+      return;
+    const serverId = target?.serverId;
     deps.updateCurrentDraft({
       attachments: deps.currentDraft().attachments.filter((attachment) => attachment.id !== id),
       text: removeAttachmentReferences(deps.currentDraft().text, id),

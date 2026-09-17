@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
@@ -25,6 +25,7 @@ import {
   isMessageReaction,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { redactText } from "@openbot/logging";
 import {
   AttachmentFiles,
@@ -56,7 +57,16 @@ interface StoredMessage {
   createdAt: string;
 }
 
+type QueueEditOutcome = "save" | "cancel";
+
+interface StoredFinishedEdit {
+  action: QueueEditOutcome;
+  saveHash?: string;
+}
+
 interface StoredDelivery {
+  editId?: string;
+  finishedEditOutcomes?: Record<string, StoredFinishedEdit>;
   id: string;
   messageId: string;
   recipientAgentId: string;
@@ -117,6 +127,7 @@ export class MailboxStore {
   readonly #statePath: string;
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
+  readonly #queueUpdates = new Set<string>();
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
@@ -140,11 +151,19 @@ export class MailboxStore {
       await this.#database.backupLegacyFile(this.#statePath);
       await this.#persist("mailbox.legacy-imported", "legacy-import:mailbox:v1");
     }
-    if (this.#state.drafts.length > 0) {
-      this.#state.drafts = [];
+    const activeEdits = new Set(
+      this.#state.deliveries
+        .filter((delivery) => delivery.status === "queued" && delivery.editId)
+        .map((delivery) => delivery.editId),
+    );
+    const retainedDrafts = this.#state.drafts.filter(
+      (draft) => draft.preserveOnRestart || (draft.ownerEditId && activeEdits.has(draft.ownerEditId)),
+    );
+    if (retainedDrafts.length !== this.#state.drafts.length) {
+      this.#state.drafts = retainedDrafts;
       await this.#persist("mailbox.drafts-cleared");
     }
-    await this.#files.resetDrafts();
+    await this.#files.resetDrafts(retainedDrafts.map((draft) => draft.id));
     await this.#drainFileDeletionOutbox();
   }
 
@@ -225,6 +244,7 @@ export class MailboxStore {
     const drafts = (input.draftIds ?? []).map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
       if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      if (draft.ownerEditId) throw new Error("An attachment belongs to a queue edit.");
       return draft;
     });
     if (drafts.length !== new Set(input.draftIds ?? []).size) {
@@ -319,6 +339,7 @@ export class MailboxStore {
     const drafts = input.draftIds.map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
       if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      if (draft.ownerEditId) throw new Error("An attachment belongs to a queue edit.");
       return draft;
     });
     if (drafts.length > MAX_ATTACHMENTS) throw new Error(`Attach at most ${MAX_ATTACHMENTS} files.`);
@@ -360,13 +381,21 @@ export class MailboxStore {
     return { text: message.text, attachments: attachments.map(toAttachmentSummary) };
   }
 
+  /**
+   * A delivery held for editing stays listed, marked `editing`, and keeps its position. Hiding it
+   * removed the row on every other device and renumbered the rest for as long as the edit ran,
+   * which reads as lost messages.
+   */
   listQueue(agentId: string): QueueSnapshot {
     const channelMessageIds = this.#channelMessageIds();
     const positions = this.#queuedPositions();
     return {
       agentId,
-      deliveries: this.#state.deliveries
+      // Queue order, not storage order: a restart reads the deliveries back sorted by their
+      // creation time and identity, which would otherwise reorder rows a client already saw.
+      deliveries: [...this.#state.deliveries]
         .filter((delivery) => delivery.recipientAgentId === agentId && !channelMessageIds.has(delivery.messageId))
+        .sort(compareQueueOrder)
         .map((delivery) => this.#publicDelivery(delivery, positions)),
     };
   }
@@ -630,7 +659,7 @@ export class MailboxStore {
     const delivery = this.#state.deliveries
       .filter((candidate) => candidate.recipientAgentId === agentId && candidate.status === "queued")
       .sort(compareQueueOrder)[0];
-    return delivery ? this.#context(delivery) : null;
+    return delivery && !delivery.editId && !this.#queueUpdates.has(delivery.id) ? this.#context(delivery) : null;
   }
 
   queuedDeliveryIds(agentId: string): string[] {
@@ -810,6 +839,7 @@ export class MailboxStore {
   }
 
   async markStarting(deliveryId: string): Promise<void> {
+    this.#assertQueueNotEditing(deliveryId);
     await this.#updateDelivery(deliveryId, ["queued"], { status: "starting", error: null });
   }
 
@@ -840,18 +870,13 @@ export class MailboxStore {
   }
 
   cancelNow(agentId: string, deliveryId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
     if (!delivery) throw new Error("Queued message was not found.");
     if (delivery.status !== "queued") throw new Error("Only queued messages can be cancelled.");
-    delivery.status = "cancelled";
-    try {
-      this.#persist("delivery.cancelled");
-    } catch (error) {
-      delivery.status = "queued";
-      throw error;
-    }
+    this.#finishCancellation(delivery, true);
   }
 
   restorePersistedState(): void {
@@ -860,18 +885,153 @@ export class MailboxStore {
     this.#state = normalizeStoredState(persisted);
   }
 
+  #assertQueueNotEditing(deliveryId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    if (this.#state.deliveries.find((item) => item.id === deliveryId)?.editId)
+      throw new Error("This message is being edited. Save or cancel the edit first.");
+  }
+
+  beginQueueEdit(agentId: string, deliveryId: string, editId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    if (delivery?.status !== "queued") throw new QueueEditRejectedError("This queued message is no longer available.");
+    if (delivery.editId && delivery.editId !== editId)
+      throw new QueueEditRejectedError("This message is being edited on another device.");
+    const previous = delivery.editId;
+    delivery.editId = editId;
+    try {
+      this.#persist("delivery.edit-started");
+    } catch (error) {
+      delivery.editId = previous;
+      throw error;
+    }
+  }
+
+  retainQueueEditAttachments(agentId: string, deliveryId: string, editId: string, draftIds: string[]): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    if (delivery?.status !== "queued" || delivery.editId !== editId)
+      throw new QueueEditRejectedError("This edit is no longer available.");
+    if (draftIds.length > MAX_ATTACHMENTS || new Set(draftIds).size !== draftIds.length)
+      throw new Error("Invalid edit attachment count.");
+    const drafts = draftIds.map((id) => {
+      const draft = this.#state.drafts.find((item) => item.id === id);
+      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      return draft;
+    });
+    if (drafts.some((draft) => draft.ownerEditId && draft.ownerEditId !== editId))
+      throw new Error("An attachment belongs to another edit.");
+    const previous = drafts.map((draft) => draft.ownerEditId);
+    for (const draft of drafts) draft.ownerEditId = editId;
+    try {
+      this.#persist("delivery.edit-attachments-retained");
+    } catch (error) {
+      drafts.forEach((draft, index) => {
+        draft.ownerEditId = previous[index];
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Reports which action completed an edit, so a retry that lost its response can tell a
+   * finished Save from a finished Cancel. A Save that repeats a Cancel must not report
+   * success: the host never applied that text.
+   */
+  finishedQueueEditAction(agentId: string, deliveryId: string, editId: string): QueueEditOutcome | undefined {
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    return delivery?.finishedEditOutcomes?.[editId]?.action;
+  }
+
+  matchesFinishedQueueSave(
+    agentId: string,
+    deliveryId: string,
+    editId: string,
+    text: string,
+    keepAttachmentIds: string[],
+    attachmentDraftIds: string[],
+  ): boolean {
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    const outcome = delivery?.finishedEditOutcomes?.[editId];
+    return (
+      outcome !== undefined &&
+      outcome.action === "save" &&
+      outcome.saveHash === queueSaveHash(text, keepAttachmentIds, attachmentDraftIds)
+    );
+  }
+
+  finishQueueEdit(agentId: string, deliveryId: string, editId: string): void {
+    this.#assertQueueNotUpdating(deliveryId);
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    if (!delivery || delivery.editId !== editId) throw new QueueEditRejectedError("This edit is no longer available.");
+    this.#finishCancellation(delivery, false);
+  }
+
+  #finishCancellation(delivery: StoredDelivery, cancelDelivery: boolean): void {
+    const editId = delivery.editId;
+    const previousStatus = delivery.status;
+    const previousOutcomes = delivery.finishedEditOutcomes;
+    const released = editId ? this.#state.drafts.filter((draft) => draft.ownerEditId === editId) : [];
+    const previousRetention = released.map((draft) => draft.preserveOnRestart);
+    if (cancelDelivery) delivery.status = "cancelled";
+    if (editId) recordFinishedQueueEdit(delivery, editId, { action: "cancel" });
+    delete delivery.editId;
+    for (const draft of released) {
+      delete draft.ownerEditId;
+      // Release the lock, not the bytes: a disconnected editor can still restore its
+      // backup, including after a lost cancellation response and host restart.
+      draft.preserveOnRestart = true;
+    }
+    try {
+      this.#persist(cancelDelivery ? "delivery.cancelled" : "delivery.edit-finished");
+    } catch (error) {
+      delivery.status = previousStatus;
+      delivery.editId = editId;
+      delivery.finishedEditOutcomes = previousOutcomes;
+      released.forEach((draft, index) => {
+        draft.ownerEditId = editId;
+        draft.preserveOnRestart = previousRetention[index];
+      });
+      throw error;
+    }
+  }
+
+  #assertQueueNotUpdating(deliveryId: string): void {
+    if (this.#queueUpdates.has(deliveryId))
+      throw new Error("This message is being saved. Try again after it finishes.");
+  }
+
   async updateQueuedMessage(
     agentId: string,
     deliveryId: string,
     text: string,
     keepAttachmentIds: string[],
     attachmentDraftIds: string[],
+    editId?: string,
+  ): Promise<void> {
+    this.#assertQueueNotUpdating(deliveryId);
+    this.#queueUpdates.add(deliveryId);
+    try {
+      await this.#updateQueuedMessage(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds, editId);
+    } finally {
+      this.#queueUpdates.delete(deliveryId);
+    }
+  }
+
+  async #updateQueuedMessage(
+    agentId: string,
+    deliveryId: string,
+    text: string,
+    keepAttachmentIds: string[],
+    attachmentDraftIds: string[],
+    editId?: string,
   ): Promise<void> {
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
     if (!delivery) throw new Error("Queued message was not found.");
     if (delivery.status !== "queued") throw new Error("Only queued messages can be edited.");
+    if (delivery.editId !== editId) throw new Error("This message is being edited on another device.");
 
     const message = this.#requireMessage(delivery.messageId);
     const keepIds = new Set(keepAttachmentIds);
@@ -885,6 +1045,7 @@ export class MailboxStore {
     const drafts = attachmentDraftIds.map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
       if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      if (draft.ownerEditId && draft.ownerEditId !== editId) throw new Error("An attachment belongs to another edit.");
       return draft;
     });
     if (keepAttachmentIds.length + drafts.length > MAX_ATTACHMENTS) {
@@ -897,13 +1058,17 @@ export class MailboxStore {
     }
 
     const previous = structuredClone(message);
+    const previousOutcomes = delivery.finishedEditOutcomes ? { ...delivery.finishedEditOutcomes } : undefined;
     const oldAttachmentPaths = message.attachments
       .filter((attachment) => !keepIds.has(attachment.id))
       .map((attachment) => attachment.path);
     const draftAttachmentPaths = drafts.map((draft) => draft.path);
     let newAttachmentPaths: string[] = [];
+    let releasedOwned: StoredDraft[] = [];
     try {
-      const keptAttachments = message.attachments.filter((attachment) => keepIds.has(attachment.id));
+      const keptAttachments = keepAttachmentIds.flatMap((id) =>
+        message.attachments.filter((attachment) => attachment.id === id),
+      );
       const committedDrafts = draftAttachmentPaths.length
         ? await this.#files.commitMessageTransfer(
             `${message.id}-edit-${randomUUID()}`,
@@ -929,7 +1094,21 @@ export class MailboxStore {
         return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
       });
       message.attachments = replacementAttachments;
+      if (editId) {
+        delete delivery.editId;
+        recordFinishedQueueEdit(delivery, editId, {
+          action: "save",
+          saveHash: queueSaveHash(text, keepAttachmentIds, attachmentDraftIds),
+        });
+      }
       this.#state.drafts = this.#state.drafts.filter((draft) => !draftIds.has(draft.id));
+      if (editId) {
+        // A durable composer backup retained for this edit is no longer owned by it:
+        // a save discards the backup, a cancel restores it, and in both cases the
+        // remaining drafts return to normal lifetime instead of staying edit-owned.
+        releasedOwned = this.#state.drafts.filter((draft) => draft.ownerEditId === editId);
+        for (const draft of releasedOwned) delete draft.ownerEditId;
+      }
       await this.#persist(
         "message.updated",
         `mailbox:message-updated:${deliveryId}:${randomUUID()}`,
@@ -938,6 +1117,12 @@ export class MailboxStore {
     } catch (error) {
       message.text = previous.text;
       message.attachments = previous.attachments;
+      if (editId) {
+        delivery.editId = editId;
+        if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
+        else delete delivery.finishedEditOutcomes;
+        for (const draft of releasedOwned) draft.ownerEditId = editId;
+      }
       for (const draft of drafts) {
         if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
           this.#state.drafts.push(draft);
@@ -950,26 +1135,38 @@ export class MailboxStore {
     await this.#drainFileDeletionOutbox();
   }
 
+  /**
+   * A held delivery keeps its place. `listQueue` reports it now, so a caller may send its id with
+   * the rest; both that list and one without it are accepted, and neither moves the held message.
+   */
   async reorderQueue(agentId: string, deliveryIds: string[]): Promise<void> {
-    const queued = this.#state.deliveries.filter(
+    const allQueued = this.#state.deliveries.filter(
       (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
     );
+    const heldIds = new Set(allQueued.filter((delivery) => delivery.editId).map((delivery) => delivery.id));
+    const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
+    const queued = allQueued.filter((delivery) => !delivery.editId);
     const expected = new Set(queued.map((delivery) => delivery.id));
     if (
-      deliveryIds.length !== queued.length ||
-      new Set(deliveryIds).size !== deliveryIds.length ||
-      deliveryIds.some((deliveryId) => !expected.has(deliveryId))
+      requested.length !== queued.length ||
+      new Set(requested).size !== requested.length ||
+      requested.some((deliveryId) => !expected.has(deliveryId))
     ) {
       throw new Error("Queue order is stale. Refresh the queue and try again.");
     }
-    const orders = new Map(deliveryIds.map((deliveryId, index) => [deliveryId, index]));
-    for (const delivery of queued) {
+    let nextVisible = 0;
+    const orderedIds = [...allQueued]
+      .sort(compareQueueOrder)
+      .map((delivery) => (delivery.editId ? delivery.id : requested[nextVisible++]));
+    const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
+    for (const delivery of allQueued) {
       delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
     }
     await this.#persist("queue.reordered");
   }
 
   async markSteering(deliveryId: string, turnId: string): Promise<void> {
+    this.#assertQueueNotEditing(deliveryId);
     await this.#updateDelivery(deliveryId, ["queued"], {
       status: "starting",
       turnId,
@@ -1145,13 +1342,15 @@ export class MailboxStore {
     positions = this.#queuedPositions(),
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
+    const { editId: _editId, finishedEditOutcomes: _finishedEditOutcomes, ...publicDelivery } = delivery;
     return {
-      ...delivery,
+      ...publicDelivery,
       sender: structuredClone(message.sender),
       text: message.text,
       attachments: message.attachments.map(toAttachmentSummary),
       replyToMessageId: message.replyToMessageId,
       position: delivery.status === "queued" ? (positions.get(delivery.id) ?? null) : null,
+      editing: Boolean(delivery.editId),
     };
   }
 
@@ -1374,7 +1573,13 @@ function isStoredGeneratedAttachment(value: unknown): value is StoredGeneratedAt
 }
 
 function isStoredDraft(value: unknown): value is StoredDraft {
-  return isRecord(value) && isString(value.createdAt) && isStoredAttachment(value);
+  return (
+    isRecord(value) &&
+    isString(value.createdAt) &&
+    (value.ownerEditId === undefined || isString(value.ownerEditId)) &&
+    (value.preserveOnRestart === undefined || typeof value.preserveOnRestart === "boolean") &&
+    isStoredAttachment(value)
+  );
 }
 
 function isStoredMessage(value: unknown): value is StoredMessage {
@@ -1404,6 +1609,8 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     isString(value.id) &&
     isString(value.messageId) &&
     isString(value.recipientAgentId) &&
+    (value.editId === undefined || isString(value.editId)) &&
+    (value.finishedEditOutcomes === undefined || isFinishedEditOutcomes(value.finishedEditOutcomes)) &&
     (value.queueOrder === undefined || (isNumber(value.queueOrder) && Number.isFinite(value.queueOrder))) &&
     (value.status === "queued" ||
       value.status === "starting" ||
@@ -1415,6 +1622,18 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     (isString(value.turnId) || value.turnId === null) &&
     (isString(value.error) || value.error === null) &&
     isString(value.createdAt)
+  );
+}
+
+function isFinishedEditOutcomes(value: unknown): value is Record<string, StoredFinishedEdit> {
+  return (
+    isRecord(value) &&
+    Object.values(value).every(
+      (item) =>
+        isRecord(item) &&
+        (item.action === "save" || item.action === "cancel") &&
+        (item.saveHash === undefined || isString(item.saveHash)),
+    )
   );
 }
 
@@ -1446,4 +1665,23 @@ function compareReactionActors(left: ConversationReaction, right: ConversationRe
   if (left.actor.kind !== right.actor.kind) return left.actor.kind === "user" ? -1 : 1;
   if (left.actor.kind === "user" || right.actor.kind === "user") return 0;
   return left.actor.agentId.localeCompare(right.actor.agentId);
+}
+
+function queueSaveHash(text: string, keepAttachmentIds: string[], attachmentDraftIds: string[]): string {
+  return createHash("sha256")
+    .update(JSON.stringify([text, keepAttachmentIds, attachmentDraftIds]))
+    .digest("hex");
+}
+
+/**
+ * Completed edit outcomes live on by edit identity, so a lost Save response stays
+ * confirmable after another device edits and saves the same message again. A single
+ * latest-only record would forget the first save the moment the second one commits.
+ * Entries are kept while the delivery stays queued: both clients retain `pendingSave`
+ * without an expiry, so the host cannot assume an older result is unused. Each entry
+ * is one edit id plus one action and hash, so the map grows only with human edits of
+ * one queued message.
+ */
+function recordFinishedQueueEdit(delivery: StoredDelivery, editId: string, outcome: StoredFinishedEdit): void {
+  delivery.finishedEditOutcomes = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
 }

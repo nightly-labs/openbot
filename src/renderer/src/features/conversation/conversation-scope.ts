@@ -42,10 +42,14 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingServerId,
     editingDeliveryId,
     setEditingDeliveryId,
+    editingEditId,
+    setEditingEditId,
     editingDraftBackup,
     setEditingDraftBackup,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
+    editingPendingSave,
+    setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
     showComposerActions,
@@ -198,6 +202,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editingAgentId,
     editingServerId,
     editingDeliveryId,
+    editingPendingSave,
     seenMessageIds: resources.seenMessageIds,
   });
   const {
@@ -344,6 +349,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const { startVoiceRecording, stopVoiceRecording } = voice;
   const actions = createComposerActions({
     props,
+    attachmentBusy,
     agentReady,
     drafts,
     setDrafts,
@@ -353,10 +359,14 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingServerId,
     editingDeliveryId,
     setEditingDeliveryId,
+    editingEditId,
+    setEditingEditId,
     editingDraftBackup,
     setEditingDraftBackup,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
+    editingPendingSave,
+    setEditingPendingSave,
     submitting,
     setSubmitting,
     selectionSending,
@@ -427,12 +437,30 @@ export function createConversationViewScope(props: ConversationProps) {
     submitComposer,
     sendSelectionInstruction,
   } = actions;
+  createEffect(
+    () => {
+      const deliveryId = currentEditingDeliveryId();
+      return (
+        !submitting() &&
+        deliveryId !== null &&
+        props.queue?.agentId === props.agent?.id &&
+        props.queue?.deliveries.some((item) => item.id === deliveryId && item.status === "cancelled")
+      );
+    },
+    (deleted) => {
+      if (deleted) void cancelQueuedMessageEdit();
+    },
+  );
   const messageActions = createMessageActions({
     props,
     installedSkills,
     currentDraft,
     updateCurrentDraft,
     currentTarget,
+    editingAgentId,
+    editingServerId,
+    editingDeliveryId,
+    editingPendingSave,
     setOpenReactionMessageId,
     setOpenMoreMessageId,
     setExpandedEmojiMessageId,
@@ -504,7 +532,7 @@ export function createConversationViewScope(props: ConversationProps) {
       } else if (event.type === "error") {
         const target = resources.importTargetAgents.get(event.requestId);
         resources.importTargetAgents.delete(event.requestId);
-        setAttachmentBusy(false);
+        setAttachmentBusy(resources.importTargetAgents.size > 0);
         if (target) {
           setConversationErrors((current) => ({
             ...current,
@@ -512,12 +540,14 @@ export function createConversationViewScope(props: ConversationProps) {
           }));
         }
       } else {
-        setAttachmentBusy(false);
         const target = resources.importTargetAgents.get(event.requestId);
-        resources.importTargetAgents.delete(event.requestId);
         if (target) {
-          addAttachments(event.attachments, target);
+          void addAttachments(event.attachments, target).finally(() => {
+            resources.importTargetAgents.delete(event.requestId);
+            setAttachmentBusy(resources.importTargetAgents.size > 0);
+          });
         } else {
+          setAttachmentBusy(resources.importTargetAgents.size > 0);
           for (const attachment of event.attachments) {
             void window.openbot.agent.discardDraftAttachment(attachment.id, event.serverId);
           }
@@ -1013,6 +1043,7 @@ export function createConversationViewScope(props: ConversationProps) {
     dropActive,
     editQueuedMessage,
     editingDeliveryId: currentEditingDeliveryId,
+    editingPendingSave,
     expandedEmojiMessageId,
     scrollFades,
     filePreviewOpen,

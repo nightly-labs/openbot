@@ -8,7 +8,7 @@ import {
 } from "../ipc-agent-profile";
 import { isAgentProvider } from "../ipc-agent-status";
 import { decodeHostAnalytics } from "../ipc-host-analytics";
-import { isDynamicRecord } from "../runtime-values";
+import { isBoolean, isDynamicRecord, isString } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
 import {
   isAgentAnalyticsRoute,
@@ -16,10 +16,12 @@ import {
   isAgentProfileRoute,
   isConversationUnreadRoute,
   isHostAnalyticsRoute,
+  isQueueSnapshotRoute,
 } from "./current";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeProfileV4Request, decodeProfileV4Response } from "./profile-v4";
+import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
 import { decodeTeamProtocolV4HttpRequest, decodeTeamProtocolV4HttpResponse } from "./v4";
 import type { TeamProtocolV4BaseJsonObject, TeamProtocolV4BaseJsonValue } from "./v4-base";
 import {
@@ -29,12 +31,46 @@ import {
   encodeTeamProtocolV4BaseCurrentHttpResponse,
 } from "./v4-base-adapter";
 
+/**
+ * `editing` rides beside the frozen queue projection: the shipped key lists drop it, so a client on
+ * protocol 1-3 reads the queue exactly as it did before, and only the current protocol carries the
+ * mark that another editor holds a message.
+ *
+ * A present mark must be a boolean. The projection removes the key, so an unchecked value would
+ * reach the client as a message nobody holds, and enable the edit actions the hold disables.
+ * Fail closed instead; an absent mark still means an older host that never sends one.
+ */
+function withQueueEditing(projected: TeamProtocolV4BaseJsonValue, source: unknown): TeamProtocolV4BaseJsonValue {
+  if (!isDynamicRecord(projected) || !Array.isArray(projected.deliveries)) return projected;
+  if (!isDynamicRecord(source) || !Array.isArray(source.deliveries)) return projected;
+  const marks = new Map<string, boolean>();
+  for (const delivery of source.deliveries) {
+    if (!isDynamicRecord(delivery) || delivery.editing === undefined) continue;
+    if (!isBoolean(delivery.editing)) throw new Error("Invalid queue edit mark.");
+    if (isString(delivery.id)) marks.set(delivery.id, delivery.editing);
+  }
+  if (marks.size === 0) return projected;
+  return {
+    ...projected,
+    deliveries: projected.deliveries.map((delivery) =>
+      isDynamicRecord(delivery) && isString(delivery.id) && marks.has(delivery.id)
+        ? { ...delivery, editing: marks.get(delivery.id) ?? false }
+        : delivery,
+    ),
+  };
+}
+
+function encodeQueueSnapshot(json: string, source: unknown): string {
+  return JSON.stringify(withQueueEditing(JSON.parse(json), source));
+}
+
 export function encodeTeamProtocolV4CurrentHttpRequest(
   method: string,
   path: string,
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): string {
+  if (isQueueEditRoute(method, path)) return JSON.stringify(decodeQueueEditRequest(value));
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path))
     return JSON.stringify(decodeScopedUsageRequest(value));
   if (isAgentProfileRoute(method, path)) return JSON.stringify(encodeProfileRequest(path, value));
@@ -66,6 +102,7 @@ export function decodeTeamProtocolV4CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): TeamProtocolV4BaseJsonObject {
+  if (isQueueEditRoute(method, path)) return { ...decodeQueueEditRequest(value) };
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) return decodeScopedUsageRequest(value);
   if (isAgentProfileRoute(method, path))
     return profileRequest(path, decodeProfileV4Request(profileGeneration(path), value));
@@ -107,6 +144,17 @@ export function encodeTeamProtocolV4CurrentHttpResponse(
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.stringify(decodeAnalyticsV1Response(decodeAgentAnalytics(value)));
   if (isAgentProfileRoute(method, path) && status < 400) return JSON.stringify(encodeProfileResponse(path, value));
+  if (isQueueEditRoute(method, path) && status === 204) return "{}";
+  if (isQueueEditRoute(method, path))
+    return encodeQueueSnapshot(
+      encodeTeamProtocolV4BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value, options),
+      value,
+    );
+  if (isQueueSnapshotRoute(method, path) && status < 400)
+    return encodeQueueSnapshot(
+      encodeTeamProtocolV4BaseCurrentHttpResponse(method, path, status, value, options),
+      value,
+    );
   if (isConversationUnreadRoute(method, path))
     return encodeTeamProtocolV4BaseCurrentHttpResponse(method, readPath(path), status, value, options);
   if (scopedUsageRoute(method, path) || isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) {
@@ -131,6 +179,14 @@ export function decodeTeamProtocolV4CurrentHttpResponse(
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.parse(JSON.stringify(decodeAgentAnalytics(decodeAnalyticsV1Response(value))));
   if (isAgentProfileRoute(method, path) && status < 400) return decodeProfileResponse(path, value);
+  if (isQueueEditRoute(method, path) && status === 204) return {};
+  if (isQueueEditRoute(method, path))
+    return withQueueEditing(
+      decodeTeamProtocolV4BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value),
+      value,
+    );
+  if (isQueueSnapshotRoute(method, path) && status < 400)
+    return withQueueEditing(decodeTeamProtocolV4BaseCurrentHttpResponse(method, path, status, value), value);
   if (isConversationUnreadRoute(method, path))
     return decodeTeamProtocolV4BaseCurrentHttpResponse(method, readPath(path), status, value);
   if (scopedUsageRoute(method, path) || isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) {

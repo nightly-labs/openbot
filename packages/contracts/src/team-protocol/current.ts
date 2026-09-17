@@ -1,5 +1,6 @@
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
+import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
@@ -18,6 +19,7 @@ export { CHANNEL_DELETE_CAPABILITY, MCP_SERVERS_CAPABILITY };
 
 export const TEAM_CURRENT_CAPABILITIES = [
   ...TEAM_PROTOCOL_V4_CAPABILITIES,
+  TEAM_QUEUE_EDIT_CAPABILITY,
   "agent-profile-generation",
   "agent-analytics",
   "host-analytics",
@@ -50,6 +52,11 @@ export function isConversationUnreadRoute(method: string, path: string): boolean
     method === "POST" &&
     /^\/v1\/agents\/[^/]+\/conversation\/unread$/u.test(new URL(path, "http://openbot.invalid").pathname)
   );
+}
+
+/** The queue snapshot route. Its response carries the `editing` mark beside the frozen keys. */
+export function isQueueSnapshotRoute(method: string, path: string): boolean {
+  return method === "GET" && /^\/v1\/agents\/[^/]+\/queue$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
 export function isAgentProfileRoute(method: string, path: string): boolean {

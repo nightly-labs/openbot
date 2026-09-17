@@ -2,22 +2,29 @@ import { GlassView } from "expo-glass-effect";
 import type { PropsWithChildren } from "react";
 import { Pressable, type ViewStyle } from "react-native";
 
-interface ChatGlassIconButtonProps extends PropsWithChildren {
+interface ChatGlassButtonProps extends PropsWithChildren {
   accessibilityLabel: string;
+  className?: string;
   disabled?: boolean;
   fallbackBackground: ViewStyle["backgroundColor"];
+  height?: number;
   liquidGlassAvailable: boolean;
   onPress: () => void;
+  width?: number;
 }
 
-export function ChatGlassIconButton({
+/** The floating control above the composer: a glass capsule with an icon, a label, or both. */
+export function ChatGlassButton({
   accessibilityLabel,
   children,
+  className = "flex-1 flex-row items-center justify-center",
   disabled = false,
   fallbackBackground,
+  height = 48,
   liquidGlassAvailable,
   onPress,
-}: ChatGlassIconButtonProps) {
+  width,
+}: ChatGlassButtonProps) {
   return (
     <GlassView
       glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -25,11 +32,11 @@ export function ChatGlassIconButton({
       style={{
         backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
         borderCurve: "continuous",
-        borderRadius: 24,
-        height: 48,
+        borderRadius: height / 2,
+        height,
         overflow: "hidden",
         opacity: disabled ? 0.45 : 1,
-        width: 48,
+        width,
       }}
     >
       <Pressable
@@ -37,7 +44,7 @@ export function ChatGlassIconButton({
         accessibilityRole="button"
         accessibilityState={{ disabled }}
         disabled={disabled}
-        className="flex-1 items-center justify-center"
+        className={className}
         hitSlop={4}
         style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
         onPress={onPress}
@@ -46,4 +53,8 @@ export function ChatGlassIconButton({
       </Pressable>
     </GlassView>
   );
+}
+
+export function ChatGlassIconButton(props: Omit<ChatGlassButtonProps, "className" | "height" | "width">) {
+  return <ChatGlassButton {...props} width={48} />;
 }

@@ -5,6 +5,23 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-16
+
+### Added
+
+- Edit a queued message before the agent starts it, on desktop, mobile, and over Team API.
+- Download one file straight from a message with the per-file Download action.
+
+### Fixed
+
+- Keep the original file name on downloads instead of a generated one.
+- Sign in to Google inside the embedded browser.
+- Open WhatsApp Web login instead of the unsupported-browser page.
+
+### Changed
+
+- Hide sidebar row time and date when the panel is narrow.
+
 ## [0.10.1] - 2026-09-15
 
 ### Added
