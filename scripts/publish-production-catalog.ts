@@ -28,6 +28,7 @@ interface PublishedSkill {
   featured: boolean;
   id: string;
   versionId: string;
+  icon: string;
   slug: string;
   name: string;
   description: string;
@@ -69,7 +70,10 @@ export function createPublicationSql(publication: Publication, publishedAt: numb
     const bundleKey = remoteBundleKey(skill);
     statements.push(
       `INSERT INTO marketplace_skills(id, slug, owner_user_id, approved_version_id, installs, featured, show_creator_avatar, created_at, updated_at) VALUES (${sql(skill.id)}, ${sql(skill.slug)}, ${sql(owner.id)}, NULL, 0, ${skill.featured ? 1 : 0}, 1, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, owner_user_id = excluded.owner_user_id, show_creator_avatar = excluded.show_creator_avatar, updated_at = excluded.updated_at;`,
-      `INSERT INTO marketplace_skill_versions(id, skill_id, version, name, description, category, status, rejection_note, bundle_key, bundle_sha256, files_json, icon_key, created_at, reviewed_at) VALUES (${sql(skill.versionId)}, ${sql(skill.id)}, ${skill.version}, ${sql(skill.name)}, ${sql(skill.description)}, ${sql(skill.category)}, 'approved', NULL, ${sql(bundleKey)}, ${sql(skill.bundleSha256)}, ${sql(JSON.stringify(skill.files))}, NULL, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO NOTHING;`,
+      `INSERT INTO marketplace_skill_versions(id, skill_id, version, name, description, category, status, rejection_note, bundle_key, bundle_sha256, files_json, icon_key, created_at, reviewed_at) VALUES (${sql(skill.versionId)}, ${sql(skill.id)}, ${skill.version}, ${sql(skill.name)}, ${sql(skill.description)}, ${sql(skill.category)}, 'approved', NULL, ${sql(bundleKey)}, ${sql(skill.bundleSha256)}, ${sql(JSON.stringify(skill.files))}, ${sql(remoteIconKey(skill))}, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO NOTHING;`,
+      /* The version row is immutable except for its artwork, which a release before the catalog
+         carried icons left empty. Only that column is repaired here. */
+      `UPDATE marketplace_skill_versions SET icon_key = ${sql(remoteIconKey(skill))} WHERE id = ${sql(skill.versionId)};`,
       `UPDATE marketplace_skills SET approved_version_id = ${sql(skill.versionId)}, updated_at = ${publishedAt} WHERE id = ${sql(skill.id)} AND NOT EXISTS (SELECT 1 FROM marketplace_skill_versions current WHERE current.id = marketplace_skills.approved_version_id AND current.version > ${skill.version});`,
     );
   }
@@ -123,6 +127,18 @@ export async function publishProductionCatalog(
         join(artifactRoot, skill.bundle),
         "--content-type",
         "application/zip",
+        "--force",
+      ]);
+      await run(wrangler, [
+        "r2",
+        "object",
+        "put",
+        `${bucket}/${remoteIconKey(skill)}`,
+        mode,
+        "--file",
+        join(artifactRoot, skill.icon),
+        "--content-type",
+        "image/svg+xml",
         "--force",
       ]);
     }
@@ -183,6 +199,7 @@ function parseSkill(value: unknown): PublishedSkill {
     !isString(value.category) ||
     !isNumber(value.version) ||
     !isString(value.bundle) ||
+    !isString(value.icon) ||
     !isString(value.bundleSha256) ||
     !Array.isArray(value.files) ||
     !value.files.every(isString)
@@ -199,6 +216,7 @@ function parseSkill(value: unknown): PublishedSkill {
     category: value.category,
     version: value.version,
     bundle: value.bundle,
+    icon: value.icon,
     bundleSha256: value.bundleSha256,
     files: value.files,
   };
@@ -240,6 +258,12 @@ function parseAgent(value: unknown): PublishedAgent {
 
 function remoteBundleKey(skill: PublishedSkill): string {
   return `skills/${skill.id}/versions/${skill.versionId}.zip`;
+}
+
+/* The key a submission through the app would use, so the icon endpoint serves a catalog Skill the
+   same way it serves a community one. */
+function remoteIconKey(skill: PublishedSkill): string {
+  return `skills/${skill.id}/versions/${skill.versionId}.icon`;
 }
 
 function sql(value: string): string {

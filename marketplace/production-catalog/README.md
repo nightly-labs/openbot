@@ -19,7 +19,7 @@ bun run marketplace:build
 bun run marketplace:publish:production
 ```
 
-The build writes deterministic ZIP bundles, manifests, notices, and checksums to `out/marketplace-production/v2`. The publish command without flags is an offline dry run. Review the catalog and ensure the account database has migrations through `0019_marketplace_presentation.sql` before production publication.
+The build writes deterministic ZIP bundles, one SVG icon per Skill, manifests, notices, and checksums to `out/marketplace-production/v2`. A Skill icon is the artwork of its category, so a listing reads as a set; the mark uses paths, not emoji, because a reader's computer may not carry the font. The publish command without flags is an offline dry run. Review the catalog and ensure the account database has migrations through `0019_marketplace_presentation.sql` before production publication.
 
 To publish after review, authenticate Wrangler for the production account and provide `SKILLS_ADMIN_TOKEN` through the environment, then run:
 
@@ -27,7 +27,7 @@ To publish after review, authenticate Wrangler for the production account and pr
 bun run marketplace:publish:production -- --apply --confirm-production
 ```
 
-The publisher verifies the production admin credential before writing, uploads immutable bundle keys, then inserts approved Skills and Agents with their exact skill-version dependencies. It does not go through community submission limits or pending review. `--local --apply` targets only local storage; mixing local and production flags is rejected.
+The publisher verifies the production admin credential before writing, uploads immutable bundle and icon keys, then inserts approved Skills and Agents with their exact skill-version dependencies. It does not go through community submission limits or pending review. `--local --apply` targets only local storage; mixing local and production flags is rejected.
 
 ## Repeating and updating
 
