@@ -180,6 +180,7 @@ import type {
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
   RemoteDesktopConnectInput,
+  RemoteDesktopConnectResult,
   RemoteDesktopSelectDisplayInput,
   RemoteDesktopSession,
   ReorderServersInput,
@@ -413,7 +414,7 @@ export interface HostDesktopApi {
 
 export interface RemoteDesktopDesktopApi {
   list: () => Promise<RemoteDesktopSession[]>;
-  connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopSession>;
+  connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopConnectResult>;
   selectDisplay: (input: RemoteDesktopSelectDisplayInput) => Promise<void>;
   disconnect: (sessionId: string) => Promise<void>;
   onEvent: (listener: (sessions: RemoteDesktopSession[]) => void) => () => void;

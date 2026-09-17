@@ -1,5 +1,11 @@
 import { EventEmitter } from "node:events";
-import type { RemoteDesktopConnectInput, RemoteDesktopSession } from "@openbot/contracts/ipc";
+import {
+  REMOTE_DESKTOP_ERROR_CODES,
+  type RemoteDesktopConnectInput,
+  type RemoteDesktopConnectResult,
+  type RemoteDesktopSession,
+} from "@openbot/contracts/ipc";
+import { RemoteRequestError } from "./remote-server-errors";
 import type { RemoteServerManager } from "./remote-server-manager";
 
 interface RemoteDesktopEvents {
@@ -27,13 +33,22 @@ export class RemoteDesktopManager extends EventEmitter<RemoteDesktopEvents> {
     return [...this.#sessions.values()].map((session) => structuredClone(session));
   }
 
-  async connect(input: RemoteDesktopConnectInput): Promise<RemoteDesktopSession> {
+  async connect(input: RemoteDesktopConnectInput): Promise<RemoteDesktopConnectResult> {
     const existing = [...this.#sessions.values()].find((session) => session.serverId === input.serverId);
-    if (existing) return structuredClone(existing);
-    const session = await this.#servers.createRemoteDesktopSession(input.serverId);
+    if (existing) return { status: "connected", session: structuredClone(existing) };
+    let session: RemoteDesktopSession;
+    try {
+      session = await this.#servers.createRemoteDesktopSession(input.serverId);
+    } catch (error) {
+      // A named refusal is the host's answer, not a broken call, and the renderer needs the name to
+      // tell a setup step apart from a retry. Anything else still rejects.
+      const refusal = hostRefusal(error);
+      if (!refusal) throw error;
+      return refusal;
+    }
     this.#sessions.set(session.id, session);
     this.#emitChanged();
-    return structuredClone(session);
+    return { status: "connected", session: structuredClone(session) };
   }
 
   async disconnect(sessionId: string): Promise<void> {
@@ -60,4 +75,10 @@ export class RemoteDesktopManager extends EventEmitter<RemoteDesktopEvents> {
   #emitChanged(): void {
     this.emit("changed", this.list());
   }
+}
+
+function hostRefusal(error: unknown): Extract<RemoteDesktopConnectResult, { status: "refused" }> | null {
+  if (!(error instanceof RemoteRequestError)) return null;
+  const errorCode = REMOTE_DESKTOP_ERROR_CODES.find((candidate) => candidate === error.code);
+  return errorCode ? { status: "refused", errorCode, message: error.message } : null;
 }

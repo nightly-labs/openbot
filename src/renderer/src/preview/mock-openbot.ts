@@ -2075,7 +2075,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         };
         remoteDesktopSessions = [...remoteDesktopSessions, session];
         emitRemoteDesktopSessions(remoteDesktopSessions);
-        return clone(session);
+        return { status: "connected", session: clone(session) };
       },
       selectDisplay: async (input) => {
         remoteDesktopSessions = remoteDesktopSessions.map((session) =>

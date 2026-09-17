@@ -17,6 +17,15 @@ describe("external destinations", () => {
     expect(EXTERNAL_DESTINATIONS["opencode-install"]).toBe("https://opencode.ai/docs/");
   });
 
+  it("sends the host owner to the macOS pane that grants screen recording", () => {
+    // A member who is refused a remote screen cannot grant anything: this address is what the host
+    // owner opens, and a wrong one leaves the desktop dark with no way to repair it.
+    expect(EXTERNAL_DESTINATIONS["mac-screen-recording"]).toBe(
+      "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture",
+    );
+    expect(parseExternalDestination("mac-screen-recording")).toBe("mac-screen-recording");
+  });
+
   it("opens no address the renderer invents", () => {
     expect(parseExternalDestination("opencode-auth")).toBe("opencode-auth");
     expect(() => parseExternalDestination("https://opencode.ai/auth")).toThrowError("Unknown external destination.");

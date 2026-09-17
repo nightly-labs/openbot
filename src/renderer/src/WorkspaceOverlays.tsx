@@ -230,6 +230,7 @@ function ServerSettings() {
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
+            onOpenScreenRecordingSettings={() => window.openbot.openExternal("mac-screen-recording")}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
             mcpLoadError={serverSettingsMcpError()}
             onMcpSectionShown={() => void refreshMcpServers()}
@@ -353,6 +354,7 @@ function RemoteDesktop() {
     remoteDesktopWorkspaceSession,
     remoteDesktopConnectingServerId,
     remoteDesktopConnectionError,
+    remoteDesktopConnectionErrorCode,
     hideRemoteDesktopWorkspace,
     disconnectRemoteDesktopWorkspace,
     retryRemoteDesktopWorkspace,
@@ -370,6 +372,7 @@ function RemoteDesktop() {
             session={remoteDesktopWorkspaceSession()}
             connecting={remoteDesktopConnectingServerId() === server.id}
             connectionError={remoteDesktopConnectionError()}
+            connectionErrorCode={remoteDesktopConnectionErrorCode()}
             onHide={hideRemoteDesktopWorkspace}
             onDisconnect={() => disconnectRemoteDesktopWorkspace()}
             onRetry={retryRemoteDesktopWorkspace}

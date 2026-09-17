@@ -1,12 +1,13 @@
 // The devices a host exposes: its embedded browser, and its remote desktop.
 // See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
 
-import type {
-  BrowserControlState,
-  BrowserPreview,
-  BrowserTab,
-  RemoteDesktopCapabilities,
-  RemoteDesktopSession,
+import {
+  type BrowserControlState,
+  type BrowserPreview,
+  type BrowserTab,
+  REMOTE_DESKTOP_ERROR_CODES,
+  type RemoteDesktopCapabilities,
+  type RemoteDesktopSession,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -108,21 +109,7 @@ export function decodeRemoteDesktopSession(value: unknown): RemoteDesktopSession
     throw new Error("Invalid remote control phase.");
   }
   if (!isOneOf(["unknown", "p2p", "relay"] as const, transport)) throw new Error("Invalid remote transport.");
-  if (
-    errorCode !== null &&
-    !isOneOf(
-      [
-        "host_unavailable",
-        "host_permissions_required",
-        "session_capacity_reached",
-        "session_expired",
-        "session_revoked",
-        "protocol_mismatch",
-        "connection_failed",
-      ] as const,
-      errorCode,
-    )
-  ) {
+  if (errorCode !== null && !isOneOf(REMOTE_DESKTOP_ERROR_CODES, errorCode)) {
     throw new Error("Invalid remote control error.");
   }
   return {

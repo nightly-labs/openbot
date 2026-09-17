@@ -911,6 +911,7 @@ export function installOpenbotStub(): void {
           apiUrl: null,
           apiOnline: false,
           remoteDesktopReady: false,
+          remoteDesktopScreenRecordingDenied: false,
           remoteDesktopUnattended: false,
           remoteDesktopActiveSessions: 0,
           remoteDesktopMaxSessions: 4,

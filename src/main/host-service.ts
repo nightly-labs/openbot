@@ -181,6 +181,9 @@ export class HostService extends EventEmitter<HostEvents> {
             },
           }
         : {}),
+      // The gateway owns the answer -- `getStatus` reads it there. This only says it changed, which is
+      // what a member's failed attempt has to do to reach the host owner's open settings panel.
+      onScreenRecordingDenied: () => this.emit("changed", this.getStatus()),
       audit: (event) => {
         if (options.logDirectory) {
           void appendRemoteDiagnosticLog(options.logDirectory, "remote-screen", `${JSON.stringify(event)}\n`);
@@ -244,6 +247,7 @@ export class HostService extends EventEmitter<HostEvents> {
     return {
       ...this.#status,
       remoteDesktopReady: capabilities.ready,
+      remoteDesktopScreenRecordingDenied: this.#remoteScreen.screenRecordingDenied(),
       remoteDesktopUnattended: capabilities.unattended,
       remoteDesktopActiveSessions: capabilities.activeSessions,
       remoteDesktopMaxSessions: capabilities.maxSessions,
@@ -1018,6 +1022,7 @@ function initialHostStatus(identity: TeamIdentity | null, unattended: boolean): 
     apiUrl: null,
     apiOnline: false,
     remoteDesktopReady: false,
+    remoteDesktopScreenRecordingDenied: false,
     remoteDesktopUnattended: unattended,
     remoteDesktopActiveSessions: 0,
     remoteDesktopMaxSessions: 4,

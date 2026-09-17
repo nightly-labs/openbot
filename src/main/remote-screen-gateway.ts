@@ -47,6 +47,9 @@ interface RemoteScreenGatewayOptions {
   audit?: (event: RemoteScreenAuditEvent) => void;
   now?: () => number;
   onDiagnostic?: (source: "sunshine" | "moonlight", message: string) => void;
+  // Called only when the answer changes, so the host owner's screen can show the one refusal a
+  // member cannot act on themselves -- and stop showing it once a member gets through.
+  onScreenRecordingDenied?: (denied: boolean) => void;
 }
 
 export interface RemoteScreenRuntime {
@@ -95,6 +98,9 @@ export class RemoteScreenGateway {
   #runtimeState: SunshineMoonlightRuntimeState | null = null;
   #selectedDisplayId: string | null = null;
   #displaySwitching = false;
+  // Sticky, unlike the runtime's own answer: the refusal below drops the runtime that reported it, so
+  // nothing would be left to ask by the time the host owner looks.
+  #screenRecordingDenied = false;
   #activeStreamStart: { sessionId: string; timeout: ReturnType<typeof setTimeout> } | null = null;
 
   constructor(options: RemoteScreenGatewayOptions) {
@@ -106,6 +112,11 @@ export class RemoteScreenGateway {
     };
     const displays = this.#options.getDisplays?.() ?? [];
     this.#selectedDisplayId = displays.find((display) => display.primary)?.id ?? displays[0]?.id ?? null;
+  }
+
+  // Whether the last attempt to start a stream was refused screen recording by the operating system.
+  screenRecordingDenied(): boolean {
+    return this.#screenRecordingDenied;
   }
 
   capabilities(): RemoteDesktopCapabilities {
@@ -161,12 +172,14 @@ export class RemoteScreenGateway {
       // shown nothing, but ending it belongs to whoever owns it rather than to another member's
       // failed create, and `closeSession` drops the runtime when the last one goes.
       if (this.#sessions.size === 0) await this.#stopRuntime();
+      this.#reportScreenRecordingDenied(true);
       throw new RemoteScreenError(
         503,
         "host_permissions_required",
         "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
       );
     }
+    this.#reportScreenRecordingDenied(false);
     const id = randomUUID();
     const usedStreamerSlots = new Set([...this.#sessions.values()].map((session) => session.streamerSlot));
     const streamerSlot = [1, 2, 3, 4].find((slot) => !usedStreamerSlots.has(slot));
@@ -506,6 +519,12 @@ export class RemoteScreenGateway {
     this.#runtimeState = await this.#runtime.start();
     this.#selectedDisplayId = this.#runtimeState.selectedDisplayId;
     return this.#runtimeState;
+  }
+
+  #reportScreenRecordingDenied(denied: boolean): void {
+    if (this.#screenRecordingDenied === denied) return;
+    this.#screenRecordingDenied = denied;
+    this.#options.onScreenRecordingDenied?.(denied);
   }
 
   #availableDisplays(): RemoteDesktopDisplay[] {
