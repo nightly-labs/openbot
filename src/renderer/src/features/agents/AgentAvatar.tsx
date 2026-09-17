@@ -1,7 +1,19 @@
-import { type Block, BloubBot, defaultCycle, makeBlock, POSES, type StateId } from "@norbert_bodziony/bloub";
+import {
+  type Block,
+  BloubBot,
+  BotEngine,
+  type BotFrame,
+  DEMI_VIEWBOX,
+  defaultCycle,
+  makeBlock,
+  POSES,
+  RAYON,
+  type StateId,
+} from "@norbert_bodziony/bloub";
 import type { AvatarHue } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId } from "../../bloub-avatar";
+import { TypingDots } from "../../components/TypingDots";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 
@@ -75,10 +87,120 @@ export function AgentAvatar(props: AgentAvatarProps) {
         />
       }
     >
-      <span class={`${className()} agent-avatar-custom`} style={props.style} aria-hidden="true">
-        <img src={url() ?? ""} alt="" draggable={false} onError={() => setImageFailed(true)} />
+      <span
+        class={`${className()} agent-avatar-custom`}
+        style={props.style}
+        data-avatar={props.animationState === "thinking" ? "dots" : "image"}
+        data-animation-state={props.animationState}
+        aria-hidden="true"
+      >
+        {/* A photo cannot morph, so the Bloub's own activity decor is drawn around it:
+            `thinking` hides the body behind three dots, every other state flies its rings. */}
+        <Show when={props.animationState !== "thinking"} fallback={<TypingDots class="agent-avatar-dots" />}>
+          <Show
+            when={props.animationState}
+            fallback={<AvatarImage url={url()} onFailed={() => setImageFailed(true)} />}
+          >
+            {(animationState) => (
+              <OrbitedAvatarImage url={url()} animationState={animationState()} onFailed={() => setImageFailed(true)} />
+            )}
+          </Show>
+        </Show>
       </span>
     </Show>
+  );
+}
+
+function AvatarImage(props: { url: string | null; onFailed: () => void }) {
+  return <img src={props.url ?? ""} alt="" draggable={false} onError={() => props.onFailed()} />;
+}
+
+// The rings an orbiting Bloub flies, around a photo instead of a body. They come
+// from the engine rather than from CSS so that a custom avatar and a generated one
+// in the same row carry the same decor: the same six ellipses at the same speed,
+// each split into the half behind the head and the half in front of it. The image
+// sits between those halves, which is what makes them read as orbits.
+function OrbitedAvatarImage(props: { url: string | null; animationState: StateId; onFailed: () => void }) {
+  const engine = new BotEngine(RAYON, props.animationState);
+  const [frame, setFrame] = createSignal(engine.sample(POSES[props.animationState]), { equals: false });
+  let elapsed = POSES[props.animationState];
+
+  createEffect(
+    () => props.animationState,
+    (state) => {
+      // The effect also runs on mount, where the engine already holds the state.
+      // Setting it again would restart its clock and blank the rings for a morph.
+      if (engine.state !== state) engine.setState(state, elapsed);
+    },
+  );
+
+  onSettled(() => {
+    if (prefersReducedMotion()) return;
+    let handle = 0;
+    let previousFrameAt = 0;
+    let drawnAt = -Infinity;
+    const step = (now: number) => {
+      handle = requestAnimationFrame(step);
+      elapsed += previousFrameAt ? Math.min((now - previousFrameAt) / 1000, 0.064) : 0;
+      previousFrameAt = now;
+      if (elapsed - drawnAt < 1 / AVATAR_FPS) return;
+      drawnAt = elapsed;
+      setFrame(engine.sample(elapsed));
+    };
+    handle = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(handle);
+  });
+
+  return (
+    <>
+      <AvatarArcs arcs={frame().arcs} half="back" />
+      <AvatarImage url={props.url} onFailed={props.onFailed} />
+      <AvatarArcs arcs={frame().arcs} half="front" />
+    </>
+  );
+}
+
+function AvatarArcs(props: { arcs: BotFrame["arcs"]; half: "back" | "front" }) {
+  const gradientId = createUniqueId();
+  return (
+    <svg
+      class="agent-avatar-arcs"
+      viewBox={`${-DEMI_VIEWBOX} ${-DEMI_VIEWBOX} ${DEMI_VIEWBOX * 2} ${DEMI_VIEWBOX * 2}`}
+      fill="none"
+      stroke-linecap="round"
+      aria-hidden="true"
+    >
+      <defs>
+        <For each={props.arcs} keyed={false}>
+          {(arc) => (
+            <linearGradient
+              id={`${gradientId}-${arc().id}`}
+              gradientUnits="userSpaceOnUse"
+              x1={arc().grad.x1}
+              y1={arc().grad.y1}
+              x2={arc().grad.x2}
+              y2={arc().grad.y2}
+            >
+              <For each={arc().grad.stops} keyed={false}>
+                {(stop, index) => (
+                  <stop offset={index / Math.max(1, arc().grad.stops.length - 1)} stop-color={stop()} />
+                )}
+              </For>
+            </linearGradient>
+          )}
+        </For>
+      </defs>
+      <For each={props.arcs} keyed={false}>
+        {(arc) => (
+          <path
+            d={props.half === "back" ? arc().back : arc().front}
+            stroke={`url(#${gradientId}-${arc().id})`}
+            stroke-width={arc().width}
+            opacity={arc().opacity}
+          />
+        )}
+      </For>
+    </svg>
   );
 }
 
@@ -157,6 +279,7 @@ function GeneratedAvatar(props: {
       ref={element}
       class={`${props.class} agent-avatar-bloub`}
       style={props.style}
+      data-avatar="generated"
       data-animation-state={props.animationState}
       aria-hidden="true"
     >

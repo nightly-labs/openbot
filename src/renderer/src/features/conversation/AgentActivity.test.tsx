@@ -1,0 +1,67 @@
+import { render, screen } from "@solidjs/testing-library";
+import { createSignal, flush } from "solid-js";
+import { describe, expect, it } from "vitest";
+import type { AgentProfile } from "../../data";
+import { STORY_AGENTS } from "../../preview/fixtures";
+import { AgentActivityIndicator } from "./AgentActivity";
+
+// An avatar is decorative, so it has no accessible name of its own: the agent it
+// belongs to is announced by the indicator's own status text. What it draws is
+// the contract this file guards, and `AgentAvatar` declares that as `data-avatar`.
+const drawnAvatar = (container: HTMLElement) => container.querySelector("[data-avatar]");
+
+function withAvatar(index: number, avatarUrl: string | null): AgentProfile {
+  const agent = STORY_AGENTS[index];
+  if (!agent) throw new Error("Story agents are empty.");
+  return { ...agent, avatarUrl };
+}
+
+describe("AgentActivityIndicator", () => {
+  it("shows the agent's custom avatar while it works", async () => {
+    const agent = withAvatar(0, "openbot-avatar://agent/chief?v=image-1");
+    const { container } = render(() => (
+      <AgentActivityIndicator agent={agent} presentation={{ animation: "orbit", label: "Working on it…" }} />
+    ));
+
+    await screen.findByRole("status");
+    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "image");
+  });
+
+  it("keeps the generated avatar when the agent has no custom image", async () => {
+    const { container } = render(() => (
+      <AgentActivityIndicator
+        agent={withAvatar(0, null)}
+        presentation={{ animation: "orbit", label: "Working on it…" }}
+      />
+    ));
+
+    await screen.findByRole("status");
+    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "generated");
+  });
+
+  it("replaces a custom avatar with dots for the thinking pose, as the generated avatar does", async () => {
+    const agent = withAvatar(0, "openbot-avatar://agent/chief?v=image-1");
+    const { container } = render(() => (
+      <AgentActivityIndicator agent={agent} presentation={{ animation: "thinking", label: "Thinking it through…" }} />
+    ));
+
+    await screen.findByRole("status");
+    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "dots");
+  });
+
+  it("follows the agent it is given, including an avatar that is removed", async () => {
+    const [agent, setAgent] = createSignal(withAvatar(0, "openbot-avatar://agent/chief?v=image-1"));
+    const { container } = render(() => (
+      <AgentActivityIndicator agent={agent()} presentation={{ animation: "orbit", label: "Working on it…" }} />
+    ));
+
+    await screen.findByRole("status");
+    setAgent(withAvatar(1, null));
+    flush();
+    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "generated");
+
+    setAgent(withAvatar(1, "openbot-avatar://agent/sales?v=image-2"));
+    flush();
+    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "image");
+  });
+});

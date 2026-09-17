@@ -1803,6 +1803,61 @@ textarea {
   object-fit: cover;
 }
 
+/* An activity state. The ring sits outside the circle, so the parent stops
+   clipping and the image rounds itself instead. */
+.agent-avatar[data-avatar="image"][data-animation-state] {
+  position: relative;
+  overflow: visible;
+}
+
+.agent-avatar[data-avatar="image"][data-animation-state] > img {
+  border-radius: var(--openbot-radius-pill);
+}
+
+/* The rings reach 1.4 ball radii, which is the margin the Bloub viewBox carries
+   past its body: 316 units drawn over the 200 the image fills, so the layer is
+   158% of the avatar box and sits (158% - 100%) / 2 outside it on each side. */
+.agent-avatar > .agent-avatar-arcs {
+  position: absolute;
+  inset: -29%;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  translate: none;
+}
+
+/* The `thinking` pose: the Bloub hides its body and leaves three dots, and a
+   custom image does the same rather than sitting still through it. The surface
+   the image sat on goes with it, so the dots stand alone. */
+.agent-avatar[data-avatar="dots"] {
+  background: none;
+  box-shadow: none;
+}
+
+.agent-avatar-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.agent-avatar-dots i {
+  --typing-dot-travel: -2px;
+
+  width: 5px;
+  height: 5px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-secondary);
+  animation: typing-dot-pulse 900ms ease-in-out infinite;
+}
+
+.agent-avatar-dots i:nth-child(2) {
+  animation-delay: var(--openbot-duration-fast);
+}
+
+.agent-avatar-dots i:nth-child(3) {
+  animation-delay: var(--openbot-duration-overlay);
+}
+
 .agent-row .agent-avatar {
   --agent-avatar-optical-offset: -4px;
 
@@ -3020,6 +3075,11 @@ textarea {
   }
 
   .account-dock-usage-loading i {
+    animation: none;
+  }
+
+  /* The rings hold a still frame of their own, drawn once by `OrbitedAvatarImage`. */
+  .agent-avatar-dots i {
     animation: none;
   }
 }

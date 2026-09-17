@@ -65,7 +65,6 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
               <AgentAvatar
                 agent={worker.agent}
                 seed={worker.agent ? undefined : worker.id}
-                url={null}
                 motion="working"
                 animationState={presentation().animation}
                 class="agent-activity-avatar"
