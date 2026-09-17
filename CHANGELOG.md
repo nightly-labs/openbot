@@ -5,6 +5,32 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-17
+
+### Added
+
+- Open a Marketplace Skill or Agent on its own detail page, with a crumb back to the listing, a
+  debounced search, and one install control that picks the target agent.
+- Show category artwork on every catalog Skill instead of the generic fallback glyph.
+- Preview Markdown and XLSX spreadsheet attachments in the file preview panel.
+- Create a channel from the sidebar context menus and the sidebar topbar.
+- Name the missing screen recording grant in Remote Control, open System Settings from the host's
+  own Server settings, and re-read the grant with **Check again**.
+- Show a themed splash backdrop on mobile startup.
+
+### Changed
+
+- Show the expanded browser edge to edge. Leave it with the button in the top right corner or with
+  Escape, while a text field in the page keeps Escape.
+- Reduce the hover area of the compact Dynamic Island.
+- Respect per-server mute on the notch.
+
+### Fixed
+
+- Hide the mobile loader that stayed over the chat.
+- Use the shared provider names on mobile and truncate long model labels.
+- Hold the mobile splash until the artwork shows on a fast startup.
+
 ## [0.11.0] - 2026-09-16
 
 ### Added
