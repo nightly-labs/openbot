@@ -442,14 +442,47 @@
   background: var(--openbot-bg-canvas);
 }
 
+.markdown-file-preview {
+  min-width: 0;
+}
+
+.markdown-file-preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: var(--openbot-space-3);
+}
+
+.markdown-file-preview-source-action {
+  flex: 0 0 auto;
+}
+
 .file-preview-markdown {
   max-width: 760px;
   margin: 0 auto;
   padding: 24px 26px 48px;
   color: var(--openbot-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.file-preview-markdown > .message-markdown {
   font-size: var(--openbot-text-md);
   line-height: 1.6;
+}
+
+.file-preview-markdown-source,
+.file-preview-markdown-status {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: 18px 20px;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .file-preview-text {
@@ -501,6 +534,117 @@
   object-fit: contain;
 }
 
+.file-preview-spreadsheet,
+.media-spreadsheet-preview {
+  min-width: 0;
+  min-height: 100%;
+  padding: 20px;
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-status {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-mono);
+  white-space: pre-wrap;
+}
+
+.file-preview-spreadsheet-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.file-preview-spreadsheet-tabs button {
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-control);
+  padding: 6px 10px;
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.file-preview-spreadsheet-tabs button[aria-pressed="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-table-wrap {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.file-preview-spreadsheet-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--openbot-text-sm);
+}
+
+.file-preview-spreadsheet-table caption {
+  padding: 10px 12px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: left;
+}
+
+.file-preview-spreadsheet-table th,
+.file-preview-spreadsheet-table td {
+  border-top: 1px solid var(--openbot-border);
+  border-right: 1px solid var(--openbot-border);
+  padding: 8px 12px;
+  text-align: left;
+  white-space: pre;
+}
+
+.file-preview-spreadsheet-table th {
+  background: var(--openbot-bg-control);
+  font-weight: 600;
+}
+
+.file-preview-spreadsheet-table td:last-child,
+.file-preview-spreadsheet-table th:last-child {
+  border-right: 0;
+}
+
+.file-preview-spreadsheet-note {
+  margin: 10px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.media-spreadsheet-preview {
+  display: flex;
+  width: min(860px, calc(100vw - 78px));
+  height: min(720px, calc(100dvh - 120px));
+  max-width: 100%;
+  max-height: calc(100dvh - 120px);
+  min-height: 0;
+  box-sizing: border-box;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-canvas);
+}
+
+.media-spreadsheet-preview .file-preview-spreadsheet-tabs {
+  flex: 0 0 auto;
+}
+
+.media-spreadsheet-preview .file-preview-spreadsheet-table-wrap {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.media-spreadsheet-preview .file-preview-spreadsheet-note {
+  flex: 0 0 auto;
+}
+
 .file-preview-unsupported {
   display: grid;
   min-height: 100%;
@@ -540,6 +684,61 @@
   border-top: 1px solid var(--openbot-border);
   background: var(--openbot-bg-control);
   padding: 7px 12px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}
+
+.media-markdown-preview {
+  width: min(860px, calc(100vw - 78px));
+  height: min(720px, calc(100dvh - 120px));
+  min-height: min(360px, calc(100dvh - 120px));
+  max-height: calc(100dvh - 120px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+.media-markdown-preview .markdown-file-preview-toolbar {
+  position: static;
+  flex: 0 0 auto;
+  margin: 0;
+  background: var(--openbot-bg-canvas);
+  padding: 12px 20px var(--openbot-space-3);
+}
+
+.media-markdown {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 20px 28px 40px;
+  overflow-wrap: anywhere;
+}
+
+.media-markdown-source {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 20px 28px 40px;
+  min-width: 0;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.media-markdown-truncated {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 20px var(--openbot-space-3);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   text-align: center;
@@ -6443,12 +6642,14 @@ button.chat-action-target:active,
 
 .media-backdrop {
   position: fixed;
-  z-index: 30;
+  z-index: var(--openbot-layer-dialog);
   inset: 0;
   width: 100vw;
   height: 100vh;
   display: grid;
   place-items: center;
+  box-sizing: border-box;
+  padding: 24px;
   background: var(--openbot-bg-overlay);
   backdrop-filter: blur(3px);
   animation: fade-in var(--openbot-duration-normal) ease both;
@@ -6465,10 +6666,11 @@ button.chat-action-target:active,
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 24px;
+  padding: 0;
   pointer-events: none;
   box-shadow: none;
   animation: modal-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -8321,7 +8523,9 @@ button.chat-action-target:active,
 
 .media-caption {
   display: flex;
-  width: 100%;
+  width: min(860px, calc(100vw - 78px));
+  max-width: 100%;
+  box-sizing: border-box;
   align-items: center;
   gap: 6px;
   padding: 8px 2px 0;
@@ -8610,71 +8814,75 @@ body:has(.browser-panel-expanded) .app-frame {
   position: fixed;
   inset: 0;
   z-index: calc(var(--openbot-layer-dropdown) - 2);
-  opacity: 1;
-  transition:
-    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
-    display var(--openbot-duration-overlay) allow-discrete;
 }
 
+/*
+ * The expanded browser fills the window edge to edge. `border: 0` is not redundant: the shared
+ * `.browser-panel` rule above gives every browser surface a `border-left`, which would otherwise
+ * draw a seam down the left edge of a panel that has nothing beside it.
+ *
+ * The panel appears and disappears in one frame, with no transition. The page inside it is a native
+ * view that the renderer cannot animate: it can only be attached once the panel has stopped moving
+ * (`BrowserPanel.tsx`), so any opening transition is time spent looking at an empty panel before the
+ * page arrives.
+ */
 .browser-panel-expanded {
   position: fixed;
-  inset: 5% 2.5%;
-  width: 95%;
-  height: 90%;
+  inset: 0;
+  /* The shared `.browser-panel` rule sizes the sidebar with `--browser-panel-width`; a set width
+   * wins over `inset`, so the panel has to give it up to reach the right window edge. */
+  width: auto;
   z-index: calc(var(--openbot-layer-dropdown) - 1);
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-xl);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: var(--openbot-shadow-overlay);
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  transition:
-    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
-    transform var(--openbot-duration-overlay) var(--openbot-ease-out),
-    display var(--openbot-duration-overlay) allow-discrete;
+  box-shadow: none;
 }
 
 .browser-panel-expanded[hidden],
 .browser-expanded-backdrop[hidden] {
   display: none;
-  opacity: 0;
-  pointer-events: none;
-  transition-duration: var(--openbot-duration-normal);
 }
 
-.browser-panel-expanded[hidden] {
-  transform: translateY(var(--openbot-space-2)) scale(0.96);
-}
-
-@starting-style {
-  .browser-panel-expanded {
-    opacity: 0;
-    transform: translateY(var(--openbot-space-2)) scale(0.96);
-  }
-  .browser-expanded-backdrop {
-    opacity: 0;
-  }
-}
-
+/*
+ * The button is portaled beside the panel rather than laid out inside the header, so it is placed
+ * against the window instead of against the row it belongs to. It is a square box with the same gap
+ * on every side: a 24px square in the 34px header leaves 10px, so 5px above and below, and the same
+ * 5px against the window's right edge. The header reserves this width so the strip cannot scroll
+ * underneath.
+ */
 .browser-hide {
   position: fixed;
-  top: var(--openbot-space-1);
-  right: var(--openbot-space-1);
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--openbot-radius-xs);
   z-index: calc(var(--openbot-layer-dropdown) - 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .browser-panel-expanded,
-  .browser-expanded-backdrop {
-    transition: none;
-  }
 }
 
 .browser-panel-expanded .browser-panel-header {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-3);
-  padding-inline: var(--openbot-space-2);
+  /* The inline end reserves the corner `.browser-hide` sits in, which is fixed to the window rather
+   * than to this header, so the tab strip would otherwise scroll underneath it: the button's own
+   * 8px inset and 24px box, and 8px between it and the last tab. */
+  padding-inline: var(--openbot-space-2) calc(var(--openbot-space-8) + var(--openbot-space-2));
+}
+
+/*
+ * On macOS the window is `titleBarStyle: "hidden"` and the traffic lights are drawn over the page.
+ * `trafficLightPosition: { x: 12, y: 13 }` (`src/main/main-window.ts`) is the top left of the group,
+ * not of one dot: macOS spaces the three 13px dots 23px apart, so they cover x 12..71 and y 13..26,
+ * centre line y 19.5. A full-bleed panel puts this header under them, so the inset clears the whole
+ * group rather than one dot, and it is the same 82px where the app frame's top row starts beside
+ * those dots - one gutter width across the app instead of a second, tighter one here. The header
+ * keeps its default height, which leaves the tab row's centre line on the dots'. The inset stays
+ * part of the drag region, which keeps the window movable at full bleed.
+ */
+.browser-panel-expanded.browser-panel-mac-controls .browser-panel-header {
+  padding-inline-start: 82px;
 }
 
 .browser-panel-expanded .browser-tabs {

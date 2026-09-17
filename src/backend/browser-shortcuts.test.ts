@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chatContextMenuItems,
   isCloseBrowserTabShortcut,
+  isCollapseBrowserShortcut,
   isGlobalSearchShortcut,
   isSelectAllShortcut,
   isToggleDevToolsShortcut,
@@ -42,6 +43,20 @@ describe("isCloseBrowserTabShortcut", () => {
     expect(isCloseBrowserTabShortcut(input({ control: true, shift: true }))).toBe(false);
     expect(isCloseBrowserTabShortcut(input({ meta: true, alt: true }))).toBe(false);
     expect(isCloseBrowserTabShortcut(input({ control: true, type: "keyUp" }))).toBe(false);
+  });
+});
+
+describe("isCollapseBrowserShortcut", () => {
+  it("accepts a bare Escape key-down", () => {
+    expect(isCollapseBrowserShortcut(input({ key: "Escape" }))).toBe(true);
+  });
+
+  it("does not claim modified shortcuts or key-up events", () => {
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", type: "keyUp" }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", meta: true }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", control: true }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", alt: true }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", shift: true }))).toBe(false);
   });
 });
 

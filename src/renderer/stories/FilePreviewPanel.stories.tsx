@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { fn } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import FilePreviewPanel from "../src/features/conversation/FilePreviewPanel";
 import {
@@ -11,6 +11,7 @@ import {
   SOURCE_PREVIEW,
   TEXT_PREVIEW,
   UNSUPPORTED_PREVIEW,
+  XLSX_PREVIEW,
 } from "./file-previews";
 import { STORY_AGENTS } from "./fixtures";
 
@@ -69,6 +70,15 @@ export const MarkdownShort: Story = {
   args: { preview: MARKDOWN_SHORT_PREVIEW },
 };
 
+/** The rendered Markdown view can be replaced with the original source and restored. */
+export const MarkdownSource: Story = {
+  name: "Markdown (source view)",
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "View source" }));
+    await expect(canvas.getByRole("button", { name: "View rendered Markdown" })).toBeVisible();
+  },
+};
+
 /** A plain text file in a monospace block that keeps its spacing and scrolls sideways. */
 export const Text: Story = {
   args: { preview: TEXT_PREVIEW },
@@ -94,6 +104,11 @@ export const Pdf: Story = {
 /** An audio file, played by the built-in controls of the browser. */
 export const Audio: Story = {
   args: { preview: AUDIO_PREVIEW },
+};
+
+/** An XLSX workbook rendered as a scrollable table with sheet tabs. */
+export const Spreadsheet: Story = {
+  args: { preview: XLSX_PREVIEW },
 };
 
 /** A kind that the panel cannot show. The user opens the file externally. */

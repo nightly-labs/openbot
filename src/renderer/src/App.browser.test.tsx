@@ -110,6 +110,18 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Hide browser" }));
     await waitFor(() => expect(card).toHaveFocus());
     expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
+
+    // Escape is the other way out of the expanded browser, and it has to land on the same card.
+    const updatedCard = await screen.findByRole("button", { name: "Open Second preview updated" });
+    await fireEvent.click(updatedCard);
+    await waitFor(() =>
+      expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith(
+        expect.objectContaining({ visible: true, target: "main" }),
+      ),
+    );
+    await fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(updatedCard).toHaveFocus());
+    expect(window.openbot.browser.setVisible).toHaveBeenLastCalledWith({ visible: false });
     expect(composer).toHaveTextContent("Keep this draft");
     expect(window.openbot.browser.close).not.toHaveBeenCalled();
   });

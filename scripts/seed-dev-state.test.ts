@@ -47,7 +47,7 @@ describe("development state seed", () => {
       dryRun: false,
       agents: 4,
       conversations: 4,
-      attachments: 5,
+      attachments: 10,
       teamMembers: 4,
       activeInvites: 1,
       sessions: 4,
@@ -127,7 +127,18 @@ describe("development state seed", () => {
         .flatMap((message) => message.attachments ?? [])
         .map((attachment) => [attachment.id, attachment]),
     );
-    expect(attachments.size).toBe(4);
+    expect(attachments.size).toBe(9);
+    expect([...attachments.values()].map((attachment) => attachment.name).sort()).toEqual([
+      "evidence-map.json",
+      "invoice-2026-09.pdf",
+      "launch-brief.md",
+      "launch-metrics.csv",
+      "openbot-launch-concept.png",
+      "operating-plan.xlsx",
+      "provider-session.log",
+      "standup-recap.mp3",
+      "trust-boundary.svg",
+    ]);
     for (const attachment of attachments.values()) {
       const resolved = await mailbox.resolveAttachment(attachment.id);
       expect(resolved).not.toBeNull();
@@ -267,12 +278,12 @@ describe("development state seed", () => {
     await seedDevelopmentState({ appDataRoot, homeDirectory, agentModel: SEED_FALLBACK_AGENT });
     const generatedRoot = join(homeDirectory, "OpenBot", "Shared", "Transfers", "generated");
     const firstDirectories = await readdir(generatedRoot);
-    expect(firstDirectories).toHaveLength(5);
+    expect(firstDirectories).toHaveLength(10);
 
     await seedDevelopmentState({ appDataRoot, homeDirectory, agentModel: SEED_FALLBACK_AGENT });
 
     const secondDirectories = await readdir(generatedRoot);
-    expect(secondDirectories).toHaveLength(5);
+    expect(secondDirectories).toHaveLength(10);
     expect(secondDirectories.every((directory) => !firstDirectories.includes(directory))).toBe(true);
     for (const directory of firstDirectories) {
       await expect(stat(join(generatedRoot, directory))).rejects.toMatchObject({ code: "ENOENT" });

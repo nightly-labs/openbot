@@ -127,8 +127,13 @@ export function createMainWindowController({
       backgroundColor: "#0b0d0e",
       title: developmentProfile === "test-client" ? "OpenBot Local Client" : "OpenBot Local Host",
       icon: appIconPath,
+      // The dots are drawn over the renderer, so this position is a layout value, not a chrome
+      // detail. macOS spaces the three 13px dots 23px apart, so the group is 59px wide: x 12 leaves
+      // it 11px clear of the 82px where the top row's first control starts, in the app frame and in
+      // the full-bleed browser header alike, and y 13 puts its centre line within half a pixel of
+      // both of those rows. The setup window below uses the same offsets.
       ...(process.platform === "darwin"
-        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 8, y: 14 } }
+        ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 13 } }
         : {}),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),

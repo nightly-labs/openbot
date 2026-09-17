@@ -36,7 +36,13 @@ import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import { applySiteIdentity } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
-import { isCloseBrowserTabShortcut, isGlobalSearchShortcut, isToggleDevToolsShortcut } from "./browser-shortcuts";
+import {
+  EDITABLE_FOCUS_SCRIPT,
+  isCloseBrowserTabShortcut,
+  isCollapseBrowserShortcut,
+  isGlobalSearchShortcut,
+  isToggleDevToolsShortcut,
+} from "./browser-shortcuts";
 import {
   type BrowserTabOwner,
   defaultBrowserEnvironment,
@@ -1039,6 +1045,13 @@ export class BrowserHost {
         this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode: "K", modifiers });
         return;
       }
+      if (isCollapseBrowserShortcut(input)) {
+        // Deliberately no `preventDefault()`: `before-input-event` is synchronous and says nothing
+        // about what has focus, so the page keeps the key and the decision is made after asking it.
+        // A page that closes its own dialog on Escape does that as well as collapsing the panel.
+        this.#collapseOnEscape(tab);
+        return;
+      }
       if (!isCloseBrowserTabShortcut(input)) return;
       event.preventDefault();
       setImmediate(() => void this.close(tab.id).catch(() => undefined));
@@ -1103,6 +1116,45 @@ export class BrowserHost {
       if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerAgentId, true);
       return { action: "deny" };
     });
+  }
+
+  /**
+   * Forward Escape from an embedded page to the renderer, which collapses the expanded browser back
+   * to the preview sidebar. Only the visible page in the main window does this: in Picture in
+   * Picture the page has a window of its own, and forwarding would focus the main window behind it
+   * and run the renderer's Escape handler, which cancels a queued message edit and discards what
+   * that edit added.
+   *
+   * A text field in the page keeps the key instead, so Escape still clears a combo box or cancels an
+   * inline edit. `EDITABLE_FOCUS_SCRIPT` decides that, and it goes to the focused frame rather than
+   * to the top document, where `document.activeElement` is the iframe element and not the editor
+   * inside it. Anything but a definite "not editable" - a frame that went away, a page that refuses
+   * to answer - leaves the key with the page, which is the harmless half of the choice. The focused
+   * element is read with `executeJavaScript`, which gives the page no capability it does not already
+   * have; a preload or a permanent debugger attach would answer synchronously but weaken the
+   * sandboxed view or fight the automation recorder.
+   */
+  #collapseOnEscape(tab: InternalTab): void {
+    if (!this.#collapsesOnEscape(tab)) return;
+    const frame = tab.view.webContents.focusedFrame ?? tab.view.webContents.mainFrame;
+    if (!frame || frame.isDestroyed()) return;
+    void frame
+      .executeJavaScript(EDITABLE_FOCUS_SCRIPT, true)
+      .then((editable) => {
+        // The page answers a frame later, by which time the panel can have collapsed, changed tab,
+        // or moved to Picture in Picture.
+        if (editable !== false) return;
+        if (!this.#collapsesOnEscape(tab) || this.#window.isDestroyed()) return;
+        this.#window.webContents.focus();
+        this.#window.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+        this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+      })
+      .catch(() => undefined);
+  }
+
+  /** Whether this tab is the page the expanded browser shows in the main window. */
+  #collapsesOnEscape(tab: InternalTab): boolean {
+    return this.#target === "main" && this.#visible && this.#activeTabId === tab.id && this.#attachedView === tab.view;
   }
 
   async #syncViewBackground(tab: InternalTab): Promise<void> {
@@ -1409,8 +1461,10 @@ export class BrowserHost {
     } else {
       this.#mountView(tab.view, targetWindow);
     }
-    // Native views are not clipped by the renderer. Match --openbot-radius-xl.
-    tab.view.setBorderRadius(this.#target === "picture-in-picture" ? 0 : 20);
+    // Native views are not clipped by the renderer, so the radius has to be set here. Every
+    // surface the page can occupy is square: the expanded panel is full bleed against the window
+    // edges, and Picture in Picture has always been square.
+    tab.view.setBorderRadius(0);
     // Renderer bounds are CSS pixels; native child views use device-independent window pixels.
     const zoomFactor = targetWindow.webContents.getZoomFactor();
     tab.view.setBounds(

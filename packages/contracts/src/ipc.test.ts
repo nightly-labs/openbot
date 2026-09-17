@@ -793,11 +793,11 @@ describe("renderer-to-main boundary guards", () => {
         name: "plan.xlsx",
         mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("accepts every file preview kind that the panel can show, and nothing else", () => {
-    for (const kind of ["markdown", "text", "image", "pdf", "audio", "video", "none"]) {
+    for (const kind of ["markdown", "text", "image", "pdf", "audio", "video", "spreadsheet", "none"]) {
       expect(isFilePreviewKind(kind)).toBe(true);
     }
     expect(isFilePreviewKind("html")).toBe(false);

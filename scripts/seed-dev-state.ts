@@ -19,6 +19,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { agentNamesById, displayMessageReferences } from "../src/backend/agent/delivery-content";
 import {
@@ -135,6 +136,54 @@ const GENERATED_DIRECTORY_PATTERN =
   /^generated\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHOWCASE_IMAGE_PATH = resolve(process.cwd(), "src", "renderer", "src", "assets", "openbot-logo-dev.png");
 
+function previewPdf(): string {
+  const stream = "BT /F1 18 Tf 24 150 Td (OpenBot file preview) Tj ET";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 320 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  const offsets: number[] = [];
+  let body = "%PDF-1.4\n";
+  objects.forEach((object, index) => {
+    offsets.push(body.length);
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const startXref = body.length;
+  const entries = offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  return `${body}xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${entries}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`;
+}
+
+function previewMp3(): Uint8Array {
+  const frameBytes = 417;
+  const frames = 40;
+  const result = new Uint8Array(frameBytes * frames);
+  for (let index = 0; index < frames; index += 1) result.set([0xff, 0xfb, 0x90, 0x00], index * frameBytes);
+  return result;
+}
+
+function previewXlsx(): Uint8Array {
+  return zipSync({
+    "xl/workbook.xml": strToU8(
+      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="1"/><sheets><sheet name="Operating plan" sheetId="1" r:id="rId1"/><sheet name="Regional view" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>',
+    ),
+    "xl/styles.xml": strToU8(
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="165" formatCode="0.0%"/><numFmt numFmtId="166" formatCode="yyyy-mm-dd"/><numFmt numFmtId="167" formatCode="h:mm"/></numFmts><cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="165"/><xf numFmtId="166"/><xf numFmtId="167"/></cellXfs></styleSheet>',
+    ),
+    "xl/worksheets/sheet1.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Workstream</t></is></c><c r="B1" t="inlineStr"><is><t>Owner</t></is></c><c r="C1" t="inlineStr"><is><t>Status</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Product QA</t></is></c><c r="B2" t="inlineStr"><is><t>Builder</t></is></c><c r="C2" t="inlineStr"><is><t>Ready</t></is></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>Evidence</t></is></c><c r="B3" t="inlineStr"><is><t>Research</t></is></c><c r="C3" t="inlineStr"><is><t>In review</t></is></c></row></sheetData></worksheet>',
+    ),
+    "xl/worksheets/sheet2.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1" t="inlineStr"><is><t>Activation</t></is></c><c r="C1" t="inlineStr"><is><t>Date</t></is></c><c r="D1" t="inlineStr"><is><t>Time</t></is></c><c r="E1" t="inlineStr"><is><t>Empty</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2" s="1"><v>0.55</v></c><c r="C2" s="2"><v>0</v></c><c r="D2" s="3"><v>0.5</v></c><c r="E2" s="1"/></row></sheetData></worksheet>',
+    ),
+  });
+}
+
 interface DevelopmentSeedManifest {
   version: 1;
   createdAt: string;
@@ -188,7 +237,7 @@ export interface DevelopmentSeedSummary {
 const SEED_SUMMARY = {
   agents: 4,
   conversations: 4,
-  attachments: 5,
+  attachments: 10,
   teamMembers: 4,
   activeInvites: 1,
   sessions: 4,
@@ -533,7 +582,12 @@ async function seedAttachments(
   mailbox: MailboxStore,
   agents: Map<string, AgentSummary>,
   transferDirectories: string[],
-): Promise<Record<"brief" | "metrics" | "evidence" | "image", AttachmentSummary>> {
+): Promise<
+  Record<
+    "brief" | "metrics" | "evidence" | "image" | "log" | "svg" | "pdf" | "audio" | "spreadsheet",
+    AttachmentSummary
+  >
+> {
   const chief = requireAgent(agents, "chief");
   const research = requireAgent(agents, "research");
   const launch = requireAgent(agents, "launch");
@@ -573,6 +627,42 @@ async function seedAttachments(
       mimeType: "image/png",
       sourcePath: SHOWCASE_IMAGE_PATH,
     }),
+    log: await store(chief, {
+      name: "provider-session.log",
+      mimeType: "text/plain",
+      bytes: bytes(
+        [
+          "2026-09-16T09:12:04.118Z  info   provider.claude-code   session started",
+          "2026-09-16T09:12:04.402Z  debug  ipc.attachments        preview requested",
+          "2026-09-16T09:12:06.311Z  error  provider.codex         spawn failed code=ENOENT",
+          "  retry 1 of 3 in 500 ms",
+          "  retry 2 of 3 in 1000 ms",
+          "2026-09-16T09:12:08.044Z  info   provider.codex         ready",
+        ].join("\n"),
+      ),
+    }),
+    svg: await store(chief, {
+      name: "trust-boundary.svg",
+      mimeType: "image/svg+xml",
+      bytes: bytes(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200"><rect width="320" height="200" rx="12" fill="#12141a"/><rect x="24" y="32" width="120" height="56" rx="10" fill="#2f6df6"/><rect x="176" y="112" width="120" height="56" rx="10" fill="#f6a62f"/><path d="M144 60 H210 V112" stroke="#8d94a5" stroke-width="3" fill="none"/></svg>',
+      ),
+    }),
+    pdf: await store(chief, {
+      name: "invoice-2026-09.pdf",
+      mimeType: "application/pdf",
+      bytes: bytes(previewPdf()),
+    }),
+    audio: await store(chief, {
+      name: "standup-recap.mp3",
+      mimeType: "audio/mpeg",
+      bytes: previewMp3(),
+    }),
+    spreadsheet: await store(chief, {
+      name: "operating-plan.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      bytes: previewXlsx(),
+    }),
   };
 }
 
@@ -580,7 +670,10 @@ async function seedConversations(
   agentStore: AgentStore,
   mailbox: MailboxStore,
   agents: Map<string, AgentSummary>,
-  attachments: Record<"brief" | "metrics" | "evidence" | "image", AttachmentSummary>,
+  attachments: Record<
+    "brief" | "metrics" | "evidence" | "image" | "log" | "svg" | "pdf" | "audio" | "spreadsheet",
+    AttachmentSummary
+  >,
   clock: SeedClock,
 ): Promise<void> {
   const message = (id: string, author: ConversationMessage["author"], text: string, ago: number): ConversationMessage =>
@@ -669,6 +762,37 @@ async function seedConversations(
           92 * MINUTE,
         ),
         status: "interrupted",
+      },
+      {
+        ...message(
+          "chief-assistant-file-previews",
+          "assistant",
+          [
+            "Here is a file preview pack. Open each one to check its renderer:",
+            "",
+            `- ${file(attachments.brief)}`,
+            `- ${file(attachments.metrics)}`,
+            `- ${file(attachments.evidence)}`,
+            `- ${file(attachments.log)}`,
+            `- ${file(attachments.svg)}`,
+            `- ${file(attachments.pdf)}`,
+            `- ${file(attachments.audio)}`,
+            `- ${file(attachments.image)}`,
+            `- ${file(attachments.spreadsheet)}`,
+          ].join("\n"),
+          43 * MINUTE,
+        ),
+        attachments: [
+          attachments.brief,
+          attachments.metrics,
+          attachments.evidence,
+          attachments.log,
+          attachments.svg,
+          attachments.pdf,
+          attachments.audio,
+          attachments.image,
+          attachments.spreadsheet,
+        ],
       },
     ],
     research: [

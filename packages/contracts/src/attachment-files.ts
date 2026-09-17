@@ -89,6 +89,8 @@ export const ATTACHMENT_FILE_ACCEPT = ATTACHMENT_FILE_EXTENSIONS.map((extension)
 export const SUPPORTED_ATTACHMENT_DESCRIPTION =
   "images, MP3 audio, MOV video, PDF, Office documents, EML, text, Markdown, data, or source files";
 
+export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
 const SUPPORTED_EXTENSIONS = new Set<string>(ATTACHMENT_FILE_EXTENSIONS);
 const EXTENSIONLESS_TEXT_FILES = new Set(["dockerfile", "makefile", "procfile"]);
 
@@ -154,7 +156,7 @@ export function attachmentMimeTypeForName(name: string) {
     case "xls":
       return "application/vnd.ms-excel";
     case "xlsx":
-      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      return XLSX_MIME_TYPE;
     case "ods":
       return "application/vnd.oasis.opendocument.spreadsheet";
     case "ppt":
@@ -184,4 +186,8 @@ export function playableMediaKind(mimeType: string): "audio" | "video" | null {
   if (mimeType.startsWith("audio/")) return "audio";
   if (mimeType.startsWith("video/")) return "video";
   return null;
+}
+
+export function isXlsxMimeType(mimeType: string): boolean {
+  return mimeType === XLSX_MIME_TYPE;
 }
