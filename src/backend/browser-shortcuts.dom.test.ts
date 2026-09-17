@@ -48,8 +48,8 @@ describe("EDITABLE_FOCUS_SCRIPT", () => {
     expect(escapeCollapsesBrowser()).toBe(false);
   });
 
-  it("keeps Escape when a closed shadow root hides what has focus", () => {
-    const host = mount(document.createElement("my-editor"));
+  it.each(["my-editor", "div"])("keeps Escape when a closed shadow root on %s hides what has focus", (name) => {
+    const host = mount(document.createElement(name));
     host.attachShadow({ mode: "closed" }).append(document.createElement("input"));
     host.tabIndex = 0;
     host.focus();
@@ -58,11 +58,13 @@ describe("EDITABLE_FOCUS_SCRIPT", () => {
     expect(escapeCollapsesBrowser()).toBe(false);
   });
 
-  it("releases Escape from a plain custom element with an open root", () => {
-    const host = mount(document.createElement("my-card"));
-    host.attachShadow({ mode: "open" }).append(document.createElement("p"));
-    host.tabIndex = 0;
-    host.focus();
-    expect(escapeCollapsesBrowser()).toBe(true);
+  it("releases Escape from a host whose open root holds nothing editable", () => {
+    for (const name of ["my-card", "div"]) {
+      const host = mount(document.createElement(name));
+      host.attachShadow({ mode: "open" }).append(document.createElement("p"));
+      host.tabIndex = 0;
+      host.focus();
+      expect(escapeCollapsesBrowser()).toBe(true);
+    }
   });
 });
