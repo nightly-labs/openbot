@@ -18,8 +18,10 @@ import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
 import { SplashBackdrop } from "@/shared/components/splash-backdrop";
+import { nativeSplash } from "@/shared/lib/native-splash";
 import { isIOS } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
+import { useSplashGate } from "@/shared/lib/use-splash-gate";
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -31,6 +33,10 @@ function RootNavigator() {
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
+  // The gate owns the native splash and keeps the backdrop up for its minimum
+  // window, so the artwork is seen on a fast release start and not only in Expo
+  // Go, where a slow first frame used to provide that window by accident.
+  const { covered, reportArtwork } = useSplashGate(loading || (!session && isLoaderPresent), nativeSplash);
 
   useLayoutEffect(() => {
     if (loading || !session || (pathname !== "/" && pathname !== "/connected")) setLoadingLabel(null);
@@ -39,8 +45,8 @@ function RootNavigator() {
     // workspace state.
   }, [loading, pathname, session, setLoadingLabel]);
 
-  if (loading || (!session && isLoaderPresent)) {
-    return <SplashBackdrop />;
+  if (covered) {
+    return <SplashBackdrop onArtworkDisplay={reportArtwork} />;
   }
 
   return (
