@@ -1048,7 +1048,7 @@ export class BrowserHost {
         // Deliberately no `preventDefault()`: `before-input-event` is synchronous and says nothing
         // about what has focus, so the page keeps the key and the decision is made after asking it.
         // A page that closes its own dialog on Escape does that as well as collapsing the panel.
-        this.#collapseOnEscape(contents);
+        this.#collapseOnEscape(tab);
         return;
       }
       if (!isCloseBrowserTabShortcut(input)) return;
@@ -1119,16 +1119,30 @@ export class BrowserHost {
 
   /**
    * Forward Escape from an embedded page to the renderer, which collapses the expanded browser back
-   * to the preview sidebar. A text field in the page keeps the key instead, so Escape still clears a
-   * combo box or cancels an inline edit. The focused element is read with `executeJavaScript`, which
-   * gives the page no capability it does not already have; a preload or a permanent debugger attach
-   * would answer synchronously but weaken the sandboxed view or fight the automation recorder.
+   * to the preview sidebar. Only the visible page in the main window does this: in Picture in
+   * Picture the page has a window of its own, and forwarding would focus the main window behind it
+   * and run the renderer's Escape handler, which cancels a queued message edit and discards what
+   * that edit added.
+   *
+   * A text field in the page keeps the key instead, so Escape still clears a combo box or cancels an
+   * inline edit. The question goes to the focused frame rather than to the top document, where
+   * `document.activeElement` is the iframe element and not the editor inside it, and within that
+   * frame it walks open shadow roots for the same reason. Anything but a definite "not editable" -
+   * a closed shadow root, a frame that went away, a page that refuses to answer - leaves the key
+   * with the page, which is the harmless half of the choice. The focused element is read with
+   * `executeJavaScript`, which gives the page no capability it does not already have; a preload or a
+   * permanent debugger attach would answer synchronously but weaken the sandboxed view or fight the
+   * automation recorder.
    */
-  #collapseOnEscape(contents: WebContents): void {
-    void contents
+  #collapseOnEscape(tab: InternalTab): void {
+    if (!this.#collapsesOnEscape(tab)) return;
+    const frame = tab.view.webContents.focusedFrame ?? tab.view.webContents.mainFrame;
+    if (!frame || frame.isDestroyed()) return;
+    void frame
       .executeJavaScript(
         `(() => {
-          const node = document.activeElement;
+          let node = document.activeElement;
+          while (node?.shadowRoot?.activeElement) node = node.shadowRoot.activeElement;
           if (!node) return false;
           if (node.isContentEditable) return true;
           const name = node.tagName;
@@ -1137,12 +1151,20 @@ export class BrowserHost {
         true,
       )
       .then((editable) => {
-        if (editable === true || this.#window.isDestroyed()) return;
+        // The page answers a frame later, by which time the panel can have collapsed, changed tab,
+        // or moved to Picture in Picture.
+        if (editable !== false) return;
+        if (!this.#collapsesOnEscape(tab) || this.#window.isDestroyed()) return;
         this.#window.webContents.focus();
         this.#window.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
         this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
       })
       .catch(() => undefined);
+  }
+
+  /** Whether this tab is the page the expanded browser shows in the main window. */
+  #collapsesOnEscape(tab: InternalTab): boolean {
+    return this.#target === "main" && this.#visible && this.#activeTabId === tab.id && this.#attachedView === tab.view;
   }
 
   async #syncViewBackground(tab: InternalTab): Promise<void> {
