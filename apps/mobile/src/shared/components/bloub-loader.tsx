@@ -124,8 +124,10 @@ export function BloubLoader({
   const reducedMotion = useReducedMotion();
   const idleFrames = useSharedValue<LoaderFrame[] | null>(null);
   const idleFrameIndex = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
+  // Mount hidden when the loader starts covered (app start under the splash), so
+  // the first frame never flashes before the exit sequence runs.
+  const scale = useSharedValue(visible ? 1 : 0);
+  const opacity = useSharedValue(visible ? 1 : 0);
   const exitRevision = useRef(0);
   const finishExit = useCallback(
     (revision: number) => {

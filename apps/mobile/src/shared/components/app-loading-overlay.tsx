@@ -25,9 +25,11 @@ const AppLoadingOverlayContext = createContext<AppLoadingOverlayContextValue | n
 const EXIT_DEADLINE_MS = 2000;
 
 export function AppLoadingOverlayProvider({ children }: PropsWithChildren) {
+  // Starts idle: the splash backdrop covers account loading on its own, so no
+  // loader is present until a screen raises one with setLoadingLabel.
   const [{ label, present }, setOverlay] = useState<{ label: string | null; present: boolean }>({
-    label: "Loading account",
-    present: true,
+    label: null,
+    present: false,
   });
   const visible = label !== null;
   const setLoadingLabel = useCallback((nextLabel: string | null) => {
