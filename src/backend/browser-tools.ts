@@ -101,7 +101,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for login, consent, CAPTCHA, passkey, two-factor authentication, or another authorization step.",
+      "Ask the user to take over a tab for an authorization step you cannot complete yourself, such as a hardware passkey, a prompt on another device, or a secret you cannot find.",
     shape: { tabId },
   }),
   browserTool({
