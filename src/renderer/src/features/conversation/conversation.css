@@ -3539,10 +3539,7 @@
 }
 
 .message-time {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  margin-inline-start: auto;
-  padding-inline-start: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
@@ -3551,8 +3548,8 @@
   transition: opacity var(--openbot-duration-hover) ease;
 }
 
-.message-entry-user .message-time {
-  margin-inline-start: 0;
+.message-author-name > .message-time {
+  padding-inline: 0;
 }
 
 .message-entry:hover .message-actions,

@@ -362,6 +362,7 @@ export function ConversationTimeline() {
                               kind: message()?.author === "you" ? "you" : "agent",
                               name: message()?.author === "you" ? "You" : (props.agent?.name ?? "Agent"),
                             }}
+                            showTime
                             animate={animateEntrance}
                             agents={props.agents}
                             skills={installedSkills()}

@@ -567,7 +567,7 @@ export function ChannelConversation() {
                             message={entry()?.message ?? initialEntry.message}
                             author={entry()?.author ?? initialEntry.author}
                             showAuthor={entry()?.showAuthor ?? initialEntry.showAuthor}
-                            showTime
+                            showTime={entry()?.showAuthor ?? initialEntry.showAuthor}
                             animate={animate}
                             agents={agentList()}
                             referencedMessage={referenced()?.message}

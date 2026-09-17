@@ -1,6 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { createStore, For, Show } from "solid-js";
-import { expect, fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ArrowUp, Button, Plus, X } from "../src/components/ui";
 import type { AgentMessage } from "../src/data";
@@ -59,7 +59,7 @@ const rows: Row[] = [
   {
     id: "m3",
     author: { kind: "you", name: "You" },
-    showAuthor: false,
+    showAuthor: true,
     dayMarker: "Today 12:59 PM",
     message: { id: "m3", author: "you", body: "Good. Start with the numbers.", time: "12:59 PM" },
   },
@@ -98,7 +98,7 @@ function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[]; child
                   message={row.message}
                   author={row.author}
                   showAuthor={row.showAuthor}
-                  showTime
+                  showTime={row.showAuthor}
                   agents={STORY_AGENTS}
                   onSelectAgent={fn()}
                   onOpenLink={fn()}
@@ -157,8 +157,12 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
     />
   ),
   play: async ({ canvas }) => {
-    await expect(await canvas.findAllByRole("article", { name: `Message from ${chief.name}` })).toHaveLength(2);
-    await expect(await canvas.findByRole("article", { name: "Message from You" })).toBeInTheDocument();
+    const chiefMessages = await canvas.findAllByRole("article", { name: `Message from ${chief.name}` });
+    await expect(chiefMessages).toHaveLength(2);
+    await expect(within(chiefMessages[0]).getByText("11:12 PM")).toBeInTheDocument();
+    await expect(within(chiefMessages[1]).queryByText("11:13 PM")).not.toBeInTheDocument();
+    const ownMessage = await canvas.findByRole("article", { name: "Message from You" });
+    await expect(within(ownMessage).getByText("12:59 PM")).toBeInTheDocument();
     // The label after the colon shifts on every turn, the way it does in the agent chat, so the
     // announcement is matched on its subject.
     await expect(
