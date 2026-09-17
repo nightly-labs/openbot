@@ -64,9 +64,27 @@ function* returnToIdleFrames(sourceFrameIndex: number): Generator<LoaderFrame> {
 
 type Schedule = (callback: () => void) => () => void;
 
+// An idle callback only runs once the JS thread reports idle time. Opening a chat
+// and streaming a reply keeps it busy, and the loader's exit waits on preparation,
+// so an idle-only schedule left the loader frozen over the conversation. Race each
+// slice against a short timer so preparation always advances.
+const SLICE_DEADLINE_MS = 32;
+
 function scheduleIdle(callback: () => void) {
-  const id = requestIdleCallback(callback);
-  return () => cancelIdleCallback(id);
+  let settled = false;
+  const stop = () => {
+    settled = true;
+    cancelIdleCallback(idle);
+    clearTimeout(deadline);
+  };
+  const run = () => {
+    if (settled) return;
+    stop();
+    callback();
+  };
+  const idle = requestIdleCallback(run);
+  const deadline = setTimeout(run, SLICE_DEADLINE_MS);
+  return stop;
 }
 
 function prepareFrames(source: Generator<LoaderFrame>, onReady: (frames: LoaderFrame[]) => void, schedule: Schedule) {

@@ -1,10 +1,10 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
-import { router, Stack, useIsFocused } from "expo-router";
+import { router, Stack } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Bot, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
-import { useLayoutEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import Animated, { Easing, FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
 import {
@@ -20,7 +20,7 @@ import { useChannels } from "@/features/channels/components/use-channels";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
+import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -77,8 +77,7 @@ function HeaderIconButton({
 }
 
 export function ConnectedScreen() {
-  const isFocused = useIsFocused();
-  const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
+  const { isLoaderPresent } = useAppLoadingOverlay();
   const { openDrawer } = useAppDrawer();
   const {
     agents,
@@ -106,11 +105,12 @@ export function ConnectedScreen() {
     (serverDirectoryState === "loading" && servers.length === 0) ||
     (hasSelectedServer && activeServer.initialConnectionPending);
   const listReady = !showLoader && !isLoaderPresent;
-  useLayoutEffect(() => {
-    if (!isFocused) return;
-    setLoadingLabel(showLoader ? (hasSelectedServer ? "Connecting to server" : "Loading your servers") : null);
-    return () => setLoadingLabel(null);
-  }, [hasSelectedServer, isFocused, setLoadingLabel, showLoader]);
+  // Connecting to a server continues while the user reads a chat, so the label only
+  // belongs to this screen while it is the route on top.
+  useScreenLoadingLabel(
+    "/connected",
+    showLoader ? (hasSelectedServer ? "Connecting to server" : "Loading your servers") : null,
+  );
   const pinnedAgents = pinnedAgentIds
     .map((agentId) => activeAgents.find((agent) => agent.id === agentId))
     .filter((agent): agent is (typeof activeAgents)[number] => Boolean(agent));
