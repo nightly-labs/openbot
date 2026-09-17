@@ -815,7 +815,7 @@ describe("OpenBot connected desktop shell", () => {
     resolveFirstOpen?.(loadingTab);
   });
 
-  it("reveals the requested browser tab and resumes the agent from the takeover card", async () => {
+  it("opens the requested browser tab from the takeover preview and resumes the agent", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await confirmOnboardingModel();
@@ -856,11 +856,16 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("region", { name: "Browser takeover" })).toHaveTextContent("Action required");
     expect(screen.getByRole("heading", { name: "Complete the step on example.com" })).toBeVisible();
     expect(await screen.findByRole("img", { name: "Preview of Sign in" })).toBeVisible();
-    expect(await screen.findByRole("complementary", { name: "Browser" })).toBeVisible();
-    await waitFor(() => expect(window.openbot.browser.activate).toHaveBeenCalledWith("tab-login"));
     expect(window.openbot.browser.capturePreview).toHaveBeenCalledTimes(1);
     expect(window.openbot.browser.capturePreview).toHaveBeenCalledWith("tab-login");
     expect(screen.queryByRole("textbox", { name: "Message Chief" })).not.toBeInTheDocument();
+    // The request alone never takes the window: the page waits behind the preview on the card.
+    expect(screen.queryByRole("complementary", { name: "Browser" })).not.toBeInTheDocument();
+    expect(window.openbot.browser.activate).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Open Sign in" }));
+    expect(await screen.findByRole("complementary", { name: "Browser" })).toBeVisible();
+    await waitFor(() => expect(window.openbot.browser.activate).toHaveBeenCalledWith("tab-login"));
 
     await fireEvent.click(screen.getByRole("button", { name: "I’m done" }));
     await waitFor(() =>

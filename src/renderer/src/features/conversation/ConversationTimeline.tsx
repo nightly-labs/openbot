@@ -76,6 +76,7 @@ export function ConversationTimeline() {
     openExternalMessageUrl,
     openMoreMessageId,
     openReactionMessageId,
+    openBrowserTakeoverTab,
     openRoutineSettings,
     openSkillSettings,
     openSharedFile,
@@ -501,6 +502,7 @@ export function ConversationTimeline() {
                 tab={browserTakeoverTab()}
                 preview={browserTakeoverPreview().preview}
                 previewStatus={browserTakeoverPreview().status}
+                onOpen={openBrowserTakeoverTab}
                 onComplete={() => respondToBrowserTakeover("complete")}
                 onCancel={() => respondToBrowserTakeover("cancel")}
               />

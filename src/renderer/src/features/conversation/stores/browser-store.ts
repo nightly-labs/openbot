@@ -197,21 +197,18 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     },
   );
 
-  createEffect(
-    () => {
-      const tabId = deps.props.browserTakeover?.tabId;
-      return {
-        tabId,
-        tabExists: Boolean(tabId && browserTabs().some((tab) => tab.id === tabId)),
-        activeTabId: deps.props.activeBrowserTabId,
-      };
-    },
-    ({ tabId, tabExists, activeTabId }) => {
-      if (!tabId || !tabExists) return;
-      deps.panels.setActiveRightPanel("browser-expanded");
-      if (activeTabId !== tabId) activateBrowserTab(tabId);
-    },
-  );
+  /**
+   * A takeover request used to expand the browser over the conversation the moment it arrived,
+   * which took the window away from whatever the user was reading for a step they may not want to
+   * start yet. The card carries the page preview instead, and pressing that preview is what opens
+   * the page -- the same gesture as a preview card in the browser sidebar.
+   */
+  function openBrowserTakeoverTab() {
+    const tab = browserTakeoverTab();
+    if (!tab) return;
+    if (deps.props.activeBrowserTabId !== tab.id) activateBrowserTab(tab.id);
+    deps.panels.setActiveRightPanel("browser-expanded");
+  }
 
   const agentsByThreadId = createMemo(() => new Map(deps.props.agents.map((agent) => [agent.threadId, agent])));
 
@@ -401,6 +398,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTakeoverPreview,
     browserTakeoverResolution,
     respondToBrowserTakeover,
+    openBrowserTakeoverTab,
     activeBrowserControl,
     actingBrowserControl,
     browserControlAgent,
