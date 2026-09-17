@@ -150,7 +150,7 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   if (decimals.length > 100) return value;
   const hasDate = hasDateFormat(format);
   if (hasDate) return formatExcelDate(number, format, date1904);
-  if (hasTimeFormat(format)) return formatExcelTime(number, format);
+  if (hasTimeFormat(format)) return number < 0 ? value : formatExcelTime(number, format);
   const suffix = formatLiteralSuffix(format);
   const hasPercentScaling = unquotedFormat(format).includes("%");
   if (hasPercentScaling) {
