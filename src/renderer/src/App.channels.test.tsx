@@ -219,6 +219,18 @@ it("opens the channel creation dialog from both sidebar context menus", async ()
   await screen.findByRole("dialog", { name: "New channel" });
 });
 
+it("offers New section from the sidebar topbar menu", async () => {
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  await fireEvent.pointerDown(await screen.findByRole("button", { name: "New agent or channel" }), { button: 0 });
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New section" }), { button: 0 });
+  // The closed dropdown leaves its aria-hidden background guard in place under jsdom, so the
+  // editor is reached by accessible name instead of role: the draft section only renders while
+  // the section editor is open.
+  await screen.findByLabelText("New section");
+  await screen.findByLabelText("New section name");
+});
+
 it("creates a channel from a searchable member dialog and keeps the chat open beside settings", async () => {
   const save = vi.spyOn(window.openbot.agent, "channelCommand");
   render(() => <App />);

@@ -1,12 +1,12 @@
 /** The server name, the marketplace or expand toggle, and new agent - plus the window drag region. */
 
 import { Show } from "solid-js";
-import { Bot, Button, DropdownMenu, Hash, Puzzle } from "../../components/ui";
+import { Bot, Button, DropdownMenu, FolderPlus, Hash, Puzzle } from "../../components/ui";
 import { PlusIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarTopbar() {
-  const { props } = useSidebarScope();
+  const { layoutMutable, props, startCreateSection } = useSidebarScope();
   return (
     <div class="window-drag sidebar-topbar">
       <Button
@@ -59,6 +59,12 @@ export function SidebarTopbar() {
                 <DropdownMenu.Item onSelect={() => props.onCreateChannel?.()}>
                   <Hash aria-hidden="true" />
                   New channel
+                </DropdownMenu.Item>
+              </Show>
+              <Show when={layoutMutable()}>
+                <DropdownMenu.Item onSelect={() => startCreateSection()}>
+                  <FolderPlus aria-hidden="true" />
+                  New section
                 </DropdownMenu.Item>
               </Show>
             </DropdownMenu.Content>
