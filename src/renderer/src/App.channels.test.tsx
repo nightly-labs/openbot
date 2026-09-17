@@ -206,6 +206,19 @@ it.each(["owner", "admin", "member"] as const)("limits remote channel deletion f
   }
 });
 
+it("opens the channel creation dialog from both sidebar context menus", async () => {
+  await openSavedChannel();
+  await fireEvent.contextMenu(channelRow("Project room"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New channel" }), { button: 0 });
+  const dialog = await screen.findByRole("dialog", { name: "New channel" });
+  await fireEvent.click(within(dialog).getByRole("button", { name: "Close new channel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "New channel" })).not.toBeInTheDocument());
+
+  await fireEvent.contextMenu(screen.getByLabelText("Sidebar free area"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New channel" }), { button: 0 });
+  await screen.findByRole("dialog", { name: "New channel" });
+});
+
 it("creates a channel from a searchable member dialog and keeps the chat open beside settings", async () => {
   const save = vi.spyOn(window.openbot.agent, "channelCommand");
   render(() => <App />);
