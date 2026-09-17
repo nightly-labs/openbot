@@ -179,7 +179,7 @@ Use `bun run dev:seed --dry-run` to inspect the target and fixture counts withou
 
 ### Marketplace launch catalog
 
-Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:local`, then start or reuse `bun run dev --isolated`. Search **OpenBot Team** in Marketplace to review its Skills and Agents. This seed adds catalog records without resetting app data.
+Seed the approved OpenBot team catalog locally with `bun run marketplace:seed:local`, then start or reuse `bun run dev --isolated`. Search **OpenBot** in Marketplace to review its Skills and Agents. This seed adds catalog records without resetting app data.
 
 `bun run marketplace:build` creates the launch bundles. `bun run marketplace:publish:production` is a dry run; production writes require explicit flags and admin credentials. See the [catalog and publication guide](marketplace/production-catalog/README.md).
 
