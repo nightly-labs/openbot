@@ -8642,18 +8642,17 @@ body:has(.browser-panel-expanded) .app-frame {
 
 /*
  * The button is portaled beside the panel rather than laid out inside the header, so it is placed
- * against the window instead of against the row it belongs to. These values put it on that row: the
- * tabs and the new-tab button are 28px boxes at y 5, so the button takes the same box on the same
- * line rather than a smaller one floating above it, and the 8px right inset matches the header's own
- * inline padding on the opposite side. The header reserves this width so the strip cannot scroll
+ * against the window instead of against the row it belongs to. It is a square box with the same gap
+ * on every side: a 24px square in the 34px header leaves 10px, so 5px above and below, and the same
+ * 5px against the window's right edge. The header reserves this width so the strip cannot scroll
  * underneath.
  */
 .browser-hide {
   position: fixed;
   top: 5px;
-  right: var(--openbot-space-2);
+  right: 5px;
   width: 24px;
-  height: 28px;
+  height: 24px;
   border-radius: var(--openbot-radius-xs);
   z-index: calc(var(--openbot-layer-dropdown) - 1);
 }
