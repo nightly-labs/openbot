@@ -146,6 +146,7 @@ const server = createServer((request, response) => {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html><body style="margin:0">
       <canvas id="grid" width="400" height="200"></canvas>
+      <input aria-label="Grid filter" />
       <output id="grid-state">{}</output>
       <script>
         const cells = {};
@@ -2339,6 +2340,23 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
   }
 }
 
+async function expectSnapshot(browser: BrowserHost, tabId: string): Promise<DynamicRecord> {
+  const result = await callBrowserTool(browser, "snapshot", { tabId });
+  const payload = toolTextPayload(result);
+  if (!result.success || !payload) throw new Error(`Snapshot failed: ${toolError(result)}`);
+  return payload;
+}
+
+function snapshotFocus(snapshot: DynamicRecord): { tag: string; name: string; editable: boolean } | null {
+  const focus = snapshot.focus;
+  if (!isDynamicRecord(focus)) return null;
+  return {
+    tag: isString(focus.tag) ? focus.tag : "",
+    name: isString(focus.name) ? focus.name : "",
+    editable: focus.editable === true,
+  };
+}
+
 async function runCanvasGridScenario(browser: BrowserHost, origin: string): Promise<void> {
   // A spreadsheet, a code editor and a map all paint their own surface, so `type` had no element to
   // resolve, no `value` to write and no contenteditable to select: every attempt to enter data in
@@ -2379,6 +2397,45 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
     if (afterSubmit !== '{"A1":"12","B1":"Done","A2":"next"}') {
       throw new Error(`Canvas grid did not commit the submitted cell: ${afterSubmit}`);
     }
+    // Keystrokes with no target land wherever the page put the focus, and a caller that cannot see
+    // where that is finds out only when the data appears in the wrong place. The canvas leaves it on
+    // the document, which is what tells a caller the page interprets the keys itself.
+    const canvasFocus = snapshotFocus(await expectSnapshot(browser, gridTab.id));
+    if (canvasFocus?.tag !== "body" || canvasFocus.editable !== false) {
+      throw new Error(`Canvas grid snapshot misreported the focus: ${JSON.stringify(canvasFocus)}`);
+    }
+    const focusedField = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      target: { kind: "role", role: "textbox", name: "Grid filter", exact: true },
+      text: "filter",
+    });
+    if (!focusedField.success) throw new Error(`Grid field typing failed: ${toolError(focusedField)}`);
+    const fieldFocus = snapshotFocus(await expectSnapshot(browser, gridTab.id));
+    if (fieldFocus?.tag !== "input" || fieldFocus.name !== "Grid filter" || fieldFocus.editable !== true) {
+      throw new Error(`Grid field snapshot misreported the focus: ${JSON.stringify(fieldFocus)}`);
+    }
+
+    // Every keystroke is its own event, so a deadline reached part way through leaves what the page
+    // already took. A caller told only that the action timed out repeats a send that half happened,
+    // which in a spreadsheet enters the same data twice -- so the error has to carry how far it got,
+    // and that number has to be the truth rather than a guess.
+    const timedOut = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "y".repeat(4_000),
+      timeoutMs: 20,
+    });
+    const reported = /timed out after (\d+) of 4000 characters/.exec(toolError(timedOut));
+    if (timedOut.success || !reported) {
+      throw new Error(`Canvas grid typing hid its progress past the deadline: ${toolError(timedOut)}`);
+    }
+    const sent = Number(reported[1]);
+    const partialCommit = await callBrowserTool(browser, "press", { tabId: gridTab.id, key: "Enter" });
+    if (!partialCommit.success) throw new Error(`Canvas grid commit failed: ${toolError(partialCommit)}`);
+    const partial = JSON.parse(await cellState()).A3;
+    if (partial?.length !== sent || sent === 0 || sent >= 4_000) {
+      throw new Error(`Canvas grid kept ${partial?.length} characters but the error reported ${sent}.`);
+    }
+
     // Replacing and appending are properties of a node's value. Reporting either one for keystrokes
     // the page interprets itself would claim an edit that never happened.
     const modeWithoutTarget = await callBrowserTool(browser, "type", {

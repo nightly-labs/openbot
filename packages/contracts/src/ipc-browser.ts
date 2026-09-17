@@ -48,6 +48,21 @@ export interface BrowserElement {
   frame: { id: string; url: string } | null;
 }
 
+/**
+ * Where a keystroke sent without a target arrives. An application that draws its own surface keeps
+ * the focus itself, so this is the only way a caller can tell whether typing will reach the cell it
+ * means to fill or the box it last used.
+ */
+export interface BrowserFocus {
+  tag: string;
+  role: string | null;
+  name: string;
+  /** True when the node takes text directly: an input, a textarea, or a contenteditable. */
+  editable: boolean;
+  /** True when the focused node is inside a frame rather than the main document. */
+  inFrame: boolean;
+}
+
 export interface BrowserDiagnosticEntry {
   timestamp: string;
   kind: "console" | "network" | "load";
@@ -75,6 +90,7 @@ export interface BrowserSnapshot {
   viewport: BrowserViewport;
   text: string;
   elements: BrowserElement[];
+  focus: BrowserFocus | null;
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];
   image?: { included: boolean; reason: string; width: number; height: number };
