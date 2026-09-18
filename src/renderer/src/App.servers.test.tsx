@@ -465,11 +465,11 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     expect(window.openbot.agent.getSidebarLayout).not.toHaveBeenCalled();
-    expect(window.openbot.browser.listTabs).not.toHaveBeenCalled();
+    expect(window.openbot.browser.getDisplayState).not.toHaveBeenCalled();
 
     emitServers?.([local, negotiated]);
     await waitFor(() => expect(window.openbot.agent.getSidebarLayout).toHaveBeenCalled());
-    expect(window.openbot.browser.listTabs).toHaveBeenCalled();
+    expect(window.openbot.browser.getDisplayState).toHaveBeenCalled();
     // The server was already active, so the workspace reloads on
     // the completed handshake. Nothing asks main to select it a second time.
     expect(window.openbot.servers.select).not.toHaveBeenCalled();
