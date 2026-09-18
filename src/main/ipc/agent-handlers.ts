@@ -50,7 +50,6 @@ import type { RemoteServerManager } from "../remote-server-manager";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
-  parseAgentId,
   parseAgentRequest,
   parseApprovalResponse,
   parseBrowserTakeoverResponse,
@@ -59,6 +58,7 @@ import {
   parseInterrupt,
   parseMarkConversationRead,
   parseMessageReaction,
+  parseOptionalAgentId,
   parsePromptResponse,
   parseQueueEdit,
   parseReadConversationPage,
@@ -126,13 +126,15 @@ export function agentIpcHandlers({
         });
       }),
       getUsage: payloadHandler(parseAgentRequest, (parsed) => {
-        const agentId = parseAgentId(parsed.payload);
+        const agentId = parseOptionalAgentId(parsed.payload);
         return routeToServer(parsed.serverId, {
           local: () => service.getUsage(agentId),
           remote: (serverId) =>
-            remoteServers.supportsCapability(serverId, "model-scoped-usage")
-              ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost)
-              : { limits: [] },
+            agentId
+              ? remoteServers.supportsCapability(serverId, "model-scoped-usage")
+                ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost)
+                : { limits: [] }
+              : remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost),
         });
       }),
       listModels: payloadHandler(parseAgentRequest, (parsed) => {

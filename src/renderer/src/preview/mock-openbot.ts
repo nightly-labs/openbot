@@ -303,8 +303,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let updateStatus = clone(options.updateStatus ?? STORY_UPDATE_STATUS);
   const usage = clone(options.usage ?? STORY_USAGE);
-  const usageTarget = agents[0];
-  const usageTargetKey = usageTarget ? `${usageTarget.provider}:${usageTarget.model}` : null;
   let agentCounter = agents.length;
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
   const localSkills = clone(
@@ -1176,8 +1174,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return mockAgentAnalytics(input, agent);
       },
       getUsage: async (agentId) => {
+        if (!agentId) return clone(usage);
         const agent = agents.find((candidate) => candidate.id === agentId);
-        return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });
+        return clone({
+          limits: agent ? usage.limits.filter((limit) => limit.id === agent.provider) : [],
+        });
       },
       // A saved endpoint's models are composed here, not stored, so a removal drops them the way a
       // respawned OpenCode would: it lists what its config names and nothing else.

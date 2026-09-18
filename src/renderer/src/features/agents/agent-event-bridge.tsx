@@ -58,7 +58,7 @@ export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServerId } = useServers();
-  const { invalidateAccountUsage } = useAuth();
+  const { applyAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents } = useAgents();
   const { setConversationErrors } = useConversationController();
@@ -105,11 +105,7 @@ export function AgentEventBridge() {
         }
         return;
       case "usage-changed":
-        // The payload is dropped on purpose. A broadcast read carries no model scope and comes from
-        // the Codex client whatever agent is active, so it cannot say whose limit it is. The dock's
-        // own reading is scoped to the active agent's provider and model, so it is the only one the
-        // composer can name a provider from.
-        invalidateAccountUsage();
+        applyAccountUsage(event.usage);
         return;
       case "agents-changed":
         applyStoredAgents(event.agents);

@@ -1937,6 +1937,7 @@ describe.sequential("AgentService: providers", () => {
         },
       ],
     });
+    expect((await service.getUsage()).limits).toHaveLength(1);
     await service.sendMessage({ agentId: "chief", text: "First task" });
     await service.sendMessage({ agentId: "sales-outbound", text: "Second task" });
     await waitFor(
@@ -2098,6 +2099,61 @@ describe.sequential("AgentService: providers", () => {
       method: "account/rateLimits/read",
       params: { model: "claude-sonnet-5" },
     });
+  });
+
+  it("reads account-wide usage from every connected provider", async () => {
+    process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await service.initialize();
+    const codex = clients.get("codex");
+    const claude = clients.get("claude");
+    if (!codex || !claude) throw new Error("Test clients were not created.");
+    codex.accountRateLimits = {
+      rateLimits: {
+        limitId: "codex",
+        secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      },
+      rateLimitsByLimitId: {
+        luna: {
+          limitId: "luna",
+          secondary: { usedPercent: 70, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+        },
+      },
+    };
+    claude.accountRateLimits = {
+      rateLimits: {
+        limitId: "claude",
+        primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: 1_787_040_000 },
+        secondary: { usedPercent: 55, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      },
+      rateLimitsByLimitId: null,
+    };
+
+    await expect(service.getUsage()).resolves.toMatchObject({
+      limits: [
+        {
+          id: "claude",
+          primary: { usedPercent: 100, windowDurationMins: 300 },
+          secondary: { usedPercent: 55, windowDurationMins: 10_080 },
+        },
+        {
+          id: "codex",
+          secondary: { usedPercent: 15, windowDurationMins: 10_080 },
+        },
+      ],
+    });
+    expect((await service.getUsage()).limits.map((limit) => limit.id)).toEqual(["claude", "codex"]);
   });
 
   it("maps provider browser tool calls to the stable OpenBot thread", async () => {

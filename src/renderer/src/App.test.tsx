@@ -261,9 +261,9 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App landingPreview />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    const usageButton = await screen.findByRole("button", { name: "Weekly usage, 59% left" });
+    const usageButton = await screen.findByRole("button", { name: "Usage, ChatGPT 59% left" });
     await fireEvent.click(usageButton);
-    expect(screen.getByRole("dialog", { name: "Weekly usage" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Usage" })).toBeInTheDocument();
 
     const accountButton = screen.getByRole("button", { name: "Open account actions" });
     await fireEvent.click(accountButton);

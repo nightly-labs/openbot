@@ -50,14 +50,13 @@ function grokRateLimits(value: unknown): AccountRateLimitsReadResult {
   const durationMins = Number.isFinite(start) && Number.isFinite(end) ? (end - start) / 60_000 : Number.NaN;
   const periodType = getString(period, "type") ?? getString(period, "periodType");
   const weekly = periodType ? periodType.toLowerCase().includes("weekly") : nearWeeklyDuration(durationMins);
-  if (!weekly) return { rateLimits: null, rateLimitsByLimitId: null };
   return {
     rateLimits: {
       limitId: "grok",
       primary: null,
       secondary: {
         usedPercent,
-        windowDurationMins: Number.isFinite(durationMins) ? durationMins : 10_080,
+        windowDurationMins: Number.isFinite(durationMins) ? durationMins : weekly ? 10_080 : null,
         resetsAt: Number.isFinite(end) ? end / 1_000 : null,
       },
     },

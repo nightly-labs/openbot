@@ -191,6 +191,7 @@ function usageWithRemaining(remainingPercent: number): AccountUsage {
   return {
     limits: STORY_USAGE.limits.map((limit) => ({
       ...limit,
+      primary: limit.primary ? { ...limit.primary, usedPercent } : null,
       secondary: limit.secondary ? { ...limit.secondary, usedPercent } : null,
     })),
   };
@@ -269,7 +270,7 @@ const meta = {
   argTypes: {
     remainingPercent: {
       control: { type: "range", min: 0, max: 100, step: 1 },
-      description: "Weekly usage remaining percentage.",
+      description: "Usage remaining percentage for connected providers.",
     },
     updateState: {
       control: "inline-radio",
@@ -304,7 +305,7 @@ export const DiscordShelf: Story = {
     docs: {
       description: {
         story:
-          "Recommended: the compact shelf uses the account identity for secondary actions, with readable weekly usage and direct Settings.",
+          "Recommended: the compact shelf uses the account identity for secondary actions, with readable provider usage and direct Settings.",
       },
     },
   },
