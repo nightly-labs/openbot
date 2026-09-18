@@ -562,6 +562,7 @@ export function ChatView({
                   onChangeDraft={setDraft}
                   onSend={sendMessage}
                   onStop={requestStop}
+                  keyboardProgress={motion.keyboardProgress}
                   stopping={stopping}
                 />
               ) : null}

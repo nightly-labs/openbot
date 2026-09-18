@@ -17,7 +17,19 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
+import Animated, {
+  cubicBezier,
+  Easing,
+  Extrapolation,
+  interpolate,
+  ReduceMotion,
+  type SharedValue,
+  useAnimatedStyle,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
@@ -45,7 +57,13 @@ const ATTACHMENT_BLOCK_HEIGHT = 120;
 // just wrote. An ease-in-out spends its first half barely moving, which reads as
 // the card answering late, so hold the shape open with a strong ease-out instead.
 const SHAPE_DURATION = 120;
+// Room around the placeholder when the composer rests as a pill.
+const PILL_INSET = 20;
+
+const AnimatedGlassView = Animated.createAnimatedComponent(GlassView);
 const SHAPE_EASING = cubicBezier(0.23, 1, 0.32, 1);
+// The same curve for worklet-driven values, which take Reanimated's own Easing.
+const SHAPE_EASING_FN = Easing.bezier(0.23, 1, 0.32, 1);
 
 interface ChatComposerProps {
   sendLabel?: string;
@@ -65,6 +83,8 @@ interface ChatComposerProps {
   onSend: (text: string) => void;
   /** Present only while a turn is running and the surface can stop it. */
   onStop?: () => void;
+  /** 0 with the keyboard down, 1 with it up, and every value a swipe passes through. */
+  keyboardProgress: SharedValue<number>;
   stopping?: boolean;
   attachments: ChatAttachments;
   sending: boolean;
@@ -91,6 +111,7 @@ export function ChatComposer({
   onChangeDraft,
   onSend,
   onStop,
+  keyboardProgress,
   stopping = false,
   attachments,
   sending,
@@ -142,8 +163,63 @@ export function ChatComposer({
     Math.min(MAX_INPUT_LINES, wrap.lines) * lineHeight + FIELD_VERTICAL_PADDING,
   );
   const attachmentsOpen = !sending && attachments.items.length > 0;
-  const shapeDuration = useReducedMotion() ? 0 : SHAPE_DURATION;
+  const reducedMotion = useReducedMotion();
+  const shapeDuration = reducedMotion ? 0 : SHAPE_DURATION;
+
+  // At rest the composer is a pill that hugs its placeholder. It opens into the
+  // full field as the keyboard rises, so an interactive dismissal closes it
+  // frame by frame instead of snapping when the keyboard finally commits.
+  const [placeholderWidth, setPlaceholderWidth] = useState(0);
+  const cardWidth = windowWidth - BAR_INSET * 2;
+  const pillWidth = placeholderWidth > 0 ? Math.min(cardWidth, placeholderWidth + PILL_INSET * 2) : cardWidth;
+  // Content outlives the keyboard: a draft or an attachment has to stay
+  // readable after a dismissal, so it holds the composer open on its own.
+  const held = useSharedValue(hasDraft ? 1 : 0);
+  useEffect(() => {
+    held.set(
+      withTiming(hasDraft ? 1 : 0, {
+        duration: reducedMotion ? 0 : SHAPE_DURATION,
+        reduceMotion: ReduceMotion.System,
+      }),
+    );
+  }, [hasDraft, held, reducedMotion]);
+  const expansion = useDerivedValue(() => Math.max(Math.min(1, keyboardProgress.get()), held.get()));
+  const cardStyle = useAnimatedStyle(() => ({
+    width: interpolate(expansion.get(), [0, 1], [pillWidth, cardWidth]),
+  }));
+  // The controls have no room in the pill, so they arrive with the width.
+  const controlStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(expansion.get(), [0.45, 1], [0, 1], Extrapolation.CLAMP),
+  }));
+  const plusStyle = useAnimatedStyle(() => {
+    const width = interpolate(expansion.get(), [0, 1], [pillWidth, cardWidth]);
+    return {
+      opacity: interpolate(expansion.get(), [0.45, 1], [0, 1], Extrapolation.CLAMP),
+      // The card centres while it is narrow, so follow its left edge in.
+      transform: [{ translateX: (cardWidth - width) / 2 }],
+    };
+  });
+  // The card shape drives the same slide, so it has to tween too. Reading
+  // `stacked` straight from React would snap the text sideways.
+  const stackedValue = useSharedValue(stacked ? 1 : 0);
+  useEffect(() => {
+    stackedValue.set(
+      withTiming(stacked ? 1 : 0, {
+        duration: reducedMotion ? 0 : SHAPE_DURATION,
+        easing: SHAPE_EASING_FN,
+        reduceMotion: ReduceMotion.System,
+      }),
+    );
+  }, [stacked, stackedValue, reducedMotion]);
+  const fieldSlideStyle = useAnimatedStyle(() => {
+    const open = interpolate(stackedValue.get(), [0, 1], [ROW_CONTROL_INSET - FIELD_INSET, 0]);
+    return { transform: [{ translateX: interpolate(expansion.get(), [0, 1], [PILL_INSET - FIELD_INSET, open]) }] };
+  });
   const [focused, setFocused] = useState(false);
+  // React-side mirror of the resting shape. Focus and content change once per
+  // interaction, never per frame, so this drives hit testing without a render
+  // during the animation.
+  const resting = !focused && !hasDraft;
   const latestTextRef = useRef(draft);
   const [sendGate] = useState(createComposerSendGate);
 
@@ -265,18 +341,44 @@ export function ChatComposer({
       ) : null}
       <View
         pointerEvents="box-none"
-        style={{ paddingHorizontal: BAR_INSET, paddingTop: 8, paddingBottom: Math.max(bottomInset, 10) }}
+        style={{
+          alignItems: "center",
+          paddingHorizontal: BAR_INSET,
+          paddingTop: 8,
+          paddingBottom: Math.max(bottomInset, 10),
+        }}
       >
+        {/* Measured in the bar, not the card: inside, the card's animating width
+            would clamp the reading and feed an ever narrower pill back into it. */}
+        <NativeText
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          pointerEvents="none"
+          numberOfLines={1}
+          className="font-sans"
+          style={{ position: "absolute", left: 0, top: 0, opacity: 0, fontSize: 16, lineHeight: 22 }}
+          onLayout={({ nativeEvent }) =>
+            setPlaceholderWidth((current) =>
+              Math.abs(current - nativeEvent.layout.width) < 1 ? current : nativeEvent.layout.width,
+            )
+          }
+        >
+          {`Ask ${agentName}`}
+        </NativeText>
         <GestureDetector gesture={pan}>
-          <GlassView
+          <AnimatedGlassView
             glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-            style={{
-              backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
-              borderCurve: "continuous",
-              borderRadius: 24,
-              overflow: "hidden",
-              opacity: disabled ? 0.45 : 1,
-            }}
+            style={[
+              {
+                backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
+                borderCurve: "continuous",
+                borderRadius: 24,
+                overflow: "hidden",
+                opacity: disabled ? 0.45 : 1,
+              },
+              cardStyle,
+            ]}
           >
             {/* Measure wrapping independently of UITextView's constrained contentSize.
                 This node keeps the field's width whatever shape the card is in, so
@@ -377,117 +479,123 @@ export function ChatComposer({
                   // overlay the field, so the text clears their width instead.
                   marginBottom: stacked ? TOOLBAR_HEIGHT : 0,
                   // The field keeps one layout width and slides. Animating the
-                  // inset would re-wrap the text on every frame of the
-                  // transition, which reads as the text shaking. A single row is
-                  // only ever used while the text fits the narrower measure, so
-                  // the slid text still stops short of the controls.
+                  // inset would re-wrap the text on every frame, which reads as
+                  // the text shaking. A single row is only ever used while the
+                  // text fits the narrower measure, so the slid text still stops
+                  // short of the controls.
                   paddingLeft: FIELD_INSET,
                   paddingRight: FIELD_INSET,
-                  transform: [{ translateX: stacked ? 0 : ROW_CONTROL_INSET - FIELD_INSET }],
-                  transitionProperty: ["height", "marginBottom", "transform"],
+                  transitionProperty: ["height", "marginBottom"],
                   transitionDuration: shapeDuration,
                   transitionTimingFunction: SHAPE_EASING,
                 }}
               >
-                <TextInput
-                  ref={inputRef}
-                  nativeID="chat-composer-input"
-                  accessibilityLabel={`Message ${agentName}`}
-                  accessibilityState={{ disabled }}
-                  editable={!disabled}
-                  showSoftInputOnFocus={!disabled}
-                  className="min-w-0 font-sans text-foreground"
-                  placeholder={`Ask ${agentName}`}
-                  autoCorrect
-                  autoCapitalize="sentences"
-                  placeholderTextColor={muted}
-                  multiline
-                  scrollEnabled={wrap.lines > MAX_INPUT_LINES}
-                  returnKeyType="default"
-                  submitBehavior="newline"
-                  selectionColor={foreground}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    fontSize: 16,
-                    lineHeight: 22,
-                    paddingVertical: FIELD_VERTICAL_PADDING / 2,
-                    textAlignVertical: "top",
-                  }}
-                  onSelectionChange={({ nativeEvent }) =>
-                    setCursor(
-                      nativeEvent.selection.start === nativeEvent.selection.end ? nativeEvent.selection.end : -1,
-                    )
-                  }
-                  onFocus={() => {
-                    sendGate.focus();
-                    setFocused(true);
-                  }}
-                  onBlur={() => setFocused(false)}
-                  onChangeText={(text) => {
-                    sendGate.edit();
-                    const pasted = !sending ? largePastedText(latestTextRef.current, text) : null;
-                    if (pasted) {
-                      // Keep the pasted text until its attachment is durable. A failed write must not lose it.
-                      latestTextRef.current = text;
-                      onChangeDraft(text);
-                      void Promise.resolve()
-                        .then(() => attachments.paste({ type: "text", text: pasted.text }, () => {}))
-                        .then(() => {
-                          if (latestTextRef.current !== text) return;
-                          latestTextRef.current = pasted.draft;
-                          onChangeDraft(pasted.draft);
-                        })
-                        .catch((error) => {
-                          Alert.alert(
-                            "Could not attach pasted text",
-                            error instanceof Error ? error.message : "Try again.",
-                          );
-                        });
-                      return;
+                {/* The slide lives here, not on the box above: a CSS transition
+                    and an animated style must not share one node. */}
+                <Animated.View style={[{ flex: 1 }, fieldSlideStyle]}>
+                  <TextInput
+                    ref={inputRef}
+                    nativeID="chat-composer-input"
+                    accessibilityLabel={`Message ${agentName}`}
+                    accessibilityState={{ disabled }}
+                    editable={!disabled}
+                    showSoftInputOnFocus={!disabled}
+                    className="min-w-0 font-sans text-foreground"
+                    placeholder={`Ask ${agentName}`}
+                    autoCorrect
+                    autoCapitalize="sentences"
+                    placeholderTextColor={muted}
+                    multiline
+                    scrollEnabled={wrap.lines > MAX_INPUT_LINES}
+                    returnKeyType="default"
+                    submitBehavior="newline"
+                    selectionColor={foreground}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 16,
+                      lineHeight: 22,
+                      paddingVertical: FIELD_VERTICAL_PADDING / 2,
+                      textAlignVertical: "top",
+                    }}
+                    onSelectionChange={({ nativeEvent }) =>
+                      setCursor(
+                        nativeEvent.selection.start === nativeEvent.selection.end ? nativeEvent.selection.end : -1,
+                      )
                     }
-                    const next = editMentionDraft(latestTextRef.current, text);
-                    latestTextRef.current = next;
-                    onChangeDraft(next);
-                  }}
-                  onSubmitEditing={({ nativeEvent }) => {
-                    if (!disabled && !sending && sendGate.submit())
-                      onSend(editMentionDraft(latestTextRef.current, nativeEvent.text));
-                  }}
-                  onEndEditing={({ nativeEvent: { text } }) => {
-                    // Native editing can end before the send button's release event,
-                    // while TextInput.isFocused() is still waiting for onBlur.
-                    latestTextRef.current = editMentionDraft(latestTextRef.current, text);
-                    if (sendGate.commit() && !disabled && !sending) onSend(latestTextRef.current);
-                  }}
-                >
-                  {/* TextInput requires native text children for editable attributed text. */}
-                  <NativeText>
-                    {display.mentions.map((mention, index) => (
-                      <NativeText key={mention.start}>
-                        {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
-                        <NativeText style={{ color: action }}>
-                          {displayText.slice(mention.start, mention.end)}
+                    onFocus={() => {
+                      sendGate.focus();
+                      setFocused(true);
+                    }}
+                    onBlur={() => setFocused(false)}
+                    onChangeText={(text) => {
+                      sendGate.edit();
+                      const pasted = !sending ? largePastedText(latestTextRef.current, text) : null;
+                      if (pasted) {
+                        // Keep the pasted text until its attachment is durable. A failed write must not lose it.
+                        latestTextRef.current = text;
+                        onChangeDraft(text);
+                        void Promise.resolve()
+                          .then(() => attachments.paste({ type: "text", text: pasted.text }, () => {}))
+                          .then(() => {
+                            if (latestTextRef.current !== text) return;
+                            latestTextRef.current = pasted.draft;
+                            onChangeDraft(pasted.draft);
+                          })
+                          .catch((error) => {
+                            Alert.alert(
+                              "Could not attach pasted text",
+                              error instanceof Error ? error.message : "Try again.",
+                            );
+                          });
+                        return;
+                      }
+                      const next = editMentionDraft(latestTextRef.current, text);
+                      latestTextRef.current = next;
+                      onChangeDraft(next);
+                    }}
+                    onSubmitEditing={({ nativeEvent }) => {
+                      if (!disabled && !sending && sendGate.submit())
+                        onSend(editMentionDraft(latestTextRef.current, nativeEvent.text));
+                    }}
+                    onEndEditing={({ nativeEvent: { text } }) => {
+                      // Native editing can end before the send button's release event,
+                      // while TextInput.isFocused() is still waiting for onBlur.
+                      latestTextRef.current = editMentionDraft(latestTextRef.current, text);
+                      if (sendGate.commit() && !disabled && !sending) onSend(latestTextRef.current);
+                    }}
+                  >
+                    {/* TextInput requires native text children for editable attributed text. */}
+                    <NativeText>
+                      {display.mentions.map((mention, index) => (
+                        <NativeText key={mention.start}>
+                          {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
+                          <NativeText style={{ color: action }}>
+                            {displayText.slice(mention.start, mention.end)}
+                          </NativeText>
                         </NativeText>
-                      </NativeText>
-                    ))}
-                    {displayText.slice(display.mentions.at(-1)?.end ?? 0)}
-                  </NativeText>
-                </TextInput>
+                      ))}
+                      {displayText.slice(display.mentions.at(-1)?.end ?? 0)}
+                    </NativeText>
+                  </TextInput>
+                </Animated.View>
               </Animated.View>
-              <View
+              <Animated.View
                 pointerEvents="box-none"
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: TOOLBAR_HEIGHT,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  paddingHorizontal: 8,
-                }}
+                style={[
+                  {
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: TOOLBAR_HEIGHT,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    paddingHorizontal: 8,
+                  },
+                  controlStyle,
+                ]}
               >
                 <Pressable
                   accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
@@ -518,23 +626,25 @@ export function ChatComposer({
                     <ArrowUp color={String(primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
                   )}
                 </Pressable>
-              </View>
+              </Animated.View>
             </View>
-          </GlassView>
+          </AnimatedGlassView>
         </GestureDetector>
         {/* Outside the glass container on purpose. A SwiftUI Menu anchored
             inside one makes iOS morph that container into the menu, which ate
             the whole composer whenever the card was no taller than the row. */}
-        <View
+        <Animated.View
           pointerEvents="box-none"
           // Absolute insets here are measured from the bar's outer edge, so they
           // have to carry the bar's own padding to land on the card.
-          style={{ position: "absolute", left: BAR_INSET + 8, bottom: Math.max(bottomInset, 10) + 4 }}
+          style={[{ position: "absolute", left: BAR_INSET + 8, bottom: Math.max(bottomInset, 10) + 4 }, plusStyle]}
         >
           <View
             ref={attachmentButton}
             collapsable={false}
-            pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
+            // Inert while the composer rests as a pill: the control is invisible
+            // there, and a tap on the pill has to reach the field instead.
+            pointerEvents={resting || disabled || sending || attachments.preparing ? "none" : "auto"}
             // SwiftUI's Menu owns the tap and @expo/ui documents onOpenMenu as
             // never firing on iOS, so answer the press itself. pointerEvents
             // already blocks this while the button cannot act.
@@ -579,7 +689,7 @@ export function ChatComposer({
               </View>
             </MenuView>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </View>
   );
