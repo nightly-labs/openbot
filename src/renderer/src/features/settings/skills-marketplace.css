@@ -1296,9 +1296,16 @@
   align-items: center;
   gap: var(--openbot-space-2);
 }
-.marketplace-plugin-heading-actions .ui-button {
-  height: var(--openbot-control-md);
+/* Copy link stands beside the install group, so it takes the group's outside: the same height, which
+   is one control plus the group's padding, and the same shell. Two pills of one size read as a pair;
+   a shorter one reads as a smaller offer. */
+.marketplace-plugin-share {
+  height: calc(var(--openbot-control-md) + var(--openbot-space-1) * 2);
+  padding-inline: var(--openbot-space-4);
+  border: 0;
   border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  box-shadow: inset 0 0 0 1px var(--openbot-border-grouped);
 }
 /* A label-and-icon button carries no size of its own for the mark beside the word, so these take the
    small one: a 24px icon dwarfs a one-word label. */

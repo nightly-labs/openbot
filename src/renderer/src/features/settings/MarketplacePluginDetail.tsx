@@ -124,7 +124,7 @@ export function MarketplacePluginDetail(props: {
           </Text>
         </div>
         <div class="marketplace-plugin-heading-actions">
-          <Button variant="outline" onClick={() => void props.onCopyLink()}>
+          <Button class="marketplace-plugin-share" variant="outline" onClick={() => void props.onCopyLink()}>
             <Link2 aria-hidden="true" />
             Copy link
           </Button>
