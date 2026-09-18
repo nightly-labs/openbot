@@ -1258,3 +1258,150 @@
 .agent-marketplace-panel[data-preview-loading] .agent-publish-card .skills-publish-actions > .ui-button:disabled {
   opacity: 1;
 }
+
+/*
+ * The plugin page. One column read top to bottom: who published this, what it can be asked, what it
+ * brings, and the listing facts. It borrows `.marketplace-detail-page` for the outer box and then
+ * lays out its own sections, because the agent page's two-column section nav answers a different
+ * question - which of three things do I want to read - than a plugin listing does.
+ */
+.marketplace-plugin-detail {
+  display: grid;
+  gap: var(--openbot-space-6);
+  align-content: start;
+}
+/* One line: the icon, the name over its tagline, and the actions at the end. The publisher is named
+   in the information list instead, where a reader who wants it will look. */
+.marketplace-plugin-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2) var(--openbot-space-4);
+}
+.marketplace-plugin-heading-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.marketplace-plugin-heading-copy h1 {
+  margin: 0;
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-medium);
+}
+.marketplace-plugin-heading-copy p {
+  margin: var(--openbot-space-1) 0 0;
+}
+.marketplace-plugin-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+.marketplace-plugin-heading-actions .ui-button {
+  height: var(--openbot-control-md);
+  border-radius: var(--openbot-radius-pill);
+}
+/* A label-and-icon button carries no size of its own for the mark beside the word, so these take the
+   small one: a 24px icon dwarfs a one-word label. */
+.marketplace-plugin-heading-actions .ui-button > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+/* The showcase reuses the skill preview's card, gradient and request row: a plugin's examples and
+   a skill's example are the same offer, so only the stack of three rows is new here. */
+.marketplace-plugin-prompts {
+  place-items: stretch;
+  gap: var(--openbot-space-2);
+}
+.marketplace-plugin-prompts ul {
+  display: grid;
+  gap: var(--openbot-space-2);
+  justify-self: center;
+  width: min(100%, 520px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.marketplace-plugin-prompt {
+  width: 100%;
+}
+
+.marketplace-plugin-detail > .marketplace-detail-lead {
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-lg);
+}
+
+.marketplace-plugin-section {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+/* The count sits beside the title, and the group below is the only edge the section draws: a rule
+   under the heading as well reads as two boundaries for one section. */
+.marketplace-plugin-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+}
+.marketplace-plugin-row-description {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The address and its mark read as one word: the link's own size, not the 24px an unsized icon
+   draws at. */
+.marketplace-plugin-link {
+  gap: var(--openbot-space-1-5);
+  font-size: var(--openbot-text-sm);
+}
+.marketplace-plugin-link > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.marketplace-plugin-information {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--openbot-space-1) var(--openbot-space-4);
+  margin: 0;
+}
+.marketplace-plugin-information dt,
+.marketplace-plugin-information dd {
+  display: flex;
+  align-items: center;
+  min-height: var(--openbot-control-md);
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  /* Too little width for the actions beside the name: they wrap to their own line under it. */
+  .marketplace-plugin-heading-copy {
+    flex-basis: 100%;
+  }
+  /* The address and its mark read as one word: the link's own size, not the 24px an unsized icon
+   draws at. */
+  .marketplace-plugin-link {
+    gap: var(--openbot-space-1-5);
+    font-size: var(--openbot-text-sm);
+  }
+  .marketplace-plugin-link > svg {
+    width: var(--openbot-icon-sm);
+    height: var(--openbot-icon-sm);
+    flex: 0 0 auto;
+    stroke-width: var(--openbot-icon-stroke);
+  }
+
+  .marketplace-plugin-information {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .marketplace-plugin-information dt {
+    min-height: 0;
+  }
+}

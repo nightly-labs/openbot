@@ -11,6 +11,7 @@ import { serverSupportsCapability } from "./features/servers/server-capabilities
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
+import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 import type { ProviderKeyApi } from "./features/settings/OpenCodeKeyDialog";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
@@ -111,6 +112,17 @@ function SkillsMarketplace() {
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
   const local = createMemo(() => activeServer()?.kind === "local");
+  /* What both example controls need: a local agent whose composer is free to take another line. */
+  const composerFree = createMemo(
+    () =>
+      local() &&
+      agentStatus().phase === "ready" &&
+      !controller.submitting() &&
+      !controller.selectionSending() &&
+      controller.voicePhase() === "idle" &&
+      !controller.editingDeliveryId() &&
+      !(agentSetupOpen() && creatingAgent()),
+  );
 
   return (
     <Show when={skillsMarketplaceOpen()}>
@@ -121,13 +133,7 @@ function SkillsMarketplace() {
           activeAgentId={local() ? (activeAgent()?.id ?? "") : ""}
           onOpenChange={setSkillsMarketplaceOpen}
           onTrySkill={
-            local() &&
-            agentStatus().phase === "ready" &&
-            !controller.submitting() &&
-            !controller.selectionSending() &&
-            controller.voicePhase() === "idle" &&
-            !controller.editingDeliveryId() &&
-            !(agentSetupOpen() && creatingAgent())
+            composerFree()
               ? (agentId, skill) => {
                   const server = activeServer();
                   if (server?.kind !== "local" || !agentList().some((agent) => agent.id === agentId)) return;
@@ -138,6 +144,22 @@ function SkillsMarketplace() {
               : undefined
           }
           onAgentInstalled={openInstalledMarketplaceAgent}
+          plugins={MARKETPLACE_PLUGINS}
+          /* A plugin's app is an MCP server, which the host holds. Only a local server takes one
+             here, as the agents list does, so a remote server browses the listings and installs
+             nothing. */
+          pluginServerId={local() ? activeServer()?.id : undefined}
+          onRunPluginPrompt={
+            composerFree()
+              ? (agentId, prompt) => {
+                  const server = activeServer();
+                  if (server?.kind !== "local" || !agentList().some((agent) => agent.id === agentId)) return;
+                  selectAgent(agentId);
+                  controller.appendPluginPrompt({ serverId: server.id, agentId }, prompt.text);
+                  setSkillsMarketplaceOpen(false);
+                }
+              : undefined
+          }
         />
       </Loading>
     </Show>

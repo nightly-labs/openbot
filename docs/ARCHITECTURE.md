@@ -896,3 +896,9 @@ a file in the share sheet. The thumbnail reads the attachment through the query 
 so a file already read in a message is not fetched again. The editor changes the text, removes the
 files the message already has, and adds new ones.
 
+
+## Plugin distribution
+
+A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
+
+See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Only the last part of that design runs today: the Plugins tab reads a literal catalog in the renderer and installs a listing's app as a host-global MCP server. The catalog files, the Worker routes, the cache in the main process, the skills half of an install, uninstall, and the links are still design.

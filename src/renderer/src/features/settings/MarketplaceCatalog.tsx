@@ -50,7 +50,7 @@ export function MarketplaceIdentity(props: { item: CatalogItem; children: JSX.El
 }
 
 export function MarketplaceCatalog<T extends CatalogItem>(props: {
-  kind: "skills" | "agents";
+  kind: "skills" | "agents" | "plugins";
   /** The search text, held by the dialog chrome that shows the field next to the kind switch. */
   query: string;
   refreshVersion: number;

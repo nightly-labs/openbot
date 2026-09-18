@@ -9,6 +9,7 @@ import { createEffect, createSignal, onCleanup } from "solid-js";
 import type { AgentActivityPresentation } from "./AgentActivity";
 import type { ChatSearchMatch } from "./chat-search";
 import {
+  appendPluginPrompt,
   appendSkillCreationRequest,
   appendSkillExample,
   EMPTY_DRAFT,
@@ -232,6 +233,11 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
     appendSkillExample(target: { serverId: string; agentId: string }, skill: MarketplaceSkillDetail) {
       const key = composerDraftKey(target);
       setDrafts((current) => ({ ...current, [key]: appendSkillExample(current[key] ?? EMPTY_DRAFT, skill) }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    appendPluginPrompt(target: { serverId: string; agentId: string }, prompt: string) {
+      const key = composerDraftKey(target);
+      setDrafts((current) => ({ ...current, [key]: appendPluginPrompt(current[key] ?? EMPTY_DRAFT, prompt) }));
       setComposerFocusRequest((value) => value + 1);
     },
     stopComposerTyping,

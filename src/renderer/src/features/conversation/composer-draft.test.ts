@@ -1,6 +1,6 @@
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { describe, expect, it } from "vitest";
-import { appendSkillCreationRequest, appendSkillExample, EMPTY_DRAFT } from "./composer-draft";
+import { appendPluginPrompt, appendSkillCreationRequest, appendSkillExample, EMPTY_DRAFT } from "./composer-draft";
 
 const skill = { id: "skill-notes", name: "Release notes", examplePrompt: "Summarize the latest commits." };
 
@@ -46,4 +46,15 @@ it("adds a skill creation request without changing the existing draft state", ()
   expect(result.replyToMessageId).toBe("reply-1");
   expect(draft.text).toBe("Keep this text");
   expect(appendSkillCreationRequest(EMPTY_DRAFT).text).toMatch(/^Help me create a new local skill/);
+});
+
+it("adds a plugin's example question as the user would have typed it", () => {
+  const draft = { ...EMPTY_DRAFT, text: "Keep this text" };
+  // No reference marker: a plugin's tools are offered to the agent already, so the example is the
+  // question alone, on its own line under whatever the user was writing.
+  expect(appendPluginPrompt(draft, "  Where can I earn the most on stablecoins?  ").text).toBe(
+    "Keep this text\nWhere can I earn the most on stablecoins?",
+  );
+  expect(draft.text).toBe("Keep this text");
+  expect(appendPluginPrompt(draft, "   ")).toBe(draft);
 });

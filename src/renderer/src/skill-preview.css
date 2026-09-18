@@ -96,8 +96,11 @@
   border-radius: inherit;
   clip-path: inset(0 round var(--openbot-radius-xl));
 }
-.skill-preview-gradient {
-  z-index: -1;
+/* The artwork stays behind the content by paint order alone. A z-index of its own puts it on a
+   stacking context that Firefox paints without the rounded clip, and the card's corners come back
+   square; the content is positioned instead, so it still paints over the artwork. */
+.skill-preview-card > :not(.skill-preview-gradient) {
+  position: relative;
 }
 .skill-preview-request {
   display: flex;

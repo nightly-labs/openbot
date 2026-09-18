@@ -8,11 +8,18 @@ export const referenceChipClasses = {
   name: "reference-chip-name",
 };
 
+/** What a reader hears before the name, so a chip is not just a word in the sentence. */
+const CHIP_KIND_LABELS: Record<"agent" | "plugin" | "skill", string> = {
+  agent: "Agent ",
+  plugin: "Plugin ",
+  skill: "Skill ",
+};
+
 /** Shared appearance for rendered references and contenteditable tokens. */
 export function ReferenceChip(props: {
   name: string;
   icon: JSX.Element;
-  kind: "agent" | "skill";
+  kind: "agent" | "plugin" | "skill";
   class?: string;
   style?: JSX.CSSProperties;
   onClick?: (event: MouseEvent) => void;
@@ -35,7 +42,7 @@ export function ReferenceChip(props: {
           style={props.style}
           title={props.name}
         >
-          <span class="sr-only">{props.kind === "skill" ? "Skill " : "Agent "}</span>
+          <span class="sr-only">{CHIP_KIND_LABELS[props.kind]}</span>
           {content()}
         </span>
       }

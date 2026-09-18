@@ -24,6 +24,8 @@
   text-decoration: none;
 }
 
+/* A plugin reads as the skill chips do: both name something the agent was given. */
+.reference-chip[data-kind="plugin"],
 .reference-chip[data-kind="skill"] {
   background: var(--openbot-accent-soft);
   color: var(--openbot-accent-text);

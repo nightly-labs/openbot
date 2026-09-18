@@ -4,7 +4,7 @@ import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
 import { SkillsMarketplaceModal } from "../src/features/settings/SkillsMarketplaceModal";
-import { STORY_AGENT_SUMMARIES } from "../src/preview/fixtures";
+import { STORY_AGENT_SUMMARIES, STORY_MARKETPLACE_PLUGINS } from "../src/preview/fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
 const storyAgents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">> = STORY_AGENT_SUMMARIES.map(
@@ -13,6 +13,7 @@ const storyAgents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">
 
 function SkillsMarketplaceModalStory(props: {
   initialOpen: boolean;
+  plugins?: boolean;
   detailState?: "fallback" | "long";
   catalogState?: "empty" | "loading" | "loading-transition" | "missing-images";
 }) {
@@ -92,6 +93,7 @@ function SkillsMarketplaceModalStory(props: {
           onOpenChange={setOpen}
           agents={storyAgents}
           activeAgentId={storyAgents[0]?.id ?? ""}
+          plugins={props.plugins ? STORY_MARKETPLACE_PLUGINS : undefined}
           onTrySkill={fn()}
           onAgentInstalled={fn()}
         />
@@ -252,13 +254,34 @@ export const NoSearchResults: Story = {
   },
 };
 
-/** Plugins are announced but not yet served. */
+/** Without a listing to show, the tab says so rather than showing an empty catalog. */
 export const Plugins: Story = {
   render: () => <SkillsMarketplaceModalStory initialOpen />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("tab", { name: "Plugins" }));
     await expect(await body.findByText("Plugins are not in the marketplace yet.")).toBeVisible();
+  },
+};
+
+/** The plugin listing under design, on the surface it will really sit on. */
+export const PluginCatalog: Story = {
+  render: () => <SkillsMarketplaceModalStory initialOpen plugins />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Plugins" }));
+    await expect(await body.findByRole("region", { name: "Discover plugins" })).toBeVisible();
+  },
+};
+
+/** A row opens the page for the plugin it names, and the listing stays behind it. */
+export const PluginDetail: Story = {
+  render: () => <SkillsMarketplaceModalStory initialOpen plugins />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Plugins" }));
+    await userEvent.click(await body.findByRole("button", { name: "View Aave details" }));
+    await expect(await body.findByRole("region", { name: "Aave details" })).toBeVisible();
   },
 };
 
