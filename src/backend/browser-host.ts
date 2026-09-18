@@ -25,6 +25,8 @@ import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   app,
   BrowserWindow,
+  clipboard,
+  Menu,
   type NativeImage,
   type Session,
   session,
@@ -43,6 +45,7 @@ import { BrowserDiagnostics } from "./browser-diagnostics";
 import { applySiteIdentity } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import {
+  browserContextMenuItems,
   EDITABLE_FOCUS_SCRIPT,
   isCloseBrowserTabShortcut,
   isCollapseBrowserShortcut,
@@ -1021,8 +1024,10 @@ export class BrowserHost {
       });
       this.#emitChanged();
     });
-    this.#session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-    this.#session.setPermissionCheckHandler(() => false);
+    this.#session.setPermissionRequestHandler((_webContents, permission, callback) =>
+      callback(isAllowedBrowserPermission(permission)),
+    );
+    this.#session.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
     this.#session.on("will-download", (_event, item) => {
       const safeName = basename(item.getFilename()).replace(/[^a-zA-Z0-9._ -]/g, "_");
       const downloadPath = uniqueDownloadPath(
@@ -1097,6 +1102,37 @@ export class BrowserHost {
       if (!isCloseBrowserTabShortcut(input)) return;
       event.preventDefault();
       setImmediate(() => void this.close(tab.id).catch(() => undefined));
+    });
+    contents.on("context-menu", (event, params) => {
+      const items = browserContextMenuItems({
+        selectionText: params.selectionText,
+        isEditable: params.isEditable,
+        linkURL: params.linkURL,
+        srcURL: params.srcURL,
+        mediaType: params.mediaType,
+      });
+      if (items.length === 0) return;
+      event.preventDefault();
+      const window = this.#mountedViews.get(tab.view);
+      if (!window || window.isDestroyed()) return;
+      // The edit entries name the page explicitly rather than taking an Electron role: a role acts
+      // on whichever contents hold focus when the item is picked, and the right-click that opened
+      // the menu may have landed on a page the user had not focused.
+      const onPage = (act: (target: WebContents) => void) => () => {
+        if (!contents.isDestroyed()) act(contents);
+      };
+      Menu.buildFromTemplate(
+        items.map((item) => {
+          if (item === "separator") return { type: "separator" } as const;
+          if (item === "copy-link") return { label: "Copy Link", click: () => clipboard.writeText(params.linkURL) };
+          if (item === "copy-image-address")
+            return { label: "Copy Image Address", click: () => clipboard.writeText(params.srcURL) };
+          if (item === "cut") return { label: "Cut", click: onPage((target) => target.cut()) };
+          if (item === "copy") return { label: "Copy", click: onPage((target) => target.copy()) };
+          if (item === "paste") return { label: "Paste", click: onPage((target) => target.paste()) };
+          return { label: "Select All", click: onPage((target) => target.selectAll()) };
+        }),
+      ).popup({ window });
     });
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
@@ -1874,6 +1910,17 @@ function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
 
 function isAllowedMainUrl(value: string): boolean {
   return value === "about:blank" || isPersistableBrowserUrl(value);
+}
+
+/**
+ * The embedded browser grants exactly one page permission: writing plain, sanitized content to the
+ * clipboard. Chromium only asks for it behind a user gesture, which is what a page's own "copy
+ * link" button is, and refusing it left such a button silently doing nothing. Reading the clipboard
+ * stays refused -- a page must never see what the user copied elsewhere -- and so does everything
+ * else, so camera, microphone, location and notifications are unchanged.
+ */
+function isAllowedBrowserPermission(permission: string): boolean {
+  return permission === "clipboard-sanitized-write";
 }
 
 function diagnosticUrl(value: string): string | undefined {

@@ -5,8 +5,23 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { BrowserWindow, type WebContents, WebContentsView, webContents } from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
+import type { BrowserContextMenuParams } from "./browser-shortcuts";
 
 const windowOpenHandlers = vi.hoisted((): Array<(details: { url: string }) => { action: string }> => []);
+type PermissionRequestHandler = (contents: unknown, permission: string, allow: (granted: boolean) => void) => void;
+type PermissionCheckHandler = (contents: unknown, permission: string) => boolean;
+interface PermissionPolicy {
+  request: PermissionRequestHandler | undefined;
+  check: PermissionCheckHandler | undefined;
+}
+const permissionPolicy = vi.hoisted((): PermissionPolicy => ({ request: undefined, check: undefined }));
+interface MenuEntry {
+  label?: string;
+  type?: string;
+  click?: () => void;
+}
+const menuTemplates = vi.hoisted((): MenuEntry[][] => []);
+const clipboardWrites = vi.hoisted((): string[] => []);
 
 vi.mock("electron", async () => {
   const { EventEmitter } = await import("node:events");
@@ -38,6 +53,10 @@ vi.mock("electron", async () => {
     }
     close() {}
     focus() {}
+    cut() {}
+    copy() {}
+    paste() {}
+    selectAll() {}
     setAudioMuted() {}
     invalidate() {}
     setWindowOpenHandler(handler: (details: { url: string }) => { action: string }) {
@@ -59,6 +78,17 @@ vi.mock("electron", async () => {
   }
   return {
     app: { getPreferredSystemLanguages: () => ["en-US"] },
+    clipboard: {
+      writeText(text: string) {
+        clipboardWrites.push(text);
+      },
+    },
+    Menu: {
+      buildFromTemplate(template: MenuEntry[]) {
+        menuTemplates.push(template);
+        return { popup() {} };
+      },
+    },
     BrowserWindow: class {
       webContents = { getZoomFactor: () => 1, focus() {}, sendInputEvent() {} };
       contentView = { addChildView() {}, removeChildView() {} };
@@ -88,8 +118,12 @@ vi.mock("electron", async () => {
         getUserAgent: () => "Chrome/144.0.0.0",
         setUserAgent() {},
         webRequest: { onBeforeSendHeaders() {}, onCompleted() {}, onErrorOccurred() {} },
-        setPermissionRequestHandler() {},
-        setPermissionCheckHandler() {},
+        setPermissionRequestHandler(handler: PermissionRequestHandler) {
+          permissionPolicy.request = handler;
+        },
+        setPermissionCheckHandler(handler: PermissionCheckHandler) {
+          permissionPolicy.check = handler;
+        },
         on() {},
         flushStorageData() {},
         cookies: { async flushStore() {} },
@@ -115,6 +149,8 @@ let browserWindow: BrowserWindow;
 let statePath: string;
 beforeEach(async () => {
   windowOpenHandlers.length = 0;
+  menuTemplates.length = 0;
+  clipboardWrites.length = 0;
   directory = await mkdtemp(join(tmpdir(), "openbot-browser-limit-"));
   statePath = join(directory, "browser-tabs.json");
   browserWindow = new BrowserWindow();
@@ -414,5 +450,64 @@ describe("browser tab capacity", () => {
     await host.close(tab.id);
     expect(host.getDisplayState()).toEqual({ tabs: [], activeTabId: null });
     expect(changed).toHaveBeenLastCalledWith([], null);
+  });
+});
+
+describe("browser clipboard", () => {
+  const contentsFor = (url: string): WebContents => {
+    const found = webContents.getAllWebContents().find((candidate) => candidate.getURL() === url);
+    if (!found) throw new Error("Browser contents were not created.");
+    return found;
+  };
+  let nextPage = 0;
+  const openMenu = async (
+    params: Partial<BrowserContextMenuParams>,
+  ): Promise<{ items: MenuEntry[]; page: WebContents }> => {
+    nextPage += 1;
+    const tab = await host.open(`https://example.com/menu-${nextPage}`);
+    await host.setVisible({ visible: true, target: "main", bounds: pageBounds });
+    const page = contentsFor(tab.url);
+    page.emit(
+      "context-menu",
+      { preventDefault: () => undefined },
+      { selectionText: "", isEditable: false, linkURL: "", srcURL: "", mediaType: "none", ...params },
+    );
+    return { items: menuTemplates.at(-1) ?? [], page };
+  };
+
+  it("lets a page write to the clipboard but never read it", () => {
+    const granted: boolean[] = [];
+    permissionPolicy.request?.({}, "clipboard-sanitized-write", (allowed) => granted.push(allowed));
+    permissionPolicy.request?.({}, "clipboard-read", (allowed) => granted.push(allowed));
+    permissionPolicy.request?.({}, "media", (allowed) => granted.push(allowed));
+
+    expect(granted).toEqual([true, false, false]);
+    expect(permissionPolicy.check?.({}, "clipboard-sanitized-write")).toBe(true);
+    expect(permissionPolicy.check?.({}, "clipboard-read")).toBe(false);
+    expect(permissionPolicy.check?.({}, "geolocation")).toBe(false);
+  });
+
+  it("copies the whole link target, not the label the page truncates", async () => {
+    const linkURL = "https://www.ubereats.com/pl/store/example/abcdefghijklmnop?utm_source=share";
+    const { items } = await openMenu({ linkURL, selectionText: "ubereats.com/pl/store/exa…" });
+
+    items.find((item) => item.label === "Copy Link")?.click?.();
+
+    expect(clipboardWrites).toEqual([linkURL]);
+  });
+
+  it("copies selected page text through the page, not the focused view", async () => {
+    const { items, page } = await openMenu({ selectionText: "Zamów ponownie" });
+    const copy = vi.spyOn(page, "copy");
+
+    expect(items.map((item) => item.label)).toEqual(["Copy", "Select All"]);
+    items[0]?.click?.();
+    expect(copy).toHaveBeenCalledOnce();
+  });
+
+  it("keeps no menu where the page offers nothing to copy", async () => {
+    await openMenu({});
+
+    expect(menuTemplates).toHaveLength(0);
   });
 });
