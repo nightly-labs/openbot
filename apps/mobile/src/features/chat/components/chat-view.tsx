@@ -77,6 +77,8 @@ export interface ChatViewProps {
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
+// The composer at rest: 8 pt of top padding above the 48 pt control row.
+const COMPOSER_RESTING_HEIGHT = 56;
 
 function leaveConversation(): void {
   if (router.canGoBack()) router.back();
@@ -138,7 +140,12 @@ export function ChatView({
   const [historyReceipt, setHistoryReceipt] = useState<ChatHistoryReceipt | null>(null);
   const [refreshingHistory, setRefreshingHistory] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
-  const [composerGestureHeight, setComposerGestureHeight] = useState(0);
+  // KeyboardGestureArea turns this offset into an invisible inputAccessoryView
+  // on the focused input, so it is part of the keyboard. Feeding the composer's
+  // live height in resizes that view, UIKit reports a new keyboard frame, and
+  // the composer jumps with it for a frame. It has to stay constant, so measure
+  // nothing and use the composer's resting height.
+  const composerGestureOffset = COMPOSER_RESTING_HEIGHT + Math.max(insets.bottom, 10) - keyboardOffset;
   const sendingRef = useRef(false);
   const uploadCancelled = useRef(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -415,7 +422,7 @@ export function ChatView({
             textInputNativeID="chat-composer-input"
             interpolator="ios"
             enableSwipeToDismiss
-            offset={Math.max(0, composerGestureHeight - keyboardOffset)}
+            offset={composerGestureOffset}
           >
             <ChatHeader
               target={target}
@@ -483,10 +490,7 @@ export function ChatView({
             <Animated.View
               style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
               pointerEvents="box-none"
-              onLayout={(event) => {
-                motion.onComposerLayout(event);
-                setComposerGestureHeight(event.nativeEvent.layout.height);
-              }}
+              onLayout={motion.onComposerLayout}
             >
               {!atLatest && motion.historyVisible && messages.length > 0 ? (
                 <View className="absolute -top-14 self-center">

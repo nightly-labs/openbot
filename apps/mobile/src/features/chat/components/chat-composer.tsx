@@ -17,11 +17,11 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
-import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
@@ -29,6 +29,19 @@ import type { ChatAttachments } from "./use-chat-attachments";
 
 // The field grows to this many lines, then keeps its height and scrolls.
 const MAX_INPUT_LINES = 5;
+// Width the controls take from the single row, the card's own text inset, and
+// the gap between the card and the screen edge.
+const ROW_CONTROL_INSET = 48;
+const FIELD_INSET = 16;
+const BAR_INSET = 16;
+// The controls are 40 pt with a 4 pt inset, and one text line sits in the same
+// box: a line plus 13 pt above and below. One formula then covers both shapes.
+const TOOLBAR_HEIGHT = 48;
+const FIELD_VERTICAL_PADDING = 26;
+// A 112 pt tile plus its 8 pt inset. Known, so the block can open and close.
+const ATTACHMENT_BLOCK_HEIGHT = 120;
+const SHAPE_DURATION = 180;
+const SHAPE_EASING = cubicBezier(0.77, 0, 0.175, 1);
 
 interface ChatComposerProps {
   sendLabel?: string;
@@ -111,13 +124,21 @@ export function ChatComposer({
     pendingCursor.current = null;
     inputRef.current?.setNativeProps({ selection: { start: position, end: position } });
   }, [displayText]);
-  const { fontScale } = useWindowDimensions();
-  const minInputHeight = Math.max(48, 22 * fontScale + 26);
-  const maxInputHeight = 22 * fontScale * MAX_INPUT_LINES + 26;
-  const [inputLines, setInputLines] = useState(1);
-  const inputHeight = !draft
-    ? minInputHeight
-    : Math.min(maxInputHeight, Math.max(minInputHeight, inputLines * 22 * fontScale + 26));
+  const { fontScale, width: windowWidth } = useWindowDimensions();
+  const lineHeight = 22 * fontScale;
+  const rowTextWidth = windowWidth - BAR_INSET * 2 - ROW_CONTROL_INSET * 2;
+  // One reading drives both the shape and the height. Measuring the two widths
+  // separately gave the card two targets in two frames, so it animated twice.
+  const [wrap, setWrap] = useState({ lines: 1, width: 0 });
+  // The bar stays a single row while the text fits beside the controls, then
+  // becomes a card with the field on its own line.
+  const stacked = wrap.lines > 1 || wrap.width > rowTextWidth;
+  const fieldHeight = Math.max(
+    TOOLBAR_HEIGHT,
+    Math.min(MAX_INPUT_LINES, wrap.lines) * lineHeight + FIELD_VERTICAL_PADDING,
+  );
+  const attachmentsOpen = !sending && attachments.items.length > 0;
+  const shapeDuration = useReducedMotion() ? 0 : SHAPE_DURATION;
   const [focused, setFocused] = useState(false);
   const latestTextRef = useRef(draft);
   const [sendGate] = useState(createComposerSendGate);
@@ -193,36 +214,11 @@ export function ChatComposer({
 
   return (
     <View>
-      {liquidGlassAvailable ? (
-        <SheetScrollEdgeEffect
-          edge="bottom"
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            // Keep the original 32 pt fade above the input, independent of the reply preview.
-            height: inputHeight + 8 + Math.max(bottomInset, 10) + 32,
-          }}
-        />
-      ) : null}
-      {replyTarget ? (
-        <View className="flex-row items-center gap-2 pl-6 pr-4">
-          <Reply color={String(muted)} size={18} />
-          <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
-            {mentionDraft(replyTarget.body).text || "Attachment"}
-          </Typography.Paragraph>
-          <Button isIconOnly variant="ghost" accessibilityLabel="Cancel reply" onPress={onCancelReply}>
-            <X color={String(muted)} size={18} />
-          </Button>
-        </View>
-      ) : null}
       {suggestionsVisible && query ? (
         <GlassView
           glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
           style={{
-            marginLeft: 72,
-            marginRight: 16,
+            marginHorizontal: 16,
             flexGrow: 0,
             maxHeight: 240,
             borderRadius: 24,
@@ -263,256 +259,310 @@ export function ChatComposer({
           </ScrollView>
         </GlassView>
       ) : null}
-      {!sending && attachments.items.length > 0 ? (
-        <ScrollView
-          horizontal
-          keyboardShouldPersistTaps="handled"
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-        >
-          {attachments.items.map((item) => (
-            <View key={item.id} className="size-28 overflow-hidden rounded-2xl bg-control p-3">
-              {item.mimeType.startsWith("image/") ? (
-                <Image
-                  source={item.uri ?? `data:${item.mimeType};base64,${item.base64}`}
-                  contentFit="contain"
-                  accessibilityLabel={item.name}
-                  style={{ position: "absolute", inset: 0 }}
-                />
-              ) : (
-                <FileText color={String(foreground)} size={24} />
-              )}
-              {!item.mimeType.startsWith("image/") ? (
-                <Typography.Paragraph numberOfLines={2} type="body-xs" className="mt-auto">
-                  {item.name}
-                </Typography.Paragraph>
-              ) : null}
-              <Button
-                isIconOnly
-                size="sm"
-                variant="secondary"
-                className="absolute right-0 top-0"
-                isDisabled={sending}
-                accessibilityLabel={`Remove ${item.name}`}
-                onPress={() => attachments.remove(item.id)}
-              >
-                <X color={String(foreground)} size={16} />
-              </Button>
-            </View>
-          ))}
-        </ScrollView>
-      ) : null}
       <View
         pointerEvents="box-none"
-        style={{
-          flexDirection: "row",
-          alignItems: "flex-end",
-          gap: 8,
-          paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: Math.max(bottomInset, 10),
-        }}
+        style={{ paddingHorizontal: BAR_INSET, paddingTop: 8, paddingBottom: Math.max(bottomInset, 10) }}
       >
-        <View
-          ref={attachmentButton}
-          collapsable={false}
-          pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
-        >
-          <MenuView
-            style={{ width: 48, height: 48 }}
-            actions={[
-              { id: "camera", title: "Camera", image: "camera" },
-              { id: "photos", title: "Photos", image: "photo" },
-              {
-                id: "files",
-                title: "Files",
-                image: "paperclip",
-                attributes: { disabled: disabled || sending || attachments.preparing },
-              },
-            ]}
-            onPressAction={({ nativeEvent }) => {
-              if (disabled || sending || attachments.preparing) return;
-              if (nativeEvent.event === "files") void attachments.chooseFiles();
-              if (nativeEvent.event === "photos") void attachments.choosePhotos();
-              if (nativeEvent.event === "camera") {
-                if (!attachmentButton.current) {
-                  void attachments.takePhoto();
-                  return;
-                }
-                attachmentButton.current.measureInWindow((x, y, width, height) => {
-                  void attachments.takePhoto(width > 0 && height > 0 ? { x, y, width, height } : undefined);
-                });
-              }
-            }}
-          >
-            <GlassView
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="Add attachment"
-              accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
-              glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-              isInteractive={liquidGlassAvailable && !disabled && !sending}
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                borderCurve: "continuous",
-                overflow: "hidden",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
-                opacity: disabled || sending || attachments.preparing ? 0.45 : 1,
-              }}
-            >
-              <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
-            </GlassView>
-          </MenuView>
-        </View>
         <GestureDetector gesture={pan}>
           <GlassView
             glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
             style={{
-              alignItems: "flex-end",
               backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
               borderCurve: "continuous",
               borderRadius: 24,
-              flex: 1,
-              flexDirection: "row",
-              height: inputHeight,
               overflow: "hidden",
               opacity: disabled ? 0.45 : 1,
-              paddingLeft: 16,
-              paddingRight: 5,
             }}
           >
-            <View style={{ flex: 1, minWidth: 0, height: inputHeight }}>
-              {/* Measure wrapping independently of UITextView's constrained contentSize. */}
-              <NativeText
-                accessible={false}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                pointerEvents="none"
-                className="font-sans"
+            {/* Measure wrapping independently of UITextView's constrained contentSize.
+                This node keeps the field's width whatever shape the card is in, so
+                its line count gives the height and its widest line says whether the
+                text would still fit beside the controls. */}
+            <NativeText
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              pointerEvents="none"
+              className="font-sans"
+              style={{
+                position: "absolute",
+                left: FIELD_INSET,
+                right: FIELD_INSET,
+                top: 0,
+                opacity: 0,
+                fontSize: 16,
+                lineHeight: 22,
+              }}
+              onTextLayout={({ nativeEvent }) => {
+                const lines = Math.max(1, nativeEvent.lines.length);
+                const width = nativeEvent.lines.reduce((widest, line) => Math.max(widest, line.width), 0);
+                setWrap((current) => (current.lines === lines && current.width === width ? current : { lines, width }));
+              }}
+            >
+              {`${displayText}​`}
+            </NativeText>
+            {replyTarget ? (
+              <View className="flex-row items-center gap-2 pt-2 pl-4 pr-2">
+                <Reply color={String(muted)} size={16} />
+                <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
+                  {mentionDraft(replyTarget.body).text || "Attachment"}
+                </Typography.Paragraph>
+                <Button isIconOnly size="sm" variant="ghost" accessibilityLabel="Cancel reply" onPress={onCancelReply}>
+                  <X color={String(muted)} size={16} />
+                </Button>
+              </View>
+            ) : null}
+            <Animated.View
+              style={{
+                height: attachmentsOpen ? ATTACHMENT_BLOCK_HEIGHT : 0,
+                overflow: "hidden",
+                transitionProperty: "height",
+                transitionDuration: shapeDuration,
+                transitionTimingFunction: SHAPE_EASING,
+              }}
+            >
+              {attachmentsOpen ? (
+                <ScrollView
+                  horizontal
+                  keyboardShouldPersistTaps="handled"
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingHorizontal: 8, paddingTop: 8 }}
+                >
+                  {attachments.items.map((item) => (
+                    <View key={item.id} className="size-28 overflow-hidden rounded-2xl bg-control p-3">
+                      {item.mimeType.startsWith("image/") ? (
+                        <Image
+                          source={item.uri ?? `data:${item.mimeType};base64,${item.base64}`}
+                          contentFit="cover"
+                          accessibilityLabel={item.name}
+                          style={{ position: "absolute", inset: 0 }}
+                        />
+                      ) : (
+                        <>
+                          <FileText color={String(foreground)} size={22} />
+                          <Typography.Paragraph numberOfLines={2} type="body-xs" className="mt-auto pr-6">
+                            {item.name}
+                          </Typography.Paragraph>
+                        </>
+                      )}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${item.name}`}
+                        accessibilityState={{ disabled: sending }}
+                        disabled={sending}
+                        hitSlop={8}
+                        // A HeroUI icon button fills a quarter of the tile here. The
+                        // badge has to read as an overlay on the file, not a control
+                        // beside it, so it keeps its 44 pt target through hitSlop.
+                        className="absolute right-1.5 top-1.5 size-7 items-center justify-center rounded-full"
+                        style={{ backgroundColor: raised }}
+                        onPress={() => attachments.remove(item.id)}
+                      >
+                        <X color={String(foreground)} size={15} strokeWidth={2.4} />
+                      </Pressable>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : null}
+            </Animated.View>
+            <View>
+              <Animated.View
+                style={{
+                  height: fieldHeight,
+                  // The controls hold the bottom of the card. In a single row they
+                  // overlay the field, so the text clears their width instead.
+                  marginBottom: stacked ? TOOLBAR_HEIGHT : 0,
+                  // The field keeps one layout width and slides. Animating the
+                  // inset would re-wrap the text on every frame of the
+                  // transition, which reads as the text shaking. A single row is
+                  // only ever used while the text fits the narrower measure, so
+                  // the slid text still stops short of the controls.
+                  paddingLeft: FIELD_INSET,
+                  paddingRight: FIELD_INSET,
+                  transform: [{ translateX: stacked ? 0 : ROW_CONTROL_INSET - FIELD_INSET }],
+                  transitionProperty: ["height", "marginBottom", "transform"],
+                  transitionDuration: shapeDuration,
+                  transitionTimingFunction: SHAPE_EASING,
+                }}
+              >
+                <TextInput
+                  ref={inputRef}
+                  nativeID="chat-composer-input"
+                  accessibilityLabel={`Message ${agentName}`}
+                  accessibilityState={{ disabled }}
+                  editable={!disabled}
+                  showSoftInputOnFocus={!disabled}
+                  className="min-w-0 font-sans text-foreground"
+                  placeholder={`Ask ${agentName}`}
+                  autoCorrect
+                  autoCapitalize="sentences"
+                  placeholderTextColor={muted}
+                  multiline
+                  scrollEnabled={wrap.lines > MAX_INPUT_LINES}
+                  returnKeyType="default"
+                  submitBehavior="newline"
+                  selectionColor={foreground}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 16,
+                    lineHeight: 22,
+                    paddingVertical: FIELD_VERTICAL_PADDING / 2,
+                    textAlignVertical: "top",
+                  }}
+                  onSelectionChange={({ nativeEvent }) =>
+                    setCursor(
+                      nativeEvent.selection.start === nativeEvent.selection.end ? nativeEvent.selection.end : -1,
+                    )
+                  }
+                  onFocus={() => {
+                    sendGate.focus();
+                    setFocused(true);
+                  }}
+                  onBlur={() => setFocused(false)}
+                  onChangeText={(text) => {
+                    sendGate.edit();
+                    const pasted = !sending ? largePastedText(latestTextRef.current, text) : null;
+                    if (pasted) {
+                      // Keep the pasted text until its attachment is durable. A failed write must not lose it.
+                      latestTextRef.current = text;
+                      onChangeDraft(text);
+                      void Promise.resolve()
+                        .then(() => attachments.paste({ type: "text", text: pasted.text }, () => {}))
+                        .then(() => {
+                          if (latestTextRef.current !== text) return;
+                          latestTextRef.current = pasted.draft;
+                          onChangeDraft(pasted.draft);
+                        })
+                        .catch((error) => {
+                          Alert.alert(
+                            "Could not attach pasted text",
+                            error instanceof Error ? error.message : "Try again.",
+                          );
+                        });
+                      return;
+                    }
+                    const next = editMentionDraft(latestTextRef.current, text);
+                    latestTextRef.current = next;
+                    onChangeDraft(next);
+                  }}
+                  onSubmitEditing={({ nativeEvent }) => {
+                    if (!disabled && !sending && sendGate.submit())
+                      onSend(editMentionDraft(latestTextRef.current, nativeEvent.text));
+                  }}
+                  onEndEditing={({ nativeEvent: { text } }) => {
+                    // Native editing can end before the send button's release event,
+                    // while TextInput.isFocused() is still waiting for onBlur.
+                    latestTextRef.current = editMentionDraft(latestTextRef.current, text);
+                    if (sendGate.commit() && !disabled && !sending) onSend(latestTextRef.current);
+                  }}
+                >
+                  {/* TextInput requires native text children for editable attributed text. */}
+                  <NativeText>
+                    {display.mentions.map((mention, index) => (
+                      <NativeText key={mention.start}>
+                        {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
+                        <NativeText style={{ color: action }}>
+                          {displayText.slice(mention.start, mention.end)}
+                        </NativeText>
+                      </NativeText>
+                    ))}
+                    {displayText.slice(display.mentions.at(-1)?.end ?? 0)}
+                  </NativeText>
+                </TextInput>
+              </Animated.View>
+              <View
+                pointerEvents="box-none"
                 style={{
                   position: "absolute",
                   left: 0,
                   right: 0,
-                  top: 0,
-                  opacity: 0,
-                  fontSize: 16,
-                  lineHeight: 22,
-                  paddingVertical: 13,
-                }}
-                onTextLayout={(event) => setInputLines(Math.max(1, event.nativeEvent.lines.length))}
-              >
-                {`${displayText}\u200b`}
-              </NativeText>
-              <TextInput
-                ref={inputRef}
-                nativeID="chat-composer-input"
-                accessibilityLabel={`Message ${agentName}`}
-                accessibilityState={{ disabled }}
-                editable={!disabled}
-                showSoftInputOnFocus={!disabled}
-                className="min-w-0 flex-1 font-sans text-foreground"
-                placeholder={`Ask ${agentName}`}
-                autoCorrect
-                autoCapitalize="sentences"
-                placeholderTextColor={muted}
-                multiline
-                scrollEnabled={inputLines > MAX_INPUT_LINES}
-                returnKeyType="default"
-                submitBehavior="newline"
-                selectionColor={foreground}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: 16,
-                  lineHeight: 22,
-                  height: inputHeight,
-                  paddingBottom: 13,
-                  paddingTop: 13,
-                  textAlignVertical: "top",
-                }}
-                onSelectionChange={({ nativeEvent }) =>
-                  setCursor(nativeEvent.selection.start === nativeEvent.selection.end ? nativeEvent.selection.end : -1)
-                }
-                onFocus={() => {
-                  sendGate.focus();
-                  setFocused(true);
-                }}
-                onBlur={() => setFocused(false)}
-                onChangeText={(text) => {
-                  sendGate.edit();
-                  const pasted = !sending ? largePastedText(latestTextRef.current, text) : null;
-                  if (pasted) {
-                    // Keep the pasted text until its attachment is durable. A failed write must not lose it.
-                    latestTextRef.current = text;
-                    onChangeDraft(text);
-                    void Promise.resolve()
-                      .then(() => attachments.paste({ type: "text", text: pasted.text }, () => {}))
-                      .then(() => {
-                        if (latestTextRef.current !== text) return;
-                        latestTextRef.current = pasted.draft;
-                        onChangeDraft(pasted.draft);
-                      })
-                      .catch((error) => {
-                        Alert.alert(
-                          "Could not attach pasted text",
-                          error instanceof Error ? error.message : "Try again.",
-                        );
-                      });
-                    return;
-                  }
-                  const next = editMentionDraft(latestTextRef.current, text);
-                  latestTextRef.current = next;
-                  onChangeDraft(next);
-                }}
-                onSubmitEditing={({ nativeEvent }) => {
-                  if (!disabled && !sending && sendGate.submit())
-                    onSend(editMentionDraft(latestTextRef.current, nativeEvent.text));
-                }}
-                onEndEditing={({ nativeEvent: { text } }) => {
-                  // Native editing can end before the send button's release event,
-                  // while TextInput.isFocused() is still waiting for onBlur.
-                  latestTextRef.current = editMentionDraft(latestTextRef.current, text);
-                  if (sendGate.commit() && !disabled && !sending) onSend(latestTextRef.current);
+                  bottom: 0,
+                  height: TOOLBAR_HEIGHT,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 8,
                 }}
               >
-                {/* TextInput requires native text children for editable attributed text. */}
-                <NativeText>
-                  {display.mentions.map((mention, index) => (
-                    <NativeText key={mention.start}>
-                      {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
-                      <NativeText style={{ color: action }}>{displayText.slice(mention.start, mention.end)}</NativeText>
-                    </NativeText>
-                  ))}
-                  {displayText.slice(display.mentions.at(-1)?.end ?? 0)}
-                </NativeText>
-              </TextInput>
+                <View
+                  ref={attachmentButton}
+                  collapsable={false}
+                  pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
+                >
+                  <MenuView
+                    style={{ width: 40, height: 40 }}
+                    actions={[
+                      { id: "camera", title: "Camera", image: "camera" },
+                      { id: "photos", title: "Photos", image: "photo" },
+                      {
+                        id: "files",
+                        title: "Files",
+                        image: "paperclip",
+                        attributes: { disabled: disabled || sending || attachments.preparing },
+                      },
+                    ]}
+                    onPressAction={({ nativeEvent }) => {
+                      if (disabled || sending || attachments.preparing) return;
+                      if (nativeEvent.event === "files") void attachments.chooseFiles();
+                      if (nativeEvent.event === "photos") void attachments.choosePhotos();
+                      if (nativeEvent.event === "camera") {
+                        if (!attachmentButton.current) {
+                          void attachments.takePhoto();
+                          return;
+                        }
+                        attachmentButton.current.measureInWindow((x, y, width, height) => {
+                          void attachments.takePhoto(width > 0 && height > 0 ? { x, y, width, height } : undefined);
+                        });
+                      }
+                    }}
+                  >
+                    <View
+                      accessible
+                      accessibilityRole="button"
+                      accessibilityLabel="Add attachment"
+                      accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
+                      className="size-10 items-center justify-center rounded-full"
+                      // The native menu lifts its anchor. Without a bounded, opaque
+                      // anchor the whole card is what animates into the menu.
+                      style={{
+                        backgroundColor: raised,
+                        opacity: disabled || sending || attachments.preparing ? 0.45 : 1,
+                      }}
+                    >
+                      <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
+                    </View>
+                  </MenuView>
+                </View>
+                <View pointerEvents="none" style={{ flex: 1 }} />
+                <Pressable
+                  accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !pressable, busy: busy || stopPending }}
+                  disabled={!pressable}
+                  className="size-10 items-center justify-center rounded-full"
+                  style={{
+                    backgroundColor: primed ? action : raised,
+                    // The card dims as a whole when the composer is disabled.
+                    // Dim only this control for a state the card does not show.
+                    opacity: disabled || pressable ? 1 : 0.45,
+                  }}
+                  onPress={stopMode ? onStop : requestSend}
+                >
+                  {busy || stopPending ? (
+                    <Spinner size="sm" color={String(actionForeground)} />
+                  ) : stopMode ? (
+                    <Square
+                      color={String(actionForeground)}
+                      fill={String(actionForeground)}
+                      size={14}
+                      strokeWidth={2}
+                    />
+                  ) : (
+                    <ArrowUp color={String(primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
+                  )}
+                </Pressable>
+              </View>
             </View>
-            <Pressable
-              accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !pressable, busy: busy || stopPending }}
-              disabled={!pressable}
-              className="mb-1 size-10 items-center justify-center rounded-full"
-              style={{
-                backgroundColor: primed ? action : raised,
-                // The parent dims the whole field when the composer is disabled.
-                // Dim only this control for a state the field does not show.
-                opacity: disabled || pressable ? 1 : 0.45,
-              }}
-              onPress={stopMode ? onStop : requestSend}
-            >
-              {busy || stopPending ? (
-                <Spinner size="sm" color={String(actionForeground)} />
-              ) : stopMode ? (
-                <Square color={String(actionForeground)} fill={String(actionForeground)} size={14} strokeWidth={2} />
-              ) : (
-                <ArrowUp color={String(primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
-              )}
-            </Pressable>
           </GlassView>
         </GestureDetector>
       </View>
