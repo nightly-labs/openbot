@@ -525,12 +525,7 @@ export function ChatComposer({
                       accessibilityLabel="Add attachment"
                       accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
                       className="size-10 items-center justify-center rounded-full"
-                      // The native menu lifts its anchor. Without a bounded, opaque
-                      // anchor the whole card is what animates into the menu.
-                      style={{
-                        backgroundColor: raised,
-                        opacity: disabled || sending || attachments.preparing ? 0.45 : 1,
-                      }}
+                      style={{ opacity: disabled || sending || attachments.preparing ? 0.45 : 1 }}
                     >
                       <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
                     </View>
@@ -544,7 +539,9 @@ export function ChatComposer({
                   disabled={!pressable}
                   className="size-10 items-center justify-center rounded-full"
                   style={{
-                    backgroundColor: primed ? action : raised,
+                    // Nothing to send reads as a bare glyph on the card, not as a
+                    // filled control the user could press.
+                    backgroundColor: primed ? action : "transparent",
                     // The card dims as a whole when the composer is disabled.
                     // Dim only this control for a state the card does not show.
                     opacity: disabled || pressable ? 1 : 0.45,
