@@ -2581,6 +2581,9 @@ textarea {
 
 .account-usage-popover-heading {
   min-width: 0;
+  /* Match the horizontal padding of a provider row, so the gauge icon lines up
+     with the provider logos below it. */
+  padding-inline-start: var(--openbot-space-1);
   gap: var(--openbot-space-2);
 }
 
