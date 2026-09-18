@@ -14,6 +14,15 @@ describe("chat tag references", () => {
     expect(expandChatTagReferences(value)).toBe("Ask @Research to use Release Notes (skill).");
   });
 
+  it("expands an MCP server tag as what it names", () => {
+    const server = serializeChatTagReference("mcp", "Aave", "mcp-aave");
+
+    expect(chatTagReferences(server)).toEqual([
+      { kind: "mcp", id: "mcp-aave", name: "Aave", start: 0, end: server.length },
+    ]);
+    expect(expandChatTagReferences(`Check ${server} for rates.`)).toBe("Check Aave (MCP server) for rates.");
+  });
+
   it("uses current names when available and leaves malformed markers untouched", () => {
     expect(
       expandChatTagReferences("@[Old name](agent:agent-1) @[broken](other:id)", (reference) =>

@@ -63,7 +63,9 @@ describe("OpenBot connected desktop shell", () => {
     window.getSelection()?.removeAllRanges();
     window.getSelection()?.addRange(range);
     await fireEvent.input(editor);
-    expect(await screen.findByRole("listbox", { name: "Insert skill" })).toHaveTextContent("Smoke checklist");
+    expect(await screen.findByRole("listbox", { name: "Insert skill or MCP server" })).toHaveTextContent(
+      "Smoke checklist",
+    );
   });
 
   it("opens the dock surfaces and closes them from their own controls", async () => {

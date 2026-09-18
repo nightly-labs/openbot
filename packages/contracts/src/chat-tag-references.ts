@@ -1,4 +1,12 @@
-export type ChatTagKind = "agent" | "skill";
+/**
+ * What a tag in a message names. `mcp` is one of the host's MCP servers: a tag is a hint for the
+ * model, in the same way a skill tag is, and it changes no tool the provider is given.
+ *
+ * An app that predates a kind does not match its marker, so it shows the marker text rather than
+ * the name. Message bodies are stored as written, so an older app reading a newer message is a
+ * real case, and it stays readable.
+ */
+export type ChatTagKind = "agent" | "skill" | "mcp";
 
 export interface ChatTagReference {
   kind: ChatTagKind;
@@ -8,7 +16,7 @@ export interface ChatTagReference {
   end: number;
 }
 
-const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill)(\+uri)?:([^)\r\n]+)\)/gu;
+const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill|mcp)(\+uri)?:([^)\r\n]+)\)/gu;
 
 export function serializeChatTagReference(kind: ChatTagKind, name: string, id: string): string {
   if (name && id && !/[\]\r\n]/u.test(name) && !/[)\r\n]/u.test(id)) return `@[${name}](${kind}:${id})`;
@@ -26,7 +34,8 @@ export function chatTagReferences(value: string): ChatTagReference[] {
 }
 
 function chatTagKind(value: string | undefined): ChatTagKind {
-  return value === "skill" ? "skill" : "agent";
+  if (value === "skill") return "skill";
+  return value === "mcp" ? "mcp" : "agent";
 }
 
 export function expandChatTagReferences(
@@ -47,9 +56,15 @@ export function expandChatTagReferences(
       const id = decodeChatTagComponent(encodedId, encoding !== undefined);
       const reference = { kind, id, name, start: offset, end: offset + marker.length };
       const resolvedName = resolveName?.(reference) ?? name;
-      return kind === "agent" ? `@${resolvedName}` : `${resolvedName} (skill)`;
+      return expandedChatTag(kind, resolvedName);
     },
   );
+}
+
+/** What the provider reads in place of a marker. A name alone would not say what it names. */
+function expandedChatTag(kind: ChatTagKind, name: string): string {
+  if (kind === "agent") return `@${name}`;
+  return kind === "mcp" ? `${name} (MCP server)` : `${name} (skill)`;
 }
 
 function encodeChatTagComponent(value: string): string {

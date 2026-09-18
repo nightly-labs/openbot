@@ -42,6 +42,7 @@ export function ConversationComposer() {
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
+    mcpServers,
     editQueuedMessage,
     editingDeliveryId,
     editingPendingSave,
@@ -264,6 +265,7 @@ export function ConversationComposer() {
               agentId={props.agent?.id}
               agents={props.agents}
               skills={installedSkills()}
+              mcpServers={mcpServers()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
               disabled={

@@ -17,6 +17,7 @@ import { createActivityStore } from "./stores/activity-store";
 import { createBrowserStore } from "./stores/browser-store";
 import { createComposerActions } from "./stores/composer-actions";
 import { createComposerStore, currentConversationTarget } from "./stores/composer-store";
+import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
 import { createPanelsStore } from "./stores/panels-store";
 import { createQueueStore } from "./stores/queue-store";
@@ -189,6 +190,7 @@ export function createConversationViewScope(props: ConversationProps) {
   } = panels;
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills } = skills;
+  const { mcpServers } = createMcpServersStore({ props, settingsOpen });
   const composer = createComposerStore({
     props,
     drafts,
@@ -1045,6 +1047,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentDraft,
     currentConversationError,
     installedSkills,
+    mcpServers,
     dropActive,
     editQueuedMessage,
     editingDeliveryId: currentEditingDeliveryId,
