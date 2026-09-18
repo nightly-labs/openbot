@@ -8,6 +8,7 @@ import type {
   SkillSubmission,
 } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "../../analytics";
 import type { MarketplacePluginDetail } from "./marketplace-plugins";
@@ -1131,7 +1132,8 @@ describe("SkillsMarketplaceModal", () => {
       enabled: true,
     };
     const app = plugin.apps[0];
-    if (!app) throw new Error("The plugin under test must publish one app.");
+    if (app?.server.transport !== "http") throw new Error("The plugin under test must publish one http app.");
+    const appUrl = app.server.url;
 
     async function openPluginPage() {
       fireEvent.click(screen.getByRole("tab", { name: "Plugins" }));
@@ -1162,7 +1164,7 @@ describe("SkillsMarketplaceModal", () => {
       // The id is empty because the store mints one. An id it does not hold reads as an edit of a
       // removed row, and the save is refused.
       expect(saveMcpServer).toHaveBeenCalledWith(
-        { config: expect.objectContaining({ id: "", name: app.server.name, transport: "http", url: app.server.url }) },
+        { config: expect.objectContaining({ id: "", name: app.server.name, transport: "http", url: appUrl }) },
         "local",
       );
       expect(await screen.findByRole("button", { name: "Installed" })).toBeDisabled();
@@ -1247,6 +1249,32 @@ describe("SkillsMarketplaceModal", () => {
 
       // Closing the dialog is a decision, not a failure: the install stops and can be started again.
       await waitFor(() => expect(screen.getByRole("button", { name: "Install plugin" })).toBeEnabled());
+      expect(saveMcpServer).not.toHaveBeenCalled();
+    });
+
+    it("stops the connect step when the marketplace itself is closed", async () => {
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => [input.config]);
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []), saveMcpServer };
+      const [open, setOpen] = createSignal(true);
+      render(() => (
+        <SkillsMarketplaceModal
+          open={open()}
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={setOpen}
+          plugins={[withKey]}
+          pluginServerId="local"
+        />
+      ));
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+      await screen.findByRole("dialog", { name: "Connect Aave" });
+
+      // The connect dialog is a sibling of the marketplace, so it has to be told the page it was
+      // started from is gone. Otherwise it stays on screen over nothing.
+      setOpen(false);
+
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Connect Aave" })).toBeNull());
       expect(saveMcpServer).not.toHaveBeenCalled();
     });
 
@@ -1358,7 +1386,7 @@ describe("SkillsMarketplaceModal", () => {
             env: [],
             envPassthrough: [],
             workingDirectory: "",
-            url: app.server.url,
+            url: appUrl,
             headers: [],
           },
         ]),
