@@ -29,6 +29,7 @@ export * from "./ipc-marketplace-agents";
 export * from "./ipc-mcp-servers";
 export * from "./ipc-queue";
 export * from "./ipc-routines";
+export * from "./ipc-shared-tables";
 export * from "./ipc-sidebar-layout";
 export * from "./ipc-skills";
 export * from "./ipc-team-host";

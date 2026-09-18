@@ -89,3 +89,19 @@ atomic.
 
 Do not add a new concern to the biggest file you can see; extract one when a change gives you the
 excuse.
+
+## The database host process
+
+`agent-data/agent-database-host.ts` is the entry of a separate process, and the only file here that
+touches the agents' shared SQLite files. Two rules keep it that way.
+
+**Its runtime imports are limited to `node:*`.** Every repository reference in it is an `import
+type`, which both the bundler and Node's type stripping erase. That gives it a standalone chunk with
+no Electron and no `openbot.db` facade behind it, and it lets a test spawn the `.ts` source under a
+real `node` and drive the true host instead of a fake.
+
+**Its isolation is the process, not a thread.** `sqlite3_step` never returns to JavaScript, so a
+worker ignores `terminate()` and only a killable process bounds a runaway statement. The supervisor
+sends SIGKILL on the deadline and re-dispatches the queued work to a fresh host. A packaged build
+ships the `runAsNode: false` fuse, so the production host is an Electron `utilityProcess` rather
+than `process.execPath` run as Node; `AgentDatabaseHostProcess` is the seam that carries both.

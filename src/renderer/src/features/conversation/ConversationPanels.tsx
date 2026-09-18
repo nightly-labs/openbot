@@ -182,6 +182,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
               skillsMarketplaceOpen={skillsMarketplaceOpen()}
               onAddFromMarketplace={props.server?.kind === "local" ? () => setSkillsMarketplaceOpen(true) : undefined}
               skillsMode={props.server?.kind === "local" ? "mutable" : "readonly"}
+              tablesVisible={props.server?.kind === "local"}
+              agents={props.agents}
               onCreateSkill={
                 props.server?.kind === "local" &&
                 agentReady() &&

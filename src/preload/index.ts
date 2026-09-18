@@ -69,6 +69,7 @@ import {
   isRoutine,
   isRoutineRun,
   isRoutineSchedule,
+  isSharedTable,
   isSidebarLayoutSnapshot,
   isSkillCategory,
   LOCAL_SERVER_ID,
@@ -85,6 +86,7 @@ import {
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
   type ScopedTeamPresenceSnapshot,
+  type SharedTable,
   type SidebarLayoutSnapshot,
   type SkillPackagePreview,
   type SkillSubmission,
@@ -379,6 +381,11 @@ function decodeAgents(value: unknown): AgentSummary[] {
 
 function decodeMemory(value: unknown): AgentMemory {
   if (!isAgentMemory(value)) throw new Error("Invalid agent memory response.");
+  return value;
+}
+
+function decodeTables(value: unknown): SharedTable[] {
+  if (!Array.isArray(value) || !value.every(isSharedTable)) throw new Error("Invalid shared tables response.");
   return value;
 }
 
@@ -955,6 +962,8 @@ const openbotApi: OpenBotDesktopApi = {
     updateMemory: (input) => invokeAgent(IPC_CHANNELS.agentUpdateMemory, input, decodeMemory),
     deleteMemory: (input) => invokeAgent(IPC_CHANNELS.agentDeleteMemory, input, decodeVoid),
     clearMemories: (agentId) => invokeAgent(IPC_CHANNELS.agentClearMemories, agentId, decodeVoid),
+    listTables: () => invokeAgent(IPC_CHANNELS.sharedListTables, null, decodeTables),
+    deleteTable: (input) => invokeAgent(IPC_CHANNELS.sharedDeleteTable, input, decodeVoid),
     listRoutines: (agentId) => invokeAgent(IPC_CHANNELS.agentListRoutines, agentId, decodeRoutines),
     createRoutine: (input) => invokeAgent(IPC_CHANNELS.agentCreateRoutine, input, decodeRoutine),
     updateRoutine: (input) => invokeAgent(IPC_CHANNELS.agentUpdateRoutine, input, decodeRoutine),

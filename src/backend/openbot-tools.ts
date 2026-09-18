@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
+import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import {
   assignAgentSectionToolSchema,
@@ -20,6 +21,7 @@ interface OpenBotToolDefinition {
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
+  ...DATA_TOOL_DEFINITIONS,
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   {
     name: "list_sites",
@@ -227,7 +229,8 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
 export const OPENBOT_DYNAMIC_TOOLS = {
   type: "namespace",
   name: "openbot",
-  description: "Attach files to the current response and work with persistent OpenBot teammates.",
+  description:
+    "Attach files to the current response, keep structured data in the shared SQLite database, and work with persistent OpenBot teammates.",
   tools: OPENBOT_TOOL_DEFINITIONS.map((definition) => ({
     type: "function" as const,
     name: definition.name,

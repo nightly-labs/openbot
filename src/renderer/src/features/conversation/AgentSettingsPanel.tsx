@@ -45,6 +45,7 @@ import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRout
 import { AgentSkillsModal, type AgentSkillsMode, userAssignedSkills } from "./AgentSkillsModal";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
+import { SharedTablesModal } from "./SharedTablesModal";
 
 export interface AgentRuntimeSettings {
   provider: AgentProviderId;
@@ -83,6 +84,10 @@ interface AgentSettingsPanelProps {
   onOpenRoutineRun?: (messageId: string) => void;
   skillsMode?: AgentSkillsMode;
   skillsMarketplaceOpen?: boolean;
+  /** The shared data lives on the computer that runs the agents, so a remote server hides it. */
+  tablesVisible?: boolean;
+  /** Names the agent that keeps each set of records. Threaded like `customProviders`, for the same reason. */
+  agents?: readonly AgentProfile[];
   onCreateSkill?: () => void;
   onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
@@ -117,6 +122,7 @@ interface AgentSettingsDraft {
   avatar: AvatarEditor;
   dirty: Record<keyof AgentTextFields, boolean>;
   fields: AgentTextFields;
+  tables: { count: number; open: boolean };
   memories: { count: number; open: boolean };
   notifications: boolean;
   routines: { count: number; open: boolean };
@@ -145,6 +151,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     },
     dirty: { description: false, name: false, title: false },
     fields: { description: "", name: "", title: "" },
+    tables: { count: 0, open: false },
     memories: { count: 0, open: false },
     notifications: true,
     routines: { count: 0, open: false },
@@ -245,6 +252,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.avatar.candidateSeed = agent.avatarSeed;
           state.avatar.batch = 0;
           state.avatar.pickerOpen = false;
+          state.tables.open = false;
           state.memories.open = false;
           state.routines.open = false;
           state.skills.open = false;
@@ -252,6 +260,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         }
       });
       if (agentChanged) {
+        void window.openbot.agent
+          .listTables()
+          .catch(() => [])
+          .then((items) => {
+            setDraft((state) => {
+              state.tables.count = items.length;
+            });
+          });
         void window.openbot.agent
           .listMemories(agent.id)
           .catch(() => [])
@@ -839,6 +855,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }
               />
             </Show>
+            <Show when={props.tablesVisible !== false}>
+              <SettingsLinkRow
+                label="Saved data"
+                value={`${draft.tables.count} kept`}
+                onClick={() =>
+                  setDraft((state) => {
+                    state.tables.open = true;
+                  })
+                }
+              />
+            </Show>
             <SettingsLinkRow
               label="Routines"
               value={`${draft.routines.count} configured`}
@@ -960,6 +987,22 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             onOpenRun={props.onOpenRoutineRun}
           />
         </div>
+      </Show>
+      <Show when={props.tablesVisible !== false}>
+        <SharedTablesModal
+          agents={props.agents ?? []}
+          open={draft.tables.open}
+          onOpenChange={(open) =>
+            setDraft((state) => {
+              state.tables.open = open;
+            })
+          }
+          onCountChange={(count) =>
+            setDraft((state) => {
+              state.tables.count = count;
+            })
+          }
+        />
       </Show>
       <AgentMemoriesModal
         port={memoriesPort()}

@@ -197,7 +197,10 @@ provider logs are outside the OpenBot application database and its daily mainten
 
 - `~/OpenBot/Agents` contains one workspace per agent. A profile written by a release before the
   bot-to-agent rename holds them under `~/OpenBot/Bots`; the application moves them on first launch.
-- `~/OpenBot/Shared` contains managed transfers shared between agents.
+- `~/OpenBot/Shared` contains managed transfers shared between agents, and
+  `~/OpenBot/Shared/Data/agent-data.db` holds the records the agents keep for themselves between tasks.
+  Every agent on this computer can read and write every table in that file, and the user can delete any
+  table in agent settings.
 - `~/OpenBot/Downloads` contains files downloaded by the embedded browser.
 - `~/Library/Application Support/OpenBot` contains the OpenBot SQLite database, agent metadata,
   conversations, message queues, direct messages, reactions, read state, attachment drafts and
@@ -268,7 +271,7 @@ counts. It contains no conversations, visited URLs, account email, file contents
 
 Quit OpenBot, then remove the OpenBot folders listed above. Removing
 `~/Library/Application Support/OpenBot` also removes the embedded browser's cookies and logins.
-Removing `~/OpenBot` removes agent workspaces, transfers, and downloads. OpenBot does not delete
+Removing `~/OpenBot` removes agent workspaces, transfers, downloads, and the records the agents kept. OpenBot does not delete
 `~/.codex` or `~/.claude`; use each CLI's own controls if you also want to remove its local data.
 
 Review folders before deleting them and keep a backup of anything you need.

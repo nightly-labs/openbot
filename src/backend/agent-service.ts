@@ -35,6 +35,7 @@ import type {
   DeleteChannelMemoryInput,
   DeleteChannelRoutineInput,
   DeleteRoutineInput,
+  DeleteSharedTableInput,
   DraftAttachment,
   DuplicateAgentResult,
   GenerateAgentProfileInput,
@@ -58,6 +59,7 @@ import type {
   SendMessageInput,
   SetMcpServerEnabledInput,
   SetMessageReactionInput,
+  SharedTable,
   SidebarLayoutSnapshot,
   SidebarSection,
   SteerQueuedMessageInput,
@@ -90,6 +92,7 @@ import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import { ContextCompaction } from "./agent/context-compaction";
 import { ConversationRuntime } from "./agent/conversation-runtime";
+import { handleDataTool } from "./agent/data-tools";
 import {
   agentNamesById,
   deliveryInput,
@@ -117,6 +120,7 @@ import { isDynamicToolCall, isRequestTimeout, providerForAgent, providerLabel } 
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
+import type { AgentTables } from "./agent-data/agent-tables";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
@@ -181,6 +185,11 @@ export interface AgentServiceOptions {
   credentials?: ProviderClientContext;
   localSkillTools?: () => LocalSkillTools;
   /**
+   * The shared database agents keep their tables in. Injected because the host child's packaged
+   * path is the main process's knowledge, not this class's.
+   */
+  tables?: AgentTables | null;
+  /**
    * Whether a new agent starts on the development default model rather than the built-in one.
    * The main process passes the app variant; only a dev build turns it on.
    */
@@ -226,6 +235,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #browser: AgentBrowserHost;
   readonly #conversationReads: ConversationReadStore;
   readonly #memories: AgentMemories;
+  readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
@@ -304,6 +314,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       (event) => this.#emit(event),
       () => this.listAgents(),
     );
+    this.#tables = options.tables ?? null;
     this.#memories = new AgentMemories({
       store,
       conversation: this.#conversation,
@@ -766,6 +777,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   clearMemories(agentId: string): void {
     this.#memories.clear(agentId);
+  }
+
+  listTables(): Promise<SharedTable[]> {
+    return this.#tables?.listShared() ?? Promise.resolve([]);
+  }
+
+  async deleteTable(input: DeleteSharedTableInput): Promise<void> {
+    if (!this.#tables) throw new Error("Shared data is unavailable.");
+    await this.#tables.removeAsUser(input.name);
   }
 
   listRoutines(agentId: string): Routine[] {
@@ -1548,6 +1568,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#deltas.dispose();
     this.#threads.dispose();
     this.#memories.clearPending();
+    this.#tables?.dispose();
     this.#attention.clearPrompts();
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
@@ -2182,6 +2203,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
     const memoryResult = this.#memories.handleTool(params, senderAgentId);
     if (memoryResult) return memoryResult;
+
+    const tableResult = await handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);
+    if (tableResult) return tableResult;
 
     if (params.tool === "react_to_user_message") {
       const args = params.arguments;

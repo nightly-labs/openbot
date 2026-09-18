@@ -75,6 +75,16 @@ the `media-attachments` capability; released protocol adapters keep their existi
   Nothing copies it first, so `src/backend/browser-state.ts` re-validates every bound it reads rather
   than trusting it: a tab whose environment fails validation is still returned, without that
   environment, because losing the user's open tab is worse than losing an emulated viewport.
+- `~/OpenBot/Shared/Data/agent-data.db` is one SQLite file that holds every table the agents create
+  for themselves, outside `openbot.db` and outside the migration runner. One file gives the agents
+  one namespace and lets them join across each other's tables. Every agent can read and write every
+  table; the `openbot_metadata` table records the agent that created each one, and that owner is the
+  only agent allowed to drop or alter it. SQLite's own authorizer refuses the other cases, so the
+  rule does not depend on reading the model's SQL. The agents own these schemas, so nothing copies
+  or migrates them before a release, and a table stays when the agent that made it is deleted. The
+  user deletes one from agent settings, which is the only way to remove a table whose owner is gone.
+  The guidance the agents read ships as the managed skill `resources/managed-skills/openbot-data`,
+  beside site hosting and the skill creator, so the always-on prompt only names the tools.
 - Renderer signals and stores are projections for the current screen only. They are not durable
   state, and one concern is one record - a row of parallel signals over its fields lets a screen
   hold states the product does not have.

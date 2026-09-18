@@ -60,6 +60,7 @@ import type {
   SetAgentAvatarInput,
   SetMessageReactionInput,
   SetTeamTypingInput,
+  SharedTable,
   SidebarLayoutSnapshot,
   SkillSubmission,
   SteerQueuedMessageInput,
@@ -105,6 +106,7 @@ import {
   STORY_REMOTE_DESKTOP_SESSION,
   STORY_SERVERS,
   STORY_SESSIONS,
+  STORY_SHARED_TABLES,
   STORY_SKILL_PACKAGE_PREVIEW,
   STORY_SKILL_SUBMISSIONS,
   STORY_SNAPSHOTS,
@@ -146,6 +148,7 @@ export interface MockOpenBotOptions {
   remoteDesktopSessions?: RemoteDesktopSession[];
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
+  tables?: SharedTable[];
   routines?: Record<string, Routine[]>;
   localSkills?: MarketplaceSkillDetail[];
   installedSkills?: Record<string, InstalledSkill[]>;
@@ -399,6 +402,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const queueEdits = new Map<string, { agentId: string; delivery: QueueDelivery }>();
   const queues = new Map<string, QueueSnapshot>(agents.map((agent) => [agent.id, emptyQueue(agent.id)]));
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
+  let tables: SharedTable[] = clone(options.tables ?? STORY_SHARED_TABLES);
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
 
@@ -1387,6 +1391,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       clearMemories: async (agentId) => {
         memories.delete(agentId);
         emitAgentEvent({ type: "memories-changed", agentId });
+      },
+      listTables: async () => clone(tables),
+      deleteTable: async (input) => {
+        tables = tables.filter((table) => table.name !== input.name);
       },
       listRoutines: async (agentId) => clone(routines.get(agentId) ?? []),
       createRoutine: async (input) => {

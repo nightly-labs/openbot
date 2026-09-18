@@ -126,6 +126,8 @@ export const IPC_CHANNELS = {
   agentUpdateMemory: "agent:update-memory",
   agentDeleteMemory: "agent:delete-memory",
   agentClearMemories: "agent:clear-memories",
+  sharedListTables: "shared:list-tables",
+  sharedDeleteTable: "shared:delete-table",
   agentListRoutines: "agent:list-routines",
   agentCreateRoutine: "agent:create-routine",
   agentUpdateRoutine: "agent:update-routine",

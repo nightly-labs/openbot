@@ -3,6 +3,7 @@ import { AVATAR_HUES, isAvatarSeed } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
+import { AGENT_DATABASE_LIMITS } from "./agent-data/agent-database-protocol";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 
 describe("OpenBot tool declarations", () => {
@@ -40,6 +41,13 @@ describe("OpenBot tool declarations", () => {
     ["ask_user", { questions: [{ question: "Where?", options: [{ label: "Here" }] }] }, true],
     ["ask_user", { questions: [] }, false],
     ["ask_user", { questions: [{ question: "Where?", options: [{ label: "Here", unexpected: true }] }] }, false],
+    ["query_data", { sql: "SELECT 1", params: ["a", 1, true, null] }, true],
+    ["query_data", {}, false],
+    ["query_data", { sql: "x".repeat(AGENT_DATABASE_LIMITS.maxSqlLength + 1) }, false],
+    ["execute_data", { sql: "DELETE FROM people", agentId: "agent-1" }, false],
+    ["delete_table", { name: "people" }, true],
+    ["delete_table", {}, false],
+    ["delete_table", { name: "x".repeat(INPUT_LIMITS.sharedTableName + 1) }, false],
   ])("advertises input constraints for %s: %j", (name, input, accepted) => {
     const definition = OPENBOT_DYNAMIC_TOOLS.tools.find((tool) => tool.name === name);
     if (!definition) throw new Error(`Missing tool: ${name}`);

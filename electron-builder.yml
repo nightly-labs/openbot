@@ -29,6 +29,9 @@ files:
   - "!node_modules/@anthropic-ai/claude-agent-sdk-darwin-*/**/*"
   - "!node_modules/@anthropic-ai/claude-agent-sdk-linux-*/**/*"
   - "!node_modules/@anthropic-ai/claude-agent-sdk-win32-*/**/*"
+asarUnpack:
+  # The database host is loaded by path as a separate process, not required into the main bundle.
+  - out/main/agent-database-host.js
 extraResources:
   - from: resources/managed-skills
     to: managed-skills

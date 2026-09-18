@@ -145,6 +145,7 @@ import type {
   TestRoutineInput,
   UpdateRoutineInput,
 } from "./ipc-routines";
+import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import type {
   CreateLocalSkillInput,
@@ -223,6 +224,12 @@ export interface AgentDesktopApi {
   updateMemory: (input: UpdateAgentMemoryInput) => Promise<AgentMemory>;
   deleteMemory: (input: DeleteAgentMemoryInput) => Promise<void>;
   clearMemories: (agentId: string) => Promise<void>;
+  /**
+   * Shared tables are not scoped to an agent: there is no `agentId` on either call. The list is
+   * every table in the one shared database, and the user's delete is not owner-gated.
+   */
+  listTables: () => Promise<SharedTable[]>;
+  deleteTable: (input: DeleteSharedTableInput) => Promise<void>;
   listRoutines: (agentId: string) => Promise<Routine[]>;
   createRoutine: (input: CreateRoutineInput) => Promise<Routine>;
   updateRoutine: (input: UpdateRoutineInput) => Promise<Routine>;

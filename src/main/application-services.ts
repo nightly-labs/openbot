@@ -1,4 +1,7 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
+import { AgentTables } from "../backend/agent-data/agent-tables";
+import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 /**
@@ -320,8 +323,17 @@ export async function createApplicationServices({
     undefined,
     "openbot-skill-creator",
   );
+  const dataSkill = new ManagedSkillService(
+    app.isPackaged
+      ? join(process.resourcesPath, "managed-skills", "openbot-data", "SKILL.md")
+      : resolve(__dirname, "../../resources/managed-skills/openbot-data/SKILL.md"),
+    undefined,
+    undefined,
+    "openbot-data",
+  );
   await managedSkills.syncAll(store.list());
   await skillCreator.syncAll(store.list());
+  await dataSkill.syncAll(store.list());
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -424,6 +436,10 @@ export async function createApplicationServices({
   if (credentialLoadError) {
     logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
   }
+  const tables = new AgentTables({
+    sharedRoot: store.sharedRoot,
+    supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
+  });
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -434,6 +450,7 @@ export async function createApplicationServices({
     prepareAgentWorkspace: async (agent) => {
       await managedSkills.syncAgent(agent);
       await skillCreator.syncAgent(agent);
+      await dataSkill.syncAgent(agent);
     },
     hostedSites,
     sidebarLayout,
@@ -451,6 +468,7 @@ export async function createApplicationServices({
       mcpServers: () => service.enabledMcpServers(),
     },
     localSkillTools: () => localSkillTools(skills),
+    tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and

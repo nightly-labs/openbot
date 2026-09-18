@@ -74,3 +74,17 @@ export function openBotToolResult(value: unknown): OpenBotToolResponse {
     contentItems: [{ type: "inputText", text: JSON.stringify(value) }],
   };
 }
+
+/**
+ * A refusal the model is meant to read and act on, rather than a throw.
+ *
+ * `#handleServerRequest` turns a thrown error into an opaque JSON-RPC fault, which a model can only
+ * give up on. `claude-client.ts` maps `success: false` onto `isError: true`, so both provider paths
+ * show this as a failed tool call with the reason attached.
+ */
+export function openBotToolFailure(message: string): OpenBotToolResponse {
+  return {
+    success: false,
+    contentItems: [{ type: "inputText", text: JSON.stringify({ error: message }) }],
+  };
+}

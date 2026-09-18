@@ -22,6 +22,7 @@ import type {
   MarketplaceSkillSummary,
   RemoteDesktopSession,
   ServerSummary,
+  SharedTable,
   SkillPackagePreview,
   SkillSubmission,
   TeamInviteSummary,
@@ -106,6 +107,15 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   time: index === 0 ? "10:00" : index === 1 ? "Yesterday" : "Mon",
   preview: agent.preview,
 }));
+
+export const STORY_SHARED_TABLES: SharedTable[] = [
+  { name: "citations", ownerAgentId: "research", rowCount: null },
+  { name: "companies", ownerAgentId: "chief", rowCount: 37 },
+  { name: "handled_mail", ownerAgentId: null, rowCount: 46 },
+  { name: "people", ownerAgentId: "chief", rowCount: 214 },
+  { name: "sources", ownerAgentId: "research", rowCount: 688 },
+  { name: "touchpoints", ownerAgentId: "chief", rowCount: 1_902 },
+];
 
 export const STORY_MODELS: AgentModelOption[] = [
   {
