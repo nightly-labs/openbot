@@ -12,6 +12,7 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
+import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
 
 describe("OpenBot connected desktop shell", () => {
   it("opens the marketplace from skill settings and returns to skills", async () => {
@@ -803,6 +804,25 @@ describe("OpenBot connected desktop shell", () => {
       expect(description).toHaveValue(draft);
     }
     expect(screen.getByRole("textbox", { name: "Agent instructions" })).toBe(description);
+  });
+
+  it("does not remount pinned agents when instructions refresh the agent list", async () => {
+    window.localStorage.setItem(
+      SIDEBAR_PINS_STORAGE_KEY,
+      JSON.stringify({ local: [{ kind: "agent", id: "sales-outbound" }] }),
+    );
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const pinnedAgent = screen.getByRole("button", { name: "Sales Outbound, pinned agent" });
+
+    emitAgentEvent?.({
+      type: "agents-changed",
+      agents: AGENTS.map((agent) =>
+        agent.id === "chief" ? { ...agent, description: "Use the updated instructions." } : agent,
+      ),
+    });
+
+    expect(screen.getByRole("button", { name: "Sales Outbound, pinned agent" })).toBe(pinnedAgent);
   });
 
   it("opens Settings with Command+,", async () => {

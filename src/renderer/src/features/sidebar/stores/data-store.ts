@@ -11,6 +11,8 @@ import { agentMatchesQuery, channelMatchesQuery, personMatchesQuery } from "../s
 import { sidebarPinnedItemKey } from "../sidebar-pins";
 import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sidebar-types";
 
+type PinnedItemSource = SidebarProps["agents"][number] | NonNullable<SidebarProps["channels"]>[number];
+
 export function createSidebarDataStore(deps: { normalizedQuery: () => string; props: SidebarProps }) {
   const { normalizedQuery, props } = deps;
 
@@ -27,22 +29,36 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
     (props.channels ?? []).filter((channel) => channelMatchesQuery(channel, normalizedQuery())),
   );
   const channelById = createMemo(() => new Map(matchingChannels().map((channel) => [channel.id, channel])));
+  let pinnedItemCache = new Map<string, { source: PinnedItemSource; item: ResolvedPinnedItem }>();
   /** Both kinds of pinned chat, resolved against the chats the sidebar has: a pin that names none is
-   * kept in storage and simply not drawn, because the chat can be absent for a passing reason. */
+   * kept in storage and simply not drawn, because the chat can be absent for a passing reason.
+   *
+   * Keep a resolved wrapper while its source chat is the same store. Solid's `For` keys by object
+   * identity, so rebuilding every wrapper for an unrelated profile update remounted all pinned
+   * tiles and replayed the unread-badge entrance animation. */
   const resolvedPinnedItems = createMemo<ResolvedPinnedItem[]>(() => {
     const items: ResolvedPinnedItem[] = [];
+    const nextCache = new Map<string, { source: PinnedItemSource; item: ResolvedPinnedItem }>();
+    const resolve = (ref: ResolvedPinnedItem["ref"], source: PinnedItemSource, item: ResolvedPinnedItem) => {
+      const key = sidebarPinnedItemKey(ref);
+      const cached = pinnedItemCache.get(key);
+      const resolved = cached?.source === source ? cached.item : item;
+      nextCache.set(key, { source, item: resolved });
+      return resolved;
+    };
     for (const ref of chatPinnedItems()) {
       if (ref.kind === "agent") {
         const agent = agentById().get(ref.id);
         if (agent && agentMatchesQuery(agent, normalizedQuery())) {
-          items.push({ ref, chat: { kind: "agent", id: agent.id, agent } });
+          items.push(resolve(ref, agent, { ref, chat: { kind: "agent", id: agent.id, agent } }));
         }
       }
       if (ref.kind === "channel") {
         const channel = channelById().get(ref.id);
-        if (channel) items.push({ ref, chat: { kind: "channel", id: channel.id, channel } });
+        if (channel) items.push(resolve(ref, channel, { ref, chat: { kind: "channel", id: channel.id, channel } }));
       }
     }
+    pinnedItemCache = nextCache;
     return items;
   });
   const filteredAgents = createMemo(() =>
