@@ -6,7 +6,11 @@ import type { AgentProfile, ChatActionMarkerModel } from "../src/data";
 import { AgentSkillsModal } from "../src/features/conversation/AgentSkillsModal";
 import { ChatActionMarker } from "../src/features/conversation/ChatActionMarker";
 
-const agents: AgentProfile[] = [agent("research", "Research"), agent("sales", "Sales")];
+const agents: AgentProfile[] = [
+  agent("research", "Research"),
+  agent("sales", "Sales"),
+  agent("social", "OpenBot SM manager for very long names"),
+];
 const onSelectAgent = fn();
 const onOpenRoutine = fn();
 const onOpenHostedSite = fn();
@@ -140,6 +144,33 @@ export const CompactAndUnavailable: Story = {
       </section>
     </main>
   ),
+};
+
+export const AgentRecipientsMenu: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <Heading as="h1" size="lg">
+        Recipient menu
+      </Heading>
+      <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Chat marker recipient menu">
+        <ChatActionMarker
+          marker={agentMarker(
+            [
+              { agentId: "research", status: "completed" },
+              { agentId: "social", status: "completed" },
+              { agentId: "sales", status: "running" },
+            ],
+            "in-progress",
+          )}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+        />
+      </section>
+    </main>
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: /3 agents/ }));
+  },
 };
 
 export const ReducedMotion: Story = {

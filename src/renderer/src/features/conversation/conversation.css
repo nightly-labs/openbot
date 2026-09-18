@@ -4007,14 +4007,24 @@ button.chat-action-target:active,
   margin-left: -6px;
 }
 
-.chat-action-agent-menu {
+/* The shared .ui-action-menu item rule outranks a single class, so the grid template and the
+ * truncation below have to be compounded to reach the row. */
+.ui-action-menu.chat-action-agent-menu {
   min-width: 220px;
+  max-width: min(320px, calc(100vw - var(--openbot-space-4)));
 }
 
-.chat-action-agent-menu-item {
+.ui-action-menu.chat-action-agent-menu .chat-action-agent-menu-item[role="menuitem"] {
   display: grid;
+  align-items: center;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: var(--openbot-space-2);
+}
+
+.chat-action-agent-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-action-agent-menu-item .chat-action-agent-avatar {
@@ -4026,6 +4036,7 @@ button.chat-action-target:active,
 .chat-action-agent-menu-status {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+  white-space: nowrap;
 }
 
 .chat-action-attachments {
