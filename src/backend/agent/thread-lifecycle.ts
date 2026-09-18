@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentSummary, McpServerConfig } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
@@ -324,9 +325,13 @@ export class ThreadLifecycle {
     }
   }
 
-  async resumeThread(agent: AgentSummary, client: AgentClient, externalThreadId: string): Promise<void> {
-    this.#conversation.bindThread(externalThreadId, agent.id);
-    const params = {
+  /**
+   * What an existing provider session is addressed with. Read by `resumeThread` and by boot
+   * recovery, which reads a session before any turn resumes it: a client that has to load the
+   * session to answer needs the same workspace and settings as the resume would have given it.
+   */
+  async threadParams(agent: AgentSummary, client: AgentClient, externalThreadId: string): Promise<DynamicRecord> {
+    return {
       threadId: externalThreadId,
       model: agent.model,
       effort: agent.reasoningEffort,
@@ -338,6 +343,11 @@ export class ThreadLifecycle {
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
       ...(await this.codexConfig(client, this.#mcpServers())),
     };
+  }
+
+  async resumeThread(agent: AgentSummary, client: AgentClient, externalThreadId: string): Promise<void> {
+    this.#conversation.bindThread(externalThreadId, agent.id);
+    const params = await this.threadParams(agent, client, externalThreadId);
 
     try {
       await client.request("thread/resume", params, decodeRecordResponse);

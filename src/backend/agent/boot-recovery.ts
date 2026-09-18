@@ -7,6 +7,7 @@ import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
+import type { ThreadLifecycle } from "./thread-lifecycle";
 
 export interface BootRecoveryHooks {
   executionThreads?(): Array<{ id: string; threadId: string }>;
@@ -20,6 +21,7 @@ export interface BootRecoveryOptions {
   providers: ProviderRuntime;
   conversation: ConversationRuntime;
   mailboxSync: MailboxSync;
+  threads: ThreadLifecycle;
   hooks: BootRecoveryHooks;
 }
 
@@ -46,6 +48,7 @@ export class BootRecovery {
   readonly #providers: ProviderRuntime;
   readonly #conversation: ConversationRuntime;
   readonly #mailboxSync: MailboxSync;
+  readonly #threads: ThreadLifecycle;
   readonly #hooks: BootRecoveryHooks;
 
   constructor(options: BootRecoveryOptions) {
@@ -54,6 +57,7 @@ export class BootRecovery {
     this.#providers = options.providers;
     this.#conversation = options.conversation;
     this.#mailboxSync = options.mailboxSync;
+    this.#threads = options.threads;
     this.#hooks = options.hooks;
   }
 
@@ -80,10 +84,10 @@ export class BootRecovery {
         const client = agent ? this.#providers.clientForAgent(agent) : null;
         const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
         const session = agent && threadId ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
-        if (session && client) {
+        if (agent && session && client) {
           const response = await client.request(
             "thread/read",
-            { threadId: session.externalSessionId, includeTurns: true },
+            { ...(await this.#threads.threadParams(agent, client, session.externalSessionId)), includeTurns: true },
             decodeThreadResponse,
           );
           const turn = response.thread.turns?.find(
@@ -157,15 +161,19 @@ export class BootRecovery {
     for (const agent of this.threads()) {
       if (!agent.threadId) continue;
       // Inactive sessions still own history after an upgrade or provider switch.
+      const active = this.#store.database.activeProviderSession(agent.threadId, agent.provider);
       for (const session of this.#store.database.listProviderSessions(agent.threadId)) {
         const client = this.#providers.clientFor(session.provider);
         if (!client) continue;
         try {
-          const response = await client.request(
-            "thread/read",
-            { threadId: session.externalSessionId, includeTurns: true },
-            decodeThreadResponse,
-          );
+          // The full parameters for the session the agent still runs on, and the id alone for the
+          // retired ones: a client that loads a session to read it must not reopen a session that
+          // was deliberately replaced.
+          const params =
+            session.externalSessionId === active?.externalSessionId
+              ? await this.#threads.threadParams(agent, client, session.externalSessionId)
+              : { threadId: session.externalSessionId };
+          const response = await client.request("thread/read", { ...params, includeTurns: true }, decodeThreadResponse);
           const imported = snapshotFromThread(agent.id, response.thread, (deliveryId) =>
             this.#mailbox.getDelivery(deliveryId),
           );
