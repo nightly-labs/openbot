@@ -1,6 +1,8 @@
 import type { BrowserControlSession, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
+import { serverSupportsCapability } from "../../servers/server-capabilities";
 import type { ConversationProps, ConversationTarget, RightPanelMode } from "../conversation-types";
 
 export interface BrowserTakeoverPreviewState {
@@ -266,7 +268,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const target = targetAgentId ? { agentId: targetAgentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
     const url = browserAddressUrl(value);
-    const currentTab = newTab || deps.props.server?.kind === "remote" ? undefined : activeBrowserTab();
+    // A host that cannot move an existing tab to an address gets a new tab for it instead: the
+    // released navigate route carries a direction only.
+    const canNavigateCurrentTab = serverSupportsCapability(deps.props.server, TEAM_BROWSER_NAVIGATION_CAPABILITY);
+    const currentTab = newTab || !canNavigateCurrentTab ? undefined : activeBrowserTab();
     if (currentTab) {
       if (closingBrowserTabIds.has(currentTab.id)) return;
       try {

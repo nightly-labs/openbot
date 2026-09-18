@@ -1,11 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   BrowserBounds,
+  BrowserLiveViewInput,
   BrowserNavigateInput,
   BrowserOpenInput,
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber } from "@openbot/contracts/runtime-values";
+import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { isObject, requireString } from "./validation";
 
 export function parseBrowserOpen(value: unknown): BrowserOpenInput {
@@ -78,4 +80,13 @@ function finiteBound(value: unknown, field: string): number {
     throw new Error(`Invalid browser bound: ${field}.`);
   }
   return value;
+}
+
+/**
+ * A pointer or key event from the live view. The protocol's own decoder is the bound: what the
+ * renderer sends here is dispatched on a host that never sees this process, so it has to pass the
+ * same reading the host applies to any other member's input.
+ */
+export function parseBrowserLiveViewInput(value: unknown): BrowserLiveViewInput {
+  return decodeBrowserViewInputValue(value);
 }

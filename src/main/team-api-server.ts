@@ -175,6 +175,12 @@ export class TeamApiServer {
         this.#options.remoteScreen.handleUpgrade(request, socket, head, url);
         return;
       }
+      // Like the remote screen, and above the token check for the same reason: a tunneled view
+      // socket carries the WebRTC session this host opened it for rather than a member's token.
+      if (this.#options.browserView?.handlesUpgrade(url)) {
+        this.#options.browserView.handleUpgrade(request, socket, head, url);
+        return;
+      }
       const protocols = (request.headers["sec-websocket-protocol"] ?? "").split(",").map((value) => value.trim());
       if (
         this.#options.appVersion &&
@@ -257,6 +263,7 @@ export class TeamApiServer {
     this.#localTypingAgentId = null;
     try {
       await this.#options.remoteScreen?.stop();
+      await this.#options.browserView?.stop();
     } finally {
       // The heartbeat and the event listeners are already gone. Leaving the socket open
       // would let the next `start()` hand back its port unchanged, so the previous account
@@ -583,7 +590,7 @@ export class TeamApiServer {
   }
 
   #routeBrowser(context: TeamApiRequestContext): Promise<RouteOutcome> {
-    return routeBrowser(context, { browser: this.#options.browser });
+    return routeBrowser(context, { browser: this.#options.browser, browserView: this.#options.browserView });
   }
 
   #routeFiles(context: TeamApiRequestContext): Promise<RouteOutcome> {

@@ -40,6 +40,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeAgentSummary, decodeDraftAttachment, decodeDuplicateAgentResultFromHost } from "./remote-agent-decoding";
@@ -790,6 +791,37 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const server = this.#store.require(serverId);
     if (server.transport !== "webrtc-v2") throw new Error("The remote viewer transport is invalid.");
     return this.#client.fetch(server, new URL(path, server.apiUrl), init, false);
+  }
+
+  /**
+   * Asks a host for a live view of one tab and answers where its frames are. A WebRTC host has no
+   * address the client can reach, so the socket goes through the same local proxy the remote screen
+   * uses; a host on the network is opened directly, with the member's token as the subprotocol.
+   */
+  async openBrowserViewStream(
+    serverId: string,
+    tabId: string,
+  ): Promise<{ sessionId: string; url: string; protocols: string[] }> {
+    const server = this.#store.require(serverId);
+    const session = await this.request(
+      serverId,
+      TEAM_API_ROUTES.browser.viewSessions,
+      decodeBrowserViewSessionResponse,
+      { method: "POST", body: { tabId } },
+    );
+    if (server.transport === "webrtc-v2") {
+      if (!this.#remoteViewerProxy) throw new Error("The local remote viewer proxy is unavailable.");
+      const url = new URL(await this.#remoteViewerProxy.viewerUrl(serverId, session.streamPath));
+      url.protocol = "ws:";
+      return { sessionId: session.id, url: url.toString(), protocols: [] };
+    }
+    const url = new URL(session.streamPath, server.apiUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return { sessionId: session.id, url: url.toString(), protocols: [`openbot-token.${this.#store.token(server)}`] };
+  }
+
+  closeBrowserViewSession(serverId: string, sessionId: string): Promise<void> {
+    return this.request(serverId, TEAM_API_ROUTES.browser.viewSession(sessionId), decodeVoid, { method: "DELETE" });
   }
 
   closeRemoteDesktopSession(serverId: string, sessionId: string): Promise<void> {

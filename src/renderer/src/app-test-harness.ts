@@ -4,6 +4,7 @@ import type {
   AgentStatus,
   AgentSummary,
   AttachmentImportEvent,
+  BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
   CentralAuthState,
   ConversationPage,
@@ -90,6 +91,7 @@ export let emitAgentEvent: ((event: AgentEvent) => void) | undefined;
 export let emitScopedAgentEvent: ((event: ScopedAgentEvent) => void) | undefined;
 export let emitAttachmentImport: ((event: AttachmentImportEvent) => void) | undefined;
 export let emitBrowserPictureInPicture: ((event: BrowserPictureInPictureEvent) => void) | undefined;
+export let emitBrowserLiveView: ((event: BrowserLiveViewEvent) => void) | undefined;
 export let emitUpdateStatus: ((status: UpdateStatus) => void) | undefined;
 export let emitAuth: ((state: CentralAuthState) => void) | undefined;
 export let emitServers: ((servers: ServerSummary[]) => void) | undefined;
@@ -161,6 +163,9 @@ const attachmentImportBridge = createEventBridge<AttachmentImportEvent>((emit) =
 const browserPictureInPictureBridge = createEventBridge<BrowserPictureInPictureEvent>((emit) => {
   emitBrowserPictureInPicture = emit;
 });
+const browserLiveViewBridge = createEventBridge<BrowserLiveViewEvent>((emit) => {
+  emitBrowserLiveView = emit;
+});
 const updateStatusBridge = createEventBridge<UpdateStatus>((emit) => {
   emitUpdateStatus = emit;
 });
@@ -191,6 +196,7 @@ const eventBridges = {
   scopedAgentEvent: scopedAgentEventBridge,
   attachmentImport: attachmentImportBridge,
   browserPictureInPicture: browserPictureInPictureBridge,
+  browserLiveView: browserLiveViewBridge,
   updateStatus: updateStatusBridge,
   auth: authBridge,
   servers: serversBridge,
@@ -214,6 +220,7 @@ export function subscriberCounts(): BridgeSubscriberCounts {
     scopedAgentEvent: scopedAgentEventBridge.count(),
     attachmentImport: attachmentImportBridge.count(),
     browserPictureInPicture: browserPictureInPictureBridge.count(),
+    browserLiveView: browserLiveViewBridge.count(),
     updateStatus: updateStatusBridge.count(),
     auth: authBridge.count(),
     servers: serversBridge.count(),
@@ -756,6 +763,10 @@ export function installOpenbotStub(): void {
           height: 600,
         }),
         setVisible: vi.fn().mockResolvedValue(undefined),
+        startLiveView: vi.fn().mockResolvedValue(undefined),
+        stopLiveView: vi.fn().mockResolvedValue(undefined),
+        sendLiveViewInput: vi.fn().mockResolvedValue(undefined),
+        onLiveViewEvent: vi.fn(browserLiveViewBridge.subscribe),
         onDisplayState: vi.fn().mockReturnValue(() => undefined),
         openPictureInPicture: vi
           .fn()

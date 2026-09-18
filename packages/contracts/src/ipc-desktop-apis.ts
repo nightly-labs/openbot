@@ -52,6 +52,8 @@ import type {
   BrowserBounds,
   BrowserControlState,
   BrowserDisplayState,
+  BrowserLiveViewEvent,
+  BrowserLiveViewInput,
   BrowserNavigateInput,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
@@ -306,6 +308,11 @@ export interface BrowserDesktopApi {
   getControlState: () => Promise<BrowserControlState>;
   capturePreview: (tabId: string) => Promise<BrowserPreview>;
   setVisible: (input: BrowserVisibilityInput) => Promise<void>;
+  /** Starts a live view of a tab on the active remote server. A local tab is already on screen. */
+  startLiveView: (tabId: string) => Promise<void>;
+  stopLiveView: () => Promise<void>;
+  sendLiveViewInput: (input: BrowserLiveViewInput) => Promise<void>;
+  onLiveViewEvent: (listener: (event: BrowserLiveViewEvent) => void) => () => void;
   onDisplayState: (listener: (state: BrowserDisplayState) => void) => () => void;
   openPictureInPicture: (bounds?: BrowserBounds) => Promise<BrowserBounds>;
   closePictureInPicture: () => Promise<void>;

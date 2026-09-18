@@ -102,6 +102,14 @@ the `media-attachments` capability; released protocol adapters keep their existi
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
+A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
+own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`
+streams the tab through CDP, and the gateway sends each frame as bytes and dispatches the pointer and
+key input that comes back, in fractions of the last frame, through the same access checks. Frames stay
+outside the per-tab operation queue, so watching never delays a tool call. `browser-view-client.ts` is
+the client half, and it reuses the Remote Desktop websocket tunnel rather than adding a WebRTC channel.
+The `browser-view` capability says whether a host has both.
+
 ## Provider CLI updates
 
 The runtime manager downloads and verifies the CLI version pinned by OpenBot. The provider runtime

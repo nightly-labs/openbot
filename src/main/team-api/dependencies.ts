@@ -24,6 +24,7 @@ import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { TeamChatStore } from "../../backend/team-chat-store";
+import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { RemoteScreenGateway } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 
@@ -128,6 +129,16 @@ export type TeamApiBrowser = Pick<
   | "close"
   | "capturePreview"
   | "setVisible"
+  | "getDisplayState"
+  | "loadUrl"
+  // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
+  // cannot, because frames outlive the request that asked for them.
+  | "startView"
+  | "dispatchViewInput"
+>;
+export type TeamApiBrowserView = Pick<
+  BrowserViewGateway,
+  "handlesUpgrade" | "handleUpgrade" | "stop" | "createSession" | "closeMemberSession" | "revokeTeamSession"
 >;
 export type TeamApiRemoteScreen = Pick<
   RemoteScreenGateway,
@@ -154,6 +165,7 @@ export interface TeamApiOptions {
   sidebarLayout?: TeamApiSidebarLayout;
   mailbox: TeamApiMailbox;
   browser: TeamApiBrowser;
+  browserView?: TeamApiBrowserView;
   remoteScreen?: TeamApiRemoteScreen;
   redeemCentralTicket?: (ticket: string, serverId: string) => Promise<CentralAuthUser | null>;
   onPresence?: (snapshot: TeamPresenceSnapshot) => void;

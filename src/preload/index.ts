@@ -1058,6 +1058,14 @@ const openbotApi: OpenBotDesktopApi = {
     capturePreview: (tabId) =>
       ipcRenderer.invoke(IPC_CHANNELS.browserCapturePreview, tabId).then(decodeBrowserPreviewFromMain),
     setVisible: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSetVisible, input),
+    startLiveView: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserStartLiveView, tabId),
+    stopLiveView: () => ipcRenderer.invoke(IPC_CHANNELS.browserStopLiveView),
+    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input),
+    onLiveViewEvent: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) => listener(event);
+      ipcRenderer.on(IPC_CHANNELS.browserLiveViewEvent, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.browserLiveViewEvent, handler);
+    },
     onDisplayState: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
       ipcRenderer.on(IPC_CHANNELS.browserDisplayStateEvent, handler);

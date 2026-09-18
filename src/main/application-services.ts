@@ -52,6 +52,7 @@ import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { HostAnalytics } from "./analytics";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
+import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
 import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
@@ -132,6 +133,7 @@ const TEARDOWN_ORDER = {
   dynamicIsland: 20,
   browser: 30,
   browserPictureInPicture: 40,
+  browserView: 45,
   providerRuntimes: 50,
   remoteServers: 60,
   voice: 70,
@@ -170,6 +172,7 @@ export interface ApplicationServices {
   mailbox: MailboxStore;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
+  browserView: BrowserViewClient;
   updater: UpdateService;
   setupFile: string;
   analyticsPreferenceFile: string;
@@ -686,6 +689,16 @@ export async function createApplicationServices({
   }
   configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
   configureServerLogoProtocols({ teamStore, remoteServers });
+  // After the servers: the view it opens belongs to one of them, and it has to stop before they do.
+  const browserView = new BrowserViewClient({
+    servers: remoteServers,
+    onEvent: (event) => {
+      const window = windows.getMainWindow();
+      if (!window || window.isDestroyed()) return;
+      sendToRenderer(window, IPC_CHANNELS.browserLiveViewEvent, event);
+    },
+  });
+  teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => browserView.stop());
   const remoteDesktop = new RemoteDesktopManager(remoteServers);
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => remoteDesktop.stop());
   const voice = new VoiceTranscriptionService({
@@ -745,6 +758,7 @@ export async function createApplicationServices({
     mailbox,
     browser,
     browserPictureInPicture,
+    browserView,
     updater,
     setupFile,
     analyticsPreferenceFile,

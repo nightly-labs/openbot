@@ -1,4 +1,6 @@
 import type { AgentSummary, BrowserPreview, BrowserTab, ServerSummary } from "@openbot/contracts/ipc";
+import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -8,6 +10,7 @@ import {
   attachment,
   confirmOnboardingModel,
   emitAgentEvent,
+  emitBrowserLiveView,
   emitBrowserPictureInPicture,
   installOpenbotStub,
   testServer,
@@ -15,6 +18,9 @@ import {
 import { toast } from "./components/ui";
 import BrowserPreviewSidebar, { BrowserPreviewCard } from "./features/conversation/BrowserPreviewSidebar";
 import { TestIntersectionObserver } from "./setupTests";
+
+/** One byte stands in for the host's JPEG: jsdom decodes no image, and the test asserts no pixels. */
+const IMAGE = new Uint8Array([0xff]);
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -231,6 +237,109 @@ describe("OpenBot connected desktop shell", () => {
       focus: true,
     });
     expect(window.openbot.browser.navigate).not.toHaveBeenCalled();
+  });
+
+  it("moves the open tab to an address on a remote host that supports it", async () => {
+    const studio = testServer("remote-1", true);
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
+      testServer("local", false),
+      {
+        ...studio,
+        compatibility: {
+          localAppVersion: "0.0.0",
+          hostAppVersion: "0.0.0",
+          localProtocol: { minimum: 1, maximum: 4 },
+          hostProtocol: { minimum: 1, maximum: 4 },
+          negotiatedProtocol: 4,
+          capabilities: ["browser-control", TEAM_BROWSER_NAVIGATION_CAPABILITY],
+        },
+      },
+    ]);
+    const tab: BrowserTab = {
+      id: "remote-address-tab",
+      title: "Remote address page",
+      url: "https://example.com",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open Remote address page" }));
+    const address = screen.getByRole("textbox", { name: "Browser address" });
+    address.focus();
+    await fireEvent.input(address, { target: { value: "remote search" } });
+    const form = address.closest("form");
+    if (!form) throw new Error("Browser address form was not rendered.");
+    await fireEvent.submit(form);
+
+    expect(window.openbot.browser.navigate).toHaveBeenCalledWith({
+      tabId: tab.id,
+      url: "https://www.google.com/search?q=remote%20search",
+    });
+    expect(window.openbot.browser.open).not.toHaveBeenCalled();
+  });
+
+  it("draws a remote host's page and sends a click back as a fraction of the frame", async () => {
+    const studio = testServer("remote-1", true);
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
+      testServer("local", false),
+      {
+        ...studio,
+        compatibility: {
+          localAppVersion: "0.0.0",
+          hostAppVersion: "0.0.0",
+          localProtocol: { minimum: 1, maximum: 4 },
+          hostProtocol: { minimum: 1, maximum: 4 },
+          negotiatedProtocol: 4,
+          capabilities: ["browser-control", TEAM_BROWSER_VIEW_CAPABILITY],
+        },
+      },
+    ]);
+    const tab: BrowserTab = {
+      id: "remote-live-tab",
+      title: "Remote live page",
+      url: "https://example.com",
+      loading: false,
+      ownerAgentId: "chief",
+      ownerThreadId: "thread-chief",
+    };
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Open Remote live page" }));
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
+    const view = await screen.findByRole("img", { name: "Live view of the page on the host" });
+    // The panel is a different size from the host's viewport, so the click is sent as the point on
+    // the frame rather than the pixel it landed on here. jsdom has no layout to measure.
+    const rect: DOMRect = {
+      x: 100,
+      y: 50,
+      left: 100,
+      top: 50,
+      right: 500,
+      bottom: 250,
+      width: 400,
+      height: 200,
+      toJSON: () => ({}),
+    };
+    view.getBoundingClientRect = () => rect;
+    await fireEvent.mouseDown(view, { clientX: 300, clientY: 150, button: 0, detail: 1 });
+
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith({
+      type: "pointer",
+      action: "down",
+      x: 0.5,
+      y: 0.5,
+      button: "left",
+      clickCount: 1,
+      modifiers: 0,
+    });
   });
 
   it("keeps existing previews when a new tab is added", async () => {
@@ -485,7 +594,7 @@ describe("OpenBot connected desktop shell", () => {
   it("restores the active local browser tab after returning from a remote server", async () => {
     const local = testServer("local", true);
     const remote = testServer("remote-1", false);
-    let resolveRemoteTabs: ((tabs: BrowserTab[]) => void) | undefined;
+    let resolveRemoteTabs: ((state: { tabs: BrowserTab[]; activeTabId: string | null }) => void) | undefined;
     const firstTab: BrowserTab = {
       id: "tab-first",
       title: "First local tab",
@@ -507,14 +616,16 @@ describe("OpenBot connected desktop shell", () => {
       { ...local, active: serverId === "local" },
       { ...remote, active: serverId === "remote-1" },
     ]);
+    // Main answers this for a remote server too, so the held read is the remote leg's display
+    // state rather than a bare tab list.
     vi.mocked(window.openbot.browser.getDisplayState)
       .mockResolvedValueOnce({ tabs: [], activeTabId: null })
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveRemoteTabs = resolve;
+        }),
+      )
       .mockResolvedValueOnce({ tabs: [firstTab, activeTab], activeTabId: activeTab.id });
-    vi.mocked(window.openbot.browser.listTabs).mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveRemoteTabs = resolve;
-      }),
-    );
 
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
@@ -522,13 +633,13 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
     await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledWith("remote-1"));
     await waitFor(() => expect(resolveRemoteTabs).toBeDefined());
-    resolveRemoteTabs?.([]);
+    resolveRemoteTabs?.({ tabs: [], activeTabId: null });
     await new Promise((resolve) => setTimeout(resolve, 0));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true"),
     );
     await fireEvent.click(screen.getByRole("button", { name: "Local server" }));
-    await waitFor(() => expect(window.openbot.browser.getDisplayState).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(window.openbot.browser.getDisplayState).toHaveBeenCalledTimes(3));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Local server" })).toHaveAttribute("aria-pressed", "true"),
     );

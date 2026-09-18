@@ -302,10 +302,10 @@ async function main(): Promise<void> {
   const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);
   if (
     scenario !== undefined &&
-    !["background", "controls", "tool-boundary", "evaluation", "wait-deadlines"].includes(scenario)
+    !["background", "controls", "tool-boundary", "evaluation", "wait-deadlines", "live-view"].includes(scenario)
   ) {
     throw new Error(
-      `Unknown browser smoke scenario: ${scenario}. Use background, controls, tool-boundary, evaluation, or wait-deadlines.`,
+      `Unknown browser smoke scenario: ${scenario}. Use background, controls, tool-boundary, evaluation, wait-deadlines, or live-view.`,
     );
   }
   const googleLive = process.argv.includes("--google-live");
@@ -376,6 +376,8 @@ async function main(): Promise<void> {
               await runCanvasGridScenario(browser, origin);
             } else if (scenario === "wait-deadlines") {
               await runWaitDeadlines(browser, tab.id, contents);
+            } else if (scenario === "live-view") {
+              await runLiveViewScenario(browser, tab.id, contents);
             } else {
               await runEvaluationScenario(browser, tab.id, contents);
             }
@@ -1253,6 +1255,7 @@ async function main(): Promise<void> {
       );
     }
     await runEvaluationScenario(browser, v2Tab.id, v2Contents);
+    await runLiveViewScenario(browser, v2Tab.id, v2Contents);
     const timedOut = await callBrowserTool(browser, "wait_for", {
       tabId: v2Tab.id,
       text: "never appears",
@@ -2017,6 +2020,110 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
   }
   await v2Contents.executeJavaScript(
     "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
+    true,
+  );
+}
+
+/**
+ * The live view a remote member watches: frames that keep coming, a rate that stays bounded, input
+ * that reaches the page, and a stream that ends when the member stops watching.
+ *
+ * The first check is the one that a unit test cannot make. A page may hold only a few frames the
+ * viewer has not acknowledged, so an acknowledgement that never arrives stops the stream after a
+ * handful of frames and looks like a frozen page. Only a real page and a real debugger session show
+ * that, and a released version already failed exactly this way.
+ */
+async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  await contents.executeJavaScript(
+    `(() => {
+    document.getElementById('live-view-probe')?.remove();
+    const probe = document.createElement('div');
+    probe.id = 'live-view-probe';
+    probe.style.cssText = 'position:fixed;left:10px;top:10px;width:120px;height:120px;background:#c33;z-index:2147483647';
+    const button = document.createElement('button');
+    button.id = 'live-view-button';
+    button.textContent = 'Live view target';
+    button.style.cssText = 'position:fixed;left:10px;top:150px;width:200px;height:60px;z-index:2147483647';
+    button.addEventListener('click', event => { if (event.isTrusted) button.dataset.pressed = 'true'; });
+    document.body.append(probe, button);
+    // A page that keeps drawing: the frames have to keep coming for as long as it does.
+    const paint = () => {
+      probe.style.opacity = String(0.4 + (Date.now() % 1000) / 2000);
+      window.__liveViewProbe = requestAnimationFrame(paint);
+    };
+    paint();
+  })()`,
+    true,
+  );
+  const frames: Array<{ sequence: number; at: number }> = [];
+  const stopView = await browser.startView(tabId, (frame) => {
+    if (frame.image.byteLength === 0) throw new Error("A live view frame carried no image.");
+    frames.push({ sequence: frame.sequence, at: Date.now() });
+  });
+  try {
+    // Chromium lets a page hold only a few unacknowledged frames, so passing this count proves the
+    // acknowledgements are landing rather than the stream having stopped after its first burst.
+    const enough = 40;
+    const deadline = Date.now() + 20_000;
+    while (frames.length < enough && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (frames.length < enough) {
+      throw new Error(`The live view stopped after ${frames.length} frames instead of continuing past ${enough}.`);
+    }
+    const elapsedSeconds = (frames[frames.length - 1].at - frames[0].at) / 1000;
+    const rate = elapsedSeconds > 0 ? (frames.length - 1) / elapsedSeconds : Number.POSITIVE_INFINITY;
+    // The host paces the stream at about thirty frames a second. A page that draws faster than that
+    // must not raise what the link and the watching computer have to carry.
+    if (rate > 45) throw new Error(`The live view sent ${rate.toFixed(1)} frames a second, above the paced rate.`);
+    const sequences = frames.map((frame) => frame.sequence);
+    if (sequences.some((value, index) => index > 0 && value <= sequences[index - 1])) {
+      throw new Error("Live view frames did not arrive in order.");
+    }
+
+    // Input from the watching member reaches the page, at the page's own pixels.
+    const centre = "document.getElementById('live-view-button').getBoundingClientRect()";
+    const x = await contents.executeJavaScript(`(r => r.left + r.width / 2)(${centre})`, true);
+    const y = await contents.executeJavaScript(`(r => r.top + r.height / 2)(${centre})`, true);
+    if (!isNumber(x) || !isNumber(y)) throw new Error("The live view target did not report a position.");
+    for (const action of ["move", "down", "up"] as const) {
+      await browser.dispatchViewInput(tabId, {
+        type: "pointer",
+        action,
+        x,
+        y,
+        button: "left",
+        clickCount: action === "move" ? 0 : 1,
+        deltaX: 0,
+        deltaY: 0,
+        modifiers: 0,
+      });
+    }
+    const pressedDeadline = Date.now() + 5_000;
+    let pressed = false;
+    while (!pressed && Date.now() < pressedDeadline) {
+      pressed = await contents.executeJavaScript(
+        "document.getElementById('live-view-button').dataset.pressed === 'true'",
+        true,
+      );
+      if (!pressed) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!pressed) throw new Error("A live view click did not reach the page.");
+  } finally {
+    await stopView();
+  }
+  // The page still draws. Nothing more may arrive once the member stops watching.
+  const afterStop = frames.length;
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+  if (frames.length !== afterStop) {
+    throw new Error(`The live view sent ${frames.length - afterStop} frames after it was stopped.`);
+  }
+  await contents.executeJavaScript(
+    `(() => {
+    cancelAnimationFrame(window.__liveViewProbe);
+    document.getElementById('live-view-probe')?.remove();
+    document.getElementById('live-view-button')?.remove();
+  })()`,
     true,
   );
 }

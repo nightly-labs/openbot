@@ -1200,6 +1200,19 @@
   background: var(--openbot-bg-canvas);
 }
 
+/* The live view of a host's tab. It fills the surface the native view would have covered. */
+.browser-live-view {
+  position: absolute;
+  inset: 0;
+}
+
+.browser-live-view canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .browser-empty-state {
   display: grid;
   height: 100%;

@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   channelEvent,
   channelRequest,
@@ -52,6 +53,8 @@ import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
+/** A Moonlight session and a few browser views, which is more than a member watches at once. */
+const MAXIMUM_DESKTOP_STREAMS = 6;
 
 export interface TeamWebRtcHostPeerOptions {
   bridge: TeamWebRtcBridge;
@@ -92,8 +95,7 @@ export class TeamWebRtcHostPeer {
   #eventsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   #eventsReconnectAttempts = 0;
   #nextEventSequence = 1;
-  #desktopSocket: Ws.WebSocket | null = null;
-  #desktopStreamId: string | null = null;
+  readonly #desktopSockets = new Map<string, Ws.WebSocket>();
   #sessionExpirationTimer: ReturnType<typeof setTimeout> | null = null;
   #sessionPreparation: Promise<void> | null = null;
   #pendingConnection: IncomingConnection | null = null;
@@ -227,7 +229,7 @@ export class TeamWebRtcHostPeer {
       return;
     }
     if (channel === "desktop") {
-      void this.#handleDesktopSignal(data).catch(() => this.#closeDesktopSocket());
+      void this.#handleDesktopSignal(data).catch(() => this.#closeDesktopSockets());
       return;
     }
     if (!isString(data)) {
@@ -621,100 +623,92 @@ export class TeamWebRtcHostPeer {
     if (!peerId || !this.#localApiPort || !this.#localSessionId) return;
     if (!isString(data)) {
       const frame = decodeRemoteDesktopSignalBinary(data);
-      if (frame.streamId !== this.#desktopStreamId || this.#desktopSocket?.readyState !== webSockets.WebSocket.OPEN)
-        return;
-      this.#desktopSocket.send(frame.bytes, { binary: true });
+      const socket = this.#desktopSockets.get(frame.streamId);
+      if (socket?.readyState !== webSockets.WebSocket.OPEN) return;
+      socket.send(frame.bytes, { binary: true });
       return;
     }
     const control = decodeRemoteDesktopSignalControl(data);
     if (control.type === "open") {
-      const url = new URL(control.path, `ws://127.0.0.1:${this.#localApiPort}`);
-      if (
-        url.origin !== `ws://127.0.0.1:${this.#localApiPort}` ||
-        !/^\/v1\/remote-screen\/sessions\/[A-Za-z0-9-]+\/stream$/u.test(url.pathname)
-      ) {
-        await this.#bridge.send(
-          peerId,
-          "desktop",
-          encodeRemoteDesktopSignalControl({
-            type: "error",
-            streamId: control.streamId,
-            message: "The remote desktop signal path is invalid.",
-          }),
-        );
-        return;
-      }
-      this.#closeDesktopSocket();
-      const socket = new webSockets.WebSocket(url, {
-        headers: { "X-OpenBot-WebRTC-Session": this.#localSessionId },
-      });
-      this.#desktopSocket = socket;
-      this.#desktopStreamId = control.streamId;
-      socket.once("open", () => {
-        this.#sendRecoverable(
-          peerId,
-          "desktop",
-          encodeRemoteDesktopSignalControl({ type: "opened", streamId: control.streamId }),
-        );
-      });
-      socket.on("message", (message, binary) => {
-        if (this.#desktopStreamId !== control.streamId) return;
-        if (binary) {
-          const bytes = rawDataBytes(message);
-          this.#sendRecoverable(peerId, "desktop", encodeRemoteDesktopSignalBinary(control.streamId, bytes));
-        } else {
-          this.#sendRecoverable(
-            peerId,
-            "desktop",
-            encodeRemoteDesktopSignalControl({
-              type: "text",
-              streamId: control.streamId,
-              data: message.toString(),
-            }),
-          );
-        }
-      });
-      socket.once("close", (code, reason) => {
-        if (this.#desktopStreamId !== control.streamId) return;
-        this.#desktopSocket = null;
-        this.#desktopStreamId = null;
-        this.#sendRecoverable(
-          peerId,
-          "desktop",
-          encodeRemoteDesktopSignalControl({
-            type: "close",
-            streamId: control.streamId,
-            code,
-            reason: reason.toString(),
-          }),
-        );
-      });
-      socket.once("error", () => {
-        this.#sendRecoverable(
-          peerId,
-          "desktop",
-          encodeRemoteDesktopSignalControl({
-            type: "error",
-            streamId: control.streamId,
-            message: "The host Moonlight signal socket failed.",
-          }),
-        );
-      });
+      this.#openDesktopSocket(peerId, control.streamId, control.path);
       return;
     }
-    if (control.streamId !== this.#desktopStreamId) return;
-    if (control.type === "text" && this.#desktopSocket?.readyState === webSockets.WebSocket.OPEN) {
-      this.#desktopSocket.send(control.data);
+    const socket = this.#desktopSockets.get(control.streamId);
+    if (!socket) return;
+    if (control.type === "text" && socket.readyState === webSockets.WebSocket.OPEN) {
+      socket.send(control.data);
     } else if (control.type === "close") {
-      this.#desktopSocket?.close(control.code ?? 1000, control.reason);
+      socket.close(control.code ?? 1000, control.reason);
     }
+  }
+
+  /**
+   * The tunnel carries more than one stream at a time: a member can watch a browser tab while a
+   * Moonlight session runs. Each stream keeps its own socket, and only the paths named here are
+   * reachable -- the tunnel opens sockets on the host's own port, so its allowlist is the boundary.
+   */
+  #openDesktopSocket(peerId: string, streamId: string, path: string): void {
+    const url = new URL(path, `ws://127.0.0.1:${this.#localApiPort}`);
+    const allowed =
+      url.origin === `ws://127.0.0.1:${this.#localApiPort}` &&
+      (/^\/v1\/remote-screen\/sessions\/[A-Za-z0-9-]+\/stream$/u.test(url.pathname) ||
+        browserViewStreamSessionId(url.pathname) !== null);
+    if (!allowed || this.#desktopSockets.size >= MAXIMUM_DESKTOP_STREAMS) {
+      void this.#bridge
+        .send(
+          peerId,
+          "desktop",
+          encodeRemoteDesktopSignalControl({
+            type: "error",
+            streamId,
+            message: allowed ? "Too many host streams are open." : "The remote desktop signal path is invalid.",
+          }),
+        )
+        .catch(() => undefined);
+      return;
+    }
+    this.#closeDesktopSocket(streamId);
+    const sessionId = this.#localSessionId ?? "";
+    const socket = new webSockets.WebSocket(url, { headers: { "X-OpenBot-WebRTC-Session": sessionId } });
+    this.#desktopSockets.set(streamId, socket);
+    socket.once("open", () => {
+      this.#sendRecoverable(peerId, "desktop", encodeRemoteDesktopSignalControl({ type: "opened", streamId }));
+    });
+    socket.on("message", (message, binary) => {
+      if (this.#desktopSockets.get(streamId) !== socket) return;
+      if (binary) {
+        this.#sendRecoverable(peerId, "desktop", encodeRemoteDesktopSignalBinary(streamId, rawDataBytes(message)));
+      } else {
+        this.#sendRecoverable(
+          peerId,
+          "desktop",
+          encodeRemoteDesktopSignalControl({ type: "text", streamId, data: message.toString() }),
+        );
+      }
+    });
+    socket.once("close", (code, reason) => {
+      if (this.#desktopSockets.get(streamId) !== socket) return;
+      this.#desktopSockets.delete(streamId);
+      this.#sendRecoverable(
+        peerId,
+        "desktop",
+        encodeRemoteDesktopSignalControl({ type: "close", streamId, code, reason: reason.toString() }),
+      );
+    });
+    socket.once("error", () => {
+      this.#sendRecoverable(
+        peerId,
+        "desktop",
+        encodeRemoteDesktopSignalControl({ type: "error", streamId, message: "The host stream socket failed." }),
+      );
+    });
   }
 
   #closeLocalSession(endLogicalSession = true): void {
     if (this.#peerId) this.#files.setPeerAuthenticated(this.#peerId, false);
     if (this.#sessionExpirationTimer) clearTimeout(this.#sessionExpirationTimer);
     this.#sessionExpirationTimer = null;
-    this.#closeDesktopSocket();
+    this.#closeDesktopSockets();
     if (this.#eventsReconnectTimer) clearTimeout(this.#eventsReconnectTimer);
     this.#eventsReconnectTimer = null;
     this.#eventsReconnectAttempts = 0;
@@ -735,11 +729,14 @@ export class TeamWebRtcHostPeer {
     void this.#bridge.send(peerId, channel, data).catch(() => undefined);
   }
 
-  #closeDesktopSocket(): void {
-    const socket = this.#desktopSocket;
-    this.#desktopSocket = null;
-    this.#desktopStreamId = null;
+  #closeDesktopSocket(streamId: string): void {
+    const socket = this.#desktopSockets.get(streamId);
+    this.#desktopSockets.delete(streamId);
     socket?.close(1000, "Remote desktop signal stopped");
+  }
+
+  #closeDesktopSockets(): void {
+    for (const streamId of [...this.#desktopSockets.keys()]) this.#closeDesktopSocket(streamId);
   }
 }
 

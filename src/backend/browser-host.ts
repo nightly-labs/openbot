@@ -32,7 +32,13 @@ import {
   WebContentsView,
   webContents,
 } from "electron";
-import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult } from "./browser-cdp";
+import {
+  BrowserCdpEngine,
+  type BrowserScreencastFrame,
+  type BrowserUploadAssignment,
+  type BrowserViewportInput,
+  type SnapshotReadResult,
+} from "./browser-cdp";
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import { applySiteIdentity } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
@@ -87,6 +93,14 @@ const OPERATION_UNWIND_GRACE_MS = 1_000;
  * it is queued on the tab, so whatever the agent does next waits behind it.
  */
 const DOCUMENT_ENUMERATION_TIMEOUT_MS = 10_000;
+/**
+ * The live view's frames. The quality is what a page of text survives on a slow link, and the size
+ * is the client's panel rather than the host's monitor: a frame larger than the panel that draws it
+ * is bytes nobody sees.
+ */
+const VIEW_FRAME_QUALITY = 60;
+const VIEW_FRAME_MAX_WIDTH = 1_280;
+const VIEW_FRAME_MAX_HEIGHT = 800;
 
 interface BrowserConsoleMessageDetails {
   level: "info" | "warning" | "error" | "debug";
@@ -588,6 +602,34 @@ export class BrowserHost {
       const dataUrl = `data:image/jpeg;base64,${preview.toJPEG(72).toString("base64")}`;
       return { dataUrl, width: 960, height: 600 };
     });
+  }
+
+  /**
+   * A live view of a tab, for a member who is not at this computer.
+   *
+   * The frames do not go through the tab's operation queue. A queued frame is a frame that arrives
+   * after whatever the agent is doing has finished, which is exactly the picture the still-image
+   * route already gave; the point of the view is that the page moves while the agent works.
+   */
+  async startView(tabId: string, onFrame: (frame: BrowserScreencastFrame) => void): Promise<() => Promise<void>> {
+    const tab = this.#requireTab(tabId);
+    return tab.engine.startScreencast(
+      { quality: VIEW_FRAME_QUALITY, maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT },
+      onFrame,
+    );
+  }
+
+  /**
+   * Input from the person watching that view. It is not queued either, for the same reason a local
+   * click on the visible tab is not: a pointer that answers when the agent's turn ends is not a
+   * pointer. Anything that can change the page clears the references the agent's last snapshot
+   * handed out, the way taking the tab over does, so the agent takes a fresh one rather than acting
+   * on an element the person moved.
+   */
+  async dispatchViewInput(tabId: string, input: BrowserViewportInput): Promise<void> {
+    const tab = this.#requireTab(tabId);
+    if (input.type !== "pointer" || input.action !== "move") tab.engine.invalidateReferences();
+    await tab.engine.dispatchViewportInput(input);
   }
 
   async handleDynamicTool(

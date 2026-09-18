@@ -15,6 +15,7 @@ import type {
   AppSetupState,
   AttachmentImportEvent,
   BrowserControlState,
+  BrowserLiveViewEvent,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
   BrowserPreview,
@@ -372,6 +373,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   };
   const agentListeners = new Set<Listener<AgentEvent>>();
   const browserDisplayListeners = new Set<Listener<{ tabs: BrowserTab[]; activeTabId: string | null }>>();
+  const browserLiveViewListeners = new Set<Listener<BrowserLiveViewEvent>>();
   const browserPictureInPictureListeners = new Set<Listener<BrowserPictureInPictureEvent>>();
   const authListeners = new Set<Listener<CentralAuthState>>();
   const presenceListeners = new Set<Listener<TeamPresenceSnapshot>>();
@@ -1769,6 +1771,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(preview);
       },
       setVisible: async () => undefined,
+      // The preview has no host, so it answers the one thing that is true: there is nothing live to
+      // show. The panel draws its own message for that rather than an empty rectangle.
+      startLiveView: async (tabId) => {
+        emit(browserLiveViewListeners, { type: "stopped", tabId, reason: "The preview has no host to watch." });
+      },
+      stopLiveView: async () => undefined,
+      sendLiveViewInput: async () => undefined,
+      onLiveViewEvent: (listener) => {
+        browserLiveViewListeners.add(listener);
+        return () => browserLiveViewListeners.delete(listener);
+      },
       onDisplayState: (listener) => {
         browserDisplayListeners.add(listener);
         return () => browserDisplayListeners.delete(listener);

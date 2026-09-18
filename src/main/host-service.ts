@@ -40,6 +40,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
+import { BrowserViewGateway } from "./browser-view-gateway";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
@@ -145,6 +146,7 @@ export class HostService extends EventEmitter<HostEvents> {
     Omit<HostServiceOptions, "allowLocalDevelopmentInvites">;
   readonly #api: TeamApiServer;
   readonly #remoteScreen: RemoteScreenGateway;
+  readonly #browserView: BrowserViewGateway;
   readonly #webrtcGateway: TeamWebRtcHostGateway | null;
   #status: HostStatus;
   #runtimeGeneration = 0;
@@ -203,6 +205,10 @@ export class HostService extends EventEmitter<HostEvents> {
         }
       },
     });
+    this.#browserView = new BrowserViewGateway({
+      browser: options.browser,
+      authenticate: (token) => options.store.authenticate(token),
+    });
     this.#api = new TeamApiServer({
       appVersion: options.appVersion,
       store: options.store,
@@ -213,6 +219,7 @@ export class HostService extends EventEmitter<HostEvents> {
       sidebarLayout: options.sidebarLayout,
       mailbox: options.mailbox,
       browser: options.browser,
+      browserView: this.#browserView,
       remoteScreen: this.#remoteScreen,
       redeemCentralTicket: options.redeemCentralTicket,
       chat: options.chat,
@@ -239,7 +246,10 @@ export class HostService extends EventEmitter<HostEvents> {
               message: error.message,
             });
           },
-          closeSession: (sessionId) => this.#remoteScreen.revokeTeamSession(sessionId),
+          closeSession: async (sessionId) => {
+            await this.#remoteScreen.revokeTeamSession(sessionId);
+            await this.#browserView.revokeTeamSession(sessionId);
+          },
           verifyClientTicket: options.verifyRemoteSessionTicket,
         })
       : null;
@@ -833,6 +843,7 @@ export class HostService extends EventEmitter<HostEvents> {
     await this.#revokeWebRtcSession(sessionId);
     await this.#options.store.revokeSession(sessionId);
     await this.#remoteScreen.revokeTeamSession(sessionId);
+    await this.#browserView.revokeTeamSession(sessionId);
     this.#api.refreshPresence();
   }
 
