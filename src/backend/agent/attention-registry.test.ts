@@ -756,7 +756,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       "This approval is no longer active.",
     );
   });
-  it("answers a granted agent's approvals without surfacing them, and still asks for wider access", async () => {
+  it("answers every one of a granted agent's approvals without surfacing them", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
     service = createTestService({
@@ -812,9 +812,17 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
         permissions: { fileSystem: { read: ["/tmp/openbot"], write: [] }, network: { enabled: true } },
       },
     });
-    await waitFor(() => events.some((event) => event.type === "approval"));
-    expect(client.responses.some((response) => response.id === "granted-permissions")).toBe(false);
-    expect(service.getRuntimeSnapshot().pendingApprovals).toHaveLength(1);
+    await waitFor(() => client.responses.some((response) => response.id === "granted-permissions"));
+    // A widened boundary is answered in the dialect the provider expects, not with a bare decision.
+    expect(client.responses.at(-1)).toEqual({
+      id: "granted-permissions",
+      result: {
+        permissions: { fileSystem: { read: ["/tmp/openbot"], write: [] }, network: { enabled: true } },
+        scope: "turn",
+      },
+    });
+    expect(events.some((event) => event.type === "approval")).toBe(false);
+    expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
   });
   it("keeps asking for an agent that was never granted", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();

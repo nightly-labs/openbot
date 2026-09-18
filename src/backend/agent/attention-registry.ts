@@ -287,7 +287,9 @@ export class AttentionRegistry {
    */
   #answerWithoutAsking(client: AgentClient, request: AppServerRequest, approval: AgentApproval): boolean {
     if (!shouldAutoApprove(this.#approvalAutomation, approval)) return false;
-    if (request.method === "applyPatchApproval" || request.method === "execCommandApproval") {
+    if (approval.kind === "permissions") {
+      client.respond(request.id, { permissions: getRecord(request.params, "permissions") ?? {}, scope: "turn" });
+    } else if (request.method === "applyPatchApproval" || request.method === "execCommandApproval") {
       client.respond(request.id, { decision: "approved" });
     } else {
       client.respond(request.id, { decision: "accept" });

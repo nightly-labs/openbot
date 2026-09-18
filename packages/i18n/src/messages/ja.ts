@@ -66,13 +66,14 @@ export const ja = {
   "settings.autonomy.title": "エージェントの自律動作",
   "settings.turbo.title": "ターボモード",
   "settings.turbo.description":
-    "すべてのエージェントが確認なしでコマンドを実行し、ファイルを変更します。ファイルシステムやネットワークのアクセス範囲を広げる要求と、公開サイトの変更は引き続き確認します。",
+    "すべてのエージェントが確認なしでコマンドを実行し、ファイルを変更し、ファイルシステムやネットワークのアクセス範囲を広げます。公開サイトの変更は引き続き確認します。",
   "settings.turbo.confirmTitle": "ターボモードを有効にしますか？",
   "settings.turbo.confirmDescription":
-    "エージェントは確認なしでこのコンピューターのコマンドを実行し、ファイルを変更します。ここでいつでも無効にできます。",
+    "エージェントは確認なしでこのコンピューターのコマンドを実行し、ファイルを変更し、自身のアクセス範囲を広げます。ここでいつでも無効にできます。",
   "settings.turbo.confirmCancel": "キャンセル",
   "settings.turbo.confirmAccept": "有効にする",
-  "settings.autoApprove.agentDescription": "確認なしでコマンドを実行し、ファイルを変更します。",
+  "settings.autoApprove.agentDescription":
+    "確認なしでコマンドを実行し、ファイルを変更し、自身のアクセス範囲を広げます。",
   "settings.autoApprove.revoke": "取り消す",
   "settings.autoApprove.revokeLabel": "{name} の常時許可を取り消す",
   "settings.autoApprove.resetTitle": "すべての常時許可",

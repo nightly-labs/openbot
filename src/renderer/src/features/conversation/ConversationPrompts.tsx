@@ -219,9 +219,9 @@ export function ApprovalCard(props: {
             >
               <AlertDialog.Title>Always allow {props.agentName ?? "this agent"}?</AlertDialog.Title>
               <AlertDialog.Description>
-                {props.agentName ?? "This agent"} will run commands and change files on this computer without asking
-                again. Requests to widen its filesystem or network access, and changes to a published site, still ask.
-                You can take this back in Settings.
+                {props.agentName ?? "This agent"} will run commands, change files and widen its own filesystem and
+                network access on this computer without asking again. Changes to a published site still ask. You can
+                take this back in Settings.
               </AlertDialog.Description>
               <div class="approval-confirm-actions">
                 <Button

@@ -131,7 +131,6 @@ export interface ConversationProps {
   agentAutoApproveLocked?: boolean;
   /** Absent for a remote agent: its own computer holds that choice. */
   onSetAgentAutoApprove?: (autoApprove: boolean) => Promise<void>;
-  onReviewAutoApprove?: (trigger: HTMLElement | null) => void;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel") => Promise<boolean>;
   onCancelQueuedMessage: (deliveryId: string) => void;
   onSteerQueuedMessage: (deliveryId: string) => void;

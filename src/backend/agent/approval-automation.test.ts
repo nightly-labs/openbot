@@ -25,19 +25,15 @@ describe("shouldAutoApprove", () => {
     expect(shouldAutoApprove(NO_APPROVAL_AUTOMATION, approval("file-change"))).toBe(false);
   });
 
-  it("answers commands and file changes for a granted agent", () => {
+  it("answers every kind of approval for a granted agent", () => {
     expect(shouldAutoApprove(grants("agent-1"), approval("command"))).toBe(true);
     expect(shouldAutoApprove(grants("agent-1"), approval("file-change"))).toBe(true);
+    // An agent asks to widen its reach before it can do the work the grant was given for.
+    expect(shouldAutoApprove(grants("agent-1"), approval("permissions"))).toBe(true);
   });
 
   it("still asks an agent that was never granted", () => {
     expect(shouldAutoApprove(grants("agent-2"), approval("command"))).toBe(false);
-  });
-
-  // The boundary the product promises: a request to widen what the agent may reach is never one the
-  // agent's own standing grant can answer, whatever the user turned on.
-  it("always asks before widening filesystem or network access", () => {
-    expect(shouldAutoApprove(grants("agent-1"), approval("permissions"))).toBe(false);
-    expect(shouldAutoApprove({ autoApproves: () => true }, approval("permissions"))).toBe(false);
+    expect(shouldAutoApprove(grants("agent-2"), approval("permissions"))).toBe(false);
   });
 });
