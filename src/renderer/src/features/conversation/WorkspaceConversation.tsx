@@ -165,6 +165,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
       activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}
+      mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
       globalOverlayOpen={
         globalSearchOpen() ||
         joinServerOpen() ||

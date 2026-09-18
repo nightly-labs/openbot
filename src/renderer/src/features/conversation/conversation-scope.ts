@@ -190,7 +190,7 @@ export function createConversationViewScope(props: ConversationProps) {
   } = panels;
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills } = skills;
-  const { mcpServers } = createMcpServersStore({ props, settingsOpen });
+  const { mcpServers } = createMcpServersStore({ props });
   const composer = createComposerStore({
     props,
     drafts,

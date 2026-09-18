@@ -4,7 +4,6 @@ import type { ConversationProps } from "../conversation-types";
 
 export interface McpServersStoreDeps {
   props: ConversationProps;
-  settingsOpen: () => boolean;
 }
 
 /**
@@ -15,8 +14,9 @@ export interface McpServersStoreDeps {
  * its names, and a tag is a hint in the prompt, so a server that cannot answer is still a server the
  * user can name.
  *
- * The list is read again when the settings dialog closes, because that dialog is where a server is
- * added or removed, and on a reconnection, because a remote host answers this only while connected.
+ * The list is read again when the server settings dialog or the marketplace closes, because those
+ * are where a server is added or removed, and on a reconnection, because a remote host answers this
+ * only while connected.
  */
 export function createMcpServersStore(deps: McpServersStoreDeps) {
   const [mcpServers, setMcpServers] = createSignal<McpServerConfig[]>([]);
@@ -25,7 +25,7 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
     const server = deps.props.server;
     // A host that predates the capability answers 404, so it is not asked at all.
     const supported = server?.kind !== "remote" || server.compatibility?.capabilities.includes(MCP_SERVERS_CAPABILITY);
-    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.settingsOpen()}`;
+    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}`;
   });
   createEffect(source, (key) => {
     const current = ++request;

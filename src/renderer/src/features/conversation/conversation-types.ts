@@ -74,6 +74,13 @@ export interface ConversationProps {
   activeTurnId: string | null | undefined;
   activityDetail?: string;
   skillsMarketplaceOpen?: boolean;
+  /**
+   * True while a surface that can add or remove one of the host's MCP servers is open: the server
+   * settings dialog and the marketplace, where a plugin installs its app. The composer reads the
+   * list again when the last of them closes, so a server added there can be tagged without a
+   * restart.
+   */
+  mcpSettingsOpen?: boolean;
   globalOverlayOpen: boolean;
   settingsRequest: { agentId: string; nonce: number } | null;
   messageFocusRequest: { agentId: string; messageId: string; nonce: number } | null;
