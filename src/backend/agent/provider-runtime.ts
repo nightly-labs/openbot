@@ -10,7 +10,12 @@ import type {
   AgentSummary,
   CustomProviderRestart,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor, isFreeOpencodeModel, isReasoningEffort } from "@openbot/contracts/ipc";
+import {
+  agentProviderDescriptor,
+  isAgentProvider,
+  isFreeOpencodeModel,
+  isReasoningEffort,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -55,6 +60,23 @@ import { providerForAgent, providerLabel } from "./thread-items";
 const logger = createOpenBotLogger("provider-runtime");
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
+const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
+
+function withUsageReadTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Usage read timed out.")), ACCOUNT_USAGE_READ_TIMEOUT_MS);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 /**
  * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
@@ -503,14 +525,46 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * Without a scope this is the account-wide reading the dock polls, and it broadcasts.
-   * Scoped to one agent it answers for that agent's own model and stays quiet: the reply goes to
-   * the caller that asked, so it must not overwrite the account-wide figure every other view shows.
+   * Without a scope this is the account-wide reading the dock polls: one limit per connected
+   * provider that can report usage, then a broadcast. Scoped to one agent it answers for that
+   * agent's own model and stays quiet, so it must not overwrite the list every other view shows.
    */
   async usage(scope?: { provider: AgentProvider; model: string }): Promise<AccountUsage> {
     if (!scope) {
-      const client = this.#clients.get("codex");
-      return client ? this.#refreshUsage(client) : { limits: [] };
+      const available = (this.status().providers ?? []).filter(
+        (item) => isAgentProvider(item.id) && item.state === "available" && item.connectionState !== "connecting",
+      );
+      const providers = available
+        .map((item) => item.id)
+        .filter(isAgentProvider)
+        .sort((left, right) => agentProviderDescriptor(left).pickerOrder - agentProviderDescriptor(right).pickerOrder);
+      const collected = new Map<AgentProvider, AccountUsage["limits"][number]>();
+      await Promise.all(
+        providers.map(async (provider) => {
+          if (provider === "opencode") return;
+          try {
+            if (!this.#clients.has(provider)) await this.ensureProvider(provider);
+            const client = this.#clients.get(provider);
+            if (!client) return;
+            const model =
+              provider === "codex" ? undefined : agentProviderDescriptor(provider).defaultModel || undefined;
+            const usage = await withUsageReadTimeout(this.#refreshUsage(client, model, false));
+            const limit = usage.limits[0];
+            if (!limit || (!limit.primary && !limit.secondary)) return;
+            collected.set(provider, { ...limit, id: provider });
+            this.#emit({
+              type: "usage-changed",
+              usage: { limits: [...collected.values()] },
+            });
+          } catch (error) {
+            logger.warn("Could not read provider usage.", {
+              provider,
+              message: error instanceof Error ? error.message : "unknown",
+            });
+          }
+        }),
+      );
+      return { limits: structuredClone([...collected.values()]) };
     }
     const client = this.#clients.get(scope.provider);
     return client ? this.#refreshUsage(client, scope.model, false) : { limits: [] };
@@ -767,7 +821,7 @@ export class ProviderRuntime implements ProviderPort {
   /** Router arm: the CLI pushed new rate limits. */
   refreshCodexUsage(): void {
     const client = this.#clients.get("codex");
-    if (client) void this.#refreshUsage(client).catch(() => undefined);
+    if (client) void this.#refreshUsage(client, undefined, false).catch(() => undefined);
   }
 
   /** Refresh the notice once when one provider reports the same exhausted balance several ways. */

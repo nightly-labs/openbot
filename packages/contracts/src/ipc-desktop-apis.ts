@@ -206,7 +206,7 @@ export interface AgentDesktopApi {
   getStatus: () => Promise<AgentStatus>;
   getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
-  getUsage: (agentId: string) => Promise<AccountUsage>;
+  getUsage: (agentId?: string) => Promise<AccountUsage>;
   listModels: () => Promise<AgentModelOption[]>;
   listAgents: (serverId?: string) => Promise<AgentSummary[]>;
   listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;

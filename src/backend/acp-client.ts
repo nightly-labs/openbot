@@ -114,6 +114,11 @@ interface AcpModel {
   usesModelReasoningEffort: boolean | null;
 }
 
+interface AcpProviderAccount {
+  email: string | null;
+  planType: string | null;
+}
+
 export interface AcpProviderOptions {
   provider: AgentProvider;
   profileGeneration?: boolean;
@@ -137,6 +142,12 @@ export interface AcpProviderOptions {
    */
   mcpServers?: McpServerSource;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
+  /**
+   * Reads optional identity fields that ACP does not define. A provider extension failing must not
+   * turn a working authenticated process into a signed-out one, so account/read falls back to null
+   * fields when this hook cannot answer.
+   */
+  readAccount?(connection: ClientSideConnection): Promise<Partial<AcpProviderAccount>>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
 }
 
@@ -148,6 +159,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #requestTimeoutMs: number;
   readonly #bridge = new LocalMcpBridge();
   readonly #threads = new Map<string, AcpThread>();
+  readonly #startingThreads = new Map<string, Promise<{ thread: { id: string } }>>();
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   #process: ChildProcessWithoutNullStreams | null = null;
   #connection: ClientSideConnection | null = null;
@@ -220,6 +232,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#initialized = null;
     for (const thread of this.#threads.values()) thread.mcp.close();
     this.#threads.clear();
+    this.#startingThreads.clear();
     for (const pending of this.#pendingServerRequests.values()) pending.reject(new Error("ACP session stopped."));
     this.#pendingServerRequests.clear();
     await this.#bridge.close();
@@ -257,11 +270,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       case "initialize":
         await this.#ensureInitialized();
         return decoder({});
-      case "account/read":
+      case "account/read": {
+        if (!this.#signedIn) return decoder({ account: null, requiresOpenaiAuth: false });
+        const account = await this.#readProviderAccount(timeoutMs);
         return decoder({
-          account: this.#signedIn ? { type: this.provider, email: null, planType: null } : null,
+          account: { type: this.provider, email: account.email, planType: account.planType },
           requiresOpenaiAuth: false,
         });
+      }
       case "account/rateLimits/read":
         await this.#ensureInitialized();
         if (!this.#signedIn) return decoder({ rateLimits: null, rateLimitsByLimitId: null });
@@ -293,8 +309,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       case "thread/resume":
         return decoder(await this.#startThread(params, true));
       case "thread/read": {
-        const thread = this.#requireThread(requiredString(params, "threadId"));
-        return decoder({ thread: { id: thread.id, turns: thread.turns } });
+        const thread = await this.#readableThread(requiredString(params, "threadId"), params);
+        return decoder({
+          thread: { id: thread?.id ?? requiredString(params, "threadId"), turns: thread?.turns ?? [] },
+        });
       }
       case "turn/start":
         return decoder(await this.#startTurn(params, false));
@@ -334,6 +352,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (this.#initialized) return this.#initialized;
     this.#initialized = this.#initialize();
     return this.#initialized;
+  }
+
+  async #readProviderAccount(timeoutMs?: number): Promise<AcpProviderAccount> {
+    if (!this.options.readAccount) return { email: null, planType: null };
+    try {
+      const account = await withTimeout(
+        this.options.readAccount(this.#requireConnection()),
+        timeoutMs ?? this.#requestTimeoutMs,
+        `${agentProviderName(this.provider)} request timed out: account/read`,
+      );
+      return { email: account.email ?? null, planType: account.planType ?? null };
+    } catch {
+      return { email: null, planType: null };
+    }
   }
 
   async #initialize(): Promise<void> {
@@ -472,12 +504,70 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return probed;
   }
 
+  /**
+   * The thread a `thread/read` can answer from, loading the session when it is not held here.
+   *
+   * An ACP session lives in this process alone, so a restart leaves every persisted session id
+   * unknown until something loads it. Boot recovery reads those ids before any turn does, and a
+   * refusal there is reported to the user as a failed history backfill. The session is loaded
+   * instead, which also leaves it warm for the first turn. `null` is answered when it cannot be
+   * loaded - the agent does not support `session/load`, the caller sent no `cwd`, or the load
+   * failed - because a read is advisory: its callers treat an absent turn as an unsettled one.
+   */
+  async #readableThread(id: string, params: unknown): Promise<AcpThread | null> {
+    const held = this.#threads.get(id);
+    if (held) return held;
+    if (!getString(params, "cwd")) return null;
+    try {
+      await this.#ensureInitialized();
+      if (!this.#loadsSessions) return null;
+      await this.#startThread(params, true);
+    } catch (error) {
+      this.emit("diagnostic", redactText(`ACP session load for a read failed: ${String(error)}`));
+      return null;
+    }
+    return this.#threads.get(id) ?? null;
+  }
+
+  /** Whether the agent answers `session/load`, which it advertises in its initialization. */
+  get #loadsSessions(): boolean {
+    return this.#initialization?.agentCapabilities?.loadSession === true;
+  }
+
   async #startThread(params: unknown, resume: boolean): Promise<{ thread: { id: string } }> {
     await this.#ensureInitialized();
     if (!this.#signedIn) throw new Error(this.options.signInMessage);
     const requestedThreadId = getString(params, "threadId");
-    if (resume && requestedThreadId && this.#threads.has(requestedThreadId))
+    if (!resume || !requestedThreadId) return this.#openThread(params, false);
+    const held = this.#threads.get(requestedThreadId);
+    // A thread this client already holds takes the caller's settings even though no session is
+    // opened for them: the loader may have been a `thread/read`, which carries none of its own, and
+    // the turn that follows must not run on the settings of whoever loaded the session first.
+    if (held) {
+      held.developerInstructions = getString(params, "developerInstructions") ?? held.developerInstructions;
+      await this.#applyConfig(held, getString(params, "model"), getString(params, "effort"));
       return { thread: { id: requestedThreadId } };
+    }
+    // One load per session id, however many callers ask for it. Boot recovery reads a session while
+    // the first drain resumes it, and two `session/load` calls would leave two threads and two MCP
+    // bridge sessions under one id, of which only the last is reachable.
+    const starting = this.#startingThreads.get(requestedThreadId);
+    if (starting) return starting;
+    const start = this.#openThread(params, true).finally(() => {
+      this.#startingThreads.delete(requestedThreadId);
+    });
+    this.#startingThreads.set(requestedThreadId, start);
+    return start;
+  }
+
+  async #openThread(params: unknown, resume: boolean): Promise<{ thread: { id: string } }> {
+    const requestedThreadId = getString(params, "threadId");
+    if (resume && requestedThreadId && !this.#loadsSessions) {
+      // Reported as a missing session, which is what it is for the caller: the agent cannot give
+      // this session back, so the recovery that replaces it runs now rather than after a protocol
+      // error the user would have to read.
+      throw new Error(`Unknown ACP session: ${requestedThreadId}`);
+    }
     const cwd = requiredString(params, "cwd");
     const dynamicTools = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
     let threadRef: AcpThread | null = null;

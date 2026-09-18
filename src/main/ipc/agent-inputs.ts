@@ -66,6 +66,11 @@ export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
 }
 
+export function parseOptionalAgentId(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  return parseAgentId(value);
+}
+
 export function parseSidebarLayoutAction(value: unknown): SidebarLayoutAction {
   if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
   switch (value.type) {

@@ -11,13 +11,9 @@ export function normalizeAccountUsage(rateLimits: AccountRateLimitsReadResult | 
   const fallback: [string, AccountRateLimitResult] | null = rateLimits?.rateLimits
     ? [rateLimits.rateLimits.limitId ?? "codex", rateLimits.rateLimits]
     : null;
-  const selectedEntries = model
-    ? selectModelRateLimits(entries, model, fallback)
-    : entries.length > 0
-      ? entries
-      : fallback
-        ? [fallback]
-        : [];
+  // No model means the dock's account-wide reading: one bucket per provider, not every
+  // Codex model window mixed into the same unlabeled list.
+  const selectedEntries = model ? selectModelRateLimits(entries, model, fallback) : fallback ? [fallback] : entries;
   const limits = selectedEntries.map(([id, limit]) => normalizeAccountLimit(id, limit));
 
   return { limits };

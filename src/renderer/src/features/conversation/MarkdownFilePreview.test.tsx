@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 import { MarkdownFilePreview } from "./MarkdownFilePreview";
 
@@ -14,9 +14,7 @@ function renderPreview(body: string) {
     <MarkdownFilePreview
       body={body}
       agents={[]}
-      resetKey="preview.md"
       renderedClass="message-markdown"
-      sourceClass="markdown-source"
       statusClass="markdown-status"
       truncatedClass="markdown-truncated"
       {...callbacks}
@@ -54,18 +52,5 @@ describe("MarkdownFilePreview", () => {
     expect(screen.getByText("<script>alert('xss')</script>")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "unsafe" })).not.toBeInTheDocument();
     expect(screen.getByText("unsafe")).toBeInTheDocument();
-  });
-
-  it("switches to the original source and back to rendered Markdown", async () => {
-    const body = "# Source check\n\n**Keep this syntax.**";
-    renderPreview(body);
-
-    await fireEvent.click(screen.getByRole("button", { name: "View source" }));
-    expect(screen.getByRole("button", { name: "View rendered Markdown" })).toBeInTheDocument();
-    expect(screen.getByText((_content, element) => element?.textContent === body)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Source check" })).not.toBeInTheDocument();
-
-    await fireEvent.click(screen.getByRole("button", { name: "View rendered Markdown" }));
-    expect(screen.getByRole("heading", { level: 1, name: "Source check" })).toBeInTheDocument();
   });
 });

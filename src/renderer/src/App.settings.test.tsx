@@ -69,18 +69,16 @@ describe("OpenBot connected desktop shell", () => {
   it("opens the dock surfaces and closes them from their own controls", async () => {
     render(() => <App />);
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1));
-    expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief");
+    expect(vi.mocked(window.openbot.agent.getUsage).mock.calls[0]).toEqual([]);
 
-    const usageButton = await screen.findByRole("button", { name: "Weekly usage, 59% left" });
+    const usageButton = await screen.findByRole("button", { name: "Usage, ChatGPT 59% left" });
     await fireEvent.click(usageButton);
-    const usageDialog = screen.getByRole("dialog", { name: "Weekly usage" });
-    const usageProgress = within(usageDialog).getByRole("progressbar", { name: "Weekly usage remaining" });
-    expect(usageProgress).toHaveAttribute("aria-valuenow", "59");
-    expect(usageProgress).toHaveAttribute("aria-valuetext", "59% left");
+    const usageDialog = screen.getByRole("dialog", { name: "Usage" });
+    expect(within(usageDialog).getByRole("listitem", { name: /ChatGPT, 59% left/ })).toBeInTheDocument();
     await fireEvent.click(within(usageDialog).getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
     await fireEvent.keyDown(usageDialog, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Weekly usage" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Usage" })).not.toBeInTheDocument());
 
     const accountButton = screen.getByRole("button", { name: "Open account actions" });
     await fireEvent.click(accountButton);
@@ -123,10 +121,38 @@ describe("OpenBot connected desktop shell", () => {
 
     expect(window.openbot.agent.getUsage).not.toHaveBeenCalled();
     await fireEvent.click(accountButton);
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief"));
+    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(window.openbot.agent.getUsage).mock.calls[0]).toEqual([]);
+    const accountDialog = screen.getByRole("dialog", { name: "Account actions" });
+    expect(within(accountDialog).getByRole("heading", { name: "Usage" })).toBeInTheDocument();
+    expect(within(accountDialog).getByRole("listitem", { name: /ChatGPT, 59% left/ })).toBeInTheDocument();
   });
 
-  it("keeps usage scoped to the selected model when an earlier request finishes late", async () => {
+  it("lists each connected provider in the usage popover", async () => {
+    vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({
+      limits: [
+        {
+          id: "codex",
+          primary: null,
+          secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: null },
+        },
+        {
+          id: "claude",
+          primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: null },
+          secondary: { usedPercent: 40, windowDurationMins: 10_080, resetsAt: null },
+        },
+      ],
+    });
+
+    render(() => <App />);
+    const usageButton = await screen.findByRole("button", { name: "Usage, Claude 0% left" });
+    await fireEvent.click(usageButton);
+    const usageDialog = screen.getByRole("dialog", { name: "Usage" });
+    expect(within(usageDialog).getByRole("listitem", { name: /Claude, 0% left/ })).toBeInTheDocument();
+    expect(within(usageDialog).getByRole("listitem", { name: /ChatGPT, 85% left/ })).toBeInTheDocument();
+  });
+
+  it("keeps host-wide usage when an earlier request finishes late", async () => {
     let resolveInitialUsage!: (usage: AccountUsage) => void;
     const initialUsageRequest = new Promise<AccountUsage>((resolve) => {
       resolveInitialUsage = resolve;
@@ -144,15 +170,22 @@ describe("OpenBot connected desktop shell", () => {
       });
 
     render(() => <App />);
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledWith("chief"));
+    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1));
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
-    const picker = screen.getByRole("dialog", { name: "Choose agent model" });
-    await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
-
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("button", { name: "Weekly usage, 18% left" })).toBeInTheDocument();
+    emitAgentEvent?.({
+      type: "usage-changed",
+      usage: {
+        limits: [
+          {
+            id: "claude",
+            primary: null,
+            secondary: { usedPercent: 82, windowDurationMins: 10_080, resetsAt: null },
+          },
+        ],
+      },
+    });
+    expect(await screen.findByRole("button", { name: "Usage, Claude 18% left" })).toBeInTheDocument();
+    expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1);
 
     resolveInitialUsage({
       limits: [
@@ -166,7 +199,7 @@ describe("OpenBot connected desktop shell", () => {
     await initialUsageRequest;
     await Promise.resolve();
 
-    expect(screen.getByRole("button", { name: "Weekly usage, 18% left" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Usage, Claude 18% left" })).toBeInTheDocument();
   });
 
   it("replaces an in-flight usage request after usage is invalidated", async () => {
@@ -189,10 +222,20 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1));
 
-    emitAgentEvent?.({ type: "usage-changed", usage: { limits: [] } });
-
-    await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("button", { name: "Weekly usage, 28% left" })).toBeInTheDocument();
+    emitAgentEvent?.({
+      type: "usage-changed",
+      usage: {
+        limits: [
+          {
+            id: "codex",
+            primary: null,
+            secondary: { usedPercent: 72, windowDurationMins: 10_080, resetsAt: null },
+          },
+        ],
+      },
+    });
+    expect(await screen.findByRole("button", { name: "Usage, ChatGPT 28% left" })).toBeInTheDocument();
+    expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1);
 
     resolveInitialUsage({
       limits: [
@@ -204,7 +247,7 @@ describe("OpenBot connected desktop shell", () => {
       ],
     });
     await initialUsageRequest;
-    expect(screen.getByRole("button", { name: "Weekly usage, 28% left" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Usage, ChatGPT 28% left" })).toBeInTheDocument();
   });
 
   it("persists every settings preference through its own IPC channel", async () => {

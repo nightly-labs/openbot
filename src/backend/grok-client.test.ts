@@ -302,7 +302,7 @@ describe.sequential("GrokAgentClient", () => {
     },
   );
 
-  it("reads the current weekly billing period and rejects a monthly period", async () => {
+  it("reads the current weekly billing period and a monthly period", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
     client.start();
     await client.request("initialize", {}, decodeRecordResponse);
@@ -321,7 +321,11 @@ describe.sequential("GrokAgentClient", () => {
     await client.request("initialize", {}, decodeRecordResponse);
     await expect(
       client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
-    ).resolves.toEqual({ rateLimits: null, rateLimitsByLimitId: null });
+    ).resolves.toMatchObject({
+      rateLimits: {
+        secondary: { usedPercent: 8, windowDurationMins: 43_200 },
+      },
+    });
   });
 
   it("reports unavailable usage for a unified weekly billing period without quota values", async () => {
@@ -367,7 +371,7 @@ describe.sequential("GrokAgentClient", () => {
 
       await client.request("initialize", {}, decodeRecordResponse);
       await expect(client.request("account/read", {}, decodeAccountReadResult)).resolves.toMatchObject({
-        account: { type: provider },
+        account: { type: provider, email: provider === "grok" ? "grok@example.com" : null },
       });
       const models = await client.request("model/list", {}, decodeModelListResponse);
       expect(models.data).toEqual([
@@ -639,6 +643,7 @@ describe.sequential("GrokAgentClient", () => {
     client.start();
     await client.request("initialize", {}, decodeRecordResponse);
     await expect(client.request("account/read", {}, decodeAccountReadResult)).resolves.toMatchObject({ account: null });
+    expect((await readLog()).some((entry) => entry.method === "_x.ai/auth/info")).toBe(false);
     await client.stop();
 
     process.env.OPENBOT_FAKE_GROK_MODE = "no-model";
@@ -648,6 +653,22 @@ describe.sequential("GrokAgentClient", () => {
       "did not advertise any ACP models",
     );
   });
+
+  it.each(["unsupported-auth-info", "malformed-auth-info", "oversized-auth-info"])(
+    "keeps Grok signed in when account identity is %s",
+    async (mode) => {
+      process.env.OPENBOT_FAKE_GROK_MODE = mode;
+      client = new GrokAgentClient({ executable, version: "1.0.22" }, 5_000);
+      client.start();
+      await client.request("initialize", {}, decodeRecordResponse);
+
+      await expect(client.request("account/read", {}, decodeAccountReadResult)).resolves.toEqual({
+        account: { type: "grok", email: null, planType: null },
+        requiresOpenaiAuth: false,
+      });
+      expect(await readLog()).toContainEqual(expect.objectContaining({ method: "_x.ai/auth/info" }));
+    },
+  );
 });
 
 async function readLog(): Promise<DynamicRecord[]> {
@@ -872,6 +893,18 @@ createInterface({ input: process.stdin }).on("line", (line) => {
               },
         },
       },
+    });
+    return;
+  }
+  if (message.method === "_x.ai/auth/info") {
+    log({ method: message.method });
+    if (mode === "unsupported-auth-info") {
+      write({ id: message.id, error: { code: -32601, message: "Method not found" } });
+      return;
+    }
+    write({
+      id: message.id,
+      result: { email: mode === "malformed-auth-info" ? 42 : mode === "oversized-auth-info" ? "x".repeat(255) : "grok@example.com" },
     });
     return;
   }

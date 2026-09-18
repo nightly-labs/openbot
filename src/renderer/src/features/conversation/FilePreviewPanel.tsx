@@ -168,10 +168,8 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           <MarkdownFilePreview
             class="file-preview-markdown"
             renderedClass="message-markdown"
-            sourceClass="file-preview-markdown-source"
             statusClass="file-preview-markdown-status"
             truncatedClass="file-preview-truncated"
-            resetKey={props.preview.name}
             body={text().value}
             truncated={text().truncated}
             agents={props.agents}

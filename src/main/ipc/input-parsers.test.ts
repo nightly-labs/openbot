@@ -25,6 +25,7 @@ import {
   parseOpenAttachment,
   parseOpenSharedFile,
   parseOpenWorkspaceFile,
+  parseOptionalAgentId,
   parsePromptResponse,
   parseQueueEdit,
   parseReorderQueue,
@@ -143,6 +144,9 @@ describe("app IPC input parsing", () => {
 
   it("validates model usage agent identifiers", () => {
     expect(parseAgentId("chief")).toBe("chief");
+    expect(parseOptionalAgentId(null)).toBeUndefined();
+    expect(parseOptionalAgentId(undefined)).toBeUndefined();
+    expect(parseOptionalAgentId("chief")).toBe("chief");
     expect(() => parseAgentId(42)).toThrowError("agentId is required.");
     expect(() => parseAgentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("agentId is too long.");
   });

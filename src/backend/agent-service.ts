@@ -481,21 +481,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         queueHold: (agentId) => this.channels.queueHold(agentId),
       },
     });
-    this.#boot = new BootRecovery({
-      store,
-      mailbox,
-      providers: this.#providers,
-      conversation: this.#conversation,
-      mailboxSync: this.#mailboxSync,
-      hooks: {
-        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        executionThreads: () => this.channels.store.executionThreads(),
-        deliveryThreadId: (deliveryId) => {
-          const assignment = this.channels.store.assignmentForDelivery(deliveryId);
-          return assignment ? this.channels.store.context(assignment.channelId, assignment.agentId).threadId : null;
-        },
-      },
-    });
     this.#attachments = new AttachmentGateway({
       conversation: this.#conversation,
       mailbox,
@@ -524,6 +509,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
         logReleaseFailure: (provider, error) =>
           logger.warn("Could not close a replaced provider session.", { provider, error }),
+      },
+    });
+    this.#boot = new BootRecovery({
+      store,
+      mailbox,
+      providers: this.#providers,
+      conversation: this.#conversation,
+      mailboxSync: this.#mailboxSync,
+      threads: this.#threads,
+      hooks: {
+        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        executionThreads: () => this.channels.store.executionThreads(),
+        deliveryThreadId: (deliveryId) => {
+          const assignment = this.channels.store.assignmentForDelivery(deliveryId);
+          return assignment ? this.channels.store.context(assignment.channelId, assignment.agentId).threadId : null;
+        },
       },
     });
     this.channels = new ChannelService(store.database, mailbox, {
