@@ -1592,7 +1592,6 @@ textarea {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-success);
   color: var(--openbot-success);
-  animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .agent-row-agent-status-responded svg {
@@ -1615,6 +1614,9 @@ textarea {
   font-size: var(--openbot-text-sm);
   font-weight: 650;
   line-height: 12px;
+}
+
+.agent-row-agent-status-entering {
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 

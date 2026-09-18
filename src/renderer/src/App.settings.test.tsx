@@ -9,6 +9,7 @@ import {
   emitScopedAgentEvent,
   emitUpdateStatus,
   installOpenbotStub,
+  testConversationPage,
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
@@ -814,6 +815,23 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     const pinnedAgent = screen.getByRole("button", { name: "Sales Outbound, pinned agent" });
+    emitAgentEvent?.({
+      type: "conversation-page",
+      page: testConversationPage(
+        "sales-outbound",
+        [
+          {
+            id: "sales-reply",
+            author: "assistant",
+            text: "I found three prospects.",
+            createdAt: "2026-09-18T09:00:00.000Z",
+            status: "completed",
+          },
+        ],
+        { readState: { unreadCount: 3, firstUnreadMessageId: "sales-reply", throughMessageId: null } },
+      ),
+    });
+    const notificationCount = await within(pinnedAgent).findByText("3");
 
     emitAgentEvent?.({
       type: "agents-changed",
@@ -823,6 +841,7 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     expect(screen.getByRole("button", { name: "Sales Outbound, pinned agent" })).toBe(pinnedAgent);
+    expect(within(pinnedAgent).getByText("3")).toBe(notificationCount);
   });
 
   it("opens Settings with Command+,", async () => {
