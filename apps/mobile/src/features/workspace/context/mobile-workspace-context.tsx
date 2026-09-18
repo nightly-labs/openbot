@@ -957,6 +957,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               : TEAM_API_ROUTES.agent.queueReorder;
         await request("POST", route(agentId), ignoreResponse, input, serverId);
       },
+      interruptTurn: async (agentId, turnId, serverId) => {
+        await request("POST", TEAM_API_ROUTES.agent.interrupt(agentId), ignoreResponse, { turnId }, serverId);
+      },
       loadConversation,
       loadOlderMessages,
       uploadAttachment: async (agentId, input, targetServerId) => {

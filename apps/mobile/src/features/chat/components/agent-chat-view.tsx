@@ -20,6 +20,7 @@ export function MobileChatView({
     servers,
     loadConversation,
     loadOlderMessages,
+    interruptTurn,
     markAgentRead,
     respondToPrompt,
     sendMessage,
@@ -31,6 +32,10 @@ export function MobileChatView({
     [agent.id, conversationStore],
   );
   const snapshot = useCallback(() => conversationStore.get(agent.id), [agent.id, conversationStore]);
+  const stopTurn = useCallback(
+    (turnId: string) => interruptTurn(agent.id, turnId, agent.serverId),
+    [agent.id, agent.serverId, interruptTurn],
+  );
   const conversation = useSyncExternalStore(subscribe, snapshot);
   const serverAgents = useMemo(
     () => agents.filter((item) => item.serverId === agent.serverId),
@@ -93,6 +98,7 @@ export function MobileChatView({
       canSend={online}
       activity={activity}
       activeTurnId={conversation?.activeTurnId ?? null}
+      stopTurn={stopTurn}
       questionForm={questionForm}
       readBoundary={latest ? `${latest.id}:${latest.status}` : null}
       markRead={markRead}

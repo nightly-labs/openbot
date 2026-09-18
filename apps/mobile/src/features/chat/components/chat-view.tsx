@@ -55,6 +55,8 @@ export interface ChatViewProps {
   activity?: MobileAgentActivity;
   activities?: MobileAgentActivity[];
   activeTurnId: string | null;
+  /** Absent for a surface that cannot stop a turn, such as a read-only channel. */
+  stopTurn?: (turnId: string) => Promise<void>;
   questionForm?: QuestionPromptController;
   onSelectQuestion?: (messageId: string) => void;
   readBoundary: string | null;
@@ -75,6 +77,8 @@ export interface ChatViewProps {
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
+// The composer at rest: 8 pt of top padding above the 48 pt control row.
+const COMPOSER_RESTING_HEIGHT = 56;
 
 function leaveConversation(): void {
   if (router.canGoBack()) router.back();
@@ -96,6 +100,7 @@ export function ChatView({
   activity,
   activities,
   activeTurnId,
+  stopTurn,
   questionForm,
   onSelectQuestion,
   readBoundary,
@@ -135,7 +140,12 @@ export function ChatView({
   const [historyReceipt, setHistoryReceipt] = useState<ChatHistoryReceipt | null>(null);
   const [refreshingHistory, setRefreshingHistory] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
-  const [composerGestureHeight, setComposerGestureHeight] = useState(0);
+  // KeyboardGestureArea turns this offset into an invisible inputAccessoryView
+  // on the focused input, so it is part of the keyboard. Feeding the composer's
+  // live height in resizes that view, UIKit reports a new keyboard frame, and
+  // the composer jumps with it for a frame. It has to stay constant, so measure
+  // nothing and use the composer's resting height.
+  const composerGestureOffset = COMPOSER_RESTING_HEIGHT + Math.max(insets.bottom, 10) - keyboardOffset;
   const sendingRef = useRef(false);
   const uploadCancelled = useRef(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -284,6 +294,28 @@ export function ChatView({
     }
   }
 
+  // Hold the turn the stop was asked for, not a flag: the host clears the turn
+  // when the stop lands, and the next turn must not inherit a pending state.
+  const [stoppingTurnId, setStoppingTurnId] = useState<string | null>(null);
+  const stopping = stoppingTurnId !== null && stoppingTurnId === activeTurnId;
+
+  const requestStop = useMemo(() => {
+    if (!stopTurn || !activeTurnId) return undefined;
+    const turnId = activeTurnId;
+    return () => {
+      setStoppingTurnId(turnId);
+      setSendError(null);
+      void haptics.impact();
+      stopTurn(turnId).catch((error: unknown) => {
+        setStoppingTurnId((current) => (current === turnId ? null : current));
+        setSendError({
+          agentId: target.id,
+          message: userErrorMessage(error, "Could not stop the agent. It may have finished already."),
+        });
+      });
+    };
+  }, [stopTurn, activeTurnId, target.id]);
+
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
     const body = value.trim();
@@ -390,7 +422,7 @@ export function ChatView({
             textInputNativeID="chat-composer-input"
             interpolator="ios"
             enableSwipeToDismiss
-            offset={Math.max(0, composerGestureHeight - keyboardOffset)}
+            offset={composerGestureOffset}
           >
             <ChatHeader
               target={target}
@@ -458,10 +490,7 @@ export function ChatView({
             <Animated.View
               style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
               pointerEvents="box-none"
-              onLayout={(event) => {
-                motion.onComposerLayout(event);
-                setComposerGestureHeight(event.nativeEvent.layout.height);
-              }}
+              onLayout={motion.onComposerLayout}
             >
               {!atLatest && motion.historyVisible && messages.length > 0 ? (
                 <View className="absolute -top-14 self-center">
@@ -532,6 +561,9 @@ export function ChatView({
                   raised={raised}
                   onChangeDraft={setDraft}
                   onSend={sendMessage}
+                  onStop={requestStop}
+                  keyboardProgress={motion.keyboardProgress}
+                  stopping={stopping}
                 />
               ) : null}
             </Animated.View>
