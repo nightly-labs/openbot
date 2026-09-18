@@ -2235,6 +2235,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       throw new Error("replyToMessageId must be a message id.");
     }
     if (!isString(params.arguments.text)) throw new Error("text is required.");
+    const expectsReply = params.arguments.expectsReply;
+    if (expectsReply !== undefined && typeof expectsReply !== "boolean") {
+      throw new Error("expectsReply must be a boolean.");
+    }
 
     const receipt = await this.#mailbox.enqueue({
       sender: { kind: "agent", agentId: senderAgentId },
@@ -2242,6 +2246,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       text: params.arguments.text,
       sourcePaths: paths,
       replyToMessageId: replyToMessageId ?? null,
+      expectsReply,
       idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
     });
     for (const recipient of recipientValues) {

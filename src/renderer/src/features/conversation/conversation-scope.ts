@@ -88,8 +88,6 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddressEditing,
     browserPipBounds,
     setBrowserPipBounds,
-    mediaPreview,
-    setMediaPreview,
     sidebarFilePreview,
     setSidebarFilePreview,
     openReactionMessageId,
@@ -152,8 +150,6 @@ export function createConversationViewScope(props: ConversationProps) {
     settingsModel,
     settingsReasoning,
     setBrowserPipBounds,
-    mediaPreview,
-    setMediaPreview,
     sidebarFilePreview,
     setSidebarFilePreview,
     setComposerError: setScopedComposerError,
@@ -187,6 +183,8 @@ export function createConversationViewScope(props: ConversationProps) {
     openSharedFile,
     openWorkspaceFile,
     openSidebarFileExternally,
+    downloadSidebarFile,
+    revealSidebarFile,
     closeSidebarFilePreview,
   } = panels;
   const skills = createSkillsStore({ props, settingsOpen });
@@ -249,6 +247,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverPreview,
     browserTakeoverResolution,
     respondToBrowserTakeover,
+    openBrowserTakeoverTab,
     activeBrowserControl,
     actingBrowserControl,
     browserControlAgent,
@@ -487,6 +486,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let scrollElement: HTMLDivElement | undefined;
   let virtualRoot: HTMLDivElement | undefined;
   let agentActivitySlot: HTMLDivElement | undefined;
+  let requiredInteractionElement: HTMLDivElement | undefined;
   let scrollResizeObserver: ResizeObserver | undefined;
   let unreadMessagesDivider: HTMLDivElement | undefined;
   let latestScrollFrame: number | undefined;
@@ -556,7 +556,7 @@ export function createConversationViewScope(props: ConversationProps) {
     });
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
-      if (browserExpandedOpen() && !props.globalOverlayOpen && !mediaPreview()) {
+      if (browserExpandedOpen() && !props.globalOverlayOpen) {
         event.preventDefault();
         setActiveRightPanel("browser");
         return;
@@ -574,7 +574,6 @@ export function createConversationViewScope(props: ConversationProps) {
       setOpenMoreMessageId(null);
       setExpandedEmojiMessageId(null);
       hideBrowserPanel();
-      setMediaPreview(null);
     };
     const closeActiveRemoteBrowserTab = (event: KeyboardEvent) => {
       if (
@@ -632,6 +631,7 @@ export function createConversationViewScope(props: ConversationProps) {
     if (scrollElement) scrollResizeObserver.observe(scrollElement);
     if (virtualRoot) scrollResizeObserver.observe(virtualRoot);
     if (agentActivitySlot) scrollResizeObserver.observe(agentActivitySlot);
+    if (requiredInteractionElement) scrollResizeObserver.observe(requiredInteractionElement);
     requestAnimationFrame(() => {
       if (!scrollElement) return;
       updateVirtualScrollMargin();
@@ -822,8 +822,7 @@ export function createConversationViewScope(props: ConversationProps) {
         Boolean(browserSurface()) &&
         !props.browserVisibilitySuspended &&
         !props.globalOverlayOpen &&
-        !props.remoteDesktopVisible &&
-        !mediaPreview(),
+        !props.remoteDesktopVisible,
     }),
     ({ agentId, visible, surface }) => {
       if (props.browserEnabled === false) return;
@@ -972,6 +971,11 @@ export function createConversationViewScope(props: ConversationProps) {
     agentActivitySlot = element;
     scrollResizeObserver?.observe(element);
   };
+  const setRequiredInteractionElement = (element: HTMLDivElement | undefined) => {
+    if (requiredInteractionElement) scrollResizeObserver?.unobserve(requiredInteractionElement);
+    requiredInteractionElement = element;
+    if (element) scrollResizeObserver?.observe(element);
+  };
   const setBrowserSurfaceElement = (element: HTMLDivElement | undefined) => {
     setBrowserSurface(element);
   };
@@ -1001,6 +1005,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverResolution,
     browserTakeoverTab,
     respondToBrowserTakeover,
+    openBrowserTakeoverTab,
     activeChatSearchIndex,
     agentActivity,
     agentReady,
@@ -1054,7 +1059,6 @@ export function createConversationViewScope(props: ConversationProps) {
     markMessageSeen,
     markUnreadMessages,
     markingRead,
-    mediaPreview,
     messageVirtualizer,
     timelineMessages,
     moveChatSearch,
@@ -1069,6 +1073,8 @@ export function createConversationViewScope(props: ConversationProps) {
     openRoutineRunMessage,
     openSharedFile,
     openSidebarFileExternally,
+    downloadSidebarFile,
+    revealSidebarFile,
     openWorkspaceFile,
     presentedQueueDeliveries,
     previewAttachment,
@@ -1101,9 +1107,9 @@ export function createConversationViewScope(props: ConversationProps) {
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,
-    setMediaPreview,
     setOpenMoreMessageId,
     setOpenReactionMessageId,
+    setRequiredInteractionElement,
     handleRoutineSettingsRequest,
     setSettingsPanelWidth,
     setShowComposerActions,

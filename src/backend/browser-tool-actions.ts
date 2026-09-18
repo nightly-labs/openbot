@@ -44,6 +44,10 @@ export function browserInputAction(call: BrowserInputCall, hooks: BrowserDynamic
     }
     case "type": {
       const { args } = call;
+      // Without a target the text goes to whatever the page has focused, where there is no value to
+      // replace and no selection to append to. Accepting `mode` there would report a replacement
+      // that never happened.
+      if (!args.target && args.mode) throw new Error("type mode requires a target.");
       return {
         name: "type",
         target: args.target,
@@ -52,7 +56,7 @@ export function browserInputAction(call: BrowserInputCall, hooks: BrowserDynamic
             args.target,
             args.text,
             {
-              mode: args.mode ?? "replace",
+              mode: args.target ? (args.mode ?? "replace") : undefined,
               submit: args.submit === true,
             },
             deadline,

@@ -1,8 +1,9 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
-import { View } from "react-native";
+import { Check, ChevronLeft, ChevronRight, Send, X } from "lucide-react-native";
+import { TextInput, View } from "react-native";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 
@@ -17,7 +18,7 @@ export function ChatQuestionPrompt({
   canSend: boolean;
   onActivate?: () => void;
 }) {
-  const muted = useThemeColor("muted");
+  const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   if (!prompt.resolution && !controller && onActivate) {
     return (
       <View className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
@@ -150,6 +151,36 @@ export function ChatQuestionPrompt({
           <Typography type="body-xs" className="text-text-secondary">
             Skip
           </Typography>
+        </Button>
+      </View>
+      <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
+        <TextInput
+          accessibilityLabel={`Custom answer for: ${question.question}`}
+          autoCapitalize={question.isSecret ? "none" : "sentences"}
+          autoCorrect={!question.isSecret}
+          editable={!disabled}
+          maxLength={INPUT_LIMITS.promptAnswerText}
+          placeholder={question.isSecret ? "Enter a private answer" : "Type your answer"}
+          placeholderTextColor={muted}
+          secureTextEntry={question.isSecret}
+          selectionColor={foreground}
+          className="min-h-12 min-w-0 flex-1 font-sans text-foreground"
+          value={controller.draft}
+          onChangeText={controller.setDraft}
+          onSubmitEditing={() => {
+            const answerText = controller.draft.trim();
+            if (answerText) answer([answerText]);
+          }}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          isIconOnly
+          accessibilityLabel="Send custom answer"
+          isDisabled={disabled || !controller.draft.trim()}
+          onPress={() => answer([controller.draft.trim()])}
+        >
+          <Send color={String(muted)} size={18} />
         </Button>
       </View>
       {pending ? (

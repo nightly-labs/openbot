@@ -3,7 +3,6 @@ import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { ConversationComposer } from "./ConversationComposer";
 import { ConversationHeader } from "./ConversationHeader";
-import { ConversationOverlays } from "./ConversationOverlays";
 import { ConversationPanels } from "./ConversationPanels";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { ConversationViewScopeContext, createConversationViewScope } from "./conversation-scope";
@@ -79,8 +78,6 @@ export function ConversationView(props: ConversationProps) {
         <ConversationTimeline />
 
         <ConversationComposer />
-
-        <ConversationOverlays />
 
         <ConversationPanels
           onOpenUsage={(trigger) => {

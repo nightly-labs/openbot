@@ -1809,6 +1809,7 @@ const actionMarkerMessages: RendererAgentMessage[] = [
       timestamp: "2026-08-19T22:49:00.000Z",
       messageId: "spacing-marker-incoming",
       replyToMessageId: null,
+      expectsReply: true,
     },
   },
   {
@@ -1837,6 +1838,7 @@ const actionMarkerMessages: RendererAgentMessage[] = [
       timestamp: "2026-08-19T22:49:00.000Z",
       messageId: "spacing-marker-outgoing",
       replyToMessageId: null,
+      expectsReply: true,
     },
   },
   {

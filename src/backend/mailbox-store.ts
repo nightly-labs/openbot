@@ -54,6 +54,11 @@ interface StoredMessage {
   text: string;
   attachments: StoredAttachment[];
   replyToMessageId: string | null;
+  /**
+   * Written only when the sender asked for no answer. Absent means an answer is expected, which is
+   * what every message stored before this field existed meant.
+   */
+  expectsReply?: false;
   createdAt: string;
 }
 
@@ -102,6 +107,8 @@ interface EnqueueInput {
   recipientAgentIds: string[];
   text: string;
   replyToMessageId?: string | null;
+  /** False marks information the recipient must not answer. Defaults to an expected answer. */
+  expectsReply?: boolean;
   draftIds?: string[];
   sourcePaths?: string[];
   idempotencyKey?: string;
@@ -283,6 +290,7 @@ export class MailboxStore {
       }),
       attachments,
       replyToMessageId: input.replyToMessageId ?? null,
+      ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
       createdAt,
     };
     const deliveries = recipients.map<StoredDelivery>((recipientAgentId) => ({
@@ -493,6 +501,7 @@ export class MailboxStore {
             senderAgentId: agentId,
             recipientAgentIds: deliveries.map((item) => item.recipientAgentId),
             replyToMessageId: message.replyToMessageId,
+            ...(message.expectsReply === false ? { expectsReply: false } : {}),
             deliveries: deliveries.map((item) => {
               const delivery = this.#publicDelivery(item, positions);
               return {
@@ -535,6 +544,7 @@ export class MailboxStore {
                   senderAgentId: message.sender.agentId,
                   recipientAgentIds: deliveries.map((item) => item.recipientAgentId),
                   replyToMessageId: message.replyToMessageId,
+                  ...(message.expectsReply === false ? { expectsReply: false } : {}),
                   deliveries: deliveries.map((item) => {
                     const publicItem = this.#publicDelivery(item, positions);
                     return {
@@ -819,6 +829,11 @@ export class MailboxStore {
       message = parent;
     }
     return null;
+  }
+
+  /** Whether the message's sender waits for an answer. Unknown messages count as expecting one. */
+  expectsReply(messageId: string): boolean {
+    return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
   }
 
   hasReplyFrom(agentId: string, messageId: string): boolean {
@@ -1349,6 +1364,7 @@ export class MailboxStore {
       text: message.text,
       attachments: message.attachments.map(toAttachmentSummary),
       replyToMessageId: message.replyToMessageId,
+      ...(message.expectsReply === false ? { expectsReply: false } : {}),
       position: delivery.status === "queued" ? (positions.get(delivery.id) ?? null) : null,
       editing: Boolean(delivery.editId),
     };
@@ -1599,6 +1615,7 @@ function isStoredMessage(value: unknown): value is StoredMessage {
     Array.isArray(value.attachments) &&
     value.attachments.every(isStoredAttachment) &&
     (isString(value.replyToMessageId) || value.replyToMessageId === null) &&
+    (value.expectsReply === undefined || value.expectsReply === false) &&
     isString(value.createdAt)
   );
 }

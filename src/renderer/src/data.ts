@@ -48,6 +48,8 @@ export type ChatActionMarkerModel =
       timestamp: string;
       messageId: string;
       replyToMessageId: string | null;
+      /** The sender asked for no answer, so the marker names it as information rather than a request. */
+      expectsReply: boolean;
     }
   | {
       kind: "routine-lifecycle";

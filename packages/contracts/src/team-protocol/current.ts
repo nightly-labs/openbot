@@ -59,6 +59,17 @@ export function isQueueSnapshotRoute(method: string, path: string): boolean {
   return method === "GET" && /^\/v1\/agents\/[^/]+\/queue$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
+/**
+ * The agent conversation routes. Their responses carry the `expectsReply` mark beside the frozen
+ * keys. The read and unread routes keep their own paths and are not included.
+ */
+export function isConversationRoute(method: string, path: string): boolean {
+  return (
+    method === "GET" &&
+    /^\/v1\/agents\/[^/]+\/conversation(?:-page)?$/u.test(new URL(path, "http://openbot.invalid").pathname)
+  );
+}
+
 export function isAgentProfileRoute(method: string, path: string): boolean {
   return (
     method === "POST" &&

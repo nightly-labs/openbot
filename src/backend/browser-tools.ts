@@ -101,7 +101,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for login, consent, CAPTCHA, passkey, two-factor authentication, or another authorization step.",
+      "Ask the user to take over a tab for an authorization step you cannot complete yourself, such as a hardware passkey, a prompt on another device, or a secret you cannot find.",
     shape: { tabId },
   }),
   browserTool({
@@ -128,9 +128,12 @@ export const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "type",
-    description: "Enter text in a unique target using trusted CDP input and return a fresh snapshot.",
+    description:
+      "Enter text in a unique target using trusted CDP input and return a fresh snapshot. Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the snapshot's focus field says where those keystrokes will land. Mode applies only to an element target.",
     shape: {
-      ...targetAction,
+      tabId,
+      target: browserTargetSchema.optional(),
+      timeoutMs: timeout,
       text: z.string().max(INPUT_LIMITS.browserActionText),
       mode: z.enum(["replace", "append"]).optional(),
       submit: z.boolean().optional(),

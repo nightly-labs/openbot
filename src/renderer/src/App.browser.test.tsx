@@ -5,6 +5,7 @@ import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
   AGENTS,
+  attachment,
   confirmOnboardingModel,
   emitAgentEvent,
   emitBrowserPictureInPicture,
@@ -814,7 +815,7 @@ describe("OpenBot connected desktop shell", () => {
     resolveFirstOpen?.(loadingTab);
   });
 
-  it("reveals the requested browser tab and resumes the agent from the takeover card", async () => {
+  it("opens the requested browser tab from the takeover preview and resumes the agent", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await confirmOnboardingModel();
@@ -855,11 +856,16 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("region", { name: "Browser takeover" })).toHaveTextContent("Action required");
     expect(screen.getByRole("heading", { name: "Complete the step on example.com" })).toBeVisible();
     expect(await screen.findByRole("img", { name: "Preview of Sign in" })).toBeVisible();
-    expect(await screen.findByRole("complementary", { name: "Browser" })).toBeVisible();
-    await waitFor(() => expect(window.openbot.browser.activate).toHaveBeenCalledWith("tab-login"));
     expect(window.openbot.browser.capturePreview).toHaveBeenCalledTimes(1);
     expect(window.openbot.browser.capturePreview).toHaveBeenCalledWith("tab-login");
     expect(screen.queryByRole("textbox", { name: "Message Chief" })).not.toBeInTheDocument();
+    // The request alone never takes the window: the page waits behind the preview on the card.
+    expect(screen.queryByRole("complementary", { name: "Browser" })).not.toBeInTheDocument();
+    expect(window.openbot.browser.activate).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Open Sign in" }));
+    expect(await screen.findByRole("complementary", { name: "Browser" })).toBeVisible();
+    await waitFor(() => expect(window.openbot.browser.activate).toHaveBeenCalledWith("tab-login"));
 
     await fireEvent.click(screen.getByRole("button", { name: "I’m done" }));
     await waitFor(() =>
@@ -1492,5 +1498,48 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByText("Pasta menu")).toBeInTheDocument();
     expect(window.openbot.agent.previewSharedFile).toHaveBeenCalledWith({ path: sharedPath });
     expect(window.openbot.agent.openSharedFile).not.toHaveBeenCalled();
+  });
+  it("opens an attached file in the right sidebar rather than a modal", async () => {
+    const attached = attachment("att-brief", "launch-brief.md", "pdf");
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({
+      agentId,
+      threadId: agentId === "chief" ? "thread-chief" : null,
+      activeTurnId: null,
+      revision: 1,
+      messages:
+        agentId === "chief"
+          ? [
+              {
+                id: "message-attachment-preview",
+                author: "assistant",
+                text: `Here is @[${attached.name}](attachment:${attached.id}).`,
+                createdAt: "2026-08-24T12:16:00.000Z",
+                status: "completed",
+                attachments: [{ ...attached, mimeType: "text/markdown", previewKind: "text" as const }],
+              },
+            ]
+          : [],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new TextEncoder().encode("# Launch brief\n\nShip **on Friday**."))),
+    );
+
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: `Open attached file ${attached.name}` }));
+
+    expect(await screen.findByRole("complementary", { name: "File preview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Launch brief" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Download file" }));
+    expect(window.openbot.agent.openAttachment).toHaveBeenCalledWith({
+      attachmentId: attached.id,
+      action: "download",
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Close file preview" }));
+    expect(screen.queryByRole("complementary", { name: "File preview" })).not.toBeInTheDocument();
   });
 });

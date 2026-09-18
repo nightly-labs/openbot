@@ -48,6 +48,21 @@ export const AllStates: Story = {
           agents={agents}
           onSelectAgent={onSelectAgent}
         />
+        <ChatActionMarker
+          marker={{ ...agentMarker([{ agentId: "sales", status: "completed" }], "completed"), expectsReply: false }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+        />
+        <ChatActionMarker
+          marker={{
+            ...agentMarker([{ agentId: "chief", status: "completed" }], "completed"),
+            direction: "incoming",
+            sourceAgentId: "research",
+            expectsReply: false,
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+        />
         <SkillMarkers />
         {routineStatuses.map((status) => (
           <ChatActionMarker
@@ -187,6 +202,7 @@ function agentMarker(
     timestamp,
     messageId: "message-1",
     replyToMessageId: null,
+    expectsReply: true,
   };
 }
 

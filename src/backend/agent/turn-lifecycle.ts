@@ -377,6 +377,9 @@ export class TurnLifecycle {
     if (
       !originAgentId ||
       originAgentId === agentId ||
+      // The sender said it wants no answer, so the turn's result stays with this agent. Without
+      // this the sender is woken for an echo of work it only wanted to know about.
+      !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
       this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId)
     )
@@ -387,6 +390,9 @@ export class TurnLifecycle {
       recipientAgentIds: [recipientAgentId],
       text,
       replyToMessageId: messageId,
+      // The requested result, not a new request. The chain-origin guard above already stops a
+      // second relay; this is what tells the recipient it owes no acknowledgement for one.
+      expectsReply: false,
       idempotencyKey: `auto-result:${turnId}:${messageId}`,
     });
     const senderSnapshot = this.#conversation.snapshot(agentId);
