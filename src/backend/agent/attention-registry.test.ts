@@ -823,6 +823,43 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     });
     expect(events.some((event) => event.type === "approval")).toBe(false);
     expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
+
+    client.emit("request", {
+      method: "item/tool/requestUserInput",
+      id: "granted-question",
+      params: {
+        threadId: externalId,
+        turnId,
+        questions: [{ id: "name", header: "Name", question: "Which file name?" }],
+      },
+    });
+    await waitFor(() => client.responses.some((response) => response.id === "granted-question"));
+    // No answer is invented: the question is skipped, so the agent chooses for itself and continues.
+    expect(client.responses.at(-1)).toEqual({ id: "granted-question", result: { answers: { name: { answers: [] } } } });
+    expect(events.some((event) => event.type === "prompt")).toBe(false);
+    expect(service.getRuntimeSnapshot().pendingPrompts).toEqual([]);
+    // The user still reads what the agent wanted, and that nobody answered it.
+    const questionMessage = (await service.readConversation("chief")).messages.find(
+      (message) => message.questionPrompt?.requestId === "granted-question",
+    );
+    expect(questionMessage?.questionPrompt?.resolution).toEqual({
+      status: "answered",
+      responses: { name: { status: "skipped" } },
+    });
+
+    client.emit("request", {
+      method: "item/tool/requestUserInput",
+      id: "granted-secret",
+      params: {
+        threadId: externalId,
+        turnId,
+        questions: [{ id: "key", header: "API key", question: "Paste your API key.", isSecret: true }],
+      },
+    });
+    // A secret is the one question no grant can answer: it exists nowhere but with the user.
+    await waitFor(() => events.some((event) => event.type === "prompt"));
+    expect(client.responses.some((response) => response.id === "granted-secret")).toBe(false);
+    expect(service.getRuntimeSnapshot().pendingPrompts).toHaveLength(1);
   });
   it("keeps asking for an agent that was never granted", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();

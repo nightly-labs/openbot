@@ -1,6 +1,6 @@
-import type { AgentApproval, AgentApprovalKind } from "@openbot/contracts/ipc";
+import type { AgentApproval, AgentApprovalKind, AgentPromptQuestion } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
+import { NO_APPROVAL_AUTOMATION, shouldAutoApprove, shouldAutoSkipPrompt } from "./approval-automation";
 
 function approval(kind: AgentApprovalKind, agentId = "agent-1"): AgentApproval {
   return {
@@ -15,6 +15,14 @@ function approval(kind: AgentApprovalKind, agentId = "agent-1"): AgentApproval {
     grantRoot: null,
     permissions: kind === "permissions" ? { fileSystem: { read: ["/"], write: [] }, network: true } : null,
   };
+}
+
+function question(): AgentPromptQuestion {
+  return { id: "name", header: "Name", question: "Which file name?", isSecret: false, options: null };
+}
+
+function secretQuestion(): AgentPromptQuestion {
+  return { id: "key", header: "API key", question: "Paste your API key.", isSecret: true, options: null };
 }
 
 const grants = (...agentIds: string[]) => ({ autoApproves: (agentId: string) => agentIds.includes(agentId) });
@@ -35,5 +43,22 @@ describe("shouldAutoApprove", () => {
   it("still asks an agent that was never granted", () => {
     expect(shouldAutoApprove(grants("agent-2"), approval("command"))).toBe(false);
     expect(shouldAutoApprove(grants("agent-2"), approval("permissions"))).toBe(false);
+  });
+});
+
+describe("shouldAutoSkipPrompt", () => {
+  it("leaves a granted agent's question to the agent", () => {
+    expect(shouldAutoSkipPrompt(grants("agent-1"), "agent-1", [question()])).toBe(true);
+  });
+
+  it("asks an agent that was never granted", () => {
+    expect(shouldAutoSkipPrompt(NO_APPROVAL_AUTOMATION, "agent-1", [question()])).toBe(false);
+    expect(shouldAutoSkipPrompt(grants("agent-2"), "agent-1", [question()])).toBe(false);
+  });
+
+  // An API key or a password exists nowhere but with the user, so skipping it only loses the work.
+  it("asks for a secret whatever the user turned on", () => {
+    expect(shouldAutoSkipPrompt({ autoApproves: () => true }, "agent-1", [secretQuestion()])).toBe(false);
+    expect(shouldAutoSkipPrompt({ autoApproves: () => true }, "agent-1", [question(), secretQuestion()])).toBe(false);
   });
 });
