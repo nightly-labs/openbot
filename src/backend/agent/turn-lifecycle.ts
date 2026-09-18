@@ -310,6 +310,9 @@ export class TurnLifecycle {
       markIncompleteImageGeneration(message, message.status);
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
+      dropPlaceholderAnswers(snapshot, turnId);
+    }
     const latestAssistant = [...snapshot.messages]
       .reverse()
       .find(
@@ -437,5 +440,30 @@ export class TurnLifecycle {
       turnId,
       detail: text,
     });
+  }
+}
+
+/**
+ * Remove a turn's answers that hold nothing for a reader.
+ *
+ * A teammate can start a turn whose work is all internal: the agent answers the teammate and has
+ * nothing left to tell the user. A provider ends a turn with text, so a model in that position
+ * writes a placeholder instead - "∅" was the one seen. That filler is not only a bubble: the turn
+ * takes the last answer as the result it relays to the teammate who asked, and as the agent's
+ * sidebar preview. A message with no letter and no digit carries neither, so it is dropped here.
+ * The turn-completion write rewrites the whole thread, which deletes the projection row of a
+ * message the snapshot no longer holds, so a placeholder already streamed to the database goes too.
+ *
+ * A message that carries an attachment or a generated image is kept whatever its text: the file is
+ * what the user was given, and the text is only its caption.
+ */
+function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string): void {
+  for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    const message = snapshot.messages[index];
+    if (message?.author !== "assistant" || message.turnId !== turnId) continue;
+    if (message.itemType === "commentary" || message.itemType === "question_prompt") continue;
+    if (message.attachments?.length || message.imageGeneration) continue;
+    if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
+    snapshot.messages.splice(index, 1);
   }
 }
