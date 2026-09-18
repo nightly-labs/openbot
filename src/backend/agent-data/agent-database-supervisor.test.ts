@@ -31,8 +31,11 @@ beforeEach(async () => {
   databasePath = join(await mkdtemp(join(tmpdir(), "openbot-supervisor-")), "work.db");
   supervisor = new AgentDatabaseSupervisor({
     spawnHost: spawnNodeDatabaseHost,
-    // Input, not a wait: the deadline is the thing under test, so it is set short rather than slept on.
-    statementDeadlineMs: 250,
+    // Input, not a wait: the deadline is the thing under test, so it is set short rather than slept
+    // on. It cannot be tighter than a cold host start, because the first statement after a spawn
+    // starts this timer before the host process exists and pays that start out of its own budget.
+    // At 250ms a loaded CI machine stopped a CREATE TABLE as a runaway; the product default is 5s.
+    statementDeadlineMs: 2_000,
   });
   expect((await statement("CREATE TABLE notes (body TEXT)", "write", true)).ok).toBe(true);
   expect((await statement("INSERT INTO notes (body) VALUES ('before')", "write")).ok).toBe(true);
