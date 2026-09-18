@@ -1,7 +1,8 @@
 // The embedded browser and its picture-in-picture window.
 
-import type { BrowserDisplayState } from "@openbot/contracts/ipc";
+import { type BrowserDisplayState, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
@@ -15,13 +16,7 @@ import {
 } from "../remote-device-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
-import {
-  parseBrowserBounds,
-  parseBrowserLiveViewInput,
-  parseBrowserNavigate,
-  parseBrowserOpen,
-  parseVisibility,
-} from "./browser-inputs";
+import { parseBrowserBounds, parseBrowserNavigate, parseBrowserOpen, parseVisibility } from "./browser-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { optionalPayload, stringPayload } from "./validation";
@@ -161,21 +156,21 @@ export function browserIpcHandlers({
             }),
         }),
       ),
-      // Visibility is a local placement, not a remote operation. The bounds are this window's CSS
-      // rectangle, and the host's browser is a native view on the host's own screen: forwarding them
-      // mounted a page over whoever is sitting at that computer, at coordinates that mean nothing
-      // there, and still showed the remote user nothing. `/v1/browser/visible` stays served for the
-      // clients that already send it.
-      setVisible: payloadHandler(parseVisibility, (parsed) =>
-        routeToServer<void>(remoteServers.activeServerId, {
-          local: () => browser.setVisible(parsed),
-          remote: async () => undefined,
-        }),
-      ),
+      // Visibility is a local placement, not a remote operation, so a host's tab is left alone. The
+      // bounds are this window's CSS rectangle, and the host's browser is a native view on the
+      // host's own screen: forwarding them mounted a page over whoever is sitting at that computer,
+      // at coordinates that mean nothing there, and still showed the remote user nothing.
+      // `/v1/browser/visible` stays served for the clients that already send it.
+      setVisible: payloadHandler(parseVisibility, async (parsed) => {
+        if (remoteServers.activeServerId === LOCAL_SERVER_ID) browser.setVisible(parsed);
+      }),
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
       startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => browserView.start(tabId)),
       stopLiveView: handler(() => browserView.stop()),
-      sendLiveViewInput: payloadHandler(parseBrowserLiveViewInput, async (input) => browserView.sendInput(input)),
+      // The protocol's own decoder is the boundary check: what the renderer sends is dispatched on a
+      // host that never sees this process, so it passes the same reading the host applies to any
+      // other member's input, and reaches the socket without a second one.
+      sendLiveViewInput: payloadHandler(decodeBrowserViewInputValue, async (input) => browserView.sendInput(input)),
       pictureInPictureOpen: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
         browserPictureInPicture.open(bounds),
       ),

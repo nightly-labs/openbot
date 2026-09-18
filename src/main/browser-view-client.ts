@@ -4,10 +4,10 @@
 // on the network or only through the WebRTC tunnel, and which session the frames belong to are all
 // answered here. Starting a second view replaces the first, because a user looks at one tab.
 
-import type { BrowserLiveViewEvent, BrowserLiveViewInput } from "@openbot/contracts/ipc";
+import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
+  type BrowserViewInput,
   decodeBrowserViewFrame,
-  decodeBrowserViewInputValue,
   encodeBrowserViewInput,
   TEAM_BROWSER_VIEW_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -73,10 +73,10 @@ export class BrowserViewClient {
    * Input is dropped rather than queued when no view is open: a click belongs to the frame the user
    * was looking at, and the next view shows a different page.
    */
-  sendInput(input: BrowserLiveViewInput): void {
+  sendInput(input: BrowserViewInput): void {
     const view = this.#view;
     if (!view || view.socket.readyState !== WebSocket.OPEN) return;
-    view.socket.send(encodeBrowserViewInput(decodeBrowserViewInputValue(input)));
+    view.socket.send(encodeBrowserViewInput(input));
   }
 
   #queue<T>(operation: () => Promise<T>): Promise<T> {
