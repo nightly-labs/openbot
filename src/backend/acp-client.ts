@@ -114,6 +114,11 @@ interface AcpModel {
   usesModelReasoningEffort: boolean | null;
 }
 
+interface AcpProviderAccount {
+  email: string | null;
+  planType: string | null;
+}
+
 export interface AcpProviderOptions {
   provider: AgentProvider;
   profileGeneration?: boolean;
@@ -137,6 +142,12 @@ export interface AcpProviderOptions {
    */
   mcpServers?: McpServerSource;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
+  /**
+   * Reads optional identity fields that ACP does not define. A provider extension failing must not
+   * turn a working authenticated process into a signed-out one, so account/read falls back to null
+   * fields when this hook cannot answer.
+   */
+  readAccount?(connection: ClientSideConnection): Promise<Partial<AcpProviderAccount>>;
   readRateLimits?(connection: ClientSideConnection): Promise<AccountRateLimitsReadResult>;
 }
 
@@ -259,11 +270,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       case "initialize":
         await this.#ensureInitialized();
         return decoder({});
-      case "account/read":
+      case "account/read": {
+        if (!this.#signedIn) return decoder({ account: null, requiresOpenaiAuth: false });
+        const account = await this.#readProviderAccount(timeoutMs);
         return decoder({
-          account: this.#signedIn ? { type: this.provider, email: null, planType: null } : null,
+          account: { type: this.provider, email: account.email, planType: account.planType },
           requiresOpenaiAuth: false,
         });
+      }
       case "account/rateLimits/read":
         await this.#ensureInitialized();
         if (!this.#signedIn) return decoder({ rateLimits: null, rateLimitsByLimitId: null });
@@ -338,6 +352,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (this.#initialized) return this.#initialized;
     this.#initialized = this.#initialize();
     return this.#initialized;
+  }
+
+  async #readProviderAccount(timeoutMs?: number): Promise<AcpProviderAccount> {
+    if (!this.options.readAccount) return { email: null, planType: null };
+    try {
+      const account = await withTimeout(
+        this.options.readAccount(this.#requireConnection()),
+        timeoutMs ?? this.#requestTimeoutMs,
+        `${agentProviderName(this.provider)} request timed out: account/read`,
+      );
+      return { email: account.email ?? null, planType: account.planType ?? null };
+    } catch {
+      return { email: null, planType: null };
+    }
   }
 
   async #initialize(): Promise<void> {
