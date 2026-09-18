@@ -26,7 +26,7 @@ import type { DeltaBuffer } from "./delta-buffer";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
-import type { ProviderRuntime } from "./provider-runtime";
+import { isUsageLimitDiagnostic, type ProviderRuntime } from "./provider-runtime";
 import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
@@ -284,6 +284,10 @@ export class TurnLifecycle {
         // `code` still carries the method for the log.
         const message = getString(params, "message") ?? "";
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
+        if (isUsageLimitDiagnostic(message)) {
+          this.#providers.refreshUsageAfterLimit(source);
+          return;
+        }
         this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
       }
     }
