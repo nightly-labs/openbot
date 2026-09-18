@@ -40,8 +40,11 @@ const TOOLBAR_HEIGHT = 48;
 const FIELD_VERTICAL_PADDING = 26;
 // A 112 pt tile plus its 8 pt inset. Known, so the block can open and close.
 const ATTACHMENT_BLOCK_HEIGHT = 120;
-const SHAPE_DURATION = 180;
-const SHAPE_EASING = cubicBezier(0.77, 0, 0.175, 1);
+// Typing is what drives this, and the user is looking straight at the line they
+// just wrote. An ease-in-out spends its first half barely moving, which reads as
+// the card answering late, so hold the shape open with a strong ease-out instead.
+const SHAPE_DURATION = 120;
+const SHAPE_EASING = cubicBezier(0.23, 1, 0.32, 1);
 
 interface ChatComposerProps {
   sendLabel?: string;
