@@ -38,6 +38,14 @@ export interface QueueDelivery {
    * key list, so a remote server drops this field instead of reporting it.
    */
   editing?: boolean;
+  /**
+   * Whether the sender waits for an answer. Only an agent sender sets it, and only to `false`:
+   * a message the sender marked as information the recipient may act on, but must not answer.
+   *
+   * Absent means an answer is expected: what every message stored before this field existed meant,
+   * and what a remote server too old to send it reports.
+   */
+  expectsReply?: boolean;
 }
 
 function isQueueDelivery(value: unknown): value is QueueDelivery {
@@ -58,7 +66,8 @@ function isQueueDelivery(value: unknown): value is QueueDelivery {
     (value.turnId === null || isIdentifier(value.turnId)) &&
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
     isBoundedString(value.createdAt, 160) &&
-    (value.editing === undefined || isBoolean(value.editing))
+    (value.editing === undefined || isBoolean(value.editing)) &&
+    (value.expectsReply === undefined || isBoolean(value.expectsReply))
   );
 }
 

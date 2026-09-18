@@ -718,6 +718,38 @@ describe("MailboxStore", () => {
     expect(store.hasAgentMessageFromTurnTo("weather", "turn-weather", "other-agent")).toBe(false);
   });
 
+  it("keeps a message that asks for no answer marked as one after a restart", async () => {
+    const notice = await store.enqueue({
+      sender: { kind: "agent", agentId: "weather" },
+      recipientAgentIds: ["researcher"],
+      text: "Kraków turned rainy.",
+      expectsReply: false,
+    });
+    const request = await store.enqueue({
+      sender: { kind: "agent", agentId: "weather" },
+      recipientAgentIds: ["researcher"],
+      text: "Which city next?",
+    });
+
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.expectsReply(notice.messageId)).toBe(false);
+    expect(restored.expectsReply(request.messageId)).toBe(true);
+    expect(
+      Object.fromEntries(
+        restored.listQueue("researcher").deliveries.map((delivery) => [delivery.text, delivery.expectsReply]),
+      ),
+    ).toEqual({ "Kraków turned rainy.": false, "Which city next?": undefined });
+    expect(
+      Object.fromEntries(
+        restored
+          .conversationMessages("researcher")
+          .filter((message) => message.exchange)
+          .map((message) => [message.text, message.exchange?.expectsReply]),
+      ),
+    ).toEqual({ "Kraków turned rainy.": false, "Which city next?": undefined });
+  });
+
   it("rejects directories and oversized recipient lists", async () => {
     const directory = join(root, "folder");
     await mkdir(directory);

@@ -10,6 +10,7 @@ import {
   createTestService,
   expectOpenBotToolError,
   FakeAgentClient,
+  inputRecords,
   notification,
   openBotToolPayload,
   protocolMessages,
@@ -20,6 +21,7 @@ import {
 } from "./agent-service-test-harness";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
+import { getString } from "./protocol";
 
 let root: string;
 let logPath: string;
@@ -760,6 +762,27 @@ describe.sequential("AgentService: routines", () => {
     expect(service.listQueue("design").deliveries[0]?.sender).toEqual({ kind: "agent", agentId: "chief" });
   });
 
+  it("carries the sender's answer choice from the tool call onto the delivery", async () => {
+    process.env.OPENBOT_FAKE_AGENT_TOOL_CALLS = JSON.stringify([
+      {
+        tool: "send_message",
+        arguments: {
+          recipientAgentIds: ["design"],
+          text: "The interface proposal is in the shared folder.",
+          expectsReply: false,
+        },
+      },
+    ]);
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await service.initialize();
+    await store.getOrCreate("design", "Design Studio", "Product design");
+    await service.sendMessage({ agentId: "chief", text: "Tell design where the proposal is." });
+
+    await waitFor(() => service?.listQueue("design").deliveries.length === 1);
+    expect(service.listQueue("design").deliveries[0]).toMatchObject({ expectsReply: false });
+  });
+
   it("reliably relays a completed teammate result back through a reply chain without loops", async () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "AUTO_WEATHER_RESULT";
     const { store, mailbox } = stores(root);
@@ -814,6 +837,48 @@ describe.sequential("AgentService: routines", () => {
     });
     expect(service.listQueue("sales-outbound").deliveries).toHaveLength(2);
     expect(service.listQueue("chief").deliveries).toHaveLength(2);
+  });
+
+  it("sends nothing back for a teammate message that asks for no answer", async () => {
+    process.env.OPENBOT_FAKE_AUTO_COMPLETE = "AUTO_RESULT";
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await store.initialize();
+    await mailbox.initialize();
+    await store.getOrCreate("chief");
+    await store.getOrCreate("sales-outbound");
+
+    await mailbox.enqueue({
+      sender: { kind: "agent", agentId: "chief" },
+      recipientAgentIds: ["sales-outbound"],
+      text: "The Berlin deck is in the shared folder.",
+      expectsReply: false,
+    });
+    // A request behind the notice: its relayed result is the point after which the notice's own
+    // turn is certainly finished, so an absent relay is a decision rather than a race.
+    const request = await mailbox.enqueue({
+      sender: { kind: "agent", agentId: "chief" },
+      recipientAgentIds: ["sales-outbound"],
+      text: "Check the weather.",
+    });
+
+    await service.initialize();
+    await waitFor(() => service?.listQueue("chief").deliveries.length === 1);
+
+    expect(service.listQueue("chief").deliveries).toEqual([
+      expect.objectContaining({
+        sender: { kind: "agent", agentId: "sales-outbound" },
+        replyToMessageId: request.messageId,
+        text: "AUTO_RESULT",
+        expectsReply: false,
+      }),
+    ]);
+    const noticeStart = (await protocolMessages(logPath)).find(
+      (message) =>
+        message.method === "turn/start" &&
+        inputRecords(message.params).some((item) => getString(item, "text")?.includes("The Berlin deck")),
+    );
+    expect(getString(inputRecords(noticeStart?.params)[0], "text")).toContain("The sender does not want an answer.");
   });
 
   it("reads the canonical SQLite conversation during an active stream", async () => {

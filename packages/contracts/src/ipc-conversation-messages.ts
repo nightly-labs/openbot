@@ -130,6 +130,8 @@ export interface AgentExchangeSummary {
   recipientAgentIds: string[];
   replyToMessageId: string | null;
   deliveries: Array<Pick<QueueDelivery, "id" | "recipientAgentId" | "status" | "position" | "error">>;
+  /** Absent means the sender waits for an answer. See `QueueDelivery.expectsReply`. */
+  expectsReply?: boolean;
 }
 
 function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
@@ -153,7 +155,8 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
         (delivery.position === null ||
           (isNumber(delivery.position) && Number.isInteger(delivery.position) && delivery.position >= 1)) &&
         (delivery.error === null || isBoundedString(delivery.error, INPUT_LIMITS.messageText)),
-    )
+    ) &&
+    (value.expectsReply === undefined || isBoolean(value.expectsReply))
   );
 }
 

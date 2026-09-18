@@ -395,7 +395,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             <header class="question-prompt-header conversation-interaction-header">
               <Questionnaire.Title>{current().question}</Questionnaire.Title>
               <Badge variant="warning-light" class="conversation-interaction-status">
-                <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+                <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
                 Input required
               </Badge>
             </header>

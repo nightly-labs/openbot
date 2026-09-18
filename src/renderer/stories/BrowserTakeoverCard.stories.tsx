@@ -27,6 +27,7 @@ const meta = {
     tab,
     preview,
     previewStatus: "ready",
+    onOpen: fn(),
     onComplete: fn(async () => true),
     onCancel: fn(async () => true),
   },
@@ -63,6 +64,11 @@ export const Narrow: Story = {
 
 export const Completed: Story = {
   args: { decision: "complete" },
+};
+
+/** A resolved card, and the channel view, have no browser panel to open: the preview is static. */
+export const NotOpenable: Story = {
+  args: { onOpen: undefined },
 };
 
 export const Cancelled: Story = {

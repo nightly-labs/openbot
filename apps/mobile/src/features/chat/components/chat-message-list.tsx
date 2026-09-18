@@ -1,3 +1,4 @@
+import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
 import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
@@ -80,6 +81,15 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] })
   .reduceMotion(ReduceMotion.System);
 const AGENT_MESSAGE_ENTRANCE = FadeIn.duration(240).reduceMotion(ReduceMotion.System);
+
+/**
+ * Matches the desktop marker. An absent mark means a request: that is what a host older than the
+ * mark reports, and what every message stored before it meant.
+ */
+function exchangeLabel(exchange: AgentExchangeSummary) {
+  if (exchange.expectsReply === false) return exchange.direction === "outgoing" ? "Informed" : "Update from";
+  return exchange.direction === "outgoing" ? "Messaged" : "Message from";
+}
 
 interface ChatMessageListProps {
   target: ChatTarget;
@@ -237,9 +247,7 @@ export function ChatMessageList({
               ? message.event.action === "assigned"
                 ? "Assigned to"
                 : "Continuing with"
-              : message.exchange.direction === "outgoing"
-                ? "Messaged"
-                : "Message from"}
+              : exchangeLabel(message.exchange)}
           </Typography.Paragraph>
           {(message.kind === "channel-routing"
             ? [message.event.agentId]

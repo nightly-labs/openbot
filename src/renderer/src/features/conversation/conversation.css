@@ -7600,6 +7600,18 @@ button.chat-action-target:active,
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/* The badge says the card is waiting on the person, so its loader has to turn: a frozen spinner
+   reads as a stalled step rather than one that is ready for them. */
+.conversation-interaction-spinner {
+  animation: ui-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-interaction-spinner {
+    animation: none;
+  }
+}
+
 .browser-takeover-card {
   display: flex;
   width: min(540px, 100%);
@@ -7680,6 +7692,50 @@ button.chat-action-target:active,
   overflow: hidden;
   place-items: stretch;
   background: var(--openbot-bg-control);
+}
+
+/* The viewport is the button that opens the page, so it keeps the frame it has as a plain
+   figure: no button padding, no radius of its own, and the preview stacked under the label. */
+.browser-takeover-preview-open.ui-button {
+  display: grid;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* The preview and the Open label share one cell, so the label floats over the page image. */
+.browser-takeover-preview-open > * {
+  grid-area: 1 / 1;
+}
+
+.browser-takeover-preview-open-label {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  align-self: center;
+  gap: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-canvas);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.browser-takeover-preview-open-label > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-takeover-preview-open:hover .browser-takeover-preview-open-label,
+.browser-takeover-preview-open:focus-visible .browser-takeover-preview-open-label {
+  opacity: 1;
 }
 
 .browser-takeover-preview-viewport img,
