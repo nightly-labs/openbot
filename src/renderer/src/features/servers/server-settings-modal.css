@@ -77,15 +77,18 @@
   min-height: 72px;
 }
 
-.server-settings-publish-setting.ui-switch-field {
+.server-settings-publish-setting.ui-switch-field,
+.server-settings-mute-setting.ui-switch-field {
   min-height: 64px;
 }
 
-.server-settings-publish-setting.ui-switch-field {
+.server-settings-publish-setting.ui-switch-field,
+.server-settings-mute-setting.ui-switch-field {
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-.server-settings-publish-setting.ui-switch-field {
+.server-settings-publish-setting.ui-switch-field,
+.server-settings-mute-setting.ui-switch-field {
   width: 100%;
   justify-content: space-between;
   gap: var(--openbot-space-6);

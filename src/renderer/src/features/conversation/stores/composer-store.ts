@@ -1,7 +1,7 @@
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import { createMemo } from "solid-js";
 import { appendVoiceTranscript } from "../../../voice-recording";
-import { EMPTY_DRAFT } from "../composer-draft";
+import { EMPTY_DRAFT, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
@@ -11,9 +11,12 @@ export interface ComposerStoreDeps {
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
   conversationErrors: () => Record<string, string>;
   setConversationErrors: (update: (current: Record<string, string>) => Record<string, string>) => void;
+  composerErrors: () => Record<string, string>;
+  setComposerErrors: (update: (current: Record<string, string>) => Record<string, string>) => void;
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDeliveryId: () => string | null;
+  editingPendingSave: () => StoredQueueEdit["pendingSave"] | null;
   seenMessageIds: Set<string>;
 }
 
@@ -38,6 +41,11 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     const target = currentTarget();
     return target ? (deps.conversationErrors()[composerDraftKey(target)] ?? null) : null;
   });
+  const currentComposerError = createMemo(() => {
+    const target = currentTarget();
+    return target ? (deps.composerErrors()[composerDraftKey(target)] ?? null) : null;
+  });
+  const currentChatError = createMemo(() => currentComposerError() ?? currentConversationError());
   const unreferencedDraftAttachments = createMemo(() => {
     const referencedIds = attachmentReferenceIds(currentDraft().text);
     return currentDraft().attachments.filter((attachment) => !referencedIds.has(attachment.id));
@@ -60,14 +68,42 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   function clearConversationError(target: ConversationTarget): void {
     const key = composerDraftKey(target);
     deps.setConversationErrors((current) => {
+      if (!(key in current)) return current;
       const { [key]: _removed, ...next } = current;
       return next;
     });
   }
 
+  function clearComposerError(target: ConversationTarget): void {
+    const key = composerDraftKey(target);
+    deps.setComposerErrors((current) => {
+      if (!(key in current)) return current;
+      const { [key]: _removed, ...next } = current;
+      return next;
+    });
+  }
+
+  function clearChatErrors(target: ConversationTarget): void {
+    clearComposerError(target);
+    clearConversationError(target);
+  }
+
+  function setComposerErrorForTarget(target: ConversationTarget, message: string): void {
+    const key = composerDraftKey(target);
+    deps.setComposerErrors((current) => (current[key] === message ? current : { ...current, [key]: message }));
+  }
+
   const updateCurrentDraft = (patch: Partial<ComposerDraft>) => {
     const target = currentTarget();
     if (!target) return;
+    // A pending Save owns the outcome: keep the exact request for retry.
+    if (
+      deps.editingPendingSave() &&
+      deps.editingAgentId() === target.agentId &&
+      deps.editingServerId() === target.serverId &&
+      deps.editingDeliveryId()
+    )
+      return;
     clearConversationError(target);
     const key = composerDraftKey(target);
     deps.setDrafts((current) => ({
@@ -98,6 +134,13 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   }
 
   function restoreVoiceTranscript(target: ConversationTarget, transcript: string): void {
+    if (
+      deps.editingPendingSave() &&
+      deps.editingAgentId() === target.agentId &&
+      deps.editingServerId() === target.serverId &&
+      deps.editingDeliveryId()
+    )
+      return;
     const key = composerDraftKey(target);
     deps.setDrafts((current) => {
       const draft = current[key] ?? EMPTY_DRAFT;
@@ -113,6 +156,8 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     currentEditingDeliveryId,
     currentDraft,
     currentConversationError,
+    currentComposerError,
+    currentChatError,
     unreferencedDraftAttachments,
     composerHasContent,
     replyTarget,
@@ -121,6 +166,9 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     clearSubmittedDraft,
     clearConversationError,
     setConversationError,
+    clearComposerError,
+    setComposerErrorForTarget,
+    clearChatErrors,
     restoreVoiceTranscript,
   };
 }

@@ -1,4 +1,4 @@
-import type { RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
+import type { RemoteDesktopErrorCode, RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -35,7 +35,14 @@ const session: RemoteDesktopSession = {
   grantExpiresAt: "2026-08-20T12:01:00.000Z",
 };
 
-function renderWorkspace(overrides: { session?: RemoteDesktopSession; visible?: boolean } = {}) {
+function renderWorkspace(
+  overrides: {
+    session?: RemoteDesktopSession;
+    visible?: boolean;
+    connectionError?: string;
+    connectionErrorCode?: RemoteDesktopErrorCode;
+  } = {},
+) {
   const [visible, setVisible] = createSignal(overrides.visible ?? true);
   const onHide = vi.fn(() => setVisible(false));
   const onRetry = vi.fn(async () => undefined);
@@ -47,8 +54,9 @@ function renderWorkspace(overrides: { session?: RemoteDesktopSession; visible?: 
       platform="darwin"
       server={server}
       session={overrides.session}
-      connecting={!overrides.session}
-      connectionError={null}
+      connecting={!overrides.session && !overrides.connectionError}
+      connectionError={overrides.connectionError ?? null}
+      connectionErrorCode={overrides.connectionErrorCode ?? null}
       onHide={onHide}
       onRetry={onRetry}
       onSelectDisplay={onSelectDisplay}
@@ -121,6 +129,21 @@ describe("RemoteDesktopWorkspace", () => {
 
     await fireEvent.keyDown(screen.getByRole("main", { name: "Remote control" }), { key: "Escape" });
     expect(onHide).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(onRetry).toHaveBeenCalledOnce());
+    expect(screen.getByRole("alert")).toHaveTextContent("The WebRTC connection failed.");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Screen Recording");
+  });
+
+  it("names the host and the repair step when the host may not record its screen", async () => {
+    const { onRetry } = renderWorkspace({
+      connectionError: "The host has not allowed OpenBot to record its screen.",
+      connectionErrorCode: "host_permissions_required",
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Studio Mac is not sharing its screen");
+    expect(alert).toHaveTextContent("System Settings → Privacy & Security → Screen Recording");
     await fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(onRetry).toHaveBeenCalledOnce());
   });

@@ -4,6 +4,7 @@ import type {
   AgentProviderId,
   AgentProviderState,
   CustomProviderSummary,
+  ProviderApiKeyStatus,
   ProviderRuntimePhase,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -23,6 +24,12 @@ export interface ProviderPickerOption {
   connectionState?: "connecting";
   checkError?: string | null;
   runtimeStatus?: ProviderRuntimeStatus;
+  /**
+   * Whether the optional OpenCode key is saved. Only the OpenCode row carries it: no other
+   * provider signs in with a pasted key. Absent while unknown, so the row shows no badge rather
+   * than a wrong one.
+   */
+  keyStatus?: ProviderApiKeyStatus;
   /** The newer runtime main says exists. The renderer never works this out itself. */
   availableVersion?: string | null;
 }
@@ -361,6 +368,19 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       <Show when={version()}>
                         {(installed) => <small class="provider-picker-version">{installed()}</small>}
                       </Show>
+                      {/* The account tier, and only while it adds to the runtime badge: a saved key
+                          leaves the runtime "Connected" to speak for the row, while a missing one
+                          still runs the free tier beside it. An unreadable key runs keyless too. */}
+                      <Show
+                        when={
+                          option().id === "opencode" &&
+                          (option().keyStatus === "missing" || option().keyStatus === "unreadable")
+                        }
+                      >
+                        <Badge class="provider-picker-status provider-picker-key-status" tone="neutral" shape="pill">
+                          {i18n.t("provider.key.free")}
+                        </Badge>
+                      </Show>
                       <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
                         <Badge
                           class={`provider-picker-status provider-picker-status-${visualState()}`}
@@ -388,7 +408,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             if (action() === "cancel") {
                               void props.onCancelProviderDownload?.(option().id);
                             } else if (action() !== "download" && action() !== "retry") {
-                              void props.onConnectProvider?.(option().id);
+                              // Only Reconnect opens the OpenCode key dialog: saving a key restarts
+                              // the CLI with it. Connect and Restart stay on onConnectProvider, so a
+                              // failed free provider with no stored key can still retry from Settings.
+                              if (option().id === "opencode" && action() === "reconnect" && props.onSignInProvider) {
+                                void props.onSignInProvider(option().id);
+                              } else {
+                                void props.onConnectProvider?.(option().id);
+                              }
                             } else {
                               void props.onDownloadProvider?.(option().id);
                             }
@@ -458,13 +485,17 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       </Button>
                     </Show>
                     {/* Claude's sign-in is a browser round trip it only needs while signed out.
-                      OpenCode's is a pasted key that unlocks the paid catalog, so its button stays on
-                      a row that already works -- and stays beside Connect instead of replacing it. */}
+                      OpenCode reconnects through its runtime Reconnect, so Sign in stays only where
+                      the row cannot offer it: with no runtime action at all, or a Connect or Restart
+                      that retries the same credentials. A saved key that blocks startup must stay
+                      replaceable and removable, so those actions never take the dialog away. */}
                     <Show
                       when={
                         props.onSignInProvider &&
                         (option().id === "opencode"
-                          ? !runtimeStatus() || runtimeStatus()?.phase === "ready"
+                          ? runtimeAction() === undefined ||
+                            runtimeAction() === "connect" ||
+                            runtimeAction() === "restart"
                           : option().id === "claude" &&
                             !runtimeStatus() &&
                             state() === "sign-in-required" &&

@@ -60,6 +60,7 @@ import type {
   SetAgentAvatarInput,
   SetMessageReactionInput,
   SetTeamTypingInput,
+  SharedTable,
   SidebarLayoutSnapshot,
   SkillSubmission,
   SteerQueuedMessageInput,
@@ -105,6 +106,7 @@ import {
   STORY_REMOTE_DESKTOP_SESSION,
   STORY_SERVERS,
   STORY_SESSIONS,
+  STORY_SHARED_TABLES,
   STORY_SKILL_PACKAGE_PREVIEW,
   STORY_SKILL_SUBMISSIONS,
   STORY_SNAPSHOTS,
@@ -146,6 +148,7 @@ export interface MockOpenBotOptions {
   remoteDesktopSessions?: RemoteDesktopSession[];
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
+  tables?: SharedTable[];
   routines?: Record<string, Routine[]>;
   localSkills?: MarketplaceSkillDetail[];
   installedSkills?: Record<string, InstalledSkill[]>;
@@ -300,8 +303,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let updateStatus = clone(options.updateStatus ?? STORY_UPDATE_STATUS);
   const usage = clone(options.usage ?? STORY_USAGE);
-  const usageTarget = agents[0];
-  const usageTargetKey = usageTarget ? `${usageTarget.provider}:${usageTarget.model}` : null;
   let agentCounter = agents.length;
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
   const localSkills = clone(
@@ -396,8 +397,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     timers.add(timer);
   };
   const emptyQueue = (agentId: string): QueueSnapshot => ({ agentId, deliveries: [] });
+  const queueEdits = new Map<string, { agentId: string; delivery: QueueDelivery }>();
   const queues = new Map<string, QueueSnapshot>(agents.map((agent) => [agent.id, emptyQueue(agent.id)]));
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
+  let tables: SharedTable[] = clone(options.tables ?? STORY_SHARED_TABLES);
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
 
@@ -596,6 +599,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       languageListeners.add(listener);
       return () => languageListeners.delete(listener);
     },
+    onOpenSettings: () => () => undefined,
     dynamicIsland: {
       getPreference: async () => clone(dynamicIslandPreference),
       setPreference: async (preference) => {
@@ -1170,8 +1174,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return mockAgentAnalytics(input, agent);
       },
       getUsage: async (agentId) => {
+        if (!agentId) return clone(usage);
         const agent = agents.find((candidate) => candidate.id === agentId);
-        return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });
+        return clone({
+          limits: agent ? usage.limits.filter((limit) => limit.id === agent.provider) : [],
+        });
       },
       // A saved endpoint's models are composed here, not stored, so a removal drops them the way a
       // respawned OpenCode would: it lists what its config names and nothing else.
@@ -1240,6 +1247,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           description: input.description,
           avatarSeed: input.avatarSeed,
           avatarHue: input.avatarHue,
+          ...(input.provider === undefined ? {} : { provider: input.provider }),
+          ...(input.model === undefined ? {} : { model: input.model }),
+          ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
         });
         agents = [...agents, agent];
         queues.set(agent.id, emptyQueue(agent.id));
@@ -1383,6 +1393,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         memories.delete(agentId);
         emitAgentEvent({ type: "memories-changed", agentId });
       },
+      listTables: async () => clone(tables),
+      deleteTable: async (input) => {
+        tables = tables.filter((table) => table.name !== input.name);
+      },
       listRoutines: async (agentId) => clone(routines.get(agentId) ?? []),
       createRoutine: async (input) => {
         const routine = createRoutineRecord(input);
@@ -1489,6 +1503,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => attachmentListeners.delete(listener);
       },
       discardDraftAttachment: async () => undefined,
+      downloadAttachments: async () => {
+        throw new Error("ZIP downloads are available in the desktop app.");
+      },
       openAttachment: async (_input: OpenAttachmentInput) => undefined,
       openSharedFile: async (_input: OpenSharedFileInput) => undefined,
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
@@ -1613,6 +1630,44 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         );
         queues.set(input.agentId, queue);
         emitAgentEvent({ type: "queue-changed", snapshot: queue });
+      },
+      editQueuedMessage: async (input) => {
+        const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
+        if (input.action === "begin") {
+          const existing = queueEdits.get(input.editId);
+          const delivery =
+            existing?.delivery ??
+            queue.deliveries.find((item) => item.id === input.deliveryId && item.status === "queued");
+          if (!delivery || (existing && existing.agentId !== input.agentId))
+            throw new Error("This queued message is no longer available.");
+          queueEdits.set(input.editId, { agentId: input.agentId, delivery });
+          // The host keeps a held delivery listed and marks it, so every device keeps the row.
+          queue.deliveries = queue.deliveries.map((item) =>
+            item.id === delivery.id ? { ...item, editing: true } : item,
+          );
+          queues.set(input.agentId, queue);
+          emitAgentEvent({ type: "queue-changed", snapshot: structuredClone(queue) });
+          return structuredClone(queue);
+        }
+        const held = queueEdits.get(input.editId);
+        if (!held || held.agentId !== input.agentId || held.delivery.id !== input.deliveryId)
+          throw new Error("This edit is no longer available.");
+        if (input.action === "retain-attachments") return structuredClone(queue);
+        queueEdits.delete(input.editId);
+        const delivery =
+          input.action === "save"
+            ? {
+                ...held.delivery,
+                text: input.text,
+                attachments: held.delivery.attachments.filter((item) => input.keepAttachmentIds.includes(item.id)),
+              }
+            : held.delivery;
+        queue.deliveries = queue.deliveries.some((item) => item.id === delivery.id)
+          ? queue.deliveries.map((item) => (item.id === delivery.id ? { ...delivery, editing: false } : item))
+          : [...queue.deliveries, { ...delivery, editing: false }];
+        queues.set(input.agentId, queue);
+        emitAgentEvent({ type: "queue-changed", snapshot: structuredClone(queue) });
+        return structuredClone(queue);
       },
       updateQueuedMessage: async (input: UpdateQueuedMessageInput) => {
         const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
@@ -1986,6 +2041,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitHostStatus(hostStatus);
         return clone(hostStatus);
       },
+      // The preview has no runtime to ask, so the check is what a granted permission looks like.
+      recheckScreenRecording: async () => {
+        hostStatus = { ...hostStatus, remoteDesktopScreenRecordingDenied: false };
+        emitHostStatus(hostStatus);
+        return clone(hostStatus);
+      },
       listMembers: async () => clone(teamMembers),
       updateMember: async (input: UpdateTeamMemberInput) => {
         const member = teamMembers.find((candidate) => candidate.id === input.memberId);
@@ -2029,7 +2090,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         };
         remoteDesktopSessions = [...remoteDesktopSessions, session];
         emitRemoteDesktopSessions(remoteDesktopSessions);
-        return clone(session);
+        return { status: "connected", session: clone(session) };
       },
       selectDisplay: async (input) => {
         remoteDesktopSessions = remoteDesktopSessions.map((session) =>

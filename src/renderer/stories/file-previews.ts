@@ -1,4 +1,5 @@
 import type { FilePreview } from "@openbot/contracts/ipc";
+import { strToU8, zipSync } from "fflate";
 
 /**
  * File previews for the Storybook stories of the file preview panel. The panel takes
@@ -71,6 +72,13 @@ export function toWireAgent(agent: AgentSummary) {
 }
 `;
 
+const JSON_DATA = `{
+  "sources": 8,
+  "verified": 7,
+  "needsReview": 1
+}
+`;
+
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200">
   <rect width="320" height="200" rx="12" fill="#12141a" />
   <rect x="24" y="32" width="120" height="56" rx="10" fill="#2f6df6" />
@@ -122,6 +130,25 @@ const buildMp3 = (): Uint8Array => {
   return bytes;
 };
 
+const buildXlsx = (): Uint8Array =>
+  zipSync({
+    "xl/workbook.xml": strToU8(
+      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="1"/><sheets><sheet name="Operating plan" sheetId="1" r:id="rId1"/><sheet name="Regional view" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>',
+    ),
+    "xl/styles.xml": strToU8(
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="165" formatCode="0.0%"/><numFmt numFmtId="166" formatCode="yyyy-mm-dd"/><numFmt numFmtId="167" formatCode="h:mm"/></numFmts><cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="165"/><xf numFmtId="166"/><xf numFmtId="167"/></cellXfs></styleSheet>',
+    ),
+    "xl/worksheets/sheet1.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Workstream</t></is></c><c r="B1" t="inlineStr"><is><t>Owner</t></is></c><c r="C1" t="inlineStr"><is><t>Status</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Product QA</t></is></c><c r="B2" t="inlineStr"><is><t>Builder</t></is></c><c r="C2" t="inlineStr"><is><t>Ready</t></is></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>Evidence</t></is></c><c r="B3" t="inlineStr"><is><t>Research</t></is></c><c r="C3" t="inlineStr"><is><t>In review</t></is></c></row></sheetData></worksheet>',
+    ),
+    "xl/worksheets/sheet2.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1" t="inlineStr"><is><t>Activation</t></is></c><c r="C1" t="inlineStr"><is><t>Date</t></is></c><c r="D1" t="inlineStr"><is><t>Time</t></is></c><c r="E1" t="inlineStr"><is><t>Empty</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2" s="1"><v>0.55</v></c><c r="C2" s="2"><v>0</v></c><c r="D2" s="3"><v>0.5</v></c><c r="E2" s="1"/></row></sheetData></worksheet>',
+    ),
+  });
+
 export const MARKDOWN_PREVIEW = filePreview("RELEASE-NOTES.md", "text/markdown", "markdown", MARKDOWN);
 
 export const MARKDOWN_SHORT_PREVIEW = filePreview(
@@ -135,6 +162,8 @@ export const TEXT_PREVIEW = filePreview("provider-session.log", "text/plain", "t
 
 export const SOURCE_PREVIEW = filePreview("current-agent-keys.ts", "text/typescript", "text", SOURCE);
 
+export const JSON_PREVIEW = filePreview("evidence-map.json", "application/json", "text", JSON_DATA);
+
 export const IMAGE_PREVIEW = filePreview("trust-boundary.svg", "image/svg+xml", "image", SVG);
 
 export const PDF_PREVIEW = filePreview("invoice-2026-09.pdf", "application/pdf", "pdf", buildPdf());
@@ -147,11 +176,19 @@ export const AUDIO_PREVIEW: FilePreview = {
   size: buildMp3().byteLength,
 };
 
-/** A kind that the panel cannot show. The card asks the user to open the file externally. */
-export const UNSUPPORTED_PREVIEW: FilePreview = {
+export const XLSX_PREVIEW: FilePreview = {
   name: "operating-plan.xlsx",
-  size: 68 * 1024,
+  size: buildXlsx().byteLength,
   mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  previewKind: "spreadsheet",
+  bytes: buildXlsx(),
+};
+
+/** A kind that the panel cannot show. The user opens the file externally. */
+export const UNSUPPORTED_PREVIEW: FilePreview = {
+  name: "archive.zip",
+  size: 68 * 1024,
+  mimeType: "application/zip",
   previewKind: "none",
   bytes: null,
 };
@@ -161,10 +198,11 @@ export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   MARKDOWN_PREVIEW,
   TEXT_PREVIEW,
   SOURCE_PREVIEW,
+  JSON_PREVIEW,
   IMAGE_PREVIEW,
   PDF_PREVIEW,
   AUDIO_PREVIEW,
-  UNSUPPORTED_PREVIEW,
+  XLSX_PREVIEW,
 ];
 
 /** Find the preview for a file path, as the main process does for a file link in a message. */

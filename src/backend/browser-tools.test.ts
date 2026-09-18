@@ -1,5 +1,6 @@
 import { decodeTeamProtocolV1Event, encodeTeamProtocolV1Event } from "@openbot/contracts/team-protocol/v1";
 import { describe, expect, it } from "vitest";
+import { browserInputAction } from "./browser-tool-actions";
 import {
   BROWSER_DYNAMIC_TOOLS,
   BROWSER_TOOL_DEFINITIONS,
@@ -84,6 +85,23 @@ describe("browser tool catalog", () => {
         returnByValue: false,
       }),
     ).toThrow("Invalid browser tool arguments");
+  });
+
+  it("types into the focused page when a canvas application has no element to target", () => {
+    const typeCall = (value: unknown) => {
+      const call = parseBrowserToolCall("type", value);
+      if (call.tool !== "type") throw new Error(`Expected a type call, got ${call.tool}.`);
+      return call;
+    };
+
+    const focusedCall = typeCall({ tabId: "tab", text: "12\tDone\n" });
+    expect(focusedCall.args).toEqual({ tabId: "tab", text: "12\tDone\n" });
+    expect(browserInputAction(focusedCall, {}).target).toBeUndefined();
+    // Replace and append describe a node's value, so honouring either one for keystrokes the page
+    // interprets itself would report an edit that never happened.
+    expect(() => browserInputAction(typeCall({ tabId: "tab", text: "x", mode: "replace" }), {})).toThrow(
+      "type mode requires a target",
+    );
   });
 
   it("rejects blank semantic and CSS targets", () => {

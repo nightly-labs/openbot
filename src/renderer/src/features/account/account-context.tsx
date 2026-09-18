@@ -201,10 +201,23 @@ const Auth = createSimpleContext({
       });
     }
 
-    async function refreshAccountUsage(agentId: string, targetKey: string): Promise<AccountUsage> {
+    function applyAccountUsage(usage: AccountUsage): void {
+      accountUsageRequestGeneration += 1;
+      setAccountUsageState((state) => {
+        if (usage.limits.length === 0) {
+          state.data = usage;
+          return;
+        }
+        const byId = new Map((state.data?.limits ?? []).map((limit) => [limit.id, limit]));
+        for (const limit of usage.limits) byId.set(limit.id, limit);
+        state.data = { limits: [...byId.values()] };
+      });
+    }
+
+    async function refreshAccountUsage(targetKey: string): Promise<AccountUsage> {
       selectAccountUsageTarget(targetKey);
       const generation = ++accountUsageRequestGeneration;
-      const usage = await window.openbot.agent.getUsage(agentId);
+      const usage = await window.openbot.agent.getUsage();
       if (generation === accountUsageRequestGeneration && accountUsageState.targetKey === targetKey) {
         setAccountUsageState((state) => {
           state.data = usage;
@@ -240,6 +253,7 @@ const Auth = createSimpleContext({
       accountUsageRefreshRevision,
       selectAccountUsageTarget,
       invalidateAccountUsage,
+      applyAccountUsage,
       refreshAccountUsage,
       requestEmailCode,
       retryCentralAccount,

@@ -2,9 +2,12 @@
 // itself: `bun run dev` owns the API, the seed and the SQLite profile, and a
 // second instance would fight it for ports and the single-instance lock.
 
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { Logger } from "@openbot/logging";
 import { type Browser, chromium, type Page } from "playwright-core";
+import { parseProcessTable } from "./cpu-sampling";
 import { describeTarget, findMainPages } from "./page-url";
 
 export const DEFAULT_DEV_AUTOMATION_PORT = 9_333;
@@ -84,8 +87,102 @@ export interface AutomationSession {
 
 // A port on the shared dev machine can belong to another Chromium. Refuse
 // anything that does not identify as OpenBot before a mutation can reach it.
+// The token is gone from new builds, so this now only gates ports no live
+// record owns; record-owned ports prove ownership through the process tree.
 export function isOpenBotBrowser(userAgent: string): boolean {
   return userAgent.includes("OpenBot/");
+}
+
+/**
+ * The `SystemInfo.getProcessInfo` entry with this type is the browser process
+ * itself. Anything else names a renderer, GPU, network, or utility process.
+ */
+export function findBrowserProcessId(processInfo: unknown): number | null {
+  if (!Array.isArray(processInfo)) return null;
+  for (const entry of processInfo) {
+    if (!isDynamicRecord(entry) || entry.type !== "browser") continue;
+    if (isNumber(entry.id) && Number.isInteger(entry.id) && entry.id > 0) return entry.id;
+  }
+  return null;
+}
+
+/**
+ * Whether `pid` is `ownerPid` itself or runs underneath it. The parent map
+ * comes from one `ps` listing, so a pid the listing never saw answers false
+ * rather than throwing. Cycles answer false too: a loop can never contain a
+ * pid outside itself.
+ */
+export function processBelongsToInstance(
+  pid: number,
+  ownerPid: number,
+  parentByPid: ReadonlyMap<number, number>,
+): boolean {
+  let current: number | undefined = pid;
+  const seen = new Set<number>();
+  while (current !== undefined && !seen.has(current)) {
+    if (current === ownerPid) return true;
+    seen.add(current);
+    current = parentByPid.get(current);
+  }
+  return false;
+}
+
+const runCommand = promisify(execFile);
+
+async function readParentProcessTable(): Promise<ReadonlyMap<number, number>> {
+  if (process.platform === "win32") {
+    const { stdout } = await runCommand(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId)" }',
+      ],
+      { timeout: 10_000, maxBuffer: 16 * 1_024 * 1_024 },
+    );
+    const table = new Map<number, number>();
+    for (const line of stdout.split("\n")) {
+      const match = /^(\d+)\s+(\d+)\s*$/u.exec(line.trim());
+      if (match) table.set(Number(match[1]), Number(match[2]));
+    }
+    return table;
+  }
+  const { stdout } = await runCommand("ps", ["-o", "pid=,ppid=,cputime=,command=", "-ax"], {
+    timeout: 10_000,
+    maxBuffer: 16 * 1_024 * 1_024,
+  });
+  const table = new Map<number, number>();
+  for (const row of parseProcessTable(stdout)) table.set(row.pid, row.ppid);
+  return table;
+}
+
+/**
+ * Whether the browser behind this connection descends from the recorded
+ * instance process. Liveness alone cannot say that: the record names a pid,
+ * not a socket, so a browser that grabbed the port during a restart passes a
+ * lifetime check while answering for someone else. Anything unverifiable
+ * answers false -- refusing a command is always safer than driving it blind.
+ */
+export async function verifyBrowserOwnership(browser: Browser, ownerPid: number): Promise<boolean> {
+  let browserPid: number | null = null;
+  try {
+    const session = await browser.newBrowserCDPSession();
+    try {
+      const { processInfo } = await session.send("SystemInfo.getProcessInfo");
+      browserPid = findBrowserProcessId(processInfo);
+    } finally {
+      await session.detach().catch(() => undefined);
+    }
+  } catch {
+    return false;
+  }
+  if (browserPid === null || browserPid === ownerPid) return browserPid !== null;
+  try {
+    return processBelongsToInstance(browserPid, ownerPid, await readParentProcessTable());
+  } catch {
+    return false;
+  }
 }
 
 // The URL shape alone cannot separate the app from an embedded browser tab:
@@ -118,19 +215,13 @@ export async function findRendererPages<T extends RendererCandidate>(
   return confirmed;
 }
 
-async function describeBrowser(port: number): Promise<{ targets: string; userAgent: string }> {
+async function describeBrowser(port: number): Promise<{ targets: string; branded: boolean }> {
   const version = await fetch(`http://127.0.0.1:${port}/json/version`, {
     signal: AbortSignal.timeout(5_000),
   });
   if (!version.ok) throw new Error(`CDP answered ${version.status}.`);
   const info = await version.json();
   const userAgent = isDynamicRecord(info) && isString(info["User-Agent"]) ? info["User-Agent"] : "";
-  if (!isOpenBotBrowser(userAgent)) {
-    throw new ForeignBrowserError(
-      `Port ${port} does not belong to OpenBot (User-Agent: ${userAgent || "unknown"}). ` +
-        "Pass --port=<OPENBOT_DEV_REMOTE_DEBUGGING_PORT> of the instance you mean to drive.",
-    );
-  }
   const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
     signal: AbortSignal.timeout(5_000),
   });
@@ -142,12 +233,12 @@ async function describeBrowser(port: number): Promise<{ targets: string; userAge
     .filter((target) => target.type === "page")
     .map((target) => `- ${describeTarget(isString(target.url) ? target.url : "")}`)
     .join("\n");
-  return { targets, userAgent };
+  return { targets, branded: isOpenBotBrowser(userAgent) };
 }
 
 export interface ConnectOptions {
   // Set from the instance registry. Null means nothing published this port, so
-  // the only check left is the OpenBot User-Agent.
+  // the port answers for itself through the build-token check.
   expectedRendererPort?: number | null;
   // A `--page=` selector. This is dev: every window is fair game, including a
   // Dynamic Island surface and an embedded browser view showing a real site,
@@ -156,6 +247,9 @@ export interface ConnectOptions {
   // accident; naming a target overrides both the route filter and the preload
   // bridge probe.
   pageSelector?: string | null;
+  // The pid of the live registry record that owns the port, if any. See
+  // OpenDevBrowserOptions: without it an unbranded browser is refused.
+  ownerPid?: number | null;
 }
 
 export interface PageChoice {
@@ -218,10 +312,22 @@ export async function matchPages<T extends { url: () => string }>(
   return pages.filter((page) => page.url().toLowerCase().includes(needle));
 }
 
-export async function openDevBrowser(port: number, logger: Logger): Promise<Browser> {
-  let targets: string;
+export interface OpenDevBrowserOptions {
+  // The pid of the live registry record that owns the port, if any. A branded
+  // build token proves the browser without further checks; an unbranded one
+  // must additionally prove the listening process descends from this pid,
+  // because liveness alone cannot tell a restarted instance from a squatter.
+  ownerPid?: number | null;
+}
+
+export async function openDevBrowser(
+  port: number,
+  logger: Logger,
+  options: OpenDevBrowserOptions = {},
+): Promise<Browser> {
+  let described: { targets: string; branded: boolean };
   try {
-    targets = (await describeBrowser(port)).targets;
+    described = await describeBrowser(port);
   } catch (error) {
     if (error instanceof ForeignBrowserError) throw error;
     throw new Error(
@@ -230,8 +336,22 @@ export async function openDevBrowser(port: number, logger: Logger): Promise<Brow
         "it owns the API, the seed and the dev profile.",
     );
   }
+  const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+  if (!described.branded) {
+    // Closing a browser obtained through `connectOverCDP` closes the WebSocket
+    // transport only, never the app, so a refusal below leaves nothing behind.
+    const ownerPid = options.ownerPid ?? null;
+    if (ownerPid === null || !(await verifyBrowserOwnership(browser, ownerPid))) {
+      await browser.close();
+      throw new ForeignBrowserError(
+        `Port ${port} does not belong to OpenBot. Pass --port=<OPENBOT_DEV_REMOTE_DEBUGGING_PORT> of the instance you mean to drive.`,
+      );
+    }
+    logger.info(`Port :${port} answers without the build token; the listener belongs to the recorded instance.`);
+  }
+  const targets = described.targets;
   logger.info(`CDP targets on :${port}`, targets || "(no pages yet)");
-  return chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+  return browser;
 }
 
 export function devBrowserPages(browser: Browser): Page[] {
@@ -243,7 +363,7 @@ export async function connectToDevApp(
   logger: Logger,
   options: ConnectOptions = {},
 ): Promise<AutomationSession> {
-  const browser = await openDevBrowser(port, logger);
+  const browser = await openDevBrowser(port, logger, { ownerPid: options.ownerPid });
   const expectedRendererPort = options.expectedRendererPort ?? null;
   const selector = options.pageSelector ?? null;
   const pages = devBrowserPages(browser);

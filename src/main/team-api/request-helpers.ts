@@ -31,7 +31,11 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { isTeamCurrentCapability, supportsTeamSemanticTags } from "@openbot/contracts/team-protocol/current";
+import {
+  isTeamCurrentCapability,
+  supportsTeamSemanticTags,
+  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import {
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_V1,
@@ -192,6 +196,7 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
     if (requestProtocol(request) === 4)
       return decodeTeamProtocolV4CurrentHttpRequest(request.method ?? "GET", request.url ?? "/", value, {
         preserveSemanticTags: supportsTeamSemanticTags(requestCapabilities(request)),
+        agentCreateModel: requestCapabilities(request).has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
       });
     return requestProtocol(request) === TEAM_PROTOCOL_V3
       ? decodeTeamProtocolV3CurrentHttpRequest(request.method ?? "GET", request.url ?? "/", value, {
@@ -372,12 +377,24 @@ export function agentCreate(value: DynamicRecord): CreateAgentInput {
   if (!isString(value.description) || value.description.length > INPUT_LIMITS.agentDescription) {
     throw new HttpError(400, "description is invalid.");
   }
+  if (value.provider !== undefined && !isAgentProvider(value.provider)) {
+    throw new HttpError(400, "provider is invalid.");
+  }
+  if (value.model !== undefined && !isAgentModel(value.model)) {
+    throw new HttpError(400, "model is invalid.");
+  }
+  if (value.reasoningEffort !== undefined && !isReasoningEffort(value.reasoningEffort)) {
+    throw new HttpError(400, "reasoningEffort is invalid.");
+  }
   return {
     name: requiredCreateText(value.name, "name", INPUT_LIMITS.agentName),
     description: value.description,
     avatarSeed: value.avatarSeed,
     avatarHue,
     initialMessage: requiredCreateText(value.initialMessage, "initialMessage", INPUT_LIMITS.messageText),
+    ...(value.provider === undefined ? {} : { provider: value.provider }),
+    ...(value.model === undefined ? {} : { model: value.model }),
+    ...(value.reasoningEffort === undefined ? {} : { reasoningEffort: value.reasoningEffort }),
   };
 }
 

@@ -210,11 +210,12 @@ export class MobileConversationStore {
       }
       if (!updates.size) continue;
       const messages = [...current.messages];
+      let added = false;
       for (const [messageId, { event, parts }] of updates) {
         const text = parts.join("");
         const index = indices.get(messageId);
         if (index === undefined) {
-          indices.set(messageId, messages.length);
+          added = true;
           messages.push({
             id: messageId,
             turnId: event.turnId,
@@ -229,7 +230,11 @@ export class MobileConversationStore {
           messages[index] = { ...message, text: message.text + text, status: "streaming" };
         }
       }
-      this.#publish(agentId, { ...current, messages, revision, activeTurnId, threadId }, false);
+      if (added) {
+        this.#publish(agentId, { ...current, messages, revision, activeTurnId, threadId });
+      } else {
+        this.#publish(agentId, { ...current, messages, revision, activeTurnId, threadId }, false);
+      }
     }
   }
 }

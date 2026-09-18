@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { createScrollFades } from "../../../components/createScrollFades";
 import { errorMessage } from "../../../error-message";
-import type { ConversationProps } from "../conversation-types";
+import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "../createChatVirtualizer";
 import { scrollToLatestMessage } from "../MessageNavigation";
 import {
@@ -28,7 +28,7 @@ export interface ScrollStoreDeps {
   props: ConversationProps;
   markingRead: () => boolean;
   setMarkingRead: (reading: boolean) => void;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   elements: ScrollElements;
   sticky: ScrollStickyState;
 }
@@ -156,12 +156,14 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   async function markUnreadMessages(): Promise<void> {
     if (deps.markingRead()) return;
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     deps.setMarkingRead(true);
-    deps.setComposerError(null);
+    deps.setComposerError(null, target);
     try {
       await deps.props.onMarkRead();
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not mark messages as read."));
+      deps.setComposerError(errorMessage(error, "Could not mark messages as read."), target);
     } finally {
       deps.setMarkingRead(false);
     }

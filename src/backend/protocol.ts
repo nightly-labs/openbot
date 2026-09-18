@@ -1,3 +1,4 @@
+import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
 export type RequestId = string | number;
@@ -163,11 +164,11 @@ export function decodeModelListResponse(value: unknown): ModelListResponse {
 }
 
 export function decodeRecordResponse(value: unknown): DynamicRecord {
-  return requiredRecord(value, "response");
+  return decodeRecord(value, "response");
 }
 
 export function decodeAccountReadResult(value: unknown): AccountReadResult {
-  const record = requiredRecord(value, "account response");
+  const record = decodeRecord(value, "account response");
   const account = record.account;
   const requiresOpenaiAuth = record.requiresOpenaiAuth;
   if (account === null) {
@@ -176,7 +177,7 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
       requiresOpenaiAuth: requiresOpenaiAuth === undefined ? false : recordBoolean(record, "requiresOpenaiAuth"),
     };
   }
-  const accountRecord = requiredRecord(account, "account");
+  const accountRecord = decodeRecord(account, "account");
   return {
     account: {
       type: requiredString(accountRecord, "type"),
@@ -188,7 +189,7 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
 }
 
 export function decodeAccountLoginStartResult(value: unknown): AccountLoginStartResult {
-  const record = requiredRecord(value, "account login response");
+  const record = decodeRecord(value, "account login response");
   if (requiredString(record, "type") !== "chatgpt") throw new Error("Unexpected Codex login type.");
   const authUrl = requiredString(record, "authUrl");
   const url = new URL(authUrl);
@@ -197,7 +198,7 @@ export function decodeAccountLoginStartResult(value: unknown): AccountLoginStart
 }
 
 export function decodeAccountLoginCompletedResult(value: unknown): AccountLoginCompletedResult {
-  const record = requiredRecord(value, "account login completion");
+  const record = decodeRecord(value, "account login completion");
   const loginId = optionalString(record, "loginId");
   const error = optionalString(record, "error");
   return {
@@ -208,7 +209,7 @@ export function decodeAccountLoginCompletedResult(value: unknown): AccountLoginC
 }
 
 export function decodeAccountRateLimitsReadResult(value: unknown): AccountRateLimitsReadResult {
-  const record = requiredRecord(value, "rate limits response");
+  const record = decodeRecord(value, "rate limits response");
   return {
     rateLimits: decodeRateLimit(record.rateLimits),
     rateLimitsByLimitId: decodeRateLimitsById(record.rateLimitsByLimitId),
@@ -216,13 +217,13 @@ export function decodeAccountRateLimitsReadResult(value: unknown): AccountRateLi
 }
 
 export function decodeThreadResponse(value: unknown): ThreadResponse {
-  const record = requiredRecord(value, "thread response");
+  const record = decodeRecord(value, "thread response");
   return { thread: decodeThreadRecord(record.thread) };
 }
 
 export function decodeTurnResponse(value: unknown): TurnResponse {
-  const record = requiredRecord(value, "turn response");
-  const turn = requiredRecord(record.turn, "turn");
+  const record = decodeRecord(value, "turn response");
+  const turn = decodeRecord(record.turn, "turn");
   const status = optionalString(turn, "status");
   return {
     turn: {
@@ -233,13 +234,13 @@ export function decodeTurnResponse(value: unknown): TurnResponse {
 }
 
 function decodeThreadRecord(value: unknown): ThreadRecord {
-  const record = requiredRecord(value, "thread");
+  const record = decodeRecord(value, "thread");
   const turns = Array.isArray(record.turns) ? record.turns.map(decodeTurnRecord) : undefined;
   return { id: requiredString(record, "id"), ...(turns ? { turns } : {}) };
 }
 
 function decodeTurnRecord(value: unknown): TurnRecord {
-  const record = requiredRecord(value, "thread turn");
+  const record = decodeRecord(value, "thread turn");
   const items = Array.isArray(record.items) ? record.items.map(decodeThreadItem) : undefined;
   const status = optionalString(record, "status");
   return {
@@ -250,7 +251,7 @@ function decodeTurnRecord(value: unknown): TurnRecord {
 }
 
 function decodeThreadItem(value: unknown): ThreadItem {
-  const record = requiredRecord(value, "thread item");
+  const record = decodeRecord(value, "thread item");
   const item: ThreadItem = { type: requiredString(record, "type") };
   const id = optionalString(record, "id");
   const clientId = optionalString(record, "clientId");
@@ -279,7 +280,7 @@ export function reasoningText(item: unknown): string {
 function decodeThreadContent(value: unknown): Array<{ type: string; text?: string }> {
   if (!Array.isArray(value)) throw new Error("Invalid thread item content.");
   return value.map((item) => {
-    const record = requiredRecord(item, "thread item content");
+    const record = decodeRecord(item, "thread item content");
     const text = optionalString(record, "text");
     return {
       type: requiredString(record, "type"),
@@ -290,7 +291,7 @@ function decodeThreadContent(value: unknown): Array<{ type: string; text?: strin
 
 function decodeRateLimit(value: unknown): AccountRateLimitResult | null | undefined {
   if (value === undefined || value === null) return value;
-  const record = requiredRecord(value, "rate limit");
+  const record = decodeRecord(value, "rate limit");
   return {
     limitId: optionalString(record, "limitId"),
     limitName: optionalString(record, "limitName"),
@@ -302,7 +303,7 @@ function decodeRateLimit(value: unknown): AccountRateLimitResult | null | undefi
 
 function decodeRateLimitWindow(value: unknown): AccountRateLimitWindowResult | null | undefined {
   if (value === undefined || value === null) return value;
-  const record = requiredRecord(value, "rate limit window");
+  const record = decodeRecord(value, "rate limit window");
   return {
     usedPercent: optionalNumber(record, "usedPercent"),
     windowDurationMins: optionalNumber(record, "windowDurationMins"),
@@ -312,24 +313,13 @@ function decodeRateLimitWindow(value: unknown): AccountRateLimitWindowResult | n
 
 function decodeRateLimitsById(value: unknown): AccountRateLimitsReadResult["rateLimitsByLimitId"] {
   if (value === undefined || value === null) return value;
-  const record = requiredRecord(value, "rate limits by ID");
+  const record = decodeRecord(value, "rate limits by ID");
   return Object.fromEntries(
     Object.entries(record).map(([key, item]) => {
       const rateLimit = decodeRateLimit(item);
       return [key, rateLimit === null ? undefined : rateLimit];
     }),
   );
-}
-
-function requiredRecord(value: unknown, label: string): DynamicRecord {
-  if (!isDynamicRecord(value)) throw new Error(`Invalid ${label}.`);
-  return value;
-}
-
-function requiredString(record: DynamicRecord, key: string): string {
-  const value = record[key];
-  if (!isString(value)) throw new Error(`Invalid ${key}.`);
-  return value;
 }
 
 function optionalString(record: DynamicRecord, key: string): string | null | undefined {

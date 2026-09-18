@@ -1,4 +1,5 @@
 import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, isHostAnalyticsRoute } from "./current";
+import { isQueueEditRoute } from "./queue-edit-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
 import {
   decodeTeamProtocolV2CurrentHttpRequest,
@@ -68,7 +69,8 @@ export function isTeamProtocolV3OnlyRoute(method: string, path: string): boolean
     isAgentAnalyticsRoute(method, path) ||
     isHostAnalyticsRoute(method, path) ||
     isAgentProfileRoute(method, path) ||
-    isConversationUnreadRoute(method, path)
+    isConversationUnreadRoute(method, path) ||
+    isQueueEditRoute(method, path)
   )
     return true;
   const pathname = new URL(path, "http://openbot.invalid").pathname;

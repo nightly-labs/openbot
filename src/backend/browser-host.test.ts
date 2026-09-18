@@ -6,6 +6,8 @@ import { BrowserWindow, type WebContents, WebContentsView, webContents } from "e
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
 
+const windowOpenHandlers = vi.hoisted((): Array<(details: { url: string }) => { action: string }> => []);
+
 vi.mock("electron", async () => {
   const { EventEmitter } = await import("node:events");
   const contents: FakeContents[] = [];
@@ -35,18 +37,30 @@ vi.mock("electron", async () => {
       this.emit("did-stop-loading");
     }
     close() {}
+    focus() {}
     setAudioMuted() {}
     invalidate() {}
-    setWindowOpenHandler() {}
+    setWindowOpenHandler(handler: (details: { url: string }) => { action: string }) {
+      windowOpenHandlers.push(handler);
+    }
     async executeJavaScript() {
       return null;
     }
+    focusedFrame: { executeJavaScript: () => Promise<unknown>; isDestroyed: () => boolean } | null = null;
+    mainFrame = {
+      async executeJavaScript() {
+        return false;
+      },
+      isDestroyed() {
+        return false;
+      },
+    };
     navigationHistory = { clear() {}, canGoBack: () => false, canGoForward: () => false };
   }
   return {
     app: { getPreferredSystemLanguages: () => ["en-US"] },
     BrowserWindow: class {
-      webContents = { getZoomFactor: () => 1 };
+      webContents = { getZoomFactor: () => 1, focus() {}, sendInputEvent() {} };
       contentView = { addChildView() {}, removeChildView() {} };
       isDestroyed() {
         return false;
@@ -100,6 +114,7 @@ let host: BrowserHost;
 let browserWindow: BrowserWindow;
 let statePath: string;
 beforeEach(async () => {
+  windowOpenHandlers.length = 0;
   directory = await mkdtemp(join(tmpdir(), "openbot-browser-limit-"));
   statePath = join(directory, "browser-tabs.json");
   browserWindow = new BrowserWindow();
@@ -129,6 +144,59 @@ describe.each(["main", "picture-in-picture"] as const)("%s browser view bounds",
       width: Math.ceil(1200 * zoomFactor),
       height: Math.ceil(600 * zoomFactor),
     });
+  });
+});
+
+const escapeInput = { type: "keyDown", key: "Escape", control: false, meta: false, alt: false, shift: false };
+const pageBounds = { x: 0, y: 0, width: 1200, height: 600 };
+
+describe("browser Escape forwarding", () => {
+  const contentsFor = (url: string): WebContents => {
+    const found = webContents.getAllWebContents().find((candidate) => candidate.getURL() === url);
+    if (!found) throw new Error("Browser contents were not created.");
+    return found;
+  };
+
+  it("collapses the expanded browser in the main window", async () => {
+    const tab = await host.open("https://example.com/escape");
+    const page = contentsFor(tab.url);
+    const sendInputEvent = vi.spyOn(browserWindow.webContents, "sendInputEvent");
+    await host.setVisible({ visible: true, target: "main", bounds: pageBounds });
+
+    page.emit("before-input-event", { preventDefault: () => undefined }, escapeInput);
+
+    await vi.waitFor(() => expect(sendInputEvent).toHaveBeenCalledWith({ type: "keyUp", keyCode: "Escape" }));
+    expect(sendInputEvent).toHaveBeenCalledWith({ type: "keyDown", keyCode: "Escape" });
+  });
+
+  it("leaves Escape in Picture in Picture, which has its own window", async () => {
+    const pictureInPictureWindow = new BrowserWindow();
+    host.setPictureInPictureWindow(pictureInPictureWindow);
+    const tab = await host.open("https://example.com/detached");
+    const page = contentsFor(tab.url);
+    const askedPage = vi.spyOn(page.mainFrame, "executeJavaScript");
+    const sendInputEvent = vi.spyOn(browserWindow.webContents, "sendInputEvent");
+    await host.setVisible({ visible: true, target: "picture-in-picture", bounds: pageBounds });
+
+    page.emit("before-input-event", { preventDefault: () => undefined }, escapeInput);
+
+    // The page is never asked, so there is nothing to wait for: the key stays in the detached
+    // window instead of reaching the main renderer, where Escape cancels a queued message edit.
+    expect(askedPage).not.toHaveBeenCalled();
+    expect(sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps Escape in the page while an editable element has focus", async () => {
+    const tab = await host.open("https://example.com/editable");
+    const page = contentsFor(tab.url);
+    const askedPage = vi.spyOn(page.mainFrame, "executeJavaScript").mockResolvedValue(true);
+    const sendInputEvent = vi.spyOn(browserWindow.webContents, "sendInputEvent");
+    await host.setVisible({ visible: true, target: "main", bounds: pageBounds });
+
+    page.emit("before-input-event", { preventDefault: () => undefined }, escapeInput);
+
+    await vi.waitFor(() => expect(askedPage).toHaveBeenCalled());
+    expect(sendInputEvent).not.toHaveBeenCalled();
   });
 });
 
@@ -187,6 +255,40 @@ describe("browser address navigation", () => {
     expect(host.listTabs()).toHaveLength(2);
     await expect(host.loadUrl(second.id, "file:///tmp/test")).rejects.toThrow("Only HTTP(S)");
     expect(host.listTabs()).toHaveLength(2);
+  });
+});
+
+describe("browser auth popups", () => {
+  it("opens an allowed popup as a focused tab with the same owner", async () => {
+    const opener = await host.open("https://example.com/start", "thread-a", "agent-a");
+    const handler = windowOpenHandlers.at(-1);
+    if (!handler) throw new Error("Window open handler was not set.");
+    const openSpy = vi.spyOn(host, "open");
+    const outcome = handler({ url: "https://accounts.google.com/o/oauth2/auth?client_id=test" });
+    expect(outcome).toEqual({ action: "deny" });
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://accounts.google.com/o/oauth2/auth?client_id=test",
+      "thread-a",
+      "agent-a",
+      true,
+    );
+    await vi.waitFor(() => expect(host.listTabs()).toHaveLength(2));
+    const popup = host.listTabs().find((tab) => tab.id !== opener.id);
+    expect(popup).toMatchObject({
+      url: "https://accounts.google.com/o/oauth2/auth?client_id=test",
+      ownerThreadId: "thread-a",
+      ownerAgentId: "agent-a",
+    });
+    expect(host.activeTabId).toBe(popup?.id);
+  });
+
+  it("ignores a popup to a disallowed URL", async () => {
+    await host.open("https://example.com/start", "thread-a", "agent-a");
+    const handler = windowOpenHandlers.at(-1);
+    if (!handler) throw new Error("Window open handler was not set.");
+    handler({ url: "file:///etc/passwd" });
+    await Promise.resolve();
+    expect(host.listTabs()).toHaveLength(1);
   });
 });
 

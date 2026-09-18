@@ -12,6 +12,7 @@ const native = vi.hoisted(() => ({
   permission: vi.fn(),
   alert: vi.fn(),
   size: 5,
+  base64Impl: async (_uri: string) => btoa("hello"),
 }));
 vi.mock("react-native", () => ({ Alert: { alert: native.alert }, Keyboard: { dismiss: () => {} } }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: native.documents }));
@@ -24,8 +25,12 @@ vi.mock("expo-image-picker", () => ({
 vi.mock("expo-file-system", () => ({
   File: class {
     size = native.size;
+    uri: string;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
     async base64() {
-      return btoa("hello");
+      return native.base64Impl(this.uri);
     }
   },
 }));
@@ -33,14 +38,15 @@ const cleanups: (() => void)[] = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   native.size = 5;
+  native.base64Impl = async (_uri: string) => btoa("hello");
   vi.clearAllMocks();
 });
-function mount() {
+function mount(persist?: Parameters<typeof useChatAttachments>[1]) {
   const container = document.createElement("div");
   const root = createRoot(container);
   let attachments: ReturnType<typeof useChatAttachments> | null = null;
   function Harness() {
-    attachments = useChatAttachments();
+    attachments = useChatAttachments([], persist);
     return null;
   }
   act(() => root.render(<Harness />));
@@ -138,4 +144,70 @@ describe("mobile attachment selection", () => {
     expect(state().items).toHaveLength(10);
     expect(native.alert).toHaveBeenCalledWith("Could not add attachment", "You can attach up to 10 files.");
   });
+});
+
+it("accepts a paste only after persistence succeeds and leaves existing items on failure", async () => {
+  let complete = () => {};
+  const persist = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const state = mount(persist);
+  let saving: Promise<void> | undefined;
+  act(() => {
+    saving = state().paste({ type: "text", text: "a".repeat(4001) }, () => {});
+  });
+  expect(state().preparing).toBe(true);
+  expect(state().items).toEqual([]);
+  await act(async () => {
+    complete();
+    await saving;
+  });
+  expect(state().items).toHaveLength(1);
+  persist.mockRejectedValueOnce(new Error("Disk full"));
+  await act(async () => {
+    await expect(state().paste({ type: "text", text: "b".repeat(4001) }, () => {})).rejects.toThrow("Disk full");
+  });
+  expect(state().items).toHaveLength(1);
+  expect(state().preparing).toBe(false);
+});
+
+it("keeps preparing true while later files of one selection are still reading", async () => {
+  // The first persist finishes before the second read. Clearing the flag there
+  // would report idle while the selection is still running.
+  const persist = vi.fn(async () => {});
+  const state = mount(persist);
+  native.documents.mockResolvedValue({
+    canceled: false,
+    assets: [
+      { name: "a.txt", uri: "file:///a.txt" },
+      { name: "b.txt", uri: "file:///b.txt" },
+    ],
+  });
+  let releaseSecond: () => void = () => {};
+  const secondGate = new Promise<void>((resolve) => {
+    releaseSecond = resolve;
+  });
+  native.base64Impl = async (uri: string) => {
+    if (uri.endsWith("b.txt")) await secondGate;
+    return btoa("hello");
+  };
+  let selecting: Promise<void> | undefined;
+  act(() => {
+    selecting = state().chooseFiles();
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(state().items.map((item) => item.name)).toEqual(["a.txt"]);
+  expect(state().preparing).toBe(true);
+  await act(async () => {
+    releaseSecond();
+    await selecting;
+  });
+  expect(state().items.map((item) => item.name)).toEqual(["a.txt", "b.txt"]);
+  expect(state().preparing).toBe(false);
+  expect(persist).toHaveBeenCalledTimes(2);
 });

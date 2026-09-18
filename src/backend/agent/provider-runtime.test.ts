@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
@@ -12,9 +12,9 @@ import {
   createFakeGrok,
   createFakeOpencode,
   createPendingFakeClaude,
+  createTestService,
   createUpdatableFakeClaude,
   FakeAgentClient,
-  fakeBrowser,
   readTextOrEmpty,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -27,6 +27,7 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
+import { isUsageLimitDiagnostic } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -45,10 +46,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);
     const clients: FakeAgentClient[] = [];
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", false);
-      if (provider === "opencode") clients.push(client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        if (provider === "opencode") clients.push(client);
+        return client;
+      },
     });
     await service.initialize();
     const openExternal = vi.fn(async () => undefined);
@@ -69,14 +75,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps another provider's live delivery running when OpenCode reconnects", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider, "", false),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+    });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Keep working." });
     const running = service;
@@ -97,15 +101,20 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     let reconnecting = false;
     let checkingAccount = false;
     const clients: FakeAgentClient[] = [];
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "opencode", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", true, true, {}, async (method) => {
-        if (provider !== "opencode" || !reconnecting || method !== "account/read") return;
-        checkingAccount = true;
-        await gate;
-        if (fail) throw new Error("Reconnect failed.");
-      });
-      if (provider === "opencode") clients.push(client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", true, true, {}, async (method) => {
+          if (provider !== "opencode" || !reconnecting || method !== "account/read") return;
+          checkingAccount = true;
+          await gate;
+          if (fail) throw new Error("Reconnect failed.");
+        });
+        if (provider === "opencode") clients.push(client);
+        return client;
+      },
     });
     await service.initialize();
     await store.getOrCreate("chief");
@@ -149,13 +158,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       if (accountReads.size === 3) releaseAccountReads?.();
       await allAccountReadsStarted;
     };
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) =>
+      preferredProvider: "codex",
+      clientFactory: (provider) =>
         new FakeAgentClient(
           provider,
           "DONE",
@@ -164,7 +171,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
           { "account/read": delays[provider] },
           waitForConcurrentAccountReads,
         ),
-    );
+    });
     service.on("event", (event) => {
       if (event.type !== "status") return;
       for (const provider of event.status.providers ?? []) {
@@ -195,29 +202,33 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   async function opencodeModelIds(storedKey: string | null, catalog?: string[]): Promise<string[]> {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "opencode",
-      (provider) => {
+      preferredProvider: "opencode",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
-        // Zen and Go reach OpenBot as one catalog, which is what makes the split a decision this
-        // app has to make rather than one it can read off the response.
+        // Zen and Go reach OpenBot as one catalog, and the stored key is a Go key: the Go models
+        // stay while the Zen ones the key does not buy leave, which is what makes the split a
+        // decision this app has to make rather than one it can read off the response.
         if (provider === "opencode") {
-          const ids = catalog ?? ["opencode/big-pickle", "opencode/claude-opus-5", "opencode-go/kimi-k3"];
+          const ids = catalog ?? [
+            "opencode/big-pickle",
+            "opencode/claude-opus-5",
+            "opencode/spark-free",
+            "opencode-go/kimi-k3",
+          ];
           client.modelList = () => ({ data: ids.map((model) => ({ model })) });
         }
         return client;
       },
-      {},
-      async () => undefined,
-      null,
-      null,
-      null,
-      { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
-    );
+      bundledExecutables: {},
+      prepareAgentWorkspace: async () => undefined,
+      hostedSites: null,
+      sidebarLayout: null,
+      preferredModel: null,
+      credentials: { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
+    });
     await service.initialize();
     return service
       .listModels()
@@ -225,13 +236,18 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       .map((model) => model.id);
   }
 
-  it("hides the OpenCode Go models that the key OpenBot supplied does not buy", async () => {
-    expect(await opencodeModelIds("zen-key")).toEqual(["opencode/big-pickle", "opencode/claude-opus-5"]);
+  it("keeps the OpenCode Go models the stored key buys, and drops the paid Zen ones it does not", async () => {
+    expect(await opencodeModelIds("go-key")).toEqual([
+      "opencode/big-pickle",
+      "opencode/spark-free",
+      "opencode-go/kimi-k3",
+    ]);
   });
 
-  it("keeps the OpenCode Go models when the user's own OpenCode sign-in is what lists them", async () => {
+  it("keeps the OpenCode Zen models when the user's own OpenCode sign-in is what lists them", async () => {
     expect(await opencodeModelIds(null)).toEqual([
       "opencode/big-pickle",
+      "opencode/spark-free",
       "opencode/claude-opus-5",
       "opencode-go/kimi-k3",
     ]);
@@ -252,11 +268,34 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       ]),
     ).toEqual([
       "opencode/muse-spark-1.3-contributor-free",
+      "opencode/big-pickle",
       "opencode/nemotron-3.5-lightning-free",
       "opencode/mimo-v2.5-free",
-      "opencode/big-pickle",
       "openai/gpt-5.3-codex-spark",
     ]);
+  });
+
+  it("keeps the CLI version with sign-in-required and no models when OpenCode reports no account", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => new FakeAgentClient(provider, "DONE", false, provider !== "opencode"),
+    });
+    await service.initialize();
+    // The version comes from the resolve step while the models come from the later discovery, so a
+    // connected CLI with no account keeps its version on the row while the catalog stays empty.
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({
+        id: "opencode",
+        state: "sign-in-required",
+        version: expect.any(String),
+        message: expect.stringContaining("OpenCode"),
+      }),
+    );
+    expect(service.listModels().filter((model) => model.provider === "opencode")).toEqual([]);
   });
 
   it("restarts OpenCode on a changed key before it reports the change", async () => {
@@ -264,37 +303,38 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     let storedKey: string | null = null;
     const clients: FakeAgentClient[] = [];
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "opencode",
-      (provider) => {
+      preferredProvider: "opencode",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({
-            data: ["opencode/big-pickle", "opencode-go/kimi-k3"].map((model) => ({ model })),
+            data: ["opencode/big-pickle", "opencode/claude-opus-5", "opencode-go/kimi-k3"].map((model) => ({
+              model,
+            })),
           });
           clients.push(client);
         }
         return client;
       },
-      {},
-      async () => undefined,
-      null,
-      null,
-      null,
-      { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
-    );
+      bundledExecutables: {},
+      prepareAgentWorkspace: async () => undefined,
+      hostedSites: null,
+      sidebarLayout: null,
+      preferredModel: null,
+      credentials: { apiKey: () => storedKey, customProviders: () => [], mcpServers: () => [] },
+    });
     await service.initialize();
 
     await service.changeProviderCredential("opencode", async () => {
-      storedKey = "zen-key";
+      storedKey = "go-key";
     });
 
-    // A CLI reads its key at spawn, so only a new process can list what the key buys. The Go
-    // model leaves the catalog only when that process is the one reporting it.
+    // A CLI reads its key at spawn, so only a new process can list what the key buys. The paid
+    // Zen model leaves the catalog only when that process is the one reporting it, while the
+    // free and Go models stay.
     expect(clients).toHaveLength(2);
     expect(clients[0]?.running).toBe(false);
     expect(
@@ -302,18 +342,23 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "opencode")
         .map((model) => model.id),
-    ).toEqual(["opencode/big-pickle"]);
+    ).toEqual(["opencode/big-pickle", "opencode-go/kimi-k3"]);
   });
 
   it("uses startup fallbacks when provider discovery is unavailable", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      client.modelList = () => {
-        throw new Error("Discovery unavailable");
-      };
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        client.modelList = () => {
+          throw new Error("Discovery unavailable");
+        };
+        return client;
+      },
     });
     const fallback = service.listModels();
     await service.initialize();
@@ -346,9 +391,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         if (failure) throw new Error("Discovery unavailable");
         return response;
       };
-      service = new AgentService(store, mailbox, fakeBrowser(), 30_000, provider, (candidate) =>
-        candidate === provider ? client : new FakeAgentClient(candidate),
-      );
+      service = createTestService({
+        store,
+        mailbox,
+        preferredProvider: provider,
+        clientFactory: (candidate) => (candidate === provider ? client : new FakeAgentClient(candidate)),
+      });
       await service.initialize();
       const catalog = () => service?.listModels().filter((model) => model.provider === provider);
       // A model the CLI marks hidden is still offered: the CLI runs it, so the picker lists it.
@@ -411,7 +459,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         { model: "gpt-6-astra", displayName: "GPT-6 Astra" },
       ],
     });
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+    });
     await service.initialize();
     expect(
       service
@@ -433,7 +486,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         { model: "claude-next", displayName: "Next" },
       ],
     });
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "claude", () => client);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "claude",
+      clientFactory: () => client,
+    });
     await service.initialize();
     expect(
       service
@@ -453,7 +511,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         ? { data: [{ model: "gpt-6-astra" }, { model: "gpt-5.6-sol" }], nextCursor: repeat ? "page-2" : null }
         : { data: [{ model: repeat ? "partial-result" : "gpt-5.6-sol" }], nextCursor: "page-2" };
     };
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", () => client);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+    });
     await service.initialize();
     expect(
       service
@@ -477,15 +540,20 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
     const openExternal = vi.fn(async () => undefined);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(
-        provider,
-        provider === "codex" ? "CODEX_DONE" : "CLAUDE_DONE",
-        true,
-        provider !== "codex",
-      );
-      if (provider === "codex") codexClients.push(client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(
+          provider,
+          provider === "codex" ? "CODEX_DONE" : "CLAUDE_DONE",
+          true,
+          provider !== "codex",
+        );
+        if (provider === "codex") codexClients.push(client);
+        return client;
+      },
     });
     await service.initialize();
 
@@ -544,10 +612,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env[pathVariable] = await createCli(root);
     const { store, mailbox } = stores(root);
     let clients = 0;
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, target, (provider) => {
-      const authenticated = provider === target ? clients > 0 : true;
-      if (provider === target) clients += 1;
-      return new FakeAgentClient(provider, "DONE", true, authenticated);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: target,
+      clientFactory: (provider) => {
+        const authenticated = provider === target ? clients > 0 : true;
+        if (provider === target) clients += 1;
+        return new FakeAgentClient(provider, "DONE", true, authenticated);
+      },
     });
     await service.initialize();
 
@@ -571,14 +644,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("restores the connect action when the login page cannot open", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider, "DONE", true, provider !== "codex"),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, "DONE", true, provider !== "codex"),
+    });
     await service.initialize();
 
     await expect(
@@ -592,10 +663,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("cancels a ChatGPT login that does not complete", async () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex");
-      if (provider === "codex") codexClients.push(client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex");
+        if (provider === "codex") codexClients.push(client);
+        return client;
+      },
     });
     await service.initialize();
     vi.useFakeTimers();
@@ -622,10 +698,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_CLAUDE_PATH = await createPendingFakeClaude(root);
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", true, false);
-      if (provider === "codex") codexClients.push(client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", true, false);
+        if (provider === "codex") codexClients.push(client);
+        return client;
+      },
     });
     await service.initialize();
 
@@ -679,10 +760,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps the active ChatGPT client until reconnect succeeds", async () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex" || codexClients.length === 0);
-      if (provider === "codex") codexClients.push(client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex" || codexClients.length === 0);
+        if (provider === "codex") codexClients.push(client);
+        return client;
+      },
     });
     await service.initialize();
     const activeClient = codexClients[0];
@@ -718,14 +804,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         process.env.OPENBOT_CLAUDE_PATH = await createPendingFakeClaude(root);
       }
       const { store, mailbox } = stores(root);
-      service = new AgentService(
+      service = createTestService({
         store,
         mailbox,
-        fakeBrowser(),
-        30_000,
-        target,
-        (provider) => new FakeAgentClient(provider),
-      );
+        preferredProvider: target,
+        clientFactory: (provider) => new FakeAgentClient(provider),
+      });
       await service.initialize();
       await service.connectProvider(target, async () => undefined);
       const install = vi.fn(async () => managed);
@@ -760,10 +844,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_CLAUDE_PATH = system.executable;
     const { store, mailbox } = stores(root);
     const clients: FakeAgentClient[] = [];
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "claude", (provider) => {
-      const client = new FakeAgentClient(provider);
-      if (provider === "claude") clients.push(client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "claude",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "claude") clients.push(client);
+        return client;
+      },
     });
     await service.initialize();
     const managed = await createFakeClaude(root);
@@ -783,19 +872,17 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
     const clients: FakeAgentClient[] = [];
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "claude",
-      (provider) => {
+      preferredProvider: "claude",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "", true, provider !== "claude" || clients.length === 0);
         if (provider === "claude") clients.push(client);
         return client;
       },
-      { claude: managed },
-    );
+      bundledExecutables: { claude: managed },
+    });
     await service.initialize();
     await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow();
     expect(clients[0]?.running).toBe(true);
@@ -808,23 +895,21 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("logs a provider's MCP server failure and raises the provider's own failures", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => {
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);
         return client;
       },
-      {},
-      async () => undefined,
-      null,
-      null,
-      null,
-      {
+      bundledExecutables: {},
+      prepareAgentWorkspace: async () => undefined,
+      hostedSites: null,
+      sidebarLayout: null,
+      preferredModel: null,
+      credentials: {
         apiKey: () => null,
         customProviders: () => [],
         // A server OpenBot configured. The user asked for this one here, so its failure is theirs
@@ -845,7 +930,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
           },
         ],
       },
-    );
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -875,10 +960,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("redacts an MCP credential a running provider still holds after the user removes the server", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const client = clients.get("codex");
@@ -919,10 +1009,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("redacts an MCP credential a long diagnostic quotes past the length a line is held to", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const client = clients.get("codex");
@@ -961,10 +1056,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("redacts an MCP credential a provider error quotes, not only a diagnostic", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const client = clients.get("codex");
@@ -1003,10 +1103,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps an MCP credential out of the provider status a crashed CLI leaves behind", async () => {
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const client = clients.get("codex");
@@ -1046,10 +1151,15 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -1080,16 +1190,95 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
   });
 
-  it("refuses to replace a CLI that is running a turn", async () => {
+  it.each([
+    "Grok Build usage balance exhausted",
+    "insufficient_quota",
+    "Your credit balance is too low to access the Anthropic API",
+    "You have exceeded your current quota",
+    "Billing hard limit has been reached",
+  ])("recognizes an exhausted provider usage limit: %s", (message) => {
+    expect(isUsageLimitDiagnostic(message)).toBe(true);
+  });
+
+  it.each([
+    "402 Payment Required",
+    "429 Too Many Requests",
+    "The provider failed to reach the model endpoint",
+    "Authentication failed",
+  ])("does not hide another provider failure: %s", (message) => {
+    expect(isUsageLimitDiagnostic(message)).toBe(false);
+  });
+
+  it("replaces Grok's repeated exhausted-balance errors with one usage refresh", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider, "", false),
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    const client = clients.get("grok");
+    if (!client) throw new Error("Grok did not start.");
+    client.accountRateLimits = {
+      rateLimits: {
+        limitId: "grok",
+        secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      },
+      rateLimitsByLimitId: null,
+    };
+    const usageReadsBefore = client.requests.filter((request) => request.method === "account/rateLimits/read").length;
+    events.length = 0;
+
+    client.emit(
+      "diagnostic",
+      '2026-09-18T08:54:24.476465Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
     );
+    client.emit(
+      "diagnostic",
+      '2026-09-18T08:54:24.476222Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
+    );
+    client.emit("notification", {
+      method: "error",
+      params: {
+        message:
+          'responses API error status=402 Payment Required error_message=Grok Build usage balance exhausted body_preview={"error":"Grok Build usage balance exhausted"} model_id=grok-4.6',
+      },
+    });
+
+    await waitFor(() => events.some((event) => event.type === "usage-changed"));
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
+    expect(client.requests.filter((request) => request.method === "account/rateLimits/read")).toHaveLength(
+      usageReadsBefore + 1,
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "usage-changed",
+        usage: expect.objectContaining({
+          limits: [expect.objectContaining({ id: "grok", secondary: expect.objectContaining({ usedPercent: 100 }) })],
+        }),
+      }),
+    );
+  });
+
+  it("refuses to replace a CLI that is running a turn", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -1110,14 +1299,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("keeps the old key while the provider is working on a turn", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider, "", false),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -1137,14 +1324,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("delivers messages again after a key change that could not be saved", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -1163,14 +1348,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("refuses to replace a CLI that is running a channel turn", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider, "", false),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+    });
     await service.initialize();
     await store.getOrCreate("chief");
     const actor = { id: "human", name: "Alex" };
@@ -1222,19 +1405,17 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
     let turnStartReached = false;
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) =>
+      preferredProvider: "codex",
+      clientFactory: (provider) =>
         new FakeAgentClient(provider, "", false, true, {}, async (method, target) => {
           if (method !== "turn/start" || target !== "codex") return;
           turnStartReached = true;
           await blocked;
         }),
-    );
+    });
     await service.initialize();
     void service.sendMessage({ agentId: "chief", text: "Keep working." });
     // The delivery has no turn id yet, and the client it is about to prompt must not be replaced.
@@ -1257,14 +1438,19 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     let compactionReached = false;
     let client: FakeAgentClient | undefined;
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const created = new FakeAgentClient(provider, "", true, true, {}, async (method, target) => {
-        if (method !== "thread/compact/start" || target !== "codex") return;
-        compactionReached = true;
-        await blocked;
-      });
-      if (provider === "codex") client = created;
-      return created;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const created = new FakeAgentClient(provider, "", true, true, {}, async (method, target) => {
+          if (method !== "thread/compact/start" || target !== "codex") return;
+          compactionReached = true;
+          await blocked;
+        });
+        if (provider === "codex") client = created;
+        return created;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -1301,14 +1487,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     const claude = await createUpdatableFakeClaude(root, "2.1.250");
     process.env.OPENBOT_CLAUDE_PATH = claude.executable;
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "claude",
-      (provider) => new FakeAgentClient(provider),
-    );
+      preferredProvider: "claude",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
     const running = service;
     const started: string[] = [];
     service.on("event", (event) => {
@@ -1349,14 +1533,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       const claude = await createUpdatableFakeClaude(root, "2.1.250");
       process.env.OPENBOT_CLAUDE_PATH = claude.executable;
       const { store, mailbox } = stores(root);
-      service = new AgentService(
+      service = createTestService({
         store,
         mailbox,
-        fakeBrowser(),
-        30_000,
-        "codex",
-        (provider) => new FakeAgentClient(provider, "", false, claudeSignedIn || provider !== "claude"),
-      );
+        preferredProvider: "codex",
+        clientFactory: (provider) => new FakeAgentClient(provider, "", false, claudeSignedIn || provider !== "claude"),
+      });
       const running = service;
       const events: AgentEvent[] = [];
       service.on("event", (event) => events.push(event));
@@ -1378,14 +1560,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("keeps the owner of a CLI whose provider is signed out", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider, undefined, true, provider !== "claude"),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, undefined, true, provider !== "claude"),
+    });
     await service.initialize();
 
     // Signed out, the provider keeps no client, so the row would name no owner - and an unowned CLI
@@ -1398,15 +1578,13 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("reports installation failure without replacing the working client", async () => {
     const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "claude",
-      (provider) => new FakeAgentClient(provider),
-      { claude: managed },
-    );
+      preferredProvider: "claude",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+      bundledExecutables: { claude: managed },
+    });
     await service.initialize();
     await expect(
       service.updateProviderCli("claude", async () => {
@@ -1435,25 +1613,23 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
     options: { preferred?: AgentProvider; autoComplete?: boolean; openCodeSignedIn?: boolean } = {},
   ): { service: AgentService; store: AgentStore } {
     const { store, mailbox } = stores(root);
-    const service = new AgentService(
+    const service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      options.preferred ?? "opencode",
-      (provider) => {
+      preferredProvider: options.preferred ?? "opencode",
+      clientFactory: (provider) => {
         const signedIn = provider !== "opencode" || (options.openCodeSignedIn ?? true);
         const client = new FakeAgentClient(provider, "DONE", options.autoComplete ?? true, signedIn);
         if (provider === "opencode") clients.push(client);
         return client;
       },
-      {},
-      async () => undefined,
-      null,
-      null,
-      null,
-      { apiKey: () => null, customProviders: () => endpoints, mcpServers: () => [] },
-    );
+      bundledExecutables: {},
+      prepareAgentWorkspace: async () => undefined,
+      hostedSites: null,
+      sidebarLayout: null,
+      preferredModel: null,
+      credentials: { apiKey: () => null, customProviders: () => endpoints, mcpServers: () => [] },
+    });
     return { service, store };
   }
 
@@ -1529,7 +1705,7 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
         id: "opencode",
         state: "sign-in-required",
         message:
-          "OpenCode could not start a session. Check your custom provider's base URL and API key, or add an OpenCode Zen key if you also use OpenCode's own models.",
+          "OpenCode could not start a session. Check your custom provider's base URL and API key, or add an OpenCode Go key if you also use OpenCode's own models.",
       }),
     );
     // Signed out, OpenCode keeps no client. A save must not read as a failure: the next spawn - the

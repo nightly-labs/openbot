@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  chatContextMenuItems,
   isCloseBrowserTabShortcut,
+  isCollapseBrowserShortcut,
   isGlobalSearchShortcut,
   isSelectAllShortcut,
   isToggleDevToolsShortcut,
@@ -44,6 +46,20 @@ describe("isCloseBrowserTabShortcut", () => {
   });
 });
 
+describe("isCollapseBrowserShortcut", () => {
+  it("accepts a bare Escape key-down", () => {
+    expect(isCollapseBrowserShortcut(input({ key: "Escape" }))).toBe(true);
+  });
+
+  it("does not claim modified shortcuts or key-up events", () => {
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", type: "keyUp" }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", meta: true }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", control: true }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", alt: true }))).toBe(false);
+    expect(isCollapseBrowserShortcut(input({ key: "Escape", shift: true }))).toBe(false);
+  });
+});
+
 describe("isSelectAllShortcut", () => {
   it("accepts Control+A and Command+A", () => {
     expect(isSelectAllShortcut(input({ control: true, key: "a" }))).toBe(true);
@@ -69,5 +85,31 @@ describe("isToggleDevToolsShortcut", () => {
     expect(isToggleDevToolsShortcut(input({ key: "i", control: true }))).toBe(false);
     expect(isToggleDevToolsShortcut(input({ key: "i", meta: true, alt: true, shift: true }))).toBe(false);
     expect(isToggleDevToolsShortcut(input({ key: "F12", type: "keyUp" }))).toBe(false);
+  });
+});
+
+describe("chatContextMenuItems", () => {
+  it("offers copy and select-all for selected chat text", () => {
+    expect(chatContextMenuItems({ selectionText: "hello", isEditable: false, linkURL: "" })).toEqual([
+      "copy",
+      "select-all",
+    ]);
+  });
+
+  it("offers only select-all in an empty editable field", () => {
+    expect(chatContextMenuItems({ selectionText: "  ", isEditable: true, linkURL: "" })).toEqual(["select-all"]);
+  });
+
+  it("puts copy-link first when right-clicking a link", () => {
+    expect(chatContextMenuItems({ selectionText: "docs", isEditable: false, linkURL: "https://example.com" })).toEqual([
+      "copy-link",
+      "separator",
+      "copy",
+      "select-all",
+    ]);
+  });
+
+  it("keeps no menu where there is nothing to copy", () => {
+    expect(chatContextMenuItems({ selectionText: "", isEditable: false, linkURL: "" })).toEqual([]);
   });
 });

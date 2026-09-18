@@ -184,4 +184,7 @@ export type ExternalDestination =
   | "claude-install"
   | "claude-sign-in"
   | "feedback"
-  | "message";
+  | "message"
+  // Not a page: the macOS pane that grants OpenBot screen recording. It is here rather than behind
+  // its own endpoint because the destination is still a fixed address the renderer only names.
+  | "mac-screen-recording";

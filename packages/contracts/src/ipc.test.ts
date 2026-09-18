@@ -793,11 +793,11 @@ describe("renderer-to-main boundary guards", () => {
         name: "plan.xlsx",
         mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("accepts every file preview kind that the panel can show, and nothing else", () => {
-    for (const kind of ["markdown", "text", "image", "pdf", "audio", "video", "none"]) {
+    for (const kind of ["markdown", "text", "image", "pdf", "audio", "video", "spreadsheet", "none"]) {
       expect(isFilePreviewKind(kind)).toBe(true);
     }
     expect(isFilePreviewKind("html")).toBe(false);
@@ -849,6 +849,9 @@ describe("renderer-to-main boundary guards", () => {
     };
     expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [delivery] })).toBe(true);
     expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [{ ...delivery, status: "pending" }] })).toBe(false);
+    // `editing` is optional: a released Team API adapter projects a fixed key list and drops it.
+    expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [{ ...delivery, editing: true }] })).toBe(true);
+    expect(isQueueSnapshot({ agentId: "bot-1", deliveries: [{ ...delivery, editing: "yes" }] })).toBe(false);
 
     const receipt = {
       messageId: "message-1",

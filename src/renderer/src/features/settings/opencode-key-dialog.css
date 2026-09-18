@@ -1,7 +1,10 @@
 /*
- * The OpenCode Zen key dialog. It opens on top of the settings modal, so its layer is one above
+ * The OpenCode Go key dialog. It opens on top of the settings modal, so its layer is one above
  * the shared dialog layer rather than the same one -- both portals are children of `body`, and
  * relying on insertion order alone would break the first time a caller mounts it from elsewhere.
+ *
+ * Minimal on purpose: left-aligned title with one dynamic description line instead of stacked
+ * notice cards, matching the small confirm dialogs.
  */
 
 .opencode-key-backdrop {
@@ -15,13 +18,13 @@
 }
 
 .opencode-key-dialog {
-  width: min(420px, 100%);
+  width: min(400px, 100%);
   max-height: calc(100dvh - var(--openbot-space-6) * 2);
   overflow-y: auto;
   outline: 0;
   border-radius: var(--openbot-radius-xl);
   background: var(--openbot-bg-control);
-  padding: var(--openbot-space-8);
+  padding: var(--openbot-space-6);
   color: var(--openbot-text-primary);
   animation: opencode-key-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
@@ -29,14 +32,8 @@
 .opencode-key-header {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  text-align: center;
-}
-
-.opencode-key-logo {
-  width: calc(var(--openbot-space-8) + var(--openbot-space-2));
-  height: calc(var(--openbot-space-8) + var(--openbot-space-2));
+  align-items: stretch;
+  gap: var(--openbot-space-1);
 }
 
 .opencode-key-title {
@@ -54,19 +51,20 @@
   line-height: var(--openbot-leading-md);
 }
 
-.opencode-key-saved {
-  display: block;
-  margin-top: var(--openbot-space-6);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-hover);
-  padding: var(--openbot-space-2) var(--openbot-space-3);
+.opencode-key-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success);
 }
 
 .opencode-key-form {
   display: flex;
   flex-direction: column;
   gap: var(--openbot-space-4);
-  margin: var(--openbot-space-6) 0 0;
+  margin: var(--openbot-space-4) 0 0;
 }
 
 .opencode-key-actions {
@@ -74,16 +72,6 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--openbot-space-2);
-}
-
-.opencode-key-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--openbot-space-2);
-  margin-top: var(--openbot-space-6);
-  border-top: 1px solid var(--openbot-border);
-  padding-top: var(--openbot-space-4);
 }
 
 @keyframes opencode-key-backdrop-in {

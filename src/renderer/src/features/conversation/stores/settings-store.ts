@@ -1,7 +1,7 @@
 import type { AgentModelId, AgentProviderId, AgentReasoningEffort, UpdateAgentInput } from "@openbot/contracts/ipc";
 import type { AgentRuntimeSettings, AgentRuntimeSettingsPatch } from "../AgentSettingsPanel";
 import { agentConversationKey } from "../conversation-keys";
-import type { ConversationProps } from "../conversation-types";
+import type { ConversationProps, ConversationTarget } from "../conversation-types";
 
 export function runtimeSettingsEqual(left: AgentRuntimeSettings, right: AgentRuntimeSettings): boolean {
   return (
@@ -34,7 +34,7 @@ export interface SettingsStoreDeps {
   setSettingsModel: (model: AgentModelId) => void;
   settingsReasoning: () => AgentReasoningEffort;
   setSettingsReasoning: (effort: AgentReasoningEffort) => void;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   viewIsMounted: () => boolean;
   saveAgentPatch: (updates: Omit<UpdateAgentInput, "agentId">, targetAgentId?: string) => Promise<boolean>;
 }
@@ -48,13 +48,15 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
   ): Promise<boolean> {
     const agentId = targetAgentId;
     if (!agentId) return false;
+    const serverId = deps.props.server?.id ?? "local";
+    const target = { agentId, serverId };
     // Both maps live on the controller, which outlives one server, so the key
     // has to say which server the settings belong to.
-    const settingsKey = agentConversationKey(deps.props.server?.id ?? "local", agentId);
+    const settingsKey = agentConversationKey(serverId, agentId);
     const previousAttempt = deps.runtimeSettingsAttempts.get(settingsKey);
     const generation = (previousAttempt?.generation ?? 0) + 1;
     deps.runtimeSettingsAttempts.set(settingsKey, { generation, pending: true, settings });
-    if (errorMessage) deps.setComposerError(null);
+    if (errorMessage) deps.setComposerError(null, target);
 
     const previousSave = deps.runtimeSettingsSaveTails.get(settingsKey);
     let releaseSave!: (baseValid: boolean) => void;
@@ -107,7 +109,7 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     deps.setSettingsProvider(activeAgent.provider);
     deps.setSettingsModel(activeAgent.model);
     deps.setSettingsReasoning(activeAgent.reasoningEffort);
-    if (errorMessage) deps.setComposerError(errorMessage);
+    if (errorMessage) deps.setComposerError(errorMessage, target);
     return false;
   }
 

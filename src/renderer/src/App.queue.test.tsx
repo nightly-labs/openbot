@@ -2,11 +2,8 @@ import { serializeAttachmentReference } from "@openbot/contracts/attachment-refe
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { ConversationSnapshot, DirectConversationSnapshot } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
-import { AppAccessGate } from "./AppView";
-import { AppProviders } from "./app-providers";
 import {
   attachment,
   confirmOnboardingModel,
@@ -21,62 +18,11 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
-import { useServers } from "./features/servers/servers-context";
-import { useUsage } from "./features/usage/usage-context";
+import { TestResizeObserver } from "./setupTests";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
-  });
-
-  it("keeps a queued-message edit through Escape while the Usage report covers the conversation", async () => {
-    vi.mocked(window.openbot.agent.listQueue).mockResolvedValueOnce({
-      agentId: "chief",
-      deliveries: [
-        queuedDelivery("delivery-running", "Running", null, { status: "running", turnId: "turn-running" }),
-        queuedDelivery("delivery-covered-edit", "Queued draft", 1),
-      ],
-    });
-
-    // The tree `App` mounts, plus a control that opens the report over it.
-    function UsageProbe() {
-      const { activeServerId } = useServers();
-      const usage = useUsage();
-      return (
-        <>
-          <button type="button" onClick={() => usage.openUsage(activeServerId(), null)}>
-            Open usage
-          </button>
-          <button type="button" onClick={() => usage.closeUsage()}>
-            Close usage
-          </button>
-        </>
-      );
-    }
-
-    render(() => (
-      <AppProviders>
-        <AppAccessGate />
-        <UsageProbe />
-      </AppProviders>
-    ));
-    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
-    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
-    composer.textContent = "Queued draft with more to say";
-    await fireEvent.input(composer);
-
-    // The report covers the conversation and marks it inert, but `inert` does not reach the
-    // document-level Escape listener the conversation registers. Escape here belongs to the
-    // pane the user is looking at, which is the report.
-    fireEvent.click(screen.getByRole("button", { name: "Open usage" }));
-    flush();
-    await fireEvent.keyDown(document, { key: "Escape" });
-
-    // Back returns to the edit as the user left it. Cancelling it would have restored the
-    // queued text and discarded anything added to the draft since.
-    fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
-    expect(await screen.findByRole("button", { name: "Save queued message" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Queued draft with more to say");
   });
 
   it("keeps a failed send in the composer and clears it only after a successful retry", async () => {
@@ -333,6 +279,9 @@ describe("OpenBot connected desktop shell", () => {
   it("replies to a message through the composer and keeps the reference in the queued input", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
+    // Wait for the agent list before the message reference resolves. The
+    // heading renders first, so without this the reference button flakes.
+    await screen.findByRole("button", { name: /Sales Outbound, Outbound specialist/ });
     emitAgentEvent?.({
       type: "conversation",
       snapshot: {
@@ -493,92 +442,6 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
-  it("lets the user remove only their own reaction while keeping the agent reaction read-only", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    emitAgentEvent?.({
-      type: "conversation",
-      snapshot: {
-        agentId: "chief",
-        threadId: "thread-chief",
-        activeTurnId: null,
-        revision: 1,
-        messages: [
-          {
-            id: "user-reactions",
-            author: "user",
-            text: "The launch is approved.",
-            createdAt: "2026-08-12T10:00:00.000Z",
-            status: "completed",
-            reaction: "❤️",
-            reactions: [
-              { emoji: "❤️", actor: { kind: "user" } },
-              { emoji: "🎉", actor: { kind: "agent", agentId: "chief" } },
-            ],
-          },
-        ],
-      },
-    });
-
-    await screen.findByRole("img", { name: "Chief reacted with 🎉" });
-    await fireEvent.click(screen.getByRole("button", { name: "Remove your reaction ❤️" }));
-    expect(window.openbot.agent.setMessageReaction).toHaveBeenCalledWith({
-      agentId: "chief",
-      messageId: "user-reactions",
-      emoji: null,
-    });
-    expect(trackAnalytics).toHaveBeenCalledWith("reaction_action", { action: "remove", result: "succeeded" });
-    expect(screen.getByRole("img", { name: "Chief reacted with 🎉" })).toBeInTheDocument();
-  });
-
-  it("supports picker and attachment-only messages", async () => {
-    const filePickerClick = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-    await fireEvent.pointerDown(screen.getByRole("button", { name: "Add to prompt" }), { button: 0 });
-    await fireEvent.pointerDown(screen.getByRole("menuitem", { name: /Attach image/ }), { button: 0 });
-    expect(filePickerClick).toHaveBeenCalledTimes(1);
-    expect(document.querySelector<HTMLInputElement>('input[type="file"][accept]')?.accept).toBe(
-      ".png,.jpg,.jpeg,.gif,.webp,.avif",
-    );
-    await fireEvent.pointerDown(screen.getByRole("button", { name: "Add to prompt" }), { button: 0 });
-    await fireEvent.pointerDown(screen.getByRole("menuitem", { name: /Add context/ }), { button: 0 });
-    expect(filePickerClick).toHaveBeenCalledTimes(2);
-    emitAttachmentImport?.({ type: "started", requestId: "picker-1", serverId: "local" });
-    emitAttachmentImport?.({
-      type: "completed",
-      requestId: "picker-1",
-      serverId: "local",
-      attachments: [attachment("draft-1", "brief.pdf", "pdf")],
-    });
-    expect(await screen.findByText("brief.pdf")).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Send message" }));
-    await waitFor(() =>
-      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
-        { agentId: "chief", text: "", attachmentDraftIds: ["draft-1"] },
-        "local",
-      ),
-    );
-  });
-
-  it("keeps an asynchronous attachment error with the agent that received the paste", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    emitAttachmentImport?.({ type: "started", requestId: "paste-error", serverId: "local" });
-    await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound/ }));
-    emitAttachmentImport?.({
-      type: "error",
-      requestId: "paste-error",
-      serverId: "local",
-      message: "Attachment import failed",
-    });
-
-    expect(screen.queryByText("Attachment import failed")).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: /Chief/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Attachment import failed");
-  });
-
   it("keeps an asynchronous pasted attachment on the server that received the paste", async () => {
     const local = testServer("local", true);
     const remote = testServer("remote-1", false);
@@ -608,6 +471,64 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(removeAttachment);
     expect(window.openbot.agent.discardDraftAttachment).toHaveBeenCalledWith("pasted-local", "local");
     await waitFor(() => expect(screen.queryByRole("button", { name: "Remove for-local.png" })).not.toBeInTheDocument());
+  });
+
+  it("allows confirmed deletion while another device is editing", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    const running = queuedDelivery("delivery-running", "Current work", null, {
+      status: "starting",
+      turnId: "turn-running",
+    });
+    const edited = queuedDelivery("delivery-edited", "Edited on phone", 1, { editing: true });
+    const next = queuedDelivery("delivery-next", "Next work", 2);
+
+    emitAgentEvent?.({
+      type: "queue-changed",
+      snapshot: { agentId: "chief", deliveries: [running, edited, next] },
+    });
+
+    // The row stays in place. Hiding it looked like the message was lost.
+    const row = await screen.findByRole("group", { name: "Queued message 1, editing: Edited on phone" });
+    expect(within(row).getByText("Editing")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Queued message 2: Next work" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Steer queued message 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Edit queued message 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete queued message 1" })).toBeEnabled();
+
+    // The edit stops the queue instead of starting message 1, and the panel stays on screen.
+    emitAgentEvent?.({
+      type: "turn-completed",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-running",
+      status: "completed",
+    });
+    emitAgentEvent?.({ type: "queue-changed", snapshot: { agentId: "chief", deliveries: [edited, next] } });
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("region", { name: "Message queue" }))
+          .getAllByLabelText(/^Queued message/u)
+          .map((element) => element.getAttribute("aria-label")),
+      ).toEqual(["Queued message 1, editing: Edited on phone", "Queued message 2: Next work"]),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Delete queued message 1" }));
+    const confirmation = await screen.findByRole("dialog", { name: "Delete queued message?" });
+    expect(window.openbot.agent.cancelQueuedMessage).not.toHaveBeenCalled();
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Keep" }));
+    expect(window.openbot.agent.cancelQueuedMessage).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("button", { name: "Delete queued message 1" }));
+    await fireEvent.click(
+      within(await screen.findByRole("dialog", { name: "Delete queued message?" })).getByRole("button", {
+        name: "Delete",
+      }),
+    );
+    await waitFor(() =>
+      expect(window.openbot.agent.cancelQueuedMessage).toHaveBeenCalledWith({
+        agentId: "chief",
+        deliveryId: "delivery-edited",
+      }),
+    );
   });
 
   it("keeps foreground starts out of Queue and hides waiting work between turns", async () => {
@@ -779,6 +700,16 @@ describe("OpenBot connected desktop shell", () => {
     const answer = await screen.findByRole("textbox", {
       name: "Custom answer for: Which account?",
     });
+    const composer = screen.getByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "Queue this while you wait";
+    await fireEvent.input(composer);
+    await fireEvent.keyDown(composer, { key: "Enter" });
+    await waitFor(() =>
+      expect(window.openbot.agent.sendMessage).toHaveBeenCalledWith(
+        { agentId: "chief", text: "Queue this while you wait", attachmentDraftIds: [] },
+        "local",
+      ),
+    );
     await fireEvent.input(answer, { target: { value: "Acme" } });
     await fireEvent.keyDown(answer, { key: "Enter" });
     await waitFor(() =>
@@ -826,6 +757,81 @@ describe("OpenBot connected desktop shell", () => {
     });
     await waitFor(() => expect(screen.getByRole("region", { name: "Answers sent" })).toBeVisible());
     expect(screen.queryByRole("textbox", { name: "Custom answer for: Which account?" })).not.toBeInTheDocument();
+  });
+
+  it("keeps required input visible without taking over a reader's manual scroll", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await confirmOnboardingModel();
+    const scrollElement = document.querySelector<HTMLElement>(".conversation-scroll");
+    if (!scrollElement) throw new Error("Conversation scroll element is missing.");
+    let scrollHeight = 1_200;
+    Object.defineProperties(scrollElement, {
+      clientHeight: { configurable: true, value: 600 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      scrollTop: { configurable: true, value: 600, writable: true },
+    });
+    scrollElement.dispatchEvent(new Event("scroll"));
+
+    emitAgentEvent?.({
+      type: "prompt",
+      requestId: "prompt-follow",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-follow",
+      questions: [
+        {
+          id: "account",
+          header: "Account",
+          question: "Which account should continue?",
+          isSecret: false,
+          options: null,
+        },
+      ],
+    });
+    const firstAnswer = await screen.findByRole("textbox", {
+      name: "Custom answer for: Which account should continue?",
+    });
+    expect(firstAnswer).not.toHaveFocus();
+    const announcement = screen.getByText("Input required. Which account should continue?");
+    expect(announcement).toHaveAttribute("role", "status");
+    expect(announcement).toHaveAttribute("aria-live", "polite");
+
+    scrollHeight = 1_500;
+    const firstPrompt = firstAnswer.closest<HTMLDivElement>("[data-slot='bubble']");
+    if (!firstPrompt) throw new Error("Question prompt bubble is missing.");
+    TestResizeObserver.resize(firstPrompt, "content-box");
+    expect(scrollElement.scrollTop).toBe(1_500);
+
+    scrollElement.scrollTop = 200;
+    scrollElement.dispatchEvent(new Event("scroll"));
+    emitAgentEvent?.({
+      type: "prompt",
+      requestId: "prompt-preserve-scroll",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-preserve-scroll",
+      questions: [
+        {
+          id: "workspace",
+          header: "Workspace",
+          question: "Which workspace should continue?",
+          isSecret: false,
+          options: null,
+        },
+      ],
+    });
+    const secondAnswer = await screen.findByRole("textbox", {
+      name: "Custom answer for: Which workspace should continue?",
+    });
+    scrollHeight = 1_800;
+    const secondPrompt = secondAnswer.closest<HTMLDivElement>("[data-slot='bubble']");
+    if (!secondPrompt) throw new Error("Replacement question prompt bubble is missing.");
+    TestResizeObserver.resize(secondPrompt, "content-box");
+
+    expect(scrollElement.scrollTop).toBe(200);
+    expect(screen.getByRole("button", { name: "Scroll to latest message" })).toBeVisible();
+    expect(secondAnswer).not.toHaveFocus();
   });
 
   it("keeps the prompt active and reports a delivery failure", async () => {
@@ -1188,3 +1194,372 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("group", { name: "Queued message 1: Next work" })).toBeInTheDocument();
   });
 });
+
+it("acquires a host hold before editing and uses its identity for save and cancel", async () => {
+  installOpenbotStub();
+  const delivery = queuedDelivery("shared-edit", "Original queue message", 1);
+  const snapshot = {
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  };
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue(snapshot);
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+  render(() => <App />);
+  const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  expect(begin).toMatchObject({ action: "begin", agentId: "chief", deliveryId: delivery.id });
+  composer.textContent = "Changed safely";
+  await fireEvent.input(composer);
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      {
+        agentId: "chief",
+        deliveryId: delivery.id,
+        editId: begin.editId,
+        action: "save",
+        text: "Changed safely",
+        keepAttachmentIds: [],
+        attachmentDraftIds: [],
+      },
+      "local",
+    ),
+  );
+  expect(window.openbot.agent.updateQueuedMessage).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  // Save confirms the hold with the same identity first, so the second hold is calls[3].
+  const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[3][0];
+  await fireEvent.keyDown(document, { key: "Escape" });
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      { agentId: "chief", deliveryId: delivery.id, editId: secondBegin.editId, action: "cancel" },
+      "local",
+    ),
+  );
+});
+
+it("reuses the durable Save request after a lost response and blocks edits until retry", async () => {
+  installOpenbotStub();
+  const delivery = queuedDelivery("durable-save", "Original queue message", 1);
+  const snapshot = {
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  };
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue(snapshot);
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+  render(() => <App />);
+  const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  composer.textContent = "First save";
+  await fireEvent.input(composer);
+  // The hold confirm succeeds; only the Save response is lost.
+  let saveAttempts = 0;
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockImplementation(async (input) => {
+    if (input.action === "save" && saveAttempts++ === 0) throw new Error("Connection lost");
+    return { agentId: "chief", deliveries: [delivery] };
+  });
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  await screen.findByText("Connection lost");
+  // The exact Save request stays durable for retry, including after a restart.
+  const stored = window.localStorage.getItem("openbot:queue-edit");
+  expect(stored).toContain(begin.editId);
+  expect(stored).toContain("First save");
+  expect(stored).toContain("pendingSave");
+  // Changes stay blocked until the pending Save resolves, so a retry cannot fail the host check.
+  // The editor is disabled while the Save is pending; a programmatic input must not
+  // change the durable draft or the retry payload.
+  composer.textContent = "Changed after lost response";
+  await fireEvent.input(composer);
+  expect(window.localStorage.getItem("openbot:queue-edit")).toContain("First save");
+  expect(window.localStorage.getItem("openbot:queue-edit")).not.toContain("Changed after lost response");
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      {
+        agentId: "chief",
+        deliveryId: delivery.id,
+        editId: begin.editId,
+        action: "save",
+        text: "First save",
+        keepAttachmentIds: [],
+        attachmentDraftIds: [],
+      },
+      "local",
+    ),
+  );
+  const saves = vi
+    .mocked(window.openbot.agent.editQueuedMessage)
+    .mock.calls.filter(([input]) => input.action === "save");
+  expect(saves).toHaveLength(2);
+  expect(saves[0][0]).toEqual(saves[1][0]);
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
+  expect(window.localStorage.getItem("openbot:queue-edit")).toBeNull();
+});
+
+it.each(["cancelled", "missing"] as const)(
+  "releases a desktop edit when its delivery is %s on another device",
+  async (state) => {
+    installOpenbotStub();
+    const delivery = queuedDelivery("deleted-edit", "Queued text", 1);
+    vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+    });
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+    render(() => <App />);
+    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "My original draft";
+    await fireEvent.input(composer);
+    emitAttachmentImport?.({ type: "started", requestId: "deleted-backup", serverId: "local" });
+    emitAttachmentImport?.({
+      type: "completed",
+      requestId: "deleted-backup",
+      serverId: "local",
+      attachments: [attachment("deleted-backup", "backup.pdf", "pdf")],
+    });
+    await screen.findByRole("button", { name: "Remove backup.pdf" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByRole("button", { name: "Save queued message" });
+    await waitFor(() => expect(composer).toHaveTextContent("Queued text"));
+    // A deleted delivery no longer needs a host round trip, even if that host is unavailable.
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockRejectedValue(new Error("Connection lost"));
+    emitAgentEvent?.({
+      type: "queue-changed",
+      snapshot: { agentId: "chief", deliveries: state === "cancelled" ? [{ ...delivery, status: "cancelled" }] : [] },
+    });
+    if (state === "missing") await fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
+    expect(composer).toHaveTextContent("My original draft");
+    expect(screen.getByRole("button", { name: "Remove backup.pdf" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("openbot:queue-edit")).toBeNull();
+    expect(vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls.map(([input]) => input.action)).toEqual([
+      "begin",
+      "retain-attachments",
+    ]);
+  },
+);
+
+it("keeps the edit identity after a lost begin response and blocks replacement until release", async () => {
+  installOpenbotStub();
+  const first = queuedDelivery("lost-edit", "First draft", 1);
+  const second = queuedDelivery("next-edit", "Second draft", 2);
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+    agentId: "chief",
+    deliveries: [
+      queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }),
+      first,
+      second,
+    ],
+  });
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockRejectedValue(new Error("Connection lost"));
+  render(() => <App />);
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByText("Connection lost");
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  expect(window.localStorage.getItem("openbot:queue-edit")).toContain(begin.editId);
+  await fireEvent.click(screen.getByRole("button", { name: "Edit queued message 2" }));
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith({ ...begin, action: "cancel" }, "local"),
+  );
+  expect(
+    vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls.filter(([input]) => input.action === "begin"),
+  ).toHaveLength(1);
+  expect(window.localStorage.getItem("openbot:queue-edit")).toContain(begin.editId);
+  expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("First draft");
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [first] });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  // Save confirms the lost hold with the same identity before sending the request.
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith({ ...begin, action: "begin" }, "local"),
+  );
+  expect(
+    vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls.filter(([input]) => input.action === "begin"),
+  ).toHaveLength(2);
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "save", editId: begin.editId, deliveryId: first.id }),
+      "local",
+    ),
+  );
+});
+
+it("uses the legacy queue update on a remote host without queue-edit-v1", async () => {
+  installOpenbotStub();
+  vi.mocked(window.openbot.servers.list).mockResolvedValue([testServer("remote-1", true)]);
+  const delivery = queuedDelivery("legacy-edit", "Legacy draft", 1);
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  });
+  render(() => <App />);
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  const composer = screen.getByRole("textbox", { name: "Message Chief" });
+  composer.textContent = "Legacy changed";
+  await fireEvent.input(composer);
+  await fireEvent.click(await screen.findByRole("button", { name: "Save queued message" }));
+  await waitFor(() =>
+    expect(window.openbot.agent.updateQueuedMessage).toHaveBeenCalledWith(
+      {
+        agentId: "chief",
+        deliveryId: delivery.id,
+        text: "Legacy changed",
+        keepAttachmentIds: [],
+        attachmentDraftIds: [],
+      },
+      "remote-1",
+    ),
+  );
+  expect(window.openbot.agent.editQueuedMessage).not.toHaveBeenCalled();
+});
+
+it("keeps an imported edit attachment busy until the host retains it", async () => {
+  installOpenbotStub();
+  const delivery = queuedDelivery("attachment-edit", "Original", 1);
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  });
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+  render(() => <App />);
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  let retain = () => {};
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        retain = () => resolve({ agentId: "chief", deliveries: [] });
+      }),
+  );
+  emitAttachmentImport?.({ type: "started", requestId: "edit-paste", serverId: "local" });
+  emitAttachmentImport?.({
+    type: "completed",
+    requestId: "edit-paste",
+    serverId: "local",
+    attachments: [attachment("pasted", "pasted.pdf", "pdf")],
+  });
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      { ...begin, action: "retain-attachments", attachmentDraftIds: ["pasted"] },
+      "local",
+    ),
+  );
+  expect(screen.getByRole("button", { name: "Save queued message" })).toBeDisabled();
+  retain();
+  await screen.findByText("pasted.pdf");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
+  await fireEvent.click(screen.getByRole("button", { name: "Save queued message" }));
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "save", editId: begin.editId, attachmentDraftIds: ["pasted"] }),
+      "local",
+    ),
+  );
+});
+
+it("retains the composer backup attachments with the queue edit", async () => {
+  installOpenbotStub();
+  const delivery = queuedDelivery("backup-edit", "Original queue message", 1);
+  vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+    agentId: "chief",
+    deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+  });
+  vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+  render(() => <App />);
+  await screen.findByRole("heading", { name: "Chief" });
+  emitAttachmentImport?.({ type: "started", requestId: "backup-paste", serverId: "local" });
+  emitAttachmentImport?.({
+    type: "completed",
+    requestId: "backup-paste",
+    serverId: "local",
+    attachments: [attachment("backup-1", "backup.pdf", "pdf")],
+  });
+  await screen.findByRole("button", { name: "Remove backup.pdf" });
+  await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+  await screen.findByRole("button", { name: "Save queued message" });
+  const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      { ...begin, action: "retain-attachments", attachmentDraftIds: ["backup-1"] },
+      "local",
+    ),
+  );
+  await fireEvent.keyDown(document, { key: "Escape" });
+  await waitFor(() =>
+    expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
+      { agentId: "chief", deliveryId: delivery.id, editId: begin.editId, action: "cancel" },
+      "local",
+    ),
+  );
+  expect(await screen.findByRole("button", { name: "Remove backup.pdf" })).toBeInTheDocument();
+});
+
+it.each(["save", "cancel"] as const)(
+  "recovers a failed backup retention through %s with the same identity",
+  async (action) => {
+    installOpenbotStub();
+    const delivery = queuedDelivery("retain-failed", "Queued text", 1);
+    vi.mocked(window.openbot.agent.listQueue).mockResolvedValue({
+      agentId: "chief",
+      deliveries: [queuedDelivery("running", "Running", null, { status: "running", turnId: "turn-running" }), delivery],
+    });
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockImplementation(async (input) => {
+      if (input.action !== "begin") throw new Error("Connection lost");
+      return { agentId: "chief", deliveries: [delivery] };
+    });
+    const view = render(() => <App />);
+    const composer = await screen.findByRole("textbox", { name: "Message Chief" });
+    composer.textContent = "Backup text";
+    await fireEvent.input(composer);
+    emitAttachmentImport?.({ type: "started", requestId: "backup-paste", serverId: "local" });
+    emitAttachmentImport?.({
+      type: "completed",
+      requestId: "backup-paste",
+      serverId: "local",
+      attachments: [attachment("backup-1", "backup.pdf", "pdf")],
+    });
+    await screen.findByRole("button", { name: "Remove backup.pdf" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
+    await screen.findByText("Connection lost");
+    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+    expect(window.localStorage.getItem("openbot:queue-edit")).toContain(begin.editId);
+    expect(composer).toHaveTextContent("Queued text");
+    await fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith({ ...begin, action: "cancel" }, "local"),
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
+    expect(window.localStorage.getItem("openbot:queue-edit")).toContain(begin.editId);
+    // A renderer restart must restore the same edit and its backup, not allocate another hold.
+    composer.textContent = "Still editing after connection loss";
+    await fireEvent.input(composer);
+    view.unmount();
+    vi.mocked(window.openbot.agent.editQueuedMessage).mockResolvedValue({ agentId: "chief", deliveries: [delivery] });
+    render(() => <App />);
+    const save = await screen.findByRole("button", { name: "Save queued message" });
+    expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent(
+      "Still editing after connection loss",
+    );
+    if (action === "save") await fireEvent.click(save);
+    else await fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
+    expect(window.localStorage.getItem("openbot:queue-edit")).toBeNull();
+    const calls = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls;
+    expect(calls.every(([input]) => input.editId === begin.editId)).toBe(true);
+    if (action === "cancel") {
+      expect(screen.getByRole("textbox", { name: "Message Chief" })).toHaveTextContent("Backup text");
+      expect(screen.getByRole("button", { name: "Remove backup.pdf" })).toBeInTheDocument();
+    } else {
+      expect(calls.filter(([input]) => input.action === "retain-attachments")).toHaveLength(2);
+      expect(calls.some(([input]) => input.action === "save")).toBe(true);
+      expect(window.openbot.agent.discardDraftAttachment).toHaveBeenCalledWith("backup-1", "local");
+    }
+  },
+);

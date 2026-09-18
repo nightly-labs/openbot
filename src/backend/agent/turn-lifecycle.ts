@@ -26,7 +26,7 @@ import type { DeltaBuffer } from "./delta-buffer";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
-import type { ProviderRuntime } from "./provider-runtime";
+import { isUsageLimitDiagnostic, type ProviderRuntime } from "./provider-runtime";
 import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
@@ -278,8 +278,16 @@ export class TurnLifecycle {
       }
       case "error":
       case "warning": {
-        const message = getString(params, "message") ?? notification.method;
+        // A notification that carries no `message` says only that something went wrong. The method
+        // name used to stand in for it, which put the bare word "error" in front of the user as if
+        // it were the report. An empty text lets the renderer's own sentence take its place; the
+        // `code` still carries the method for the log.
+        const message = getString(params, "message") ?? "";
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
+        if (isUsageLimitDiagnostic(message)) {
+          this.#providers.refreshUsageAfterLimit(source);
+          return;
+        }
         this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
       }
     }
@@ -373,6 +381,9 @@ export class TurnLifecycle {
     if (
       !originAgentId ||
       originAgentId === agentId ||
+      // The sender said it wants no answer, so the turn's result stays with this agent. Without
+      // this the sender is woken for an echo of work it only wanted to know about.
+      !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
       this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId)
     )
@@ -383,6 +394,9 @@ export class TurnLifecycle {
       recipientAgentIds: [recipientAgentId],
       text,
       replyToMessageId: messageId,
+      // The requested result, not a new request. The chain-origin guard above already stops a
+      // second relay; this is what tells the recipient it owes no acknowledgement for one.
+      expectsReply: false,
       idempotencyKey: `auto-result:${turnId}:${messageId}`,
     });
     const senderSnapshot = this.#conversation.snapshot(agentId);

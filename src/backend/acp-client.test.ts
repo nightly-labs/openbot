@@ -3,7 +3,7 @@
 /*
  * The OpenCode driver's environment seam, through a real spawn.
  *
- * OpenCode's whole account is one variable: with `OPENCODE_API_KEY` the CLI lists the paid Zen
+ * OpenCode's whole account is one variable: with `OPENCODE_API_KEY` the CLI lists the paid Go
  * catalog, without it the free one. Nothing else in OpenBot reads that variable, so this file spawns
  * a fake ACP agent that reports the environment it was given, and asserts what a user gets: free
  * models with no account, the paid list after a key is saved, and no forced sign-in in between.
@@ -21,7 +21,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentClient } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
 import type { CustomProviderConfig } from "./opencode-config";
-import { decodeAccountReadResult, decodeModelListResponse, decodeRecordResponse } from "./protocol";
+import {
+  decodeAccountReadResult,
+  decodeModelListResponse,
+  decodeRecordResponse,
+  decodeThreadResponse,
+} from "./protocol";
 import { requireProviderDriver } from "./provider-drivers";
 
 const started: AgentClient[] = [];
@@ -50,6 +55,41 @@ if (envLog) {
   );
 }
 let buffer = "";
+// An agent of the second kind: no \`models\` in \`session/new\`, one \`model\` config option, and a
+// \`thought_level\` option that exists only while the session is on a model that reasons. OpenCode
+// works this way, and \`minimal\` next to \`low\` is its own naming.
+const FAILING_MODEL = process.env.OPENBOT_FAKE_ACP_CONFIG_FAIL ?? null;
+const HANGING_MODEL = process.env.OPENBOT_FAKE_ACP_CONFIG_HANG ?? null;
+const CONFIG_MODELS = [
+  ...(FAILING_MODEL ? [FAILING_MODEL] : []),
+  "agent/thinker",
+  ...(HANGING_MODEL ? [HANGING_MODEL] : []),
+  "agent/plain",
+];
+const THOUGHT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "default"];
+let selected = CONFIG_MODELS[0];
+const configOptions = () => [
+  {
+    id: "model",
+    name: "Model",
+    category: "model",
+    type: "select",
+    currentValue: selected,
+    options: CONFIG_MODELS.map((value) => ({ value, name: value })),
+  },
+  ...(selected === "agent/thinker"
+    ? [
+        {
+          id: "effort",
+          name: "Effort",
+          category: "thought_level",
+          type: "select",
+          currentValue: "minimal",
+          options: THOUGHT_LEVELS.map((value) => ({ value, name: value })),
+        },
+      ]
+    : []),
+];
 const write = (message) => process.stdout.write(JSON.stringify(message) + NL);
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -69,13 +109,33 @@ process.stdin.on("data", (chunk) => {
 function handle(message) {
   if (typeof message.id === "undefined") return;
   if (message.method === "initialize") {
-    write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities: {} } });
+    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1" ? { loadSession: true } : {};
+    write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities } });
+    return;
+  }
+  if (message.method === "session/load") {
+    const loadLog = process.env.OPENBOT_FAKE_ACP_LOAD_LOG;
+    if (loadLog) fs.appendFileSync(loadLog, JSON.stringify(message.params) + NL);
+    write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
   if (message.method === "session/prompt") {
     const promptLog = process.env.OPENBOT_FAKE_ACP_PROMPT_LOG;
     if (promptLog) fs.appendFileSync(promptLog, JSON.stringify(message.params) + NL);
     write({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } });
+    return;
+  }
+  if (message.method === "session/set_config_option") {
+    const configLog = process.env.OPENBOT_FAKE_ACP_CONFIG_LOG;
+    if (configLog) fs.appendFileSync(configLog, JSON.stringify(message.params) + NL);
+    // No answer at all, which is what a hung agent gives.
+    if (message.params.value === HANGING_MODEL) return;
+    if (message.params.value === FAILING_MODEL) {
+      write({ jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Model unavailable." } });
+      return;
+    }
+    if (message.params.configId === "model") selected = message.params.value;
+    write({ jsonrpc: "2.0", id: message.id, result: { configOptions: configOptions() } });
     return;
   }
   if (message.method === "session/new") {
@@ -85,12 +145,17 @@ function handle(message) {
       write({ jsonrpc: "2.0", id: message.id, error: { code: -32000, message: "Invalid api key." } });
       return;
     }
+    if (process.env.OPENBOT_FAKE_ACP_CONFIG_MODELS === "1") {
+      selected = CONFIG_MODELS[0];
+      write({ jsonrpc: "2.0", id: message.id, result: { sessionId: "session-1", configOptions: configOptions() } });
+      return;
+    }
     if (process.env.OPENBOT_FAKE_ACP_EMPTY_MODELS === "1") {
       write({ jsonrpc: "2.0", id: message.id, result: { sessionId: "session-1" } });
       return;
     }
     const ids = process.env.OPENCODE_API_KEY
-      ? ["opencode/zen-one", "opencode/zen-two", "opencode/zen-three"]
+      ? ["opencode-go/go-one", "opencode-go/go-two", "opencode-go/go-three"]
       : ["opencode/big-pickle"];
     write({
       jsonrpc: "2.0",
@@ -108,9 +173,14 @@ function handle(message) {
 
 interface FakeOpencode {
   cli: OpencodeCliInfo;
+  directory: string;
   envLog: string;
   promptLog: string;
+  configLog: string;
+  loadLog: string;
+  readLoadedSessions: () => Promise<Array<{ sessionId: string; cwd: string }>>;
   readPrompts: () => Promise<string[]>;
+  readConfigCalls: () => Promise<Array<{ configId: string; value: string }>>;
   readSpawnEnvironments: () => Promise<
     Array<{
       argv: string[];
@@ -128,13 +198,32 @@ async function createFakeOpencodeAgent(source?: "system" | "managed"): Promise<F
   await chmod(executable, 0o755);
   const envLog = join(directory, "spawn-env.ndjson");
   const promptLog = join(directory, "prompts.ndjson");
+  const configLog = join(directory, "config-options.ndjson");
+  const loadLog = join(directory, "loaded-sessions.ndjson");
   return {
     cli: { executable, version: "1.18.30", ...(source ? { source } : {}) },
+    directory,
     envLog,
     promptLog,
+    configLog,
+    loadLog,
+    readLoadedSessions: async () => {
+      const source = await readFile(loadLog, "utf8").catch(() => "");
+      return source
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line));
+    },
     readPrompts: async () => {
       const source = await readFile(promptLog, "utf8").catch(() => "");
       return source.split("\n").filter((line) => line.trim());
+    },
+    readConfigCalls: async () => {
+      const source = await readFile(configLog, "utf8").catch(() => "");
+      return source
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line));
     },
     readSpawnEnvironments: async () => {
       const source = await readFile(envLog, "utf8").catch(() => "");
@@ -159,6 +248,8 @@ function startOpencode(
     servesModel?: (modelId: string) => boolean;
     /** Read at every session, the same way the real source is. */
     mcpServers?: () => McpServerConfig[];
+    /** How long one request may take, which is also the deadline model discovery works inside. */
+    requestTimeoutMs?: number;
   } = {},
 ): AgentClient {
   vi.stubEnv("OPENBOT_FAKE_ACP_ENV_LOG", envLog);
@@ -169,9 +260,10 @@ function startOpencode(
     mcpServers: options.mcpServers ?? (() => []),
     servesModel: options.servesModel,
   };
+  const timeoutMs = options.requestTimeoutMs ?? 10_000;
   const client = options.profile
-    ? (driver.createProfileClient?.(cli, 10_000, context) ?? driver.createClient(cli, 10_000, context))
-    : driver.createClient(cli, 10_000, context);
+    ? (driver.createProfileClient?.(cli, timeoutMs, context) ?? driver.createClient(cli, timeoutMs, context))
+    : driver.createClient(cli, timeoutMs, context);
   started.push(client);
   client.start();
   return client;
@@ -214,17 +306,17 @@ describe("OpenCode ACP environment", () => {
     await client.request("initialize", {}, decodeRecordResponse);
     await client.stop();
 
-    key = "zen-key-value";
+    key = "go-key-value";
     client.start();
     await client.request("initialize", {}, decodeRecordResponse);
 
     const environments = await fake.readSpawnEnvironments();
-    expect(environments.map((environment) => environment.apiKey)).toEqual([null, "zen-key-value"]);
+    expect(environments.map((environment) => environment.apiKey)).toEqual([null, "go-key-value"]);
     const models = await client.request("model/list", {}, decodeModelListResponse);
     expect(models.data.map((model) => model.model)).toEqual([
-      "opencode/zen-one",
-      "opencode/zen-two",
-      "opencode/zen-three",
+      "opencode-go/go-one",
+      "opencode-go/go-two",
+      "opencode-go/go-three",
     ]);
   });
 
@@ -356,6 +448,109 @@ describe("OpenCode ACP environment", () => {
   });
 });
 
+describe("OpenCode ACP reasoning efforts", () => {
+  it("reports the efforts of each model, not the efforts of the model the session opened on", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+
+    // `thought_level` describes the model the session is on, and a new session is on one model. Read
+    // without a probe per model, the whole catalog carried that one answer: the Effort menu offered
+    // `Medium` alone for a model that reasons from minimal to xhigh.
+    expect(
+      models.data.map((model) => [
+        model.model,
+        model.supportedReasoningEfforts?.map((effort) => effort.reasoningEffort),
+      ]),
+    ).toEqual([
+      ["agent/thinker", ["low", "medium", "high", "xhigh"]],
+      // A model the agent gives no `thought_level` for has one effort, which is what it had before.
+      ["agent/plain", ["medium"]],
+    ]);
+    // The sweep ends on the model the session opened on. An agent that remembers a last used model
+    // outside the session would otherwise start the user's own next session on `agent/plain`.
+    expect((await fake.readConfigCalls()).at(-1)).toEqual({
+      sessionId: "session-1",
+      configId: "model",
+      value: "agent/thinker",
+    });
+  });
+
+  it("keeps reading the rest of the catalog when one model refuses to be selected", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    // The session opens on this model, and the agent rejects every attempt to select it.
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_FAIL", "agent/broken");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+
+    // A model an agent will not answer for keeps the efforts the session published, and costs the
+    // models after it nothing: a catalog is what the user picks from, so one refusal must not empty it.
+    expect(
+      models.data.map((model) => [
+        model.model,
+        model.supportedReasoningEfforts?.map((effort) => effort.reasoningEffort),
+      ]),
+    ).toEqual([
+      ["agent/broken", ["medium"]],
+      ["agent/thinker", ["low", "medium", "high", "xhigh"]],
+      ["agent/plain", ["medium"]],
+    ]);
+  });
+
+  it("returns the catalog when a model's probe never answers", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    // The agent accepts the selection of this model and then says nothing more about it.
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_HANG", "agent/silent");
+    const client = startOpencode(fake.cli, () => null, fake.envLog, { requestTimeoutMs: 4_000 });
+
+    const models = await client.request("model/list", {}, decodeModelListResponse);
+
+    // The sweep runs inside the caller's own timeout, so a probe that never answers has to end
+    // before that timeout does. A sweep that waited for it would time `model/list` out, and the
+    // user would have no models to pick from instead of one model with imprecise efforts.
+    expect(
+      models.data.map((model) => [
+        model.model,
+        model.supportedReasoningEfforts?.map((effort) => effort.reasoningEffort),
+      ]),
+    ).toEqual([
+      ["agent/thinker", ["low", "medium", "high", "xhigh"]],
+      // What the session published, which is the efforts of the model it opened on.
+      ["agent/silent", ["low", "medium", "high", "xhigh"]],
+      // The model after the silent one keeps its own answer: one probe ends, not the sweep.
+      ["agent/plain", ["medium"]],
+    ]);
+  });
+
+  it("sends the agent's own low effort, not the lowest effort the model has", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_MODELS", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CONFIG_LOG", fake.configLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    await client.request(
+      "thread/start",
+      { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()], model: "agent/thinker", effort: "low" },
+      decodeRecordResponse,
+    );
+
+    // `minimal` also reads as low effort and comes first in the agent's list, so a first-match
+    // mapping sent the model's lowest setting whenever the user asked for low.
+    expect((await fake.readConfigCalls()).slice(-2)).toEqual([
+      { sessionId: "session-1", configId: "model", value: "agent/thinker" },
+      { sessionId: "session-1", configId: "effort", value: "low" },
+    ]);
+  });
+});
+
 describe("OpenCode ACP MCP servers", () => {
   it("sends the enabled servers as ACP name/value pairs", async () => {
     const fake = await createFakeOpencodeAgent("system");
@@ -423,5 +618,64 @@ describe("OpenCode ACP MCP servers", () => {
     // directory, and a server told to open `./data.db` somewhere else creates a second database
     // rather than reading the one the user named.
     expect(params.mcpServers.map((server: { name: string }) => server.name)).toEqual(["Filesystem"]);
+  });
+});
+
+describe("OpenCode ACP session loading", () => {
+  it("answers a read for a session this process does not hold by loading it", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    // What boot recovery sends after a restart: a session id from the database that no turn has
+    // resumed yet. Before the session is loaded the client holds nothing under that id.
+    const response = await client.request(
+      "thread/read",
+      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+      decodeThreadResponse,
+    );
+
+    expect(response.thread.id).toBe("ses_stored");
+    expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: "ses_stored", cwd: fake.directory }]);
+  });
+
+  it("loads a session once when a read and a resume ask for it together", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    // The startup race: the history read and the first drain reach the same stored session id in
+    // the same tick. Two loads would leave two threads and two MCP bridge sessions under one id.
+    await Promise.all([
+      client.request(
+        "thread/read",
+        { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+        decodeThreadResponse,
+      ),
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ]);
+
+    expect(await fake.readLoadedSessions()).toHaveLength(1);
+  });
+
+  it("reports a session an agent cannot load as missing instead of asking for it", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    // An agent that does not advertise `loadSession` cannot give the session back. The read answers
+    // an empty thread, so a restart reports no failure to the user, and the resume fails as a
+    // missing session, which is what starts the replacement.
+    const read = await client.request(
+      "thread/read",
+      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+      decodeThreadResponse,
+    );
+    expect(read.thread.turns).toEqual([]);
+    await expect(
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ).rejects.toThrow(/unknown acp session/i);
+    expect(await fake.readLoadedSessions()).toEqual([]);
   });
 });

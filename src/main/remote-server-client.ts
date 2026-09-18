@@ -21,7 +21,9 @@ import { randomBytes, verify } from "node:crypto";
 import type { RemoteDesktopCapabilities, ServerCompatibility } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  isAgentCreateRoute,
   supportsTeamSemanticTags,
+  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
@@ -58,7 +60,7 @@ export interface RemoteHostRequestTransport {
   request: (
     hostId: string,
     path: string,
-    init?: { method?: string; body?: unknown; preserveSemanticTags?: boolean },
+    init?: { method?: string; body?: unknown; preserveSemanticTags?: boolean; agentCreateModel?: boolean },
   ) => Promise<unknown>;
   requestResponse: (
     hostId: string,
@@ -142,6 +144,7 @@ export class RemoteServerClient {
         const value = await this.#hostRequest(server.id, path, {
           ...init,
           preserveSemanticTags: supportsTeamSemanticTags(compatibility.capabilities),
+          agentCreateModel: this.supportsAgentCreateModel(path, init, compatibility.capabilities),
         });
         // Decoding is outside the transport's catch on purpose. A frame that arrived intact and then
         // failed its route decoder is a protocol failure, not a request that happened to fail, and
@@ -155,6 +158,9 @@ export class RemoteServerClient {
         ...init,
         token: this.#servers.token(server),
         timeoutMs: init.timeoutMs,
+        // A host without the capability drops the fields in its frozen projection and starts the
+        // agent on its own default, so the pair is only encoded for hosts that read it.
+        agentCreateModel: this.supportsAgentCreateModel(path, init, compatibility.capabilities),
         ...this.requestProtocol(compatibility),
       });
       return addRemotePreviewUrls(value, server.id);
@@ -465,13 +471,24 @@ export class RemoteServerClient {
   async #hostRequest(
     serverId: string,
     path: string,
-    init: { method?: string; body?: unknown; preserveSemanticTags?: boolean } = {},
+    init: { method?: string; body?: unknown; preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
   ): Promise<unknown> {
     try {
       return await this.#requireTransport().request(serverId, path, init);
     } catch (error) {
       rethrowAsRemoteRequestError(error);
     }
+  }
+
+  /**
+   * Whether the chosen pair may ride an agent creation request to this host: only the create
+   * route carries the fields, and only a host advertising the capability reads them.
+   */
+  private supportsAgentCreateModel(path: string, init: RemoteRequestInit, capabilities: readonly string[]): boolean {
+    return (
+      isAgentCreateRoute(init.method ?? (init.body === undefined ? "GET" : "POST"), path) &&
+      capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY)
+    );
   }
 
   #requireTransport(): RemoteHostRequestTransport {

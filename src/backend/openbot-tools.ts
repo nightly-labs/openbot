@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
+import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import {
   assignAgentSectionToolSchema,
@@ -20,6 +21,7 @@ interface OpenBotToolDefinition {
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
+  ...DATA_TOOL_DEFINITIONS,
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   {
     name: "list_sites",
@@ -113,12 +115,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_routine",
     description:
-      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default and uses the host timezone by default.",
+      "Create a scheduled routine for this agent, or for another local agent when agentId is provided. It is active by default and uses the host timezone by default. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes. When watching a folder for new files and no interval was requested, use a 15 minute interval and keep the folder path plus handling instructions in the routine instruction.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       name: z.string().min(1).max(INPUT_LIMITS.routineName),
       instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction),
-      schedule: routineScheduleZodSchema,
+      schedule: routineScheduleZodSchema.describe(
+        "Routine schedule. Interval, advanced-every, and custom schedules must not run more often than every 3 minutes.",
+      ),
       active: z.boolean().optional(),
       timezone: z.string().min(1).max(128).describe("IANA timezone such as Europe/Warsaw.").optional(),
     },
@@ -126,13 +130,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "update_routine",
     description:
-      "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided.",
+      "Update, pause, or resume an existing routine for this agent, or for another local agent when agentId is provided. Replacement schedules must not run more often than every 3 minutes.",
     shape: {
       agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
       name: z.string().min(1).max(INPUT_LIMITS.routineName).optional(),
       instruction: z.string().min(1).max(INPUT_LIMITS.routineInstruction).optional(),
-      schedule: routineScheduleZodSchema.optional(),
+      schedule: routineScheduleZodSchema
+        .describe("Routine schedule. Must not run more often than every 3 minutes.")
+        .optional(),
       active: z.boolean().optional(),
     },
   },
@@ -204,12 +210,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "send_message",
     description:
-      "Queue an asynchronous message and optional local files for one or more OpenBot agents. When replying, pass the original message id as replyToMessageId.",
+      "Queue an asynchronous message and optional local files for one or more OpenBot agents. When replying, pass the original message id as replyToMessageId. Set expectsReply false to pass information on without asking the recipient for an answer.",
     shape: {
       recipientAgentIds: z.array(z.string()).min(1).max(32),
       text: z.string().min(1).max(100_000),
       paths: z.array(z.string()).max(10).optional(),
       replyToMessageId: z.string().nullable().optional(),
+      expectsReply: z
+        .boolean()
+        .describe(
+          "True, the default, for a request, question, or delegated task: the recipient answers you and OpenBot sends its result back. False for information the recipient may act on but must not answer, such as a status update, a heads-up, or your own reply to a task. A false message ends the exchange.",
+        )
+        .optional(),
     },
   },
 ];
@@ -217,7 +229,8 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
 export const OPENBOT_DYNAMIC_TOOLS = {
   type: "namespace",
   name: "openbot",
-  description: "Attach files to the current response and work with persistent OpenBot teammates.",
+  description:
+    "Attach files to the current response, keep structured data in the shared SQLite database, and work with persistent OpenBot teammates.",
   tools: OPENBOT_TOOL_DEFINITIONS.map((definition) => ({
     type: "function" as const,
     name: definition.name,

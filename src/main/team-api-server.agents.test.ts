@@ -1,4 +1,5 @@
 import { isAgentSummary } from "@openbot/contracts/ipc";
+import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import opencodeFixture from "../../packages/contracts/src/team-protocol/fixtures/v4/host-http-response.json";
 // @vitest-environment node
 
@@ -32,6 +33,46 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer agents", () => {
+  it("requires authentication, capability and valid input for a queue edit", async () => {
+    const { start, signIn } = await createTeamApiFixture("queue-edit", { configure: true });
+    const editQueuedMessage = vi.fn(async () => ({ agentId: "chief", deliveries: [] }));
+    const { base } = await start({ agents: createAgents({ editQueuedMessage }) });
+    const token = await signIn();
+    const input = { action: "begin", deliveryId: "delivery-1", editId: "edit-1" };
+    const path = `${base}/v1/agents/chief/queue/edit`;
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      [TEAM_PROTOCOL_VERSION_HEADER]: "3",
+      [TEAM_CAPABILITIES_HEADER]: "queue-edit-v1",
+    };
+    const unauthorized = await fetch(path, {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(unauthorized.ok).toBe(false);
+    const unsupported = await fetch(path, {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers: { ...headers, [TEAM_CAPABILITIES_HEADER]: "" },
+    });
+    expect(unsupported.ok).toBe(false);
+    const malformed = await fetch(path, { method: "POST", body: JSON.stringify({ ...input, editId: 7 }), headers });
+    expect(malformed.ok).toBe(false);
+    expect(editQueuedMessage).not.toHaveBeenCalled();
+    const accepted = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
+    expect(accepted.status).toBe(200);
+    expect(editQueuedMessage).toHaveBeenCalledExactlyOnceWith("chief", input);
+    editQueuedMessage.mockRejectedValueOnce(new QueueEditRejectedError("Held by another device"));
+    const rejected = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
+    expect(rejected.status).toBe(409);
+    editQueuedMessage.mockRejectedValueOnce(new Error("Disk write failed"));
+    const uncertain = await fetch(path, { method: "POST", body: JSON.stringify(input), headers });
+    expect(uncertain.ok).toBe(false);
+    expect(uncertain.status).not.toBe(409);
+  });
+
   it.each(["", "   ", "Plan trips"])("creates an agent through the API with description %j", async (description) => {
     const { root, start, signIn } = await createTeamApiFixture("agent-create", { configure: true });
     const store = new AgentStore(join(root, "agents"), join(root, "home"));
@@ -68,6 +109,38 @@ describe("TeamApiServer agents", () => {
         avatarHue: null,
       }),
     ).toThrow("description is invalid.");
+  });
+
+  it("passes a named provider and model through agent creation", () => {
+    expect(
+      agentCreate({
+        name: "Explorer",
+        description: "Explores ideas.",
+        initialMessage: "Greet me briefly.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+        provider: "opencode",
+        model: "opencode/example-model",
+      }),
+    ).toEqual({
+      name: "Explorer",
+      description: "Explores ideas.",
+      avatarSeed: "mobile:newagentseed",
+      avatarHue: null,
+      initialMessage: "Greet me briefly.",
+      provider: "opencode",
+      model: "opencode/example-model",
+    });
+    expect(() =>
+      agentCreate({
+        name: "Explorer",
+        description: "Explores ideas.",
+        initialMessage: "Greet me briefly.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+        provider: "unknown",
+      }),
+    ).toThrow("provider is invalid.");
   });
 
   it("downloads uploaded and replaced avatars through a WebRTC request and removes them", async () => {

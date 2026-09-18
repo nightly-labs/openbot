@@ -22,6 +22,7 @@ import { usePlatform } from "../../platform";
 import { fileBadge, formatFileSize } from "./AttachmentCards";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { ComposerEditor } from "./ComposerEditor";
+import { ComposerErrorBanner } from "./ComposerErrorBanner";
 import { ComposerSignInNotice, ComposerUsageLimitNotice } from "./ComposerNotice";
 import { CloseIcon, MoreIcon, StopIcon } from "./ConversationIcons";
 import { useConversationViewScope } from "./conversation-scope";
@@ -34,14 +35,16 @@ export function ConversationComposer() {
     agentReady,
     attachmentAction,
     attachmentBusy,
-    composerError,
     composerFocusRequest,
     composerHasContent,
+    currentChatConversationKey,
+    currentChatError,
     currentDraft,
-    currentConversationError,
+    dismissCurrentChatErrors,
     installedSkills,
     editQueuedMessage,
     editingDeliveryId,
+    editingPendingSave,
     openAttachmentPicker,
     openAttachmentPickerFromKey,
     openExternalMessageUrl,
@@ -71,6 +74,8 @@ export function ConversationComposer() {
   } = useConversationViewScope();
   const platform = usePlatform();
   const [pickerOpen, setPickerOpen] = createSignal(false);
+  // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
+  const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
   // The mention picker grows out of the same edge as the queue, so only one of them holds it.
   const queueVisible = () => queuePanelVisible() && !pickerOpen();
   const voiceAvailable = () => voiceSupported(platform.appInfo()?.platform);
@@ -98,6 +103,7 @@ export function ConversationComposer() {
     const provider = props.agent?.provider;
     if (!provider || signInRequired()) return null;
     for (const limit of props.accountUsage?.limits ?? []) {
+      if (limit.id !== provider) continue;
       for (const plan of [limit.primary, limit.secondary]) {
         if (!plan || plan.usedPercent < 100) continue;
         if (plan.resetsAt !== null && plan.resetsAt * 1_000 <= now()) continue;
@@ -128,7 +134,7 @@ export function ConversationComposer() {
       .join(",");
   };
   return (
-    <Show when={!props.prompt && !props.approval && !props.browserTakeover}>
+    <Show when={!props.approval && !props.browserTakeover}>
       <div class="composer-wrap">
         <div
           class="agent-queue-slot"
@@ -199,10 +205,17 @@ export function ConversationComposer() {
         <Show when={usageExhausted()}>
           {(spent) => <ComposerUsageLimitNotice provider={spent().provider} resetsAt={spent().resetsAt} />}
         </Show>
-        <Show when={composerError() ?? currentConversationError()}>
-          <div class="composer-error" role="alert">
-            {composerError() ?? currentConversationError()}
-          </div>
+        <Show when={currentChatError()}>
+          {(message) => (
+            <ComposerErrorBanner
+              message={message()}
+              conversationKey={currentChatConversationKey()}
+              onDismiss={() => {
+                dismissCurrentChatErrors();
+                setComposerFocusRequest((current) => current + 1);
+              }}
+            />
+          )}
         </Show>
         <div
           class={`composer${voicePhase() === "recording" ? " composer-recording" : ""}`}
@@ -238,7 +251,7 @@ export function ConversationComposer() {
                     </Show>
                     <ImageRemoveButton
                       label={`Remove ${attachment.name}`}
-                      disabled={voicePhase() === "transcribing"}
+                      disabled={voicePhase() === "transcribing" || savePending()}
                       onClick={() => removeAttachment(attachment.id)}
                     />
                   </div>
@@ -253,7 +266,9 @@ export function ConversationComposer() {
               skills={installedSkills()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
-              disabled={submitting() || selectionSending() || voicePhase() === "transcribing" || !agentReady()}
+              disabled={
+                submitting() || selectionSending() || voicePhase() === "transcribing" || !agentReady() || savePending()
+              }
               placeholder={
                 !agentReady()
                   ? "Complete agent CLI setup to start"
@@ -310,7 +325,8 @@ export function ConversationComposer() {
                   submitting() ||
                   selectionSending() ||
                   voicePhase() === "transcribing" ||
-                  !agentReady()
+                  !agentReady() ||
+                  savePending()
                 }
               >
                 <Plus aria-hidden="true" />
@@ -414,6 +430,7 @@ export function ConversationComposer() {
                           : "Send message"
                     }
                     disabled={
+                      attachmentBusy() ||
                       submitting() ||
                       selectionSending() ||
                       !agentReady() ||

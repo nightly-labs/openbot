@@ -69,6 +69,7 @@ import {
   isRoutine,
   isRoutineRun,
   isRoutineSchedule,
+  isSharedTable,
   isSidebarLayoutSnapshot,
   isSkillCategory,
   LOCAL_SERVER_ID,
@@ -85,6 +86,7 @@ import {
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
   type ScopedTeamPresenceSnapshot,
+  type SharedTable,
   type SidebarLayoutSnapshot,
   type SkillPackagePreview,
   type SkillSubmission,
@@ -379,6 +381,11 @@ function decodeAgents(value: unknown): AgentSummary[] {
 
 function decodeMemory(value: unknown): AgentMemory {
   if (!isAgentMemory(value)) throw new Error("Invalid agent memory response.");
+  return value;
+}
+
+function decodeTables(value: unknown): SharedTable[] {
+  if (!Array.isArray(value) || !value.every(isSharedTable)) throw new Error("Invalid shared tables response.");
   return value;
 }
 
@@ -767,6 +774,11 @@ const openbotApi: OpenBotDesktopApi = {
     ipcRenderer.on(IPC_CHANNELS.appLanguagePreference, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.appLanguagePreference, handler);
   },
+  onOpenSettings: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IPC_CHANNELS.openSettings, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.openSettings, handler);
+  },
   dynamicIsland: {
     getPreference: () =>
       ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandGetPreference).then(decodeDynamicIslandPreference),
@@ -924,7 +936,7 @@ const openbotApi: OpenBotDesktopApi = {
       invokeAgentForServer(serverId, IPC_CHANNELS.hostGetAnalytics, input, decodeHostAnalyticsFromMain),
     getAnalytics: (input, serverId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentGetAnalytics, input, decodeAgentAnalyticsFromMain),
-    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId, decodeAccountUsageFromMain),
+    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId ?? null, decodeAccountUsageFromMain),
     listModels: () => invokeAgent(IPC_CHANNELS.agentListModels, null, decodeAgentModels),
     listAgents: (serverId) =>
       serverId === undefined
@@ -950,6 +962,8 @@ const openbotApi: OpenBotDesktopApi = {
     updateMemory: (input) => invokeAgent(IPC_CHANNELS.agentUpdateMemory, input, decodeMemory),
     deleteMemory: (input) => invokeAgent(IPC_CHANNELS.agentDeleteMemory, input, decodeVoid),
     clearMemories: (agentId) => invokeAgent(IPC_CHANNELS.agentClearMemories, agentId, decodeVoid),
+    listTables: () => invokeAgent(IPC_CHANNELS.sharedListTables, null, decodeTables),
+    deleteTable: (input) => invokeAgent(IPC_CHANNELS.sharedDeleteTable, input, decodeVoid),
     listRoutines: (agentId) => invokeAgent(IPC_CHANNELS.agentListRoutines, agentId, decodeRoutines),
     createRoutine: (input) => invokeAgent(IPC_CHANNELS.agentCreateRoutine, input, decodeRoutine),
     updateRoutine: (input) => invokeAgent(IPC_CHANNELS.agentUpdateRoutine, input, decodeRoutine),
@@ -997,6 +1011,7 @@ const openbotApi: OpenBotDesktopApi = {
     },
     discardDraftAttachment: (attachmentId, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentDiscardDraftAttachment, attachmentId, decodeVoid),
+    downloadAttachments: (input) => invokeAgent(IPC_CHANNELS.agentDownloadAttachments, input, decodeVoid),
     openAttachment: (input) => invokeAgent(IPC_CHANNELS.agentOpenAttachment, input, decodeVoid),
     openSharedFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenSharedFile, input, decodeVoid),
     openWorkspaceFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenWorkspaceFile, input, decodeVoid),
@@ -1009,6 +1024,8 @@ const openbotApi: OpenBotDesktopApi = {
     acknowledgeFailedTurn: (input) => invokeAgent(IPC_CHANNELS.agentAcknowledgeFailedTurn, input, decodeVoid),
     cancelQueuedMessage: (input) => invokeAgent(IPC_CHANNELS.agentCancelQueuedMessage, input, decodeVoid),
     steerQueuedMessage: (input) => invokeAgent(IPC_CHANNELS.agentSteerQueuedMessage, input, decodeVoid),
+    editQueuedMessage: (input, serverId = selectedServerId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.agentEditQueuedMessage, input, decodeQueue),
     updateQueuedMessage: (input, serverId = selectedServerId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentUpdateQueuedMessage, input, decodeVoid),
     reorderQueue: (input) => invokeAgent(IPC_CHANNELS.agentReorderQueue, input, decodeVoid),
@@ -1152,6 +1169,7 @@ const openbotApi: OpenBotDesktopApi = {
     getPresence: () => ipcRenderer.invoke(IPC_CHANNELS.hostGetPresence),
     start: () => ipcRenderer.invoke(IPC_CHANNELS.hostStart),
     stop: () => ipcRenderer.invoke(IPC_CHANNELS.hostStop),
+    recheckScreenRecording: () => ipcRenderer.invoke(IPC_CHANNELS.hostRecheckScreenRecording),
     listMembers: () => ipcRenderer.invoke(IPC_CHANNELS.hostListMembers),
     updateMember: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostUpdateMember, input),
     removeMember: (memberId) => ipcRenderer.invoke(IPC_CHANNELS.hostRemoveMember, memberId),

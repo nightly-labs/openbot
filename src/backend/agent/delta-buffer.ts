@@ -66,12 +66,19 @@ export class DeltaBuffer {
     this.#pending.delete(key);
     if (pending.timer) clearTimeout(pending.timer);
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
-    const persisted = this.#database.persistConversation(snapshot, "response.delta-flushed", {
-      turnId: pending.turnId,
+    // Only the streamed message changed, and a flush lands ten times a second per streaming
+    // message. Writing the whole thread here made the cost of one flush grow with the thread's
+    // whole history, which is what saturated the main process when several agents streamed at once.
+    snapshot.revision = this.#database.persistStreamingMessage({
+      snapshot,
       messageId: pending.messageId,
-      bytes: Buffer.byteLength(pending.text, "utf8"),
+      eventType: "response.delta-flushed",
+      detail: {
+        turnId: pending.turnId,
+        messageId: pending.messageId,
+        bytes: Buffer.byteLength(pending.text, "utf8"),
+      },
     });
-    snapshot.revision = persisted.revision;
     this.#hooks.emit({
       type: "conversation-delta",
       agentId: pending.agentId,

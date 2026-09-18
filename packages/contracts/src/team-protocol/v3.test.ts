@@ -16,6 +16,7 @@ import {
 import requestFixture from "./fixtures/v3/client-http-request.json";
 import responseFixture from "./fixtures/v3/host-http-response.json";
 import profileResponseFixture from "./fixtures/v3/profile-host-response.json";
+import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import {
   decodeTeamProtocolV1HttpRequest,
   highestCommonTeamProtocol,
@@ -34,6 +35,12 @@ import {
   encodeTeamProtocolV3WebRtcHttpRequest,
   encodeTeamProtocolV3WebRtcHttpResponse,
 } from "./v3-webrtc-adapter";
+import {
+  decodeTeamProtocolV4CurrentHttpRequest,
+  decodeTeamProtocolV4CurrentHttpResponse,
+  encodeTeamProtocolV4CurrentHttpRequest,
+  encodeTeamProtocolV4CurrentHttpResponse,
+} from "./v4-adapter";
 
 const duplicatePath = "/v1/agents/bot-source/duplicate";
 /**
@@ -60,6 +67,56 @@ const currentResponseFixture = {
 const scopedUsagePath = "/v1/agents/bot-source/usage";
 
 describe("Team protocol v3", () => {
+  it("carries optional queue edits over current HTTP and WebRTC adapters without changing v1", () => {
+    const path = "/v1/agents/chief/queue/edit";
+    const body = {
+      action: "save",
+      editId: "edit-1",
+      deliveryId: "delivery-1",
+      text: "Changed",
+      keepAttachmentIds: ["second", "first"],
+      attachmentDraftIds: [],
+    };
+    expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_QUEUE_EDIT_CAPABILITY);
+    expect(TEAM_PROTOCOL_V3_CAPABILITIES).not.toContain(TEAM_QUEUE_EDIT_CAPABILITY);
+    for (const { encode, decode } of [
+      { encode: encodeTeamProtocolV3CurrentHttpRequest, decode: decodeTeamProtocolV3CurrentHttpRequest },
+      { encode: encodeTeamProtocolV4CurrentHttpRequest, decode: decodeTeamProtocolV4CurrentHttpRequest },
+    ]) {
+      expect(decode("POST", path, JSON.parse(encode("POST", path, body)))).toEqual(body);
+      const retain = {
+        action: "retain-attachments",
+        deliveryId: "delivery-1",
+        editId: "edit-1",
+        attachmentDraftIds: ["draft-1"],
+      };
+      expect(decode("POST", path, JSON.parse(encode("POST", path, retain)))).toEqual(retain);
+      expect(() => encode("POST", path, { ...retain, attachmentDraftIds: [42] })).toThrow("Invalid queue edit request");
+      expect(() => encode("POST", path, { ...body, keepAttachmentIds: [42] })).toThrow("Invalid queue edit request");
+    }
+    expect(encodeTeamProtocolV3WebRtcHttpRequest("POST", path, body)).toEqual(body);
+    const held = { agentId: "chief", deliveries: [] };
+    expect(
+      decodeTeamProtocolV3CurrentHttpResponse(
+        "POST",
+        path,
+        200,
+        JSON.parse(encodeTeamProtocolV3CurrentHttpResponse("POST", path, 200, held)),
+      ),
+    ).toEqual(held);
+    expect(
+      decodeTeamProtocolV4CurrentHttpResponse(
+        "POST",
+        path,
+        200,
+        JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, held)),
+      ),
+    ).toEqual(held);
+    expect(encodeTeamProtocolV3CurrentHttpResponse("POST", path, 204, {})).toBe("{}");
+    expect(encodeTeamProtocolV4CurrentHttpResponse("POST", path, 204, {})).toBe("{}");
+    expect(() => decodeTeamProtocolV1HttpRequest("POST", path, body)).toThrow();
+  });
+
   it("validates host analytics across HTTP and WebRTC without changing agent analytics", () => {
     const path = "/v1/analytics";
     const input = { startDate: "2026-09-01", endDate: "2026-09-07", timeZone: "UTC" };

@@ -47,6 +47,7 @@ const MESSAGES: AgentMessage[] = [
       "",
       `- [provider-session.log](${WORKSPACE}/provider-session.log)`,
       `- [current-agent-keys.ts](${WORKSPACE}/current-agent-keys.ts)`,
+      `- [evidence-map.json](${WORKSPACE}/evidence-map.json)`,
     ].join("\n"),
     time: "10:06",
   },
@@ -65,7 +66,7 @@ const MESSAGES: AgentMessage[] = [
       `- [trust-boundary.svg](${WORKSPACE}/trust-boundary.svg)`,
       `- [invoice-2026-09.pdf](${WORKSPACE}/invoice-2026-09.pdf)`,
       `- [standup-recap.mp3](${WORKSPACE}/standup-recap.mp3)`,
-      `- [operating-plan.xlsx](${WORKSPACE}/operating-plan.xlsx) — the panel cannot show this kind.`,
+      `- [operating-plan.xlsx](${WORKSPACE}/operating-plan.xlsx)`,
     ].join("\n"),
     time: "10:09",
     status: "Done",
@@ -168,7 +169,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Click a file in a message to open it on the right side. The panel stays while you click others. */
+/** A chat with Markdown, CSV, JSON, plain text, SVG, PDF, audio, image, and XLSX files. */
 export const Chat: Story = {};
 
 /** The same chat with the markdown file already open, as after a click. */

@@ -72,8 +72,43 @@ function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
   return 6;
 }
 
+// Lexed tokens are shared across re-renders of identical bodies (scroll
+// virtualization re-renders settled messages often). Cap the size so a long
+// session cannot grow this without bound.
+const LEXER_CACHE_LIMIT = 200;
+const lexerCache = new Map<string, Token[]>();
+const inlineLexerCache = new Map<string, Token[]>();
+
+function lexBlockTokens(body: string, cache: boolean): Token[] {
+  if (!cache) return marked.lexer(body, { breaks: true, gfm: true });
+  const cached = lexerCache.get(body);
+  if (cached) return cached;
+  const tokens = marked.lexer(body, { breaks: true, gfm: true });
+  if (lexerCache.size >= LEXER_CACHE_LIMIT) {
+    const oldest = lexerCache.keys().next();
+    if (!oldest.done) lexerCache.delete(oldest.value);
+  }
+  lexerCache.set(body, tokens);
+  return tokens;
+}
+
+function lexInlineTokens(body: string): Token[] {
+  const cached = inlineLexerCache.get(body);
+  if (cached) return cached;
+  const tokens = marked.Lexer.lexInline(body, { breaks: true, gfm: true });
+  if (inlineLexerCache.size >= LEXER_CACHE_LIMIT) {
+    const oldest = inlineLexerCache.keys().next();
+    if (!oldest.done) inlineLexerCache.delete(oldest.value);
+  }
+  inlineLexerCache.set(body, tokens);
+  return tokens;
+}
+
 export function MarkdownMessageText(props: MarkdownMessageTextProps) {
-  const tokens = createMemo(() => marked.lexer(props.body, { breaks: true, gfm: true }));
+  // A streaming reply passes each growing prefix here. Caching those would
+  // retain up to 200 obsolete token trees and evict completed messages, so
+  // only a settled body enters the shared cache.
+  const tokens = createMemo(() => lexBlockTokens(props.body, props.streaming !== true));
   const contentProps = (): MarkdownContentProps => ({
     imagesAsLinks: props.imagesAsLinks,
     agents: props.agents,
@@ -106,7 +141,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
 export function MarkdownInlineText(
   props: Omit<MarkdownMessageTextProps, "showCitationFooter" | "streaming" | "streamingTail">,
 ) {
-  const tokens = createMemo(() => marked.Lexer.lexInline(props.body, { breaks: true, gfm: true }));
+  const tokens = createMemo(() => lexInlineTokens(props.body));
   const contentProps = (): MarkdownContentProps => ({
     imagesAsLinks: props.imagesAsLinks,
     agents: props.agents,

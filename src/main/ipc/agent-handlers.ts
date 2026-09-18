@@ -50,7 +50,6 @@ import type { RemoteServerManager } from "../remote-server-manager";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
-  parseAgentId,
   parseAgentRequest,
   parseApprovalResponse,
   parseBrowserTakeoverResponse,
@@ -59,7 +58,9 @@ import {
   parseInterrupt,
   parseMarkConversationRead,
   parseMessageReaction,
+  parseOptionalAgentId,
   parsePromptResponse,
+  parseQueueEdit,
   parseReadConversationPage,
   parseReorderQueue,
   parseSearchConversationMessages,
@@ -125,13 +126,15 @@ export function agentIpcHandlers({
         });
       }),
       getUsage: payloadHandler(parseAgentRequest, (parsed) => {
-        const agentId = parseAgentId(parsed.payload);
+        const agentId = parseOptionalAgentId(parsed.payload);
         return routeToServer(parsed.serverId, {
           local: () => service.getUsage(agentId),
           remote: (serverId) =>
-            remoteServers.supportsCapability(serverId, "model-scoped-usage")
-              ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost)
-              : { limits: [] },
+            agentId
+              ? remoteServers.supportsCapability(serverId, "model-scoped-usage")
+                ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost)
+                : { limits: [] }
+              : remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost),
         });
       }),
       listModels: payloadHandler(parseAgentRequest, (parsed) => {
@@ -353,6 +356,17 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueSteer(parsed.agentId), decodeVoid, {
               method: "POST",
               body: { deliveryId: parsed.deliveryId, expectedTurnId: parsed.expectedTurnId },
+            }),
+        });
+      }),
+      editQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
+        const { agentId, ...input } = parseQueueEdit(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.editQueuedMessage(agentId, input),
+          remote: (serverId) =>
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueEdit(agentId), decodeQueueSnapshot, {
+              method: "POST",
+              body: { ...input },
             }),
         });
       }),

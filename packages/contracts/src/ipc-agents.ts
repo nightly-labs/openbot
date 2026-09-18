@@ -82,6 +82,15 @@ export interface CreateAgentInput {
   avatarSeed: string;
   avatarHue: AvatarHue | null;
   initialMessage: string;
+  /**
+   * The provider and model the agent starts on, applied before the initial message is queued.
+   * Absent, the backend picks its starting default. A provider change after the first message is
+   * queued is rejected while work is active, so naming them here is the only way a chosen pair
+   * survives creation.
+   */
+  provider?: AgentProviderId;
+  model?: AgentModelId;
+  reasoningEffort?: AgentReasoningEffort;
 }
 
 export interface UpdateAgentInput {

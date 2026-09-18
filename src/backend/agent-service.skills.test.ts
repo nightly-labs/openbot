@@ -2,12 +2,12 @@ import { skillConversationEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalSkillTools } from "./agent/skill-tools";
 import type { AgentProvider } from "./agent-client";
-import { AgentService } from "./agent-service";
+import type { AgentService } from "./agent-service";
 import {
   callOpenBotTool,
   createFakeClaude,
+  createTestService,
   FakeAgentClient,
-  fakeBrowser,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
@@ -39,25 +39,20 @@ describe.sequential("local skill provider tools", () => {
         get: vi.fn<LocalSkillTools["get"]>(),
         install: vi.fn<LocalSkillTools["install"]>(),
       };
-      service = new AgentService(
+      service = createTestService({
         store,
         mailbox,
-        fakeBrowser(),
-        30_000,
-        provider,
-        (selected) => {
+        preferredProvider: provider,
+        clientFactory: (selected) => {
           const client = new FakeAgentClient(selected);
           clients.set(selected, client);
           return client;
         },
-        undefined,
-        undefined,
-        null,
-        null,
-        null,
-        undefined,
-        () => api,
-      );
+        hostedSites: null,
+        sidebarLayout: null,
+        preferredModel: null,
+        localSkillTools: () => api,
+      });
       await service.initialize();
       await store.getOrCreate("chief");
       await service.updateAgent({

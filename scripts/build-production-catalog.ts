@@ -52,6 +52,8 @@ interface CatalogSpec {
 interface BuiltSkill {
   id: string;
   versionId: string;
+  icon: string;
+  iconSha256: string;
   slug: string;
   name: string;
   description: string;
@@ -109,9 +111,14 @@ export async function buildProductionCatalog(outputArgument?: string): Promise<s
       const bundle = `skills/${skill.slug}.zip`;
       await writeFile(join(staging, bundle), archive);
       const bundleSha256 = sha256(archive);
+      const icon = `skills/${skill.slug}.icon.svg`;
+      const artwork = utf8Bytes(createCategoryIcon(skill.category));
+      await writeFile(join(staging, icon), artwork);
       builtSkills.push({
         id: skillId(skill.slug),
         versionId: skillVersionId(skill.slug, version, bundleSha256),
+        icon,
+        iconSha256: sha256(artwork),
         slug: skill.slug,
         name: preview.name,
         description: preview.description,
@@ -367,6 +374,36 @@ function sha256(value: Uint8Array | string): string {
 
 function utf8Bytes(value: string): Uint8Array {
   return Uint8Array.from(Buffer.from(value, "utf8"));
+}
+
+/*
+ * Every category carries its own colour and mark, so a listing reads as a set and a Skill without
+ * artwork of its own still shows more than the generic fallback glyph. The mark is drawn as paths
+ * rather than as text: an emoji would depend on a font the reader's computer may not carry.
+ */
+const categoryArtwork: Record<SkillCategory, { background: string; mark: string }> = {
+  coding: { background: "#2463a6", mark: '<path d="M9 18 3 12 9 6"/><path d="m15 6 6 6-6 6"/>' },
+  design: {
+    background: "#be4d86",
+    mark: '<circle cx="9" cy="9" r="5.5"/><rect x="10.5" y="10.5" width="9" height="9" rx="1.5"/>',
+  },
+  "data-analytics": { background: "#268477", mark: '<path d="M5 20V11"/><path d="M12 20V4"/><path d="M19 20v-6"/>' },
+  documents: {
+    background: "#7255ce",
+    mark: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h4"/><path d="M10 13h6"/><path d="M10 17h6"/>',
+  },
+  productivity: { background: "#e88124", mark: '<circle cx="12" cy="12" r="8.5"/><path d="m8 12 3 3 5-6"/>' },
+  research: { background: "#3b7dd8", mark: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>' },
+  automation: {
+    background: "#c0563f",
+    mark: '<path d="M13 3 5 14h5l-1 7 8-11h-5z" stroke-linejoin="round"/>',
+  },
+  other: { background: "#526178", mark: '<path d="m12 4 2 5.5L19.5 12 14 14.5 12 20l-2-5.5L4.5 12 10 9.5z"/>' },
+};
+
+function createCategoryIcon(category: SkillCategory): string {
+  const artwork = categoryArtwork[category];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="18" fill="${artwork.background}"/><g transform="translate(16 16) scale(2)" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${artwork.mark}</g></svg>\n`;
 }
 
 function stableJson(value: unknown): string {

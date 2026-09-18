@@ -187,7 +187,7 @@ export const AccountMenu: Story = {
   play: async ({ canvas, canvasElement, userEvent }) => {
     await canvas.findByRole("heading", { name: "Chief" });
     const trigger = await canvas.findByRole("button", { name: "Open account actions" });
-    const usageTrigger = await canvas.findByRole("button", { name: /Weekly usage/ });
+    const usageTrigger = await canvas.findByRole("button", { name: /^Usage,/ });
     const settingsTrigger = await canvas.findByRole("button", { name: "Settings" });
     const dock = canvasElement.querySelector<HTMLElement>(".account-dock");
     const rail = canvasElement.querySelector<HTMLElement>(".server-rail");
@@ -202,7 +202,7 @@ export const AccountMenu: Story = {
 
     await userEvent.click(usageTrigger);
     const usagePopover = await within(canvasElement.ownerDocument.body).findByRole("dialog", {
-      name: "Weekly usage",
+      name: "Usage",
     });
     await expect(within(usagePopover).getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");

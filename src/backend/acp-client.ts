@@ -40,6 +40,34 @@ import {
 } from "./protocol";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 
+/**
+ * How long model discovery may spend on asking an agent for each model's reasoning efforts. One
+ * OpenCode sweep of 49 models costs about 20ms, so this is not a target: it is the point where an
+ * agent that answers slowly stops delaying the catalog the user is waiting for.
+ */
+const MODEL_REASONING_PROBE_BUDGET_MS = 5_000;
+
+/**
+ * How long one model's probe may take before the sweep goes on without it. An agent that stops
+ * answering for one model then costs that model's efforts alone, and not the efforts of every model
+ * after it in the catalog.
+ */
+const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
+
+/**
+ * What the sweep leaves of the discovery deadline for the two requests that follow it: the restore of
+ * the model the session opened on, and the close of the probe session. Both are one round trip, and
+ * the catalog the caller waits for is already built when they run.
+ */
+const MODEL_REASONING_CLEANUP_MS = 1_000;
+
+/**
+ * What discovery keeps of the caller's timeout to return with. Every request it makes ends by its own
+ * deadline, which is this much before the timeout: a catalog that was read in time is worth returning,
+ * and one that reaches the timeout is thrown away with the models already in it.
+ */
+const MODEL_DISCOVERY_RETURN_MS = 250;
+
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
@@ -120,6 +148,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #requestTimeoutMs: number;
   readonly #bridge = new LocalMcpBridge();
   readonly #threads = new Map<string, AcpThread>();
+  readonly #startingThreads = new Map<string, Promise<{ thread: { id: string } }>>();
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   #process: ChildProcessWithoutNullStreams | null = null;
   #connection: ClientSideConnection | null = null;
@@ -192,6 +221,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#initialized = null;
     for (const thread of this.#threads.values()) thread.mcp.close();
     this.#threads.clear();
+    this.#startingThreads.clear();
     for (const pending of this.#pendingServerRequests.values()) pending.reject(new Error("ACP session stopped."));
     this.#pendingServerRequests.clear();
     await this.#bridge.close();
@@ -265,8 +295,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       case "thread/resume":
         return decoder(await this.#startThread(params, true));
       case "thread/read": {
-        const thread = this.#requireThread(requiredString(params, "threadId"));
-        return decoder({ thread: { id: thread.id, turns: thread.turns } });
+        const thread = await this.#readableThread(requiredString(params, "threadId"), params);
+        return decoder({
+          thread: { id: thread?.id ?? requiredString(params, "threadId"), turns: thread?.turns ?? [] },
+        });
       }
       case "turn/start":
         return decoder(await this.#startTurn(params, false));
@@ -342,13 +374,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   async #discoverModels(timeoutMs = this.#requestTimeoutMs): Promise<AcpModel[]> {
     const connection = this.#requireConnection();
+    // One deadline for the whole discovery, read before the session opens and held short of the
+    // caller's own timeout: what the sweep may spend is what a slow `session/new` left of the time
+    // the caller gave `model/list`. A sweep that timed the caller out would return no catalog at all.
+    const deadline = Date.now() + timeoutMs - MODEL_DISCOVERY_RETURN_MS;
     return withTimeout(
       (async () => {
         const probe = await connection.newSession({ cwd: process.cwd(), mcpServers: [] });
         try {
-          return modelsFromSessionSetup(probe);
+          return await this.#modelReasoningEfforts(connection, probe, modelsFromSessionSetup(probe), deadline);
         } finally {
-          await connection.closeSession({ sessionId: probe.sessionId }).catch(() => undefined);
+          // Bounded like the probes, and for the same reason: the catalog is complete by now, and an
+          // agent that is slow to close a session it is about to lose anyway must not take it away.
+          await this.#requestBefore(
+            () => connection.closeSession({ sessionId: probe.sessionId }),
+            deadline,
+            "session/close",
+          );
         }
       })(),
       timeoutMs,
@@ -356,12 +398,148 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
+  /**
+   * A discovery request that gives up at `until`, and reports any failure as `null`.
+   *
+   * The request is sent here, and not by the caller: after `until` there is nothing to send. A
+   * request made anyway would still reach the agent and still change the session the sweep is about
+   * to give back, and its own failure would have nobody left to read it.
+   */
+  async #requestBefore<T>(request: () => Promise<T>, until: number, method: string): Promise<T | null> {
+    const remaining = until - Date.now();
+    if (remaining <= 0) return null;
+    return withTimeout(request(), remaining, `${agentProviderName(this.provider)} request timed out: ${method}`).catch(
+      () => null,
+    );
+  }
+
+  /**
+   * The reasoning efforts of each model, asked one model at a time on the session that listed them.
+   *
+   * An agent that holds reasoning in a session config option publishes `thought_level` for the model
+   * the session is on, and a new session is on one model. Read as it arrives, every model of the
+   * catalog carries that one model's efforts, and a model the session never selected carries no
+   * efforts at all: OpenCode offers `minimal` to `xhigh` per model, and the Effort menu showed
+   * `Medium` alone for all of them. Selecting the model on the same session makes the agent publish
+   * the options of that model, so the catalog is built from one answer per model.
+   *
+   * Only for a catalog that came from the config option. An agent that describes each model's efforts
+   * in `session/new` has answered already and is not asked again.
+   *
+   * No probe has to succeed. A model whose probe fails, or that the time does not reach, keeps the
+   * session-wide efforts the catalog held before. `deadline` is when the caller's own `model/list`
+   * times out: a sweep that ran past it would leave the user with no models at all, rather than with
+   * imprecise efforts.
+   */
+  async #modelReasoningEfforts(
+    connection: ClientSideConnection,
+    probe: SessionSetupResponse & { sessionId: string },
+    models: AcpModel[],
+    deadline: number,
+  ): Promise<AcpModel[]> {
+    const option = (probe.configOptions ?? []).find(
+      (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
+        candidate.category === "model" && candidate.type === "select",
+    );
+    if (!option || availableModels(probe).length > 0) return models;
+    // The sweep, and each request in it, ends at whichever comes first: its own budget, or the point
+    // where the caller's deadline still holds the cleanup. One agent that never answers then costs
+    // its own model's efforts, and not the whole catalog.
+    const sweepEnd = Math.min(Date.now() + MODEL_REASONING_PROBE_BUDGET_MS, deadline - MODEL_REASONING_CLEANUP_MS);
+    const probed: AcpModel[] = [];
+    let selected = option.currentValue;
+    for (const model of models) {
+      const response = await this.#requestBefore(
+        () => connection.setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: model.id }),
+        Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
+        "session/set_config_option",
+      );
+      if (response) selected = model.id;
+      probed.push(response ? { ...model, ...reasoningFromConfig(response.configOptions) } : model);
+    }
+    // Back to the model the session opened on. The session is closed next, but an agent that keeps a
+    // "last used model" outside the session would otherwise remember the end of this sweep, and the
+    // user's own next CLI session would start on a model they never chose. Half of the cleanup
+    // reserve, so the close that follows keeps the other half.
+    if (selected !== option.currentValue) {
+      await this.#requestBefore(
+        () =>
+          connection.setSessionConfigOption({
+            sessionId: probe.sessionId,
+            configId: option.id,
+            value: option.currentValue,
+          }),
+        Math.min(Date.now() + MODEL_REASONING_CLEANUP_MS / 2, deadline),
+        "session/set_config_option",
+      );
+    }
+    return probed;
+  }
+
+  /**
+   * The thread a `thread/read` can answer from, loading the session when it is not held here.
+   *
+   * An ACP session lives in this process alone, so a restart leaves every persisted session id
+   * unknown until something loads it. Boot recovery reads those ids before any turn does, and a
+   * refusal there is reported to the user as a failed history backfill. The session is loaded
+   * instead, which also leaves it warm for the first turn. `null` is answered when it cannot be
+   * loaded - the agent does not support `session/load`, the caller sent no `cwd`, or the load
+   * failed - because a read is advisory: its callers treat an absent turn as an unsettled one.
+   */
+  async #readableThread(id: string, params: unknown): Promise<AcpThread | null> {
+    const held = this.#threads.get(id);
+    if (held) return held;
+    if (!getString(params, "cwd")) return null;
+    try {
+      await this.#ensureInitialized();
+      if (!this.#loadsSessions) return null;
+      await this.#startThread(params, true);
+    } catch (error) {
+      this.emit("diagnostic", redactText(`ACP session load for a read failed: ${String(error)}`));
+      return null;
+    }
+    return this.#threads.get(id) ?? null;
+  }
+
+  /** Whether the agent answers `session/load`, which it advertises in its initialization. */
+  get #loadsSessions(): boolean {
+    return this.#initialization?.agentCapabilities?.loadSession === true;
+  }
+
   async #startThread(params: unknown, resume: boolean): Promise<{ thread: { id: string } }> {
     await this.#ensureInitialized();
     if (!this.#signedIn) throw new Error(this.options.signInMessage);
     const requestedThreadId = getString(params, "threadId");
-    if (resume && requestedThreadId && this.#threads.has(requestedThreadId))
+    if (!resume || !requestedThreadId) return this.#openThread(params, false);
+    const held = this.#threads.get(requestedThreadId);
+    // A thread this client already holds takes the caller's settings even though no session is
+    // opened for them: the loader may have been a `thread/read`, which carries none of its own, and
+    // the turn that follows must not run on the settings of whoever loaded the session first.
+    if (held) {
+      held.developerInstructions = getString(params, "developerInstructions") ?? held.developerInstructions;
+      await this.#applyConfig(held, getString(params, "model"), getString(params, "effort"));
       return { thread: { id: requestedThreadId } };
+    }
+    // One load per session id, however many callers ask for it. Boot recovery reads a session while
+    // the first drain resumes it, and two `session/load` calls would leave two threads and two MCP
+    // bridge sessions under one id, of which only the last is reachable.
+    const starting = this.#startingThreads.get(requestedThreadId);
+    if (starting) return starting;
+    const start = this.#openThread(params, true).finally(() => {
+      this.#startingThreads.delete(requestedThreadId);
+    });
+    this.#startingThreads.set(requestedThreadId, start);
+    return start;
+  }
+
+  async #openThread(params: unknown, resume: boolean): Promise<{ thread: { id: string } }> {
+    const requestedThreadId = getString(params, "threadId");
+    if (resume && requestedThreadId && !this.#loadsSessions) {
+      // Reported as a missing session, which is what it is for the caller: the agent cannot give
+      // this session back, so the recovery that replaces it runs now rather than after a protocol
+      // error the user would have to read.
+      throw new Error(`Unknown ACP session: ${requestedThreadId}`);
+    }
     const cwd = requiredString(params, "cwd");
     const dynamicTools = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
     let threadRef: AcpThread | null = null;
@@ -450,9 +628,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
         continue;
       }
-      const selected = selectValues(option).find((candidate) =>
-        category === "thought_level" ? normalizeEffort(candidate.value) === value : candidate.value === value,
-      );
+      // An effort travels by OpenBot's name, and the agent's own name for it is read from the option
+      // this session published, not from the catalog: the session is the one that has to accept it.
+      const values = selectValues(option);
+      const wanted =
+        category === "thought_level" ? reasoningEffortWireValues(values.map((entry) => entry.value)).get(value) : value;
+      const selected = values.find((candidate) => candidate.value === wanted);
       if (!selected) continue;
       const response = await this.#requireConnection().setSessionConfigOption({
         sessionId: thread.id,
@@ -658,7 +839,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const message =
         this.provider === "opencode" &&
         /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
-          ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Zen key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
+          ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
           : detail;
       this.emit("notification", {
         method: "error",
@@ -934,11 +1115,26 @@ function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) 
   return option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
 }
 
+/**
+ * What OpenBot's effort names are sent as, keyed by the OpenBot name.
+ *
+ * The exact name wins over an alias, whichever comes first. OpenCode offers
+ * `["minimal", "low", "medium", "high", "xhigh"]`, where `minimal` also reads as low effort: first
+ * value per key would make OpenBot's `low` send `minimal`, and a user who asks for low effort would
+ * silently get the lowest one the model has. An alias is still kept for a key the agent has no exact
+ * name for, which is how a model with `minimal` and no `low` stays reachable.
+ */
 function reasoningEffortWireValues(values: string[]): Map<string, string> {
   const result = new Map<string, string>();
   for (const value of values) {
     const normalized = normalizeEffort(value);
-    if (normalized && !result.has(normalized)) result.set(normalized, value);
+    if (!normalized) continue;
+    const held = result.get(normalized);
+    // `value.toLowerCase()` and not the normalized form of it: an exact name is the agent's own
+    // spelling of the key, and every key OpenBot has is one word.
+    if (held === undefined || (held !== normalized && value.toLowerCase() === normalized)) {
+      result.set(normalized, value);
+    }
   }
   return result;
 }

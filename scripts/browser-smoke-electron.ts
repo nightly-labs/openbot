@@ -10,6 +10,9 @@ import { type DynamicToolResult, getString } from "../src/backend/protocol";
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
 let browserToolCall = 0;
+// The user agent each `/headers` hit carried, keyed by `?source=`. A subframe request that
+// bypasses the session identity shows up here under its own source with the raw build string.
+const recordedIdentityAgents: Record<string, string> = {};
 
 interface PersistenceSnapshot {
   ready: true;
@@ -51,6 +54,7 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/headers") {
     response.setHeader("content-type", "text/html; charset=utf-8");
+    recordedIdentityAgents[url.searchParams.get("source") ?? "document"] = String(request.headers["user-agent"] ?? "");
     const requestHeaders = JSON.stringify(request.headers).replaceAll("<", "\\u003c");
     response.end(`<main></main><script>
       document.querySelector("main").textContent = JSON.stringify({
@@ -64,6 +68,33 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/abort") {
     response.destroy();
+    return;
+  }
+  if (url.pathname === "/identity-frame") {
+    // The frame and the worker below are cross-origin to this host on purpose: same-origin
+    // subresources already inherit the session identity, while out-of-process frames and
+    // service workers can fall back to the raw build string instead.
+    const host = request.headers.host ?? "127.0.0.1";
+    const sibling = host.startsWith("127.0.0.1")
+      ? host.replace("127.0.0.1", "localhost")
+      : host.replace("localhost", "127.0.0.1");
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<main>identity frame host</main><iframe title="Identity frame" src="http://${sibling}/headers?source=iframe"></iframe>
+<script>navigator.serviceWorker?.register("/sw-identity.js").catch(() => undefined);</script>`,
+    );
+    return;
+  }
+  if (url.pathname === "/sw-identity.js") {
+    response.setHeader("content-type", "application/javascript; charset=utf-8");
+    response.end(`self.addEventListener("install", (event) => {
+  event.waitUntil(fetch("/headers?source=worker").then(() => self.skipWaiting()).catch(() => undefined));
+});`);
+    return;
+  }
+  if (url.pathname === "/headers-report") {
+    response.setHeader("content-type", "application/json; charset=utf-8");
+    response.end(JSON.stringify(recordedIdentityAgents));
     return;
   }
   if (url.pathname === "/frame") {
@@ -107,6 +138,50 @@ const server = createServer((request, response) => {
   }
   // Its own page rather than more markup on `/v2`: that page's height and width are asserted against
   // a 220x560 panel, and a block form plus a default-sized iframe put a scrollbar in it.
+  // A canvas application: the grid is painted, so it has no element to focus, no value to set, and
+  // nothing for a semantic target to find. It reads keystrokes from the page the way a spreadsheet
+  // does -- characters build the pending cell, Tab commits it and moves a column right, Enter
+  // commits it and moves a row down.
+  if (url.pathname === "/grid") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html><body style="margin:0">
+      <canvas id="grid" width="400" height="200"></canvas>
+      <input aria-label="Grid filter" />
+      <output id="grid-state">{}</output>
+      <script>
+        const cells = {};
+        const canvas = document.getElementById('grid');
+        const state = document.getElementById('grid-state');
+        let row = 0;
+        let column = 0;
+        let pending = '';
+        const commit = () => {
+          if (pending) cells[String.fromCharCode(65 + column) + (row + 1)] = pending;
+          pending = '';
+          state.textContent = JSON.stringify(cells);
+        };
+        canvas.addEventListener('mousedown', (event) => {
+          const bounds = canvas.getBoundingClientRect();
+          commit();
+          column = Math.floor((event.clientX - bounds.left) / 100);
+          row = Math.floor((event.clientY - bounds.top) / 40);
+        });
+        window.addEventListener('keydown', (event) => {
+          if (event.key !== 'Tab' && event.key !== 'Enter') return;
+          event.preventDefault();
+          commit();
+          if (event.key === 'Tab') column += 1;
+          else {
+            row += 1;
+            column = 0;
+          }
+        });
+        window.addEventListener('keypress', (event) => {
+          if (event.key.length === 1) pending += event.key;
+        });
+      </script>`);
+    return;
+  }
   if (url.pathname === "/keys") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
@@ -235,6 +310,7 @@ async function main(): Promise<void> {
   }
   const googleLive = process.argv.includes("--google-live");
   const xLive = process.argv.includes("--x-live");
+  const whatsappLive = process.argv.includes("--whatsapp-live");
   const configuredRoot = argumentValue("--smoke-root=");
   const persistencePhase = argumentValue("--persistence-phase=");
   const persistenceOrigin = argumentValue("--persistence-origin=");
@@ -297,6 +373,7 @@ async function main(): Promise<void> {
               await runDragAction(browser, tab.id, contents);
               await runDoubleClickScenario(browser, origin);
               await runKeyboardScenario(browser, origin, temporaryRoot);
+              await runCanvasGridScenario(browser, origin);
             } else if (scenario === "wait-deadlines") {
               await runWaitDeadlines(browser, tab.id, contents);
             } else {
@@ -726,6 +803,7 @@ async function main(): Promise<void> {
     if (noDomRefs !== true) throw new Error("V2 snapshot mutated the page DOM.");
     await runControlActions(browser, v2Tab.id, v2Contents);
     await runKeyboardScenario(browser, origin, temporaryRoot);
+    await runCanvasGridScenario(browser, origin);
     // A snapshot walks every frame, and Electron's `sendCommand` has no timeout of its own, so a frame
     // whose process is spinning never answers the walk. The timeout returns an error to the caller
     // either way; what it also has to do is cancel the command, or the promise the tab's queue was told
@@ -1598,17 +1676,13 @@ async function main(): Promise<void> {
       : [];
     const clientHintBrands = getString(identity.requestHeaders, "sec-ch-ua") ?? "";
     const chromiumMajorVersion = process.versions.chrome.split(".")[0];
-    // The page and its requests present plain Chromium: neither the build token nor the app product
-    // token, which `navigator.userAgentData.brands` never carried either. A site that gates on a
-    // browser allowlist reads a product it does not know as an unsupported browser -- WhatsApp Web
-    // refuses to start on it, which blocks the QR login.
+    // The page and its requests share one honest identity, tokens included: Google reads a
+    // scrubbed Chromium string as an unknown client and refuses sign-in, while workers leaked
+    // the tokens anyway. Only the match between page and request identity is asserted here.
     if (
-      headerSnapshot.text.includes("Electron/") ||
-      headerSnapshot.text.includes("OpenBot/") ||
       !navigatorUserAgent?.includes(`Chrome/${chromiumMajorVersion}`) ||
       getString(identity.requestHeaders, "user-agent") !== navigatorUserAgent ||
       identity.navigatorWebdriver !== false ||
-      headerSnapshot.text.includes("Google Chrome") ||
       (clientHintBrands.length > 0 &&
         navigatorBrands.some(
           (brand) => !clientHintBrands.includes(`"${getString(brand, "brand")}";v="${getString(brand, "version")}"`),
@@ -1616,9 +1690,11 @@ async function main(): Promise<void> {
     ) {
       throw new Error(`Browser identity headers are invalid: ${headerSnapshot.text}`);
     }
-    process.stdout.write("BrowserHost: matching Chromium page and request identity passed.\n");
+    process.stdout.write("BrowserHost: matching page and request identity passed.\n");
+    await runIdentityFrameProbe(browser, origin);
     if (googleLive) await runGoogleLiveProbe(browser);
     if (xLive) await runXLiveProbe(browser);
+    if (whatsappLive) await runWhatsAppLiveProbe(browser);
     await expectFailure(() => browser.act(tab.id, first.revision, { type: "click", ref: save.ref }));
 
     const child = result.elements.find((element) => element.name === "Child");
@@ -2264,6 +2340,117 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
   }
 }
 
+async function expectSnapshot(browser: BrowserHost, tabId: string): Promise<DynamicRecord> {
+  const result = await callBrowserTool(browser, "snapshot", { tabId });
+  const payload = toolTextPayload(result);
+  if (!result.success || !payload) throw new Error(`Snapshot failed: ${toolError(result)}`);
+  return payload;
+}
+
+function snapshotFocus(snapshot: DynamicRecord): { tag: string; name: string; editable: boolean } | null {
+  const focus = snapshot.focus;
+  if (!isDynamicRecord(focus)) return null;
+  return {
+    tag: isString(focus.tag) ? focus.tag : "",
+    name: isString(focus.name) ? focus.name : "",
+    editable: focus.editable === true,
+  };
+}
+
+async function runCanvasGridScenario(browser: BrowserHost, origin: string): Promise<void> {
+  // A spreadsheet, a code editor and a map all paint their own surface, so `type` had no element to
+  // resolve, no `value` to write and no contenteditable to select: every attempt to enter data in
+  // one failed with "Typing requires an element target". Without a target the text has to arrive as
+  // the key events a person produces, which is also the only way the page's own keydown handlers
+  // see the tab and newline that move between columns and rows.
+  const { tab: gridTab, contents: gridContents } = await openTabWithContents(
+    browser,
+    `${origin}/grid`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const cellState = () => gridContents.executeJavaScript("document.querySelector('#grid-state').textContent", true);
+  try {
+    const selected = await callBrowserTool(browser, "click", {
+      tabId: gridTab.id,
+      target: { kind: "point", x: 50, y: 20 },
+    });
+    if (!selected.success) throw new Error(`Canvas cell selection failed: ${toolError(selected)}`);
+    const filledRow = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "12\tDone\n",
+    });
+    if (!filledRow.success) throw new Error(`Canvas grid typing failed: ${toolError(filledRow)}`);
+    const afterRow = await cellState();
+    if (afterRow !== '{"A1":"12","B1":"Done"}') {
+      throw new Error(`Canvas grid did not take the row: ${afterRow}`);
+    }
+    // Enter returned to the first column of the next row, so the second call proves the page kept
+    // the focus the first one left it with, without any element to re-target.
+    const committed = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "next",
+      submit: true,
+    });
+    if (!committed.success) throw new Error(`Canvas grid submit failed: ${toolError(committed)}`);
+    const afterSubmit = await cellState();
+    if (afterSubmit !== '{"A1":"12","B1":"Done","A2":"next"}') {
+      throw new Error(`Canvas grid did not commit the submitted cell: ${afterSubmit}`);
+    }
+    // Keystrokes with no target land wherever the page put the focus, and a caller that cannot see
+    // where that is finds out only when the data appears in the wrong place. The canvas leaves it on
+    // the document, which is what tells a caller the page interprets the keys itself.
+    const canvasFocus = snapshotFocus(await expectSnapshot(browser, gridTab.id));
+    if (canvasFocus?.tag !== "body" || canvasFocus.editable !== false) {
+      throw new Error(`Canvas grid snapshot misreported the focus: ${JSON.stringify(canvasFocus)}`);
+    }
+    const focusedField = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      target: { kind: "role", role: "textbox", name: "Grid filter", exact: true },
+      text: "filter",
+    });
+    if (!focusedField.success) throw new Error(`Grid field typing failed: ${toolError(focusedField)}`);
+    const fieldFocus = snapshotFocus(await expectSnapshot(browser, gridTab.id));
+    if (fieldFocus?.tag !== "input" || fieldFocus.name !== "Grid filter" || fieldFocus.editable !== true) {
+      throw new Error(`Grid field snapshot misreported the focus: ${JSON.stringify(fieldFocus)}`);
+    }
+
+    // Every keystroke is its own event, so a deadline reached part way through leaves what the page
+    // already took. A caller told only that the action timed out repeats a send that half happened,
+    // which in a spreadsheet enters the same data twice -- so the error has to carry how far it got,
+    // and that number has to be the truth rather than a guess.
+    const timedOut = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "y".repeat(4_000),
+      timeoutMs: 20,
+    });
+    const reported = /timed out after (\d+) of 4000 characters/.exec(toolError(timedOut));
+    if (timedOut.success || !reported) {
+      throw new Error(`Canvas grid typing hid its progress past the deadline: ${toolError(timedOut)}`);
+    }
+    const sent = Number(reported[1]);
+    const partialCommit = await callBrowserTool(browser, "press", { tabId: gridTab.id, key: "Enter" });
+    if (!partialCommit.success) throw new Error(`Canvas grid commit failed: ${toolError(partialCommit)}`);
+    const partial = JSON.parse(await cellState()).A3;
+    if (partial?.length !== sent || sent === 0 || sent >= 4_000) {
+      throw new Error(`Canvas grid kept ${partial?.length} characters but the error reported ${sent}.`);
+    }
+
+    // Replacing and appending are properties of a node's value. Reporting either one for keystrokes
+    // the page interprets itself would claim an edit that never happened.
+    const modeWithoutTarget = await callBrowserTool(browser, "type", {
+      tabId: gridTab.id,
+      text: "ignored",
+      mode: "replace",
+    });
+    if (modeWithoutTarget.success || !toolError(modeWithoutTarget).includes("type mode requires a target")) {
+      throw new Error(`Canvas grid accepted a mode without a target: ${toolError(modeWithoutTarget)}`);
+    }
+  } finally {
+    await browser.close(gridTab.id);
+  }
+}
+
 async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
   const evaluated = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
@@ -2422,7 +2609,7 @@ async function runToolBoundaryScenario(browser: BrowserHost, origin: string): Pr
 }
 
 async function runPersistencePhase(root: string, origin: string, phase: string): Promise<void> {
-  if (!new Set(["write", "read", "clear", "verify-cleared"]).has(phase)) {
+  if (!new Set(["write", "read", "clear", "verify-cleared", "read-clear"]).has(phase)) {
     throw new Error(`Unknown persistence phase: ${phase}`);
   }
   await app.whenReady();
@@ -2430,9 +2617,35 @@ async function runPersistencePhase(root: string, origin: string, phase: string):
   const browser = new BrowserHost(window, join(root, "downloads"), join(root, "browser-tabs.json"));
   await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
   try {
-    const tab = await browser.open(`${origin}/persistence?phase=${encodeURIComponent(phase)}`, "persistence-thread");
+    if (phase === "read-clear") {
+      // Read proves write persists across restart. Clear runs in the same
+      // boot. A later boot must verify that clear persists across restart.
+      await checkOnePersistencePage(browser, origin, "read", true);
+      await checkOnePersistencePage(browser, origin, "clear", false);
+      await browser.flushPersistentStorage();
+    } else {
+      await checkOnePersistencePage(browser, origin, phase, phase === "write" || phase === "read");
+      await browser.flushPersistentStorage();
+    }
+  } finally {
+    try {
+      await browser.destroy();
+    } finally {
+      window.destroy();
+    }
+  }
+  process.stdout.write(`BrowserHost: persistence ${phase} phase passed.\n`);
+}
+
+async function checkOnePersistencePage(
+  browser: BrowserHost,
+  origin: string,
+  phase: string,
+  expectedStored: boolean,
+): Promise<void> {
+  const tab = await browser.open(`${origin}/persistence?phase=${encodeURIComponent(phase)}`, "persistence-thread");
+  try {
     const snapshot = await waitForPersistenceSnapshot(browser, tab.id);
-    const expectedStored = phase === "write" || phase === "read";
     const cookie = getString(snapshot, "cookie") ?? "";
     const localStorageValue = getString(snapshot, "localStorage");
     const indexedDbValue = getString(snapshot, "indexedDb");
@@ -2452,15 +2665,9 @@ async function runPersistencePhase(root: string, origin: string, phase: string):
     if (expectedStored && !requireCrossProcessCookie && !cookie.includes("openbot_persistence=kept")) {
       process.stdout.write("BrowserHost: signed macOS app must verify encrypted cookie persistence.\n");
     }
-    await browser.flushPersistentStorage();
   } finally {
-    try {
-      await browser.destroy();
-    } finally {
-      window.destroy();
-    }
+    await browser.close(tab.id);
   }
-  process.stdout.write(`BrowserHost: persistence ${phase} phase passed.\n`);
 }
 
 async function waitForPersistenceSnapshot(browser: BrowserHost, tabId: string): Promise<PersistenceSnapshot> {
@@ -2541,6 +2748,41 @@ function toolTextPayload(result: DynamicToolResult): DynamicRecord | undefined {
 function toolError(result: DynamicToolResult): string {
   const item = result.contentItems.find((candidate) => candidate.type === "inputText");
   return item?.type === "inputText" ? item.text : "unknown browser tool error";
+}
+
+async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Promise<void> {
+  // Every source must present the same identity the session carries: a subframe or worker that
+  // falls back to a different string reads as a second, unknown client next to the page.
+  const frameTab = await browser.open(`${origin}/identity-frame`, "smoke-thread");
+  try {
+    const deadline = Date.now() + 15_000;
+    let report: Record<string, string> = {};
+    while (Date.now() < deadline) {
+      try {
+        const parsed = await (await fetch(`${origin}/headers-report`)).json();
+        if (isDynamicRecord(parsed)) {
+          report = Object.fromEntries(
+            Object.entries(parsed).map(([source, agent]) => [source, isString(agent) ? agent : ""]),
+          );
+        }
+      } catch {
+        // The frame or worker request may not have arrived yet.
+      }
+      if (report.document && report.iframe && report.worker) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!report.document || !report.iframe || !report.worker) {
+      throw new Error(`Browser identity probe missed a source: ${JSON.stringify(report)}`);
+    }
+    for (const [source, agent] of Object.entries(report)) {
+      if (agent !== report.document) {
+        throw new Error(`Browser identity differs by source (${source}): ${agent} vs ${report.document}`);
+      }
+    }
+    process.stdout.write("BrowserHost: matching frame and worker identity passed.\n");
+  } finally {
+    await browser.close(frameTab.id);
+  }
 }
 
 async function runGoogleLiveProbe(browser: BrowserHost): Promise<void> {
@@ -2643,6 +2885,40 @@ async function runXLiveProbe(browser: BrowserHost): Promise<void> {
   const identifier = loginPage.elements.find((element) => element.tag === "input" && !element.disabled);
   if (!identifier) throw new Error("X did not show an account identifier field.");
   process.stdout.write("BrowserHost: X login identifier step loaded.\n");
+}
+
+async function runWhatsAppLiveProbe(browser: BrowserHost): Promise<void> {
+  // No credentials needed: the allowlist refusal renders before any login, while the real
+  // login page shows the phone-linking controls instead.
+  const whatsappTab = await browser.open(
+    "https://web.whatsapp.com/",
+    "whatsapp-live-smoke",
+    "whatsapp-live-smoke",
+    true,
+  );
+  const deadline = Date.now() + 30_000;
+  let page = await browser.snapshot(whatsappTab.id);
+  while (Date.now() < deadline) {
+    const normalized = page.text.toLowerCase();
+    if (
+      normalized.includes("works with google chrome") ||
+      normalized.includes("update google chrome") ||
+      normalized.includes("phone number") ||
+      normalized.includes("scan")
+    ) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    page = await browser.snapshot(whatsappTab.id);
+  }
+  const normalized = page.text.toLowerCase();
+  if (normalized.includes("works with google chrome") || normalized.includes("update google chrome")) {
+    throw new Error(`WhatsApp rejected the embedded browser: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  if (!normalized.includes("phone number") && !normalized.includes("scan")) {
+    throw new Error(`WhatsApp returned an unexpected page: ${page.url} ${page.text.slice(0, 500)}`);
+  }
+  process.stdout.write("BrowserHost: WhatsApp login page loaded without a browser block.\n");
 }
 
 async function waitForXSnapshot(

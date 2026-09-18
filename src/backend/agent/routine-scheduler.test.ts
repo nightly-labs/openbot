@@ -2,12 +2,12 @@
 import { routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
   callOpenBotTool,
+  createTestService,
   expectOpenBotToolError,
   FakeAgentClient,
-  fakeBrowser,
   openBotToolPayload,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -31,10 +31,15 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("lets an agent manage routines for itself and another agent", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     await store.getOrCreate("design", "Design Studio", "Product design");
@@ -127,9 +132,14 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("appends a cancellation marker before deleting an active routine run", async () => {
     const { store, mailbox } = stores(root);
     let client: FakeAgentClient | undefined;
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      client = new FakeAgentClient(provider, "", false);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        client = new FakeAgentClient(provider, "", false);
+        return client;
+      },
     });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
@@ -168,14 +178,12 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("rolls back a routine transition and retries without a duplicate marker", async () => {
     const { store, mailbox } = stores(root);
     const createService = () =>
-      new AgentService(
+      createTestService({
         store,
         mailbox,
-        fakeBrowser(),
-        30_000,
-        "codex",
-        (provider) => new FakeAgentClient(provider, "", false),
-      );
+        preferredProvider: "codex",
+        clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+      });
     service = createService();
     await service.initialize();
     const agent = await store.getOrCreate("chief");
@@ -238,10 +246,15 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   it("rejects invalid or cross-agent routine tool mutations", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     await store.getOrCreate("design", "Design Studio", "Product design");
@@ -300,9 +313,72 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       "routine no longer exists",
     );
   });
+  it("creates folder-listening routines with short polling and rejects intervals below 3 minutes", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Watch the inbox folder." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")));
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The folder listening test thread did not start.");
+
+    const folderInstruction =
+      "Watch /Users/kamicyrek/Desktop/OpenBot/INBOX for new invoice files and create a notification for each new file.";
+    const created = await callOpenBotTool(client, threadId, "create_routine", {
+      name: "Inbox watcher",
+      instruction: folderInstruction,
+      schedule: { kind: "interval", amount: 5, unit: "minutes", anchorAt: new Date().toISOString() },
+    });
+    expect(created.error).toBeUndefined();
+    const folderRoutine = openBotToolPayload(created.result);
+    expect(folderRoutine).toMatchObject({
+      name: "Inbox watcher",
+      trigger: { schedule: { kind: "interval", amount: 5, unit: "minutes" } },
+    });
+    expect(folderRoutine.instruction).toContain("/Users/kamicyrek/Desktop/OpenBot/INBOX");
+
+    await expectOpenBotToolError(
+      client,
+      threadId,
+      "create_routine",
+      {
+        name: "Too frequent watcher",
+        instruction: folderInstruction,
+        schedule: { kind: "interval", amount: 2, unit: "minutes", anchorAt: new Date().toISOString() },
+      },
+      "at least 3 minutes",
+    );
+    await expectOpenBotToolError(
+      client,
+      threadId,
+      "update_routine",
+      {
+        routineId: folderRoutine.id,
+        schedule: { kind: "interval", amount: 1, unit: "minutes", anchorAt: new Date().toISOString() },
+      },
+      "at least 3 minutes",
+    );
+    // The failed updates must not drop the folder path or the monitoring instructions.
+    expect(service?.listRoutines("chief").find((routine) => routine.id === folderRoutine.id)).toMatchObject({
+      instruction: expect.stringContaining("/Users/kamicyrek/Desktop/OpenBot/INBOX"),
+      trigger: { schedule: { kind: "interval", amount: 5, unit: "minutes" } },
+    });
+  });
   it("rolls back a routine mutation when its transcript marker cannot persist", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
     const initialAgent = store.list().find((candidate) => candidate.id === agent.id);
@@ -329,7 +405,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
   });
   it("restores queued routine work when a delete marker cannot persist", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
     const routine = service.createRoutine({

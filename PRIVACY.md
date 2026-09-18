@@ -171,7 +171,10 @@ when displaying a conversation. Link destinations are contacted only when you ch
 Mobile chat can send selected files to the conversation's desktop host through the existing encrypted
 team connection. Text pasted into the input is processed only after the user pastes it. A text paste
 longer than 4,000 characters becomes a text attachment. Selected documents can also have a temporary
-copy in the phone's system cache. Uploads are limited to 10 MB per file on mobile; successful uploads
+copy in the phone's system cache. Attachments added while editing a queued message are saved in the
+phone's app document storage, with references in the saved edit, so they survive an app restart.
+Those draft copies are removed when the attachment is removed or the edit is saved or cancelled.
+Uploads are limited to 10 MB per file on mobile; successful uploads
 become managed attachments on the host. Camera capture uses an in-chat preview. Photo selection uses the phone's system interface.
 Image attachment previews are downloaded from the desktop host through the same encrypted connection.
 Other attachments are downloaded when you choose Open or save. The phone creates a temporary file for
@@ -194,7 +197,10 @@ provider logs are outside the OpenBot application database and its daily mainten
 
 - `~/OpenBot/Agents` contains one workspace per agent. A profile written by a release before the
   bot-to-agent rename holds them under `~/OpenBot/Bots`; the application moves them on first launch.
-- `~/OpenBot/Shared` contains managed transfers shared between agents.
+- `~/OpenBot/Shared` contains managed transfers shared between agents, and
+  `~/OpenBot/Shared/Data/agent-data.db` holds the records the agents keep for themselves between tasks.
+  Every agent on this computer can read and write every table in that file, and the user can delete any
+  table in agent settings.
 - `~/OpenBot/Downloads` contains files downloaded by the embedded browser.
 - `~/Library/Application Support/OpenBot` contains the OpenBot SQLite database, agent metadata,
   conversations, message queues, direct messages, reactions, read state, attachment drafts and
@@ -265,7 +271,7 @@ counts. It contains no conversations, visited URLs, account email, file contents
 
 Quit OpenBot, then remove the OpenBot folders listed above. Removing
 `~/Library/Application Support/OpenBot` also removes the embedded browser's cookies and logins.
-Removing `~/OpenBot` removes agent workspaces, transfers, and downloads. OpenBot does not delete
+Removing `~/OpenBot` removes agent workspaces, transfers, downloads, and the records the agents kept. OpenBot does not delete
 `~/.codex` or `~/.claude`; use each CLI's own controls if you also want to remove its local data.
 
 Review folders before deleting them and keep a backup of anything you need.
@@ -291,10 +297,10 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 OpenBot downloads the pinned OpenCode CLI from `registry.npmjs.org` and its license from
 `github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
 results go to that local process. OpenCode can send them to the model provider selected in its
-configuration. OpenCode's free models are the default, and they reach OpenCode Zen with no account,
+configuration. OpenCode's free models are the default, and they reach OpenCode Go with no account,
 so a first OpenCode turn leaves this computer without a sign-in.
 
-An OpenCode Zen key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
+An OpenCode Go key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
 system's secret storage, writes it to a file that only your user account can read, and passes it
 only to the local OpenCode process. No screen, log, data export, or diagnostics report contains it;
 the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
@@ -318,3 +324,17 @@ Archiving a channel stops its work and retains its transcript. Restore makes the
 These actions do not remove agents, their memories, or linked conversations. Channel traffic between
 desktop clients and a host uses the existing host transport. The account API and Signal service do
 not store channel chats or make routing decisions. This feature adds no mobile chat interface.
+
+## Mobile queue drafts
+
+A phone stores the text and attachment references of an active queue edit in its secure local
+storage, and keeps a copy of each file the edit adds in its own application storage, so it can
+recover the edit after navigation or restart. These copies stay on the phone and are removed when
+the edit is saved or cancelled. The host keeps the original message and a persistent edit hold
+until the edit is saved, cancelled, or the message is deleted.
+
+The desktop editor also keeps its active queue edit, attachment references, and edit identity in
+local application storage. This lets it recover the held draft after restart. Neither client
+releases the host hold merely because the editor closes or disconnects. The host also preserves
+attachment drafts released by edit cancellation or message deletion until they are sent or
+discarded. This lets a disconnected desktop recover its saved composer backup after host restart.

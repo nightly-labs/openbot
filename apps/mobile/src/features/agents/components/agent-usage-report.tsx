@@ -1,9 +1,12 @@
-import type { AgentAnalytics } from "@openbot/contracts/ipc";
+import { type AgentAnalytics, agentProviderCliName, isAgentProvider } from "@openbot/contracts/ipc";
 import { Button, Typography } from "heroui-native";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 
+// A usage row names the provider the record carried, which is not always one OpenBot knows:
+// an unrecognised string is shown as it was stored rather than guessed at.
+const providerName = (value: string) => (isAgentProvider(value) ? agentProviderCliName(value) : value);
 const number = (value: number | null) => (value === null ? "Unavailable" : value.toLocaleString());
 const money = (value: number | null) => (value === null ? "Unavailable" : `$${value.toFixed(4)}`);
 const date = (value: string, includeYear = false) =>
@@ -136,7 +139,8 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
             <View key={`${model.provider}:${model.model}`} className="gap-2 p-4">
               <Typography>{model.model || "Unknown model"}</Typography>
               <Typography type="body-xs" className="text-grouped-secondary">
-                {model.provider} · {number(model.processedTokens)} tokens · {money(model.estimatedCostUsd)}
+                {providerName(model.provider)} · {number(model.processedTokens)} tokens ·{" "}
+                {money(model.estimatedCostUsd)}
               </Typography>
               <View className="h-1 overflow-hidden rounded-full bg-grouped-border">
                 <View

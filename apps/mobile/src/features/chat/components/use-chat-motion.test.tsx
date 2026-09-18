@@ -189,3 +189,62 @@ it("reveals a virtualized history and does not jump to the end when older messag
   motion.scrollToLatest();
   expect(native.scrollTo).toHaveBeenLastCalledWith({ y: 2600, animated: false });
 });
+
+it("follows required input after layout but preserves a manual history position", async () => {
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    const id = ++native.nextFrame;
+    native.frames.set(id, callback);
+    return id;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => native.frames.delete(id));
+  let motion: ChatMotion | undefined;
+  function Chat({ requiredInputId }: { requiredInputId: string | null }) {
+    const current = useChatMotion(100, 0, true, "user", requiredInputId);
+    useLayoutEffect(() => {
+      motion = current;
+    });
+    return null;
+  }
+  async function flush() {
+    await act(() => {
+      while (native.frames.size) {
+        const frames = [...native.frames.values()];
+        native.frames.clear();
+        for (const frame of frames) frame(0);
+      }
+      native.reactions.at(-1)?.();
+    });
+  }
+
+  await act(() => root.render(<Chat requiredInputId={null} />));
+  if (!motion) throw new Error("Chat motion is not mounted");
+  motion.onViewportLayout(layout(800));
+  motion.onComposerLayout(layout(80));
+  motion.onTailStartLayout("user", layout(100, 2_600));
+  motion.onContentSizeChange(390, 3_000);
+  motion.onContentInsetChange({ bottom: 400 });
+  await flush();
+  native.scrollTo.mockClear();
+
+  await act(() => root.render(<Chat requiredInputId="prompt-1" />));
+  await flush();
+  expect(native.scrollTo).not.toHaveBeenCalled();
+  motion.onContentSizeChange(390, 3_400);
+  await flush();
+  expect(native.scrollTo).toHaveBeenLastCalledWith({ y: 3_000, animated: false });
+
+  native.scrollTo.mockClear();
+  motion.onScrollBeginDrag();
+  await act(() => root.render(<Chat requiredInputId="prompt-2" />));
+  motion.onContentSizeChange(390, 3_800);
+  await flush();
+  expect(native.scrollTo).not.toHaveBeenCalled();
+
+  motion.scrollToLatest();
+  native.scrollTo.mockClear();
+  await act(() => root.render(<Chat requiredInputId="prompt-3" />));
+  motion.onScrollBeginDrag();
+  motion.onContentSizeChange(390, 4_200);
+  await flush();
+  expect(native.scrollTo).not.toHaveBeenCalled();
+});

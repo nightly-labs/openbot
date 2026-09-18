@@ -1,4 +1,7 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
+import { AgentTables } from "../backend/agent-data/agent-tables";
+import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
 /**
@@ -38,7 +41,6 @@ import { IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
-import electronUpdater from "electron-updater";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
@@ -93,7 +95,13 @@ import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { readUpdatePreference } from "./update-preference-store";
-import { supportsInstalledUpdates, UpdateService } from "./update-service";
+import {
+  createDisabledUpdateAdapter,
+  isValidSemver,
+  supportsInstalledUpdates,
+  type UpdateAdapter,
+  UpdateService,
+} from "./update-service";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 
@@ -315,8 +323,17 @@ export async function createApplicationServices({
     undefined,
     "openbot-skill-creator",
   );
+  const dataSkill = new ManagedSkillService(
+    app.isPackaged
+      ? join(process.resourcesPath, "managed-skills", "openbot-data", "SKILL.md")
+      : resolve(__dirname, "../../resources/managed-skills/openbot-data/SKILL.md"),
+    undefined,
+    undefined,
+    "openbot-data",
+  );
   await managedSkills.syncAll(store.list());
   await skillCreator.syncAll(store.list());
+  await dataSkill.syncAll(store.list());
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -419,22 +436,29 @@ export async function createApplicationServices({
   if (credentialLoadError) {
     logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
   }
-  const service: AgentService = new AgentService(
+  const tables = new AgentTables({
+    sharedRoot: store.sharedRoot,
+    supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
+  });
+  const service: AgentService = new AgentService({
     store,
     mailbox,
     browser,
-    30_000,
-    setupState.preferredProvider ?? "codex",
-    null,
-    providerRuntimes.bundledExecutables(),
-    async (agent) => {
+    requestTimeoutMs: 30_000,
+    preferredProvider: setupState.preferredProvider ?? "codex",
+    bundledExecutables: providerRuntimes.bundledExecutables(),
+    prepareAgentWorkspace: async (agent) => {
       await managedSkills.syncAgent(agent);
       await skillCreator.syncAgent(agent);
+      await dataSkill.syncAgent(agent);
     },
     hostedSites,
     sidebarLayout,
-    setupState.preferredModel,
-    {
+    preferredModel: setupState.preferredModel,
+    // Only a dev build leads with the OpenCode development model; a packaged app keeps the
+    // built-in default.
+    developmentDefaults: appVariant === "dev",
+    credentials: {
       apiKey: (provider) => providerCredentials.get(provider),
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
@@ -443,8 +467,9 @@ export async function createApplicationServices({
       // into the object being constructed; nothing calls it before the constructor returns.
       mcpServers: () => service.enabledMcpServers(),
     },
-    () => localSkillTools(skills),
-  );
+    localSkillTools: () => localSkillTools(skills),
+    tables,
+  });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
@@ -672,13 +697,37 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => voice.shutdown());
   voice.on("modelStatus", forwardVoiceModelStatus);
-  const { autoUpdater } = electronUpdater;
-  const updater = new UpdateService(autoUpdater, {
-    currentVersion: app.getVersion(),
-    enabled:
-      app.isPackaged &&
-      supportsInstalledUpdates(process.platform) &&
-      existsSync(join(process.resourcesPath, "app-update.yml")),
+  const currentVersion = app.getVersion();
+  // Skip the file check in dev: unpacked runs never enable updates, so avoid touching resourcesPath.
+  const updateMetadataAvailable = app.isPackaged && existsSync(join(process.resourcesPath, "app-update.yml"));
+  const updatesEnabled =
+    app.isPackaged &&
+    supportsInstalledUpdates(process.platform) &&
+    updateMetadataAvailable &&
+    isValidSemver(currentVersion);
+  if (app.isPackaged && updateMetadataAvailable && !isValidSemver(currentVersion)) {
+    logger.warn(`OpenBot updates are disabled because the application version is not valid SemVer: ${currentVersion}`);
+  }
+  let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
+  let updaterEnabled = updatesEnabled;
+  if (updatesEnabled) {
+    try {
+      const updaterModule = await import("electron-updater");
+      const realAdapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+      if (realAdapter) {
+        updateAdapter = realAdapter;
+      } else {
+        updaterEnabled = false;
+        logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
+      }
+    } catch {
+      updaterEnabled = false;
+      logger.warn("OpenBot updates are disabled: electron-updater failed to load");
+    }
+  }
+  const updater = new UpdateService(updateAdapter, {
+    currentVersion,
+    enabled: updaterEnabled,
     autoDownload: updatePreference.autoDownload,
     beforeInstall: prepareForUpdateInstall,
     platform: process.platform,

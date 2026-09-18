@@ -4,7 +4,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack }
 import { type BubbleVariant, Button, DropdownMenu } from "../../components/ui";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentMessage, AgentProfile } from "../../data";
-import { AttachmentCards } from "./AttachmentCards";
+import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { ComparisonTable } from "./ComparisonTable";
 import { CheckIcon, CopyIcon, MoreIcon, PlusIcon, ReactionIcon, ReplyIcon } from "./ConversationIcons";
@@ -147,6 +147,7 @@ export function MessageBody(props: {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
+  onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
   onDownload?: (attachment: AttachmentSummary) => void;
 }) {
   const streamingBody = createStreamingBody(
@@ -170,6 +171,7 @@ export function MessageBody(props: {
       (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
     );
   });
+  const [downloadingAttachments, setDownloadingAttachments] = createSignal(false);
   const standaloneImageAttachments = createMemo(() =>
     props.message.author === "agent"
       ? standaloneAttachments().filter((attachment) => attachment.previewKind === "image")
@@ -298,7 +300,10 @@ export function MessageBody(props: {
                   );
                 }
                 return (
-                  <p class="message-copy">
+                  <p
+                    class="message-copy"
+                    data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
+                  >
                     <RichMessageText
                       body={block.text}
                       agents={props.agents}
@@ -357,11 +362,26 @@ export function MessageBody(props: {
         </div>
       </Show>
       <Show when={standaloneFileAttachments().length > 0}>
-        <AttachmentCards
-          attachments={standaloneFileAttachments()}
-          onPreview={props.onPreview}
-          onAction={props.onAttachmentAction}
-        />
+        <div class="message-attachments-group">
+          <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
+            <AttachmentDownloadAll
+              count={props.message.attachments?.length ?? 0}
+              pending={downloadingAttachments()}
+              onDownload={() => {
+                if (downloadingAttachments()) return;
+                setDownloadingAttachments(true);
+                void props
+                  .onDownloadAttachments?.(props.message.attachments ?? [])
+                  .finally(() => setDownloadingAttachments(false));
+              }}
+            />
+          </Show>
+          <AttachmentCards
+            attachments={standaloneFileAttachments()}
+            onPreview={props.onPreview}
+            onAction={props.onAttachmentAction}
+          />
+        </div>
       </Show>
     </>
   );

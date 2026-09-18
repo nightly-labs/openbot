@@ -44,6 +44,10 @@ export const IPC_ENDPOINTS = {
     // Dynamic Island overlay has no Settings of its own and would otherwise stay in the old
     // language until it was next recreated.
     appLanguagePreference: event(IPC_CHANNELS.appLanguagePreference),
+    // The native Preferences menu item and its shortcut live in main, while the dialog lives in
+    // the renderer, so the menu click is broadcast rather than handled: every window opens its
+    // own Settings.
+    openSettings: event(IPC_CHANNELS.openSettings),
     openExternal: request(IPC_CHANNELS.openExternal),
     openUrl: request(IPC_CHANNELS.openUrl),
   },
@@ -186,6 +190,7 @@ export const IPC_ENDPOINTS = {
     acknowledgeFailedTurn: request(IPC_CHANNELS.agentAcknowledgeFailedTurn),
     cancelQueuedMessage: request(IPC_CHANNELS.agentCancelQueuedMessage),
     steerQueuedMessage: request(IPC_CHANNELS.agentSteerQueuedMessage),
+    editQueuedMessage: request(IPC_CHANNELS.agentEditQueuedMessage),
     updateQueuedMessage: request(IPC_CHANNELS.agentUpdateQueuedMessage),
     reorderQueue: request(IPC_CHANNELS.agentReorderQueue),
     interrupt: request(IPC_CHANNELS.agentInterrupt),
@@ -200,6 +205,10 @@ export const IPC_ENDPOINTS = {
     updateMemory: request(IPC_CHANNELS.agentUpdateMemory),
     deleteMemory: request(IPC_CHANNELS.agentDeleteMemory),
     clearMemories: request(IPC_CHANNELS.agentClearMemories),
+  },
+  sharedTables: {
+    listTables: request(IPC_CHANNELS.sharedListTables),
+    deleteTable: request(IPC_CHANNELS.sharedDeleteTable),
   },
   agentRoutines: {
     listRoutines: request(IPC_CHANNELS.agentListRoutines),
@@ -228,6 +237,7 @@ export const IPC_ENDPOINTS = {
     chooseAttachments: request(IPC_CHANNELS.agentChooseAttachments),
     importAttachments: request(IPC_CHANNELS.agentImportAttachments),
     discardDraftAttachment: request(IPC_CHANNELS.agentDiscardDraftAttachment),
+    downloadAttachments: request(IPC_CHANNELS.agentDownloadAttachments),
     openAttachment: request(IPC_CHANNELS.agentOpenAttachment),
     openSharedFile: request(IPC_CHANNELS.agentOpenSharedFile),
     openWorkspaceFile: request(IPC_CHANNELS.agentOpenWorkspaceFile),
@@ -301,6 +311,7 @@ export const IPC_ENDPOINTS = {
     getPresence: request(IPC_CHANNELS.hostGetPresence),
     start: request(IPC_CHANNELS.hostStart),
     stop: request(IPC_CHANNELS.hostStop),
+    recheckScreenRecording: request(IPC_CHANNELS.hostRecheckScreenRecording),
     listMembers: request(IPC_CHANNELS.hostListMembers),
     createInvite: request(IPC_CHANNELS.hostCreateInvite),
     listInvites: request(IPC_CHANNELS.hostListInvites),

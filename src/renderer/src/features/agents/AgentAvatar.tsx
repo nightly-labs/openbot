@@ -1,7 +1,19 @@
-import { type Block, BloubBot, defaultCycle, makeBlock, POSES, type StateId } from "@norbert_bodziony/bloub";
+import {
+  type Block,
+  BloubBot,
+  BotEngine,
+  type BotFrame,
+  DEMI_VIEWBOX,
+  defaultCycle,
+  makeBlock,
+  POSES,
+  RAYON,
+  type StateId,
+} from "@norbert_bodziony/bloub";
 import type { AvatarHue } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId } from "../../bloub-avatar";
+import { TypingDots } from "../../components/TypingDots";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 
@@ -25,6 +37,11 @@ const CONNECTING_CYCLE: Block[] = [makeBlock("orbit"), makeBlock("swirl")];
 // focus or was minimized. `working` and `connecting` keep animating: motion is
 // the only sidebar signal that an agent runs.
 const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
+
+// Read from the avatar upwards: the first of these is its hover group. A `[tabindex]` element that
+// matches none of them, such as the dialog or a scroll region, is too wide to be one. An item of a
+// composite widget states its own group with `data-avatar-hover`.
+const HOVER_GROUP = "[data-avatar-hover], button, a, [role='button'], [role='link'], [role='menuitem']";
 
 function slowerBlock(state: StateId): Block {
   const block = makeBlock(state);
@@ -75,10 +92,146 @@ export function AgentAvatar(props: AgentAvatarProps) {
         />
       }
     >
-      <span class={`${className()} agent-avatar-custom`} style={props.style} aria-hidden="true">
-        <img src={url() ?? ""} alt="" draggable={false} onError={() => setImageFailed(true)} />
+      <span
+        class={`${className()} agent-avatar-custom`}
+        style={props.style}
+        data-avatar={props.animationState === "thinking" ? "dots" : "image"}
+        data-animation-state={props.animationState}
+        aria-hidden="true"
+      >
+        {/* A photo cannot morph, so the Bloub's own activity decor is drawn around it:
+            `thinking` hides the body behind three dots, every other state flies its rings. */}
+        <Show when={props.animationState !== "thinking"} fallback={<TypingDots class="agent-avatar-dots" />}>
+          <Show
+            when={props.animationState}
+            fallback={<AvatarImage url={url()} onFailed={() => setImageFailed(true)} />}
+          >
+            {(animationState) => (
+              <OrbitedAvatarImage url={url()} animationState={animationState()} onFailed={() => setImageFailed(true)} />
+            )}
+          </Show>
+        </Show>
       </span>
     </Show>
+  );
+}
+
+function AvatarImage(props: { url: string | null; onFailed: () => void }) {
+  return <img src={props.url ?? ""} alt="" draggable={false} onError={() => props.onFailed()} />;
+}
+
+// A pose whose decor a photo can wear. `burst` and `wide` carry theirs in the
+// body and the face, which a photo replaces, so they would leave it still for
+// the whole turn; they borrow the orbit rings instead. Asked of the engine
+// rather than listed here, so a pose that gains or loses rings upstream needs
+// no edit.
+function ringPose(state: StateId): StateId {
+  return new BotEngine(RAYON, state).sample(POSES[state]).arcs.length > 0 ? state : "orbit";
+}
+
+// The rings an orbiting Bloub flies, around a photo instead of a body. They come
+// from the engine rather than from CSS so that a custom avatar and a generated one
+// in the same row carry the same decor: the same ellipses at the same speed, each
+// split into the half behind the head and the half in front of it. The image sits
+// between those halves, which is what makes them read as orbits.
+function OrbitedAvatarImage(props: { url: string | null; animationState: StateId; onFailed: () => void }) {
+  let pose = ringPose(props.animationState);
+  let elapsed = POSES[pose];
+  let ringsSeen = false;
+  const engine = new BotEngine(RAYON, pose);
+  const [frame, setFrame] = createSignal(engine.sample(elapsed), { equals: false });
+
+  createEffect(
+    () => props.animationState,
+    (state) => {
+      const next = ringPose(state);
+      // The effect also runs on mount, where the engine already holds the pose.
+      if (next === pose) return;
+      pose = next;
+      ringsSeen = false;
+      engine.reset(next, elapsed);
+    },
+  );
+
+  onSettled(() => {
+    if (prefersReducedMotion()) return;
+    let handle = 0;
+    let previousFrameAt = 0;
+    let drawnAt = -Infinity;
+    const step = (now: number) => {
+      handle = requestAnimationFrame(step);
+      elapsed += previousFrameAt ? Math.min((now - previousFrameAt) / 1000, 0.064) : 0;
+      previousFrameAt = now;
+      if (elapsed - drawnAt < 1 / AVATAR_FPS) return;
+      drawnAt = elapsed;
+      let sampled = engine.sample(elapsed);
+      // A pose plays once, and its rings fade out before it ends — orbit holds
+      // them for 3.6s of a 4.3s block. The body keeps the generated avatar alive
+      // through that tail; a photo would simply stop. So the pose restarts on the
+      // frame its rings run out, which is the engine's own measure of the cycle
+      // rather than a duration restated here.
+      if (ringsSeen && sampled.arcs.length === 0) {
+        ringsSeen = false;
+        engine.reset(pose, elapsed);
+        sampled = engine.sample(elapsed);
+      }
+      ringsSeen ||= sampled.arcs.length > 0;
+      setFrame(sampled);
+    };
+    handle = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(handle);
+  });
+
+  return (
+    <>
+      <AvatarArcs arcs={frame().arcs} half="back" />
+      <AvatarImage url={props.url} onFailed={props.onFailed} />
+      <AvatarArcs arcs={frame().arcs} half="front" />
+    </>
+  );
+}
+
+function AvatarArcs(props: { arcs: BotFrame["arcs"]; half: "back" | "front" }) {
+  const gradientId = createUniqueId();
+  return (
+    <svg
+      class="agent-avatar-arcs"
+      viewBox={`${-DEMI_VIEWBOX} ${-DEMI_VIEWBOX} ${DEMI_VIEWBOX * 2} ${DEMI_VIEWBOX * 2}`}
+      fill="none"
+      stroke-linecap="round"
+      aria-hidden="true"
+    >
+      <defs>
+        <For each={props.arcs} keyed={false}>
+          {(arc) => (
+            <linearGradient
+              id={`${gradientId}-${arc().id}`}
+              gradientUnits="userSpaceOnUse"
+              x1={arc().grad.x1}
+              y1={arc().grad.y1}
+              x2={arc().grad.x2}
+              y2={arc().grad.y2}
+            >
+              <For each={arc().grad.stops} keyed={false}>
+                {(stop, index) => (
+                  <stop offset={index / Math.max(1, arc().grad.stops.length - 1)} stop-color={stop()} />
+                )}
+              </For>
+            </linearGradient>
+          )}
+        </For>
+      </defs>
+      <For each={props.arcs} keyed={false}>
+        {(arc) => (
+          <path
+            d={props.half === "back" ? arc().back : arc().front}
+            stroke={`url(#${gradientId}-${arc().id})`}
+            stroke-width={arc().width}
+            opacity={arc().opacity}
+          />
+        )}
+      </For>
+    </svg>
   );
 }
 
@@ -115,7 +268,11 @@ function GeneratedAvatar(props: {
     syncReducedMotion();
     media?.addEventListener?.("change", syncReducedMotion);
 
-    const interactionTarget = element?.closest<HTMLElement>("button, a, [role='button'], [tabindex]") ?? element;
+    // What must be hovered or focused for a resting avatar to move: the control the avatar sits in or
+    // beside, marked with `data-avatar-hover` when the avatar is only a neighbour of it. A dialog and a
+    // scroll region are focusable as well, and taking one of those would start every avatar on it at once.
+    const group = element?.closest<HTMLElement>(`${HOVER_GROUP}, [tabindex]`);
+    const interactionTarget = group?.matches(HOVER_GROUP) ? group : element;
     const startInteraction = () => setInteracting(true);
     const stopInteraction = () => setInteracting(false);
     const stopFocusInteraction = (event: FocusEvent) => {
@@ -157,6 +314,7 @@ function GeneratedAvatar(props: {
       ref={element}
       class={`${props.class} agent-avatar-bloub`}
       style={props.style}
+      data-avatar="generated"
       data-animation-state={props.animationState}
       aria-hidden="true"
     >

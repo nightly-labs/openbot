@@ -1,4 +1,4 @@
-import type { AgentEvent, ConversationMessage, ServerSummary } from "@openbot/contracts/ipc";
+import type { AgentEvent, ServerSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -716,6 +716,57 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("keeps muted servers out of the notch and returns one the moment it is unmuted", async () => {
+    const local = testServer("local", true);
+    const office: ServerSummary = { ...testServer("remote-1", false), name: "Office Mac", notificationsMuted: true };
+    const studio: ServerSummary = { ...testServer("remote-2", false), name: "Studio Mac", notificationsMuted: true };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, office, studio]);
+    const approval = (serverId: string, requestId: string) => {
+      emitScopedAgentEvent?.({ serverId, event: { type: "agents-changed", agents: AGENTS } });
+      emitScopedAgentEvent?.({
+        serverId,
+        event: {
+          type: "approval",
+          approval: {
+            requestId,
+            agentId: "chief",
+            threadId: "thread-chief",
+            turnId: `turn-${requestId}`,
+            kind: "command",
+            command: "bun test",
+            cwd: null,
+            reason: null,
+            grantRoot: null,
+            permissions: null,
+          },
+        },
+      });
+    };
+    const published = vi.mocked(window.openbot.dynamicIsland.publishPresentation);
+
+    render(() => <App />);
+    await waitFor(() => expect(emitScopedAgentEvent).toBeTypeOf("function"));
+    const publishedBefore = published.mock.calls.length;
+    approval(office.id, "approval-office");
+    approval(studio.id, "approval-studio");
+
+    await waitFor(() => expect(published.mock.calls.length).toBeGreaterThan(publishedBefore));
+    expect(published.mock.calls.at(-1)?.[0]).toMatchObject({ serverId: "local", mode: "idle" });
+    expect(published.mock.calls.every(([presentation]) => presentation.serverId === "local")).toBe(true);
+
+    emitServers?.([local, { ...office, notificationsMuted: false }, studio]);
+
+    // The still-muted server contributes no attention either, so nothing remains behind this one.
+    await waitFor(() =>
+      expect(published.mock.calls.at(-1)?.[0]).toMatchObject({
+        serverId: office.id,
+        mode: "approval",
+        item: { requestId: "approval-office" },
+        remainingCount: 0,
+      }),
+    );
+  });
+
   it("preserves omitted attention only when a compact runtime snapshot is incomplete", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
@@ -781,164 +832,6 @@ describe("OpenBot connected desktop shell", () => {
       expect(screen.queryByRole("textbox", { name: "Custom answer for: Which scope?" })).not.toBeInTheDocument(),
     );
     await waitFor(() => expect(screen.queryByRole("status", { name: /^Chief is working:/ })).not.toBeInTheDocument());
-  });
-
-  it("shows only the latest commentary beside the agent activity", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-
-    const conversation = (revision: number, activeTurnId: string | null, messages: ConversationMessage[]) => ({
-      type: "conversation" as const,
-      snapshot: {
-        agentId: "chief",
-        threadId: "thread-chief",
-        activeTurnId,
-        revision,
-        messages,
-      },
-    });
-    const userMessage = {
-      id: "user-live-status",
-      turnId: "turn-live-status",
-      author: "user",
-      text: "Check the release status",
-      createdAt: "2026-09-02T10:00:00.000Z",
-      status: "completed",
-    } satisfies ConversationMessage;
-
-    emitAgentEvent?.(conversation(1, "turn-live-status", [userMessage]));
-    expect(await screen.findByRole("status", { name: /^Chief is working:/ })).toBeInTheDocument();
-
-    emitAgentEvent?.({
-      type: "turn-progress",
-      agentId: "chief",
-      threadId: "thread-chief",
-      turnId: "turn-live-status",
-      detail: "Searching for current information…",
-    });
-    expect(
-      await within(screen.getByRole("region", { name: "Current activity" })).findByText(
-        "Searching for current information…",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("status", { name: "Chief is working: Searching for current information…" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show thinking details" })).not.toBeInTheDocument();
-
-    const firstCommentary = {
-      id: "commentary-live-status-1",
-      turnId: "turn-live-status",
-      author: "assistant",
-      text: "Inspecting the release",
-      createdAt: "2026-09-02T10:00:01.000Z",
-      status: "streaming",
-      itemType: "commentary",
-    } satisfies ConversationMessage;
-    emitAgentEvent?.(conversation(2, "turn-live-status", [userMessage, firstCommentary]));
-    emitAgentEvent?.({
-      type: "conversation-delta",
-      agentId: "chief",
-      threadId: "thread-chief",
-      turnId: "turn-live-status",
-      messageId: firstCommentary.id,
-      delta: " checks",
-      createdAt: firstCommentary.createdAt,
-      revision: 3,
-    });
-    expect(screen.queryByRole("button", { name: "Hide thinking details" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show thinking details" })).not.toBeInTheDocument();
-    expect(
-      await within(screen.getByRole("region", { name: "Current activity" })).findByText(
-        "Inspecting the release checks",
-      ),
-    ).toBeInTheDocument();
-
-    const latestCommentary = {
-      ...firstCommentary,
-      id: "commentary-live-status-2",
-      text: "Verifying the final build artifacts",
-      createdAt: "2026-09-02T10:00:02.000Z",
-    } satisfies ConversationMessage;
-    emitAgentEvent?.(
-      conversation(4, "turn-live-status", [
-        userMessage,
-        { ...firstCommentary, text: "Inspecting the release checks", status: "completed" },
-        latestCommentary,
-      ]),
-    );
-    expect(await screen.findAllByText("Verifying the final build artifacts")).toHaveLength(1);
-    expect(screen.queryByText("Inspecting the release checks")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("status", { name: "Chief is working: Verifying the final build artifacts" }),
-    ).toBeInTheDocument();
-
-    emitAgentEvent?.({
-      type: "turn-progress",
-      agentId: "chief",
-      threadId: "thread-chief",
-      turnId: "turn-live-status",
-      detail: "Reviewing the verification results…",
-    });
-    expect(
-      within(screen.getByRole("region", { name: "Current activity" })).getByText("Verifying the final build artifacts"),
-    ).toBeInTheDocument();
-
-    emitAgentEvent?.({
-      type: "turn-completed",
-      agentId: "chief",
-      threadId: "thread-chief",
-      turnId: "turn-live-status",
-      status: "completed",
-    });
-    emitAgentEvent?.(conversation(5, null, [userMessage, { ...firstCommentary, status: "completed" }]));
-    await waitFor(() => expect(screen.queryByRole("status", { name: /^Chief is working:/ })).not.toBeInTheDocument());
-  });
-
-  it("stops showing reasoning as the current activity once the answer arrives", async () => {
-    render(() => <App />);
-    await screen.findByRole("heading", { name: "Chief" });
-    await confirmOnboardingModel();
-
-    const turnId = "turn-answering";
-    const base = {
-      turnId,
-      author: "assistant",
-      createdAt: "2026-09-02T11:00:01.000Z",
-      status: "completed",
-    } as const;
-    emitAgentEvent?.({
-      type: "conversation",
-      snapshot: {
-        agentId: "chief",
-        threadId: "thread-chief",
-        activeTurnId: turnId,
-        revision: 1,
-        messages: [
-          {
-            id: "user-answering",
-            turnId,
-            author: "user",
-            text: "Check the release status",
-            createdAt: "2026-09-02T11:00:00.000Z",
-            status: "completed",
-          },
-          { ...base, id: "commentary-answering", text: "Verifying the build artifacts", itemType: "commentary" },
-          {
-            ...base,
-            id: "answer-answering",
-            text: "The release is green.",
-            createdAt: "2026-09-02T11:00:02.000Z",
-            status: "streaming",
-          },
-        ] satisfies ConversationMessage[],
-      },
-    });
-
-    const activity = await screen.findByRole("region", { name: "Current activity" });
-    expect(within(activity).queryByText("Verifying the build artifacts")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Hide thinking details" })).not.toBeInTheDocument();
   });
 
   it("merges compact runtime attention into the active server", async () => {
@@ -1014,21 +907,28 @@ describe("OpenBot connected desktop shell", () => {
       ]);
       const setupError = "The host has not allowed OpenBot to record its screen.";
       if (!remoteDesktopAvailable) {
-        vi.mocked(window.openbot.remoteDesktop.connect).mockRejectedValueOnce(new Error(setupError));
+        vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
+          status: "refused",
+          errorCode: "host_permissions_required",
+          message: setupError,
+        });
       }
       vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
-        id: "desktop-1",
-        serverId: "remote-1",
-        viewerUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/v1/remote-screen/sessions/desktop-1/viewer",
-        viewerGrant: "viewer-grant",
-        displays: [],
-        selectedDisplayId: null,
-        phase: "connecting",
-        transport: "unknown",
-        errorCode: null,
-        message: "Connecting…",
-        createdAt: "2026-08-18T12:00:00.000Z",
-        grantExpiresAt: "2026-08-18T12:01:00.000Z",
+        status: "connected",
+        session: {
+          id: "desktop-1",
+          serverId: "remote-1",
+          viewerUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/v1/remote-screen/sessions/desktop-1/viewer",
+          viewerGrant: "viewer-grant",
+          displays: [],
+          selectedDisplayId: null,
+          phase: "connecting",
+          transport: "unknown",
+          errorCode: null,
+          message: "Connecting…",
+          createdAt: "2026-08-18T12:00:00.000Z",
+          grantExpiresAt: "2026-08-18T12:01:00.000Z",
+        },
       });
 
       render(() => <App />);
@@ -1046,7 +946,11 @@ describe("OpenBot connected desktop shell", () => {
       await waitFor(() => expect(window.openbot.remoteDesktop.connect).toHaveBeenCalledWith({ serverId: "remote-1" }));
 
       if (!remoteDesktopAvailable) {
-        expect(await screen.findByRole("alert")).toHaveTextContent(setupError);
+        // The host named its refusal, so the member reads the repair step instead of the raw sentence.
+        const refusal = await screen.findByRole("alert");
+        expect(refusal).toHaveTextContent("Studio Mac is not sharing its screen");
+        expect(refusal).toHaveTextContent("System Settings → Privacy & Security → Screen Recording");
+        expect(refusal).not.toHaveTextContent(setupError);
         expect(screen.queryByText("Update required")).not.toBeInTheDocument();
         await fireEvent.click(screen.getByRole("button", { name: "Try again" }));
       }
@@ -1099,18 +1003,21 @@ describe("OpenBot connected desktop shell", () => {
       servers.map((server) => ({ ...server, active: server.id === "remote-2" })),
     );
     vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
-      id: "desktop-1",
-      serverId: "remote-1",
-      viewerUrl: "https://studio.example.com/v1/remote-screen/sessions/desktop-1/viewer",
-      viewerGrant: "viewer-grant",
-      displays: [],
-      selectedDisplayId: null,
-      phase: "connected",
-      transport: "p2p",
-      errorCode: null,
-      message: "Connected",
-      createdAt: "2026-08-18T12:00:00.000Z",
-      grantExpiresAt: "2026-08-18T12:01:00.000Z",
+      status: "connected",
+      session: {
+        id: "desktop-1",
+        serverId: "remote-1",
+        viewerUrl: "https://studio.example.com/v1/remote-screen/sessions/desktop-1/viewer",
+        viewerGrant: "viewer-grant",
+        displays: [],
+        selectedDisplayId: null,
+        phase: "connected",
+        transport: "p2p",
+        errorCode: null,
+        message: "Connected",
+        createdAt: "2026-08-18T12:00:00.000Z",
+        grantExpiresAt: "2026-08-18T12:01:00.000Z",
+      },
     });
 
     render(() => <App />);
@@ -1302,12 +1209,51 @@ describe("OpenBot connected desktop shell", () => {
       },
     });
     await fireEvent.click(await screen.findByRole("button", { name: "Preview brief.pdf" }));
-    expect(screen.getByRole("dialog", { name: "brief.pdf" })).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Show in Finder" }));
+    expect(await screen.findByRole("complementary", { name: "File preview" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Show file in Finder" }));
     expect(window.openbot.agent.openAttachment).toHaveBeenCalledWith({
       attachmentId: "file-1",
       action: "reveal",
     });
+  });
+
+  it("renders Markdown attachments", async () => {
+    const markdown = "# Release notes\n";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(markdown));
+    render(() => <App />);
+
+    emitAgentEvent?.({
+      type: "conversation",
+      snapshot: {
+        agentId: "chief",
+        threadId: null,
+        activeTurnId: null,
+        revision: 2,
+        messages: [
+          {
+            id: "markdown-file-message",
+            author: "user",
+            text: "",
+            createdAt: new Date().toISOString(),
+            status: "completed",
+            attachments: [
+              {
+                id: "markdown-file",
+                name: "release-notes.md",
+                size: markdown.length,
+                kind: "file",
+                mimeType: "text/markdown",
+                previewKind: "text",
+                previewUrl: "openbot-attachment://file/markdown-file",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Preview release-notes.md" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Release notes" })).toBeInTheDocument();
   });
 
   it("duplicates an agent from its context menu and opens its empty conversation", async () => {
@@ -1327,6 +1273,31 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.duplicateAgent).toHaveBeenCalledWith("sales-outbound"));
     expect(await screen.findByRole("heading", { name: "Sales Outbound copy" })).toBeInTheDocument();
     await waitFor(() => expect(window.openbot.agent.readConversation).toHaveBeenCalledWith("sales-outbound-copy"));
+    expect(
+      screen.getByRole("button", {
+        name: "Sales Outbound copy, Outbound specialist. No messages yet",
+      }),
+    ).toBeInTheDocument();
+    emitAgentEvent?.({
+      type: "agents-changed",
+      agents: [
+        ...AGENTS,
+        {
+          ...AGENTS[1],
+          id: "sales-outbound-copy",
+          name: "Sales Outbound copy",
+          threadId: "thread-sales-outbound-copy",
+          workspacePath: "/tmp/OpenBot/Agents/sales-outbound-copy",
+          preview: "I finished the copied task.",
+          updatedAt: "2026-09-18T10:33:00.000Z",
+        },
+      ],
+    });
+    expect(
+      await screen.findByRole("button", {
+        name: "Sales Outbound copy, Outbound specialist. I finished the copied task.",
+      }),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: "Pinned chats" })).queryByRole("button", {
         name: /Sales Outbound copy/,
@@ -1584,15 +1555,4 @@ it("mutes and unmutes a server without changing other servers", async () => {
   await fireEvent.contextMenu(muted);
   await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Unmute notifications" }), { button: 0 });
   expect(await screen.findByRole("button", { name: "Studio Mac server" })).toBeVisible();
-});
-
-it("keeps a server unmuted when saving fails", async () => {
-  installOpenbotStub();
-  vi.mocked(window.openbot.servers.list).mockResolvedValue([testServer("local", true)]);
-  vi.mocked(window.openbot.servers.setMuted).mockRejectedValue(new Error("Disk is full."));
-  render(() => <App />);
-  await fireEvent.contextMenu(await screen.findByRole("button", { name: "Local server" }));
-  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Mute notifications" }), { button: 0 });
-  expect(await screen.findByText("Could not change server notifications")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Local server" })).toBeVisible();
 });

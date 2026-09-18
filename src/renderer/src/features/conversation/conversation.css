@@ -442,14 +442,47 @@
   background: var(--openbot-bg-canvas);
 }
 
+.markdown-file-preview {
+  min-width: 0;
+}
+
+.markdown-file-preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: var(--openbot-space-3);
+}
+
+.markdown-file-preview-source-action {
+  flex: 0 0 auto;
+}
+
 .file-preview-markdown {
   max-width: 760px;
   margin: 0 auto;
   padding: 24px 26px 48px;
   color: var(--openbot-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.file-preview-markdown > .message-markdown {
   font-size: var(--openbot-text-md);
   line-height: 1.6;
+}
+
+.file-preview-markdown-source,
+.file-preview-markdown-status {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: 18px 20px;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .file-preview-text {
@@ -501,6 +534,88 @@
   object-fit: contain;
 }
 
+.file-preview-spreadsheet {
+  min-width: 0;
+  min-height: 100%;
+  padding: 20px;
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-status {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-mono);
+  white-space: pre-wrap;
+}
+
+.file-preview-spreadsheet-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.file-preview-spreadsheet-tabs button {
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-control);
+  padding: 6px 10px;
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.file-preview-spreadsheet-tabs button[aria-pressed="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-table-wrap {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.file-preview-spreadsheet-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--openbot-text-sm);
+}
+
+.file-preview-spreadsheet-table caption {
+  padding: 10px 12px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: left;
+}
+
+.file-preview-spreadsheet-table th,
+.file-preview-spreadsheet-table td {
+  border-top: 1px solid var(--openbot-border);
+  border-right: 1px solid var(--openbot-border);
+  padding: 8px 12px;
+  text-align: left;
+  white-space: pre;
+}
+
+.file-preview-spreadsheet-table th {
+  background: var(--openbot-bg-control);
+  font-weight: 600;
+}
+
+.file-preview-spreadsheet-table td:last-child,
+.file-preview-spreadsheet-table th:last-child {
+  border-right: 0;
+}
+
+.file-preview-spreadsheet-note {
+  margin: 10px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
 .file-preview-unsupported {
   display: grid;
   min-height: 100%;
@@ -544,7 +659,6 @@
   font-size: var(--openbot-text-sm);
   text-align: center;
 }
-
 .browser-pip-window {
   width: 100%;
   height: 100%;
@@ -1542,6 +1656,12 @@
   gap: 10px;
 }
 
+.agent-routine-schedule-hint {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 .agent-routine-field {
   display: grid;
   min-width: 0;
@@ -1908,6 +2028,65 @@
 .agent-memory-error {
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger);
+}
+
+.shared-table-list {
+  min-height: 0;
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: var(--openbot-space-0-5);
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--openbot-border-strong) transparent;
+}
+
+.shared-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.shared-table-main {
+  min-width: 0;
+  display: grid;
+  gap: var(--openbot-space-1);
+}
+
+.shared-table-name {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-md);
+}
+
+.shared-table-confirm {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-3);
+}
+
+.shared-table-confirm p {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.shared-table-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
 }
 
 .agent-memories-footer {
@@ -2334,6 +2513,19 @@
 
 .agent-settings-model .agent-settings-thinking-row {
   border-top: 0;
+}
+
+.agent-settings-model .agent-settings-workspace-row > span:last-child {
+  overflow-wrap: anywhere;
+}
+
+.agent-settings-access-note {
+  margin: 0;
+  background: var(--openbot-hover);
+  padding: 6px 8px 8px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
 }
 
 .agent-settings-save-error {
@@ -3321,10 +3513,7 @@
 }
 
 .message-time {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  margin-inline-start: auto;
-  padding-inline-start: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
@@ -3333,8 +3522,8 @@
   transition: opacity var(--openbot-duration-hover) ease;
 }
 
-.message-entry-user .message-time {
-  margin-inline-start: 0;
+.message-author-name > .message-time {
+  padding-inline: 0;
 }
 
 .message-entry:hover .message-actions,
@@ -4239,6 +4428,7 @@ button.chat-action-target:active,
   line-height: 20px;
   overflow-wrap: anywhere;
   white-space: pre-line;
+  user-select: text;
 }
 
 .message-markdown {
@@ -5668,24 +5858,6 @@ button.chat-action-target:active,
   line-height: var(--openbot-leading-lg);
   overflow-wrap: anywhere;
 }
-
-.media-close {
-  display: grid;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 0;
-  border-radius: var(--openbot-radius-pill);
-  background: transparent;
-  color: var(--openbot-text-muted);
-}
-
-.media-close:hover {
-  background: var(--openbot-border);
-  color: var(--openbot-text-primary);
-}
-
 .choice-options {
   min-width: 0;
   overflow: hidden;
@@ -6420,72 +6592,6 @@ button.chat-action-target:active,
   height: 100%;
   object-fit: cover;
 }
-
-.media-backdrop {
-  position: fixed;
-  z-index: 30;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  display: grid;
-  place-items: center;
-  background: var(--openbot-bg-overlay);
-  backdrop-filter: blur(3px);
-  animation: fade-in var(--openbot-duration-normal) ease both;
-}
-
-.media-modal {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 24px;
-  pointer-events: none;
-  box-shadow: none;
-  animation: modal-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.media-modal > * {
-  pointer-events: auto;
-}
-
-.media-close {
-  position: absolute;
-  z-index: 2;
-  top: 12px;
-  right: 12px;
-  background: var(--openbot-bg-overlay);
-  color: var(--openbot-text-primary);
-}
-
-.media-image {
-  display: block;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 96px);
-  border-radius: var(--openbot-radius-md);
-  object-fit: contain;
-}
-
-.media-caption {
-  display: flex;
-  width: min(100%, 860px);
-  align-items: center;
-  gap: 6px;
-  padding: 8px 0 2px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  text-align: left;
-}
-
 .message-attachments {
   display: grid;
   width: min(100%, 256px);
@@ -6495,7 +6601,7 @@ button.chat-action-target:active,
 
 .message-attachment {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
   min-width: 0;
   min-height: 56px;
   align-items: center;
@@ -6515,9 +6621,208 @@ button.chat-action-target:active,
 
 [data-slot="bubble"]:not([data-variant="ghost"])
   > [data-slot="bubble-content"]
+  > .message-attachments-group:last-child {
+  margin-bottom: var(--openbot-space-1);
+}
+
+[data-slot="bubble"]:not([data-variant="ghost"])
+  > [data-slot="bubble-content"]
   > .message-attachments:last-child
   .message-attachment {
   border-radius: var(--openbot-radius-bubble-inset);
+}
+
+.message-attachments-group {
+  display: grid;
+  width: min(100%, 256px);
+  margin-top: var(--openbot-space-2);
+  gap: var(--openbot-space-1-5);
+}
+
+/* The cards paint over the island's tucked bottom edge, so they need to sit in
+   the positioned layer the island's own `z-index` puts it in. */
+.message-attachments-group .message-attachments {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: 0;
+}
+
+/* The island tucks its lower corners under the attachment stack, so the gap the
+   group would otherwise add is cancelled by the same amount the island pads. */
+.message-attachments-group:has(.attachment-download-island) {
+  gap: 0;
+}
+
+.attachment-download-island {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  min-height: var(--openbot-control-xl);
+  align-items: center;
+  border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
+  background: var(--openbot-accent-strong);
+  box-shadow: 0 0 0 1px var(--openbot-accent-soft);
+  -webkit-backdrop-filter: blur(var(--openbot-space-3));
+  backdrop-filter: blur(var(--openbot-space-3));
+  padding: calc(var(--openbot-space-1) + 1px) var(--openbot-space-1-5)
+    calc(var(--openbot-space-4) + var(--openbot-space-1) - 1px);
+  margin-bottom: calc(var(--openbot-space-4) * -1);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-accent-text);
+}
+
+.attachment-download-island__copy {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--openbot-accent-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-download-island__action-shell {
+  display: grid;
+  flex-shrink: 0;
+}
+
+.attachment-download-island__action.ui-button {
+  width: 100%;
+  height: var(--openbot-control-sm);
+  min-height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-surface-light);
+  box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
+  padding: 0 var(--openbot-space-3) 0 var(--openbot-space-2);
+  color: var(--openbot-text-on-light);
+  transition:
+    box-shadow var(--openbot-duration-normal) var(--openbot-ease-out),
+    transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.attachment-download-island__action.ui-button:disabled {
+  cursor: progress;
+  opacity: 1;
+}
+
+.attachment-download-island__action.ui-button:active:not(:disabled):not([data-disabled]) {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attachment-download-island__action.ui-button:hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-surface-light);
+    box-shadow:
+      0 0 0 1px var(--openbot-text-dim-on-light),
+      0 1px 2px var(--openbot-shadow-popover-ambient);
+    color: var(--openbot-text-on-light);
+  }
+}
+
+.attachment-download-island__action-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.attachment-download-island__action-label {
+  --text-swap-dur: var(--openbot-duration-normal);
+  --text-swap-translate-y: var(--openbot-space-1);
+  --text-swap-blur: var(--openbot-space-0-5);
+  --text-swap-ease: var(--openbot-ease-in-out);
+
+  display: inline-grid;
+  min-width: calc(var(--openbot-control-xl) + var(--openbot-space-3));
+  color: var(--openbot-text-on-light);
+  font-weight: var(--openbot-weight-semibold);
+  text-align: left;
+}
+
+.attachment-download-island__action-label > [data-text] {
+  transform: translateY(0);
+  opacity: 1;
+  filter: blur(0);
+  grid-area: 1 / 1;
+  transition:
+    transform var(--text-swap-dur) var(--text-swap-ease),
+    filter var(--text-swap-dur) var(--text-swap-ease),
+    opacity var(--text-swap-dur) var(--text-swap-ease);
+}
+
+.attachment-download-island__action-label[data-state="action"] > [data-text="pending"] {
+  transform: translateY(var(--text-swap-translate-y));
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+}
+
+.attachment-download-island__action-label[data-state="pending"] > [data-text="action"] {
+  transform: translateY(calc(var(--text-swap-translate-y) * -1));
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+}
+
+.attachment-download-island__icon.t-icon-swap {
+  --icon-swap-dur: var(--openbot-duration-overlay);
+  --icon-swap-blur: var(--openbot-space-0-5);
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: var(--openbot-ease-in-out);
+
+  position: relative;
+  display: inline-grid;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.attachment-download-island__icon.t-icon-swap .t-icon {
+  position: relative;
+  top: 1px;
+  display: grid;
+  grid-area: 1 / 1;
+  place-items: center;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease);
+}
+
+.attachment-download-island__icon.t-icon-swap svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.attachment-download-island__icon.t-icon-swap .ui-spinner {
+  border-color: var(--openbot-text-dim-on-light);
+  border-top-color: currentColor;
+}
+
+.attachment-download-island__icon.t-icon-swap[data-state="a"] .t-icon[data-icon="a"],
+.attachment-download-island__icon.t-icon-swap[data-state="b"] .t-icon[data-icon="b"] {
+  transform: scale(1);
+  opacity: 1;
+  filter: blur(0);
+}
+
+.attachment-download-island__icon.t-icon-swap[data-state="a"] .t-icon[data-icon="b"],
+.attachment-download-island__icon.t-icon-swap[data-state="b"] .t-icon[data-icon="a"] {
+  transform: scale(var(--icon-swap-start-scale));
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attachment-download-island__action.ui-button,
+  .attachment-download-island__icon.t-icon-swap .t-icon,
+  .attachment-download-island__action-label > [data-text] {
+    transition: none;
+  }
 }
 
 .ui-button.attachment-preview-button {
@@ -6793,6 +7098,21 @@ button.chat-action-target:active,
 
 .agent-queue-item-steering {
   color: var(--openbot-text-muted);
+}
+
+.agent-queue-item-editing {
+  color: var(--openbot-text-muted);
+}
+
+.agent-queue-editing-badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 18px;
+  white-space: nowrap;
 }
 
 .agent-queue-item-has-attachment {
@@ -7231,15 +7551,25 @@ button.chat-action-target:active,
   line-height: 1.35;
 }
 
-.composer-error {
-  max-width: 560px;
-  margin: 0 auto 6px;
-  padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
-  border-radius: var(--openbot-radius-md);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-sm);
+/*
+ * The close button reads as a control, not as the action the card offers: the tinted fill above
+ * belongs to the one button that resolves a state (Sign in), and an X that carried the same fill
+ * would compete with it wherever both appear. It takes the accent only under the pointer.
+ */
+.composer-notice-dismiss {
+  flex: none;
+  align-self: flex-start;
+}
+
+.composer-notice .composer-notice-dismiss {
+  background: transparent;
+  color: var(--notice-accent);
+}
+
+@media (hover: hover) {
+  .composer-notice .composer-notice-dismiss:hover:not(:disabled):not([data-disabled]) {
+    background: color-mix(in srgb, var(--notice-accent) 18%, transparent);
+  }
 }
 
 .agent-setup-card {
@@ -7329,6 +7659,18 @@ button.chat-action-target:active,
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/* The badge says the card is waiting on the person, so its loader has to turn: a frozen spinner
+   reads as a stalled step rather than one that is ready for them. */
+.conversation-interaction-spinner {
+  animation: ui-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-interaction-spinner {
+    animation: none;
+  }
+}
+
 .browser-takeover-card {
   display: flex;
   width: min(540px, 100%);
@@ -7409,6 +7751,50 @@ button.chat-action-target:active,
   overflow: hidden;
   place-items: stretch;
   background: var(--openbot-bg-control);
+}
+
+/* The viewport is the button that opens the page, so it keeps the frame it has as a plain
+   figure: no button padding, no radius of its own, and the preview stacked under the label. */
+.browser-takeover-preview-open.ui-button {
+  display: grid;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* The preview and the Open label share one cell, so the label floats over the page image. */
+.browser-takeover-preview-open > * {
+  grid-area: 1 / 1;
+}
+
+.browser-takeover-preview-open-label {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  align-self: center;
+  gap: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-canvas);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.browser-takeover-preview-open-label > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-takeover-preview-open:hover .browser-takeover-preview-open-label,
+.browser-takeover-preview-open:focus-visible .browser-takeover-preview-open-label {
+  opacity: 1;
 }
 
 .browser-takeover-preview-viewport img,
@@ -8023,74 +8409,6 @@ button.chat-action-target:active,
     transform: translateY(0) scale(1);
   }
 }
-
-.media-caption button {
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: transparent;
-  padding: 4px 6px;
-  color: var(--text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.media-caption button:hover {
-  background: var(--openbot-border);
-  color: var(--text-primary);
-}
-
-.media-document {
-  width: min(860px, calc(100vw - 78px));
-  height: calc(100vh - 140px);
-  border: 0;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-surface-light);
-}
-
-.media-audio {
-  width: min(560px, calc(100vw - 78px));
-}
-
-.media-video {
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 140px);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-canvas);
-  object-fit: contain;
-}
-
-.media-text {
-  width: min(820px, calc(100vw - 90px));
-  max-height: calc(100vh - 150px);
-  overflow: auto;
-  margin: 0;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-canvas);
-  padding: 20px;
-  color: var(--openbot-text-primary);
-  font:
-    12px / 1.6 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  white-space: pre-wrap;
-}
-
-.media-caption {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 2px 0;
-}
-
-.media-caption > span {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 800px) {
   .direct-private-label {
     display: none;
@@ -8152,8 +8470,7 @@ button.chat-action-target:active,
 }
 
 .remote-desktop-stage,
-.remote-desktop-viewer,
-.media-text {
+.remote-desktop-viewer {
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-secondary);
 }
@@ -8366,71 +8683,75 @@ body:has(.browser-panel-expanded) .app-frame {
   position: fixed;
   inset: 0;
   z-index: calc(var(--openbot-layer-dropdown) - 2);
-  opacity: 1;
-  transition:
-    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
-    display var(--openbot-duration-overlay) allow-discrete;
 }
 
+/*
+ * The expanded browser fills the window edge to edge. `border: 0` is not redundant: the shared
+ * `.browser-panel` rule above gives every browser surface a `border-left`, which would otherwise
+ * draw a seam down the left edge of a panel that has nothing beside it.
+ *
+ * The panel appears and disappears in one frame, with no transition. The page inside it is a native
+ * view that the renderer cannot animate: it can only be attached once the panel has stopped moving
+ * (`BrowserPanel.tsx`), so any opening transition is time spent looking at an empty panel before the
+ * page arrives.
+ */
 .browser-panel-expanded {
   position: fixed;
-  inset: 5% 2.5%;
-  width: 95%;
-  height: 90%;
+  inset: 0;
+  /* The shared `.browser-panel` rule sizes the sidebar with `--browser-panel-width`; a set width
+   * wins over `inset`, so the panel has to give it up to reach the right window edge. */
+  width: auto;
   z-index: calc(var(--openbot-layer-dropdown) - 1);
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-xl);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: var(--openbot-shadow-overlay);
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  transition:
-    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
-    transform var(--openbot-duration-overlay) var(--openbot-ease-out),
-    display var(--openbot-duration-overlay) allow-discrete;
+  box-shadow: none;
 }
 
 .browser-panel-expanded[hidden],
 .browser-expanded-backdrop[hidden] {
   display: none;
-  opacity: 0;
-  pointer-events: none;
-  transition-duration: var(--openbot-duration-normal);
 }
 
-.browser-panel-expanded[hidden] {
-  transform: translateY(var(--openbot-space-2)) scale(0.96);
-}
-
-@starting-style {
-  .browser-panel-expanded {
-    opacity: 0;
-    transform: translateY(var(--openbot-space-2)) scale(0.96);
-  }
-  .browser-expanded-backdrop {
-    opacity: 0;
-  }
-}
-
+/*
+ * The button is portaled beside the panel rather than laid out inside the header, so it is placed
+ * against the window instead of against the row it belongs to. It is a square box with the same gap
+ * on every side: a 24px square in the 34px header leaves 10px, so 5px above and below, and the same
+ * 5px against the window's right edge. The header reserves this width so the strip cannot scroll
+ * underneath.
+ */
 .browser-hide {
   position: fixed;
-  top: var(--openbot-space-1);
-  right: var(--openbot-space-1);
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--openbot-radius-xs);
   z-index: calc(var(--openbot-layer-dropdown) - 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .browser-panel-expanded,
-  .browser-expanded-backdrop {
-    transition: none;
-  }
 }
 
 .browser-panel-expanded .browser-panel-header {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-3);
-  padding-inline: var(--openbot-space-2);
+  /* The inline end reserves the corner `.browser-hide` sits in, which is fixed to the window rather
+   * than to this header, so the tab strip would otherwise scroll underneath it: the button's own
+   * 8px inset and 24px box, and 8px between it and the last tab. */
+  padding-inline: var(--openbot-space-2) calc(var(--openbot-space-8) + var(--openbot-space-2));
+}
+
+/*
+ * On macOS the window is `titleBarStyle: "hidden"` and the traffic lights are drawn over the page.
+ * `trafficLightPosition: { x: 12, y: 13 }` (`src/main/main-window.ts`) is the top left of the group,
+ * not of one dot: macOS spaces the three 13px dots 23px apart, so they cover x 12..71 and y 13..26,
+ * centre line y 19.5. A full-bleed panel puts this header under them, so the inset clears the whole
+ * group rather than one dot, and it is the same 82px where the app frame's top row starts beside
+ * those dots - one gutter width across the app instead of a second, tighter one here. The header
+ * keeps its default height, which leaves the tab row's centre line on the dots'. The inset stays
+ * part of the drag region, which keeps the window movable at full bleed.
+ */
+.browser-panel-expanded.browser-panel-mac-controls .browser-panel-header {
+  padding-inline-start: 82px;
 }
 
 .browser-panel-expanded .browser-tabs {

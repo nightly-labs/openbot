@@ -1,13 +1,22 @@
 import type { UpdateAgentInput } from "@openbot/contracts/ipc";
-import { createContext, createEffect, createSignal, onCleanup, onSettled, untrack, useContext } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onSettled,
+  untrack,
+  useContext,
+} from "solid-js";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
-import type { ComposerDraft, ConversationProps } from "./conversation-types";
+import type { ComposerDraft, ConversationProps, ConversationTarget } from "./conversation-types";
 import { createActivityStore } from "./stores/activity-store";
 import { createBrowserStore } from "./stores/browser-store";
 import { createComposerActions } from "./stores/composer-actions";
-import { createComposerStore } from "./stores/composer-store";
+import { createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMessageActions } from "./stores/message-actions";
 import { createPanelsStore } from "./stores/panels-store";
 import { createQueueStore } from "./stores/queue-store";
@@ -33,18 +42,22 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingServerId,
     editingDeliveryId,
     setEditingDeliveryId,
+    editingEditId,
+    setEditingEditId,
     editingDraftBackup,
     setEditingDraftBackup,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
+    editingPendingSave,
+    setEditingPendingSave,
     composerFocusRequest,
     setComposerFocusRequest,
     showComposerActions,
     setShowComposerActions,
     attachmentBusy,
     setAttachmentBusy,
-    composerError,
-    setComposerError,
+    composerErrors,
+    setComposerErrors,
     conversationErrors,
     setConversationErrors,
     voicePhase,
@@ -75,8 +88,6 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddressEditing,
     browserPipBounds,
     setBrowserPipBounds,
-    mediaPreview,
-    setMediaPreview,
     sidebarFilePreview,
     setSidebarFilePreview,
     openReactionMessageId,
@@ -105,6 +116,32 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserPanelWidth,
     resources,
   } = controller;
+  /**
+   * Chat-scoped composer errors, keyed by conversation.
+   *
+   * The previous server-scoped `composerError` string leaked one chat's banner
+   * into unrelated chats on the same server. Every write is keyed by
+   * `composerDraftKey(target)` so navigating between chats never carries stale
+   * state, and dismissal removes only the current chat's entry.
+   *
+   * Async completions must pass an explicit target captured at operation start;
+   * reading `currentConversationTarget(props)` at completion time would
+   * attribute the failure to whichever chat the user has since opened.
+   */
+  const setScopedComposerError = (error: string | null, targetOverride?: ConversationTarget): void => {
+    const target = targetOverride ?? currentConversationTarget(props);
+    if (!target) return;
+    const key = composerDraftKey(target);
+    if (error === null) {
+      setComposerErrors((current) => {
+        if (!(key in current)) return current;
+        const { [key]: _removed, ...next } = current;
+        return next;
+      });
+      return;
+    }
+    setComposerErrors((current) => (current[key] === error ? current : { ...current, [key]: error }));
+  };
   const panels = createPanelsStore({
     props,
     rightPanels,
@@ -113,11 +150,9 @@ export function createConversationViewScope(props: ConversationProps) {
     settingsModel,
     settingsReasoning,
     setBrowserPipBounds,
-    mediaPreview,
-    setMediaPreview,
     sidebarFilePreview,
     setSidebarFilePreview,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     nextFilePreviewGeneration: () => {
       resources.filePreviewRequestGeneration += 1;
       return resources.filePreviewRequestGeneration;
@@ -144,9 +179,12 @@ export function createConversationViewScope(props: ConversationProps) {
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
+    downloadAttachments,
     openSharedFile,
     openWorkspaceFile,
     openSidebarFileExternally,
+    downloadSidebarFile,
+    revealSidebarFile,
     closeSidebarFilePreview,
   } = panels;
   const skills = createSkillsStore({ props, settingsOpen });
@@ -157,9 +195,12 @@ export function createConversationViewScope(props: ConversationProps) {
     setDrafts,
     conversationErrors,
     setConversationErrors,
+    composerErrors,
+    setComposerErrors,
     editingAgentId,
     editingServerId,
     editingDeliveryId,
+    editingPendingSave,
     seenMessageIds: resources.seenMessageIds,
   });
   const {
@@ -167,6 +208,8 @@ export function createConversationViewScope(props: ConversationProps) {
     currentEditingDeliveryId,
     currentDraft,
     currentConversationError,
+    currentComposerError,
+    currentChatError,
     unreferencedDraftAttachments,
     composerHasContent,
     replyTarget,
@@ -175,6 +218,9 @@ export function createConversationViewScope(props: ConversationProps) {
     clearSubmittedDraft,
     clearConversationError,
     setConversationError,
+    clearComposerError,
+    setComposerErrorForTarget,
+    clearChatErrors,
   } = composer;
   const queue = createQueueStore({ props });
   const { activeDeliveries, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } = queue;
@@ -190,7 +236,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserAddress,
     setBrowserAddress,
     setBrowserAddressEditing,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     panels: { setActiveRightPanel, screenOpen: () => screenOpen() },
   });
   const {
@@ -201,6 +247,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverPreview,
     browserTakeoverResolution,
     respondToBrowserTakeover,
+    openBrowserTakeoverTab,
     activeBrowserControl,
     actingBrowserControl,
     browserControlAgent,
@@ -227,7 +274,7 @@ export function createConversationViewScope(props: ConversationProps) {
     props,
     markingRead,
     setMarkingRead,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     elements: {
       scrollElement: () => scrollElement,
       virtualRoot: () => virtualRoot,
@@ -287,7 +334,7 @@ export function createConversationViewScope(props: ConversationProps) {
     drafts,
     setDrafts,
     setConversationErrors,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     setComposerFocusRequest,
     clearConversationError,
     setConversationError,
@@ -301,6 +348,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const { startVoiceRecording, stopVoiceRecording } = voice;
   const actions = createComposerActions({
     props,
+    attachmentBusy,
     agentReady,
     drafts,
     setDrafts,
@@ -310,16 +358,20 @@ export function createConversationViewScope(props: ConversationProps) {
     setEditingServerId,
     editingDeliveryId,
     setEditingDeliveryId,
+    editingEditId,
+    setEditingEditId,
     editingDraftBackup,
     setEditingDraftBackup,
     editingOriginalAttachmentIds,
     setEditingOriginalAttachmentIds,
+    editingPendingSave,
+    setEditingPendingSave,
     submitting,
     setSubmitting,
     selectionSending,
     setSelectionSending,
     voicePhase,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     setComposerFocusRequest,
     setShowComposerActions,
     orderedQueuedDeliveries,
@@ -384,18 +436,36 @@ export function createConversationViewScope(props: ConversationProps) {
     submitComposer,
     sendSelectionInstruction,
   } = actions;
+  createEffect(
+    () => {
+      const deliveryId = currentEditingDeliveryId();
+      return (
+        !submitting() &&
+        deliveryId !== null &&
+        props.queue?.agentId === props.agent?.id &&
+        props.queue?.deliveries.some((item) => item.id === deliveryId && item.status === "cancelled")
+      );
+    },
+    (deleted) => {
+      if (deleted) void cancelQueuedMessageEdit();
+    },
+  );
   const messageActions = createMessageActions({
     props,
     installedSkills,
     currentDraft,
     updateCurrentDraft,
     currentTarget,
+    editingAgentId,
+    editingServerId,
+    editingDeliveryId,
+    editingPendingSave,
     setOpenReactionMessageId,
     setOpenMoreMessageId,
     setExpandedEmojiMessageId,
     copiedMessageId,
     setCopiedMessageId,
-    setComposerError,
+    setComposerError: setScopedComposerError,
   });
   const { replyToMessage, reactToMessage, copyMessage, removeAttachment } = messageActions;
   const settings = createSettingsStore({
@@ -408,7 +478,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setSettingsModel,
     settingsReasoning,
     setSettingsReasoning,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     viewIsMounted,
     saveAgentPatch,
   });
@@ -416,6 +486,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let scrollElement: HTMLDivElement | undefined;
   let virtualRoot: HTMLDivElement | undefined;
   let agentActivitySlot: HTMLDivElement | undefined;
+  let requiredInteractionElement: HTMLDivElement | undefined;
   let scrollResizeObserver: ResizeObserver | undefined;
   let unreadMessagesDivider: HTMLDivElement | undefined;
   let latestScrollFrame: number | undefined;
@@ -457,11 +528,11 @@ export function createConversationViewScope(props: ConversationProps) {
           clearConversationError(target);
         }
         setAttachmentBusy(true);
-        setComposerError(null);
+        setScopedComposerError(null);
       } else if (event.type === "error") {
         const target = resources.importTargetAgents.get(event.requestId);
         resources.importTargetAgents.delete(event.requestId);
-        setAttachmentBusy(false);
+        setAttachmentBusy(resources.importTargetAgents.size > 0);
         if (target) {
           setConversationErrors((current) => ({
             ...current,
@@ -469,12 +540,14 @@ export function createConversationViewScope(props: ConversationProps) {
           }));
         }
       } else {
-        setAttachmentBusy(false);
         const target = resources.importTargetAgents.get(event.requestId);
-        resources.importTargetAgents.delete(event.requestId);
         if (target) {
-          addAttachments(event.attachments, target);
+          void addAttachments(event.attachments, target).finally(() => {
+            resources.importTargetAgents.delete(event.requestId);
+            setAttachmentBusy(resources.importTargetAgents.size > 0);
+          });
         } else {
+          setAttachmentBusy(resources.importTargetAgents.size > 0);
           for (const attachment of event.attachments) {
             void window.openbot.agent.discardDraftAttachment(attachment.id, event.serverId);
           }
@@ -483,7 +556,7 @@ export function createConversationViewScope(props: ConversationProps) {
     });
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
-      if (browserExpandedOpen() && !props.globalOverlayOpen && !mediaPreview()) {
+      if (browserExpandedOpen() && !props.globalOverlayOpen) {
         event.preventDefault();
         setActiveRightPanel("browser");
         return;
@@ -501,7 +574,6 @@ export function createConversationViewScope(props: ConversationProps) {
       setOpenMoreMessageId(null);
       setExpandedEmojiMessageId(null);
       hideBrowserPanel();
-      setMediaPreview(null);
     };
     const closeActiveRemoteBrowserTab = (event: KeyboardEvent) => {
       if (
@@ -559,6 +631,7 @@ export function createConversationViewScope(props: ConversationProps) {
     if (scrollElement) scrollResizeObserver.observe(scrollElement);
     if (virtualRoot) scrollResizeObserver.observe(virtualRoot);
     if (agentActivitySlot) scrollResizeObserver.observe(agentActivitySlot);
+    if (requiredInteractionElement) scrollResizeObserver.observe(requiredInteractionElement);
     requestAnimationFrame(() => {
       if (!scrollElement) return;
       updateVirtualScrollMargin();
@@ -749,8 +822,7 @@ export function createConversationViewScope(props: ConversationProps) {
         Boolean(browserSurface()) &&
         !props.browserVisibilitySuspended &&
         !props.globalOverlayOpen &&
-        !props.remoteDesktopVisible &&
-        !mediaPreview(),
+        !props.remoteDesktopVisible,
     }),
     ({ agentId, visible, surface }) => {
       if (props.browserEnabled === false) return;
@@ -850,12 +922,30 @@ export function createConversationViewScope(props: ConversationProps) {
   });
 
   async function openExternalMessageUrl(url: string) {
+    const target = currentTarget();
     try {
       await window.openbot.openUrl(url);
     } catch {
-      setComposerError("Could not open the link in the external browser.");
+      setScopedComposerError("Could not open the link in the external browser.", target);
     }
   }
+
+  /**
+   * Dismiss the current chat's banner. Removes both the transient composer
+   * error and the keyed conversation error for this chat only, so dismissal
+   * never clears another chat and a dismissed banner does not reappear on
+   * rerender, navigation, or reconnect unless a new error is recorded.
+   */
+  function dismissCurrentChatErrors(): void {
+    const target = currentTarget();
+    if (!target) return;
+    clearChatErrors(target);
+  }
+
+  const currentChatConversationKey = createMemo(() => {
+    const target = currentTarget();
+    return target ? composerDraftKey(target) : null;
+  });
 
   const setConversationPanelElement = (element: HTMLElement) => {
     conversationPanel = element;
@@ -880,6 +970,11 @@ export function createConversationViewScope(props: ConversationProps) {
   const setAgentActivitySlotElement = (element: HTMLDivElement) => {
     agentActivitySlot = element;
     scrollResizeObserver?.observe(element);
+  };
+  const setRequiredInteractionElement = (element: HTMLDivElement | undefined) => {
+    if (requiredInteractionElement) scrollResizeObserver?.unobserve(requiredInteractionElement);
+    requiredInteractionElement = element;
+    if (element) scrollResizeObserver?.observe(element);
   };
   const setBrowserSurfaceElement = (element: HTMLDivElement | undefined) => {
     setBrowserSurface(element);
@@ -910,12 +1005,14 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverResolution,
     browserTakeoverTab,
     respondToBrowserTakeover,
+    openBrowserTakeoverTab,
     activeChatSearchIndex,
     agentActivity,
     agentReady,
     agentActivitySpaceReserved,
     activateBrowserTab,
     attachmentAction,
+    downloadAttachments,
     attachmentBusy,
     browserAddress,
     browserSidebarOpen,
@@ -933,7 +1030,14 @@ export function createConversationViewScope(props: ConversationProps) {
     closeChatSearch,
     clearNewMessages,
     closeSidebarFilePreview,
-    composerError,
+    composerError: currentComposerError,
+    currentComposerError,
+    currentChatError,
+    currentChatConversationKey,
+    dismissCurrentChatErrors,
+    clearComposerError,
+    setComposerErrorForTarget,
+    clearChatErrors,
     composerFocusRequest,
     composerHasContent,
     copiedMessageId,
@@ -944,6 +1048,7 @@ export function createConversationViewScope(props: ConversationProps) {
     dropActive,
     editQueuedMessage,
     editingDeliveryId: currentEditingDeliveryId,
+    editingPendingSave,
     expandedEmojiMessageId,
     scrollFades,
     filePreviewOpen,
@@ -954,7 +1059,6 @@ export function createConversationViewScope(props: ConversationProps) {
     markMessageSeen,
     markUnreadMessages,
     markingRead,
-    mediaPreview,
     messageVirtualizer,
     timelineMessages,
     moveChatSearch,
@@ -969,6 +1073,8 @@ export function createConversationViewScope(props: ConversationProps) {
     openRoutineRunMessage,
     openSharedFile,
     openSidebarFileExternally,
+    downloadSidebarFile,
+    revealSidebarFile,
     openWorkspaceFile,
     presentedQueueDeliveries,
     previewAttachment,
@@ -997,13 +1103,13 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddressEditing,
     setBrowserPanelWidth,
     setChatSearchQuery,
-    setComposerError,
+    setComposerError: setScopedComposerError,
     setComposerFocusRequest,
     setDropActive,
     setExpandedEmojiMessageId,
-    setMediaPreview,
     setOpenMoreMessageId,
     setOpenReactionMessageId,
+    setRequiredInteractionElement,
     handleRoutineSettingsRequest,
     setSettingsPanelWidth,
     setShowComposerActions,

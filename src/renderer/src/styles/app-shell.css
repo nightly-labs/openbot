@@ -651,6 +651,7 @@ textarea {
   flex-direction: column;
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
+  container-type: inline-size;
 }
 
 .sidebar-topbar {
@@ -1591,7 +1592,6 @@ textarea {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-success);
   color: var(--openbot-success);
-  animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .agent-row-agent-status-responded svg {
@@ -1614,6 +1614,9 @@ textarea {
   font-size: var(--openbot-text-sm);
   font-weight: 650;
   line-height: 12px;
+}
+
+.agent-row-agent-status-entering {
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1800,6 +1803,61 @@ textarea {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* An activity state. The ring sits outside the circle, so the parent stops
+   clipping and the image rounds itself instead. */
+.agent-avatar[data-avatar="image"][data-animation-state] {
+  position: relative;
+  overflow: visible;
+}
+
+.agent-avatar[data-avatar="image"][data-animation-state] > img {
+  border-radius: var(--openbot-radius-pill);
+}
+
+/* The rings reach 1.4 ball radii, which is the margin the Bloub viewBox carries
+   past its body: 316 units drawn over the 200 the image fills, so the layer is
+   158% of the avatar box and sits (158% - 100%) / 2 outside it on each side. */
+.agent-avatar > .agent-avatar-arcs {
+  position: absolute;
+  inset: -29%;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  translate: none;
+}
+
+/* The `thinking` pose: the Bloub hides its body and leaves three dots, and a
+   custom image does the same rather than sitting still through it. The surface
+   the image sat on goes with it, so the dots stand alone. */
+.agent-avatar[data-avatar="dots"] {
+  background: none;
+  box-shadow: none;
+}
+
+.agent-avatar-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.agent-avatar-dots i {
+  --typing-dot-travel: -2px;
+
+  width: 5px;
+  height: 5px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-secondary);
+  animation: typing-dot-pulse 900ms ease-in-out infinite;
+}
+
+.agent-avatar-dots i:nth-child(2) {
+  animation-delay: var(--openbot-duration-fast);
+}
+
+.agent-avatar-dots i:nth-child(3) {
+  animation-delay: var(--openbot-duration-overlay);
 }
 
 .agent-row .agent-avatar {
@@ -2145,6 +2203,17 @@ textarea {
   white-space: nowrap;
 }
 
+/* Narrow panel: name and badge win over time and date. The time element keeps
+   no reserved width, so long names get the space instead of truncating to a
+   few characters beside a date. */
+@container (max-width: 210px) {
+  .agent-row-time,
+  .person-row .agent-row-heading > span,
+  .channel-row .agent-row-time {
+    display: none;
+  }
+}
+
 .agent-row-preview {
   display: block;
   margin-top: 0;
@@ -2482,7 +2551,9 @@ textarea {
   position: relative;
   z-index: 80;
   display: grid;
-  width: min(232px, calc(100vw - var(--openbot-space-4)));
+  width: min(260px, calc(100vw - var(--openbot-space-4)));
+  max-height: min(60vh, 420px);
+  overflow: auto;
   padding: var(--openbot-space-2);
   gap: var(--openbot-space-2);
   opacity: 1;
@@ -2499,8 +2570,7 @@ textarea {
 }
 
 .account-usage-popover-header,
-.account-usage-popover-heading,
-.account-usage-popover-reset {
+.account-usage-popover-heading {
   display: flex;
   align-items: center;
 }
@@ -2529,52 +2599,79 @@ textarea {
   line-height: var(--openbot-leading-md);
 }
 
-.account-usage-popover-meter {
+.account-usage-providers {
   display: grid;
-  place-items: center;
-  padding-block: var(--openbot-space-0-5) var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  gap: var(--openbot-space-1);
+  list-style: none;
 }
 
-.account-usage-popover-meter .ui-radial-progress-content > strong {
-  color: var(--ui-radial-progress-color);
-  font-size: var(--openbot-text-3xl);
-  font-weight: var(--openbot-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--openbot-tracking-tight);
-  line-height: var(--openbot-leading-3xl);
-}
-
-.account-usage-popover-reset {
+.account-usage-provider {
+  display: grid;
   min-width: 0;
-  border-top: 1px solid var(--openbot-border);
-  padding-top: var(--openbot-space-2);
+  align-items: center;
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-1);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--openbot-space-2);
-  color: var(--openbot-text-secondary);
 }
 
-.account-usage-popover-reset > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
+.account-usage-provider-logo {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   flex: 0 0 auto;
-  color: var(--openbot-text-muted);
+  overflow: visible;
+  fill: var(--openbot-provider-current);
 }
 
-.account-usage-popover-reset > span {
+.account-usage-provider-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.account-usage-provider-name {
   overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-usage-provider-meta {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.account-usage-popover-reset > strong {
-  margin-left: auto;
-  color: var(--openbot-text-secondary);
+.account-usage-provider-remaining {
+  color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  font-weight: var(--openbot-weight-medium);
+  font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: var(--openbot-leading-sm);
   white-space: nowrap;
+}
+
+.account-usage-provider[data-usage-tone="warning"] .account-usage-provider-remaining {
+  color: var(--openbot-warning);
+}
+
+.account-usage-provider[data-usage-tone="critical"] .account-usage-provider-remaining {
+  color: var(--openbot-danger);
+}
+
+.account-usage-empty {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .account-usage-refresh.ui-button {
@@ -2843,9 +2940,10 @@ textarea {
 
 .account-popover {
   position: relative;
-  width: min(232px, calc(100vw - var(--openbot-space-4)));
+  width: min(260px, calc(100vw - var(--openbot-space-4)));
+  max-height: min(60vh, 420px);
   z-index: 80;
-  overflow: hidden;
+  overflow: auto;
   padding: var(--openbot-space-1);
   opacity: 1;
   transform: scale(1);
@@ -3010,6 +3108,11 @@ textarea {
   .account-dock-usage-loading i {
     animation: none;
   }
+
+  /* The rings hold a still frame of their own, drawn once by `OrbitedAvatarImage`. */
+  .agent-avatar-dots i {
+    animation: none;
+  }
 }
 
 .server-rail,
@@ -3041,7 +3144,6 @@ textarea {
 .reaction-picker-row button[aria-checked="true"],
 .message-more-menu button:hover,
 .message-more-menu button:focus-visible,
-.media-close:hover,
 .composer-button:hover,
 .composer-attachment > button:hover,
 .account-menu-row:hover,
@@ -3094,11 +3196,6 @@ textarea {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-secondary);
 }
-
-.media-backdrop {
-  background: var(--openbot-bg-overlay);
-}
-
 .agent-delete-dialog {
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-surface);

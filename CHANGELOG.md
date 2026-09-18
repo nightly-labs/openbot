@@ -5,6 +5,72 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-17
+
+### Added
+
+- Open a Marketplace Skill or Agent on its own detail page, with a crumb back to the listing, a
+  debounced search, and one install control that picks the target agent.
+- Show category artwork on every catalog Skill instead of the generic fallback glyph.
+- Preview Markdown and XLSX spreadsheet attachments in the file preview panel.
+- Create a channel from the sidebar context menus and the sidebar topbar.
+- Name the missing screen recording grant in Remote Control, open System Settings from the host's
+  own Server settings, and re-read the grant with **Check again**.
+- Show a themed splash backdrop on mobile startup.
+
+### Changed
+
+- Show the expanded browser edge to edge. Leave it with the button in the top right corner or with
+  Escape, while a text field in the page keeps Escape.
+- Reduce the hover area of the compact Dynamic Island.
+- Respect per-server mute on the notch.
+
+### Fixed
+
+- Hide the mobile loader that stayed over the chat.
+- Use the shared provider names on mobile and truncate long model labels.
+- Hold the mobile splash until the artwork shows on a fast startup.
+
+## [0.11.0] - 2026-09-16
+
+### Added
+
+- Edit a queued message before the agent starts it, on desktop, mobile, and over Team API.
+- Download one file straight from a message with the per-file Download action.
+
+### Fixed
+
+- Keep the original file name on downloads instead of a generated one.
+- Sign in to Google inside the embedded browser.
+- Open WhatsApp Web login instead of the unsupported-browser page.
+
+### Changed
+
+- Hide sidebar row time and date when the panel is narrow.
+
+## [0.10.1] - 2026-09-15
+
+### Added
+
+- Download all files from a message with three or more attachments as one ZIP file.
+- Enter an OpenCode key for paid OpenCode models, with refresh and status in the provider row.
+- Choose provider, model, and reasoning effort when you create an agent, where the host supports it.
+- Read the WTF Is OpenBot guide under `/guides`.
+- Open Settings from the application menu with a keyboard shortcut.
+
+### Changed
+
+- Show provider errors on one composer card instead of in the transcript.
+- Write only the streamed message on each flush, and cut idle CPU and per-frame render work.
+- Anchor the stopped task banner above the composer.
+- Fix dismissible chat-scoped error banners so they stay dismissed in their chat.
+
+### Fixed
+
+- Fix OpenCode model list, agent setup picker, permissions text, and chat copy.
+- Fix folder listening setup that failed on routine interval validation.
+- Handle dynamic channel tools with no active assignment.
+
 ## [0.10.0] - 2026-09-15
 
 ### Added

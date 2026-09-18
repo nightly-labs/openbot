@@ -10,9 +10,10 @@ import type { MessageCatalog } from "../message";
  */
 export const en = {
   // The native application menu. Electron localizes its own `role:` entries from the operating
-  // system, so only the two custom items are here.
+  // system, so only the custom items are here.
   "menu.stopAllAgents": "Stop all agents",
   "menu.checkForUpdates": "Check for Updates…",
+  "menu.preferences": "Settings…",
 
   // Desktop notifications, raised by the main process while the window may be closed.
   "notification.needsInput": "Needs your input.",
@@ -131,6 +132,10 @@ export const en = {
   "provider.status.updateRequired": "Update required",
   "provider.status.unavailable": "Unavailable",
   "provider.status.checking": "Checking",
+
+  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
+  // badge: a saved key leaves the runtime "Connected" to speak for the row.
+  "provider.key.free": "Free",
 
   // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
   // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.

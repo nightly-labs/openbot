@@ -61,7 +61,6 @@ export function AgentActivityIndicator(props: {
       <section class="agent-activity-content" aria-label="Current activity">
         <AgentAvatar
           agent={props.agent}
-          url={null}
           motion="working"
           animationState={props.presentation.animation}
           class="agent-activity-avatar"

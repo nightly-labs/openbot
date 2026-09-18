@@ -5,6 +5,7 @@ import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "./app-settings";
+import { isOpenSettingsShortcut } from "./settings-shortcut";
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
 
@@ -140,10 +141,27 @@ const Settings = createSimpleContext({
     }
 
     /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
-    function openAppSettings(trigger: HTMLElement): void {
-      appSettingsRestoreTarget = trigger;
+    function openAppSettings(trigger?: HTMLElement | null): void {
+      const target = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      appSettingsRestoreTarget = target;
       setAppSettingsOpen(true);
     }
+
+    onSettled(() => {
+      // The native Preferences menu item sends the same request from main, so the shortcut below only
+      // covers the window itself: both land here, and the dialog owns the open state either way.
+      const handleSettingsShortcut = (event: KeyboardEvent) => {
+        if (!isOpenSettingsShortcut(event)) return;
+        event.preventDefault();
+        openAppSettings(event.target instanceof HTMLElement ? event.target : null);
+      };
+      window.addEventListener("keydown", handleSettingsShortcut);
+      const unsubscribe = window.openbot.onOpenSettings(() => openAppSettings());
+      return () => {
+        window.removeEventListener("keydown", handleSettingsShortcut);
+        unsubscribe();
+      };
+    });
 
     onSettled(() => {
       void window.openbot

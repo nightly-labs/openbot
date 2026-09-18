@@ -405,6 +405,7 @@ export function installOpenbotStub(): void {
       getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
       setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
       onAppLanguagePreference: vi.fn(() => () => undefined),
+      onOpenSettings: vi.fn(() => () => undefined),
       dynamicIsland: {
         getPreference: vi.fn().mockResolvedValue({
           enabled: true,
@@ -596,6 +597,8 @@ export function installOpenbotStub(): void {
         listMemories: vi.fn().mockResolvedValue([]),
         listRoutines: vi.fn().mockResolvedValue([]),
         listRoutineRuns: vi.fn().mockResolvedValue([]),
+        listTables: vi.fn().mockResolvedValue([]),
+        deleteTable: vi.fn().mockResolvedValue(undefined),
         createMemory: vi.fn().mockImplementation(async (input) => ({
           id: "memory-new",
           agentId: input.agentId,
@@ -638,6 +641,8 @@ export function installOpenbotStub(): void {
           description: input.description,
           avatarSeed: input.avatarSeed,
           avatarHue: input.avatarHue,
+          provider: input.provider ?? AGENTS[0]?.provider,
+          model: input.model ?? AGENTS[0]?.model,
         })),
         duplicateAgent: vi.fn().mockImplementation(async (agentId) => {
           const source = AGENTS.find((agent) => agent.id === agentId) ?? AGENTS[0];
@@ -698,6 +703,7 @@ export function installOpenbotStub(): void {
         chooseAttachments: vi.fn().mockResolvedValue([]),
         onAttachmentImport: vi.fn(attachmentImportBridge.subscribe),
         discardDraftAttachment: vi.fn().mockResolvedValue(undefined),
+        downloadAttachments: vi.fn().mockResolvedValue(undefined),
         openAttachment: vi.fn().mockResolvedValue(undefined),
         openSharedFile: vi.fn().mockResolvedValue(undefined),
         openWorkspaceFile: vi.fn().mockResolvedValue(undefined),
@@ -724,6 +730,7 @@ export function installOpenbotStub(): void {
         acknowledgeFailedTurn: vi.fn().mockResolvedValue(undefined),
         cancelQueuedMessage: vi.fn().mockResolvedValue(undefined),
         steerQueuedMessage: vi.fn().mockResolvedValue(undefined),
+        editQueuedMessage: vi.fn().mockImplementation(async (input) => window.openbot.agent.listQueue(input.agentId)),
         updateQueuedMessage: vi.fn().mockResolvedValue(undefined),
         reorderQueue: vi.fn().mockResolvedValue(undefined),
         interrupt: vi.fn().mockResolvedValue(undefined),
@@ -906,6 +913,7 @@ export function installOpenbotStub(): void {
           apiUrl: null,
           apiOnline: false,
           remoteDesktopReady: false,
+          remoteDesktopScreenRecordingDenied: false,
           remoteDesktopUnattended: false,
           remoteDesktopActiveSessions: 0,
           remoteDesktopMaxSessions: 4,
@@ -916,6 +924,7 @@ export function installOpenbotStub(): void {
         getPresence: vi.fn().mockResolvedValue({ serverId: null, members: [], updatedAt: "" }),
         start: vi.fn().mockResolvedValue(undefined),
         stop: vi.fn().mockResolvedValue(undefined),
+        recheckScreenRecording: vi.fn().mockResolvedValue(undefined),
         listMembers: vi.fn().mockResolvedValue([]),
         updateMember: vi.fn().mockResolvedValue(undefined),
         removeMember: vi.fn().mockResolvedValue(undefined),

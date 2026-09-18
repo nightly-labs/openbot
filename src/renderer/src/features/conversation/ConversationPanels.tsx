@@ -1,3 +1,4 @@
+import { usePlatform } from "../../platform";
 import { useSettings } from "../settings/settings-context";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
@@ -16,6 +17,7 @@ import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
   const controller = useConversationController();
+  const platform = usePlatform();
   const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
   const {
     agentReady,
@@ -32,6 +34,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     browserTabs,
     closeSidebarFilePreview,
     closeBrowserTab,
+    downloadSidebarFile,
+    revealSidebarFile,
     conversationPanelElement,
     filePreviewOpen,
     openBrowserAddress,
@@ -80,32 +84,41 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
   return (
     <>
       <Show when={filePreviewOpen() && sidebarFilePreview()}>
-        {(file) => (
-          <Loading>
-            <FilePreviewPanel
-              preview={file().preview}
-              agents={props.agents}
-              defaultWidth={() =>
-                (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
-              }
-              maxWidth={() =>
-                Math.min(
-                  BROWSER_PANEL_MAX,
-                  Math.max(
-                    BROWSER_PANEL_MIN,
-                    (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
-                  ),
-                )
-              }
-              onWidthChange={setBrowserPanelWidth}
-              onOpenLink={(url) => void openExternalMessageUrl(url)}
-              onOpenSharedFile={openSharedFile}
-              onOpenWorkspaceFile={openWorkspaceFile}
-              onOpenExternally={openSidebarFileExternally}
-              onClose={closeSidebarFilePreview}
-            />
-          </Loading>
-        )}
+        {(file) => {
+          const attached = () => {
+            const source = file().source;
+            return source.kind === "attachment" ? source.attachment : null;
+          };
+          return (
+            <Loading>
+              <FilePreviewPanel
+                preview={file().preview}
+                agents={props.agents}
+                defaultWidth={() =>
+                  (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
+                }
+                maxWidth={() =>
+                  Math.min(
+                    BROWSER_PANEL_MAX,
+                    Math.max(
+                      BROWSER_PANEL_MIN,
+                      (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
+                    ),
+                  )
+                }
+                onWidthChange={setBrowserPanelWidth}
+                onOpenLink={(url) => void openExternalMessageUrl(url)}
+                onOpenSharedFile={openSharedFile}
+                onOpenWorkspaceFile={openWorkspaceFile}
+                sourceUrl={attached()?.previewUrl ?? null}
+                onOpenExternally={openSidebarFileExternally}
+                onDownload={attached() ? downloadSidebarFile : undefined}
+                onReveal={attached() ? revealSidebarFile : undefined}
+                onClose={closeSidebarFilePreview}
+              />
+            </Loading>
+          );
+        }}
       </Show>
 
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>
@@ -141,6 +154,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
           <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
           <BrowserPanel
             open={browserExpandedOpen()}
+            macWindowControls={platform.appInfo()?.platform === "darwin"}
             tabs={browserTabs()}
             activeTab={activeBrowserTab()}
             activeControl={activeBrowserControl()}
@@ -168,6 +182,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
               skillsMarketplaceOpen={skillsMarketplaceOpen()}
               onAddFromMarketplace={props.server?.kind === "local" ? () => setSkillsMarketplaceOpen(true) : undefined}
               skillsMode={props.server?.kind === "local" ? "mutable" : "readonly"}
+              tablesVisible={props.server?.kind === "local"}
+              agents={props.agents}
               onCreateSkill={
                 props.server?.kind === "local" &&
                 agentReady() &&

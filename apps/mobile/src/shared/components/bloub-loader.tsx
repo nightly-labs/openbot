@@ -44,6 +44,12 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const LOADER_SPRING = { duration: 240, dampingRatio: 0.75, overshootClamping: true, reduceMotion: ReduceMotion.System };
+// Longer than preparing the settling sequence takes, short enough that a stalled
+// JS thread cannot hold the loader over the app.
+const SETTLE_DEADLINE_MS = 250;
+// Longer than the whole exit - settling, the overshoot and the spring - so a healthy
+// exit keeps its own timing. A lost animation callback leaves through this instead.
+const EXIT_DEADLINE_MS = 1500;
 interface BloubAnimationContextValue {
   frameIndex: DerivedValue<number>;
   frames: LoaderFrame[] | null;
@@ -118,8 +124,10 @@ export function BloubLoader({
   const reducedMotion = useReducedMotion();
   const idleFrames = useSharedValue<LoaderFrame[] | null>(null);
   const idleFrameIndex = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
+  // Mount hidden when the loader starts covered (app start under the splash), so
+  // the first frame never flashes before the exit sequence runs.
+  const scale = useSharedValue(visible ? 1 : 0);
+  const opacity = useSharedValue(visible ? 1 : 0);
   const exitRevision = useRef(0);
   const finishExit = useCallback(
     (revision: number) => {
@@ -138,6 +146,7 @@ export function BloubLoader({
   useLayoutEffect(() => {
     const revision = ++exitRevision.current;
     let cancelPreparation: (() => void) | undefined;
+    let cancelExitDeadline: (() => void) | undefined;
     if (reducedMotion) {
       scale.set(1);
       opacity.set(
@@ -150,6 +159,15 @@ export function BloubLoader({
       opacity.set(1);
       scale.set(withSpring(1, LOADER_SPRING));
     } else {
+      // Every branch below reports the exit through an animation callback, and the
+      // overlay above stays over the app until that report arrives. Leave on a
+      // deadline as well, so a dropped callback cannot strand the loader.
+      const exitDeadline = setTimeout(() => {
+        cancelAnimation(scale);
+        scale.set(0);
+        finishExit(revision);
+      }, EXIT_DEADLINE_MS);
+      cancelExitDeadline = () => clearTimeout(exitDeadline);
       const scaleDown = () => {
         "worklet";
         scale.set(
@@ -172,7 +190,17 @@ export function BloubLoader({
         // commit path. Otherwise the loop advances and the exit starts with a jump.
         idleFrames.set([frames[sourceIndex] ?? REST_FRAME]);
         idleFrameIndex.set(0);
-        cancelPreparation = prepareReturnToIdleFrames(sourceIndex, (settling) => {
+        // Holding the pose must never outlive the hidden state: preparation runs on
+        // the JS thread and the screen behind the loader is often busy. Leave from
+        // the held pose when the sequence is late, rather than waiting for it.
+        let cancelSettling: (() => void) | undefined;
+        const settleDeadline = setTimeout(() => {
+          cancelSettling?.();
+          cancelSettling = undefined;
+          scaleDown();
+        }, SETTLE_DEADLINE_MS);
+        cancelSettling = prepareReturnToIdleFrames(sourceIndex, (settling) => {
+          clearTimeout(settleDeadline);
           idleFrames.set(settling);
           idleFrameIndex.set(
             withTiming(
@@ -184,11 +212,16 @@ export function BloubLoader({
             ),
           );
         });
+        cancelPreparation = () => {
+          clearTimeout(settleDeadline);
+          cancelSettling?.();
+        };
       }
     }
     return () => {
       exitRevision.current += 1;
       cancelPreparation?.();
+      cancelExitDeadline?.();
       cancelAnimation(idleFrameIndex);
       cancelAnimation(scale);
       cancelAnimation(opacity);

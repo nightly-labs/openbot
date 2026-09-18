@@ -174,7 +174,7 @@ function JoinServer(props: AccountProps) {
  */
 function ServerSettings() {
   const platform = usePlatform();
-  const { hostStatus } = useServers();
+  const { hostStatus, setServerMuted } = useServers();
   const {
     serverSettingsTarget,
     serverSettingsOpen,
@@ -186,6 +186,7 @@ function ServerSettings() {
     serverSettingsError,
     refreshServerSettings,
     saveServerIdentity,
+    recheckScreenRecording,
     setServerPublished,
     createServerInvite,
     updateServerMember,
@@ -225,10 +226,13 @@ function ServerSettings() {
             onRetry={() => refreshServerSettings(server().id)}
             onSaveIdentity={saveServerIdentity}
             onSetPublished={setServerPublished}
+            onSetMuted={(muted) => setServerMuted(server().id, muted)}
             onCreateInvite={createServerInvite}
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
+            onOpenScreenRecordingSettings={() => window.openbot.openExternal("mac-screen-recording")}
+            onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
             mcpLoadError={serverSettingsMcpError()}
             onMcpSectionShown={() => void refreshMcpServers()}
@@ -352,6 +356,7 @@ function RemoteDesktop() {
     remoteDesktopWorkspaceSession,
     remoteDesktopConnectingServerId,
     remoteDesktopConnectionError,
+    remoteDesktopConnectionErrorCode,
     hideRemoteDesktopWorkspace,
     disconnectRemoteDesktopWorkspace,
     retryRemoteDesktopWorkspace,
@@ -369,6 +374,7 @@ function RemoteDesktop() {
             session={remoteDesktopWorkspaceSession()}
             connecting={remoteDesktopConnectingServerId() === server.id}
             connectionError={remoteDesktopConnectionError()}
+            connectionErrorCode={remoteDesktopConnectionErrorCode()}
             onHide={hideRemoteDesktopWorkspace}
             onDisconnect={() => disconnectRemoteDesktopWorkspace()}
             onRetry={retryRemoteDesktopWorkspace}

@@ -10,7 +10,12 @@ import type {
   AgentSummary,
   CustomProviderRestart,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor, isFreeOpencodeModelName, isReasoningEffort } from "@openbot/contracts/ipc";
+import {
+  agentProviderDescriptor,
+  isAgentProvider,
+  isFreeOpencodeModel,
+  isReasoningEffort,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -55,6 +60,23 @@ import { providerForAgent, providerLabel } from "./thread-items";
 const logger = createOpenBotLogger("provider-runtime");
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
+const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
+
+function withUsageReadTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Usage read timed out.")), ACCOUNT_USAGE_READ_TIMEOUT_MS);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 /**
  * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
@@ -94,6 +116,26 @@ export function isTelemetryExportDiagnostic(message: string): boolean {
   if (/openbot/i.test(message)) return false;
   return /\b(?:batch(?:span|log|logrecord)processor|(?:span|log|logrecord|metric)exporter|opentelemetry|otlp|otel)\b/i.test(
     message,
+  );
+}
+
+/**
+ * Whether a provider says that the account's paid usage is exhausted.
+ *
+ * This is narrower than an HTTP status check. A 429 can be a short request-rate throttle, and a
+ * 402 can describe a subscription problem that the usage notice cannot explain. The explicit
+ * balance, credit and quota phrases below mean the provider's usage reading is the useful report.
+ */
+export function isUsageLimitDiagnostic(message: string): boolean {
+  return (
+    /\binsufficient[_ -]?(?:quota|credits?)\b/iu.test(message) ||
+    /\b(?:quota|credits?|credit balance|usage balance|usage limits?)\b.{0,80}\b(?:exhausted|depleted|exceeded|insufficient|reached|too low)\b/iu.test(
+      message,
+    ) ||
+    /\b(?:exhausted|depleted|exceeded|insufficient|reached)\b.{0,80}\b(?:quota|credits?|credit balance|usage balance|usage limits?)\b/iu.test(
+      message,
+    ) ||
+    /\bbilling hard limit (?:has been )?reached\b/iu.test(message)
   );
 }
 
@@ -181,7 +223,7 @@ const INITIAL_STATUS: AgentStatus = {
  * `gpt-reserve` are Codex picks for its own use -- a review pass and spare capacity -- and
  * `gpt-5.5` and `gpt-5.4-mini` are older models this product does not offer. Everything else the
  * CLI reports reaches the picker, the models it marks hidden included, so this list and
- * CREDENTIAL_ONLY_MODEL_PREFIXES below are the only things that keep a model out, and adding to
+ * the stored-key drop in `#refreshModelCatalog` are the only things that keep a model out, and adding to
  * either is a product decision, not a guess about a flag.
  */
 const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
@@ -198,17 +240,25 @@ function modelDisplayName(name: string): string {
 }
 
 /**
- * Model families a CLI advertises because OpenBot supplied a key, which that key does not buy.
+ * OpenCode models a stored key does not buy, dropped while OpenBot supplies the key.
  *
- * OpenCode reports OpenCode Zen and OpenCode Go as one catalog although they are two products on
- * two endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- and one `OPENCODE_API_KEY`
- * turns both on. A Zen key from `opencode.ai/auth` does not buy Go, so a stored key adds about two
- * dozen `opencode-go/` models that answer every prompt with "Invalid API key.".
+ * The stored key is an OpenCode Go key: it buys `opencode-go/` and the free tier, not OpenCode
+ * Zen. OpenCode reports both products as one catalog although they are two products on two
+ * endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- so a stored key also lists
+ * Zen models that answer every prompt with "Invalid API key.".
  *
- * The prefix is dropped only while OpenBot is the one supplying the key. With no key stored, a Go
+ * The drop applies only while OpenBot is the one supplying the key. With no key stored, a Zen
  * model can only come from the user's own OpenCode sign-in, and that one does buy it.
+ *
+ * Free is decided by id and display name, after the name is resolved: `isFreeOpencodeModel`
+ * is what the picker badges a model with, so the badge and the catalog cannot disagree about
+ * what costs money.
  */
-const CREDENTIAL_ONLY_MODEL_PREFIXES: ReadonlyMap<AgentProvider, string> = new Map([["opencode", "opencode-go/"]]);
+function isOpencodeModelUnusableWithStoredKey(id: string, name: string): boolean {
+  const lower = id.toLowerCase();
+  if (lower.startsWith("opencode-go/")) return false;
+  return lower.startsWith("opencode/") && !isFreeOpencodeModel(id, name);
+}
 
 /**
  * Which OpenCode model a new agent runs, as the tier its catalog leads with.
@@ -219,17 +269,18 @@ const CREDENTIAL_ONLY_MODEL_PREFIXES: ReadonlyMap<AgentProvider, string> = new M
  * message failed with "Token refresh failed: 401" although the free models needed no account.
  *
  * The order is free first, Muse ahead of the rest of the free tier, so nobody is billed for a model
- * they did not choose. Below the free tier come OpenCode's own paid models -- OpenBot supplies the
- * key for those and can say why one failed -- and last the models behind a separate sign-in, whose
- * token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
+ * they did not choose. Below the free tier come OpenCode's own paid models -- the `opencode-go/`
+ * family the stored key buys, and any `opencode/` model behind the user's own OpenCode sign-in --
+ * and last the models behind a separate sign-in, whose token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
  * at all; it is the difference between a bad default and an unusable one.
  */
 function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
-  // Names, not ids, because the price is a naming convention and `isFreeOpencodeModelName` is what
+  // Names, not ids, because the price is a naming convention and `isFreeOpencodeModel` is what
   // the picker badges a model with. An id reaches here as the name anyway when the CLI sends no
   // display name, and both spellings carry the same two words.
-  if (isFreeOpencodeModelName(model.name)) return /\bmuse\b/i.test(model.name) ? 0 : 1;
-  return model.id.toLowerCase().startsWith("opencode/") ? 2 : 3;
+  if (isFreeOpencodeModel(model.id, model.name)) return /\bmuse\b/i.test(model.name) ? 0 : 1;
+  const id = model.id.toLowerCase();
+  return id.startsWith("opencode/") || id.startsWith("opencode-go/") ? 2 : 3;
 }
 
 const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentModelOption) => number> = new Map([
@@ -331,6 +382,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
+  readonly #usageLimitRefreshes = new WeakMap<AgentClient, Promise<void>>();
   /**
    * What this app has already handed to a provider process.
    *
@@ -473,14 +525,46 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * Without a scope this is the account-wide reading the dock polls, and it broadcasts.
-   * Scoped to one agent it answers for that agent's own model and stays quiet: the reply goes to
-   * the caller that asked, so it must not overwrite the account-wide figure every other view shows.
+   * Without a scope this is the account-wide reading the dock polls: one limit per connected
+   * provider that can report usage, then a broadcast. Scoped to one agent it answers for that
+   * agent's own model and stays quiet, so it must not overwrite the list every other view shows.
    */
   async usage(scope?: { provider: AgentProvider; model: string }): Promise<AccountUsage> {
     if (!scope) {
-      const client = this.#clients.get("codex");
-      return client ? this.#refreshUsage(client) : { limits: [] };
+      const available = (this.status().providers ?? []).filter(
+        (item) => isAgentProvider(item.id) && item.state === "available" && item.connectionState !== "connecting",
+      );
+      const providers = available
+        .map((item) => item.id)
+        .filter(isAgentProvider)
+        .sort((left, right) => agentProviderDescriptor(left).pickerOrder - agentProviderDescriptor(right).pickerOrder);
+      const collected = new Map<AgentProvider, AccountUsage["limits"][number]>();
+      await Promise.all(
+        providers.map(async (provider) => {
+          if (provider === "opencode") return;
+          try {
+            if (!this.#clients.has(provider)) await this.ensureProvider(provider);
+            const client = this.#clients.get(provider);
+            if (!client) return;
+            const model =
+              provider === "codex" ? undefined : agentProviderDescriptor(provider).defaultModel || undefined;
+            const usage = await withUsageReadTimeout(this.#refreshUsage(client, model, false));
+            const limit = usage.limits[0];
+            if (!limit || (!limit.primary && !limit.secondary)) return;
+            collected.set(provider, { ...limit, id: provider });
+            this.#emit({
+              type: "usage-changed",
+              usage: { limits: [...collected.values()] },
+            });
+          } catch (error) {
+            logger.warn("Could not read provider usage.", {
+              provider,
+              message: error instanceof Error ? error.message : "unknown",
+            });
+          }
+        }),
+      );
+      return { limits: structuredClone([...collected.values()]) };
     }
     const client = this.#clients.get(scope.provider);
     return client ? this.#refreshUsage(client, scope.model, false) : { limits: [] };
@@ -737,7 +821,22 @@ export class ProviderRuntime implements ProviderPort {
   /** Router arm: the CLI pushed new rate limits. */
   refreshCodexUsage(): void {
     const client = this.#clients.get("codex");
-    if (client) void this.#refreshUsage(client).catch(() => undefined);
+    if (client) void this.#refreshUsage(client, undefined, false).catch(() => undefined);
+  }
+
+  /** Refresh the notice once when one provider reports the same exhausted balance several ways. */
+  refreshUsageAfterLimit(source: AgentClient): void {
+    const client = this.#clients.get(source.provider);
+    if (!client || this.#usageLimitRefreshes.has(client)) return;
+    const refresh = this.#refreshUsage(client)
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+      .finally(() => {
+        if (this.#usageLimitRefreshes.get(client) === refresh) this.#usageLimitRefreshes.delete(client);
+      });
+    this.#usageLimitRefreshes.set(client, refresh);
   }
 
   /**
@@ -1483,6 +1582,11 @@ export class ProviderRuntime implements ProviderPort {
         logger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
         return;
       }
+      if (isUsageLimitDiagnostic(message)) {
+        logger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
+        this.refreshUsageAfterLimit(client);
+        return;
+      }
       this.#emitError(`${client.provider}_diagnostic`, message);
     });
     client.once("exit", (error) => this.#handleExit(client, error));
@@ -1560,10 +1664,8 @@ export class ProviderRuntime implements ProviderPort {
           if (!client) return { provider, models: previous, fresh: false };
           const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
           // Read once per pass, not per model: a stored key cannot change inside one refresh, and
-          // the prefix is unusable only because OpenBot is what put that key in the environment.
-          const unusablePrefix = this.#credentials.apiKey(provider)
-            ? CREDENTIAL_ONLY_MODEL_PREFIXES.get(provider)
-            : undefined;
+          // a model is unusable only because OpenBot is what put that key in the environment.
+          const hasStoredKey = Boolean(this.#credentials.apiKey(provider));
           try {
             const serverModels = new Map<string, ModelListResponse["data"][number]>();
             const cursors = new Set<string>();
@@ -1586,7 +1688,6 @@ export class ProviderRuntime implements ProviderPort {
                 // id would fail the contract guard downstream and take the whole list with it.
                 const id = item.model?.trim();
                 if (!id || suppressed.has(id.toLowerCase())) continue;
-                if (unusablePrefix && id.toLowerCase().startsWith(unusablePrefix)) continue;
                 serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;
@@ -1602,23 +1703,31 @@ export class ProviderRuntime implements ProviderPort {
               const efforts = (server?.supportedReasoningEfforts ?? [])
                 .map((item) => item.reasoningEffort)
                 .filter(isReasoningEffort);
+              // The name the provider CLI gives, whole: a model is easier to recognise as
+              // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
+              // Claude Code is the exception, and `claudeModelName` says why.
+              // Clamped, because a name over the limit is not a long name downstream: it fails
+              // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
+              // whole array, so one over-long name empties the picker. OpenCode is the CLI that
+              // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
+              // 160 characters passes 160 - but the clamp protects every CLI.
+              const name = modelDisplayName(
+                (client.provider === "claude" ? claudeModelName(server.model) : null) ||
+                  server.displayName?.trim() ||
+                  fallback?.name ||
+                  server.model,
+              );
+              // The stored key is an OpenCode Go key, so the Zen models the key also lists never
+              // reach the picker. With no key stored the same models can only come from the user's
+              // own OpenCode sign-in, which does buy them. Decided here, on the resolved name, so
+              // the catalog and the picker's Free badge cannot disagree about what costs money.
+              if (provider === "opencode" && hasStoredKey && isOpencodeModelUnusableWithStoredKey(server.model, name)) {
+                continue;
+              }
               models.push({
                 provider: client.provider,
                 id: server.model,
-                // The name the provider CLI gives, whole: a model is easier to recognise as
-                // `GPT-5.6 Sol` than as `Sol`, and its own CLI names it that way.
-                // Claude Code is the exception, and `claudeModelName` says why.
-                // Clamped, because a name over the limit is not a long name downstream: it fails
-                // `isAgentModelOption`, and the IPC and Team API list decoders fail closed on the
-                // whole array, so one over-long name empties the picker. OpenCode is the CLI that
-                // reaches it - it names a custom model `"<provider name>/<model name>"`, and 80 plus
-                // 160 characters passes 160 - but the clamp protects every CLI.
-                name: modelDisplayName(
-                  (client.provider === "claude" ? claudeModelName(server.model) : null) ||
-                    server.displayName?.trim() ||
-                    fallback?.name ||
-                    server.model,
-                ),
+                name,
                 description:
                   fallback?.description ?? `${providerLabel(client.provider)} model discovered from the local CLI.`,
                 defaultReasoningEffort: isReasoningEffort(server?.defaultReasoningEffort)

@@ -1,9 +1,9 @@
 // @vitest-environment node
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
-  fakeBrowser,
+  createTestService,
   protocolMessages,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -29,7 +29,7 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "DONE";
     process.env.OPENBOT_FAKE_CONTEXT_USAGE = "82000";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -53,7 +53,7 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "DONE";
     process.env.OPENBOT_FAKE_CONTEXT_USAGE = "79000";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Normal task" });
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
@@ -67,7 +67,7 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     // Long enough to save a server inside the compaction, which is the window the deadlock needs.
     process.env.OPENBOT_FAKE_COMPACTION_DELAY = "400";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
 
     await service.sendMessage({ agentId: "chief", text: "First large task" });
@@ -106,7 +106,7 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     process.env.OPENBOT_FAKE_CONTEXT_USAGE = "82000";
     process.env.OPENBOT_FAKE_COMPACTION_ERROR = "1";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();

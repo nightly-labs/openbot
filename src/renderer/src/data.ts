@@ -48,6 +48,8 @@ export type ChatActionMarkerModel =
       timestamp: string;
       messageId: string;
       replyToMessageId: string | null;
+      /** The sender asked for no answer, so the marker names it as information rather than a request. */
+      expectsReply: boolean;
     }
   | {
       kind: "routine-lifecycle";
@@ -141,6 +143,8 @@ export interface AgentProfile {
   model: AgentModelId;
   reasoningEffort: AgentReasoningEffort;
   threadId: string | null;
+  /** The agent's working directory. Absent for profiles built before it was tracked. */
+  workspacePath?: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
   avatarUrl: string | null;

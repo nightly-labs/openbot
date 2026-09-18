@@ -34,6 +34,9 @@ const plistPath = resolve(contentsPath, "Info.plist");
 const whisperExecutablePath = resolve(resourcesPath, "whisper/bin/whisper-cli");
 const whisperModelPath = resolve(resourcesPath, "whisper/model/ggml-medium-q5_0.bin");
 const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin/arm64");
+// The database host is spawned by path as its own process, so it has to survive the asar unchanged.
+// Packed into app.asar it would still be readable, but `utilityProcess` cannot start it from there.
+const databaseHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/agent-database-host.js");
 
 await Promise.all([
   access(executablePath),
@@ -45,6 +48,7 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/OpenAI-Whisper-LICENSE")),
   access(resolve(resourcesPath, "licenses/whisper.cpp-LICENSE")),
   access(whisperExecutablePath),
+  access(databaseHostPath),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/source-manifest.json")),
@@ -87,6 +91,12 @@ expectEqual(
 const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 if (!isDynamicRecord(packageJson)) throw new Error("package.json is not a JSON object.");
 expectEqual(plist.CFBundleShortVersionString, packageJson.version, "application version");
+
+// Electron is unavailable to this process, and its own imports are what keep it startable there.
+const databaseHost = await readFile(databaseHostPath, "utf8");
+if (/from "(?!node:)/.test(databaseHost)) {
+  throw new Error("The database host must import nothing but node: builtins.");
+}
 
 const architecture = run("file", [executablePath]);
 if (!architecture.includes("arm64")) throw new Error(`Expected an ARM64 executable: ${architecture}`);

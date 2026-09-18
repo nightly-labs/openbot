@@ -1,4 +1,5 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import {
@@ -81,6 +82,8 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         ): Promise<T> => {
           const result = await enqueue({ type: "request", method, path, body, upload });
           if (!result.ok) throw new Error(result.error ?? "The server request failed.");
+          if (result.status === 409 && isQueueEditRoute(method, path))
+            throw new QueueEditRejectedError("The host did not accept this edit.");
           if (result.status !== undefined && result.status >= 400) throw new Error("The server request failed.");
           return decode(result.body);
         },

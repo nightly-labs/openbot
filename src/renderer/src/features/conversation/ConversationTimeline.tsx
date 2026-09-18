@@ -49,6 +49,7 @@ export function ConversationTimeline() {
     agentActivitySpaceReserved,
     agentReady,
     attachmentAction,
+    downloadAttachments,
     browserTakeoverPreview,
     browserTakeoverResolution,
     browserTakeoverTab,
@@ -75,6 +76,7 @@ export function ConversationTimeline() {
     openExternalMessageUrl,
     openMoreMessageId,
     openReactionMessageId,
+    openBrowserTakeoverTab,
     openRoutineSettings,
     openSkillSettings,
     openSharedFile,
@@ -91,6 +93,7 @@ export function ConversationTimeline() {
     setExpandedEmojiMessageId,
     setOpenMoreMessageId,
     setOpenReactionMessageId,
+    setRequiredInteractionElement,
     showScrollToLatest,
     unreadDividerVisible,
     updateScrollFade,
@@ -117,6 +120,9 @@ export function ConversationTimeline() {
   });
   return (
     <>
+      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {keyedPrompt() ? `Input required. ${keyedPrompt()?.prompt.questions[0]?.question ?? ""}` : ""}
+      </span>
       <Show when={chatSearchOpen()}>
         <ChatSearch
           query={chatSearchQuery()}
@@ -176,13 +182,15 @@ export function ConversationTimeline() {
                 <Button
                   variant="outline"
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    const agentId = props.agent?.id;
+                    const target = agentId ? { agentId, serverId: props.server?.id ?? "local" } : undefined;
                     void props
                       .onOpenAgentSetup()
                       .catch((error) =>
-                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again.")),
-                      )
-                  }
+                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again."), target),
+                      );
+                  }}
                 >
                   Setup guide
                 </Button>
@@ -359,6 +367,7 @@ export function ConversationTimeline() {
                               kind: message()?.author === "you" ? "you" : "agent",
                               name: message()?.author === "you" ? "You" : (props.agent?.name ?? "Agent"),
                             }}
+                            showTime
                             animate={animateEntrance}
                             agents={props.agents}
                             skills={installedSkills()}
@@ -381,6 +390,7 @@ export function ConversationTimeline() {
                             onAttachmentAction={attachmentAction}
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={openWorkspaceFile}
+                            onDownloadAttachments={downloadAttachments}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             actions={
                               <MessageActions
@@ -466,6 +476,7 @@ export function ConversationTimeline() {
               <Loading>
                 <QuestionPromptBubble
                   questions={entry.prompt.questions}
+                  elementRef={setRequiredInteractionElement}
                   onSubmit={props.onAnswerPrompt}
                   onResolutionPresented={() =>
                     props.onPromptResolutionPresented?.(
@@ -496,6 +507,7 @@ export function ConversationTimeline() {
                 tab={browserTakeoverTab()}
                 preview={browserTakeoverPreview().preview}
                 previewStatus={browserTakeoverPreview().status}
+                onOpen={openBrowserTakeoverTab}
                 onComplete={() => respondToBrowserTakeover("complete")}
                 onCancel={() => respondToBrowserTakeover("cancel")}
               />

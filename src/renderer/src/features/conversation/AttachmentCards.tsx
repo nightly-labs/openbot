@@ -1,13 +1,58 @@
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
-import { Button } from "../../components/ui";
+import { Button, Download, Spinner } from "../../components/ui";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { attachmentReferenceTone } from "./AttachmentReference";
+
+/**
+ * The whole-list action, shaped like the account update island: a tinted bar
+ * that states what is attached, with a light action button beside it. The
+ * bottom edge tucks under the first attachment card, so the stack reads as one
+ * object rather than a button parked above a list.
+ */
+export function AttachmentDownloadAll(props: { count: number; pending: boolean; onDownload: () => void }) {
+  const label = () => (props.pending ? "Downloading ZIP…" : "Download all as ZIP");
+  return (
+    <div class="attachment-download-island">
+      <p class="attachment-download-island__copy">{props.count} attachments</p>
+      <div class="attachment-download-island__action-shell">
+        <Button
+          type="button"
+          size="xs"
+          class="attachment-download-island__action"
+          aria-label={label()}
+          aria-busy={props.pending ? "true" : undefined}
+          disabled={props.pending}
+          onClick={() => props.onDownload()}
+        >
+          <span class="attachment-download-island__action-content">
+            <span class="attachment-download-island__icon t-icon-swap" data-state={props.pending ? "b" : "a"}>
+              <span class="t-icon" data-icon="a" aria-hidden="true">
+                <Download />
+              </span>
+              <span class="t-icon" data-icon="b" aria-hidden="true">
+                <Spinner size="sm" />
+              </span>
+            </span>
+            <span
+              class="attachment-download-island__action-label"
+              data-state={props.pending ? "pending" : "action"}
+              aria-hidden="true"
+            >
+              <span data-text="action">Download</span>
+              <span data-text="pending">Zipping</span>
+            </span>
+          </span>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
   onPreview: (attachment: AttachmentSummary) => void;
-  onAction: (attachment: AttachmentSummary, action: "open" | "reveal") => void;
+  onAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
 }) {
   const tooltipId = `attachment-action-tooltip-${createUniqueId()}`;
   const [tooltip, setTooltip] = createSignal<{ anchor: HTMLElement; content: string } | null>(null);
@@ -59,6 +104,18 @@ export function AttachmentCards(props: {
                   <strong>{attachment.name}</strong>
                   <small>{formatFileSize(attachment.size)}</small>
                 </span>
+              </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                class="attachment-open-button"
+                aria-label={`Download ${attachment.name}`}
+                onClick={() => {
+                  setTooltip(null);
+                  props.onAction(attachment, "download");
+                }}
+              >
+                <Download />
               </Button>
               <Button
                 variant="ghost"

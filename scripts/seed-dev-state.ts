@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, mkdtemp, readFile, readlink, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -6,6 +7,9 @@ import { pathToFileURL } from "node:url";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type {
+  AgentModelId,
+  AgentProviderId,
+  AgentReasoningEffort,
   AgentSummary,
   AttachmentSummary,
   ChannelMessage,
@@ -15,18 +19,31 @@ import type {
 } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { strToU8, zipSync } from "fflate";
 import { z } from "zod";
 import { agentNamesById, displayMessageReferences } from "../src/backend/agent/delivery-content";
+import {
+  DEVELOPMENT_DEFAULT_MODEL,
+  DEVELOPMENT_DEFAULT_PROVIDER,
+  DEVELOPMENT_DEFAULT_REASONING_EFFORT,
+} from "../src/backend/agent/development-defaults";
 import { AgentMemoryStore } from "../src/backend/agent-memory-store";
 import { AgentRoutineStore } from "../src/backend/agent-routine-store";
-import { AgentStore } from "../src/backend/agent-store";
+import {
+  AgentStore,
+  DEFAULT_AGENT_MODEL,
+  DEFAULT_AGENT_PROVIDER,
+  DEFAULT_REASONING_EFFORT,
+} from "../src/backend/agent-store";
 import { ChannelMemoryStore } from "../src/backend/channel-memory-store";
 import { ChannelRoutineStore } from "../src/backend/channel-routine-store";
 import { ChannelStore } from "../src/backend/channel-store";
+import { resolveOpencodeCli } from "../src/backend/cli";
 import { sortConversationMessages } from "../src/backend/conversation-snapshots";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName, readDevelopmentInstanceId } from "../src/main/development-profile";
+import { ProviderRuntimeManager, providerRuntimeRoot } from "../src/main/provider-runtime-manager";
 import { writeSetupState } from "../src/main/setup-store";
 import { TeamStore } from "../src/main/team-store";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
@@ -50,11 +67,122 @@ const CHANNEL_BETA_FEEDBACK = "channel-beta-feedback";
  * adopts these cursors through `ChannelStore.adoptReads`, so the seeded read state follows it.
  */
 const LOCAL_MEMBER_ID = "local";
-const SEED_AGENT_MODEL = "gpt-5.6-luna";
-const SEED_AGENT_REASONING_EFFORT = "low";
+/** The provider, model and effort every seeded agent shares. Not per-agent data: one answer. */
+export interface SeededAgentModel {
+  provider: AgentProviderId;
+  model: AgentModelId;
+  reasoningEffort: AgentReasoningEffort;
+}
+
+/**
+ * What the seeded agents run on when the development default is out of reach. The same pair the app
+ * falls back to, which is the built-in default of a new agent record.
+ */
+export const SEED_FALLBACK_AGENT: SeededAgentModel = {
+  provider: DEFAULT_AGENT_PROVIDER,
+  model: DEFAULT_AGENT_MODEL,
+  reasoningEffort: DEFAULT_REASONING_EFFORT,
+};
+
+/**
+ * What the seeded agents run on: the development default while this computer's OpenCode CLI lists
+ * it, and the built-in default otherwise.
+ *
+ * The app asks the CLI it spawns, over ACP. A seed has no provider runtime, so it asks the same
+ * binary with that CLI's own `models` command, and reads anything that fails -- nothing downloaded
+ * yet, no OpenCode Go key and no sign-in, a command that moved -- as "not listed". Four seeded
+ * agents whose first turn answers "Invalid API key." are a worse start than four on the default the
+ * app itself falls back to.
+ */
+async function seededAgentModel(appDataRoot: string): Promise<SeededAgentModel> {
+  try {
+    const cli = await resolveOpencodeCli({ bundledExecutable: managedOpencodeExecutable(appDataRoot) });
+    const catalog = execFileSync(cli.executable, ["models"], {
+      encoding: "utf8",
+      timeout: 60_000,
+      // The flag the app spawns a managed CLI with. A managed binary that updates itself while a
+      // profile is seeded stops being the exact version the app verifies, and the app downloads it
+      // again on the next start.
+      env: { ...process.env, ...(cli.source === "managed" ? { OPENCODE_DISABLE_AUTOUPDATE: "1" } : {}) },
+    });
+    if (!catalog.split("\n").some((line) => line.trim() === DEVELOPMENT_DEFAULT_MODEL)) return SEED_FALLBACK_AGENT;
+    return {
+      provider: DEVELOPMENT_DEFAULT_PROVIDER,
+      model: DEVELOPMENT_DEFAULT_MODEL,
+      reasoningEffort: DEVELOPMENT_DEFAULT_REASONING_EFFORT,
+    };
+  } catch {
+    return SEED_FALLBACK_AGENT;
+  }
+}
+
+/**
+ * Where the app's own OpenCode is: the runtime store this computer shares, which is where a CLI the
+ * user downloaded in OpenBot is the only copy there is. A seed that looked at the repository's
+ * `build/` tree and the user's own installs instead would find nothing on such a computer, and would
+ * put four agents on a provider the app does not start a new agent on.
+ *
+ * The store, not the status: the manager is read for the path it computes, and nothing here creates
+ * a directory, downloads, or collects an old version.
+ */
+function managedOpencodeExecutable(appDataRoot: string): string | null {
+  const runtimes = new ProviderRuntimeManager({
+    root: providerRuntimeRoot({ appData: appDataRoot, userDataOverride: "" }),
+  });
+  return runtimes.executablePath("opencode");
+}
+
 const GENERATED_DIRECTORY_PATTERN =
   /^generated\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHOWCASE_IMAGE_PATH = resolve(process.cwd(), "src", "renderer", "src", "assets", "openbot-logo-dev.png");
+
+function previewPdf(): string {
+  const stream = "BT /F1 18 Tf 24 150 Td (OpenBot file preview) Tj ET";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 320 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  const offsets: number[] = [];
+  let body = "%PDF-1.4\n";
+  objects.forEach((object, index) => {
+    offsets.push(body.length);
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const startXref = body.length;
+  const entries = offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  return `${body}xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${entries}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`;
+}
+
+function previewMp3(): Uint8Array {
+  const frameBytes = 417;
+  const frames = 40;
+  const result = new Uint8Array(frameBytes * frames);
+  for (let index = 0; index < frames; index += 1) result.set([0xff, 0xfb, 0x90, 0x00], index * frameBytes);
+  return result;
+}
+
+function previewXlsx(): Uint8Array {
+  return zipSync({
+    "xl/workbook.xml": strToU8(
+      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="1"/><sheets><sheet name="Operating plan" sheetId="1" r:id="rId1"/><sheet name="Regional view" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>',
+    ),
+    "xl/styles.xml": strToU8(
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="165" formatCode="0.0%"/><numFmt numFmtId="166" formatCode="yyyy-mm-dd"/><numFmt numFmtId="167" formatCode="h:mm"/></numFmts><cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="165"/><xf numFmtId="166"/><xf numFmtId="167"/></cellXfs></styleSheet>',
+    ),
+    "xl/worksheets/sheet1.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Workstream</t></is></c><c r="B1" t="inlineStr"><is><t>Owner</t></is></c><c r="C1" t="inlineStr"><is><t>Status</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Product QA</t></is></c><c r="B2" t="inlineStr"><is><t>Builder</t></is></c><c r="C2" t="inlineStr"><is><t>Ready</t></is></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>Evidence</t></is></c><c r="B3" t="inlineStr"><is><t>Research</t></is></c><c r="C3" t="inlineStr"><is><t>In review</t></is></c></row></sheetData></worksheet>',
+    ),
+    "xl/worksheets/sheet2.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Region</t></is></c><c r="B1" t="inlineStr"><is><t>Activation</t></is></c><c r="C1" t="inlineStr"><is><t>Date</t></is></c><c r="D1" t="inlineStr"><is><t>Time</t></is></c><c r="E1" t="inlineStr"><is><t>Empty</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>North</t></is></c><c r="B2" s="1"><v>0.55</v></c><c r="C2" s="2"><v>0</v></c><c r="D2" s="3"><v>0.5</v></c><c r="E2" s="1"/></row></sheetData></worksheet>',
+    ),
+  });
+}
 
 interface DevelopmentSeedManifest {
   version: 1;
@@ -74,12 +202,19 @@ export interface DevelopmentSeedOptions {
   dryRun?: boolean;
   ifMissing?: boolean;
   instanceId?: string | null;
+  /**
+   * What the seeded agents run on. Left out, it is resolved from this computer's OpenCode CLI,
+   * which is what makes it an option: a test pins the answer instead of asking the machine.
+   */
+  agentModel?: SeededAgentModel;
 }
 
 export interface DevelopmentSeedSummary {
   targetProfile: string;
   dryRun: boolean;
   profileActive: boolean;
+  /** The model every seeded agent runs on, which a dry run reports before anything is written. */
+  agentModel: AgentModelId;
   agents: number;
   conversations: number;
   attachments: number;
@@ -102,7 +237,7 @@ export interface DevelopmentSeedSummary {
 const SEED_SUMMARY = {
   agents: 4,
   conversations: 4,
-  attachments: 5,
+  attachments: 10,
   teamMembers: 4,
   activeInvites: 1,
   sessions: 4,
@@ -125,8 +260,6 @@ const AGENTS = [
     name: "Chief",
     title: "Chief of staff",
     description: "Coordinates priorities, decisions, and handoffs across the team.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 245,
   },
   {
@@ -134,8 +267,6 @@ const AGENTS = [
     name: "Research",
     title: "Research partner",
     description: "Finds reliable sources and turns them into concise briefs.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 185,
   },
   {
@@ -143,8 +274,6 @@ const AGENTS = [
     name: "Builder",
     title: "Product engineer",
     description: "Builds product changes and records clear technical decisions.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 30,
   },
   {
@@ -152,8 +281,6 @@ const AGENTS = [
     name: "Launch",
     title: "Go-to-market lead",
     description: "Prepares launch assets, messaging, and release checklists.",
-    model: SEED_AGENT_MODEL,
-    reasoningEffort: SEED_AGENT_REASONING_EFFORT,
     avatarHue: 320,
   },
 ] as const;
@@ -168,10 +295,12 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
   if (dirname(targetProfile) !== appDataRoot) throw new Error(`Unsafe OpenBot dev profile path: ${targetProfile}`);
 
   const profileActive = await isDevelopmentProfileActive(targetProfile);
+  const agentModel = options.agentModel ?? (await seededAgentModel(appDataRoot));
   const summary: DevelopmentSeedSummary = {
     targetProfile,
     dryRun: options.dryRun ?? false,
     profileActive,
+    agentModel: agentModel.model,
     ...SEED_SUMMARY,
   };
   if (options.dryRun) return summary;
@@ -184,7 +313,7 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
   const stagingProfile = await mkdtemp(join(appDataRoot, ".openbot-dev-seed-"));
   const newTransferDirectories: string[] = [];
   try {
-    await buildSeedProfile(stagingProfile, homeDirectory, newTransferDirectories);
+    await buildSeedProfile(stagingProfile, homeDirectory, newTransferDirectories, agentModel);
     if (await isDevelopmentProfileActive(targetProfile)) {
       throw new Error("Quit the OpenBot dev app before you seed its local state.");
     }
@@ -236,6 +365,7 @@ async function buildSeedProfile(
   profilePath: string,
   homeDirectory: string,
   transferDirectories: string[],
+  agentModel: SeededAgentModel,
 ): Promise<void> {
   const agentStore = new AgentStore(profilePath, homeDirectory);
   await agentStore.initialize();
@@ -244,7 +374,7 @@ async function buildSeedProfile(
 
   const clock = createSeedClock();
   try {
-    const agents = await seedAgents(agentStore);
+    const agents = await seedAgents(agentStore, agentModel);
     const attachments = await seedAttachments(mailbox, agents, transferDirectories);
     seedMemories(agentStore);
     await seedRoutines(agentStore, mailbox, clock);
@@ -252,7 +382,13 @@ async function buildSeedProfile(
     await seedConversations(agentStore, mailbox, agents, attachments, clock);
     await seedChannels(agentStore, mailbox, agents, clock, transferDirectories);
     await seedTeam(profilePath, agentStore, clock);
-    await writeSetupState(join(profilePath, SETUP_FILE), { preferredProvider: "codex", preferredModel: null });
+    // No model beside the provider, and the built-in provider: a seeded profile records no choice
+    // of the developer's, which is what lets the app apply its own development default to an agent
+    // created later. `AgentService` decides that one against the live catalog; this script cannot.
+    await writeSetupState(join(profilePath, SETUP_FILE), {
+      preferredProvider: DEFAULT_AGENT_PROVIDER,
+      preferredModel: null,
+    });
     await writeSeedManifest(profilePath, clock, transferDirectories);
   } finally {
     agentStore.database.close();
@@ -419,7 +555,7 @@ async function seedRoutineRun(
   routines.updateRunStatus(run.id, status, error);
 }
 
-async function seedAgents(agentStore: AgentStore): Promise<Map<string, AgentSummary>> {
+async function seedAgents(agentStore: AgentStore, agentModel: SeededAgentModel): Promise<Map<string, AgentSummary>> {
   const agents = new Map<string, AgentSummary>();
   for (const fixture of AGENTS) {
     await agentStore.getOrCreate(fixture.id, fixture.name, fixture.title);
@@ -428,8 +564,11 @@ async function seedAgents(agentStore: AgentStore): Promise<Map<string, AgentSumm
       name: fixture.name,
       title: fixture.title,
       description: fixture.description,
-      model: fixture.model,
-      reasoningEffort: fixture.reasoningEffort,
+      // The provider travels with the model: a record left on the built-in provider while its
+      // model belongs to another one names a model that provider cannot run.
+      provider: agentModel.provider,
+      model: agentModel.model,
+      reasoningEffort: agentModel.reasoningEffort,
       avatarSeed: fixture.id,
       avatarHue: fixture.avatarHue,
     });
@@ -443,7 +582,12 @@ async function seedAttachments(
   mailbox: MailboxStore,
   agents: Map<string, AgentSummary>,
   transferDirectories: string[],
-): Promise<Record<"brief" | "metrics" | "evidence" | "image", AttachmentSummary>> {
+): Promise<
+  Record<
+    "brief" | "metrics" | "evidence" | "image" | "log" | "svg" | "pdf" | "audio" | "spreadsheet",
+    AttachmentSummary
+  >
+> {
   const chief = requireAgent(agents, "chief");
   const research = requireAgent(agents, "research");
   const launch = requireAgent(agents, "launch");
@@ -483,6 +627,42 @@ async function seedAttachments(
       mimeType: "image/png",
       sourcePath: SHOWCASE_IMAGE_PATH,
     }),
+    log: await store(chief, {
+      name: "provider-session.log",
+      mimeType: "text/plain",
+      bytes: bytes(
+        [
+          "2026-09-16T09:12:04.118Z  info   provider.claude-code   session started",
+          "2026-09-16T09:12:04.402Z  debug  ipc.attachments        preview requested",
+          "2026-09-16T09:12:06.311Z  error  provider.codex         spawn failed code=ENOENT",
+          "  retry 1 of 3 in 500 ms",
+          "  retry 2 of 3 in 1000 ms",
+          "2026-09-16T09:12:08.044Z  info   provider.codex         ready",
+        ].join("\n"),
+      ),
+    }),
+    svg: await store(chief, {
+      name: "trust-boundary.svg",
+      mimeType: "image/svg+xml",
+      bytes: bytes(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200"><rect width="320" height="200" rx="12" fill="#12141a"/><rect x="24" y="32" width="120" height="56" rx="10" fill="#2f6df6"/><rect x="176" y="112" width="120" height="56" rx="10" fill="#f6a62f"/><path d="M144 60 H210 V112" stroke="#8d94a5" stroke-width="3" fill="none"/></svg>',
+      ),
+    }),
+    pdf: await store(chief, {
+      name: "invoice-2026-09.pdf",
+      mimeType: "application/pdf",
+      bytes: bytes(previewPdf()),
+    }),
+    audio: await store(chief, {
+      name: "standup-recap.mp3",
+      mimeType: "audio/mpeg",
+      bytes: previewMp3(),
+    }),
+    spreadsheet: await store(chief, {
+      name: "operating-plan.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      bytes: previewXlsx(),
+    }),
   };
 }
 
@@ -490,7 +670,10 @@ async function seedConversations(
   agentStore: AgentStore,
   mailbox: MailboxStore,
   agents: Map<string, AgentSummary>,
-  attachments: Record<"brief" | "metrics" | "evidence" | "image", AttachmentSummary>,
+  attachments: Record<
+    "brief" | "metrics" | "evidence" | "image" | "log" | "svg" | "pdf" | "audio" | "spreadsheet",
+    AttachmentSummary
+  >,
   clock: SeedClock,
 ): Promise<void> {
   const message = (id: string, author: ConversationMessage["author"], text: string, ago: number): ConversationMessage =>
@@ -579,6 +762,37 @@ async function seedConversations(
           92 * MINUTE,
         ),
         status: "interrupted",
+      },
+      {
+        ...message(
+          "chief-assistant-file-previews",
+          "assistant",
+          [
+            "Here is a file preview pack. Open each one to check its renderer:",
+            "",
+            `- ${file(attachments.brief)}`,
+            `- ${file(attachments.metrics)}`,
+            `- ${file(attachments.evidence)}`,
+            `- ${file(attachments.log)}`,
+            `- ${file(attachments.svg)}`,
+            `- ${file(attachments.pdf)}`,
+            `- ${file(attachments.audio)}`,
+            `- ${file(attachments.image)}`,
+            `- ${file(attachments.spreadsheet)}`,
+          ].join("\n"),
+          43 * MINUTE,
+        ),
+        attachments: [
+          attachments.brief,
+          attachments.metrics,
+          attachments.evidence,
+          attachments.log,
+          attachments.svg,
+          attachments.pdf,
+          attachments.audio,
+          attachments.image,
+          attachments.spreadsheet,
+        ],
       },
     ],
     research: [
@@ -686,6 +900,21 @@ async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
     await mailbox.markRunning(delivery.id, `dev-seed-turn-completed-${index + 1}`);
     await mailbox.markTerminal(delivery.id, "completed");
   }
+
+  // A teammate passing information on without asking for an answer: the state the marker reads as
+  // "Informed" for the sender and "Update from" for the recipient.
+  const notice = await mailbox.enqueue({
+    sender: { kind: "agent", agentId: "builder" },
+    recipientAgentIds: ["chief"],
+    text: "The staging build is live. I am continuing with the checklist; no answer needed.",
+    expectsReply: false,
+    idempotencyKey: "dev-seed:exchange:notice",
+  });
+  const noticeDelivery = notice.deliveries[0];
+  if (!noticeDelivery) throw new Error("The seeded notice exchange did not create a delivery.");
+  await mailbox.markStarting(noticeDelivery.id);
+  await mailbox.markRunning(noticeDelivery.id, "dev-seed-turn-notice");
+  await mailbox.markTerminal(noticeDelivery.id, "completed");
 
   const failed = await mailbox.enqueue({
     sender: { kind: "agent", agentId: "research" },
@@ -1313,6 +1542,7 @@ async function main(): Promise<void> {
   logger.info(dryRun ? "OpenBot development seed dry run:" : "OpenBot development state seeded:");
   logger.info(`- profile: ${summary.targetProfile}`);
   logger.info(`- profile active: ${summary.profileActive ? "yes" : "no"}`);
+  logger.info(`- agent model: ${summary.agentModel}`);
   logger.info(`- agents: ${summary.agents}`);
   logger.info(`- conversations: ${summary.conversations}`);
   logger.info(`- managed attachments: ${summary.attachments}`);

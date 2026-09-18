@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
-import { isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
 export const QUEUE_DELIVERY_STATUSES = [
   "queued",
@@ -30,6 +30,22 @@ export interface QueueDelivery {
   turnId: string | null;
   error: string | null;
   createdAt: string;
+  /**
+   * Another editor holds this queued message. It keeps its place in the queue and the agent does
+   * not start it until the edit is saved or cancelled.
+   *
+   * Absent rather than false on a released Team API response: the shipped adapters project a fixed
+   * key list, so a remote server drops this field instead of reporting it.
+   */
+  editing?: boolean;
+  /**
+   * Whether the sender waits for an answer. Only an agent sender sets it, and only to `false`:
+   * a message the sender marked as information the recipient may act on, but must not answer.
+   *
+   * Absent means an answer is expected: what every message stored before this field existed meant,
+   * and what a remote server too old to send it reports.
+   */
+  expectsReply?: boolean;
 }
 
 function isQueueDelivery(value: unknown): value is QueueDelivery {
@@ -49,7 +65,9 @@ function isQueueDelivery(value: unknown): value is QueueDelivery {
       (isNumber(value.position) && Number.isInteger(value.position) && value.position >= 1)) &&
     (value.turnId === null || isIdentifier(value.turnId)) &&
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
-    isBoundedString(value.createdAt, 160)
+    isBoundedString(value.createdAt, 160) &&
+    (value.editing === undefined || isBoolean(value.editing)) &&
+    (value.expectsReply === undefined || isBoolean(value.expectsReply))
   );
 }
 

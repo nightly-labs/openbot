@@ -21,6 +21,7 @@ export function toAgentProfile(stored: AgentSummary): AgentProfile {
     model: stored.model,
     reasoningEffort: stored.reasoningEffort,
     threadId: stored.threadId,
+    workspacePath: stored.workspacePath,
     avatarSeed: stored.avatarSeed,
     avatarHue: stored.avatarHue,
     avatarUrl: stored.avatarUrl,
@@ -205,6 +206,7 @@ function chatActionMarker(
       timestamp: message.createdAt,
       messageId: message.exchange.messageId,
       replyToMessageId: message.exchange.replyToMessageId,
+      expectsReply: message.exchange.expectsReply !== false,
     };
   }
   const skillEvent = skillConversationEvent(message);

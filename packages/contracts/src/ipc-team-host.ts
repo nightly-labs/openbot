@@ -80,6 +80,9 @@ export interface HostStatus {
   logoUrl: string | null;
   apiOnline: boolean;
   remoteDesktopReady: boolean;
+  // True once this host has refused a member because the operating system will not let OpenBot record
+  // the screen. The member's error tells them to ask the host owner; this is what the host owner sees.
+  remoteDesktopScreenRecordingDenied: boolean;
   remoteDesktopUnattended: boolean;
   remoteDesktopActiveSessions: number;
   remoteDesktopMaxSessions: number;
@@ -391,14 +394,20 @@ export interface RemoteDesktopCapabilities {
 export type RemoteDesktopPhase = "starting_host" | "connecting" | "connected" | "disconnecting" | "error";
 export type RemoteDesktopTransport = "unknown" | "p2p" | "relay";
 
-export type RemoteDesktopErrorCode =
-  | "host_unavailable"
-  | "host_permissions_required"
-  | "session_capacity_reached"
-  | "session_expired"
-  | "session_revoked"
-  | "protocol_mismatch"
-  | "connection_failed";
+// Every reason a host gives for refusing a remote screen, as a closed table. Exported as values
+// because both ends need to check a code they were handed: the host writes one into a session it is
+// ending, and the client decodes one out of a host's answer.
+export const REMOTE_DESKTOP_ERROR_CODES = [
+  "host_unavailable",
+  "host_permissions_required",
+  "session_capacity_reached",
+  "session_expired",
+  "session_revoked",
+  "protocol_mismatch",
+  "connection_failed",
+] as const;
+
+export type RemoteDesktopErrorCode = (typeof REMOTE_DESKTOP_ERROR_CODES)[number];
 
 export interface RemoteDesktopSession {
   id: string;
@@ -414,6 +423,19 @@ export interface RemoteDesktopSession {
   createdAt: string;
   grantExpiresAt: string;
 }
+
+/**
+ * What `remoteDesktop.connect` answers.
+ *
+ * A host that refuses names its reason, and the reason decides what the workspace can offer: a
+ * missing screen recording grant is a setup step on the host, while a failed connection is a retry.
+ * Rejecting the call would leave the renderer holding the sentence and none of the code -- an IPC
+ * rejection carries a message and nothing else -- so a refusal the host answered with travels as a
+ * value. A call that never reached the host still rejects.
+ */
+export type RemoteDesktopConnectResult =
+  | { status: "connected"; session: RemoteDesktopSession }
+  | { status: "refused"; errorCode: RemoteDesktopErrorCode; message: string };
 
 export interface RemoteDesktopConnectInput {
   serverId: string;

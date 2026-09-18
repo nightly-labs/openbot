@@ -1,7 +1,7 @@
-import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserControlSession, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import type { ConversationProps, RightPanelMode } from "../conversation-types";
+import type { ConversationProps, ConversationTarget, RightPanelMode } from "../conversation-types";
 
 export interface BrowserTakeoverPreviewState {
   status: "idle" | "loading" | "ready" | "failed";
@@ -62,7 +62,7 @@ export interface BrowserStoreDeps {
   browserAddress: () => string;
   setBrowserAddress: (address: string) => void;
   setBrowserAddressEditing: (editing: boolean) => void;
-  setComposerError: (error: string | null) => void;
+  setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   panels: BrowserPanels;
 }
 
@@ -197,21 +197,31 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     },
   );
 
-  createEffect(
-    () => {
-      const tabId = deps.props.browserTakeover?.tabId;
-      return {
-        tabId,
-        tabExists: Boolean(tabId && browserTabs().some((tab) => tab.id === tabId)),
-        activeTabId: deps.props.activeBrowserTabId,
-      };
-    },
-    ({ tabId, tabExists, activeTabId }) => {
-      if (!tabId || !tabExists) return;
-      deps.panels.setActiveRightPanel("browser-expanded");
-      if (activeTabId !== tabId) activateBrowserTab(tabId);
-    },
-  );
+  /**
+   * A takeover request used to expand the browser over the conversation the moment it arrived,
+   * which took the window away from whatever the user was reading for a step they may not want to
+   * start yet. The card carries the page preview instead, and pressing that preview is what opens
+   * the page -- the same gesture as a preview card in the browser sidebar.
+   */
+  function openBrowserTakeoverTab() {
+    const tab = browserTakeoverTab();
+    if (!tab) return;
+    if (deps.props.activeBrowserTabId !== tab.id) activateBrowserTab(tab.id);
+    deps.panels.setActiveRightPanel("browser-expanded");
+  }
+
+  const agentsByThreadId = createMemo(() => new Map(deps.props.agents.map((agent) => [agent.threadId, agent])));
+
+  // Single pass, no copy and no localeCompare sort per evaluation.
+  const newestSession = (sessions: readonly BrowserControlSession[]) => {
+    let acting: BrowserControlSession | undefined;
+    let newest: BrowserControlSession | undefined;
+    for (const session of sessions) {
+      if (!newest || session.startedAt > newest.startedAt) newest = session;
+      if (session.phase === "acting" && (!acting || session.startedAt > acting.startedAt)) acting = session;
+    }
+    return acting ?? newest;
+  };
 
   const activeBrowserControl = createMemo(() => {
     if (deps.props.browserEnabled === false) return undefined;
@@ -224,11 +234,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       ? sessions.filter((session) => session.threadId === deps.props.agent?.threadId)
       : [];
     const candidates = forActiveTab.length > 0 ? forActiveTab : forActiveAgent;
-    return (
-      [...candidates]
-        .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
-        .find((session) => session.phase === "acting") ?? candidates.at(-1)
-    );
+    return newestSession(candidates);
   });
   const actingBrowserControl = createMemo(() => {
     const control = activeBrowserControl();
@@ -236,7 +242,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   });
   const browserControlAgent = createMemo(() => {
     const control = activeBrowserControl();
-    return control ? deps.props.agents.find((agent) => agent.threadId === control.threadId) : undefined;
+    return control ? agentsByThreadId().get(control.threadId) : undefined;
   });
   const browserControlForTab = (tab: BrowserTab) => {
     const sessions = deps.props.browserControlState.sessions.filter(
@@ -244,12 +250,11 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         session.tabId === tab.id ||
         (session.tabId === null && tab.id === activeBrowserTab()?.id && session.threadId === tab.ownerThreadId),
     );
-    const newestFirst = [...sessions].sort((left, right) => right.startedAt.localeCompare(left.startedAt));
-    return newestFirst.find((session) => session.phase === "acting") ?? newestFirst[0];
+    return newestSession(sessions);
   };
   const browserControllerForTab = (tab: BrowserTab) => {
     const control = browserControlForTab(tab);
-    return control ? deps.props.agents.find((agent) => agent.threadId === control.threadId) : undefined;
+    return control ? agentsByThreadId().get(control.threadId) : undefined;
   };
 
   async function openBrowserAddress(address = deps.browserAddress(), newTab = false) {
@@ -257,6 +262,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const value = address.trim();
     if (!value) return;
     deps.setBrowserAddressEditing(false);
+    const targetAgentId = deps.props.agent?.id;
+    const target = targetAgentId ? { agentId: targetAgentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
     const url = browserAddressUrl(value);
     const currentTab = newTab || deps.props.server?.kind === "remote" ? undefined : activeBrowserTab();
@@ -265,7 +272,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       try {
         await window.openbot.browser.navigate({ tabId: currentTab.id, url });
       } catch {
-        deps.setComposerError("Could not open the address in this tab.");
+        deps.setComposerError("Could not open the address in this tab.", target);
       }
       return;
     }
@@ -319,11 +326,13 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     ) {
       return;
     }
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     closingBrowserTabIds.add(tabId);
     try {
       await deps.props.onCloseBrowserTab(tabId);
     } catch {
-      deps.setComposerError("Could not close the browser tab.");
+      deps.setComposerError("Could not close the browser tab.", target);
     } finally {
       closingBrowserTabIds.delete(tabId);
     }
@@ -348,12 +357,14 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     ) {
       return;
     }
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
     try {
       await window.openbot.browser.reload(tabId);
       analytics.track("browser_action", { action: "reload", result: "succeeded" });
     } catch {
-      deps.setComposerError("Could not reload the browser tab.");
+      deps.setComposerError("Could not reload the browser tab.", target);
       analytics.track("browser_action", {
         action: "reload",
         result: "failed",
@@ -370,10 +381,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     ) {
       return;
     }
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
       await window.openbot.browser.navigate({ tabId, direction });
     } catch {
-      deps.setComposerError(`Could not navigate ${direction}.`);
+      deps.setComposerError(`Could not navigate ${direction}.`, target);
     }
   }
 
@@ -385,6 +398,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTakeoverPreview,
     browserTakeoverResolution,
     respondToBrowserTakeover,
+    openBrowserTakeoverTab,
     activeBrowserControl,
     actingBrowserControl,
     browserControlAgent,

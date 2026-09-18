@@ -1,9 +1,13 @@
-import { For, Show } from "solid-js";
-import { expect, fn } from "storybook/test";
+import type { JSX } from "@solidjs/web";
+import { createStore, For, Show } from "solid-js";
+import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { ArrowUp, Button, Plus, X } from "../src/components/ui";
 import type { AgentMessage } from "../src/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "../src/features/channels/ChannelActivityIndicator";
+import { ChannelStoppedTasks } from "../src/features/channels/ChannelStoppedTasks";
 import { ChatMessageRow } from "../src/features/conversation/ChatMessageRow";
+import { ComposerEditor } from "../src/features/conversation/ComposerEditor";
 import { MessageActions } from "../src/features/conversation/MessageRendering";
 import { UnreadMessagesDivider } from "../src/features/conversation/UnreadMessages";
 import { STORY_AGENTS } from "./fixtures";
@@ -55,7 +59,7 @@ const rows: Row[] = [
   {
     id: "m3",
     author: { kind: "you", name: "You" },
-    showAuthor: false,
+    showAuthor: true,
     dayMarker: "Today 12:59 PM",
     message: { id: "m3", author: "you", body: "Good. Start with the numbers.", time: "12:59 PM" },
   },
@@ -74,9 +78,9 @@ const rows: Row[] = [
   },
 ];
 
-function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[] }) {
+function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[]; children?: JSX.Element }) {
   return (
-    <main class="conversation-panel" aria-label="Channel conversation">
+    <main class="conversation-panel" aria-label="Channel conversation" style={{ height: "100dvh" }}>
       <section class="conversation-scroll" aria-label="Shared messages">
         <div class="virtual-chat-list virtual-chat-list-static">
           <For each={props.rows}>
@@ -94,7 +98,7 @@ function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[] }) {
                   message={row.message}
                   author={row.author}
                   showAuthor={row.showAuthor}
-                  showTime
+                  showTime={row.showAuthor}
                   agents={STORY_AGENTS}
                   onSelectAgent={fn()}
                   onOpenLink={fn()}
@@ -128,6 +132,7 @@ function ChannelTranscript(props: { rows: Row[]; workers: ChannelWorker[] }) {
           </Show>
         </div>
       </section>
+      {props.children}
     </main>
   );
 }
@@ -152,8 +157,12 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
     />
   ),
   play: async ({ canvas }) => {
-    await expect(await canvas.findAllByRole("article", { name: `Message from ${chief.name}` })).toHaveLength(2);
-    await expect(await canvas.findByRole("article", { name: "Message from You" })).toBeInTheDocument();
+    const chiefMessages = await canvas.findAllByRole("article", { name: `Message from ${chief.name}` });
+    await expect(chiefMessages).toHaveLength(2);
+    await expect(within(chiefMessages[0]).getByText("11:12 PM")).toBeInTheDocument();
+    await expect(within(chiefMessages[1]).queryByText("11:13 PM")).not.toBeInTheDocument();
+    const ownMessage = await canvas.findByRole("article", { name: "Message from You" });
+    await expect(within(ownMessage).getByText("12:59 PM")).toBeInTheDocument();
     // The label after the colon shifts on every turn, the way it does in the agent chat, so the
     // announcement is matched on its subject.
     await expect(
@@ -199,4 +208,117 @@ export const AuthorLayout: Story = {
       workers={[]}
     />
   ),
+};
+
+function StoppedTaskConversation(props: { long?: boolean; expanded?: boolean; multiple?: boolean }) {
+  const [state, setState] = createStore({
+    text: props.expanded ? "Check the report again.\nInclude the source data." : "",
+    attachment: Boolean(props.expanded),
+    tasks: (props.multiple ? [chief, sales, research] : [chief]).map((agent) => ({
+      id: `stopped-${agent.id}`,
+      ownerAgentId: agent.id,
+      error: props.expanded
+        ? "The automatic assignment limit was reached. Continue or reassign this task. The source report still needs review before the team can complete the work."
+        : "The agent could not complete this task.",
+    })),
+  });
+  const transcript = props.long
+    ? Array.from({ length: 12 }, (_, index) =>
+        rows.map((row) => ({ ...row, id: `${index}-${row.id}`, unread: false })),
+      ).flat()
+    : rows.slice(0, 3);
+  return (
+    <ChannelTranscript rows={transcript} workers={[]}>
+      <div class="composer-wrap">
+        <ChannelStoppedTasks
+          tasks={state.tasks}
+          members={STORY_AGENTS.map((agent) => ({ agentId: agent.id }))}
+          name={(id) => STORY_AGENTS.find((agent) => agent.id === id)?.name ?? "Unassigned"}
+          onResume={async (id) => {
+            setState((state) => {
+              state.tasks = state.tasks.filter((task) => task.id !== id);
+            });
+            return true;
+          }}
+        />
+        <form
+          class="composer"
+          data-compact={!state.attachment && !state.text.includes("\n") && state.text.length < 120 ? "true" : undefined}
+          onSubmit={(event) => event.preventDefault()}
+        >
+          <Show when={state.attachment}>
+            <div class="composer-attachments">
+              <div class="composer-attachment" data-kind="file">
+                <span class="composer-attachment-copy">
+                  <strong>report.csv</strong>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  aria-label="Remove report.csv"
+                  onClick={() =>
+                    setState((state) => {
+                      state.attachment = false;
+                    })
+                  }
+                >
+                  <X aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+          </Show>
+          <div class="composer-input-label">
+            <ComposerEditor
+              agentId={undefined}
+              agents={STORY_AGENTS}
+              value={state.text}
+              placeholder="Message Project room"
+              ariaLabel="Message to channel"
+              disabled={false}
+              onSubmit={fn()}
+              onValueChange={(text) =>
+                setState((state) => {
+                  state.text = text;
+                })
+              }
+            />
+          </div>
+          <div class="composer-toolbar">
+            <Button
+              type="button"
+              variant="ghost"
+              class="composer-button"
+              aria-label="Attach files"
+              onClick={() =>
+                setState((state) => {
+                  state.attachment = true;
+                })
+              }
+            >
+              <Plus aria-hidden="true" />
+            </Button>
+            <div class="composer-primary-actions">
+              <Button type="submit" variant="ghost" class="voice-button" aria-label="Send message">
+                <ArrowUp aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </ChannelTranscript>
+  );
+}
+
+/** Scroll the messages while the stopped task stays above the input. */
+export const StoppedTaskAboveComposer: Story = {
+  render: () => <StoppedTaskConversation long />,
+};
+
+export const StoppedTaskWithShortConversation: Story = {
+  render: () => <StoppedTaskConversation />,
+};
+
+/** Resize the viewport, remove the attachment, and shorten the draft to check both composer sizes. */
+export const StoppedTasksWithAttachments: Story = {
+  render: () => <StoppedTaskConversation long expanded multiple />,
 };

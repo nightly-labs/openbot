@@ -65,6 +65,14 @@ export function GlobalSearch(props: GlobalSearchProps) {
   let searchRequest = 0;
 
   const agentResults = createMemo<GlobalSearchResult[]>(() => props.agents.map((agent) => ({ kind: "agent", agent })));
+  // Search text is built once per candidate list change, not once per
+  // candidate per keystroke: the filter below runs on every input.
+  const agentSearchTexts = createMemo(
+    () => new Map(agentResults().map((result) => [resultKey(result), resultSearchText(result)])),
+  );
+  const messageSearchTexts = createMemo(
+    () => new Map(messageResults().map((result) => [resultKey(result), resultSearchText(result)])),
+  );
   const results = createMemo(() => {
     const value = normalized(query());
     const category = tab();
@@ -77,8 +85,10 @@ export function GlobalSearch(props: GlobalSearchProps) {
             ? [...agentResults(), ...messageResults()]
             : agentResults();
     if (!value) return candidates.slice(0, SEARCH_RESULT_LIMIT);
-    return candidates.filter((result) => resultSearchText(result).includes(value)).slice(0, SEARCH_RESULT_LIMIT);
+    const texts = new Map([...agentSearchTexts(), ...messageSearchTexts()]);
+    return candidates.filter((result) => texts.get(resultKey(result))?.includes(value)).slice(0, SEARCH_RESULT_LIMIT);
   });
+  const resultRanks = createMemo(() => new Map(results().map((result, index) => [resultKey(result), index])));
 
   createEffect(
     () => props.open,
@@ -156,7 +166,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
             onChange={activate}
             itemComponent={(itemProps) => {
               const result = itemProps.item.rawValue;
-              const index = () => results().findIndex((candidate) => resultKey(candidate) === resultKey(result));
+              const index = () => resultRanks().get(resultKey(result)) ?? -1;
               return (
                 <Combobox.Item item={itemProps.item} class="global-search-result">
                   <AgentAvatar agent={result.agent} motion="hover" class="global-search-avatar" />

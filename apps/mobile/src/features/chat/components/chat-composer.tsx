@@ -1,6 +1,4 @@
 import { MenuView } from "@expo/ui/community/menu";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentPromptQuestion } from "@openbot/contracts/ipc";
 import { GlassView } from "expo-glass-effect";
 import { Image } from "expo-image";
 import { useIsFocused } from "expo-router";
@@ -29,6 +27,7 @@ import { createComposerSendGate } from "../model/composer-send";
 import type { ChatAttachments } from "./use-chat-attachments";
 
 interface ChatComposerProps {
+  sendLabel?: string;
   action: ViewStyle["backgroundColor"];
   actionForeground: ViewStyle["backgroundColor"];
   agentName: string;
@@ -36,7 +35,6 @@ interface ChatComposerProps {
   bottomInset: number;
   disabled: boolean;
   draft: string;
-  answerQuestion?: AgentPromptQuestion;
   fallbackBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   liquidGlassAvailable: boolean;
@@ -53,6 +51,7 @@ interface ChatComposerProps {
 }
 
 export function ChatComposer({
+  sendLabel = "Send message",
   action,
   actionForeground,
   agentName,
@@ -60,7 +59,6 @@ export function ChatComposer({
   bottomInset,
   disabled,
   draft,
-  answerQuestion,
   fallbackBackground,
   foreground,
   liquidGlassAvailable,
@@ -75,10 +73,10 @@ export function ChatComposer({
   replyFocusVersion,
   onCancelReply,
 }: ChatComposerProps) {
-  const display = mentionDraft(answerQuestion ? "" : draft);
-  const displayText = answerQuestion ? draft : display.text;
+  const display = mentionDraft(draft);
+  const displayText = display.text;
   const [cursor, setCursor] = useState(0);
-  const query = !answerQuestion ? mentionQuery(draft, cursor) : null;
+  const query = mentionQuery(draft, cursor);
   const suggestions = query
     ? mentionAgents
         .filter((agent) =>
@@ -92,11 +90,11 @@ export function ChatComposer({
   const isFocused = useIsFocused();
   const focusedReplyVersion = useRef(0);
   useEffect(() => {
-    if (isFocused && !disabled && !answerQuestion && replyTarget && focusedReplyVersion.current !== replyFocusVersion) {
+    if (isFocused && !disabled && replyTarget && focusedReplyVersion.current !== replyFocusVersion) {
       focusedReplyVersion.current = replyFocusVersion;
       inputRef.current?.focus();
     }
-  }, [isFocused, disabled, answerQuestion, replyTarget, replyFocusVersion]);
+  }, [isFocused, disabled, replyTarget, replyFocusVersion]);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
@@ -108,10 +106,9 @@ export function ChatComposer({
   const minInputHeight = Math.max(48, 22 * fontScale + 26);
   const maxInputHeight = 22 * fontScale * 5 + 26;
   const [inputLines, setInputLines] = useState(1);
-  const inputHeight =
-    !draft || answerQuestion?.isSecret
-      ? minInputHeight
-      : Math.min(maxInputHeight, Math.max(minInputHeight, inputLines * 22 * fontScale + 26));
+  const inputHeight = !draft
+    ? minInputHeight
+    : Math.min(maxInputHeight, Math.max(minInputHeight, inputLines * 22 * fontScale + 26));
   const [focused, setFocused] = useState(false);
   const latestTextRef = useRef(draft);
   const [sendGate] = useState(createComposerSendGate);
@@ -284,7 +281,7 @@ export function ChatComposer({
         <View
           ref={attachmentButton}
           collapsable={false}
-          pointerEvents={disabled || sending || attachments.preparing || answerQuestion ? "none" : "auto"}
+          pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
         >
           <MenuView
             style={{ width: 48, height: 48 }}
@@ -295,11 +292,11 @@ export function ChatComposer({
                 id: "files",
                 title: "Files",
                 image: "paperclip",
-                attributes: { disabled: disabled || sending || attachments.preparing || Boolean(answerQuestion) },
+                attributes: { disabled: disabled || sending || attachments.preparing },
               },
             ]}
             onPressAction={({ nativeEvent }) => {
-              if (disabled || sending || attachments.preparing || answerQuestion) return;
+              if (disabled || sending || attachments.preparing) return;
               if (nativeEvent.event === "files") void attachments.chooseFiles();
               if (nativeEvent.event === "photos") void attachments.choosePhotos();
               if (nativeEvent.event === "camera") {
@@ -317,9 +314,9 @@ export function ChatComposer({
               accessible
               accessibilityRole="button"
               accessibilityLabel="Add attachment"
-              accessibilityState={{ disabled: disabled || sending || attachments.preparing || Boolean(answerQuestion) }}
+              accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
               glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-              isInteractive={liquidGlassAvailable && !disabled && !sending && !answerQuestion}
+              isInteractive={liquidGlassAvailable && !disabled && !sending}
               style={{
                 width: 48,
                 height: 48,
@@ -329,7 +326,7 @@ export function ChatComposer({
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: liquidGlassAvailable ? "transparent" : fallbackBackground,
-                opacity: disabled || sending || attachments.preparing || answerQuestion ? 0.45 : 1,
+                opacity: disabled || sending || attachments.preparing ? 0.45 : 1,
               }}
             >
               <Plus color={String(foreground)} size={25} strokeWidth={1.8} />
@@ -355,52 +352,42 @@ export function ChatComposer({
           >
             <View style={{ flex: 1, minWidth: 0, height: inputHeight }}>
               {/* Measure wrapping independently of UITextView's constrained contentSize. */}
-              {!answerQuestion?.isSecret ? (
-                <NativeText
-                  accessible={false}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no-hide-descendants"
-                  pointerEvents="none"
-                  className="font-sans"
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    right: 0,
-                    top: 0,
-                    opacity: 0,
-                    fontSize: 16,
-                    lineHeight: 22,
-                    paddingVertical: 13,
-                  }}
-                  onTextLayout={(event) => setInputLines(Math.max(1, event.nativeEvent.lines.length))}
-                >
-                  {`${displayText}\u200b`}
-                </NativeText>
-              ) : null}
+              <NativeText
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                pointerEvents="none"
+                className="font-sans"
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  opacity: 0,
+                  fontSize: 16,
+                  lineHeight: 22,
+                  paddingVertical: 13,
+                }}
+                onTextLayout={(event) => setInputLines(Math.max(1, event.nativeEvent.lines.length))}
+              >
+                {`${displayText}\u200b`}
+              </NativeText>
               <TextInput
                 ref={inputRef}
                 nativeID="chat-composer-input"
-                accessibilityLabel={answerQuestion?.question ?? `Message ${agentName}`}
+                accessibilityLabel={`Message ${agentName}`}
                 accessibilityState={{ disabled }}
                 editable={!disabled}
                 showSoftInputOnFocus={!disabled}
                 className="min-w-0 flex-1 font-sans text-foreground"
-                placeholder={
-                  answerQuestion
-                    ? answerQuestion.isSecret
-                      ? "Enter a private answer"
-                      : "Type your answer"
-                    : `Ask ${agentName}`
-                }
-                secureTextEntry={answerQuestion?.isSecret ?? false}
-                autoCorrect={!answerQuestion?.isSecret}
-                autoCapitalize={answerQuestion?.isSecret ? "none" : "sentences"}
-                maxLength={answerQuestion ? INPUT_LIMITS.promptAnswerText : undefined}
+                placeholder={`Ask ${agentName}`}
+                autoCorrect
+                autoCapitalize="sentences"
                 placeholderTextColor={muted}
-                multiline={!answerQuestion?.isSecret}
-                scrollEnabled={!answerQuestion?.isSecret && inputLines > 5}
-                returnKeyType={answerQuestion?.isSecret ? "send" : "default"}
-                submitBehavior={answerQuestion?.isSecret ? "submit" : "newline"}
+                multiline
+                scrollEnabled={inputLines > 5}
+                returnKeyType="default"
+                submitBehavior="newline"
                 selectionColor={foreground}
                 style={{
                   flex: 1,
@@ -412,7 +399,6 @@ export function ChatComposer({
                   paddingTop: 13,
                   textAlignVertical: "top",
                 }}
-                value={answerQuestion ? draft : undefined}
                 onSelectionChange={({ nativeEvent }) =>
                   setCursor(nativeEvent.selection.start === nativeEvent.selection.end ? nativeEvent.selection.end : -1)
                 }
@@ -423,55 +409,55 @@ export function ChatComposer({
                 onBlur={() => setFocused(false)}
                 onChangeText={(text) => {
                   sendGate.edit();
-                  const pasted = !answerQuestion && !sending ? largePastedText(latestTextRef.current, text) : null;
+                  const pasted = !sending ? largePastedText(latestTextRef.current, text) : null;
                   if (pasted) {
-                    try {
-                      attachments.paste({ type: "text", text: pasted.text }, () => {});
-                      latestTextRef.current = pasted.draft;
-                      onChangeDraft(pasted.draft);
-                      return;
-                    } catch (error) {
-                      Alert.alert(
-                        "Could not attach pasted text",
-                        error instanceof Error ? error.message : "Try again.",
-                      );
-                    }
+                    // Keep the pasted text until its attachment is durable. A failed write must not lose it.
+                    latestTextRef.current = text;
+                    onChangeDraft(text);
+                    void Promise.resolve()
+                      .then(() => attachments.paste({ type: "text", text: pasted.text }, () => {}))
+                      .then(() => {
+                        if (latestTextRef.current !== text) return;
+                        latestTextRef.current = pasted.draft;
+                        onChangeDraft(pasted.draft);
+                      })
+                      .catch((error) => {
+                        Alert.alert(
+                          "Could not attach pasted text",
+                          error instanceof Error ? error.message : "Try again.",
+                        );
+                      });
+                    return;
                   }
-                  const next = answerQuestion ? text : editMentionDraft(latestTextRef.current, text);
+                  const next = editMentionDraft(latestTextRef.current, text);
                   latestTextRef.current = next;
                   onChangeDraft(next);
                 }}
                 onSubmitEditing={({ nativeEvent }) => {
                   if (!disabled && !sending && sendGate.submit())
-                    onSend(
-                      answerQuestion ? nativeEvent.text : editMentionDraft(latestTextRef.current, nativeEvent.text),
-                    );
+                    onSend(editMentionDraft(latestTextRef.current, nativeEvent.text));
                 }}
                 onEndEditing={({ nativeEvent: { text } }) => {
                   // Native editing can end before the send button's release event,
                   // while TextInput.isFocused() is still waiting for onBlur.
-                  latestTextRef.current = answerQuestion ? text : editMentionDraft(latestTextRef.current, text);
+                  latestTextRef.current = editMentionDraft(latestTextRef.current, text);
                   if (sendGate.commit() && !disabled && !sending) onSend(latestTextRef.current);
                 }}
               >
                 {/* TextInput requires native text children for editable attributed text. */}
-                {!answerQuestion ? (
-                  <NativeText>
-                    {display.mentions.map((mention, index) => (
-                      <NativeText key={mention.start}>
-                        {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
-                        <NativeText style={{ color: action }}>
-                          {displayText.slice(mention.start, mention.end)}
-                        </NativeText>
-                      </NativeText>
-                    ))}
-                    {displayText.slice(display.mentions.at(-1)?.end ?? 0)}
-                  </NativeText>
-                ) : null}
+                <NativeText>
+                  {display.mentions.map((mention, index) => (
+                    <NativeText key={mention.start}>
+                      {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
+                      <NativeText style={{ color: action }}>{displayText.slice(mention.start, mention.end)}</NativeText>
+                    </NativeText>
+                  ))}
+                  {displayText.slice(display.mentions.at(-1)?.end ?? 0)}
+                </NativeText>
               </TextInput>
             </View>
             <Pressable
-              accessibilityLabel={hasDraft ? (answerQuestion ? "Send answer" : "Send message") : "Start voice message"}
+              accessibilityLabel={hasDraft ? sendLabel : "Start voice message"}
               accessibilityRole="button"
               accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
               disabled={disabled || sending || attachments.preparing}

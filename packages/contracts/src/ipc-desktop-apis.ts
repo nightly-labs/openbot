@@ -41,6 +41,7 @@ import type { RespondToApprovalInput, RespondToBrowserTakeoverInput } from "./ip
 import type {
   AttachmentImportEvent,
   ChooseAttachmentsInput,
+  DownloadAttachmentsInput,
   DraftAttachment,
   FilePreview,
   OpenAttachmentInput,
@@ -144,6 +145,7 @@ import type {
   TestRoutineInput,
   UpdateRoutineInput,
 } from "./ipc-routines";
+import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import type {
   CreateLocalSkillInput,
@@ -179,6 +181,7 @@ import type {
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
   RemoteDesktopConnectInput,
+  RemoteDesktopConnectResult,
   RemoteDesktopSelectDisplayInput,
   RemoteDesktopSession,
   ReorderServersInput,
@@ -193,6 +196,7 @@ import type {
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
+import type { QueueEditRequest } from "./team-protocol/queue-edit-v1";
 
 export interface AgentDesktopApi {
   listChannels: () => Promise<ChannelSummary[]>;
@@ -202,7 +206,7 @@ export interface AgentDesktopApi {
   getStatus: () => Promise<AgentStatus>;
   getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
-  getUsage: (agentId: string) => Promise<AccountUsage>;
+  getUsage: (agentId?: string) => Promise<AccountUsage>;
   listModels: () => Promise<AgentModelOption[]>;
   listAgents: (serverId?: string) => Promise<AgentSummary[]>;
   listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
@@ -220,6 +224,12 @@ export interface AgentDesktopApi {
   updateMemory: (input: UpdateAgentMemoryInput) => Promise<AgentMemory>;
   deleteMemory: (input: DeleteAgentMemoryInput) => Promise<void>;
   clearMemories: (agentId: string) => Promise<void>;
+  /**
+   * Shared tables are not scoped to an agent: there is no `agentId` on either call. The list is
+   * every table in the one shared database, and the user's delete is not owner-gated.
+   */
+  listTables: () => Promise<SharedTable[]>;
+  deleteTable: (input: DeleteSharedTableInput) => Promise<void>;
   listRoutines: (agentId: string) => Promise<Routine[]>;
   createRoutine: (input: CreateRoutineInput) => Promise<Routine>;
   updateRoutine: (input: UpdateRoutineInput) => Promise<Routine>;
@@ -253,6 +263,7 @@ export interface AgentDesktopApi {
   chooseAttachments: (input: ChooseAttachmentsInput) => Promise<DraftAttachment[]>;
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
   discardDraftAttachment: (attachmentId: string, serverId?: string) => Promise<void>;
+  downloadAttachments: (input: DownloadAttachmentsInput) => Promise<void>;
   openAttachment: (input: OpenAttachmentInput) => Promise<void>;
   openSharedFile: (input: OpenSharedFileInput) => Promise<void>;
   openWorkspaceFile: (input: OpenWorkspaceFileInput) => Promise<void>;
@@ -264,6 +275,7 @@ export interface AgentDesktopApi {
   acknowledgeFailedTurn: (input: AcknowledgeFailedTurnInput) => Promise<void>;
   cancelQueuedMessage: (input: CancelQueuedMessageInput) => Promise<void>;
   steerQueuedMessage: (input: SteerQueuedMessageInput) => Promise<void>;
+  editQueuedMessage: (input: QueueEditRequest & { agentId: string }, serverId?: string) => Promise<QueueSnapshot>;
   updateQueuedMessage: (input: UpdateQueuedMessageInput, serverId?: string) => Promise<void>;
   reorderQueue: (input: ReorderQueueInput) => Promise<void>;
   interrupt: (input: InterruptTurnInput) => Promise<void>;
@@ -396,6 +408,15 @@ export interface HostDesktopApi {
   getPresence: () => Promise<TeamPresenceSnapshot>;
   start: () => Promise<HostStatus>;
   stop: () => Promise<HostStatus>;
+  /**
+   * Asks the screen sharing runtime again whether the operating system lets it record, and answers
+   * the status that holds the result.
+   *
+   * The refusal is remembered, because the runtime that reported it is dropped so that the next
+   * attempt reads a new grant. Without this call only another member's attempt could clear it, and
+   * the host owner who just gave the grant would keep reading that they had not.
+   */
+  recheckScreenRecording: () => Promise<HostStatus>;
   listMembers: () => Promise<TeamMemberSummary[]>;
   updateMember: (input: UpdateTeamMemberInput) => Promise<TeamMemberSummary>;
   removeMember: (memberId: string) => Promise<void>;
@@ -409,7 +430,7 @@ export interface HostDesktopApi {
 
 export interface RemoteDesktopDesktopApi {
   list: () => Promise<RemoteDesktopSession[]>;
-  connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopSession>;
+  connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopConnectResult>;
   selectDisplay: (input: RemoteDesktopSelectDisplayInput) => Promise<void>;
   disconnect: (sessionId: string) => Promise<void>;
   onEvent: (listener: (sessions: RemoteDesktopSession[]) => void) => () => void;
@@ -468,6 +489,7 @@ export interface OpenBotDesktopApi {
   getAppLanguagePreference: () => Promise<AppLanguagePreference>;
   setAppLanguagePreference: (input: SetAppLanguagePreferenceInput) => Promise<AppLanguagePreference>;
   onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
+  onOpenSettings: (listener: () => void) => () => void;
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseMacSetupState: () => Promise<ComputerUseMacSetupState>;
   openComputerUsePermissionSetup: (permission: MacPermissionId) => Promise<ComputerUseMacSetupState>;

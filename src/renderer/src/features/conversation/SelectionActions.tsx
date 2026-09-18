@@ -172,6 +172,9 @@ export function MessageSelectionActions(props: {
 
   onSettled(() => {
     const onPointerDown = (event: PointerEvent) => {
+      // A secondary button opens the native context menu, which reads the live selection: dismissing
+      // here would clear the text before Copy ever sees it.
+      if (event.button !== 0) return;
       if (event.target instanceof Element && event.target.closest(".selection-actions-layer")) return;
       if (selection()) dismiss();
     };

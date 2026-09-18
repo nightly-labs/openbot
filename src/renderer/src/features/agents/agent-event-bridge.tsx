@@ -13,7 +13,8 @@ import { useAuth } from "../account/account-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
-import { agentConversationKey, promptRequestKey } from "../conversation/conversation-keys";
+import { useConversationController } from "../conversation/conversation-controller-context";
+import { agentConversationKey, composerDraftKey, promptRequestKey } from "../conversation/conversation-keys";
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import { reconcileQueuesWithRuntimeWork } from "../dynamic-island/dynamic-island-coordinator";
 import { useServers } from "../servers/servers-context";
@@ -23,12 +24,17 @@ import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-
 import { useAgents } from "./agents-context";
 
 /** A provider quotes what it was given, so an error can carry a whole request body back. */
-const ERROR_TOAST_DESCRIPTION_LIMIT = 300;
+const ERROR_DESCRIPTION_LIMIT = 300;
+// Repeated model-refresh failures arrive as identical error events. Coalesce
+// them so one outage shows one toast instead of one per retry.
+const ERROR_TOAST_DEDUPE_MS = 30_000;
+const lastErrorToastAt = new Map<string, number>();
 
-function errorToastDescription(message: string): string {
+/** One sentence a reader can act on, whichever surface shows it. */
+function readableAgentError(message: string): string {
   const readable = errorMessage(message, "The agent could not continue. Try again.");
-  if (readable.length <= ERROR_TOAST_DESCRIPTION_LIMIT) return readable;
-  return `${readable.slice(0, ERROR_TOAST_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
+  if (readable.length <= ERROR_DESCRIPTION_LIMIT) return readable;
+  return `${readable.slice(0, ERROR_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
 }
 
 /**
@@ -52,9 +58,10 @@ export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServerId } = useServers();
-  const { invalidateAccountUsage } = useAuth();
+  const { applyAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
-  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, appendUiError } = useAgents();
+  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents } = useAgents();
+  const { setConversationErrors } = useConversationController();
   const {
     applyRuntimeMessages,
     conversations,
@@ -98,11 +105,7 @@ export function AgentEventBridge() {
         }
         return;
       case "usage-changed":
-        // The payload is dropped on purpose. A broadcast read carries no model scope and comes from
-        // the Codex client whatever agent is active, so it cannot say whose limit it is. The dock's
-        // own reading is scoped to the active agent's provider and model, so it is the only one the
-        // composer can name a provider from.
-        invalidateAccountUsage();
+        applyAccountUsage(event.usage);
         return;
       case "agents-changed":
         applyStoredAgents(event.agents);
@@ -263,24 +266,36 @@ export function AgentEventBridge() {
         return;
       case "error": {
         // A provider reports an expired account as a 401 quoted inside the whole HTTP exchange, so
-        // the kind has to be read from the text. Naming it here gives the bubble a label the user
-        // can act on, and the refresh flips the provider to `sign-in-required`, which is what puts
-        // the Sign in notice above the composer. Nothing else knows the account has lapsed until
-        // the next probe, so without the refresh the user would have to reopen settings to find out.
+        // the kind has to be read from the text. The refresh flips the provider to
+        // `sign-in-required`, which is what puts the Sign in notice above the composer. Nothing
+        // else knows the account has lapsed until the next probe, so without the refresh the user
+        // would have to reopen settings to find out.
         const authFailure = classifyUserError(event.message) === "auth";
         // A failed refresh is not reported: the error the user already has is the report, and a
         // second toast for the probe that went looking for its cause only buries the first.
         if (authFailure) void refreshAgentProviders().catch(() => undefined);
-        if (event.agentId) {
-          appendUiError(event.agentId, event.message, authFailure ? "Sign in required" : "Error", activeServerId());
+        const agentId = event.agentId;
+        if (agentId) {
+          // The banner above the composer, in the same column as the usage-limit and sign-in
+          // notices - not a bubble in the transcript, and no toast. A provider that retries a
+          // dropped transport reports the same failure once per attempt, and every report used to
+          // become a message the user had to scroll past to reach their own conversation. One
+          // entry per chat means the newest report replaces the last, so an outage costs the
+          // reader one line whatever its length, and dismissing it clears the whole run.
+          setConversationErrors((current) => ({
+            ...current,
+            [composerDraftKey({ agentId, serverId: activeServerId() })]: readableAgentError(event.message),
+          }));
+          return;
         }
-        // The inline feed is keyed by agent and by server, so it reaches nobody when the error
-        // carries no agent - a provider that fails to start is the common case - and it is unread
-        // until the user opens that chat. The message is already redacted in the main process.
-        const failing = event.agentId ? agentList().find((agent) => agent.id === event.agentId) : undefined;
-        toast.error(failing ? `${failing.name} could not continue` : "Provider error", {
-          description: errorToastDescription(event.message),
-        });
+        // No agent to attach it to - a provider that fails to start is the common case - so this
+        // one stays global. The message is already redacted in the main process.
+        const toastKey = readableAgentError(event.message);
+        const now = Date.now();
+        if ((lastErrorToastAt.get(toastKey) ?? 0) + ERROR_TOAST_DEDUPE_MS < now) {
+          lastErrorToastAt.set(toastKey, now);
+          toast.error("Provider error", { description: toastKey });
+        }
       }
     }
   }

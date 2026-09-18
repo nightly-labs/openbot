@@ -84,6 +84,7 @@ export class ThreadReplay {
       }
       const snapshot = conversationSnapshotValue(objectValue(record?.snapshot));
       const appendedMessage = currentConversationMessage(record?.appendedMessage);
+      const streamedMessage = currentConversationMessage(record?.streamedMessage);
       const appendedActiveTurnId = record?.activeTurnId;
       if (snapshot) {
         latest = snapshot;
@@ -95,6 +96,18 @@ export class ThreadReplay {
           const activeSession = [...sessions.values()].find((session) => session.state === "active");
           turnSessions.set(snapshot.activeTurnId, activeSession?.id ?? null);
         }
+      } else if (latest && streamedMessage) {
+        // A flush of streamed text carries the message whole, not the delta, so it replaces the
+        // one it names. Replacing rather than appending is what makes it safe to lose the earlier
+        // flushes of the same run, which both the supersede on write and the prune on the next
+        // whole snapshot do.
+        const index = latest.messages.findIndex((message) => message.id === streamedMessage.id);
+        if (index >= 0) latest.messages[index] = structuredClone(streamedMessage);
+        else latest.messages.push(structuredClone(streamedMessage));
+        if (isString(appendedActiveTurnId) || appendedActiveTurnId === null) {
+          latest.activeTurnId = appendedActiveTurnId;
+        }
+        latestSequence = event.sequence;
       } else if (latest && appendedMessage) {
         if (!latest.messages.some((message) => message.id === appendedMessage.id)) {
           latest.messages.push(structuredClone(appendedMessage));

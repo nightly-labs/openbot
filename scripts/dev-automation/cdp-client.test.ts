@@ -8,9 +8,11 @@ import { describe, expect, it } from "vitest";
 import {
   assertMutationAllowed,
   describeDevPages,
+  findBrowserProcessId,
   findRendererPages,
   isOpenBotBrowser,
   matchPages,
+  processBelongsToInstance,
   resolveAutomationPort,
 } from "./cdp-client";
 import { describeTarget, findMainPages, isMainAppUrl } from "./page-url";
@@ -318,5 +320,56 @@ describe("reportableScreenshotPath", () => {
     expect(() => reportableScreenshotPath("/tree/.openbot-build/token=abcdef123456.png", "/tree")).toThrow(
       "would be redacted",
     );
+  });
+});
+
+describe("findBrowserProcessId", () => {
+  it("reads the browser process out of getProcessInfo", () => {
+    expect(
+      findBrowserProcessId([
+        { type: "renderer", id: 101 },
+        { type: "browser", id: 100 },
+        { type: "GPU", id: 102 },
+      ]),
+    ).toBe(100);
+  });
+
+  it("answers null when nothing identifies the browser", () => {
+    expect(findBrowserProcessId([{ type: "renderer", id: 101 }])).toBeNull();
+    expect(findBrowserProcessId([{ type: "browser", id: "100" }])).toBeNull();
+    expect(findBrowserProcessId([{ type: "browser", id: -4 }])).toBeNull();
+    expect(findBrowserProcessId("browser")).toBeNull();
+    expect(findBrowserProcessId(null)).toBeNull();
+  });
+});
+
+describe("processBelongsToInstance", () => {
+  // supervisor 10 -> launcher 20 -> electron 30 -> helper 40.
+  const tree = new Map([
+    [20, 10],
+    [30, 20],
+    [40, 30],
+  ]);
+
+  it("accepts the owner itself and every descendant", () => {
+    expect(processBelongsToInstance(10, 10, tree)).toBe(true);
+    expect(processBelongsToInstance(30, 10, tree)).toBe(true);
+    expect(processBelongsToInstance(40, 10, tree)).toBe(true);
+  });
+
+  it("refuses pids outside the tree, unknown pids, and cycles", () => {
+    expect(processBelongsToInstance(99, 10, tree)).toBe(false);
+    expect(processBelongsToInstance(10, 99, tree)).toBe(false);
+    expect(processBelongsToInstance(40, 20, new Map([[40, 40]]))).toBe(false);
+    expect(
+      processBelongsToInstance(
+        40,
+        50,
+        new Map([
+          [40, 41],
+          [41, 40],
+        ]),
+      ),
+    ).toBe(false);
   });
 });

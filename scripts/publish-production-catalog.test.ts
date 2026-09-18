@@ -33,6 +33,7 @@ describe("production catalog publication", () => {
           category: "productivity",
           version: 1,
           bundle: "skills/example.zip",
+          icon: "skills/example.icon.svg",
           bundleSha256: "a".repeat(64),
           files: ["LICENSE.txt", "NOTICE.txt", "SKILL.md"],
         },
@@ -64,22 +65,25 @@ describe("production catalog publication", () => {
     };
 
     expect(sql).toContain("'openbot-production-catalog'");
-    expect(sql).toContain("'OpenBot Team'");
+    expect(sql).toContain("'OpenBot'");
     expect(sql.match(/'approved'/gu)).toHaveLength(2);
     expect(sql).toContain("ON CONFLICT(id) DO NOTHING");
     expect(sql).not.toMatch(/DO UPDATE SET[^;]*(?:installs|featured)/u);
     expect(sql).toContain(
       "skills/openbot-curated-skill-example/versions/openbot-curated-version-example-v1-deadbeefdeadbeef.zip",
     );
+    expect(sql).toContain(
+      "skills/openbot-curated-skill-example/versions/openbot-curated-version-example-v1-deadbeefdeadbeef.icon",
+    );
 
     const verification = spawnSync("/usr/bin/sqlite3", [":memory:"], {
       encoding: "utf8",
-      input: `${schema}\n${sql}\nCREATE TEMP TABLE initial AS SELECT (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT featured FROM marketplace_agents) AS agent_featured;\nUPDATE users SET avatar_url = NULL;\nUPDATE marketplace_skills SET installs = 8, featured = 0, show_creator_avatar = 0;\nUPDATE marketplace_agents SET installs = 5, featured = 0, show_creator_avatar = 0;\n${createPublicationSql(newer, 4567)}\n${createPublicationSql(publication, 5678)}\n.mode json\nSELECT (SELECT name FROM users WHERE id = 'openbot-production-catalog') AS owner, (SELECT avatar_url FROM users WHERE id = 'openbot-production-catalog') AS owner_avatar, (SELECT show_creator_avatar FROM marketplace_skills) AS skill_creator_avatar, (SELECT show_creator_avatar FROM marketplace_agents) AS agent_creator_avatar, (SELECT installs FROM marketplace_skills) AS skill_installs, (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT installs FROM marketplace_agents) AS agent_installs, (SELECT featured FROM marketplace_agents) AS agent_featured, (SELECT status FROM marketplace_skill_versions) AS skill_status, (SELECT status FROM marketplace_agent_versions) AS agent_status, (SELECT category FROM marketplace_agent_versions) AS category, (SELECT skill_featured FROM initial) AS initial_skill_featured, (SELECT agent_featured FROM initial) AS initial_agent_featured, (SELECT count(*) FROM marketplace_skill_versions) AS skill_versions, (SELECT version FROM marketplace_skill_versions WHERE id = (SELECT approved_version_id FROM marketplace_skills)) AS approved_skill_version, (SELECT version FROM marketplace_agent_versions WHERE id = (SELECT approved_version_id FROM marketplace_agents)) AS approved_agent_version;\n`,
+      input: `${schema}\n${sql}\nCREATE TEMP TABLE initial AS SELECT (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT featured FROM marketplace_agents) AS agent_featured;\nUPDATE users SET avatar_url = NULL;\nUPDATE marketplace_skill_versions SET icon_key = NULL;\nUPDATE marketplace_skills SET installs = 8, featured = 0, show_creator_avatar = 0;\nUPDATE marketplace_agents SET installs = 5, featured = 0, show_creator_avatar = 0;\n${createPublicationSql(newer, 4567)}\n${createPublicationSql(publication, 5678)}\n.mode json\nSELECT (SELECT name FROM users WHERE id = 'openbot-production-catalog') AS owner, (SELECT avatar_url FROM users WHERE id = 'openbot-production-catalog') AS owner_avatar, (SELECT show_creator_avatar FROM marketplace_skills) AS skill_creator_avatar, (SELECT show_creator_avatar FROM marketplace_agents) AS agent_creator_avatar, (SELECT installs FROM marketplace_skills) AS skill_installs, (SELECT featured FROM marketplace_skills) AS skill_featured, (SELECT installs FROM marketplace_agents) AS agent_installs, (SELECT featured FROM marketplace_agents) AS agent_featured, (SELECT icon_key FROM marketplace_skill_versions WHERE id = (SELECT approved_version_id FROM marketplace_skills)) AS skill_icon, (SELECT status FROM marketplace_skill_versions) AS skill_status, (SELECT status FROM marketplace_agent_versions) AS agent_status, (SELECT category FROM marketplace_agent_versions) AS category, (SELECT skill_featured FROM initial) AS initial_skill_featured, (SELECT agent_featured FROM initial) AS initial_agent_featured, (SELECT count(*) FROM marketplace_skill_versions) AS skill_versions, (SELECT version FROM marketplace_skill_versions WHERE id = (SELECT approved_version_id FROM marketplace_skills)) AS approved_skill_version, (SELECT version FROM marketplace_agent_versions WHERE id = (SELECT approved_version_id FROM marketplace_agents)) AS approved_agent_version;\n`,
     });
     expect(verification.status).toBe(0);
     expect(JSON.parse(verification.stdout)).toEqual([
       {
-        owner: "OpenBot Team",
+        owner: "OpenBot",
         owner_avatar: "https://openbot.run/icon-192x192.png",
         skill_creator_avatar: 1,
         agent_creator_avatar: 1,
@@ -87,6 +91,8 @@ describe("production catalog publication", () => {
         skill_featured: 0,
         agent_installs: 5,
         agent_featured: 0,
+        skill_icon:
+          "skills/openbot-curated-skill-example/versions/openbot-curated-version-example-v1-deadbeefdeadbeef-v2.icon",
         skill_status: "approved",
         agent_status: "approved",
         category: "research",

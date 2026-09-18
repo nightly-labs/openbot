@@ -5,6 +5,7 @@ import request from "./fixtures/v4/client-http-request.json";
 import response from "./fixtures/v4/host-http-response.json";
 import profileResponseFixture from "./fixtures/v4/profile-host-response.json";
 import { decodeProfileV4Draft, decodeProfileV4Request, decodeProfileV4Response } from "./profile-v4";
+import { encodeTeamProtocolV1CurrentHttpResponse } from "./v1-adapter";
 import { decodeTeamProtocolV3CurrentHttpResponse } from "./v3-adapter";
 import {
   decodeTeamProtocolV4CurrentHttpRequest,
@@ -32,6 +33,116 @@ describe("Team protocol v4", () => {
     expect(() =>
       decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/agents", 200, [{ ...response[0], provider: "unknown" }]),
     ).toThrow();
+  });
+
+  it("carries the queue edit mark to a current client and drops it for a frozen one", () => {
+    const delivery = {
+      id: "delivery-1",
+      messageId: "message-1",
+      recipientAgentId: "chief",
+      sender: { kind: "user" },
+      text: "Read the report",
+      attachments: [],
+      replyToMessageId: null,
+      status: "queued",
+      position: 1,
+      turnId: null,
+      error: null,
+      createdAt: "2026-09-16T10:00:00.000Z",
+      editing: true,
+    };
+    const snapshot = { agentId: "chief", deliveries: [delivery] };
+    const queuePath = "/v1/agents/chief/queue";
+
+    const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot));
+    expect(wire.deliveries[0].editing).toBe(true);
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, wire)).toEqual(snapshot);
+    // The queue edit response is the same snapshot, so the holder sees the mark too.
+    const edited = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", `${queuePath}/edit`, 200, snapshot));
+    expect(edited.deliveries[0].editing).toBe(true);
+    // A direct WebRTC connection carries it too, so a phone on either transport sees the mark.
+    const overWebRtc = encodeTeamProtocolV4WebRtcHttpResponse("GET", queuePath, 200, snapshot);
+    expect(decodeTeamProtocolV4WebRtcHttpResponse("GET", queuePath, 200, overWebRtc)).toEqual(snapshot);
+    // A frozen adapter projects a fixed key list: the mark is absent, not false.
+    const frozen = JSON.parse(encodeTeamProtocolV1CurrentHttpResponse("GET", queuePath, 200, snapshot));
+    expect(frozen.deliveries[0]).not.toHaveProperty("editing");
+  });
+
+  it("carries the exchange reply mark to a current client and drops it for a frozen one", () => {
+    const conversationPath = "/v1/agents/chief/conversation";
+    const exchange = {
+      direction: "incoming",
+      messageId: "message-1",
+      senderAgentId: "builder",
+      recipientAgentIds: ["chief"],
+      replyToMessageId: null,
+      deliveries: [{ id: "delivery-1", recipientAgentId: "chief", status: "completed", position: null, error: null }],
+    };
+    const message = {
+      id: "notice",
+      author: "system",
+      text: "",
+      createdAt: "2026-09-16T10:00:00.000Z",
+      status: "completed",
+    };
+    // The mark is the only thing that varies, and one case gives it a shape the host never writes.
+    const conversation = (...mark: unknown[]) => ({
+      agentId: "chief",
+      threadId: "thread-1",
+      activeTurnId: null,
+      revision: 1,
+      messages: [{ ...message, exchange: mark.length ? { ...exchange, expectsReply: mark[0] } : exchange }],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    });
+    const marked = conversation(false);
+
+    const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, marked));
+    expect(wire.messages[0].exchange.expectsReply).toBe(false);
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, wire)).toEqual(marked);
+    // A direct WebRTC connection carries it too, so a phone on either transport names the message.
+    const overWebRtc = encodeTeamProtocolV4WebRtcHttpResponse("GET", conversationPath, 200, marked);
+    expect(decodeTeamProtocolV4WebRtcHttpResponse("GET", conversationPath, 200, overWebRtc)).toEqual(marked);
+    // A frozen adapter projects a fixed key list: the mark is absent, so the client reads a request.
+    const frozen = JSON.parse(encodeTeamProtocolV1CurrentHttpResponse("GET", conversationPath, 200, marked));
+    expect(frozen.messages[0].exchange).not.toHaveProperty("expectsReply");
+    // A host that never sends the mark still passes, and still means a request.
+    const unmarked = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, conversation()));
+    expect(unmarked.messages[0].exchange).not.toHaveProperty("expectsReply");
+    // An unchecked mark would read as an exchange nobody owes an answer for, hiding a waiting
+    // teammate. Both directions refuse it rather than project it.
+    const malformed = conversation("no");
+    expect(() => encodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, malformed)).toThrow(
+      "reply mark",
+    );
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, malformed)).toThrow();
+  });
+
+  it("rejects a queue snapshot whose edit mark is not a boolean", () => {
+    const queuePath = "/v1/agents/chief/queue";
+    const delivery = {
+      id: "delivery-1",
+      messageId: "message-1",
+      recipientAgentId: "chief",
+      sender: { kind: "user" },
+      text: "Read the report",
+      attachments: [],
+      replyToMessageId: null,
+      status: "queued",
+      position: 1,
+      turnId: null,
+      error: null,
+      createdAt: "2026-09-16T10:00:00.000Z",
+    };
+    const snapshot = { agentId: "chief", deliveries: [{ ...delivery, editing: "true" }] };
+    // The projection drops the key, so a mark that survived unchecked would read as a message
+    // nobody holds. The frozen response validator rejects the snapshot, and the encoder refuses
+    // to write one, so neither side turns a malformed mark into an editable row.
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot)).toThrow();
+    expect(() => encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot)).toThrow("edit mark");
+    // A host that never sends the mark still passes.
+    const unmarked = { agentId: "chief", deliveries: [delivery] };
+    const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, unmarked));
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, wire)).toEqual(unmarked);
   });
 
   it("carries OpenCode agent events through HTTP events and WebRTC", () => {
@@ -110,6 +221,72 @@ it("keeps profile save responses frozen across HTTP and WebRTC adapters", () => 
     version: 2,
     skillIds: ["primary-sources"],
     routineIds: ["routine-copy"],
+  });
+});
+
+// The frozen base projection names no provider or model, so the pair rides beside it only behind
+// the capability: both directions drop it without the flag, which is the released behavior.
+it("carries a chosen provider and model on agent creation only behind the capability", () => {
+  const path = "/v1/agents";
+  const input = {
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
+    provider: "opencode",
+    model: "opencode/example-model",
+    reasoningEffort: "high",
+  };
+  const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", path, input, { agentCreateModel: true }));
+  expect(wire).toMatchObject({
+    name: "Helper",
+    provider: "opencode",
+    model: "opencode/example-model",
+    reasoningEffort: "high",
+  });
+  expect(decodeTeamProtocolV4CurrentHttpRequest("POST", path, wire, { agentCreateModel: true })).toEqual(input);
+  const bare = JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", path, input));
+  expect(bare).not.toHaveProperty("provider");
+  expect(bare).not.toHaveProperty("model");
+  expect(decodeTeamProtocolV4CurrentHttpRequest("POST", path, wire)).toEqual({
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
+  });
+  expect(() =>
+    decodeTeamProtocolV4CurrentHttpRequest("POST", path, { ...wire, provider: "unknown" }, { agentCreateModel: true }),
+  ).toThrow();
+});
+
+// The WebRTC arm runs the same current-layer codec around the frozen v2 framing, so the chosen
+// pair needs the flag at both WebRTC calls too — without it the frozen projection drops the
+// fields while both peers advertise the capability.
+it("carries a chosen provider and model on agent creation through WebRTC only behind the capability", () => {
+  const path = "/v1/agents";
+  const input = {
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
+    provider: "opencode",
+    model: "opencode/example-model",
+    reasoningEffort: "high",
+  };
+  const wire = encodeTeamProtocolV4WebRtcHttpRequest("POST", path, input, { agentCreateModel: true });
+  expect(isDynamicRecord(wire) ? wire.provider : undefined).toBe("opencode");
+  expect(decodeTeamProtocolV4WebRtcHttpRequest("POST", path, wire, { agentCreateModel: true })).toEqual(input);
+  const bare = encodeTeamProtocolV4WebRtcHttpRequest("POST", path, input);
+  expect(isDynamicRecord(bare) && "provider" in bare).toBe(false);
+  expect(decodeTeamProtocolV4WebRtcHttpRequest("POST", path, wire)).toEqual({
+    name: "Helper",
+    description: "Helps out.",
+    avatarSeed: "setup:helper",
+    avatarHue: null,
+    initialMessage: "Greet me briefly.",
   });
 });
 

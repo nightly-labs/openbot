@@ -75,6 +75,16 @@ the `media-attachments` capability; released protocol adapters keep their existi
   Nothing copies it first, so `src/backend/browser-state.ts` re-validates every bound it reads rather
   than trusting it: a tab whose environment fails validation is still returned, without that
   environment, because losing the user's open tab is worse than losing an emulated viewport.
+- `~/OpenBot/Shared/Data/agent-data.db` is one SQLite file that holds every table the agents create
+  for themselves, outside `openbot.db` and outside the migration runner. One file gives the agents
+  one namespace and lets them join across each other's tables. Every agent can read and write every
+  table; the `openbot_metadata` table records the agent that created each one, and that owner is the
+  only agent allowed to drop or alter it. SQLite's own authorizer refuses the other cases, so the
+  rule does not depend on reading the model's SQL. The agents own these schemas, so nothing copies
+  or migrates them before a release, and a table stays when the agent that made it is deleted. The
+  user deletes one from agent settings, which is the only way to remove a table whose owner is gone.
+  The guidance the agents read ships as the managed skill `resources/managed-skills/openbot-data`,
+  beside site hosting and the skill creator, so the always-on prompt only names the tools.
 - Renderer signals and stores are projections for the current screen only. They are not durable
   state, and one concern is one record - a row of parallel signals over its fields lets a screen
   hold states the product does not have.
@@ -707,7 +717,7 @@ login and billing hooks. The OpenCode driver starts `opencode acp` on the runtim
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
 OpenCode has no login step OpenBot can drive, because the account is one environment variable: a
-spawn without `OPENCODE_API_KEY` lists the free OpenCode Zen models, and a spawn with one lists the
+spawn without `OPENCODE_API_KEY` lists the free OpenCode Go models, and a spawn with one lists the
 paid catalog. So `AcpAgentClient` derives `#signedIn` from the models `session/new` returns, not
 from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptions.extraEnv` is read
 at every spawn, which is what lets a key saved in Settings reach the next process with no other
@@ -722,10 +732,10 @@ the provider's serialized connection command. It refuses a provider that is runn
 deliveries while it writes, and reports success only after a new process runs with the new key.
 
 That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
-catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and a Zen key
-does not buy Go. So `CREDENTIAL_ONLY_MODEL_PREFIXES` in `src/backend/agent/provider-runtime.ts`
-drops the `opencode-go/` models from `#refreshModelCatalog` while OpenBot is the one supplying the
-key; with no key stored those models can only come from the user's own OpenCode sign-in, which does
+catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot
+supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-runtime.ts`
+drops the paid Zen models from `#refreshModelCatalog` while OpenBot is the one supplying the key;
+with no key stored those models can only come from the user's own OpenCode sign-in, which does
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.
 
@@ -736,7 +746,7 @@ OpenBot can neither see nor refresh. `opencodeModelRank` sorts free models first
 the rest, then OpenCode's own paid models, then everything behind a separate sign-in. The sort is
 stable, so the CLI's order survives inside one tier.
 
-Free means a display name ending in "Free": `model/list` carries no price and neither Zen endpoint
+Free means a display name ending in "Free": `model/list` carries no price and neither Go endpoint
 authenticates, so the name is the only signal. `isFreeOpencodeModelName` in
 `packages/contracts/src/agent-providers.ts` is shared with the picker badge in
 `src/renderer/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
@@ -850,3 +860,39 @@ No account API, Signal, IPC contract, or database migration changes are required
 The shared package validator handles local and marketplace bundles. The existing installer owns per-agent files, hashes, disabled storage, and both provider directories. Local installations skip marketplace downloads and receipt requests. Installation operations are serialized per agent; a library revision does not update installed copies.
 
 The backend local skill tools derive the agent from the calling provider session. Main-process IPC validates local library inputs independently of sender validation. The renderer reads local previews through that bridge. The released Team API adapters are unchanged; local creation and revision are not exposed as remote operations.
+
+### Mobile chat queue
+
+Mobile reads the host queue, applies `queue-changed` snapshots, and refreshes active queue
+queries on `queue-invalidated` events. Both events cancel earlier reads before they update the cache. It does not
+run a second delivery loop. Queued and cancelled deliveries stay outside the chat transcript.
+The panel uses a bounded virtualized list and one glass surface with a bottom-anchored
+transition that respects reduced motion. Its fixed list viewport stays mounted, and the
+composer inset changes once per toggle. Streaming does not change the panel's inputs.
+
+The optional `queue-edit-v1` capability and desktop edit IPC provide the same host edit hold.
+Held deliveries remain in public queue snapshots with an editing marker. The private edit
+identity is not exposed. Only the matching editor can change the held message.
+Desktop and mobile write the edit identity before requesting the hold. Each client enables
+saving only after confirmation. A failed attachment-retention request keeps the desktop edit
+identity and backup available for retry. The mailbox stores
+the hold in the existing delivery JSON. The first held delivery blocks automatic queue dispatch;
+steer and an update without that edit identity are rejected. Saving commits the replacement
+message and releases the hold in one mailbox transaction. Cancel restores normal dispatch without
+changing the message. Delete cancels the delivery, finishes its edit, and releases attachment
+ownership in the same mailbox transaction. Released edit drafts survive restart until sent or
+discarded, so a lost cancellation response cannot destroy a saved composer backup. Ordinary
+unretained drafts still expire at host startup. A finished edit identity records the action that
+finished it, so a repeat of that same action stays safe after a lost response, while a save that
+follows a completed cancel is rejected instead of reporting success for text the host never took. Holds and locally saved edit drafts survive host restart and client navigation; they have
+no timeout that could send a message while someone is still editing it. Older hosts retain queue
+view, steer, delete and reorder, but mobile disables editing without the capability.
+
+The mobile queue is a route, not a panel. Each chat publishes its live queue controller under its
+own identity, and the sheet reads the identity it was opened with, so a chat that the native stack
+keeps mounted cannot answer for another chat's open sheet. Queued files are listed as rows: an
+image shows its own thumbnail, every other file shows the file icon, and the message options open
+a file in the share sheet. The thumbnail reads the attachment through the query key the chat uses,
+so a file already read in a message is not fetched again. The editor changes the text, removes the
+files the message already has, and adds new ones.
+

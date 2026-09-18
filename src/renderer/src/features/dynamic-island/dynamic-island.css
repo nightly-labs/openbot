@@ -6,8 +6,7 @@
   --dynamic-island-hover-width-growth: 32px;
   --dynamic-island-hover-height-growth: 8px;
   --dynamic-island-hover-hit-top: 6px;
-  --dynamic-island-hover-hit-bottom: 12px;
-  --dynamic-island-hover-hit-inline-growth: 28px;
+  --dynamic-island-hover-hit-bottom: 6px;
   --dynamic-island-hover-retention-bottom: 6px;
   --dynamic-island-hover-retention-inline-growth: 24px;
   --dynamic-island-shoulder-size: 6px;
@@ -346,10 +345,13 @@
   top: calc(-1 * var(--dynamic-island-hover-hit-top));
   left: 50%;
   display: none;
-  width: min(
-    calc(var(--dynamic-island-compact-width) + var(--dynamic-island-hover-hit-inline-growth)),
-    calc(100vw - var(--openbot-space-6))
-  );
+  /* Acquiring the island takes no more room than the island shows: an ear reads as part of the
+     notch, so a wider zone would only take the menu bar beside it away from the mouse. The band
+     below is `--dynamic-island-hover-hit-bottom`, which stays inside the menu bar - taller than the
+     notch on every notched MacBook - rather than reaching into the window under it. The retention
+     zone below is the generous one, and it only applies once the pointer is already on the
+     island. */
+  width: min(var(--dynamic-island-compact-width), calc(100vw - var(--openbot-space-6)));
   height: calc(
     var(--dynamic-island-notch-height) +
     var(--dynamic-island-hover-hit-top) +

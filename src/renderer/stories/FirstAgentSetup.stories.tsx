@@ -17,6 +17,8 @@ function draftFromSuggestion(suggestion: FirstAgentSuggestion): FirstAgentDraft 
     avatarSeed: suggestion.avatarSeed,
     avatarHue: suggestion.avatarHue,
     suggestionId: suggestion.id,
+    provider: DEFAULT_FIRST_AGENT_DRAFT.provider,
+    model: DEFAULT_FIRST_AGENT_DRAFT.model,
   };
 }
 

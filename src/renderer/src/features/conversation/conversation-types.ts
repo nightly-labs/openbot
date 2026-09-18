@@ -140,17 +140,19 @@ export interface ComposerDraft {
   replyToMessageId: string | null;
 }
 
-export interface MediaPreview {
-  attachment: AttachmentSummary;
-  text: string | null;
-  loading: boolean;
-  error: string | null;
-}
+/**
+ * What the file preview panel is showing. A shared or workspace file is named by its path, which
+ * the main process reads; an attachment is named by its record, because its bytes arrive over
+ * `previewUrl` and "open externally" goes through the attachment handler instead of a path.
+ */
+export type SidebarFilePreviewSource =
+  | { kind: "shared"; path: string }
+  | { kind: "workspace"; path: string }
+  | { kind: "attachment"; attachment: AttachmentSummary };
 
 export interface SidebarFilePreview {
   ownerAgentId: string;
-  source: "shared" | "workspace";
-  path: string;
+  source: SidebarFilePreviewSource;
   preview: FilePreview;
 }
 

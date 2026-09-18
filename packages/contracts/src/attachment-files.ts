@@ -89,6 +89,8 @@ export const ATTACHMENT_FILE_ACCEPT = ATTACHMENT_FILE_EXTENSIONS.map((extension)
 export const SUPPORTED_ATTACHMENT_DESCRIPTION =
   "images, MP3 audio, MOV video, PDF, Office documents, EML, text, Markdown, data, or source files";
 
+export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
 const SUPPORTED_EXTENSIONS = new Set<string>(ATTACHMENT_FILE_EXTENSIONS);
 const EXTENSIONLESS_TEXT_FILES = new Set(["dockerfile", "makefile", "procfile"]);
 
@@ -102,6 +104,19 @@ export function isSupportedAttachmentName(name: string): boolean {
   const basename = name.split(/[\\/]/u).at(-1)?.trim().toLowerCase() ?? "";
   const extension = attachmentFileExtension(basename);
   return EXTENSIONLESS_TEXT_FILES.has(basename) || (extension !== null && SUPPORTED_EXTENSIONS.has(extension));
+}
+
+/**
+ * The one rejection message for an unsupported attachment. Both import paths throw it: the renderer
+ * drop and file-picker handlers in `src/main/ipc/attachment-handlers.ts`, and the draft and transfer
+ * operations in `src/backend/attachment-files.ts`. A user must not read two different sentences for
+ * the same refused file.
+ */
+export function assertSupportedAttachmentName(name: string): void {
+  if (isSupportedAttachmentName(name)) return;
+  throw new Error(
+    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
+  );
 }
 
 export function attachmentMimeTypeForName(name: string) {
@@ -141,7 +156,7 @@ export function attachmentMimeTypeForName(name: string) {
     case "xls":
       return "application/vnd.ms-excel";
     case "xlsx":
-      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      return XLSX_MIME_TYPE;
     case "ods":
       return "application/vnd.oasis.opendocument.spreadsheet";
     case "ppt":
@@ -171,4 +186,8 @@ export function playableMediaKind(mimeType: string): "audio" | "video" | null {
   if (mimeType.startsWith("audio/")) return "audio";
   if (mimeType.startsWith("video/")) return "video";
   return null;
+}
+
+export function isXlsxMimeType(mimeType: string): boolean {
+  return mimeType === XLSX_MIME_TYPE;
 }

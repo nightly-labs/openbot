@@ -13,6 +13,16 @@ export default defineConfig({
         exclude: ["@openbot/contracts", "@openbot/i18n", "@openbot/logging", "@openbot/team-client"],
       }),
     ],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve("src/main/index.ts"),
+          // The database host is its own process. Its runtime imports are `node:*` only, so it
+          // emits a standalone chunk that `utilityProcess.fork` can load by path.
+          "agent-database-host": resolve("src/backend/agent-data/agent-database-host.ts"),
+        },
+      },
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: ["@openbot/contracts"] })],

@@ -439,21 +439,41 @@ function CitationArrowIcon() {
   );
 }
 
-function taggedMessageParts(body: string, agents: AgentProfile[]) {
+interface AgentTagMatcher {
+  expression: RegExp;
+  agentsByName: Map<string, AgentProfile>;
+}
+
+const agentTagMatchers = new WeakMap<AgentProfile[], AgentTagMatcher>();
+
+function agentTagMatcher(agents: AgentProfile[]): AgentTagMatcher | null {
+  if (agents.length === 0) return null;
+  const cached = agentTagMatchers.get(agents);
+  if (cached) return cached;
   const orderedAgents = [...agents].sort((left, right) => right.name.length - left.name.length);
-  if (orderedAgents.length === 0) return [{ text: body, agent: undefined }];
-  const agentsByName = new Map(orderedAgents.map((agent) => [agent.name.toLocaleLowerCase(), agent]));
-  const expression = new RegExp(
-    `@(${orderedAgents.map((agent) => escapeExpression(agent.name)).join("|")})(?=$|[\\s.,!?;:()\\[\\]{}])`,
-    "giu",
-  );
+  const matcher: AgentTagMatcher = {
+    expression: new RegExp(
+      `@(${orderedAgents.map((agent) => escapeExpression(agent.name)).join("|")})(?=$|[\\s.,!?;:()\\[\\]{}])`,
+      "giu",
+    ),
+    agentsByName: new Map(orderedAgents.map((agent) => [agent.name.toLocaleLowerCase(), agent])),
+  };
+  agentTagMatchers.set(agents, matcher);
+  return matcher;
+}
+
+function taggedMessageParts(body: string, agents: AgentProfile[]) {
+  if (!body.includes("@")) return [{ text: body, agent: undefined }];
+  const matcher = agentTagMatcher(agents);
+  if (!matcher) return [{ text: body, agent: undefined }];
+  matcher.expression.lastIndex = 0;
   const parts: Array<{ text: string; agent: AgentProfile | undefined }> = [];
   let cursor = 0;
-  for (const match of body.matchAll(expression)) {
+  for (const match of body.matchAll(matcher.expression)) {
     const index = match.index ?? 0;
     if (index > cursor) parts.push({ text: body.slice(cursor, index), agent: undefined });
     const name = match[1] ?? "";
-    const agent = agentsByName.get(name.toLocaleLowerCase());
+    const agent = matcher.agentsByName.get(name.toLocaleLowerCase());
     parts.push({ text: match[0], agent });
     cursor = index + match[0].length;
   }

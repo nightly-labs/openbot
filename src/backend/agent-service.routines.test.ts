@@ -4,12 +4,13 @@ import { join } from "node:path";
 import { type AgentEvent, routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
-import { AgentService } from "./agent-service";
+import type { AgentService } from "./agent-service";
 import {
   callOpenBotTool,
+  createTestService,
   expectOpenBotToolError,
   FakeAgentClient,
-  fakeBrowser,
+  inputRecords,
   notification,
   openBotToolPayload,
   protocolMessages,
@@ -20,6 +21,7 @@ import {
 } from "./agent-service-test-harness";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
+import { getString } from "./protocol";
 
 let root: string;
 let logPath: string;
@@ -63,14 +65,12 @@ describe.sequential("AgentService: routines", () => {
       },
       new Date("2026-08-25T10:00:00.000Z"),
     );
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
     await service.initialize();
 
     await service.channels.command(
@@ -86,7 +86,7 @@ describe.sequential("AgentService: routines", () => {
 
   it("persists routine lifecycle markers without adding unread or search results", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
 
@@ -115,7 +115,7 @@ describe.sequential("AgentService: routines", () => {
     expect(service.searchConversationMessages("morning brief", agent.id).total).toBe(0);
 
     await service.stop();
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     expect(
       (await service.readConversation(agent.id)).messages.flatMap((message) => routineConversationEvent(message) ?? []),
@@ -125,9 +125,14 @@ describe.sequential("AgentService: routines", () => {
   it("keeps a started routine delivery running while its transition marker retries", async () => {
     const { store, mailbox } = stores(root);
     let client: FakeAgentClient | undefined;
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      client = new FakeAgentClient(provider, "", false);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        client = new FakeAgentClient(provider, "", false);
+        return client;
+      },
     });
     const emitted: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => emitted.push(event));
@@ -171,9 +176,14 @@ describe.sequential("AgentService: routines", () => {
   it("keeps routine approvals interactive while attention markers retry", async () => {
     const { store, mailbox } = stores(root);
     let client: FakeAgentClient | undefined;
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      client = new FakeAgentClient(provider, "", false);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        client = new FakeAgentClient(provider, "", false);
+        return client;
+      },
     });
     const emitted: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => emitted.push(event));
@@ -253,9 +263,14 @@ describe.sequential("AgentService: routines", () => {
   it("continues turn completion while a terminal routine marker retries", async () => {
     const { store, mailbox } = stores(root);
     let client: FakeAgentClient | undefined;
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      client = new FakeAgentClient(provider, "", false);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        client = new FakeAgentClient(provider, "", false);
+        return client;
+      },
     });
     const emitted: AgentEvent[] = [];
     service.on("event", (event: AgentEvent) => emitted.push(event));
@@ -327,14 +342,12 @@ describe.sequential("AgentService: routines", () => {
 
   it("persists a completed routine turn as terminal", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(
+    service = createTestService({
       store,
       mailbox,
-      fakeBrowser(),
-      30_000,
-      "codex",
-      (provider) => new FakeAgentClient(provider),
-    );
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
     await service.initialize();
     const agent = await store.getOrCreate("chief");
     const routine = service.createRoutine({
@@ -367,10 +380,15 @@ describe.sequential("AgentService: routines", () => {
   it("lets an agent react to the current user message without replacing the user's reaction", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const receipt = await service.sendMessage({ agentId: "chief", text: "The launch is approved." });
@@ -418,10 +436,15 @@ describe.sequential("AgentService: routines", () => {
       recipientAgentIds: ["chief"],
       text: "Teammate update.",
     });
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
@@ -443,10 +466,15 @@ describe.sequential("AgentService: routines", () => {
   it("attaches an agent-created screenshot to the current user response", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const screenshotPath = join(store.sharedRoot, "desktop-screenshot.png");
@@ -571,10 +599,15 @@ describe.sequential("AgentService: routines", () => {
   it("shares one attachment operation between concurrent retries", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const screenshotPath = join(store.sharedRoot, "concurrent-screenshot.png");
@@ -642,10 +675,15 @@ describe.sequential("AgentService: routines", () => {
   it("rolls back response attachments when conversation persistence fails and permits retry", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider, "", false);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     const screenshotPath = join(store.sharedRoot, "retry-screenshot.png");
@@ -709,7 +747,7 @@ describe.sequential("AgentService: routines", () => {
       },
     ]);
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await store.getOrCreate("design", "Design Studio", "Product design");
     await store.updateAgent({
@@ -724,10 +762,31 @@ describe.sequential("AgentService: routines", () => {
     expect(service.listQueue("design").deliveries[0]?.sender).toEqual({ kind: "agent", agentId: "chief" });
   });
 
+  it("carries the sender's answer choice from the tool call onto the delivery", async () => {
+    process.env.OPENBOT_FAKE_AGENT_TOOL_CALLS = JSON.stringify([
+      {
+        tool: "send_message",
+        arguments: {
+          recipientAgentIds: ["design"],
+          text: "The interface proposal is in the shared folder.",
+          expectsReply: false,
+        },
+      },
+    ]);
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await service.initialize();
+    await store.getOrCreate("design", "Design Studio", "Product design");
+    await service.sendMessage({ agentId: "chief", text: "Tell design where the proposal is." });
+
+    await waitFor(() => service?.listQueue("design").deliveries.length === 1);
+    expect(service.listQueue("design").deliveries[0]).toMatchObject({ expectsReply: false });
+  });
+
   it("reliably relays a completed teammate result back through a reply chain without loops", async () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "AUTO_WEATHER_RESULT";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await store.initialize();
     await mailbox.initialize();
     await store.getOrCreate("chief");
@@ -780,9 +839,51 @@ describe.sequential("AgentService: routines", () => {
     expect(service.listQueue("chief").deliveries).toHaveLength(2);
   });
 
+  it("sends nothing back for a teammate message that asks for no answer", async () => {
+    process.env.OPENBOT_FAKE_AUTO_COMPLETE = "AUTO_RESULT";
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await store.initialize();
+    await mailbox.initialize();
+    await store.getOrCreate("chief");
+    await store.getOrCreate("sales-outbound");
+
+    await mailbox.enqueue({
+      sender: { kind: "agent", agentId: "chief" },
+      recipientAgentIds: ["sales-outbound"],
+      text: "The Berlin deck is in the shared folder.",
+      expectsReply: false,
+    });
+    // A request behind the notice: its relayed result is the point after which the notice's own
+    // turn is certainly finished, so an absent relay is a decision rather than a race.
+    const request = await mailbox.enqueue({
+      sender: { kind: "agent", agentId: "chief" },
+      recipientAgentIds: ["sales-outbound"],
+      text: "Check the weather.",
+    });
+
+    await service.initialize();
+    await waitFor(() => service?.listQueue("chief").deliveries.length === 1);
+
+    expect(service.listQueue("chief").deliveries).toEqual([
+      expect.objectContaining({
+        sender: { kind: "agent", agentId: "sales-outbound" },
+        replyToMessageId: request.messageId,
+        text: "AUTO_RESULT",
+        expectsReply: false,
+      }),
+    ]);
+    const noticeStart = (await protocolMessages(logPath)).find(
+      (message) =>
+        message.method === "turn/start" &&
+        inputRecords(message.params).some((item) => getString(item, "text")?.includes("The Berlin deck")),
+    );
+    expect(getString(inputRecords(noticeStart?.params)[0], "text")).toContain("The sender does not want an answer.");
+  });
+
   it("reads the canonical SQLite conversation during an active stream", async () => {
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "First turn" });
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
@@ -808,7 +909,7 @@ describe.sequential("AgentService: routines", () => {
     // delays the fake CLI, and the wait then never sees completed.
     process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "1500";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 400);
+    service = createTestService({ store, mailbox, requestTimeoutMs: 400 });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
     await service.initialize();
@@ -829,7 +930,7 @@ describe.sequential("AgentService: routines", () => {
     process.env.OPENBOT_FAKE_AUTO_COMPLETE = "Finished before the start response";
     process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "100";
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser());
+    service = createTestService({ store, mailbox });
     await service.initialize();
 
     await service.sendMessage({ agentId: "chief", text: "Run exactly once" });

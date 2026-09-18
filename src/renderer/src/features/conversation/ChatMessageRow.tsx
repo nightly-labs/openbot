@@ -64,6 +64,7 @@ export interface ChatMessageRowProps {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
+  onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
   onDownload?: (attachment: AttachmentSummary) => void;
 }
 
@@ -141,6 +142,16 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                 </Button>
               )}
             </Show>
+            <Show when={props.showTime}>
+              <time class="message-time" datetime={props.message.createdAt}>
+                {props.message.time}
+              </time>
+            </Show>
+          </MessageHeader>
+        </Show>
+        <Show when={props.showTime && (!props.showAuthor || own())}>
+          <MessageHeader class="message-time">
+            <time datetime={props.message.createdAt}>{props.message.time}</time>
           </MessageHeader>
         </Show>
         <div class="message-shell">
@@ -164,6 +175,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                 onAttachmentAction={props.onAttachmentAction}
                 onOpenSharedFile={props.onOpenSharedFile}
                 onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                onDownloadAttachments={props.onDownloadAttachments}
                 onDownload={props.onDownload}
               />
               {props.children}
@@ -210,11 +222,6 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
             </Show>
           </Bubble>
           {props.actions}
-          <Show when={props.showTime}>
-            <time class="message-time" datetime={props.message.createdAt}>
-              {props.message.time}
-            </time>
-          </Show>
         </div>
         <Show when={props.footer}>
           <MessageFooter>{props.footer}</MessageFooter>

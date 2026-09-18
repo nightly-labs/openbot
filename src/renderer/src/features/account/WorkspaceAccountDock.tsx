@@ -23,19 +23,25 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
   const auth = useAuth();
   const setup = useSetup();
   const updates = useUpdates();
-  const { activeAgent, agentStatus } = useAgents();
-  const { activeServerId, activeServerSupportsCapability } = useServers();
+  const { agentStatus } = useAgents();
+  const { activeServerId } = useServers();
   const { openAppSettings, setSkillsMarketplaceOpen } = useSettings();
   const usageReady = createMemo(() => {
-    const agent = activeAgent();
-    if (!agent || agentStatus().phase !== "ready") return false;
-    const provider = agentStatus().providers?.find((candidate) => candidate.id === agent.provider);
-    return provider ? provider.state === "available" && provider.connectionState !== "connecting" : true;
+    const status = agentStatus();
+    return (
+      status.phase === "ready" ||
+      Boolean(status.providers?.some((item) => item.state === "available" && item.connectionState !== "connecting"))
+    );
   });
   const usageTargetKey = createMemo(() => {
-    const agent = activeAgent();
-    if (!agent || !usageReady() || !activeServerSupportsCapability("model-scoped-usage")) return null;
-    return JSON.stringify([activeServerId(), agent.provider, agent.model]);
+    const serverId = activeServerId();
+    if (!serverId) return null;
+    const connected = (agentStatus().providers ?? [])
+      .filter((item) => item.state === "available" && item.connectionState !== "connecting")
+      .map((item) => item.id)
+      .sort()
+      .join(",");
+    return `${serverId}:${connected}`;
   });
 
   createEffect(
@@ -66,9 +72,8 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
         compact={layout.leftPanelCompact()}
         withServerRail={platform.serverRailVisible()}
         onRefreshUsage={() => {
-          const agent = activeAgent();
           const targetKey = usageTargetKey();
-          return agent && targetKey ? auth.refreshAccountUsage(agent.id, targetKey) : Promise.resolve({ limits: [] });
+          return targetKey ? auth.refreshAccountUsage(targetKey) : Promise.resolve({ limits: [] });
         }}
         onUpdateAction={updates.runAction}
         onLogout={platform.landingPreview ? undefined : auth.logoutCentralAccount}

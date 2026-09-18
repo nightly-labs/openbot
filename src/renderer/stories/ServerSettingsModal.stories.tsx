@@ -33,6 +33,7 @@ const meta = {
     onRetry: fn(async () => undefined),
     onSaveIdentity: fn(async () => undefined),
     onSetPublished: fn(async () => undefined),
+    onSetMuted: fn(async () => undefined),
     onCreateInvite: fn(async (input) => ({
       id: "invite-story",
       inviteUrl: "https://team.example.com/invite/story",
@@ -44,6 +45,8 @@ const meta = {
     onUpdateMember: fn(async () => undefined),
     onRemoveMember: fn(async () => undefined),
     onRevokeInvite: fn(async () => undefined),
+    onOpenScreenRecordingSettings: fn(async () => undefined),
+    onRecheckScreenRecording: fn(async () => undefined),
   },
   parameters: {
     layout: "fullscreen",
@@ -88,6 +91,7 @@ export const LocalFirstSetup: Story = {
       apiUrl: null,
       apiOnline: false,
       remoteDesktopReady: false,
+      remoteDesktopScreenRecordingDenied: false,
       remoteDesktopUnattended: false,
       remoteDesktopActiveSessions: 0,
       remoteDesktopMaxSessions: 4,
@@ -294,6 +298,22 @@ export const RemoteDesktop: Story = {
     body.getByRole("tab", { name: "Remote desktop" }).click();
     await expect(body.getByText("Service available")).toBeVisible();
     await expect(body.queryByRole("button", { name: "Connect" })).not.toBeInTheDocument();
+  },
+};
+
+// What the host owner sees after a member was refused: the repair step is here, on the computer
+// that holds the grant.
+export const HostScreenRecordingBlocked: Story = {
+  args: {
+    hostStatus: { ...STORY_HOST_STATUS, remoteDesktopScreenRecordingDenied: true },
+  },
+  play: async () => {
+    const body = within(document.body);
+    await body.findByRole("dialog", { name: "General" });
+    body.getByRole("tab", { name: "Remote desktop" }).click();
+    await expect(body.getByText("OpenBot may not record this screen")).toBeVisible();
+    await expect(body.getByRole("button", { name: "Open System Settings" })).toBeVisible();
+    await expect(body.getByRole("button", { name: "Check again" })).toBeVisible();
   },
 };
 

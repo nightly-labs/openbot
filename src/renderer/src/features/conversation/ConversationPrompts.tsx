@@ -1,7 +1,18 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Badge, Button, Check, Input, LoaderCircle, Monitor, RadioGroup, Skeleton, X } from "../../components/ui";
+import {
+  Badge,
+  Button,
+  Check,
+  Input,
+  LoaderCircle,
+  Maximize2,
+  Monitor,
+  RadioGroup,
+  Skeleton,
+  X,
+} from "../../components/ui";
 
 export function ChoiceCard(props: {
   title: string;
@@ -24,7 +35,7 @@ export function ChoiceCard(props: {
       <header class="conversation-interaction-header">
         <strong>{props.title}</strong>
         <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
           {props.pending ? "Sending…" : "Input required"}
         </Badge>
       </header>
@@ -107,7 +118,7 @@ export function ApprovalCard(props: {
       <header class="approval-card-header conversation-interaction-header">
         <strong>{approvalTitle(props.approval)}</strong>
         <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
           Approval
         </Badge>
       </header>
@@ -163,6 +174,7 @@ export function BrowserTakeoverCard(props: {
   preview: BrowserPreview | null;
   previewStatus: "idle" | "loading" | "ready" | "failed";
   decision?: "complete" | "cancel" | null;
+  onOpen?: () => void;
   onComplete: () => Promise<boolean>;
   onCancel: () => Promise<boolean>;
 }) {
@@ -210,7 +222,7 @@ export function BrowserTakeoverCard(props: {
           }
         >
           <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-            <LoaderCircle data-icon="inline-start" aria-hidden="true" />
+            <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
             Action required
           </Badge>
         </Show>
@@ -221,7 +233,7 @@ export function BrowserTakeoverCard(props: {
             ? `${props.agentName} is continuing.`
             : cancelled()
               ? "The browser step was cancelled."
-              : `Finish the sign-in, verification, or consent in the open browser. Then let ${props.agentName} continue.`}
+              : `Open the page to finish the sign-in, verification, or consent. Then let ${props.agentName} continue.`}
         </p>
       </div>
 
@@ -231,34 +243,32 @@ export function BrowserTakeoverCard(props: {
           <span title={pageDetails().title}>{pageDetails().title}</span>
           <small title={pageDetails().host}>{pageDetails().host}</small>
         </figcaption>
-        <div class="browser-takeover-preview-viewport">
-          <Show
-            when={props.previewStatus === "ready" ? props.preview : null}
-            fallback={
-              <Show
-                when={props.previewStatus === "loading" || props.previewStatus === "idle"}
-                fallback={
-                  <div class="browser-takeover-preview-fallback">
-                    <Monitor aria-hidden="true" />
-                    <strong>{pageDetails().title}</strong>
-                    <span>{pageDetails().host}</span>
-                  </div>
-                }
-              >
-                <Skeleton class="browser-takeover-preview-skeleton" />
-              </Show>
-            }
-          >
-            {(preview) => (
-              <img
-                src={preview().dataUrl}
-                width={preview().width}
-                height={preview().height}
-                alt={`Preview of ${pageDetails().title}`}
+        <Show
+          when={props.onOpen}
+          fallback={
+            <div class="browser-takeover-preview-viewport">
+              <BrowserTakeoverPreview
+                preview={props.preview}
+                previewStatus={props.previewStatus}
+                page={pageDetails()}
               />
-            )}
-          </Show>
-        </div>
+            </div>
+          }
+        >
+          <Button
+            variant="ghost"
+            type="button"
+            class="browser-takeover-preview-viewport browser-takeover-preview-open"
+            aria-label={`Open ${pageDetails().title}`}
+            onClick={() => props.onOpen?.()}
+          >
+            <BrowserTakeoverPreview preview={props.preview} previewStatus={props.previewStatus} page={pageDetails()} />
+            <span class="browser-takeover-preview-open-label" aria-hidden="true">
+              <Maximize2 />
+              Open
+            </span>
+          </Button>
+        </Show>
       </figure>
 
       <Show when={!props.decision}>
@@ -290,6 +300,41 @@ export function BrowserTakeoverCard(props: {
         </footer>
       </Show>
     </section>
+  );
+}
+
+function BrowserTakeoverPreview(props: {
+  preview: BrowserPreview | null;
+  previewStatus: "idle" | "loading" | "ready" | "failed";
+  page: { title: string; host: string };
+}) {
+  return (
+    <Show
+      when={props.previewStatus === "ready" ? props.preview : null}
+      fallback={
+        <Show
+          when={props.previewStatus === "loading" || props.previewStatus === "idle"}
+          fallback={
+            <div class="browser-takeover-preview-fallback">
+              <Monitor aria-hidden="true" />
+              <strong>{props.page.title}</strong>
+              <span>{props.page.host}</span>
+            </div>
+          }
+        >
+          <Skeleton class="browser-takeover-preview-skeleton" />
+        </Show>
+      }
+    >
+      {(preview) => (
+        <img
+          src={preview().dataUrl}
+          width={preview().width}
+          height={preview().height}
+          alt={`Preview of ${props.page.title}`}
+        />
+      )}
+    </Show>
   );
 }
 

@@ -4,6 +4,7 @@ import {
   type FileHandle,
   mkdir,
   open,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -12,11 +13,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
-import {
-  attachmentMimeTypeForName,
-  isSupportedAttachmentName,
-  SUPPORTED_ATTACHMENT_DESCRIPTION,
-} from "@openbot/contracts/attachment-files";
+import { assertSupportedAttachmentName, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AttachmentDataInput,
@@ -42,6 +39,9 @@ export interface StoredGeneratedAttachment extends StoredAttachment {
 }
 
 export interface StoredDraft extends StoredAttachment {
+  ownerEditId?: string;
+  /** Released edit drafts can still belong to a durable composer backup. */
+  preserveOnRestart?: boolean;
   createdAt: string;
 }
 
@@ -106,9 +106,12 @@ export class AttachmentFiles {
     ]);
   }
 
-  async resetDrafts(): Promise<void> {
-    await this.remove(this.#draftsRoot);
-    await mkdir(this.#draftsRoot, { recursive: true, mode: 0o700 });
+  async resetDrafts(retainedIds: string[] = []): Promise<void> {
+    const retained = new Set(retainedIds);
+    const entries = await readdir(this.#draftsRoot);
+    await Promise.all(
+      entries.filter((name) => !retained.has(name)).map((name) => this.remove(join(this.#draftsRoot, name))),
+    );
   }
 
   transferRoot(id: string): string {
@@ -138,11 +141,11 @@ export class AttachmentFiles {
     await Promise.allSettled(roots.map((path) => this.remove(path)));
   }
 
-  resolveDraft(attachment: StoredAttachment): Promise<{ path: string; mimeType: string } | null> {
+  resolveDraft(attachment: StoredAttachment): Promise<{ path: string; mimeType: string; name: string } | null> {
     return resolveManagedAttachment(this.#draftsRoot, attachment);
   }
 
-  resolveTransfer(attachment: StoredAttachment): Promise<{ path: string; mimeType: string } | null> {
+  resolveTransfer(attachment: StoredAttachment): Promise<{ path: string; mimeType: string; name: string } | null> {
     return resolveManagedAttachment(this.#transfersRoot, attachment);
   }
 
@@ -378,14 +381,14 @@ export class AttachmentFiles {
 async function resolveManagedAttachment(
   root: string,
   attachment: StoredAttachment,
-): Promise<{ path: string; mimeType: string } | null> {
+): Promise<{ path: string; mimeType: string; name: string } | null> {
   try {
     const [canonicalRoot, canonicalPath] = await Promise.all([realpath(root), realpath(attachment.path)]);
     if (!isWithin(canonicalRoot, canonicalPath)) return null;
     const metadata = await stat(canonicalPath);
     if (!metadata.isFile() || metadata.size !== attachment.size) return null;
     if ((await sha256(canonicalPath)) !== attachment.sha256) return null;
-    return { path: canonicalPath, mimeType: attachment.mimeType };
+    return { path: canonicalPath, mimeType: attachment.mimeType, name: attachment.name };
   } catch {
     return null;
   }
@@ -510,13 +513,6 @@ function attachmentMetadata(
         ? "text"
         : "none";
   return { kind: previewKind === "image" ? "image" : "file", mimeType, previewKind };
-}
-
-function assertSupportedAttachmentName(name: string): void {
-  if (isSupportedAttachmentName(name)) return;
-  throw new Error(
-    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
-  );
 }
 
 function attachmentPreviewUrl(id: string): string {

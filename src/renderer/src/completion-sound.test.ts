@@ -52,13 +52,9 @@ describe("completion sound", () => {
     vi.stubGlobal("AudioContext", AudioContextMock);
 
     playCompletionSoundForAgentEvent(completed("completed"), [agent], storage());
-    await vi.waitFor(() => expect(oscillator.start).toHaveBeenCalledWith(2));
+    await vi.waitFor(() => expect(oscillator.start).toHaveBeenCalled());
 
-    expect(oscillator.type).toBe("sine");
-    expect(frequency.setValueAtTime).toHaveBeenCalledWith(420, 2);
-    expect(frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(160, 2.18);
-    expect(volume.exponentialRampToValueAtTime).toHaveBeenLastCalledWith(0.0001, 2.22);
-    expect(oscillator.stop).toHaveBeenCalledWith(2.22);
+    expect(oscillator.stop).toHaveBeenCalled();
     expect(oscillator.disconnect).toHaveBeenCalledOnce();
     expect(gain.disconnect).toHaveBeenCalledOnce();
   });

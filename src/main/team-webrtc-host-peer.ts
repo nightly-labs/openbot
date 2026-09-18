@@ -9,7 +9,11 @@ import {
   channelResponse,
   isChannelRoute,
 } from "@openbot/contracts/team-protocol/channels-v1";
-import { supportsTeamSemanticTags, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
+import {
+  supportsTeamSemanticTags,
+  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
+  TEAM_CURRENT_CAPABILITIES,
+} from "@openbot/contracts/team-protocol/current";
 import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
@@ -452,6 +456,7 @@ export class TeamWebRtcHostPeer {
                         ? decodeTeamProtocolV4WebRtcHttpRequest
                         : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
                     preserveSemanticTags,
+                    agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
                   }),
                 ),
     });

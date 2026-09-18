@@ -12,7 +12,6 @@ import {
   Badge,
   Button,
   buttonVariants,
-  CalendarClock,
   ChevronUp,
   CircleArrowDown,
   Gauge,
@@ -21,8 +20,6 @@ import {
   Megaphone,
   Popover,
   Puzzle,
-  RadialProgress,
-  RefreshCw,
   Settings,
   ShieldCheck,
   Tooltip,
@@ -31,6 +28,8 @@ import {
 import { errorMessage } from "../../error-message";
 import { presentUpdateStatus } from "../updates/update-status";
 import { AccountUpdateIsland } from "./AccountUpdateIsland";
+import { AccountUsageDetails } from "./AccountUsageDetails";
+import { accountUsageProviderRows, accountUsageSummary } from "./account-usage-view";
 
 interface AccountDockProps {
   account: CentralAuthUser;
@@ -51,6 +50,8 @@ interface AccountDockProps {
   onOpenSettings: (trigger: HTMLElement) => void;
   onOpenSkills: () => void;
 }
+
+const USAGE_REFRESH_TIMEOUT_MS = 12_000;
 
 function AnimatedUsagePercentage(props: { value: number | null }) {
   let digitGroup: HTMLSpanElement | undefined;
@@ -98,6 +99,7 @@ export function AccountDock(props: AccountDockProps) {
   const [updateError, setUpdateError] = createSignal<string | null>(null);
   const [loggingOut, setLoggingOut] = createSignal(false);
   let usageRefreshTimer: number | undefined;
+  let usageWatchdog: number | undefined;
   let usageRequestGeneration = 0;
   let usageRequestTargetKey: string | null = null;
   let usageRequestRevision = -1;
@@ -110,47 +112,18 @@ export function AccountDock(props: AccountDockProps) {
   const accountName = createMemo(
     () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email,
   );
-  const weeklyUsage = createMemo(() => {
-    for (const limit of props.accountUsage?.limits ?? []) {
-      const weekly = [limit.primary, limit.secondary].find((window) => isWeeklyWindow(window?.windowDurationMins));
-      if (weekly) return weekly;
-    }
-    return null;
-  });
-  const weeklyUsageRemaining = createMemo(() => {
-    const usage = weeklyUsage();
-    return usage ? Math.max(0, Math.round(100 - usage.usedPercent)) : null;
-  });
-  const usageValue = createMemo(() => weeklyUsageRemaining() ?? 0);
-  const usageTone = createMemo(() => {
-    const remaining = weeklyUsageRemaining();
-    if (remaining === null || remaining >= 30) return "neutral";
-    return remaining < 10 ? "critical" : "warning";
-  });
-  const usageRadialTone = createMemo(() => {
-    const tone = usageTone();
-    if (tone === "critical") return "danger";
-    return tone === "warning" ? "warning" : "accent";
-  });
+  const usageRows = createMemo(() => accountUsageProviderRows(props.accountUsage, props.agentStatus.providers));
+  const usageSummary = createMemo(() => accountUsageSummary(usageRows()));
+  const usageRemaining = createMemo(() => usageSummary()?.remainingPercent ?? null);
+  const usageTone = createMemo(() => usageSummary()?.tone ?? "neutral");
   const usageButtonLabel = createMemo(() => {
-    if (usageLoading() && weeklyUsageRemaining() === null) return "Weekly usage is loading";
-    if (weeklyUsageRemaining() === null) return "Weekly usage unavailable";
-    return `Weekly usage, ${weeklyUsageRemaining()}% left`;
+    const summary = usageSummary();
+    if (usageLoading() && summary === null) return "Usage is loading";
+    if (summary === null || summary.remainingPercent === null) return "Usage unavailable";
+    return `Usage, ${summary.name} ${summary.remainingPercent}% left`;
   });
   const usageRefreshActive = createMemo(() => usageLoading() || usageRefreshAcknowledging());
   const usageRefreshDisabled = createMemo(() => usageRefreshActive() || !props.usageReady || !props.usageTargetKey);
-  const weeklyUsageReset = createMemo(() => {
-    const resetsAt = weeklyUsage()?.resetsAt;
-    if (resetsAt === null || resetsAt === undefined) return null;
-    const date = new Date(resetsAt * 1_000);
-    if (Number.isNaN(date.getTime())) return null;
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(date);
-  });
   const updatePresentation = createMemo(() => presentUpdateStatus(props.updateStatus));
   const accountMenuError = createMemo(
     () =>
@@ -163,20 +136,26 @@ export function AccountDock(props: AccountDockProps) {
 
   onCleanup(() => {
     if (usageRefreshTimer !== undefined) window.clearTimeout(usageRefreshTimer);
+    if (usageWatchdog !== undefined) window.clearTimeout(usageWatchdog);
   });
 
   createEffect(
     () =>
       [
-        props.usageTargetKey,
-        props.usageReady,
-        props.usageRefreshRevision,
-        hybridLayout(),
-        menuOpen(),
-        usageOpen(),
-      ] as const,
-    ([targetKey, ready, revision, hybrid, menu, usage]) => {
-      if (!targetKey || !ready) {
+        props.usageTargetKey ?? "",
+        props.usageReady ? "1" : "0",
+        hybridLayout() ? "1" : "0",
+        menuOpen() ? "1" : "0",
+        usageOpen() ? "1" : "0",
+      ].join("|"),
+    (key) => {
+      const [targetKeyRaw, readyRaw, hybridRaw, menuRaw, usageRaw] = key.split("|");
+      const targetKey = targetKeyRaw || null;
+      const ready = readyRaw === "1";
+      const hybrid = hybridRaw === "1";
+      const menu = menuRaw === "1";
+      const usage = usageRaw === "1";
+      if (!targetKey) {
         usageRequestGeneration += 1;
         usageRequestTargetKey = null;
         usageRequestRevision = -1;
@@ -184,8 +163,9 @@ export function AccountDock(props: AccountDockProps) {
         setUsageError(null);
         return;
       }
+      if (!ready) return;
       if (!hybrid && !menu && !usage) return;
-      if (usageRequestTargetKey === targetKey && usageRequestRevision === revision) return;
+      if (usageRequestTargetKey === targetKey) return;
       void refreshUsage();
     },
   );
@@ -221,6 +201,12 @@ export function AccountDock(props: AccountDockProps) {
     usageRequestRevision = revision;
     setUsageLoading(true);
     setUsageError(null);
+    if (usageWatchdog !== undefined) window.clearTimeout(usageWatchdog);
+    usageWatchdog = window.setTimeout(() => {
+      if (generation !== usageRequestGeneration) return;
+      setUsageLoading(false);
+      setUsageError("Usage is unavailable.");
+    }, USAGE_REFRESH_TIMEOUT_MS);
     try {
       await props.onRefreshUsage();
     } catch (cause) {
@@ -228,6 +214,10 @@ export function AccountDock(props: AccountDockProps) {
         setUsageError(errorMessage(cause, "Usage is unavailable."));
       }
     } finally {
+      if (usageWatchdog !== undefined) {
+        window.clearTimeout(usageWatchdog);
+        usageWatchdog = undefined;
+      }
       if (generation === usageRequestGeneration && props.usageTargetKey === targetKey) {
         setUsageLoading(false);
       }
@@ -284,19 +274,17 @@ export function AccountDock(props: AccountDockProps) {
     return (
       <>
         <Show when={includeDockActions}>
+          <AccountUsageDetails
+            rows={usageRows()}
+            loading={usageLoading()}
+            error={usageError()}
+            refreshActive={usageRefreshActive()}
+            refreshDisabled={usageRefreshDisabled()}
+            onRefresh={refreshUsageWithFeedback}
+            title={<h2 class="account-usage-popover-title">Usage</h2>}
+          />
+          <div class="account-menu-separator" />
           <section class="account-menu-group" aria-label="Account">
-            <Button
-              variant="ghost"
-              type="button"
-              class="account-menu-row"
-              aria-label={usageButtonLabel()}
-              onClick={refreshUsageWithFeedback}
-              disabled={usageRefreshDisabled()}
-            >
-              <Gauge class="account-menu-icon" aria-hidden="true" />
-              <span>Weekly usage</span>
-              <small>{weeklyUsageRemaining() === null ? "—" : `${weeklyUsageRemaining()}%`}</small>
-            </Button>
             <Button
               variant="ghost"
               type="button"
@@ -390,9 +378,6 @@ export function AccountDock(props: AccountDockProps) {
               {message()}
             </p>
           )}
-        </Show>
-        <Show when={includeDockActions ? usageError() : null}>
-          {(message) => <p class="account-popover-error">{message()}</p>}
         </Show>
       </>
     );
@@ -542,8 +527,8 @@ export function AccountDock(props: AccountDockProps) {
                   <Gauge aria-hidden="true" />
                   <strong>
                     <Show
-                      when={usageLoading() && weeklyUsageRemaining() === null}
-                      fallback={<AnimatedUsagePercentage value={weeklyUsageRemaining()} />}
+                      when={usageLoading() && usageRemaining() === null}
+                      fallback={<AnimatedUsagePercentage value={usageRemaining()} />}
                     >
                       <TypingDots class="account-dock-usage-loading" />
                     </Show>
@@ -555,63 +540,21 @@ export function AccountDock(props: AccountDockProps) {
                   class="ui-popover-menu-surface account-usage-popover"
                   aria-hidden={usageOpen() ? undefined : "true"}
                 >
-                  <header class="account-usage-popover-header">
-                    <div class="account-usage-popover-heading">
-                      <Gauge aria-hidden="true" />
-                      <Popover.Title class="account-usage-popover-title">Weekly usage</Popover.Title>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      size="icon-sm"
-                      class="account-usage-refresh"
-                      aria-label={usageRefreshActive() ? "Refreshing" : usageError() ? "Try again" : "Refresh"}
-                      title="Refresh usage"
-                      onClick={refreshUsageWithFeedback}
-                      disabled={usageRefreshDisabled()}
-                    >
-                      <RefreshCw
-                        class={usageRefreshActive() ? "account-menu-icon-spinning" : undefined}
-                        aria-hidden="true"
-                      />
-                    </Button>
-                  </header>
-                  <div class="account-usage-popover-meter">
-                    <RadialProgress
-                      value={usageValue()}
-                      tone={usageRadialTone()}
-                      aria-label="Weekly usage remaining"
-                      aria-valuetext={
-                        usageLoading() && weeklyUsageRemaining() === null
-                          ? "Loading"
-                          : weeklyUsageRemaining() === null
-                            ? "Unavailable"
-                            : `${weeklyUsageRemaining()}% left`
-                      }
-                    >
-                      <strong>
-                        {usageLoading() && weeklyUsageRemaining() === null
-                          ? "…"
-                          : weeklyUsageRemaining() === null
-                            ? "—"
-                            : `${weeklyUsageRemaining()}%`}
-                      </strong>
-                    </RadialProgress>
-                  </div>
-                  <div class="account-usage-popover-reset">
-                    <CalendarClock aria-hidden="true" />
-                    <span>Resets</span>
-                    <strong>
-                      {weeklyUsageReset() ? weeklyUsageReset() : usageLoading() ? "Checking…" : "Unavailable"}
-                    </strong>
-                  </div>
-                  <Show when={usageError()}>{(message) => <p class="account-usage-popover-error">{message()}</p>}</Show>
+                  <AccountUsageDetails
+                    rows={usageRows()}
+                    loading={usageLoading()}
+                    error={usageError()}
+                    refreshActive={usageRefreshActive()}
+                    refreshDisabled={usageRefreshDisabled()}
+                    onRefresh={refreshUsageWithFeedback}
+                    title={<Popover.Title class="account-usage-popover-title">Usage</Popover.Title>}
+                  />
                 </Popover.Content>
               </Popover.Portal>
             </Popover.Root>
           </Tooltip.Trigger>
           <Tooltip.Portal>
-            <Tooltip.Content class="ui-tooltip">Weekly usage</Tooltip.Content>
+            <Tooltip.Content class="ui-tooltip">Usage</Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
 
@@ -661,8 +604,4 @@ export function AccountDock(props: AccountDockProps) {
       </Show>
     </div>
   );
-}
-
-function isWeeklyWindow(durationMins: number | null | undefined): boolean {
-  return durationMins !== null && durationMins !== undefined && Math.abs(durationMins - 10_080) <= 10_080 * 0.05;
 }

@@ -35,6 +35,7 @@ import type {
   DeleteChannelMemoryInput,
   DeleteChannelRoutineInput,
   DeleteRoutineInput,
+  DeleteSharedTableInput,
   DraftAttachment,
   DuplicateAgentResult,
   GenerateAgentProfileInput,
@@ -58,6 +59,7 @@ import type {
   SendMessageInput,
   SetMcpServerEnabledInput,
   SetMessageReactionInput,
+  SharedTable,
   SidebarLayoutSnapshot,
   SidebarSection,
   SteerQueuedMessageInput,
@@ -80,6 +82,7 @@ import {
   skillConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AttachmentGateway } from "./agent/attachment-gateway";
@@ -89,6 +92,7 @@ import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import { ContextCompaction } from "./agent/context-compaction";
 import { ConversationRuntime } from "./agent/conversation-runtime";
+import { handleDataTool } from "./agent/data-tools";
 import {
   agentNamesById,
   deliveryInput,
@@ -96,6 +100,7 @@ import {
   responseAttachmentMessageId,
 } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
+import { DEVELOPMENT_DEFAULT_PROVIDER, developmentStartingModel } from "./agent/development-defaults";
 import { DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
@@ -115,6 +120,7 @@ import { isDynamicToolCall, isRequestTimeout, providerForAgent, providerLabel } 
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentClient, AgentProvider } from "./agent-client";
+import type { AgentTables } from "./agent-data/agent-tables";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "./agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
@@ -158,6 +164,38 @@ export interface ResolvedSharedFile {
   size: number;
 }
 
+export interface AgentServiceOptions {
+  store: AgentStore;
+  mailbox: MailboxStore;
+  browser: AgentBrowserHost;
+  requestTimeoutMs?: number;
+  preferredProvider?: AgentProvider;
+  /** The model chosen beside `preferredProvider`, or `null` for that provider's own default. */
+  preferredModel?: AgentModelId | null;
+  clientFactory?: AgentClientFactory | null;
+  bundledExecutables?: BundledProviderExecutables;
+  prepareAgentWorkspace?: (agent: AgentSummary) => Promise<void>;
+  hostedSites?: AgentHostedSites | null;
+  sidebarLayout?: AgentSidebar | null;
+  /**
+   * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
+   * endpoints. The main process owns both, because they carry secrets that must not reach the
+   * renderer or the database.
+   */
+  credentials?: ProviderClientContext;
+  localSkillTools?: () => LocalSkillTools;
+  /**
+   * The shared database agents keep their tables in. Injected because the host child's packaged
+   * path is the main process's knowledge, not this class's.
+   */
+  tables?: AgentTables | null;
+  /**
+   * Whether a new agent starts on the development default model rather than the built-in one.
+   * The main process passes the app variant; only a dev build turns it on.
+   */
+  developmentDefaults?: boolean;
+}
+
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
@@ -197,6 +235,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #browser: AgentBrowserHost;
   readonly #conversationReads: ConversationReadStore;
   readonly #memories: AgentMemories;
+  readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
@@ -223,34 +262,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #compaction: ContextCompaction;
   readonly #duplication: DuplicationGate;
   readonly #sidebarLayout: AgentSidebar | null;
+  readonly #localSkillTools?: () => LocalSkillTools;
+  readonly #developmentDefaults: boolean;
   #initialized = false;
   #stopping = false;
 
-  constructor(
-    store: AgentStore,
-    mailbox: MailboxStore,
-    browser: AgentBrowserHost,
-    requestTimeoutMs = 30_000,
-    preferredProvider: AgentProvider = "codex",
-    clientFactory: AgentClientFactory | null = null,
-    bundledExecutables: BundledProviderExecutables = DEFAULT_BUNDLED_EXECUTABLES,
-    prepareAgentWorkspace: (agent: AgentSummary) => Promise<void> = async () => undefined,
-    hostedSites: AgentHostedSites | null = null,
-    sidebarLayout: AgentSidebar | null = null,
-    /**
-     * The model setup chose beside `preferredProvider`, or `null` for that provider's own default.
-     * It arrives last because it was added last, and every caller that has no answer says `null`.
-     */
-    preferredModel: AgentModelId | null = null,
-    /**
-     * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
-     * endpoints. The main process owns both, because they carry secrets that must not reach the
-     * renderer or the database.
-     */
-    credentials: ProviderClientContext = NO_PROVIDER_CREDENTIALS,
-    private readonly localSkillTools?: () => LocalSkillTools,
-  ) {
+  constructor(options: AgentServiceOptions) {
     super();
+    const {
+      store,
+      mailbox,
+      browser,
+      requestTimeoutMs = 30_000,
+      preferredProvider = "codex",
+      preferredModel = null,
+      clientFactory = null,
+      bundledExecutables = DEFAULT_BUNDLED_EXECUTABLES,
+      prepareAgentWorkspace = async () => undefined,
+      hostedSites = null,
+      sidebarLayout = null,
+      credentials = NO_PROVIDER_CREDENTIALS,
+      localSkillTools,
+      developmentDefaults = false,
+    } = options;
+    this.#developmentDefaults = developmentDefaults;
+    this.#localSkillTools = localSkillTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
     // given that callback.
@@ -278,6 +314,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       (event) => this.#emit(event),
       () => this.listAgents(),
     );
+    this.#tables = options.tables ?? null;
     this.#memories = new AgentMemories({
       store,
       conversation: this.#conversation,
@@ -444,21 +481,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         queueHold: (agentId) => this.channels.queueHold(agentId),
       },
     });
-    this.#boot = new BootRecovery({
-      store,
-      mailbox,
-      providers: this.#providers,
-      conversation: this.#conversation,
-      mailboxSync: this.#mailboxSync,
-      hooks: {
-        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        executionThreads: () => this.channels.store.executionThreads(),
-        deliveryThreadId: (deliveryId) => {
-          const assignment = this.channels.store.assignmentForDelivery(deliveryId);
-          return assignment ? this.channels.store.context(assignment.channelId, assignment.agentId).threadId : null;
-        },
-      },
-    });
     this.#attachments = new AttachmentGateway({
       conversation: this.#conversation,
       mailbox,
@@ -487,6 +509,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
         logReleaseFailure: (provider, error) =>
           logger.warn("Could not close a replaced provider session.", { provider, error }),
+      },
+    });
+    this.#boot = new BootRecovery({
+      store,
+      mailbox,
+      providers: this.#providers,
+      conversation: this.#conversation,
+      mailboxSync: this.#mailboxSync,
+      threads: this.#threads,
+      hooks: {
+        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        executionThreads: () => this.channels.store.executionThreads(),
+        deliveryThreadId: (deliveryId) => {
+          const assignment = this.channels.store.assignmentForDelivery(deliveryId);
+          return assignment ? this.channels.store.context(assignment.channelId, assignment.agentId).threadId : null;
+        },
       },
     });
     this.channels = new ChannelService(store.database, mailbox, {
@@ -570,7 +608,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // moves. Without this its panel keeps naming the channel task that has already ended.
       queueHoldChanged: () => {
         for (const agent of this.#store.list())
-          if (this.#mailbox.nextQueued(agent.id)) this.#mailboxSync.emitQueue(agent.id);
+          if (this.#mailbox.queuedDeliveryIds(agent.id).length) this.#mailboxSync.emitQueue(agent.id);
       },
       error: (error) => this.#emitError("channel_coordination_failed", error),
     });
@@ -740,6 +778,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   clearMemories(agentId: string): void {
     this.#memories.clear(agentId);
+  }
+
+  listTables(): Promise<SharedTable[]> {
+    return this.#tables?.listShared() ?? Promise.resolve([]);
+  }
+
+  async deleteTable(input: DeleteSharedTableInput): Promise<void> {
+    if (!this.#tables) throw new Error("Shared data is unavailable.");
+    await this.#tables.removeAsUser(input.name);
   }
 
   listRoutines(agentId: string): Routine[] {
@@ -960,6 +1007,61 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  /**
+   * The provider and model a creation request names, resolved against what the CLIs list right now,
+   * or `null` when the request names neither. A named model must be listed for the named provider;
+   * a lone provider takes its default when listed, else whatever it lists first.
+   */
+  #creationModel(input: CreateAgentInput): { provider: AgentProvider; model: AgentModelOption } | null {
+    const { provider, model: requestedId } = input;
+    if (provider === undefined && requestedId === undefined) return null;
+    const models = this.#availableModels();
+    if (requestedId !== undefined) {
+      const model = models.find(
+        (candidate) => candidate.id === requestedId && (provider === undefined || candidate.provider === provider),
+      );
+      if (!model) throw new Error("The selected agent model is unavailable.");
+      if (provider !== undefined && model.provider !== provider) {
+        throw new Error("The selected model does not belong to that provider.");
+      }
+      return { provider: model.provider, model };
+    }
+    if (provider === undefined) return null;
+    const model =
+      models.find((candidate) => candidate.provider === provider && candidate.id === defaultProviderModel(provider)) ??
+      models.find((candidate) => candidate.provider === provider) ??
+      null;
+    if (!model) throw new Error(`${providerLabel(provider)} has no available model.`);
+    return { provider, model };
+  }
+
+  /**
+   * The provider and model a new agent starts on, or `null` when the preferred provider lists
+   * nothing at all.
+   *
+   * `#startingModel` answers for one provider; this one chooses the provider too, which is what a
+   * development default needs: the model it names belongs to OpenCode, and a preferred provider of
+   * Codex would never list it.
+   *
+   * That default stands in for the built-in one and nothing else. A preferred provider that is not
+   * the built-in one, or a model recorded beside it, is the developer's own choice and is left as
+   * it is.
+   */
+  #startingChoice(models: AgentModelOption[]): { provider: AgentProvider; model: AgentModelOption } | null {
+    const preferredProvider = this.#providers.preferredProvider();
+    const development =
+      preferredProvider === DEFAULT_AGENT_PROVIDER && this.#providers.preferredModel() === null
+        ? developmentStartingModel({
+            enabled: this.#developmentDefaults,
+            models,
+            providerAvailable: (provider) => this.#providerAvailable(provider),
+          })
+        : null;
+    if (development) return { provider: DEVELOPMENT_DEFAULT_PROVIDER, model: development };
+    const model = this.#startingModel(preferredProvider, models);
+    return model ? { provider: preferredProvider, model } : null;
+  }
+
   async createAgent(
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,
@@ -971,19 +1073,37 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     let agent = await this.#store.createAgent(input, profileOperationId);
     try {
       await this.#prepareAgentWorkspace(agent);
-      const preferredProvider = this.#providers.preferredProvider();
-      // A new record starts on the built-in default provider, so this is the one place a preferred
-      // provider lands on a new agent -- and with it the model setup chose, which is how a custom
-      // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
-      if (preferredProvider !== agent.provider) {
-        const preferredModel = this.#startingModel(preferredProvider, this.#availableModels());
-        if (!preferredModel) throw new Error(`${providerLabel(preferredProvider)} has no available model.`);
+      // A named pair lands before the initial message is queued: a provider change afterwards is
+      // rejected while the delivery or turn is active, so a follow-up update could never apply it.
+      const requested = this.#creationModel(input);
+      if (requested) {
         agent = await this.#store.updateAgent({
           agentId: agent.id,
-          provider: preferredProvider,
-          model: preferredModel.id,
-          reasoningEffort: preferredModel.defaultReasoningEffort,
+          provider: requested.provider,
+          model: requested.model.id,
+          reasoningEffort:
+            input.reasoningEffort && requested.model.supportedReasoningEfforts.includes(input.reasoningEffort)
+              ? input.reasoningEffort
+              : requested.model.defaultReasoningEffort,
         });
+      } else {
+        const starting = this.#startingChoice(this.#availableModels());
+        // The provider a start lands on, even when it lists no model: the throw below names the
+        // provider the developer expected, and a preferred provider that equals the record's own is
+        // still the no-op it always was.
+        const startingProvider = starting?.provider ?? this.#providers.preferredProvider();
+        // A new record starts on the built-in default provider, so this is the one place a preferred
+        // provider lands on a new agent -- and with it the model setup chose, which is how a custom
+        // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
+        if (startingProvider !== agent.provider) {
+          if (!starting) throw new Error(`${providerLabel(startingProvider)} has no available model.`);
+          agent = await this.#store.updateAgent({
+            agentId: agent.id,
+            provider: starting.provider,
+            model: starting.model.id,
+            reasoningEffort: starting.model.defaultReasoningEffort,
+          });
+        }
       }
       if (configure) agent = await configure(agent);
       await this.sendMessage({ agentId: agent.id, text: initialMessage, attachmentDraftIds: [] });
@@ -1449,6 +1569,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#deltas.dispose();
     this.#threads.dispose();
     this.#memories.clearPending();
+    this.#tables?.dispose();
     this.#attention.clearPrompts();
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
@@ -1575,6 +1696,69 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       throw new Error("Use the channel task controls for this assignment.");
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);
+    this.#drain.scheduleDrain(agentId);
+  }
+
+  async editQueuedMessage(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {
+    const finished = this.#mailbox.finishedQueueEditAction(agentId, input.deliveryId, input.editId);
+    if (finished) {
+      if (input.action === "begin" || input.action === "retain-attachments")
+        throw new QueueEditRejectedError("This edit has already finished.");
+      // The uploads belong to an edit that is over, so they never stay behind.
+      if (input.action === "save")
+        await Promise.all(input.attachmentDraftIds.map((id) => this.#mailbox.discardDraft(id)));
+      // Only a retry of the action that finished can report success. A Save that follows a
+      // finished Cancel never reached the message, so the client must keep its text.
+      if (input.action !== finished)
+        throw new QueueEditRejectedError(
+          finished === "cancel"
+            ? "This edit was cancelled, so the message keeps its original text."
+            : "This edit was already saved.",
+        );
+      if (
+        input.action === "save" &&
+        !this.#mailbox.matchesFinishedQueueSave(
+          agentId,
+          input.deliveryId,
+          input.editId,
+          input.text,
+          input.keepAttachmentIds,
+          input.attachmentDraftIds,
+        )
+      )
+        throw new QueueEditRejectedError(
+          "This edit was already saved with different contents. Your changes were not saved.",
+        );
+      this.#drain.scheduleDrain(agentId);
+      this.#mailboxSync.emitQueue(agentId);
+      return this.listQueue(agentId);
+    }
+    if (this.channels.store.assignmentForDelivery(input.deliveryId))
+      throw new Error("Use the channel task controls for this assignment.");
+    if (input.action === "begin") this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId);
+    else {
+      if (input.action === "retain-attachments")
+        this.#mailbox.retainQueueEditAttachments(agentId, input.deliveryId, input.editId, input.attachmentDraftIds);
+      if (input.action === "save") {
+        await this.#mailbox.updateQueuedMessage(
+          agentId,
+          input.deliveryId,
+          input.text,
+          input.keepAttachmentIds,
+          input.attachmentDraftIds,
+          input.editId,
+        );
+        const snapshot = this.#conversation.snapshot(agentId);
+        if (snapshot) {
+          this.#mailboxSync.syncMailboxMessages(snapshot);
+          this.#conversation.emitConversation(snapshot, "queue.message-updated");
+        }
+      }
+      if (input.action === "cancel") this.#mailbox.finishQueueEdit(agentId, input.deliveryId, input.editId);
+      this.#drain.scheduleDrain(agentId);
+    }
+    this.#mailboxSync.emitQueue(agentId);
+    return this.#mailbox.listQueue(agentId);
   }
 
   async updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {
@@ -1591,6 +1775,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (snapshot) this.#mailboxSync.syncMailboxMessages(snapshot);
     this.#mailboxSync.emitQueue(input.agentId);
     if (snapshot) this.#conversation.emitConversation(snapshot, "queue.message-updated");
+    this.#drain.scheduleDrain(input.agentId);
   }
 
   async reorderQueue(input: ReorderQueueInput): Promise<void> {
@@ -1843,9 +2028,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
     if (LOCAL_SKILL_TOOL_DEFINITIONS.some((tool) => tool.name === params.tool)) {
       try {
-        if (!this.localSkillTools) throw new Error("Local skill tools are unavailable.");
+        if (!this.#localSkillTools) throw new Error("Local skill tools are unavailable.");
         const result = openBotToolResult(
-          await runLocalSkillTool(this.localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
+          await runLocalSkillTool(this.#localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
             const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
             const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
             snapshot.messages.push({
@@ -1885,7 +2070,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         await this.channels.tool(channelId, senderAgentId, params.turnId, params.callId, params.tool, params.arguments),
       );
     }
-    if (params.tool.startsWith("channel_")) throw new Error("Channel tools require an active channel assignment.");
+    if (params.tool.startsWith("channel_")) {
+      return {
+        success: false,
+        contentItems: [
+          {
+            type: "inputText",
+            text: "This chat has no active channel assignment. Channel tools work only inside a channel task. Use openbot.send_message for direct teammate work, or sidebar section tools (list_sections, create_section, assign_agent_section) to group agents.",
+          },
+        ],
+      };
+    }
 
     if (params.tool === "list_sites") {
       return openBotToolResult({ sites: await this.#hostedSites.listSites(), limit: 10 });
@@ -2010,6 +2205,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const memoryResult = this.#memories.handleTool(params, senderAgentId);
     if (memoryResult) return memoryResult;
 
+    const tableResult = await handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);
+    if (tableResult) return tableResult;
+
     if (params.tool === "react_to_user_message") {
       const args = params.arguments;
       if (!isRecord(args) || !isMessageReaction(args.emoji)) {
@@ -2055,6 +2253,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       throw new Error("replyToMessageId must be a message id.");
     }
     if (!isString(params.arguments.text)) throw new Error("text is required.");
+    const expectsReply = params.arguments.expectsReply;
+    if (expectsReply !== undefined && typeof expectsReply !== "boolean") {
+      throw new Error("expectsReply must be a boolean.");
+    }
 
     const receipt = await this.#mailbox.enqueue({
       sender: { kind: "agent", agentId: senderAgentId },
@@ -2062,6 +2264,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       text: params.arguments.text,
       sourcePaths: paths,
       replyToMessageId: replyToMessageId ?? null,
+      expectsReply,
       idempotencyKey: `${params.threadId}:${params.turnId}:${params.callId}`,
     });
     for (const recipient of recipientValues) {

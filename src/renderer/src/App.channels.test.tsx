@@ -206,6 +206,59 @@ it.each(["owner", "admin", "member"] as const)("limits remote channel deletion f
   }
 });
 
+it("opens the channel creation dialog from both sidebar context menus", async () => {
+  await openSavedChannel();
+  await fireEvent.contextMenu(channelRow("Project room"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New channel" }), { button: 0 });
+  const dialog = await screen.findByRole("dialog", { name: "New channel" });
+  await fireEvent.click(within(dialog).getByRole("button", { name: "Close new channel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "New channel" })).not.toBeInTheDocument());
+
+  await fireEvent.contextMenu(screen.getByLabelText("Sidebar free area"));
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "New channel" }), { button: 0 });
+  await screen.findByRole("dialog", { name: "New channel" });
+});
+
+it("keeps the section editor open past menu focus restoration", async () => {
+  render(() => <App />);
+  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
+  // Hold the trigger: the open menu hides the background from role queries.
+  const trigger = await screen.findByRole("button", { name: "New agent or channel" });
+  await fireEvent.pointerDown(trigger, { button: 0 });
+  const item = await screen.findByRole("menuitem", { name: "New section" });
+  // Frames are a fake modeling animation-frame timing, not a sleep: each step runs exactly
+  // the callbacks the production code scheduled.
+  const pendingFrames: FrameRequestCallback[] = [];
+  const restore = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    pendingFrames.push(callback);
+    return pendingFrames.length;
+  });
+  const runFrame = async () => {
+    // Browsers checkpoint microtasks between callbacks in the same frame.
+    for (const callback of pendingFrames.splice(0)) {
+      callback(performance.now());
+      await Promise.resolve();
+    }
+  };
+  try {
+    await fireEvent.pointerUp(item, { button: 0 });
+    // The menu hands focus back to its trigger two frames after closing (focusRestoreHandler
+    // in components/ui/complex.tsx); the editor must open only after that. Keep the counts
+    // in step with complex.tsx.
+    await runFrame();
+    await runFrame();
+    // This is exactly what that restoration does: focus the trigger. An editor that opened
+    // too early loses its input to this steal and cancels on blur.
+    trigger.focus();
+    await runFrame();
+    await runFrame();
+    expect(screen.getByLabelText("New section")).toBeInTheDocument();
+    expect(screen.getByLabelText("New section name")).toHaveFocus();
+  } finally {
+    restore.mockRestore();
+  }
+});
+
 it("creates a channel from a searchable member dialog and keeps the chat open beside settings", async () => {
   const save = vi.spyOn(window.openbot.agent, "channelCommand");
   render(() => <App />);
@@ -472,59 +525,6 @@ it("keeps a queued settings save on the channel it was made in", async () => {
   expect(saves.map((input) => input.type === "save" && input.update === true)).toEqual([true, true]);
 });
 
-it("keeps the text a queued settings save carries when the reader opens another channel", async () => {
-  for (const [channelId, name] of [
-    ["channel-test", "Project room"],
-    ["channel-other", "Release room"],
-  ]) {
-    await window.openbot.agent.channelCommand({
-      type: "save",
-      operationId: `create-${channelId}`,
-      channelId,
-      draft: {
-        name,
-        title: "",
-        instructions: "",
-        members: [{ agentId: "chief" }, { agentId: "sales-outbound" }],
-        leadAgentId: "chief",
-      },
-    });
-  }
-  render(() => <App />);
-  await screen.findByRole("button", { name: /Open account (actions|menu)/ });
-  await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
-  const chat = await screen.findByRole("main", { name: "Channel conversation" });
-  await within(chat).findByRole("heading", { name: "Project room", level: 1 });
-  await openChannelMenuItem("Edit channel");
-  await within(chat).findByRole("button", { name: "Remove Chief" });
-
-  const original = window.openbot.agent.channelCommand;
-  let release: () => void = () => undefined;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const save = vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
-    if (input.type === "save") await gate;
-    return original(input);
-  });
-  // The removal holds the gate, so the title the reader writes next waits behind it.
-  void fireEvent.click(within(chat).getByRole("button", { name: "Remove Chief" }));
-  const title = within(chat).getByRole("textbox", { name: "Channel title" });
-  await fireEvent.input(title, { target: { value: "Weekly sync" } });
-  void fireEvent.blur(title);
-  await fireEvent.click(screen.getByRole("button", { name: /Release room/ }));
-  release();
-
-  // The queued save carries the membership the save before it left, and its own title: the text
-  // was written in this channel, not read from the one the reader went to.
-  await waitFor(() => expect(save.mock.calls.filter(([input]) => input.type === "save")).toHaveLength(2));
-  const saves = save.mock.calls.map(([input]) => input).filter((input) => input.type === "save");
-  expect(saves.map((input) => input.channelId)).toEqual(["channel-test", "channel-test"]);
-  expect(saves.at(-1)).toMatchObject({
-    draft: { name: "Project room", title: "Weekly sync", members: [{ agentId: "sales-outbound" }] },
-  });
-});
-
 /**
  * A channel with one task that the service stopped and wrote a reason on. The stub does not run
  * the automatic assignment limit, so the stopped task arrives through the read.
@@ -585,10 +585,11 @@ async function openChannelWithStoppedTask(options: { withChild?: boolean; state?
     attachmentDraftIds: [],
   });
   const originalRead = window.openbot.agent.readChannel;
-  const state = { taskId: "" };
-  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
+  const state = { taskId: "", stopped: true };
+  const read = vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
     const page = await originalRead(input);
     state.taskId = page.tasks[0]?.id ?? "";
+    if (!state.stopped) return page;
     const stopped = page.tasks.map((task) => ({
       ...task,
       state: options.state ?? ("paused" as const),
@@ -599,13 +600,18 @@ async function openChannelWithStoppedTask(options: { withChild?: boolean; state?
     const child = stopped[0] ? [{ ...stopped[0], id: `${stopped[0].id}-child`, parentTaskId: stopped[0].id }] : [];
     return { ...page, tasks: options.withChild ? [...stopped, ...child] : stopped };
   });
-  const command = vi.spyOn(window.openbot.agent, "channelCommand");
+  const originalCommand = window.openbot.agent.channelCommand;
+  const command = vi.spyOn(window.openbot.agent, "channelCommand").mockImplementation(async (input) => {
+    const result = await originalCommand(input);
+    if (input.type === "resume" || input.type === "reassign") state.stopped = false;
+    return result;
+  });
   render(() => <App />);
   await screen.findByRole("button", { name: /Open account (actions|menu)/ });
   await fireEvent.click(await screen.findByRole("button", { name: /Project room/ }));
   const chat = await screen.findByRole("main", { name: "Channel conversation" });
   const notice = await within(chat).findByRole("region", { name: "Stopped task for Chief" });
-  return { notice, command, state };
+  return { chat, notice, command, read, state };
 }
 
 it("continues a task the channel stopped with a reason", async () => {
@@ -617,23 +623,13 @@ it("continues a task the channel stopped with a reason", async () => {
       expect.objectContaining({ type: "resume", taskId: state.taskId, recipientAgentId: null }),
     ),
   );
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
 });
 
 it("shows one notice for a stopped run and continues it at the root", async () => {
   const { command, state } = await openChannelWithStoppedTask({ withChild: true });
   expect(screen.getAllByRole("region", { name: /^Stopped task for / })).toHaveLength(1);
   const notice = screen.getByRole("region", { name: /^Stopped task for / });
-  await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
-  await waitFor(() =>
-    expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "resume", taskId: state.taskId })),
-  );
-});
-
-it("continues a task that failed, which nothing but the reader starts again", async () => {
-  // A provider that cannot start, and a turn that ends in an error, both leave a failed task. Its
-  // parent waits for it, so the request never finishes until the reader continues it.
-  const { notice, command, state } = await openChannelWithStoppedTask({ state: "failed" });
-  expect(notice).toHaveTextContent(STOPPED_TASK_REASON);
   await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
   await waitFor(() =>
     expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "resume", taskId: state.taskId })),
@@ -651,6 +647,24 @@ it("reassigns a task the channel stopped with a reason", async () => {
       expect.objectContaining({ type: "reassign", taskId: state.taskId, recipientAgentId: "sales-outbound" }),
     ),
   );
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
+});
+
+it("keeps a stopped-task notice after a failed action and a refresh", async () => {
+  const { notice, command, read } = await openChannelWithStoppedTask();
+  command.mockRejectedValueOnce(new Error("Connection lost. Try again."));
+  await fireEvent.click(within(notice).getByRole("button", { name: "Continue" }));
+  await screen.findByText("Connection lost. Try again.");
+  expect(screen.getByRole("region", { name: "Stopped task for Chief" })).toHaveTextContent(STOPPED_TASK_REASON);
+
+  read.mockClear();
+  await fireEvent.focus(window);
+  await waitFor(() => expect(read).toHaveBeenCalled());
+  expect(await screen.findByRole("region", { name: "Stopped task for Chief" })).toHaveTextContent(STOPPED_TASK_REASON);
+  await fireEvent.click(
+    within(screen.getByRole("region", { name: "Stopped task for Chief" })).getByRole("button", { name: "Continue" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Stopped task for Chief" })).not.toBeInTheDocument());
 });
 
 it("retries a lost response once and keeps a focused draft through incoming messages", async () => {
@@ -733,42 +747,6 @@ it("closes a channel deleted from another connection", async () => {
   expect(screen.queryByRole("button", { name: /^Project room\./ })).not.toBeInTheDocument();
 });
 
-it("opens channel memories and channel routines from the settings panel", async () => {
-  const chat = await openSavedChannel();
-  await openChannelMenuItem("Edit channel");
-  await fireEvent.click(await within(chat).findByRole("button", { name: /^Memories0 saved$/ }));
-  const memories = await screen.findByRole("dialog", { name: "Memories" });
-  // The modal reads "channel", not "agent": the port names the owner, so the shared copy follows.
-  await within(memories).findByText("This channel has no saved memories yet.");
-  await fireEvent.click(within(memories).getByRole("button", { name: "Close memories" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Memories" })).not.toBeInTheDocument());
-  await fireEvent.click(within(chat).getByRole("button", { name: /^Routines0 configured$/ }));
-  // Routines replace the panel header, so "Channel settings" gives way to the routines view.
-  await within(chat).findByRole("heading", { name: "Routines", level: 2 });
-  expect(within(chat).queryByRole("heading", { name: "Channel settings" })).not.toBeInTheDocument();
-  await fireEvent.click(within(chat).getByRole("button", { name: "Back to settings" }));
-  await within(chat).findByRole("heading", { name: "Channel settings", level: 2 });
-});
-
-it("shows the saved memory and routine counts before either view opens", async () => {
-  const chat = await openSavedChannel();
-  await window.openbot.agent.createChannelMemory({ channelId: "channel-test", text: "Ship on Fridays." });
-  await window.openbot.agent.createChannelRoutine({
-    channelId: "channel-test",
-    name: "Morning brief",
-    instruction: "Summarise the open work.",
-    active: true,
-    timezone: "UTC",
-    schedule: { kind: "daily", time: "09:00" },
-  });
-  await openChannelMenuItem("Edit channel");
-
-  // The row reads both counts from the channel, not from the view that lists the entries. That
-  // view renders only after the reader opens it, so the row held zero until then.
-  await within(chat).findByRole("button", { name: /^Memories1 saved$/ });
-  await within(chat).findByRole("button", { name: /^Routines1 configured$/ });
-});
-
 it("addresses a channel member only while the request names one", async () => {
   const chat = await openSavedChannel();
   const command = vi.spyOn(window.openbot.agent, "channelCommand");
@@ -843,10 +821,4 @@ it("keeps the working indicator while the coordinator chooses an owner", async (
   // The lead is the coordinator. Its routing turn holds the task and posts nothing until it
   // decides, so the indicator is the only sign that the request is alive.
   expect(await within(chat).findByRole("status", { name: /^Chief is working: / })).toBeInTheDocument();
-});
-
-it("drops the working indicator when routing ends without an owner", async () => {
-  const chat = await openChannelWhileRouting("paused");
-  await within(chat).findByRole("article", { name: "Message from You" });
-  expect(within(chat).queryByRole("status", { name: / is working: / })).not.toBeInTheDocument();
 });

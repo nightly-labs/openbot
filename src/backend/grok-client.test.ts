@@ -162,7 +162,7 @@ describe.sequential("GrokAgentClient", () => {
     expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
       expect.objectContaining({
         message:
-          "OpenCode rejected the selected model's credentials. Update or remove the OpenCode Zen key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\nRequestError: Internal error: Invalid API key.",
+          "OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\nRequestError: Internal error: Invalid API key.",
       }),
     ]);
     const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
@@ -302,7 +302,7 @@ describe.sequential("GrokAgentClient", () => {
     },
   );
 
-  it("reads the current weekly billing period and rejects a monthly period", async () => {
+  it("reads the current weekly billing period and a monthly period", async () => {
     client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
     client.start();
     await client.request("initialize", {}, decodeRecordResponse);
@@ -321,7 +321,11 @@ describe.sequential("GrokAgentClient", () => {
     await client.request("initialize", {}, decodeRecordResponse);
     await expect(
       client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
-    ).resolves.toEqual({ rateLimits: null, rateLimitsByLimitId: null });
+    ).resolves.toMatchObject({
+      rateLimits: {
+        secondary: { usedPercent: 8, windowDurationMins: 43_200 },
+      },
+    });
   });
 
   it("reports unavailable usage for a unified weekly billing period without quota values", async () => {

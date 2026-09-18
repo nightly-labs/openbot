@@ -10,8 +10,9 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
-import { AgentService } from "../agent-service";
+import type { AgentService } from "../agent-service";
 import {
+  createTestService,
   FakeAgentClient,
   fakeBrowser,
   openBotToolPayload,
@@ -37,10 +38,15 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
   it("surfaces Codex approvals without auto-accepting and maps one-shot decisions", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -118,10 +124,15 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
   it("surfaces Computer Use app access elicitations and returns the user's persistence choice", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -225,10 +236,15 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
   it("provides a default-mode ask_user tool that resolves through the Questions card", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -559,10 +575,16 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       return { success: true, contentItems: [] };
     };
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, browser, 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      browser,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -694,10 +716,15 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
   it("keeps legacy approvals interactive and clears pending approvals on shutdown", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
-    service = new AgentService(store, mailbox, fakeBrowser(), 30_000, "codex", (provider) => {
-      const client = new FakeAgentClient(provider);
-      clients.set(provider, client);
-      return client;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
     });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Need a legacy approval" });
