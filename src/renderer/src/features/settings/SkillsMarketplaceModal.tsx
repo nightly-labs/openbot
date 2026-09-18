@@ -208,13 +208,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     leaveDetails();
   }
 
-  async function copyPluginLink(plugin: PluginDetail) {
-    try {
-      await navigator.clipboard.writeText(plugin.shareUrl);
-    } catch {
-      setError("Could not copy the plugin link.");
-    }
-  }
+  /* No `onCopyLink` is given: `openbot.run/plugins/<slug>` is not served yet, so the page withholds
+     the button rather than copy an address that answers 404. The listing still carries `shareUrl`,
+     so the button returns with the route. */
   function openPluginUrl(url: string) {
     const safe = safeBrowserUrl(url);
     if (!safe) return;
@@ -992,7 +988,6 @@ description: Turn merged work into clear, consistent release notes.
                                 state.browse.targetAgentId = id;
                               })
                             }
-                            onCopyLink={() => copyPluginLink(plugin)}
                             installed={pluginInstalled(plugin)}
                             busy={panel.busy === `plugin:${plugin.id}`}
                             onInstall={() => installPlugin(plugin)}

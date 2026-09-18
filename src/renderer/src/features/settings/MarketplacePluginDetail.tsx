@@ -97,7 +97,11 @@ export function MarketplacePluginDetail(props: {
   installed?: boolean;
   busy?: boolean;
   onInstall: () => void | Promise<void>;
-  onCopyLink: () => void | Promise<void>;
+  /**
+   * Given only where the copied address leads somewhere. `openbot.run/plugins/<slug>` is not served
+   * yet, so the app withholds the button rather than hand out a link that answers 404.
+   */
+  onCopyLink?: () => void | Promise<void>;
   /** Given only where a prompt can actually be sent somewhere; without it the arrows are disabled. */
   onRunPrompt?: (prompt: MarketplacePluginPrompt) => void;
   onOpenUrl: (url: string) => void;
@@ -124,10 +128,14 @@ export function MarketplacePluginDetail(props: {
           </Text>
         </div>
         <div class="marketplace-plugin-heading-actions">
-          <Button class="marketplace-plugin-share" variant="outline" onClick={() => void props.onCopyLink()}>
-            <Link2 aria-hidden="true" />
-            Copy link
-          </Button>
+          <Show when={props.onCopyLink}>
+            {(copyLink) => (
+              <Button class="marketplace-plugin-share" variant="outline" onClick={() => void copyLink()()}>
+                <Link2 aria-hidden="true" />
+                Copy link
+              </Button>
+            )}
+          </Show>
           {/* The target and the install share one control, as they do on a skill page: the page
               states which agent gets the plugin and sends it there in the same place. */}
           <div class="marketplace-install-control">
