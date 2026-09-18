@@ -857,8 +857,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             </Show>
             <Show when={props.tablesVisible !== false}>
               <SettingsLinkRow
-                label="Saved data"
-                value={`${draft.tables.count} kept`}
+                label="Tables"
+                value={`${draft.tables.count} ${draft.tables.count === 1 ? "table" : "tables"}`}
                 onClick={() =>
                   setDraft((state) => {
                     state.tables.open = true;
