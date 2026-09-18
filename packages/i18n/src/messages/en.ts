@@ -71,14 +71,13 @@ export const en = {
   "settings.autonomy.title": "Agent autonomy",
   "settings.turbo.title": "Turbo mode",
   "settings.turbo.description":
-    "Let every agent run commands, change files, widen its own filesystem and network access, and decide for itself instead of asking you a question. A request for a secret, and changes to a published site, still ask.",
+    "Let every agent run commands, change files and widen its own filesystem and network access without asking. Changes to a published site still ask.",
   "settings.turbo.confirmTitle": "Turn on Turbo mode?",
   "settings.turbo.confirmDescription":
-    "Agents will run commands, change files and widen their own access on this computer without asking you first, and will decide for themselves instead of asking you. Turn this off here at any time.",
+    "Agents will run commands, change files and widen their own access on this computer without asking you first. Turn this off here at any time.",
   "settings.turbo.confirmCancel": "Cancel",
   "settings.turbo.confirmAccept": "Turn on",
-  "settings.autoApprove.agentDescription":
-    "Runs commands, changes files, widens its own access, and answers its own questions.",
+  "settings.autoApprove.agentDescription": "Runs commands, changes files and widens its own access without asking.",
   "settings.autoApprove.revoke": "Revoke",
   "settings.autoApprove.revokeLabel": "Revoke the standing approval for {name}",
   "settings.autoApprove.resetTitle": "Every standing approval",

@@ -21,12 +21,7 @@ import {
   getString,
   type RequestId,
 } from "../protocol";
-import {
-  type ApprovalAutomationPolicy,
-  NO_APPROVAL_AUTOMATION,
-  shouldAutoApprove,
-  shouldAutoSkipPrompt,
-} from "./approval-automation";
+import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   HOSTED_SITE_APPROVAL_METHOD,
@@ -205,7 +200,17 @@ export class AttentionRegistry {
     }
     this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
-    pending.client.respond(pending.id, promptResponse(pending, input.answers));
+    const result =
+      pending.responseKind === "dynamic-tool"
+        ? dynamicPromptResult(input.answers)
+        : pending.responseKind === "mcp-elicitation"
+          ? mcpElicitationResult(pending.params, input.answers)
+          : {
+              answers: Object.fromEntries(
+                Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
+              ),
+            };
+    pending.client.respond(pending.id, result);
     this.#prompts.delete(input.requestId);
     this.#emit({ type: "agent-input-resolved", kind: "prompt", requestId: input.requestId, agentId: pending.agentId });
     try {
@@ -452,7 +457,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    const pending: PendingPrompt = {
+    this.#prompts.set(request.id, {
       client,
       id: request.id,
       responseKind: "dynamic-tool",
@@ -462,9 +467,7 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
-    };
-    if (this.#skipWithoutAsking(pending)) return;
-    this.#prompts.set(request.id, pending);
+    });
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -492,7 +495,7 @@ export class AttentionRegistry {
     }
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    const pending: PendingPrompt = {
+    this.#prompts.set(request.id, {
       client,
       id: request.id,
       responseKind: "user-input",
@@ -502,9 +505,7 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
-    };
-    if (this.#skipWithoutAsking(pending)) return;
-    this.#prompts.set(request.id, pending);
+    });
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -672,25 +673,6 @@ export class AttentionRegistry {
     return messageId;
   }
 
-  /**
-   * Leaves a granted agent's question to the agent, and reports whether it did.
-   *
-   * The question is persisted and resolved as skipped rather than passed over in silence: unlike an
-   * approval, whose command or file change is an ordinary timeline item either way, nothing else
-   * records that the agent asked. The user reads what it wanted and what it was told, after the fact.
-   */
-  #skipWithoutAsking(pending: PendingPrompt): boolean {
-    if (!shouldAutoSkipPrompt(this.#approvalAutomation, pending.agentId, pending.questions)) return false;
-    const answers = Object.fromEntries(pending.questions.map((question) => [question.id, []]));
-    pending.client.respond(pending.id, promptResponse(pending, answers));
-    try {
-      this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, answers));
-    } catch (error) {
-      this.#emitError("prompt_persistence_failed", error, pending.agentId);
-    }
-    return true;
-  }
-
   #resolvePersistedPrompt(pending: PendingPrompt, resolution: AgentPromptResolution): void {
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
     const message = snapshot.messages.find((candidate) => candidate.id === pending.messageId);
@@ -703,17 +685,4 @@ export class AttentionRegistry {
       status: resolution.status,
     });
   }
-}
-
-/** What a provider gets back for an answered prompt, in the dialect its own request kind speaks. */
-type PromptResponse =
-  | DynamicToolResult
-  | ReturnType<typeof mcpElicitationResult>
-  | { answers: Record<string, { answers: string[] }> };
-
-/** The shape each provider understands for an answered prompt, a skipped question included. */
-function promptResponse(pending: PendingPrompt, answers: Record<string, string[]>): PromptResponse {
-  if (pending.responseKind === "dynamic-tool") return dynamicPromptResult(answers);
-  if (pending.responseKind === "mcp-elicitation") return mcpElicitationResult(pending.params, answers);
-  return { answers: Object.fromEntries(Object.entries(answers).map(([id, values]) => [id, { answers: values }])) };
 }

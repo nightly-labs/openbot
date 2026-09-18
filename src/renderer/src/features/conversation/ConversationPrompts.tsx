@@ -103,8 +103,8 @@ export function ApprovalCard(props: {
   onReject: () => Promise<boolean>;
   /**
    * Grants this agent a standing approval, then accepts the request in hand. Absent where the grant
-   * cannot be given: an agent on a remote server, whose own computer owns that choice. The card then
-   * reads exactly as it did before this option existed.
+   * cannot be given: a `permissions` request, or an agent on a remote server whose own computer
+   * owns that choice. The card then reads exactly as it did before this option existed.
    */
   onAlwaysAllow?: () => Promise<boolean>;
   /** The agent this grant would cover, for the confirmation the grant deserves. */
@@ -220,9 +220,8 @@ export function ApprovalCard(props: {
               <AlertDialog.Title>Always allow {props.agentName ?? "this agent"}?</AlertDialog.Title>
               <AlertDialog.Description>
                 {props.agentName ?? "This agent"} will run commands, change files and widen its own filesystem and
-                network access on this computer without asking again, and will decide for itself instead of asking you a
-                question. A request for a secret, and changes to a published site, still ask. You can take this back in
-                Settings.
+                network access on this computer without asking again. Changes to a published site still ask. You can
+                take this back in Settings.
               </AlertDialog.Description>
               <div class="approval-confirm-actions">
                 <Button
