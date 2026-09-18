@@ -1,0 +1,214 @@
+/*
+ * The connect dialog. It opens over the marketplace modal, so its layer is one above the layer the
+ * marketplace takes, and not one above the shared dialog layer: both portals are children of `body`,
+ * and insertion order alone would break the first time it is opened from somewhere else.
+ *
+ * The shape is a centred column: the two ends of the connection, the name, one card of facts, and
+ * one button. A connection is a single decision, so the dialog is a single line of reading down the
+ * middle rather than a form with a toolbar under it.
+ */
+
+.mcp-connect-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover) + 1);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+  animation: mcp-connect-backdrop-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+.mcp-connect-dialog {
+  position: relative;
+  width: min(420px, 100%);
+  max-height: calc(100dvh - var(--openbot-space-6) * 2);
+  overflow-y: auto;
+  outline: 0;
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-6);
+  color: var(--openbot-text-primary);
+  animation: mcp-connect-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
+/* The header reads down the middle: the two ends, the name, the one line about what happens next. */
+.mcp-connect-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+/* Out of the column, so the centred name is centred on the dialog and not on what is left of it. */
+.mcp-connect-close {
+  position: absolute;
+  top: var(--openbot-space-3);
+  right: var(--openbot-space-3);
+}
+
+/* This computer and the app, joined by the dots the connection is about to become. The dots run
+   from left to right, so the picture says which way the app is being brought in. */
+.mcp-connect-marks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-3);
+}
+
+.mcp-connect-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+}
+
+.mcp-connect-mark .app-logo {
+  width: 48px;
+  height: 48px;
+}
+
+.mcp-connect-dots {
+  width: 28px;
+  height: 2px;
+  background-image: radial-gradient(circle, var(--openbot-text-muted) 1px, transparent 1px);
+  background-size: 7px 2px;
+  animation: mcp-connect-dots-run 900ms linear infinite;
+}
+
+/* The app icon is the one being joined, so it is the one that arrives - at the size of the mark
+   opposite it, because the two ends are equal. */
+.mcp-connect-marks .skills-marketplace-icon {
+  width: 48px;
+  height: 48px;
+  animation: mcp-connect-mark-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcp-connect-dots,
+  .mcp-connect-marks .skills-marketplace-icon {
+    animation: none;
+  }
+}
+
+.mcp-connect-title {
+  display: block;
+  margin: var(--openbot-space-3) 0 0;
+  text-align: center;
+  font-size: var(--openbot-text-xl);
+  line-height: var(--openbot-leading-xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-tight);
+}
+
+.mcp-connect-description {
+  margin: 0;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+/* One card of facts, its rows divided rather than spaced: a connection is one thing to read. */
+.mcp-connect-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-grouped);
+}
+
+.mcp-connect-row {
+  position: relative;
+  margin: 0;
+  padding: var(--openbot-space-3);
+}
+
+.mcp-connect-row + .mcp-connect-row {
+  border-top: 1px solid var(--openbot-border-grouped);
+}
+
+.mcp-connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  margin: var(--openbot-space-4) 0 0;
+}
+
+/* On the label's line, at the far end of it: the way out to the key page is a quiet aside, and it
+   is the size of the other links in the marketplace rather than the size of the field. */
+.mcp-connect-docs {
+  position: absolute;
+  top: var(--openbot-space-3);
+  right: var(--openbot-space-3);
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-connect-docs > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.mcp-connect-primary {
+  width: 100%;
+}
+
+/* The mark that says the button leaves the app. It reads beside the words rather than over them,
+   so it is the size of every other external-link mark in the marketplace. */
+.mcp-connect-primary > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+/* Empty until a connection answers, and it holds no height then: a live region that reserves space
+   would leave a gap over the buttons in the state the dialog opens in. */
+.mcp-connect-status:empty {
+  display: none;
+}
+
+.mcp-connect-privacy {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-connect-privacy svg {
+  flex: none;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
+
+@keyframes mcp-connect-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes mcp-connect-dots-run {
+  to {
+    background-position-x: 7px;
+  }
+}
+
+@keyframes mcp-connect-mark-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes mcp-connect-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}

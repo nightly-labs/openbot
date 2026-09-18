@@ -1409,7 +1409,31 @@ export const STORY_MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
         name: "Linear",
         description: "Issues, projects, cycles and comments, over the Linear MCP server.",
         iconUrl: skillPreviewIcon("📐", "#2f2f46"),
-        server: { name: "linear", transport: "http", url: "https://mcp.linear.app/mcp" },
+        server: {
+          name: "linear",
+          transport: "http",
+          url: "https://mcp.linear.app/mcp",
+          auth: [
+            { id: "oauth", kind: "link", label: "Sign in" },
+            {
+              id: "api-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "lin_api_…",
+                  hint: "Settings · Security & access · Personal API keys.",
+                },
+              ],
+              docsUrl: "https://linear.app/settings/api",
+              docsLabel: "Get an API key",
+            },
+          ],
+        },
       },
     ],
     skills: [
@@ -1457,7 +1481,29 @@ export const STORY_MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
         name: "Figma",
         description: "Files, pages, frames, variables and comments, read-only, over the Figma MCP server.",
         iconUrl: skillPreviewIcon("🎨", "#d4452c"),
-        server: { name: "figma", transport: "http", url: "https://mcp.figma.com/mcp" },
+        server: {
+          name: "figma",
+          transport: "http",
+          url: "https://mcp.figma.com/mcp",
+          auth: [
+            {
+              id: "token",
+              kind: "key",
+              label: "Personal access token",
+              fields: [
+                {
+                  id: "token",
+                  label: "Personal access token",
+                  header: "X-Figma-Token",
+                  placeholder: "figd_…",
+                  hint: "Settings · Security · Personal access tokens.",
+                },
+              ],
+              docsUrl: "https://www.figma.com/developers/api#access-tokens",
+              docsLabel: "Get a token",
+            },
+          ],
+        },
       },
     ],
     skills: [

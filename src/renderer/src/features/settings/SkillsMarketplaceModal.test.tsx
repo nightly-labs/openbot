@@ -1168,6 +1168,88 @@ describe("SkillsMarketplaceModal", () => {
       expect(await screen.findByRole("button", { name: "Installed" })).toBeDisabled();
     });
 
+    /**
+     * A listing that declares a way in is connected before it is installed, and what is saved is
+     * what connected. A key that never reached the server would be stored as a working app, and the
+     * failure would arrive inside an agent's next answer instead of here.
+     */
+    const withKey: MarketplacePluginDetail = {
+      ...plugin,
+      apps: [
+        {
+          ...app,
+          server: {
+            ...app.server,
+            auth: [
+              {
+                id: "api-key",
+                kind: "key",
+                label: "API key",
+                fields: [{ id: "token", label: "API key", header: "Authorization", prefix: "Bearer " }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    it("saves the configuration the connect dialog proved", async () => {
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => [input.config]);
+      const testMcpServer: OpenBotDesktopApi["agent"]["testMcpServer"] = vi.fn(async () => ({
+        toolCount: 4,
+        error: null,
+      }));
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer,
+        testMcpServer,
+      };
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[withKey]}
+          pluginServerId="local"
+        />
+      ));
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      const key = await screen.findByLabelText(/API key/);
+      fireEvent.input(key, { target: { value: "live-key" } });
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+
+      await waitFor(() => expect(saveMcpServer).toHaveBeenCalled());
+      const sent = { key: "Authorization", value: "Bearer live-key" };
+      expect(testMcpServer).toHaveBeenCalledWith({ config: expect.objectContaining({ headers: [sent] }) }, "local");
+      expect(saveMcpServer).toHaveBeenCalledWith({ config: expect.objectContaining({ headers: [sent] }) }, "local");
+    });
+
+    it("saves nothing when the connect dialog is closed", async () => {
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => [input.config]);
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []), saveMcpServer };
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[withKey]}
+          pluginServerId="local"
+        />
+      ));
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Close connect Aave" }));
+
+      // Closing the dialog is a decision, not a failure: the install stops and can be started again.
+      await waitFor(() => expect(screen.getByRole("button", { name: "Install plugin" })).toBeEnabled());
+      expect(saveMcpServer).not.toHaveBeenCalled();
+    });
+
     it("sends an example question to the chosen agent", async () => {
       const onRunPluginPrompt = vi.fn();
       window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []) };

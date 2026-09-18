@@ -10,6 +10,7 @@
  */
 
 import type { McpTransport, SkillCategory } from "@openbot/contracts/ipc";
+import type { McpAuth } from "./mcp-connect-auth";
 
 /**
  * Where a shared plugin link points. Derived from the slug rather than carried as catalog data, so
@@ -35,7 +36,22 @@ export interface MarketplacePluginServer {
   /** The name the MCP record takes on this computer, and what an installed check matches on. */
   name: string;
   transport: McpTransport;
+  /** The address an http server answers on. Empty for an app that runs a command. */
   url: string;
+  /**
+   * The command a stdio app launches, and the words it is launched with. An app runs a command when
+   * its server is not reachable over http alone - a bridge that signs in for the user, or a server
+   * that is published as a package. Both are ignored for an http app, as `normalizeMcpConfig` clears
+   * them there.
+   */
+  command?: string;
+  args?: string[];
+  /**
+   * How the user proves who they are, when the server asks: a sign-in, a key, or both. The
+   * declaration names the way in and where a key goes; the value is only ever typed by the user or
+   * granted in the browser, so nothing secret is catalog data.
+   */
+  auth?: McpAuth | null;
 }
 
 /** An MCP server the plugin publishes. The listing calls it an app, because that is what it is to the user. */
