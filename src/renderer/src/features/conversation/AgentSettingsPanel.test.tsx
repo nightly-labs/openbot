@@ -13,6 +13,121 @@ afterEach(() => {
 });
 
 describe("AgentSettingsPanel", () => {
+  it("saves edited instructions while the field stays focused", async () => {
+    vi.useFakeTimers();
+    try {
+      mock = createMockOpenBot();
+      window.openbot = mock.api;
+      const onUpdateAgent = vi.fn(async () => undefined);
+      render(() => (
+        <AgentSettingsPanel
+          onOpenUsage={vi.fn()}
+          agent={STORY_AGENTS[0]}
+          runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
+          agentStatus={STORY_AGENT_STATUS}
+          modelOptions={STORY_MODELS}
+          working={false}
+          maxWidth={() => 640}
+          onClose={vi.fn()}
+          onWidthChange={vi.fn()}
+          onUpdateAgent={onUpdateAgent}
+          onUpdateRuntimeSettings={vi.fn(async () => true)}
+          onSetAgentAvatar={vi.fn(async () => undefined)}
+        />
+      ));
+
+      const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
+      instructions.focus();
+      await fireEvent.input(instructions, { target: { value: "Use the reviewed release instructions." } });
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(instructions).toHaveFocus();
+      expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, {
+        description: "Use the reviewed release instructions.",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("flushes pasted instructions when the settings panel closes", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    const onUpdateAgent = vi.fn(async () => undefined);
+    const view = render(() => (
+      <AgentSettingsPanel
+        onOpenUsage={vi.fn()}
+        agent={STORY_AGENTS[0]}
+        runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
+        agentStatus={STORY_AGENT_STATUS}
+        modelOptions={STORY_MODELS}
+        working={false}
+        maxWidth={() => 640}
+        onClose={vi.fn()}
+        onWidthChange={vi.fn()}
+        onUpdateAgent={onUpdateAgent}
+        onUpdateRuntimeSettings={vi.fn(async () => true)}
+        onSetAgentAvatar={vi.fn(async () => undefined)}
+      />
+    ));
+
+    const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
+    await fireEvent.input(instructions, { target: { value: "Keep this instruction when the panel closes." } });
+    view.unmount();
+
+    expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, {
+      description: "Keep this instruction when the panel closes.",
+    });
+  });
+
+  it("queues a newer instruction behind an active save", async () => {
+    vi.useFakeTimers();
+    try {
+      mock = createMockOpenBot();
+      window.openbot = mock.api;
+      let finishFirstSave!: () => void;
+      const firstSave = new Promise<void>((resolve) => {
+        finishFirstSave = resolve;
+      });
+      const onUpdateAgent = vi
+        .fn<(agentId: string, updates: { description?: string }) => Promise<void>>()
+        .mockReturnValueOnce(firstSave)
+        .mockResolvedValue(undefined);
+      render(() => (
+        <AgentSettingsPanel
+          onOpenUsage={vi.fn()}
+          agent={STORY_AGENTS[0]}
+          runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
+          agentStatus={STORY_AGENT_STATUS}
+          modelOptions={STORY_MODELS}
+          working={false}
+          maxWidth={() => 640}
+          onClose={vi.fn()}
+          onWidthChange={vi.fn()}
+          onUpdateAgent={onUpdateAgent}
+          onUpdateRuntimeSettings={vi.fn(async () => true)}
+          onSetAgentAvatar={vi.fn(async () => undefined)}
+        />
+      ));
+
+      const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
+      await fireEvent.input(instructions, { target: { value: "First instruction" } });
+      await vi.advanceTimersByTimeAsync(500);
+      await fireEvent.input(instructions, { target: { value: "Latest instruction" } });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(onUpdateAgent).toHaveBeenCalledTimes(1);
+
+      finishFirstSave();
+      await vi.waitFor(() => expect(onUpdateAgent).toHaveBeenCalledTimes(2));
+      expect(onUpdateAgent).toHaveBeenLastCalledWith(STORY_AGENTS[0].id, {
+        description: "Latest instruction",
+      });
+      expect(instructions).toHaveValue("Latest instruction");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("opens a requested skill in the existing management modal", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
