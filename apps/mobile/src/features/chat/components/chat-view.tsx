@@ -55,6 +55,8 @@ export interface ChatViewProps {
   activity?: MobileAgentActivity;
   activities?: MobileAgentActivity[];
   activeTurnId: string | null;
+  /** Absent for a surface that cannot stop a turn, such as a read-only channel. */
+  stopTurn?: (turnId: string) => Promise<void>;
   questionForm?: QuestionPromptController;
   onSelectQuestion?: (messageId: string) => void;
   readBoundary: string | null;
@@ -96,6 +98,7 @@ export function ChatView({
   activity,
   activities,
   activeTurnId,
+  stopTurn,
   questionForm,
   onSelectQuestion,
   readBoundary,
@@ -283,6 +286,28 @@ export function ChatView({
       setRefreshingHistory(false);
     }
   }
+
+  // Hold the turn the stop was asked for, not a flag: the host clears the turn
+  // when the stop lands, and the next turn must not inherit a pending state.
+  const [stoppingTurnId, setStoppingTurnId] = useState<string | null>(null);
+  const stopping = stoppingTurnId !== null && stoppingTurnId === activeTurnId;
+
+  const requestStop = useMemo(() => {
+    if (!stopTurn || !activeTurnId) return undefined;
+    const turnId = activeTurnId;
+    return () => {
+      setStoppingTurnId(turnId);
+      setSendError(null);
+      void haptics.impact();
+      stopTurn(turnId).catch((error: unknown) => {
+        setStoppingTurnId((current) => (current === turnId ? null : current));
+        setSendError({
+          agentId: target.id,
+          message: userErrorMessage(error, "Could not stop the agent. It may have finished already."),
+        });
+      });
+    };
+  }, [stopTurn, activeTurnId, target.id]);
 
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
@@ -532,6 +557,8 @@ export function ChatView({
                   raised={raised}
                   onChangeDraft={setDraft}
                   onSend={sendMessage}
+                  onStop={requestStop}
+                  stopping={stopping}
                 />
               ) : null}
             </Animated.View>

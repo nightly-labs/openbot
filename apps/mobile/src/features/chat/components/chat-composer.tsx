@@ -2,10 +2,11 @@ import { MenuView } from "@expo/ui/community/menu";
 import { GlassView } from "expo-glass-effect";
 import { Image } from "expo-image";
 import { useIsFocused } from "expo-router";
-import { Button, Typography } from "heroui-native";
-import { ArrowUp, FileText, Mic, Plus, Reply, X } from "lucide-react-native";
+import { Button, Spinner, Typography } from "heroui-native";
+import { ArrowUp, FileText, Plus, Reply, Square, X } from "lucide-react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   Alert,
   Text as NativeText,
   Pressable,
@@ -26,6 +27,9 @@ import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
 import type { ChatAttachments } from "./use-chat-attachments";
 
+// The field grows to this many lines, then keeps its height and scrolls.
+const MAX_INPUT_LINES = 5;
+
 interface ChatComposerProps {
   sendLabel?: string;
   action: ViewStyle["backgroundColor"];
@@ -42,6 +46,9 @@ interface ChatComposerProps {
   raised: ViewStyle["backgroundColor"];
   onChangeDraft: (value: string) => void;
   onSend: (text: string) => void;
+  /** Present only while a turn is running and the surface can stop it. */
+  onStop?: () => void;
+  stopping?: boolean;
   attachments: ChatAttachments;
   sending: boolean;
   sendRetryVersion: number;
@@ -66,6 +73,8 @@ export function ChatComposer({
   raised,
   onChangeDraft,
   onSend,
+  onStop,
+  stopping = false,
   attachments,
   sending,
   sendRetryVersion,
@@ -104,7 +113,7 @@ export function ChatComposer({
   }, [displayText]);
   const { fontScale } = useWindowDimensions();
   const minInputHeight = Math.max(48, 22 * fontScale + 26);
-  const maxInputHeight = 22 * fontScale * 5 + 26;
+  const maxInputHeight = 22 * fontScale * MAX_INPUT_LINES + 26;
   const [inputLines, setInputLines] = useState(1);
   const inputHeight = !draft
     ? minInputHeight
@@ -132,6 +141,32 @@ export function ChatComposer({
       inputRef.current?.blur();
     }
   }, [disabled, sendGate]);
+
+  const suggestionsVisible = Boolean(focused && query && suggestions.length > 0 && !disabled);
+  const announcedSuggestions = useRef("");
+  useEffect(() => {
+    // The list opens and closes under the keyboard with no focus change, so a
+    // screen reader gets no event. Announce the count, once per distinct query.
+    const announcement = suggestionsVisible ? `${suggestions.length}:${query?.query ?? ""}` : "";
+    if (announcedSuggestions.current === announcement) return;
+    announcedSuggestions.current = announcement;
+    if (!suggestionsVisible) return;
+    AccessibilityInfo.announceForAccessibility(
+      suggestions.length === 1 ? "1 teammate suggestion" : `${suggestions.length} teammate suggestions`,
+    );
+  }, [suggestionsVisible, suggestions.length, query?.query]);
+
+  // The draft clears the moment a send starts, so the control must not read
+  // its appearance from the draft alone: it would flip to an empty state
+  // under the user's own press.
+  const busy = sending || attachments.preparing;
+  // A draft still sends while the agent works: the host queues it. So stop only
+  // takes the control when there is nothing to send.
+  const stopMode = Boolean(onStop) && !hasDraft && !busy;
+  const primed = hasDraft || busy || stopMode;
+  const canPressSend = !disabled && !busy && hasDraft;
+  const stopPending = stopMode && stopping;
+  const pressable = stopMode ? !disabled && !stopPending : canPressSend;
 
   function requestSend(): void {
     if (disabled || sending || attachments.preparing) return;
@@ -182,7 +217,7 @@ export function ChatComposer({
           </Button>
         </View>
       ) : null}
-      {focused && query && suggestions.length > 0 && !disabled ? (
+      {suggestionsVisible && query ? (
         <GlassView
           glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
           style={{
@@ -385,7 +420,7 @@ export function ChatComposer({
                 autoCapitalize="sentences"
                 placeholderTextColor={muted}
                 multiline
-                scrollEnabled={inputLines > 5}
+                scrollEnabled={inputLines > MAX_INPUT_LINES}
                 returnKeyType="default"
                 submitBehavior="newline"
                 selectionColor={foreground}
@@ -457,22 +492,25 @@ export function ChatComposer({
               </TextInput>
             </View>
             <Pressable
-              accessibilityLabel={hasDraft ? sendLabel : "Start voice message"}
+              accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
               accessibilityRole="button"
-              accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
-              disabled={disabled || sending || attachments.preparing}
+              accessibilityState={{ disabled: !pressable, busy: busy || stopPending }}
+              disabled={!pressable}
               className="mb-1 size-10 items-center justify-center rounded-full"
-              style={{ backgroundColor: hasDraft ? action : raised }}
-              onPress={() =>
-                hasDraft
-                  ? requestSend()
-                  : Alert.alert("Voice messages", "Voice input will be connected with the conversation API.")
-              }
+              style={{
+                backgroundColor: primed ? action : raised,
+                // The parent dims the whole field when the composer is disabled.
+                // Dim only this control for a state the field does not show.
+                opacity: disabled || pressable ? 1 : 0.45,
+              }}
+              onPress={stopMode ? onStop : requestSend}
             >
-              {hasDraft ? (
-                <ArrowUp color={String(actionForeground)} size={21} strokeWidth={2.2} />
+              {busy || stopPending ? (
+                <Spinner size="sm" color={String(actionForeground)} />
+              ) : stopMode ? (
+                <Square color={String(actionForeground)} fill={String(actionForeground)} size={14} strokeWidth={2} />
               ) : (
-                <Mic color={String(muted)} size={21} strokeWidth={2} />
+                <ArrowUp color={String(primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
               )}
             </Pressable>
           </GlassView>
