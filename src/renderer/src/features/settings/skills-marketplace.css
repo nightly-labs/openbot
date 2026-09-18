@@ -1351,6 +1351,19 @@
   align-items: baseline;
   gap: var(--openbot-space-2);
 }
+/* A row is not a card: the listing icon is drawn for a 42px card tile, and at that size it overshoots
+   a compact row's two lines of text and pushes the row past the 52px the size is built on. One
+   control unit holds the mark at the height of the title and description together. */
+.marketplace-plugin-section .ui-item .skills-marketplace-icon {
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  border-radius: var(--openbot-radius-md);
+}
+.marketplace-plugin-section .ui-item .skills-marketplace-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
 .marketplace-plugin-row-description {
   display: block;
   overflow: hidden;
