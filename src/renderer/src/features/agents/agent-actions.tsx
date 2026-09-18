@@ -112,7 +112,7 @@ const AgentActions = createSimpleContext({
       try {
         const result = await window.openbot.agent.duplicateAgent(agentId);
         if (!scopeIsCurrent()) return;
-        const profile = toAgentProfile(result.agent);
+        const profile = createStoredProfile(toAgentProfile(result.agent));
         setAgentList((current) => [profile, ...current.filter((candidate) => candidate.id !== profile.id)]);
         setSidebarLayout(result.layout);
         selectAgent(result.agent.id);

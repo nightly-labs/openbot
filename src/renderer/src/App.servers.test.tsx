@@ -1274,6 +1274,31 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("heading", { name: "Sales Outbound copy" })).toBeInTheDocument();
     await waitFor(() => expect(window.openbot.agent.readConversation).toHaveBeenCalledWith("sales-outbound-copy"));
     expect(
+      screen.getByRole("button", {
+        name: "Sales Outbound copy, Outbound specialist. No messages yet",
+      }),
+    ).toBeInTheDocument();
+    emitAgentEvent?.({
+      type: "agents-changed",
+      agents: [
+        ...AGENTS,
+        {
+          ...AGENTS[1],
+          id: "sales-outbound-copy",
+          name: "Sales Outbound copy",
+          threadId: "thread-sales-outbound-copy",
+          workspacePath: "/tmp/OpenBot/Agents/sales-outbound-copy",
+          preview: "I finished the copied task.",
+          updatedAt: "2026-09-18T10:33:00.000Z",
+        },
+      ],
+    });
+    expect(
+      await screen.findByRole("button", {
+        name: "Sales Outbound copy, Outbound specialist. I finished the copied task.",
+      }),
+    ).toBeInTheDocument();
+    expect(
       within(screen.getByRole("region", { name: "Pinned chats" })).queryByRole("button", {
         name: /Sales Outbound copy/,
       }),
