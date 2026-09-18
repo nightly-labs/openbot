@@ -22,6 +22,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { haptics } from "@/shared/lib/haptics";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
@@ -484,54 +485,10 @@ export function ChatComposer({
                   height: TOOLBAR_HEIGHT,
                   flexDirection: "row",
                   alignItems: "center",
+                  justifyContent: "flex-end",
                   paddingHorizontal: 8,
                 }}
               >
-                <View
-                  ref={attachmentButton}
-                  collapsable={false}
-                  pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
-                >
-                  <MenuView
-                    style={{ width: 40, height: 40 }}
-                    actions={[
-                      { id: "camera", title: "Camera", image: "camera" },
-                      { id: "photos", title: "Photos", image: "photo" },
-                      {
-                        id: "files",
-                        title: "Files",
-                        image: "paperclip",
-                        attributes: { disabled: disabled || sending || attachments.preparing },
-                      },
-                    ]}
-                    onPressAction={({ nativeEvent }) => {
-                      if (disabled || sending || attachments.preparing) return;
-                      if (nativeEvent.event === "files") void attachments.chooseFiles();
-                      if (nativeEvent.event === "photos") void attachments.choosePhotos();
-                      if (nativeEvent.event === "camera") {
-                        if (!attachmentButton.current) {
-                          void attachments.takePhoto();
-                          return;
-                        }
-                        attachmentButton.current.measureInWindow((x, y, width, height) => {
-                          void attachments.takePhoto(width > 0 && height > 0 ? { x, y, width, height } : undefined);
-                        });
-                      }
-                    }}
-                  >
-                    <View
-                      accessible
-                      accessibilityRole="button"
-                      accessibilityLabel="Add attachment"
-                      accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
-                      className="size-10 items-center justify-center rounded-full"
-                      style={{ opacity: disabled || sending || attachments.preparing ? 0.45 : 1 }}
-                    >
-                      <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
-                    </View>
-                  </MenuView>
-                </View>
-                <View pointerEvents="none" style={{ flex: 1 }} />
                 <Pressable
                   accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
                   accessibilityRole="button"
@@ -565,6 +522,64 @@ export function ChatComposer({
             </View>
           </GlassView>
         </GestureDetector>
+        {/* Outside the glass container on purpose. A SwiftUI Menu anchored
+            inside one makes iOS morph that container into the menu, which ate
+            the whole composer whenever the card was no taller than the row. */}
+        <View
+          pointerEvents="box-none"
+          // Absolute insets here are measured from the bar's outer edge, so they
+          // have to carry the bar's own padding to land on the card.
+          style={{ position: "absolute", left: BAR_INSET + 8, bottom: Math.max(bottomInset, 10) + 4 }}
+        >
+          <View
+            ref={attachmentButton}
+            collapsable={false}
+            pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
+            // SwiftUI's Menu owns the tap and @expo/ui documents onOpenMenu as
+            // never firing on iOS, so answer the press itself. pointerEvents
+            // already blocks this while the button cannot act.
+            onTouchStart={() => void haptics.selection()}
+          >
+            <MenuView
+              style={{ width: 40, height: 40 }}
+              actions={[
+                { id: "camera", title: "Camera", image: "camera" },
+                { id: "photos", title: "Photos", image: "photo" },
+                {
+                  id: "files",
+                  title: "Files",
+                  image: "paperclip",
+                  attributes: { disabled: disabled || sending || attachments.preparing },
+                },
+              ]}
+              onPressAction={({ nativeEvent }) => {
+                if (disabled || sending || attachments.preparing) return;
+                if (nativeEvent.event === "files") void attachments.chooseFiles();
+                if (nativeEvent.event === "photos") void attachments.choosePhotos();
+                if (nativeEvent.event === "camera") {
+                  if (!attachmentButton.current) {
+                    void attachments.takePhoto();
+                    return;
+                  }
+                  attachmentButton.current.measureInWindow((x, y, width, height) => {
+                    void attachments.takePhoto(width > 0 && height > 0 ? { x, y, width, height } : undefined);
+                  });
+                }
+              }}
+            >
+              <View
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="Add attachment"
+                accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
+                className="size-10 items-center justify-center rounded-full"
+                style={{ opacity: disabled || sending || attachments.preparing ? 0.45 : 1 }}
+              >
+                <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
+              </View>
+            </MenuView>
+          </View>
+        </View>
       </View>
     </View>
   );
