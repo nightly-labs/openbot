@@ -27,25 +27,31 @@ export interface MarketplacePluginPrompt {
 }
 
 /**
- * The server an app installs as: the name the record takes and the address it answers on. It is the
- * shape of the MCP server, never a stored configuration - no id, no credential. A listing that
- * needed a key would declare which key, and the user would type it, so nothing secret is catalog
- * data.
+ * The server an app installs as: the name the record takes and how it is reached. It is the shape of
+ * the MCP server, never a stored configuration - no id, no credential.
+ *
+ * How it is reached goes with the transport rather than beside it, so a listing cannot state an
+ * address for a server that runs a command, or a command for one that answers on an address. Each
+ * transport carries exactly the fields `normalizeMcpConfig` keeps for it.
  */
-export interface MarketplacePluginServer {
+export type MarketplacePluginServer = MarketplacePluginServerBase &
+  (
+    | { transport: Extract<McpTransport, "http">; url: string }
+    | {
+        transport: Extract<McpTransport, "stdio">;
+        /**
+         * The command the app launches, and the words it is launched with. An app runs a command
+         * when its server is not reachable over http alone - a bridge that signs in for the user,
+         * or a server that is published as a package.
+         */
+        command: string;
+        args: string[];
+      }
+  );
+
+interface MarketplacePluginServerBase {
   /** The name the MCP record takes on this computer, and what an installed check matches on. */
   name: string;
-  transport: McpTransport;
-  /** The address an http server answers on. Empty for an app that runs a command. */
-  url: string;
-  /**
-   * The command a stdio app launches, and the words it is launched with. An app runs a command when
-   * its server is not reachable over http alone - a bridge that signs in for the user, or a server
-   * that is published as a package. Both are ignored for an http app, as `normalizeMcpConfig` clears
-   * them there.
-   */
-  command?: string;
-  args?: string[];
   /**
    * How the user proves who they are, when the server asks: a sign-in, a key, or both. The
    * declaration names the way in and where a key goes; the value is only ever typed by the user or

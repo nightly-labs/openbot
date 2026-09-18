@@ -15,7 +15,18 @@ import type {
   SkillSubmission,
 } from "@openbot/contracts/ipc";
 import { isSkillCategory, mcpConfigErrors, SKILL_CATEGORIES } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, snapshot } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  Match,
+  onSettled,
+  Show,
+  Switch,
+  snapshot,
+} from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { normalizeAvatarFile } from "../../avatar-image";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
@@ -370,6 +381,11 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     (open) => {
       if (!open) {
         closeDetail();
+        /* The connect dialog is a sibling of the marketplace, so closing the marketplace would
+           otherwise leave it on screen over nothing, with the install still waiting behind it.
+           Closing the page the install was started from is the same decision as closing the
+           dialog: it stops. */
+        connecting()?.settle(null);
         return;
       }
       setMarket((state) => {
@@ -1118,35 +1134,30 @@ description: Turn merged work into clear, consistent release notes.
           way in, opened by an install and closed by it, each handing back what connected. */}
       <Show when={connecting()} keyed>
         {(pending) => (
-          <Show
-            when={pending.flow.kind === "key" ? pending.flow : null}
-            keyed
-            fallback={
+          <Switch>
+            <Match when={pending.flow.kind === "link"}>
               <McpSignInDialog
                 open={true}
                 subject={pending.subject}
-                /* No exchange happens on this side. A listing that signs in does it where its
-                   own bridge or the main process can hold the token; this side only learns
-                   whether the connection that follows works. */
-                onSignIn={async (config) => config}
                 onTest={testPluginApp}
                 onConnected={(config) => pending.settle(config)}
                 onCancel={() => pending.settle(null)}
               />
-            }
-          >
-            {(flow) => (
-              <McpKeyDialog
-                open={true}
-                subject={pending.subject}
-                flow={flow}
-                onTest={testPluginApp}
-                onConnected={(config) => pending.settle(config)}
-                onCancel={() => pending.settle(null)}
-                onOpenUrl={openPluginUrl}
-              />
-            )}
-          </Show>
+            </Match>
+            <Match when={pending.flow.kind === "key" ? pending.flow : null} keyed>
+              {(flow) => (
+                <McpKeyDialog
+                  open={true}
+                  subject={pending.subject}
+                  flow={flow}
+                  onTest={testPluginApp}
+                  onConnected={(config) => pending.settle(config)}
+                  onCancel={() => pending.settle(null)}
+                  onOpenUrl={openPluginUrl}
+                />
+              )}
+            </Match>
+          </Switch>
         )}
       </Show>
     </>

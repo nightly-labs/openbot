@@ -1,7 +1,8 @@
 /*
- * The connect dialog. It opens over the marketplace modal, so its layer is one above the layer the
- * marketplace takes, and not one above the shared dialog layer: both portals are children of `body`,
- * and insertion order alone would break the first time it is opened from somewhere else.
+ * The connect dialog. It opens over the marketplace modal and over the menus the marketplace opens,
+ * so it takes the nested step of `--openbot-layer-dialog-host` rather than the shared dialog layer:
+ * both portals are children of `body`, and insertion order alone would break the first time it is
+ * opened from somewhere else.
  *
  * The shape is a centred column: the two ends of the connection, the name, one card of facts, and
  * one button. A connection is a single decision, so the dialog is a single line of reading down the
@@ -11,7 +12,7 @@
 .mcp-connect-backdrop {
   position: fixed;
   inset: 0;
-  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover) + 1);
+  z-index: calc(var(--openbot-layer-dialog-host) + 2);
   display: grid;
   place-items: center;
   padding: var(--openbot-space-6);
@@ -77,7 +78,7 @@
 
 /* The app icon is the one being joined, so it is the one that arrives - at the size of the mark
    opposite it, because the two ends are equal. */
-.mcp-connect-marks .skills-marketplace-icon {
+.mcp-connect-marks .mcp-connect-mark-icon {
   width: 48px;
   height: 48px;
   animation: mcp-connect-mark-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
@@ -85,7 +86,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mcp-connect-dots,
-  .mcp-connect-marks .skills-marketplace-icon {
+  .mcp-connect-marks .mcp-connect-mark-icon {
     animation: none;
   }
 }
@@ -146,19 +147,13 @@
   line-height: var(--openbot-leading-sm);
 }
 
-.mcp-connect-docs > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  flex: 0 0 auto;
-  stroke-width: var(--openbot-icon-stroke);
-}
-
 .mcp-connect-primary {
   width: 100%;
 }
 
-/* The mark that says the button leaves the app. It reads beside the words rather than over them,
-   so it is the size of every other external-link mark in the marketplace. */
+/* The marks that say a control leaves the app. They read beside the words rather than over them,
+   so they are the size of every other external-link mark in the marketplace. */
+.mcp-connect-docs > svg,
 .mcp-connect-primary > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
