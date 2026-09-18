@@ -138,6 +138,53 @@ describe.sequential("AgentService: restart", () => {
     });
   });
 
+  it("reads a stored session with the workspace an ACP agent needs to load it", async () => {
+    const { store } = stores(root);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.bindProviderSession("chief", "ses_stored");
+    const local = {
+      id: "local-message",
+      author: "user" as const,
+      text: "Keep this local message",
+      createdAt: "2026-08-01T12:00:00.000Z",
+      status: "completed" as const,
+    };
+    store.database.persistConversation(
+      { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [local] },
+      "test.saved-before-restart",
+    );
+    store.database.close();
+
+    const events: AgentEvent[] = [];
+    const restored = stores(root);
+    service = createTestService({
+      store: restored.store,
+      mailbox: restored.mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        // An ACP session lives in the agent process alone, so a read answers only for a session the
+        // client can load - which it cannot do without the workspace the session belongs to.
+        client.threadRead = (params) => {
+          if (!getString(params, "cwd")) throw new Error(`Unknown ACP session: ${getString(params, "threadId")}`);
+          return { thread: { id: getString(params, "threadId"), turns: [] } };
+        };
+        return client;
+      },
+    });
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+
+    // The banner above the composer is what a failed read costs the user at every start.
+    await waitFor(async () => (await service?.readConversation("chief"))?.messages.length === 1);
+    expect(events.some((event) => event.type === "error" && event.code === "provider_history_backfill_pending")).toBe(
+      false,
+    );
+    expect((await service.readConversation("chief")).messages).toEqual([expect.objectContaining(local)]);
+  });
+
   it("recovers history from sessions retired by an upgrade and retries failed reads without losing local messages", async () => {
     const { store } = stores(root);
     await store.initialize();
