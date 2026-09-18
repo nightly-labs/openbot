@@ -97,6 +97,26 @@ export function isTelemetryExportDiagnostic(message: string): boolean {
   );
 }
 
+/**
+ * Whether a provider says that the account's paid usage is exhausted.
+ *
+ * This is narrower than an HTTP status check. A 429 can be a short request-rate throttle, and a
+ * 402 can describe a subscription problem that the usage notice cannot explain. The explicit
+ * balance, credit and quota phrases below mean the provider's usage reading is the useful report.
+ */
+export function isUsageLimitDiagnostic(message: string): boolean {
+  return (
+    /\binsufficient[_ -]?(?:quota|credits?)\b/iu.test(message) ||
+    /\b(?:quota|credits?|credit balance|usage balance|usage limits?)\b.{0,80}\b(?:exhausted|depleted|exceeded|insufficient|reached|too low)\b/iu.test(
+      message,
+    ) ||
+    /\b(?:exhausted|depleted|exceeded|insufficient|reached)\b.{0,80}\b(?:quota|credits?|credit balance|usage balance|usage limits?)\b/iu.test(
+      message,
+    ) ||
+    /\bbilling hard limit (?:has been )?reached\b/iu.test(message)
+  );
+}
+
 interface PendingCodexLogin {
   client: AgentClient;
   cli: CodexCliInfo;
@@ -340,6 +360,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #credentials: ProviderClientContext;
   readonly #clients = new Map<AgentProvider, AgentClient>();
+  readonly #usageLimitRefreshes = new WeakMap<AgentClient, Promise<void>>();
   /**
    * What this app has already handed to a provider process.
    *
@@ -747,6 +768,21 @@ export class ProviderRuntime implements ProviderPort {
   refreshCodexUsage(): void {
     const client = this.#clients.get("codex");
     if (client) void this.#refreshUsage(client).catch(() => undefined);
+  }
+
+  /** Refresh the notice once when one provider reports the same exhausted balance several ways. */
+  refreshUsageAfterLimit(source: AgentClient): void {
+    const client = this.#clients.get(source.provider);
+    if (!client || this.#usageLimitRefreshes.has(client)) return;
+    const refresh = this.#refreshUsage(client)
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+      .finally(() => {
+        if (this.#usageLimitRefreshes.get(client) === refresh) this.#usageLimitRefreshes.delete(client);
+      });
+    this.#usageLimitRefreshes.set(client, refresh);
   }
 
   /**
@@ -1490,6 +1526,11 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (isTelemetryExportDiagnostic(message)) {
         logger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
+        return;
+      }
+      if (isUsageLimitDiagnostic(message)) {
+        logger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
+        this.refreshUsageAfterLimit(client);
         return;
       }
       this.#emitError(`${client.provider}_diagnostic`, message);

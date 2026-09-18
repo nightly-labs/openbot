@@ -27,6 +27,7 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
+import { isUsageLimitDiagnostic } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -1187,6 +1188,87 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     await service.sendMessage({ agentId: "chief", text: "Continue on Grok." });
     await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
+  });
+
+  it.each([
+    "Grok Build usage balance exhausted",
+    "insufficient_quota",
+    "Your credit balance is too low to access the Anthropic API",
+    "You have exceeded your current quota",
+    "Billing hard limit has been reached",
+  ])("recognizes an exhausted provider usage limit: %s", (message) => {
+    expect(isUsageLimitDiagnostic(message)).toBe(true);
+  });
+
+  it.each([
+    "402 Payment Required",
+    "429 Too Many Requests",
+    "The provider failed to reach the model endpoint",
+    "Authentication failed",
+  ])("does not hide another provider failure: %s", (message) => {
+    expect(isUsageLimitDiagnostic(message)).toBe(false);
+  });
+
+  it("replaces Grok's repeated exhausted-balance errors with one usage refresh", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    const client = clients.get("grok");
+    if (!client) throw new Error("Grok did not start.");
+    client.accountRateLimits = {
+      rateLimits: {
+        limitId: "grok",
+        secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      },
+      rateLimitsByLimitId: null,
+    };
+    const usageReadsBefore = client.requests.filter((request) => request.method === "account/rateLimits/read").length;
+    events.length = 0;
+
+    client.emit(
+      "diagnostic",
+      '2026-09-18T08:54:24.476465Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
+    );
+    client.emit(
+      "diagnostic",
+      '2026-09-18T08:54:24.476222Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
+    );
+    client.emit("notification", {
+      method: "error",
+      params: {
+        message:
+          'responses API error status=402 Payment Required error_message=Grok Build usage balance exhausted body_preview={"error":"Grok Build usage balance exhausted"} model_id=grok-4.6',
+      },
+    });
+
+    await waitFor(() => events.some((event) => event.type === "usage-changed"));
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
+    expect(client.requests.filter((request) => request.method === "account/rateLimits/read")).toHaveLength(
+      usageReadsBefore + 1,
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "usage-changed",
+        usage: expect.objectContaining({
+          limits: [expect.objectContaining({ id: "grok", secondary: expect.objectContaining({ usedPercent: 100 }) })],
+        }),
+      }),
+    );
   });
 
   it("refuses to replace a CLI that is running a turn", async () => {
