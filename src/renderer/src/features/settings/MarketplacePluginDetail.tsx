@@ -196,7 +196,7 @@ export function MarketplacePluginDetail(props: {
           <ItemGroup surface="subtle">
             <For each={props.plugin.apps}>
               {(app) => (
-                <Item size="compact">
+                <Item>
                   <ItemMedia>
                     <PluginIcon iconUrl={app.iconUrl} />
                   </ItemMedia>
@@ -216,7 +216,7 @@ export function MarketplacePluginDetail(props: {
           <ItemGroup surface="subtle">
             <For each={props.plugin.skills}>
               {(skill) => (
-                <Item size="compact">
+                <Item>
                   <ItemMedia>
                     <PluginIcon iconUrl={null} fallback="skill" />
                   </ItemMedia>
