@@ -297,9 +297,13 @@
   }
 }
 
+/* The fallback is what a preview whose logo yields no tint already uses, and it is needed here: a
+   plugin listing reuses these classes without setting `--skill-logo-color`. Without it both
+   declarations are invalid at computed-value time, so the chip loses its fill to `transparent`
+   rather than falling back to the accent fill the base rule gives it. */
 .skill-preview-request .skill-preview-chip {
-  color: color-mix(in srgb, var(--skill-logo-color), var(--openbot-text-primary) 35%);
-  background: color-mix(in srgb, var(--skill-logo-color) 18%, transparent);
+  color: color-mix(in srgb, var(--skill-logo-color, var(--openbot-accent-text)), var(--openbot-text-primary) 35%);
+  background: color-mix(in srgb, var(--skill-logo-color, var(--openbot-accent-text)) 18%, transparent);
 }
 
 .agent-skills-tabs {
