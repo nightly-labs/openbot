@@ -15,6 +15,7 @@ import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import {
   ArrowRight,
+  Badge,
   Blocks,
   Button,
   ExternalLink,
@@ -79,9 +80,9 @@ function PluginSection(props: { title: string; count: number; children: JSX.Elem
         <Heading as="h2" size="sm">
           {props.title}
         </Heading>
-        <Text tone="muted" aria-hidden="true">
+        <Badge class="marketplace-plugin-section-count" aria-hidden="true">
           {props.count}
-        </Text>
+        </Badge>
       </div>
       {props.children}
     </section>

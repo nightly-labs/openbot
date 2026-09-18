@@ -1348,8 +1348,17 @@
    under the heading as well reads as two boundaries for one section. */
 .marketplace-plugin-section-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--openbot-space-2);
+}
+/* A count is one or two digits, so the badge's pill shape and its side padding draw a lozenge around
+   a single character. A square box the height of the badge holds every count at one width, and the
+   figures line up between the sections. */
+.marketplace-plugin-section-count {
+  min-width: 22px;
+  padding-inline: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-sm);
+  font-variant-numeric: tabular-nums;
 }
 /* A row is not a card: the listing icon is drawn for a 42px card tile, and at that size it overshoots
    a compact row's two lines of text and pushes the row past the 52px the size is built on. One
