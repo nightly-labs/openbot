@@ -1336,30 +1336,35 @@ export const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
   skills: [
     {
       id: "plugin-skill-account-activity",
+      versionId: "plugin-skill-account-activity-v1",
       slug: "account-activity",
       description:
         "An Aave account's history — past supplies, borrows, repays, withdrawals and collateral changes, and how net worth moved with them.",
     },
     {
       id: "plugin-skill-deleverage",
+      versionId: "plugin-skill-deleverage-v1",
       slug: "deleverage",
       description:
         'Reduce the risk on an Aave position — "reduce my risk", "unwind", "get my health factor up", "I\'m close to liquidation".',
     },
     {
       id: "plugin-skill-safe-transactions",
+      versionId: "plugin-skill-safe-transactions-v1",
       slug: "safe-transactions",
       description:
         "Prepare an Aave state change — supply, borrow, withdraw, repay, or any other prepare_* action — when asked to act rather than to read.",
     },
     {
       id: "plugin-skill-tx-confirmation",
+      versionId: "plugin-skill-tx-confirmation-v1",
       slug: "tx-confirmation",
       description:
         'Confirm what an Aave transaction did after the user signed it — "did it go through", "was my supply counted".',
     },
     {
       id: "plugin-skill-yield-analysis",
+      versionId: "plugin-skill-yield-analysis-v1",
       slug: "yield-analysis",
       description:
         "Compare Aave yields and rates — best APY for an asset, rates across chains or between V3 and V4, APY history.",
@@ -1410,11 +1415,13 @@ export const STORY_MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
     skills: [
       {
         id: "plugin-skill-issue-triage",
+        versionId: "plugin-skill-issue-triage-v1",
         slug: "issue-triage",
         description: "Turn a described problem into an issue with the right team, labels, priority and estimate.",
       },
       {
         id: "plugin-skill-cycle-review",
+        versionId: "plugin-skill-cycle-review-v1",
         slug: "cycle-review",
         description: "Summarise a cycle — what shipped, what slipped, and what is unassigned with days left.",
       },
@@ -1456,6 +1463,7 @@ export const STORY_MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
     skills: [
       {
         id: "plugin-skill-design-handoff",
+        versionId: "plugin-skill-design-handoff-v1",
         slug: "design-handoff",
         description: "Describe a frame for implementation — its layers, spacing, and the variables it uses.",
       },
@@ -1486,11 +1494,13 @@ export const STORY_MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
     skills: [
       {
         id: "plugin-skill-release-notes",
+        versionId: "plugin-skill-release-notes-v1",
         slug: "release-notes",
         description: "Group merged work by what it changes for a reader, and write it in the product's own voice.",
       },
       {
         id: "plugin-skill-upgrade-notes",
+        versionId: "plugin-skill-upgrade-notes-v1",
         slug: "upgrade-notes",
         description: "Call out the changes a reader must act on before upgrading, and what happens if they do not.",
       },

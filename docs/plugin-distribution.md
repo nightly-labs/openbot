@@ -427,9 +427,13 @@ Ordered by cost.
 6. ~~Connect the Plugins tab to the real data. Keep the fixtures for Storybook.~~ Partly done: the
    tab reads `src/renderer/src/features/settings/marketplace-plugin-catalog.ts`, a literal in the
    renderer with one listing. Steps 2 to 5 replace that literal; nothing the tab renders changes.
-7. Install and uninstall. Install is done for the app half: the page saves the listing's MCP server
-   through `saveMcpServer` on the selected host, and reads the installed state back from
-   `listMcpServers`. A listing that carries skills is refused before any write, because a skill
-   installs by published version and `skills.installVersion` is not offered to the renderer.
-   Uninstall is not built: the user removes the server in the MCP settings panel.
-8. The deep-link router and the share link. `Copy link` writes the address today; nothing opens it.
+7. Install and uninstall. Install is done: the page installs each pinned skill into the agent in the
+   picker, then saves the listing's MCP server through `saveMcpServer` on the selected host. It
+   reads the installed state back from `listMcpServers` and from the agent's installed skills, so a
+   listing counts as installed only when both halves are present. A skill installs by published
+   version through the optional `versionId` on `skills.install`, which the main process routes to
+   `installVersion`. A failure unwinds the skills this attempt installed, and writes no MCP record.
+   Uninstall is not built: the user removes the server in the MCP settings panel and the skill in
+   the agent's skills panel.
+8. The deep-link router and the share link. Nothing serves `openbot.run/plugins/<slug>` yet, so the
+   page withholds `Copy link`: the button returns when the address answers.

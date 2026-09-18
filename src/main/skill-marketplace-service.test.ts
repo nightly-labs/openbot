@@ -187,4 +187,87 @@ describe("SkillMarketplaceService", () => {
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Unowned files after disable");
     await expect(service.listInstalled(agent.id)).resolves.toEqual([]);
   });
+  /*
+   * A plugin listing pins the version of each skill it brings, so the install must ask for that
+   * version and not for whatever is newest. The endpoint it reaches is the whole difference.
+   */
+  it("installs the pinned version when the caller names one", async () => {
+    const bundle = zipSync({ "SKILL.md": encoder.encode("---\nname: Yield\ndescription: Reads yields.\n---\n") });
+    const hash = createHash("sha256").update(bundle).digest("hex");
+    const sessionPath = join(root, "session.bin");
+    await writeFile(
+      sessionPath,
+      Buffer.from(JSON.stringify({ version: 2, sessionToken: "token", teamHostTokens: {} })).toString("base64"),
+    );
+    const requests: string[] = [];
+    const auth = new CentralAuthManager({
+      apiUrl: "http://127.0.0.1:3100",
+      storagePath: sessionPath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: async (input, init) => {
+        const path = new URL(input instanceof Request ? input.url : input).pathname;
+        requests.push(`${init?.method ?? "GET"} ${path}`);
+        if (path === "/v1/me")
+          return Response.json({ id: "user-1", email: "ada@example.com", name: "Ada", avatarUrl: null });
+        if (path.endsWith("/content"))
+          return new Response(Uint8Array.from(bundle).buffer, { headers: { "Content-Type": "application/zip" } });
+        if (path === "/v1/skills/skill-1/versions/version-7")
+          return Response.json({
+            id: "skill-1",
+            slug: "yield",
+            name: "Yield",
+            description: "Reads yields.",
+            category: "other",
+            creatorName: "Ada",
+            version: 7,
+            installs: 0,
+            featured: false,
+            iconUrl: null,
+            updatedAt: "2026-09-18T00:00:00.000Z",
+            versionId: "version-7",
+            bundleSha256: hash,
+            files: ["SKILL.md"],
+            instructions: "Reads yields.",
+            examplePrompt: "Where is the best yield?",
+          });
+        if (path.endsWith("/install")) return Response.json({ installed: true });
+        return new Response(null, { status: 404 });
+      },
+    });
+    await auth.initialize();
+    const agent: AgentSummary = {
+      id: "reader",
+      provider: "codex",
+      name: "Reader",
+      title: "",
+      description: "",
+      notifications: true,
+      model: "gpt-5.6-luna",
+      reasoningEffort: "medium",
+      threadId: null,
+      workspacePath: join(root, "reader"),
+      preview: "",
+      updatedAt: null,
+      avatarSeed: "reader",
+      avatarHue: null,
+      avatarUrl: null,
+    };
+    const service = new SkillMarketplaceService(
+      auth,
+      () => [agent],
+      async () => undefined,
+    );
+
+    await expect(
+      service.install({ agentId: agent.id, skillId: "skill-1", versionId: "version-7" }),
+    ).resolves.toMatchObject({ installedVersion: 7, state: "installed" });
+    expect(requests).toContain("GET /v1/skills/skill-1/versions/version-7");
+    expect(requests).toContain("GET /v1/skills/skill-1/versions/version-7/content");
+    expect(requests).not.toContain("GET /v1/skills/skill-1");
+
+    await expect(
+      service.install({ agentId: agent.id, skillId: "local-skill-1", versionId: "version-7" }),
+    ).rejects.toThrow("A local skill has no published version.");
+  });
 });

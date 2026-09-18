@@ -44,6 +44,7 @@ import {
   parseDynamicIslandPreference,
   parseDynamicIslandPresentation,
   parseExternalDestination,
+  parseInstallSkill,
   parseMacPermission,
   parseMarketplaceAgentQuery,
   parseMarketplaceSkillQuery,
@@ -85,6 +86,29 @@ describe("app IPC input parsing", () => {
     expect(() =>
       parseSubmitSkill({ draftId: "draft", category: "coding", icon: null, showCreatorAvatar: "true" }),
     ).toThrow();
+  });
+
+  /*
+   * A plugin listing pins the version of each skill it brings. The decoder is where that pin either
+   * reaches the main process or is dropped, and a caller that names no version must still parse as
+   * the install every marketplace screen has always sent.
+   */
+  it("carries a pinned skill version and rejects a version that is not a name", () => {
+    expect(parseInstallSkill({ agentId: "agent-1", skillId: "skill-1" })).toEqual({
+      agentId: "agent-1",
+      skillId: "skill-1",
+    });
+    expect(parseInstallSkill({ agentId: "agent-1", skillId: "skill-1", versionId: "version-7" })).toEqual({
+      agentId: "agent-1",
+      skillId: "skill-1",
+      versionId: "version-7",
+    });
+    expect(() => parseInstallSkill({ agentId: "agent-1", skillId: "skill-1", versionId: 7 })).toThrow(
+      "versionId is required.",
+    );
+    expect(() => parseInstallSkill({ agentId: "agent-1", skillId: "skill-1", versionId: "" })).toThrow(
+      "versionId is required.",
+    );
   });
 
   it("parses setup and permission values", () => {

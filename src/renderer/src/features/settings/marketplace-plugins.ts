@@ -47,9 +47,14 @@ export interface MarketplacePluginApp {
   server: MarketplacePluginServer;
 }
 
-/** A skill the plugin installs alongside its app, named by slug as the skill library names it. */
+/**
+ * A skill the plugin installs alongside its app. `id` is the marketplace skill, and `versionId` is
+ * the published version the listing pins: a plugin is written against one version of its own
+ * instructions, so an install takes that version and not whatever is newest today.
+ */
 export interface MarketplacePluginSkill {
   id: string;
+  versionId: string;
   slug: string;
   description: string;
 }

@@ -219,12 +219,15 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
 
   /**
    * The names of the MCP servers this host already holds. A plugin reads as installed when every
-   * app it publishes is among them, so a server the user removed by hand stops being reported as
-   * installed on the next read, and the list is what an install writes back into.
+   * app it publishes is among them and the selected agent holds every skill it pins, so a server or
+   * a skill the user removed by hand stops being reported as installed on the next read. Both sides
+   * are read back from the host rather than from a record of what an install once did.
    */
   const [hostMcpNames, setHostMcpNames] = createSignal<readonly string[]>([]);
   const pluginInstalled = (plugin: PluginDetail) =>
-    plugin.apps.length > 0 && plugin.apps.every((app) => hostMcpNames().includes(app.server.name));
+    (plugin.apps.length > 0 || plugin.skills.length > 0) &&
+    plugin.apps.every((app) => hostMcpNames().includes(app.server.name)) &&
+    plugin.skills.every((skill) => installedById().has(skill.id));
 
   async function loadHostMcpNames(serverId: string) {
     const configs = await run(() => window.openbot.agent.listMcpServers(serverId));
@@ -232,13 +235,13 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   /**
-   * One install: the plugin's apps become MCP servers on this host.
+   * One install, both halves: the plugin's skills go to the selected agent, and its apps become MCP
+   * servers on this host. The two land in different places because that is what they are - a skill
+   * is one agent's instructions, and an MCP server is held by the host that runs the agents.
    *
-   * The apps are saved one at a time and the answer of each save is the new list, so a failure part
-   * way through leaves the earlier apps saved and the page showing exactly that. The install stops
-   * before it writes anything when the listing carries skills, because a skill installs by
-   * published version and no plugin skill is published yet - a half-installed plugin would be
-   * worse than a refusal that names what is missing.
+   * The skills go first, so a failure never leaves a server standing that nothing knows how to
+   * drive. If a later step fails, the skills this attempt installed are removed again; a skill the
+   * agent already had is left alone, because the user put it there and this attempt did not.
    */
   async function installPlugin(plugin: PluginDetail) {
     const serverId = props.pluginServerId;
@@ -246,16 +249,35 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       setError("Select a local server to install a plugin.");
       return;
     }
+    const agentId = market.browse.targetAgentId;
+    if (plugin.skills.length > 0 && !agentId) {
+      setError("Choose an agent to install this plugin's skills.");
+      return;
+    }
     setBusy(`plugin:${plugin.id}`);
-    await run(async () => {
-      if (plugin.skills.length > 0) throw new Error("This plugin's skills are not published yet.");
-      for (const app of plugin.apps) {
-        const config = createPluginAppConfig(app);
-        const invalid = Object.values(mcpConfigErrors(config))[0];
-        if (invalid) throw new Error(`${app.name} cannot be added: ${invalid}`);
-        setHostMcpNames((await window.openbot.agent.saveMcpServer({ config }, serverId)).map((saved) => saved.name));
+    const installed = await run(async () => {
+      const added: string[] = [];
+      try {
+        for (const skill of plugin.skills) {
+          const held = installedById().has(skill.id);
+          await window.openbot.skills.install({ agentId, skillId: skill.id, versionId: skill.versionId });
+          if (!held) added.push(skill.id);
+        }
+        for (const app of plugin.apps) {
+          const config = createPluginAppConfig(app);
+          const invalid = Object.values(mcpConfigErrors(config))[0];
+          if (invalid) throw new Error(`${app.name} cannot be added: ${invalid}`);
+          setHostMcpNames((await window.openbot.agent.saveMcpServer({ config }, serverId)).map((saved) => saved.name));
+        }
+      } catch (error) {
+        for (const skillId of added) await window.openbot.skills.uninstall({ agentId, skillId }).catch(() => undefined);
+        throw error;
       }
+      return true;
     });
+    /* Only on success: reading the list again starts by clearing the panel, which would take the
+       failure off the screen before the reader saw it. */
+    if (installed && plugin.skills.length > 0) await loadInstalled(agentId);
     setBusy(null);
   }
 

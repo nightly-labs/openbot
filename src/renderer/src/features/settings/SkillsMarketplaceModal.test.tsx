@@ -1121,6 +1121,15 @@ describe("SkillsMarketplaceModal", () => {
       privacyPolicyUrl: null,
       termsUrl: null,
     };
+    const installedYield: InstalledSkill = {
+      skillId: "skill-yield",
+      slug: "yield-analysis",
+      name: "Yield analysis",
+      installedVersion: 3,
+      availableVersion: 3,
+      state: "installed",
+      enabled: true,
+    };
     const app = plugin.apps[0];
     if (!app) throw new Error("The plugin under test must publish one app.");
 
@@ -1178,6 +1187,79 @@ describe("SkillsMarketplaceModal", () => {
       fireEvent.click(await screen.findByRole("button", { name: `Ask Aave: ${asked.text}` }));
 
       expect(onRunPluginPrompt).toHaveBeenCalledWith("writer", asked);
+    });
+
+    /** A plugin with skills: the two halves land in different places, and in this order. */
+    const withSkill: MarketplacePluginDetail = {
+      ...plugin,
+      skills: [
+        {
+          id: "skill-yield",
+          versionId: "skill-yield-v3",
+          slug: "yield-analysis",
+          description: "Compare Aave yields and rates.",
+        },
+      ],
+    };
+
+    it("installs the pinned skill into the agent before the app reaches the host", async () => {
+      const order: string[] = [];
+      const install = vi.fn(async () => {
+        order.push("skill");
+        return installedYield;
+      });
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => {
+        order.push("app");
+        return [input.config];
+      });
+      window.openbot.skills = { ...window.openbot.skills, install };
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []), saveMcpServer };
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[withSkill]}
+          pluginServerId="local"
+        />
+      ));
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      await waitFor(() => expect(saveMcpServer).toHaveBeenCalled());
+      expect(install).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield", versionId: "skill-yield-v3" });
+      // The skills go first, so a failure never leaves a server that nothing knows how to drive.
+      expect(order).toEqual(["skill", "app"]);
+    });
+
+    it("removes the skill it installed when the app cannot be saved", async () => {
+      const install = vi.fn(async () => installedYield);
+      const uninstall = vi.fn(async () => undefined);
+      window.openbot.skills = { ...window.openbot.skills, install, uninstall };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(async () => {
+          throw new Error("This MCP server no longer exists.");
+        }),
+      };
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[withSkill]}
+          pluginServerId="local"
+        />
+      ));
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("This MCP server no longer exists.");
+      expect(screen.getByRole("button", { name: "Install plugin" })).toBeEnabled();
     });
 
     it("reports a plugin whose app the host already holds as installed", async () => {

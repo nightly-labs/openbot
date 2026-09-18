@@ -102,6 +102,13 @@ export interface InstalledSkill {
 export interface InstallSkillInput {
   agentId: string;
   skillId: string;
+  /**
+   * The exact published version to install, for a caller that pins one - a plugin listing names the
+   * version its app was written against. Omitted, the install takes the newest published version,
+   * which is what the marketplace screens have always sent. An older host ignores the field and
+   * installs the newest version, so a pin is a preference and never a requirement.
+   */
+  versionId?: string;
   replaceModified?: boolean;
 }
 

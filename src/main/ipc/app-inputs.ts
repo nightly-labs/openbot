@@ -176,6 +176,7 @@ export function parseInstallSkill(input: unknown): InstallSkillInput {
   return {
     agentId: requireString(input.agentId, "agentId"),
     skillId: requireString(input.skillId, "skillId"),
+    ...(input.versionId === undefined ? {} : { versionId: requireString(input.versionId, "versionId") }),
     ...(input.replaceModified === true ? { replaceModified: true } : {}),
   };
 }
