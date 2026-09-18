@@ -45,6 +45,23 @@ Type-only imports (`import type`) are erased by the compiler and stay allowed in
 Do not commit generated `out`, `dist`, coverage, local browser profiles, Electron `userData`, CLI
 state, `.env` files, credentials, real conversations, or user attachments.
 
+## Writing guides
+
+Public guides live in `apps/auth-api/src/content/guides/`. To add one:
+
+1. Write the body as a TSX component in that directory, using the article slug for the file name.
+2. Add the article metadata to `apps/auth-api/src/lib/guides.ts` and the body to
+   `apps/auth-api/src/content/guides/index.ts`.
+3. Run `bun run api:images` and commit the generated files in `apps/auth-api/content-art`.
+4. Open the guide in a local preview and check the guide index, article page, feed and social card.
+
+Write for someone who has OpenBot open and is trying to complete a task. Use short paragraphs, plain English and the
+exact names of buttons, settings and files. Keep product claims tied to the current app. Use `ArticleImage`,
+`ArticleGif`, `ArticleClip` or `ArticleVideo` only when the media adds information that the text does not.
+
+Use `OPENBOT_LINKS` for external links and include useful `alt` text for every image. Do not paste bare URLs into a
+guide.
+
 ### Answering the NorbiAI review
 
 Every push to a branch in this repository runs the automated reviewer, and it blocks the merge on
