@@ -69,6 +69,55 @@ describe("ApprovalCard", () => {
     response.resolve(false);
     await vi.waitFor(() => expect(button).toBeEnabled());
   });
+
+  it("offers no standing grant where the caller gives none", () => {
+    render(() => <ApprovalCard approval={approval} onApprove={async () => true} onReject={async () => true} />);
+    expect(screen.queryByRole("button", { name: "Always allow" })).not.toBeInTheDocument();
+  });
+
+  it("confirms before granting, and grants nothing when the confirmation is cancelled", async () => {
+    const grant = vi.fn(async () => true);
+    const approve = vi.fn(async () => true);
+    render(() => (
+      <ApprovalCard
+        approval={approval}
+        agentName="Chief"
+        onApprove={approve}
+        onReject={async () => true}
+        onAlwaysAllow={grant}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("button", { name: "Always allow" }));
+    expect(await screen.findByText("Always allow Chief?")).toBeInTheDocument();
+    expect(grant).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(grant).not.toHaveBeenCalled();
+    // The request is still the user's to answer: cancelling the grant must not answer it either way.
+    expect(approve).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Allow" })).toBeEnabled();
+  });
+
+  it("grants and answers the request in hand once the confirmation is accepted", async () => {
+    const grant = vi.fn(async () => true);
+    render(() => (
+      <ApprovalCard
+        approval={approval}
+        agentName="Chief"
+        onApprove={async () => true}
+        onReject={async () => true}
+        onAlwaysAllow={grant}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("button", { name: "Always allow" }));
+    const confirmations = await screen.findAllByRole("button", { name: "Always allow" });
+    const confirm = confirmations.at(-1);
+    if (!confirm) throw new Error("The confirmation was not rendered.");
+    await fireEvent.click(confirm);
+    await vi.waitFor(() => expect(grant).toHaveBeenCalledTimes(1));
+  });
 });
 
 describe("BrowserTakeoverCard", () => {

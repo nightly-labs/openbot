@@ -1639,7 +1639,9 @@ textarea {
   }
 }
 
-.agent-delete-backdrop {
+/* The approval confirmation shares this modal's shape; only the copy inside it differs. */
+.agent-delete-backdrop,
+.approval-confirm-backdrop {
   position: fixed;
   z-index: 100;
   inset: 0;
@@ -1648,7 +1650,8 @@ textarea {
   animation: agent-backdrop-in var(--openbot-duration-normal) ease-out;
 }
 
-.agent-delete-dialog {
+.agent-delete-dialog,
+.approval-confirm-dialog {
   display: flex;
   width: min(390px, calc(100vw - 40px));
   flex-direction: column;
@@ -1659,7 +1662,8 @@ textarea {
   animation: agent-dialog-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.agent-delete-dialog h2 {
+.agent-delete-dialog h2,
+.approval-confirm-dialog h2 {
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-2xl);
@@ -1668,7 +1672,8 @@ textarea {
   letter-spacing: var(--openbot-tracking-tight);
 }
 
-.agent-delete-dialog > p {
+.agent-delete-dialog > p,
+.approval-confirm-dialog > p {
   max-width: 310px;
   margin: 8px 0 0;
   color: var(--openbot-text-muted);
@@ -1706,7 +1711,8 @@ textarea {
   overflow-y: auto;
 }
 
-.agent-delete-actions {
+.agent-delete-actions,
+.approval-confirm-actions {
   display: grid;
   width: 100%;
   margin-top: 22px;
@@ -1714,7 +1720,8 @@ textarea {
   gap: 9px;
 }
 
-.agent-delete-actions button {
+.agent-delete-actions button,
+.approval-confirm-actions button {
   height: 38px;
   border: 0.5px solid var(--openbot-border);
   border-radius: var(--openbot-radius-md);

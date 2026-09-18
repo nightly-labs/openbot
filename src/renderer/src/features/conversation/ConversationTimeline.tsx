@@ -494,8 +494,10 @@ export function ConversationTimeline() {
               <Loading>
                 <ApprovalCard
                   approval={approval()}
+                  agentName={props.agent?.name}
                   onApprove={() => props.onRespondToApproval("accept")}
                   onReject={() => props.onRespondToApproval("decline")}
+                  onAlwaysAllow={props.onAlwaysAllowApproval}
                 />
               </Loading>
             )}

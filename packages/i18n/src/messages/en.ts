@@ -68,6 +68,23 @@ export const en = {
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Default browser",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.autonomy.title": "Agent autonomy",
+  "settings.turbo.title": "Turbo mode",
+  "settings.turbo.description":
+    "Let every agent run commands, change files and widen its own filesystem and network access without asking. Changes to a published site still ask.",
+  "settings.turbo.confirmTitle": "Turn on Turbo mode?",
+  "settings.turbo.confirmDescription":
+    "Agents will run commands, change files and widen their own access on this computer without asking you first. Turn this off here at any time.",
+  "settings.turbo.confirmCancel": "Cancel",
+  "settings.turbo.confirmAccept": "Turn on",
+  "settings.autoApprove.agentDescription": "Runs commands, changes files and widens its own access without asking.",
+  "settings.autoApprove.revoke": "Revoke",
+  "settings.autoApprove.revokeLabel": "Revoke the standing approval for {name}",
+  "settings.autoApprove.resetTitle": "Every standing approval",
+  "settings.autoApprove.resetDescription": "Make every agent above ask again.",
+  "settings.autoApprove.reset": "Revoke all",
+  "settings.autoApprove.emptyTitle": "No agent has a standing approval",
+  "settings.autoApprove.emptyDescription": "Choose Always allow on an approval to add one here.",
   "settings.notifications.title": "Notifications",
   "settings.desktopNotifications.title": "Desktop notifications",
   "settings.desktopNotifications.description": "Show a notification when an agent needs attention.",

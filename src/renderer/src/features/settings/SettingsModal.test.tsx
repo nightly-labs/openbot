@@ -939,4 +939,111 @@ describe("SettingsModal", () => {
     await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(1));
     expect(screen.queryByText("Free")).toBeNull();
   });
+
+  it("warns before Turbo mode is turned on, and turns it off without asking", async () => {
+    const [value, setValue] = createSignal({ ...DEFAULT_GENERAL_SETTINGS });
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={value()}
+        onValueChange={setValue}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+      />
+    ));
+
+    const toggle = await screen.findByRole("switch", { name: "Turbo mode" });
+    await fireEvent.click(toggle);
+    // Nothing is on yet: the switch is a request to turn it on, and the dialog is where it is given.
+    expect(value().turboMode).toBe(false);
+    await fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(value().turboMode).toBe(false);
+
+    await fireEvent.click(toggle);
+    await fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+    await waitFor(() => expect(value().turboMode).toBe(true));
+
+    await fireEvent.click(await screen.findByRole("switch", { name: "Turbo mode" }));
+    await waitFor(() => expect(value().turboMode).toBe(false));
+  });
+
+  it("lists each granted agent and revokes the one the user chooses", async () => {
+    const revoke = vi.fn(async () => undefined);
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+        autoApprovedAgents={[{ id: "agent-1", name: "Chief" }]}
+        onRevokeAutoApprove={revoke}
+      />
+    ));
+
+    expect(await screen.findByText("Chief")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Revoke the standing approval for Chief" }));
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith("agent-1"));
+  });
+
+  it("revokes every grant at once, and offers that only when there is more than one", async () => {
+    const revoke = vi.fn(async () => undefined);
+    const [agents, setAgents] = createSignal([
+      { id: "agent-1", name: "Chief" },
+      { id: "agent-2", name: "Scout" },
+    ]);
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+        autoApprovedAgents={agents()}
+        onRevokeAutoApprove={revoke}
+      />
+    ));
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Revoke all" }));
+    await waitFor(() => expect(revoke.mock.calls).toEqual([["agent-1"], ["agent-2"]]));
+
+    // One grant is revoked from its own row; the bulk action would be a second button for one agent.
+    setAgents([{ id: "agent-1", name: "Chief" }]);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Revoke all" })).not.toBeInTheDocument());
+  });
+
+  it("says so when no agent has a standing approval", async () => {
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+        autoApprovedAgents={[]}
+      />
+    ));
+
+    expect(await screen.findByText("No agent has a standing approval")).toBeInTheDocument();
+  });
 });

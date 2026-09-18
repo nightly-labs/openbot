@@ -39,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
   SlidersHorizontal,
+  Switch,
   Tabs,
 } from "./ui";
 import { cx } from "./ui/utils";
@@ -65,6 +66,15 @@ interface ProviderModelPickerProps {
    */
   customProviders?: readonly CustomProviderSummary[];
   onAddCustomProvider?: () => void;
+  /**
+   * This agent's standing approval, below Effort. Without the callback the row is absent, which is
+   * how a remote agent and the setup screen show the picker they always showed: the grant belongs
+   * to the computer that runs the agent.
+   */
+  autoApprove?: boolean;
+  /** Turbo mode already covers every agent, so the switch reads on and cannot be turned off here. */
+  autoApproveLocked?: boolean;
+  onAutoApproveChange?: (autoApprove: boolean) => void;
   onChange: (model: AgentModelId, provider: AgentProviderId) => void;
 }
 
@@ -484,6 +494,20 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           <SelectContent class="provider-model-effort-content" />
                         </Select>
                       </div>
+                    </Show>
+                    <Show when={props.onAutoApproveChange}>
+                      {(change) => (
+                        <div class="provider-model-effort">
+                          <span>Auto approve</span>
+                          <Switch
+                            size="sm"
+                            aria-label="Auto approve this agent's actions"
+                            checked={props.autoApprove === true}
+                            disabled={props.autoApproveLocked === true}
+                            onChange={(next) => change()(next)}
+                          />
+                        </div>
+                      )}
                     </Show>
                   </Tabs.Content>
                 );
