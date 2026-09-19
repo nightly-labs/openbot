@@ -27,35 +27,42 @@ import {
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 
-export interface ComputerUseMacSetupProps {
+export interface ComputerUseSetupProps {
   platform: DesktopPlatform;
   variant: "settings" | "compact";
 }
 
-/** What the user must install, when this computer has no driver. Shown, never run for them. */
-const DRIVER_INSTALL_COMMAND = '/bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"';
+/**
+ * What the user must install, when this computer has no driver. Shown, never run for them.
+ *
+ * Each desktop has its own installer and its own shell to run it in, so the command and the shell
+ * that is named are chosen together.
+ */
+const DRIVER_INSTALL: Record<DesktopPlatform, { shell: string; command: string }> = {
+  darwin: { shell: "Terminal", command: '/bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"' },
+  linux: { shell: "a terminal", command: '/bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"' },
+  win32: { shell: "PowerShell", command: "irm https://cua.ai/driver/install.ps1 | iex" },
+};
 
-const PERMISSIONS: ReadonlyArray<{
-  id: MacPermissionId;
-  title: string;
-  description: string;
-  icon: typeof Monitor;
-}> = [
-  {
-    id: "screen-recording",
+/**
+ * How each grant is described. Which of them apply is the driver's answer, never this table: only
+ * macOS puts a permission between OpenBot and the desktop, and a row shown elsewhere would name a
+ * setting the user cannot find.
+ */
+const PERMISSION_DETAILS: Record<MacPermissionId, { title: string; description: string; icon: typeof Monitor }> = {
+  "screen-recording": {
     title: "Screen Recording",
     description: "Lets OpenBot see app windows.",
     icon: Monitor,
   },
-  {
-    id: "accessibility",
+  accessibility: {
     title: "Accessibility",
     description: "Lets OpenBot click and type.",
     icon: MousePointer2,
   },
-];
+};
 
-export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
+export function ComputerUseSetup(props: ComputerUseSetupProps) {
   const desktopApi = window.openbot;
   const [state, setState] = createSignal<ComputerUseState | null>(null);
   const [loading, setLoading] = createSignal(false);
@@ -63,11 +70,10 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
   const [error, setError] = createSignal<string | null>(null);
   let disposed = false;
 
-  const granted = (permission: MacPermissionId): boolean =>
-    state()?.permissions.some((entry) => entry.id === permission && entry.granted) ?? false;
+  const permissions = () => state()?.permissions ?? [];
 
   async function loadState(): Promise<void> {
-    if (props.platform !== "darwin" || loading()) return;
+    if (loading()) return;
     setLoading(true);
     setError(null);
     try {
@@ -101,7 +107,7 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
 
   const showPermissions = () => {
     const status = state()?.status;
-    return status === "permissions-required" || status === "ready";
+    return (status === "permissions-required" || status === "ready") && permissions().length > 0;
   };
 
   const content = () => (
@@ -132,8 +138,8 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
           <AlertContent>
             <AlertTitle>Install the Computer Use driver</AlertTitle>
             <AlertDescription>
-              Run this in Terminal, then check again.
-              <code class="computer-use-install-command">{DRIVER_INSTALL_COMMAND}</code>
+              Run this in {DRIVER_INSTALL[props.platform].shell}, then check again.
+              <code class="computer-use-install-command">{DRIVER_INSTALL[props.platform].command}</code>
             </AlertDescription>
           </AlertContent>
           <AlertActions>
@@ -168,12 +174,26 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
       <Show when={showPermissions()}>
         <Show
           when={props.variant === "settings"}
-          fallback={<PermissionGroup busy={busyPermission()} granted={granted} onOpen={openPermission} />}
+          fallback={<PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />}
         >
           <SettingsSection title="System permissions" description="Permissions are managed by macOS.">
-            <PermissionGroup busy={busyPermission()} granted={granted} onOpen={openPermission} />
+            <PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />
           </SettingsSection>
         </Show>
+      </Show>
+
+      <Show when={state()?.status === "ready" && permissions().length === 0}>
+        <Alert tone="success" class="computer-use-alert" role="status">
+          <AlertIcon>
+            <CircleCheck />
+          </AlertIcon>
+          <AlertContent>
+            <AlertTitle>Computer Use is ready</AlertTitle>
+            <AlertDescription>
+              OpenBot can see and interact with apps on this computer. This system asks for no extra permission.
+            </AlertDescription>
+          </AlertContent>
+        </Alert>
       </Show>
 
       <Show when={error() && showPermissions()}>
@@ -191,50 +211,49 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
   );
 
   return (
-    <Show when={props.platform === "darwin"}>
-      <Show
-        when={props.variant === "settings"}
-        fallback={
-          <section class="computer-use-compact" aria-labelledby="computer-use-compact-title">
-            <header class="computer-use-compact-header">
-              <div>
-                <h2 id="computer-use-compact-title">Enable Computer Use</h2>
-                <p>Let OpenBot see and interact with apps on this Mac.</p>
-              </div>
-              <span>Optional</span>
-            </header>
-            {content()}
-          </section>
-        }
-      >
-        <div class="computer-use-settings">{content()}</div>
-      </Show>
+    <Show
+      when={props.variant === "settings"}
+      fallback={
+        <section class="computer-use-compact" aria-labelledby="computer-use-compact-title">
+          <header class="computer-use-compact-header">
+            <div>
+              <h2 id="computer-use-compact-title">Enable Computer Use</h2>
+              <p>Let OpenBot see and interact with apps on this computer.</p>
+            </div>
+            <span>Optional</span>
+          </header>
+          {content()}
+        </section>
+      }
+    >
+      <div class="computer-use-settings">{content()}</div>
     </Show>
   );
 }
 
 function PermissionGroup(props: {
   busy: MacPermissionId | null;
-  granted: (permission: MacPermissionId) => boolean;
+  permissions: ComputerUseState["permissions"];
   onOpen: (permission: MacPermissionId) => Promise<void>;
 }) {
   return (
     <ItemGroup class="settings-modal-card computer-use-card computer-use-permission-list">
-      <For each={PERMISSIONS}>
+      <For each={props.permissions}>
         {(permission) => {
-          const PermissionIcon = permission.icon;
+          const details = PERMISSION_DETAILS[permission.id];
+          const PermissionIcon = details.icon;
           return (
             <Item class="settings-modal-row computer-use-row">
               <ItemMedia class="computer-use-permission-icon">
                 <PermissionIcon aria-hidden="true" />
               </ItemMedia>
               <ItemContent>
-                <ItemTitle>{permission.title}</ItemTitle>
-                <ItemDescription>{permission.description}</ItemDescription>
+                <ItemTitle>{details.title}</ItemTitle>
+                <ItemDescription>{details.description}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 <Show
-                  when={props.granted(permission.id)}
+                  when={permission.granted}
                   fallback={
                     <Button
                       type="button"

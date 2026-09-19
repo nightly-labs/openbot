@@ -1,7 +1,7 @@
-import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
+import type { ComputerUseState, DesktopPlatform, MacPermissionId } from "@openbot/contracts/ipc";
 import { onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ComputerUseMacSetup } from "../src/features/computer-use/ComputerUseMacSetup";
+import { ComputerUseSetup } from "../src/features/computer-use/ComputerUseSetup";
 import { createMockOpenBot } from "./mock-openbot";
 
 function permissions(granted: readonly MacPermissionId[]): ComputerUseState["permissions"] {
@@ -14,7 +14,12 @@ const permissionsRequired: ComputerUseState = {
   message: null,
 };
 
-function MockedSetup(props: { state?: ComputerUseState; error?: Error; loading?: boolean }) {
+function MockedSetup(props: {
+  state?: ComputerUseState;
+  error?: Error;
+  loading?: boolean;
+  platform?: DesktopPlatform;
+}) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
   mock.api.getComputerUseState = props.loading
@@ -31,16 +36,16 @@ function MockedSetup(props: { state?: ComputerUseState; error?: Error; loading?:
   });
   return (
     <main class="foundation-story foundation-interaction-stage">
-      <ComputerUseMacSetup platform="darwin" variant="compact" />
+      <ComputerUseSetup platform={props.platform ?? "darwin"} variant="compact" />
     </main>
   );
 }
 
 const meta = {
-  title: "Settings/ComputerUseMacSetup",
-  component: ComputerUseMacSetup,
+  title: "Settings/ComputerUseSetup",
+  component: ComputerUseSetup,
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
-} satisfies Meta<typeof ComputerUseMacSetup>;
+} satisfies Meta<typeof ComputerUseSetup>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -71,6 +76,25 @@ export const DriverMissing: Story = {
       state={{
         status: "driver-missing",
         permissions: permissions([]),
+        message: "Install the Computer Use driver, then check again.",
+      }}
+    />
+  ),
+};
+
+/** Windows and Linux grant no permission, so a driver that answers is all the panel has to report. */
+export const ReadyWithoutPermissions: Story = {
+  render: () => <MockedSetup platform="win32" state={{ status: "ready", permissions: [], message: null }} />,
+};
+
+/** Each desktop has its own installer, so the command and the shell named change with the platform. */
+export const DriverMissingOnWindows: Story = {
+  render: () => (
+    <MockedSetup
+      platform="win32"
+      state={{
+        status: "driver-missing",
+        permissions: [],
         message: "Install the Computer Use driver, then check again.",
       }}
     />

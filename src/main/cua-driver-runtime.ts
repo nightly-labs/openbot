@@ -20,15 +20,21 @@ import { stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
 /**
- * The most a Unix socket path may hold.
+ * The most a Unix socket path may hold, per platform.
  *
- * `sockaddr_un.sun_path` is 104 bytes on macOS, the last of them the terminator, and the kernel
- * answers a longer path with `EINVAL` rather than anything that names the real cause. The user data
- * directory is far too deep to hold the socket: an isolated development profile alone spends 64
- * characters on the worktree hash. So the socket lives in the per-user temporary directory, which
- * macOS already creates for this user alone, and this limit is checked before the connection.
+ * `sockaddr_un.sun_path` is 104 bytes on macOS and 108 on Linux, the last of them the terminator,
+ * and the kernel answers a longer path with `EINVAL` rather than anything that names the real
+ * cause. The user data directory is far too deep to hold the socket: an isolated development
+ * profile alone spends 64 characters on the worktree hash. So the socket lives in a per-user
+ * runtime directory, and the length is checked before the daemon is started.
+ *
+ * Windows has no such limit. A named pipe is a name in a kernel namespace rather than a path on
+ * disk, so nothing there is measured.
  */
-const MAX_SOCKET_PATH_LENGTH = 103;
+const MAX_SOCKET_PATH_LENGTH: Readonly<Partial<Record<NodeJS.Platform, number>>> = {
+  darwin: 103,
+  linux: 107,
+};
 const READY_TIMEOUT_MS = 20_000;
 const READY_POLL_MS = 200;
 const PERMISSION_TIMEOUT_MS = 10_000;
@@ -42,13 +48,25 @@ const PERMISSION_TIMEOUT_MS = 10_000;
  * signed by somebody else. Launching it through `open(1)` or `NSWorkspace` would hand the chain to
  * `launchd` instead and break the attribution, so nothing here may do that.
  *
+ * Windows and Linux have no equivalent to grant, so there the variable only tells the driver that
+ * its lifetime belongs to this process.
+ *
  * The driver reads this variable as the exact string `1`.
  */
 const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
 
-/** The two grants the driver needs, in the order the panel lists them. */
-const REQUIRED_PERMISSIONS: readonly MacPermissionId[] = ["screen-recording", "accessibility"];
+/**
+ * The grants the driver needs, in the order the panel lists them.
+ *
+ * Only macOS has any. Windows and Linux put no permission between a program and the desktop it is
+ * already running on, so there the list is empty and a driver that answers is a driver that is
+ * ready. An empty list must never read as "nothing granted yet": the panel shows rows only when
+ * this list has entries.
+ */
+const REQUIRED_PERMISSIONS: Readonly<Partial<Record<NodeJS.Platform, readonly MacPermissionId[]>>> = {
+  darwin: ["screen-recording", "accessibility"],
+};
 
 /**
  * Exactly the spawn this class performs, rather than every overload `child_process` carries.
@@ -69,23 +87,71 @@ export type SpawnDriverProcess = (
   options: SpawnDriverOptions,
 ) => ChildProcess;
 
+/**
+ * The variables the proxy inherits from this machine, named per desktop.
+ *
+ * The proxy is a short-lived client of the daemon, so it needs only enough to start and to find a
+ * temporary directory. Windows needs `SystemRoot`: a process started without it cannot load the
+ * system libraries it links against. A name this machine does not hold is skipped, so nothing here
+ * invents a value.
+ */
+const ENVIRONMENT_PASSTHROUGH: Readonly<Partial<Record<NodeJS.Platform, readonly string[]>>> = {
+  win32: ["SystemRoot", "windir", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "TEMP", "TMP"],
+};
+
+/** The POSIX set, which macOS and Linux share. */
+const POSIX_ENVIRONMENT_PASSTHROUGH: readonly string[] = ["HOME", "USER", "TMPDIR"];
+
+function environmentPassthrough(platform: NodeJS.Platform): readonly string[] {
+  return ENVIRONMENT_PASSTHROUGH[platform] ?? POSIX_ENVIRONMENT_PASSTHROUGH;
+}
+
+/**
+ * Where the daemon listens, which is a different kind of thing on each desktop.
+ *
+ * Both forms are passed to the driver as `--socket`, and both are what `net.connect` takes, so the
+ * only code that cares about the difference is the code that creates and removes them.
+ */
+export type CuaDriverEndpoint =
+  | {
+      /**
+       * A Unix domain socket in a directory private to this user.
+       *
+       * Private, because the socket is a control channel to a process that can drive the whole
+       * desktop. Short, because of `MAX_SOCKET_PATH_LENGTH`.
+       */
+      kind: "unix-socket";
+      directory: string;
+    }
+  | {
+      /**
+       * A Windows named pipe.
+       *
+       * Windows gives a pipe a security descriptor rather than a directory mode, and the default
+       * one already denies every other user, so there is nothing here to create or to remove.
+       */
+      kind: "windows-pipe";
+      name: string;
+    };
+
 export interface CuaDriverRuntimeOptions {
   /** The resolved executable, or `null` when this computer has none. */
   executable: string | null;
+  endpoint: CuaDriverEndpoint;
   /**
-   * Where the control socket goes. It must be private to this user and short.
+   * Whether the driver is published for this computer at all, which is not whether it is installed.
    *
-   * Private, because the socket is a control channel to a process that can drive the whole desktop.
-   * Short, because of `MAX_SOCKET_PATH_LENGTH`. The per-user temporary directory is both.
+   * Separate from `executable`, because the two mean different things to the user: an unsupported
+   * computer has nothing to install, and a supported one without a binary has an install command.
    */
-  socketDirectory: string;
+  supported: boolean;
   /** Advisory only. The driver logs it; it is not a trust signal, so nothing may treat it as one. */
   hostBundleId: string;
   platform: NodeJS.Platform;
   spawnProcess?: SpawnDriverProcess;
   onDiagnostic?: (message: string) => void;
   /** Injected by the test, which has no driver to ask. */
-  readPermissions?: (config: McpServerConfig) => Promise<readonly ComputerUsePermission[]>;
+  readPermissions?: (config: McpServerConfig, platform: NodeJS.Platform) => Promise<readonly ComputerUsePermission[]>;
   waitForSocket?: (path: string) => Promise<void>;
 }
 
@@ -111,8 +177,10 @@ export class CuaDriverRuntime {
     return this.#child !== null && this.#child.exitCode === null;
   }
 
+  /** The address the daemon listens on and every client connects to. */
   socketPath(): string {
-    return join(this.#options.socketDirectory, SOCKET_FILE);
+    const endpoint = this.#options.endpoint;
+    return endpoint.kind === "windows-pipe" ? endpoint.name : join(endpoint.directory, SOCKET_FILE);
   }
 
   /**
@@ -133,7 +201,7 @@ export class CuaDriverRuntime {
       command: executable,
       args: ["mcp", "--socket", this.socketPath()],
       env: [{ key: EMBEDDED_ENV, value: "1" }],
-      envPassthrough: ["HOME", "USER", "TMPDIR"],
+      envPassthrough: [...environmentPassthrough(this.#options.platform)],
       workingDirectory: "",
       url: "",
       headers: [],
@@ -171,15 +239,14 @@ export class CuaDriverRuntime {
 
   /** The panel's answer: starts the daemon if it is not running, then asks it what it may do. */
   async state(): Promise<ComputerUseState> {
-    if (this.#options.platform !== "darwin") return this.#publish(initialState(this.#options));
-    if (!this.#options.executable) return this.#publish(initialState(this.#options));
+    if (!this.#options.supported || !this.#options.executable) return this.#publish(initialState(this.#options));
 
     try {
       await this.start();
     } catch (error) {
       return this.#publish({
         status: "error",
-        permissions: ungranted(),
+        permissions: ungranted(this.#options.platform),
         message: `The Computer Use driver did not start. ${describe(error)}`,
       });
     }
@@ -188,14 +255,18 @@ export class CuaDriverRuntime {
     if (!config) {
       return this.#publish({
         status: "error",
-        permissions: ungranted(),
+        permissions: ungranted(this.#options.platform),
         message: "The Computer Use driver stopped before it could answer.",
       });
     }
 
     try {
-      const permissions = await (this.#options.readPermissions ?? readPermissionsOverMcp)(config);
-      const granted = REQUIRED_PERMISSIONS.every((id) => permissions.some((p) => p.id === id && p.granted));
+      const required = requiredPermissions(this.#options.platform);
+      const permissions = await (this.#options.readPermissions ?? readPermissionsOverMcp)(
+        config,
+        this.#options.platform,
+      );
+      const granted = required.every((id) => permissions.some((p) => p.id === id && p.granted));
       return this.#publish({
         status: granted ? "ready" : "permissions-required",
         permissions,
@@ -204,7 +275,7 @@ export class CuaDriverRuntime {
     } catch (error) {
       return this.#publish({
         status: "error",
-        permissions: ungranted(),
+        permissions: ungranted(this.#options.platform),
         message: `The Computer Use driver did not answer. ${describe(error)}`,
       });
     }
@@ -215,17 +286,21 @@ export class CuaDriverRuntime {
     if (!executable) throw new Error("This computer has no Computer Use driver.");
 
     const socketPath = this.socketPath();
-    if (socketPath.length > MAX_SOCKET_PATH_LENGTH) {
-      throw new Error(
-        `The Computer Use socket path is ${socketPath.length} characters, and macOS allows ${MAX_SOCKET_PATH_LENGTH}.`,
-      );
-    }
+    const endpoint = this.#options.endpoint;
+    if (endpoint.kind === "unix-socket") {
+      const limit = MAX_SOCKET_PATH_LENGTH[this.#options.platform];
+      if (limit !== undefined && socketPath.length > limit) {
+        throw new Error(
+          `The Computer Use socket path is ${socketPath.length} characters, and this system allows ${limit}.`,
+        );
+      }
 
-    // `0o700`, because the socket inside is a control channel to a process that can drive the whole
-    // desktop. The per-user temporary directory is already private; this keeps it private if the
-    // caller ever names somewhere else.
-    await mkdir(this.#options.socketDirectory, { recursive: true, mode: 0o700 });
-    await this.#removeSocket();
+      // `0o700`, because the socket inside is a control channel to a process that can drive the
+      // whole desktop. The per-user runtime directory is already private; this keeps it private if
+      // the caller ever names somewhere else.
+      await mkdir(endpoint.directory, { recursive: true, mode: 0o700 });
+      await this.#removeSocket();
+    }
     const child = this.#spawn(executable, ["serve", "--socket", socketPath], {
       cwd: dirname(executable),
       env: {
@@ -244,7 +319,7 @@ export class CuaDriverRuntime {
       this.#options.onDiagnostic?.(`OpenBot: the Computer Use driver stopped with code ${code ?? "unknown"}.\n`);
       this.#publish({
         status: "error",
-        permissions: ungranted(),
+        permissions: ungranted(this.#options.platform),
         message: "The Computer Use driver stopped.",
       });
     });
@@ -258,7 +333,9 @@ export class CuaDriverRuntime {
   }
 
   async #removeSocket(): Promise<void> {
-    // A socket left by a previous run refuses the bind, so it goes before the daemon starts.
+    // A socket file left by a previous run refuses the bind, so it goes before the daemon starts.
+    // A Windows pipe has no file: it is released when the process that owns it exits.
+    if (this.#options.endpoint.kind !== "unix-socket") return;
     await rm(this.socketPath(), { force: true }).catch(() => undefined);
   }
 
@@ -275,26 +352,32 @@ export class CuaDriverRuntime {
   }
 }
 
-function initialState(options: Pick<CuaDriverRuntimeOptions, "platform" | "executable">): ComputerUseState {
-  if (options.platform !== "darwin") {
+function initialState(
+  options: Pick<CuaDriverRuntimeOptions, "platform" | "executable" | "supported">,
+): ComputerUseState {
+  if (!options.supported) {
     return {
       status: "unsupported",
-      permissions: ungranted(),
-      message: "Computer Use is available on macOS.",
+      permissions: ungranted(options.platform),
+      message: "Computer Use is available on macOS, Windows and Linux.",
     };
   }
   if (!options.executable) {
     return {
       status: "driver-missing",
-      permissions: ungranted(),
+      permissions: ungranted(options.platform),
       message: "Install the Computer Use driver, then check again.",
     };
   }
-  return { status: "permissions-required", permissions: ungranted(), message: null };
+  return { status: "permissions-required", permissions: ungranted(options.platform), message: null };
 }
 
-function ungranted(): ComputerUsePermission[] {
-  return REQUIRED_PERMISSIONS.map((id) => ({ id, granted: false }));
+function requiredPermissions(platform: NodeJS.Platform): readonly MacPermissionId[] {
+  return REQUIRED_PERMISSIONS[platform] ?? [];
+}
+
+function ungranted(platform: NodeJS.Platform): ComputerUsePermission[] {
+  return requiredPermissions(platform).map((id) => ({ id, granted: false }));
 }
 
 function describe(error: unknown): string {
@@ -329,8 +412,17 @@ async function waitForSocket(path: string): Promise<void> {
   throw new Error(`It did not accept a connection in ${READY_TIMEOUT_MS / 1000} seconds. ${describe(lastError)}`);
 }
 
-/** Asks the driver which grants macOS has given it, over one short-lived MCP connection. */
-async function readPermissionsOverMcp(config: McpServerConfig): Promise<readonly ComputerUsePermission[]> {
+/**
+ * Asks the driver what it may do, over one short-lived MCP connection.
+ *
+ * Only macOS has a grant to report. Elsewhere the question is simply whether the daemon answers, so
+ * the tool list is the probe: it proves the same connection without assuming a tool that a
+ * non-macOS build may not publish.
+ */
+async function readPermissionsOverMcp(
+  config: McpServerConfig,
+  platform: NodeJS.Platform,
+): Promise<readonly ComputerUsePermission[]> {
   const client = new Client({ name: "openbot-computer-use", version: "1" }, { capabilities: {} });
   const transport = new StdioClientTransport({
     command: config.command,
@@ -342,10 +434,14 @@ async function readPermissionsOverMcp(config: McpServerConfig): Promise<readonly
   const deadline = setTimeout(() => timer.abort(), PERMISSION_TIMEOUT_MS);
   try {
     await client.connect(transport);
+    if (requiredPermissions(platform).length === 0) {
+      await client.listTools(undefined, { signal: timer.signal });
+      return [];
+    }
     const result = await client.callTool({ name: "check_permissions", arguments: {} }, undefined, {
       signal: timer.signal,
     });
-    return readPermissionResult(result);
+    return readPermissionResult(result, platform);
   } finally {
     clearTimeout(deadline);
     await client.close().catch(() => undefined);
@@ -360,10 +456,10 @@ async function readPermissionsOverMcp(config: McpServerConfig): Promise<readonly
  * the driver does. Anything it does not recognise counts as not granted, which keeps a driver
  * release that renames a field from reporting a permission the user never gave.
  */
-export function readPermissionResult(result: unknown): ComputerUsePermission[] {
+export function readPermissionResult(result: unknown, platform: NodeJS.Platform): ComputerUsePermission[] {
   const structured = isDynamicRecord(result) ? result.structuredContent : undefined;
   const source: DynamicRecord = isDynamicRecord(structured) ? structured : isDynamicRecord(result) ? result : {};
-  return REQUIRED_PERMISSIONS.map((id) => ({ id, granted: grantedIn(source, id) }));
+  return requiredPermissions(platform).map((id) => ({ id, granted: grantedIn(source, id) }));
 }
 
 function grantedIn(source: DynamicRecord, id: MacPermissionId): boolean {

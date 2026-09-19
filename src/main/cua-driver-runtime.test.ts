@@ -33,7 +33,8 @@ async function runtime(overrides: Partial<CuaDriverRuntimeOptions> = {}) {
   });
   const driver = new CuaDriverRuntime({
     executable: "/opt/cua/bin/cua-driver",
-    socketDirectory,
+    endpoint: { kind: "unix-socket", directory: socketDirectory },
+    supported: true,
     hostBundleId: "app.openbot.desktop",
     platform: "darwin",
     spawnProcess,
@@ -64,7 +65,7 @@ describe("CuaDriverRuntime", () => {
   // that names nothing. The daemon must not be started at all in that case.
   it("refuses a socket path macOS cannot hold, rather than let the connection fail as EINVAL", async () => {
     const tooDeep = join(tmpdir(), "cua", "x".repeat(120));
-    const { driver, spawned } = await runtime({ socketDirectory: tooDeep });
+    const { driver, spawned } = await runtime({ endpoint: { kind: "unix-socket", directory: tooDeep } });
 
     await expect(driver.start()).rejects.toThrow(/103/);
     expect(spawned).toHaveLength(0);
@@ -130,12 +131,71 @@ describe("CuaDriverRuntime", () => {
     await expect(partial.driver.state()).resolves.toMatchObject({ status: "permissions-required" });
   });
 
+  // Windows names a pipe in a kernel namespace rather than a path on disk, so nothing is created,
+  // nothing is unlinked, and the path-length rule that macOS and Linux need does not apply.
+  it("serves on a named pipe on Windows, and measures no path", async () => {
+    const { driver, spawned } = await runtime({
+      endpoint: { kind: "windows-pipe", name: `\\\\.\\pipe\\openbot-cua-${"x".repeat(200)}` },
+      platform: "win32",
+    });
+    await driver.start();
+
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0].args).toEqual(["serve", "--socket", driver.socketPath()]);
+    expect(driver.socketPath().startsWith("\\\\.\\pipe\\")).toBe(true);
+    // A Windows process started without `SystemRoot` cannot load the system libraries it links
+    // against, so the proxy would fail before it reached the daemon.
+    expect(driver.mcpServerConfig()?.envPassthrough).toContain("SystemRoot");
+  });
+
+  // Linux allows four more characters than macOS. A limit copied from macOS would refuse a path the
+  // system accepts, and no limit at all would return the same unnamed `EINVAL`.
+  it("holds a Linux socket path macOS would refuse, and refuses a longer one", async () => {
+    const base = join(tmpdir(), "cua");
+    const fits = "y".repeat(105 - base.length - "/driver.sock".length);
+    const fitting = await runtime({
+      endpoint: { kind: "unix-socket", directory: join(base, fits) },
+      platform: "linux",
+    });
+    await fitting.driver.start();
+    expect(fitting.driver.socketPath().length).toBeGreaterThan(103);
+    expect(fitting.spawned).toHaveLength(1);
+
+    const tooDeep = await runtime({
+      endpoint: { kind: "unix-socket", directory: join(base, "z".repeat(120)) },
+      platform: "linux",
+    });
+    await expect(tooDeep.driver.start()).rejects.toThrow(/107/);
+    expect(tooDeep.spawned).toHaveLength(0);
+  });
+
+  // Windows and Linux put no permission between a program and the desktop it already runs on. An
+  // empty permission list must read as ready, never as "nothing granted yet".
+  it("treats a driver that answers as ready where the system grants no permission", async () => {
+    const { driver } = await runtime({
+      endpoint: { kind: "windows-pipe", name: "\\\\.\\pipe\\openbot-cua-test" },
+      platform: "win32",
+      readPermissions: async () => [],
+    });
+
+    await expect(driver.state()).resolves.toMatchObject({ status: "ready", permissions: [] });
+  });
+
+  it("reports a computer the driver is not published for, without spawning anything", async () => {
+    const { driver, spawned } = await runtime({ supported: false, executable: null });
+
+    await expect(driver.state()).resolves.toMatchObject({ status: "unsupported" });
+    expect(spawned).toHaveLength(0);
+  });
+
   it("does not claim a grant an unfamiliar answer never mentioned", () => {
-    expect(readPermissionResult({ structuredContent: { screen_capture: true, accessibility: "granted" } })).toEqual([
+    expect(
+      readPermissionResult({ structuredContent: { screen_capture: true, accessibility: "granted" } }, "darwin"),
+    ).toEqual([
       { id: "screen-recording", granted: true },
       { id: "accessibility", granted: true },
     ]);
-    expect(readPermissionResult({ structuredContent: { somethingElse: true } })).toEqual([
+    expect(readPermissionResult({ structuredContent: { somethingElse: true } }, "darwin")).toEqual([
       { id: "screen-recording", granted: false },
       { id: "accessibility", granted: false },
     ]);

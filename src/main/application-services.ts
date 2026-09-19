@@ -57,8 +57,8 @@ import { readAnalyticsPreference } from "./analytics-preference-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
-import { resolveCuaDriver } from "./cua-driver-artifact";
-import { CuaDriverRuntime } from "./cua-driver-runtime";
+import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
+import { type CuaDriverEndpoint, CuaDriverRuntime } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
 import {
   applyDevelopmentRemoteAccount,
@@ -152,6 +152,21 @@ function profileDigest(userDataPath: string): string {
   return createHash("sha256").update(userDataPath).digest("hex").slice(0, 12);
 }
 
+/**
+ * Where the driver listens, which each desktop names differently.
+ *
+ * On macOS and Linux it is a Unix socket in the per-user temporary directory, not in the user data
+ * directory: a socket path may hold about a hundred characters, and an isolated development profile
+ * spends 64 of them on a worktree hash alone. Both systems give each user their own temporary
+ * directory, readable by nobody else. On Windows it is a named pipe, which is a name rather than a
+ * path and so has no such limit. The digest keeps two profiles on one computer apart.
+ */
+function cuaDriverEndpoint(platform: NodeJS.Platform, digest: string): CuaDriverEndpoint {
+  return platform === "win32"
+    ? { kind: "windows-pipe", name: `\\\\.\\pipe\\openbot-cua-${digest}` }
+    : { kind: "unix-socket", directory: join(tmpdir(), `openbot-cua-${digest}`) };
+}
+
 const TEARDOWN_ORDER = {
   updater: 10,
   dynamicIsland: 20,
@@ -215,7 +230,7 @@ export interface ApplicationServices {
   marketplaceAgents: AgentMarketplaceService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
-  cuaDriver: CuaDriverRuntime | null;
+  cuaDriver: CuaDriverRuntime;
   analytics: HostAnalytics;
   teamStore: TeamStore;
   /**
@@ -475,27 +490,22 @@ export async function createApplicationServices({
     homeDirectory: homedir(),
     pathVariable: process.env.PATH ?? null,
     overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
-    installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR,
+    installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
+    localAppDataDirectory: process.env.LOCALAPPDATA,
   });
-  const cuaDriver =
-    process.platform === "darwin"
-      ? new CuaDriverRuntime({
-          executable: cuaDriverExecutable,
-          // The per-user temporary directory, not the user data directory: a Unix socket path may
-          // hold 103 characters, and an isolated development profile spends 64 of them on a worktree
-          // hash alone. macOS gives each user their own, readable by nobody else. The digest keeps two
-          // profiles on one computer apart.
-          socketDirectory: join(tmpdir(), `openbot-cua-${profileDigest(app.getPath("userData"))}`),
-          hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
-          platform: process.platform,
-          onDiagnostic: (message) => {
-            void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);
-          },
-        })
-      : null;
+  const cuaDriver = new CuaDriverRuntime({
+    executable: cuaDriverExecutable,
+    endpoint: cuaDriverEndpoint(process.platform, profileDigest(app.getPath("userData"))),
+    supported: isSupportedCuaDriverTarget(process.platform, process.arch),
+    hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
+    platform: process.platform,
+    onDiagnostic: (message) => {
+      void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);
+    },
+  });
   // After the provider runtimes, which hold the `cua-driver mcp` children that talk to this
   // daemon: stopping it first would leave them reading a socket nothing answers.
-  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => cuaDriver?.stop() ?? Promise.resolve());
+  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => cuaDriver.stop());
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -526,14 +536,14 @@ export async function createApplicationServices({
     // Appended to the stored servers at each spawn, so the same tools reach Codex, Claude and the
     // ACP providers. Null until the daemon runs, which is what keeps a machine with no driver from
     // handing every provider a command it cannot start.
-    computerUseMcpServer: () => cuaDriver?.mcpServerConfig() ?? null,
+    computerUseMcpServer: () => cuaDriver.mcpServerConfig(),
     localSkillTools: () => localSkillTools(skills),
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // The capability and the tool list both follow the daemon, and nothing else can tell them: no
   // provider probe reaches the driver, because the driver is this process's child.
-  cuaDriver?.onStateChanged((state) => {
+  cuaDriver.onStateChanged((state) => {
     service.setComputerUseCapability(computerUseCapability(state));
     service.notifyComputerUseChanged();
   });
