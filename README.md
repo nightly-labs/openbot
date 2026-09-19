@@ -25,7 +25,7 @@ messaging in one desktop app.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
 - Shared desktop channel chats with one task owner, explicit delegation, shared history, and Stop, Resume, Reassign, Archive, and Restore controls.
 - A persistent embedded browser that agents can open, inspect, and control.
-- Optional Computer Use integration for macOS through a locally installed Codex plugin.
+- Optional Computer Use on macOS through `cua-driver`, which OpenBot starts as its own child process and gives to every provider.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.
 - Local data and privacy-safe diagnostics exports from the account menu.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
@@ -114,7 +114,7 @@ On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
 
 Bun and Node.js are not required when using an installed release. Screen Recording and Accessibility
-permissions are needed only for the optional Computer Use plugin.
+permissions are needed only for optional Computer Use, and only on macOS.
 
 OpenBot uses the existing local CLI login. It does not copy provider credentials. Grok's
 `XAI_API_KEY` and per-session MCP bearer tokens are never persisted or logged.
@@ -148,8 +148,8 @@ bun run codex:doctor
 bun run dev
 ```
 
-`codex:doctor` checks the CLI version, App Server handshake, ChatGPT login, and Computer Use plugin
-without starting a model turn.
+`codex:doctor` checks the CLI version, App Server handshake, and ChatGPT login without starting a
+model turn. `bun run cua-driver:doctor` reports the Computer Use driver separately.
 
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
@@ -239,6 +239,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
+| `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |

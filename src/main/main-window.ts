@@ -10,7 +10,7 @@
  */
 
 import { join } from "node:path";
-import { type AgentEvent, IPC_CHANNELS, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
+import { type AgentEvent, IPC_CHANNELS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { app, BrowserWindow, clipboard, type Display, Menu, type Rectangle, screen } from "electron";
 import type { AgentService } from "../backend/agent-service";
@@ -21,7 +21,6 @@ import {
   isSelectAllShortcut,
   isToggleDevToolsShortcut,
 } from "../backend/browser-shortcuts";
-import type { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import {
@@ -45,7 +44,6 @@ export interface MainWindowApplicationServices {
   service: AgentService;
   browser: BrowserHost;
   remoteServers: RemoteServerManager;
-  computerUseMacSetup: ComputerUseMacSetupWindowController;
 }
 
 /** The two handles that outlive any one window, so `activate` can rebuild into the same slot. */
@@ -82,7 +80,6 @@ export interface MainWindowController {
   openMainWindow: () => BrowserWindow;
   ensureMainWindow: () => Promise<BrowserWindow>;
   loadRenderer: (window: BrowserWindow) => Promise<void>;
-  createComputerUseMacSetupWindow: () => BrowserWindow;
   restoreMainWindowBounds: () => Promise<void>;
   flushMainWindowBounds: () => Promise<void>;
 }
@@ -169,7 +166,6 @@ export function createMainWindowController({
     });
     window.on("move", () => rememberMainWindowBounds(window.getNormalBounds()));
     window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
-    window.on("hide", () => getServices()?.computerUseMacSetup.close());
 
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("before-input-event", (event, input) => {
@@ -260,49 +256,6 @@ export function createMainWindowController({
     return window;
   }
 
-  function createComputerUseMacSetupWindow(): BrowserWindow {
-    const anchor = holder.current;
-    const workArea =
-      anchor && !anchor.isDestroyed()
-        ? screen.getDisplayMatching(anchor.getBounds()).workArea
-        : screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-    const width = 360;
-    const height = 300;
-    const window = new BrowserWindow({
-      width,
-      height,
-      x: workArea.x + workArea.width - width - 16,
-      y: workArea.y + 52,
-      show: false,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      skipTaskbar: true,
-      alwaysOnTop: true,
-      backgroundColor: "#0b0d0e",
-      title: "Set up Computer Use",
-      icon: appIconPath,
-      ...(process.platform === "darwin"
-        ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 12, y: 13 } }
-        : {}),
-      webPreferences: {
-        preload: join(__dirname, "../preload/index.cjs"),
-        contextIsolation: true,
-        devTools: true,
-        sandbox: true,
-        nodeIntegration: false,
-        webSecurity: true,
-      },
-    });
-    window.setAlwaysOnTop(true, "floating");
-    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    window.webContents.on("will-navigate", (event, targetUrl) => {
-      if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
-    });
-    return window;
-  }
-
   function openMainWindow(): BrowserWindow {
     const window = createWindow();
     holder.current = window;
@@ -338,7 +291,6 @@ export function createMainWindowController({
     openMainWindow,
     ensureMainWindow,
     loadRenderer,
-    createComputerUseMacSetupWindow,
     restoreMainWindowBounds,
     flushMainWindowBounds,
   };
@@ -394,14 +346,6 @@ export function loadDynamicIslandRenderer(window: BrowserWindow, display: Displa
     url.searchParams.set("notch-width", String(notch.width));
     url.searchParams.set("notch-height", String(notch.height));
   }
-  return window.loadURL(url.toString());
-}
-
-export function loadComputerUseMacSetupRenderer(window: BrowserWindow, permission: MacPermissionId): Promise<void> {
-  const developmentUrl = process.env.ELECTRON_RENDERER_URL;
-  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
-  url.searchParams.set("surface", "computer-use-setup");
-  url.searchParams.set("permission", permission);
   return window.loadURL(url.toString());
 }
 

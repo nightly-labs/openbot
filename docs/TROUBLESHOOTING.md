@@ -59,9 +59,18 @@ platforms.
 
 ## Computer Use is unavailable
 
-Computer Use requires a compatible local Codex plugin plus macOS Screen Recording and Accessibility
-permissions. Open **System Settings → Privacy & Security**, grant the permissions requested by the
-plugin, then restart OpenBot. OpenBot does not bypass macOS prompts or plugin safety hand-offs.
+Computer Use needs the `cua-driver` binary, plus the macOS Screen Recording and Accessibility
+permissions. OpenBot starts the driver itself; it does not bypass the macOS prompts.
+
+If the panel reports that the driver is missing, install it with the command the panel shows, then
+press **Check again**. `bun run cua-driver:doctor` reports which binary OpenBot would use, and
+`OPENBOT_CUA_DRIVER_PATH` selects a different one.
+
+If the panel reports that permissions are needed, open **System Settings → Privacy & Security** and
+grant both **Screen & System Audio Recording** and **Accessibility**, then press **Check again**. A
+development build asks for the grants as **Electron**, not as OpenBot, because the development binary
+is the responsible process. For the same reason a development grant does not carry over to an
+installed release, and each build must be granted once.
 
 ## A chat is missing after an update
 
