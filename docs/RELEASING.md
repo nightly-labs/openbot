@@ -140,7 +140,10 @@ the lock, so paste it over the `cuaDriver` entry. Use the versioned `cua-driver-
 every digest before and after it installs, and `electron-builder.yml` copies that directory to
 `resources/cua-driver/<platform>/<arch>`. Every `package`, `package:*`, `dist:*` and `dist:release`
 run does this first. Each installer carries only its own target's driver, and the package verifiers
-check both that the driver is present and that no other platform's is.
+check both that the driver is present and that no other platform's is. The macOS release job calls
+`electron-builder` directly rather than through `dist:mac`, so it installs the driver in its own
+`Install and verify native runtimes` step; the Windows and Linux jobs get it from `dist:win` and
+`dist:linux`.
 
 On macOS the driver arrives signed by Cua AI with the hardened runtime, a secure timestamp, and the
 Automation entitlement. `mac.signIgnore` keeps that signature: re-signing it under OpenBot's
