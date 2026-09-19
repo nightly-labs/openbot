@@ -69,6 +69,7 @@ import type {
   MarketplacePluginPrompt,
   MarketplacePluginDetail as PluginDetail,
 } from "./marketplace-plugins";
+import { createPluginShareUrl } from "./marketplace-plugins";
 import type { McpConnectFlow } from "./mcp-connect-auth";
 
 /** Pending install connect; settle(null) on dismiss. */
@@ -91,6 +92,16 @@ interface SkillsMarketplaceModalProps {
   pluginServerId?: string;
   /** Insert a listing's example question into the chosen agent's composer. */
   onRunPluginPrompt?: (agentId: string, prompt: MarketplacePluginPrompt) => void;
+  /**
+   * The listing an `openbot://plugins/<slug>` link asked for. It selects the tab and opens the page;
+   * it never installs, so what a link can do is show a user a listing they then decide about.
+   */
+  initialPluginSlug?: string;
+  /**
+   * Runs after the modal consumes `initialPluginSlug`. The owner clears the pending slug there, so
+   * a second link to the same listing reads as a new request instead of no change.
+   */
+  onInitialPluginSlugConsumed?: () => void;
 }
 
 type Tab = "discover" | "mine";
@@ -215,7 +226,30 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     leaveDetails();
   }
 
-  /* No share button yet: the route is not served, so copying it would hand out a 404. */
+  /**
+   * A slug a link named that this catalog does not hold - an older build, or a listing that was
+   * withdrawn. It is the slug and not a plugin, because there is nothing to show but the name.
+   */
+  const [missingPluginSlug, setMissingPluginSlug] = createSignal<string | null>(null);
+  createEffect(
+    () => (props.open ? props.initialPluginSlug : undefined),
+    (slug) => {
+      if (!slug) return;
+      // A link replaces the page on screen: without this, an unknown slug leaves the previous
+      // plugin set, and leaving its notice returns to that page with the header already gone.
+      setOpenPlugin(null);
+      selectKind("plugins");
+      const plugin = (props.plugins ?? []).find((candidate) => candidate.slug === slug);
+      setMissingPluginSlug(plugin ? null : slug);
+      if (plugin) showPlugin(plugin);
+      // The page holds this listing now, so the owner forgets the link: the same slug arriving
+      // again changes the signal from nothing, and this effect runs for it.
+      props.onInitialPluginSlugConsumed?.();
+    },
+  );
+
+  /* `openbot.run/plugins/<slug>` is served now, so the page offers Copy link. The address is built
+     from the slug rather than read from `shareUrl`, so what is copied is what the route answers. */
   function openPluginUrl(url: string) {
     const safe = safeBrowserUrl(url);
     if (!safe) return;
@@ -1026,47 +1060,60 @@ description: Turn merged work into clear, consistent release notes.
                         )}
                       </Show>
                       <Show
-                        when={props.plugins?.length}
+                        when={!missingPluginSlug()}
                         fallback={
                           <div class="skills-marketplace-state" role="status">
-                            Plugins are not in the marketplace yet.
+                            This plugin is not in the OpenBot catalog.
+                            <Button variant="outline" onClick={() => setMissingPluginSlug(null)}>
+                              Browse plugins
+                            </Button>
                           </div>
                         }
                       >
-                        {/* The listing and its page, arranged as the agent half arranges them: the rows
-                          stay mounted and inert under the page, so leaving it keeps their scroll. */}
-                        <div hidden={Boolean(openPlugin())} inert={Boolean(openPlugin())}>
-                          <MarketplaceCatalog
-                            kind="plugins"
-                            query={searchQuery()}
-                            refreshVersion={0}
-                            list={async (query) => ({ items: listPlugins(query), nextCursor: null })}
-                            icon={(row) => <PluginIcon iconUrl={row.plugin.iconUrl} />}
-                            onOpen={(row) => showPlugin(row.plugin)}
-                          />
-                        </div>
-                        <Show when={openPlugin()} keyed>
-                          {(plugin) => (
-                            <MarketplacePluginDetail
-                              plugin={plugin}
-                              agents={props.agents}
-                              targetAgentId={market.browse.targetAgentId}
-                              onTargetChange={(id) =>
-                                setMarket((state) => {
-                                  state.browse.targetAgentId = id;
-                                })
-                              }
-                              installed={pluginInstalled(plugin)}
-                              busy={panel.busy === `plugin:${plugin.id}`}
-                              onInstall={() => installPlugin(plugin)}
-                              onRunPrompt={
-                                props.onRunPluginPrompt && market.browse.targetAgentId
-                                  ? (prompt) => props.onRunPluginPrompt?.(market.browse.targetAgentId, prompt)
-                                  : undefined
-                              }
-                              onOpenUrl={openPluginUrl}
+                        <Show
+                          when={props.plugins?.length}
+                          fallback={
+                            <div class="skills-marketplace-state" role="status">
+                              Plugins are not in the marketplace yet.
+                            </div>
+                          }
+                        >
+                          {/* The listing and its page, arranged as the agent half arranges them: the
+                            rows stay mounted and inert under the page, so leaving it keeps scroll. */}
+                          <div hidden={Boolean(openPlugin())} inert={Boolean(openPlugin())}>
+                            <MarketplaceCatalog
+                              kind="plugins"
+                              query={searchQuery()}
+                              refreshVersion={0}
+                              list={async (query) => ({ items: listPlugins(query), nextCursor: null })}
+                              icon={(row) => <PluginIcon iconUrl={row.plugin.iconUrl} />}
+                              onOpen={(row) => showPlugin(row.plugin)}
                             />
-                          )}
+                          </div>
+                          <Show when={openPlugin()} keyed>
+                            {(plugin) => (
+                              <MarketplacePluginDetail
+                                plugin={plugin}
+                                agents={props.agents}
+                                targetAgentId={market.browse.targetAgentId}
+                                onTargetChange={(id) =>
+                                  setMarket((state) => {
+                                    state.browse.targetAgentId = id;
+                                  })
+                                }
+                                installed={pluginInstalled(plugin)}
+                                busy={panel.busy === `plugin:${plugin.id}`}
+                                onInstall={() => installPlugin(plugin)}
+                                onRunPrompt={
+                                  props.onRunPluginPrompt && market.browse.targetAgentId
+                                    ? (prompt) => props.onRunPluginPrompt?.(market.browse.targetAgentId, prompt)
+                                    : undefined
+                                }
+                                onCopyLink={() => navigator.clipboard.writeText(createPluginShareUrl(plugin.slug))}
+                                onOpenUrl={openPluginUrl}
+                              />
+                            )}
+                          </Show>
                         </Show>
                       </Show>
                     </div>

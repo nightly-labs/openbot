@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     environmentOptions: { jsdom: { url: "https://openbot.run/" } },
-    setupFiles: ["@testing-library/jest-dom/vitest"],
+    setupFiles: ["@testing-library/jest-dom/vitest", "./test/dialog-methods.ts"],
     include: [
       "test/analytics.test.ts",
       "test/hero-download-selector.test.tsx",
@@ -16,6 +16,7 @@ export default defineConfig({
       "test/landing-glow.test.tsx",
       "test/landing-reveal.test.tsx",
       "test/content.test.tsx",
+      "test/plugins-page.test.tsx",
     ],
   },
 });

@@ -105,7 +105,7 @@ function PermissionsReview(props: AccountProps) {
  * machine, so the picker is empty for a remote server.
  */
 function SkillsMarketplace() {
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
+  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const controller = useConversationController();
   const { selectAgent } = useNavigation();
@@ -131,7 +131,12 @@ function SkillsMarketplace() {
           open={true}
           agents={local() ? agentList() : []}
           activeAgentId={local() ? (activeAgent()?.id ?? "") : ""}
-          onOpenChange={setSkillsMarketplaceOpen}
+          onOpenChange={(open) => {
+            /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
+               hand lands on the catalog rather than on the listing a link once named. */
+            if (!open) setPendingPluginSlug(null);
+            setSkillsMarketplaceOpen(open);
+          }}
           onTrySkill={
             composerFree()
               ? (agentId, skill) => {
@@ -145,6 +150,8 @@ function SkillsMarketplace() {
           }
           onAgentInstalled={openInstalledMarketplaceAgent}
           plugins={MARKETPLACE_PLUGINS}
+          initialPluginSlug={pendingPluginSlug() ?? undefined}
+          onInitialPluginSlugConsumed={() => setPendingPluginSlug(null)}
           /* A plugin's app is an MCP server, which the host holds. Only a local server takes one
              here, as the agents list does, so a remote server browses the listings and installs
              nothing. */

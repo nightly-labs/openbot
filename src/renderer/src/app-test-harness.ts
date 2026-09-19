@@ -99,6 +99,7 @@ export let emitPresence: ((snapshot: TeamPresenceSnapshot) => void) | undefined;
 export let emitDirectMessage: ((event: DirectMessageRealtimeEvent) => void) | undefined;
 export let emitDirectTyping: ((event: DirectTypingRealtimeEvent) => void) | undefined;
 export let emitInvite: ((inviteUrl: string) => void) | undefined;
+export let emitOpenPluginListing: ((slug: string) => void) | undefined;
 export let emitDynamicIslandAction: ((action: DynamicIslandAction) => void) | undefined;
 
 type BridgeListener<Event> = (event: Event) => void;
@@ -187,6 +188,9 @@ const directTypingBridge = createEventBridge<DirectTypingRealtimeEvent>((emit) =
 const inviteBridge = createEventBridge<string>((emit) => {
   emitInvite = emit;
 });
+const pluginListingBridge = createEventBridge<string>((emit) => {
+  emitOpenPluginListing = emit;
+});
 const dynamicIslandActionBridge = createEventBridge<DynamicIslandAction>((emit) => {
   emitDynamicIslandAction = emit;
 });
@@ -204,6 +208,7 @@ const eventBridges = {
   directMessage: directMessageBridge,
   directTyping: directTypingBridge,
   invite: inviteBridge,
+  pluginListing: pluginListingBridge,
   dynamicIslandAction: dynamicIslandActionBridge,
 } as const;
 
@@ -228,6 +233,7 @@ export function subscriberCounts(): BridgeSubscriberCounts {
     directMessage: directMessageBridge.count(),
     directTyping: directTypingBridge.count(),
     invite: inviteBridge.count(),
+    pluginListing: pluginListingBridge.count(),
     dynamicIslandAction: dynamicIslandActionBridge.count(),
   };
 }
@@ -913,6 +919,10 @@ export function installOpenbotStub(): void {
         onDirectTyping: vi.fn(directTypingBridge.subscribe),
         onEvent: vi.fn(serversBridge.subscribe),
         onInvite: vi.fn(inviteBridge.subscribe),
+      },
+      plugins: {
+        takePendingListing: vi.fn().mockResolvedValue(null),
+        onOpenListing: vi.fn(pluginListingBridge.subscribe),
       },
       host: {
         getStatus: vi.fn().mockResolvedValue({

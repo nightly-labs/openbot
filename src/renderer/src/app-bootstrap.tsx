@@ -2,9 +2,10 @@ import { createEffect, flush, onSettled } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useServers } from "./features/servers/servers-context";
+import { useSettings } from "./features/settings/settings-context";
 
 /**
- * The deep-link invite, and nothing else.
+ * The deep links, and nothing else.
  *
  * This used to hold the first per-server load and the two window listeners as
  * well. Both moved into `server-scope.tsx` when the per-server state became a
@@ -15,11 +16,15 @@ import { useServers } from "./features/servers/servers-context";
  * before any server exists, has to survive the switch it causes, and spans
  * setup, auth and servers - so it is registered once, for the life of the
  * window.
+ *
+ * A plugin link is the same problem with a shorter answer: it opens the
+ * marketplace on one listing, and installs nothing.
  */
 export function AppBootstrap() {
   const { centralAuth } = useAuth();
   const { setupState, pendingInviteUrl, setPendingInviteUrl } = useSetup();
   const { setJoinServerOpen } = useServers();
+  const { setPendingPluginSlug, setSkillsMarketplaceOpen } = useSettings();
 
   onSettled(() => {
     const receiveInvite = (inviteUrl: string) => {
@@ -31,11 +36,29 @@ export function AppBootstrap() {
     const unsubscribeInvite = window.openbot.servers.onInvite((inviteUrl) => {
       receiveInvite(inviteUrl);
     });
+    const receivePluginSlug = (slug: string) => {
+      flush(() => {
+        setPendingPluginSlug(slug);
+        setSkillsMarketplaceOpen(true);
+      });
+    };
+    const unsubscribePlugin = window.openbot.plugins.onOpenListing((slug) => {
+      receivePluginSlug(slug);
+    });
+    // Both subscriptions are in place before either link is asked for, because the first of these
+    // two requests is what tells main that a window is listening.
     void window.openbot.servers
       .takePendingInvite()
       .then((inviteUrl) => inviteUrl && receiveInvite(inviteUrl))
       .catch(() => undefined);
-    return unsubscribeInvite;
+    void window.openbot.plugins
+      .takePendingListing()
+      .then((slug) => slug && receivePluginSlug(slug))
+      .catch(() => undefined);
+    return () => {
+      unsubscribeInvite();
+      unsubscribePlugin();
+    };
   });
 
   createEffect(
