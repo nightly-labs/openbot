@@ -1,0 +1,50 @@
+{
+  "slug": "brave-search",
+  "name": "Brave Search",
+  "tagline": "Private web search",
+  "description": "Brave Search lets agents search the web and local results without tracking. An API key from the Brave Search API dashboard is passed to the local server as one environment variable.",
+  "category": "research",
+  "creatorName": "brave.com",
+  "iconUrl": "https://brave.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-search", "text": "What are reviewers saying about this framework version?" },
+    { "id": "prompt-news", "text": "Find today's announcements for this product area." },
+    { "id": "prompt-compare", "text": "Compare these two vendors with cited sources." }
+  ],
+  "apps": [
+    {
+      "id": "app-brave-search-mcp",
+      "name": "Brave Search",
+      "description": "Web and local search, over a local MCP server with a Brave API key.",
+      "iconUrl": "https://brave.com/favicon.ico",
+      "server": {
+        "name": "brave-search",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "@brave/brave-search-mcp-server"],
+        "auth": [
+          {
+            "id": "brave-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "token",
+                "label": "API key",
+                "env": "BRAVE_API_KEY",
+                "hint": "Brave Search API dashboard → API keys"
+              }
+            ],
+            "docsUrl": "https://brave.com/search/api/",
+            "docsLabel": "Get a key"
+          }
+        ]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://brave.com",
+  "privacyPolicyUrl": "https://brave.com/privacy/",
+  "termsUrl": "https://brave.com/terms-of-use/"
+}

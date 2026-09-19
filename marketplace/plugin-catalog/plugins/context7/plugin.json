@@ -1,0 +1,28 @@
+{
+  "slug": "context7",
+  "name": "Context7",
+  "tagline": "Current library documentation",
+  "description": "Context7 fetches current documentation and API references for libraries and frameworks, so answers use the version the project actually runs. It needs no account and no key.",
+  "category": "research",
+  "creatorName": "context7.com",
+  "iconUrl": "https://context7.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-api-check", "text": "What is the current API for virtualized lists in this framework?" },
+    { "id": "prompt-migrate", "text": "What changed between v2 and v3 of this router?" },
+    { "id": "prompt-example", "text": "Show a current example for authenticated file uploads." }
+  ],
+  "apps": [
+    {
+      "id": "app-context7-mcp",
+      "name": "Context7",
+      "description": "Current library documentation lookup, over the Context7 MCP server with no sign-in.",
+      "iconUrl": "https://context7.com/favicon.ico",
+      "server": { "name": "context7", "transport": "http", "url": "https://mcp.context7.com/mcp" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://context7.com",
+  "privacyPolicyUrl": "https://context7.com/privacy",
+  "termsUrl": "https://context7.com/terms"
+}

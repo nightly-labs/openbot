@@ -1,0 +1,34 @@
+{
+  "slug": "linear",
+  "name": "Linear",
+  "tagline": "Issues and project triage",
+  "description": "Linear lets agents list assigned issues, triage the backlog, update statuses, and draft new issues in the workspace the signed-in account belongs to. Each user signs in to their own Linear account through the browser.",
+  "category": "coding",
+  "creatorName": "linear.app",
+  "iconUrl": "https://linear.app/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-my-week", "text": "What is assigned to me this week?" },
+    { "id": "prompt-backlog", "text": "Triage the backlog: what is stale, blocked, or missing an owner?" },
+    { "id": "prompt-new-issue", "text": "File an issue for the crash in the sync queue with reproduction steps." }
+  ],
+  "apps": [
+    {
+      "id": "app-linear-mcp",
+      "name": "Linear",
+      "description": "Issue search, triage, status updates, and issue creation, over Linear's MCP server with browser sign-in.",
+      "iconUrl": "https://linear.app/favicon.ico",
+      "server": {
+        "name": "linear",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "mcp-remote@latest", "https://mcp.linear.app/sse"],
+        "auth": [{ "id": "linear-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://linear.app",
+  "privacyPolicyUrl": "https://linear.app/privacy",
+  "termsUrl": "https://linear.app/terms",
+  "skills": []
+}

@@ -1,0 +1,34 @@
+{
+  "slug": "sentry",
+  "name": "Sentry",
+  "tagline": "Errors and crash triage",
+  "description": "Sentry lets agents search recent errors, inspect stack traces and affected releases, and summarize what broke after a deploy. Each user signs in to their own Sentry account through the browser.",
+  "category": "coding",
+  "creatorName": "sentry.io",
+  "iconUrl": "https://sentry.io/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-new-errors", "text": "What new errors appeared since yesterday's deploy?" },
+    { "id": "prompt-top-crash", "text": "Explain the top crash in the mobile project and its likely cause." },
+    { "id": "prompt-release-health", "text": "How healthy is the current release compared to the last one?" }
+  ],
+  "apps": [
+    {
+      "id": "app-sentry-mcp",
+      "name": "Sentry",
+      "description": "Error search, issue inspection, and release health, over Sentry's MCP server with browser sign-in.",
+      "iconUrl": "https://sentry.io/favicon.ico",
+      "server": {
+        "name": "sentry",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "mcp-remote@latest", "https://mcp.sentry.dev/mcp"],
+        "auth": [{ "id": "sentry-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://sentry.io",
+  "privacyPolicyUrl": "https://sentry.io/privacy/",
+  "termsUrl": "https://sentry.io/terms/"
+}

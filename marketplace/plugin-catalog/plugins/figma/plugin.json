@@ -1,0 +1,34 @@
+{
+  "slug": "figma",
+  "name": "Figma",
+  "tagline": "Designs and prototypes",
+  "description": "Figma lets agents read design files, inspect components and styles, extract assets, and hand production specs to engineers. Each user signs in to their own Figma account through the browser.",
+  "category": "design",
+  "creatorName": "figma.com",
+  "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-handoff", "text": "Hand off the checkout file: list screens, components, and styles." },
+    { "id": "prompt-audit", "text": "Audit this file for inconsistent spacing and color use." },
+    { "id": "prompt-assets", "text": "Extract the marketing icons at 2x for the app bundle." }
+  ],
+  "apps": [
+    {
+      "id": "app-figma-mcp",
+      "name": "Figma",
+      "description": "File reading, component inspection, and asset extraction, over Figma's MCP server with browser sign-in.",
+      "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
+      "server": {
+        "name": "figma",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "mcp-remote@latest", "https://mcp.figma.com/mcp"],
+        "auth": [{ "id": "figma-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.figma.com",
+  "privacyPolicyUrl": "https://www.figma.com/privacy/",
+  "termsUrl": "https://www.figma.com/tos/"
+}

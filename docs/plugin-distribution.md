@@ -420,13 +420,17 @@ Ordered by cost.
 
 1. ~~Correct the fixture host to `openbot.run`, and build the share URL from the slug.~~ Done:
    `createPluginShareUrl` in `src/renderer/src/features/settings/marketplace-plugins.ts`.
-2. `marketplace/plugin-catalog/` and `scripts/build-plugin-catalog.ts`, with fixtures and `--check`.
+2. ~~`marketplace/plugin-catalog/` and `scripts/build-plugin-catalog.ts`, with fixtures and `--check`.~~ Done:
+   the source holds 14 listings (no-auth, header key, stdio env key, and OAuth
+   over the `mcp-remote` bridge), and the build writes the renderer literal,
+   the Worker module, and the offline snapshot, with `--check` for CI.
 3. The Worker routes: the JSON first, then the page and the sitemap entries.
 4. The contract types, the channels, the decoders, the preload and the mock.
 5. `src/main/plugin-catalog-service.ts`: the request, the cache and the snapshot.
 6. ~~Connect the Plugins tab to the real data. Keep the fixtures for Storybook.~~ Partly done: the
-   tab reads `src/renderer/src/features/settings/marketplace-plugin-catalog.ts`, a literal in the
-   renderer with one listing. Steps 2 to 5 replace that literal; nothing the tab renders changes.
+   tab reads the generated `src/renderer/src/features/settings/marketplace-plugin-catalog.ts`,
+   built from `marketplace/plugin-catalog/`. Steps 3 to 5 replace that generated
+   file with the served catalog; nothing the tab renders changes.
 7. Install and uninstall. Install is done: the page installs each pinned skill into the agent in the
    picker, then saves the listing's MCP server through `saveMcpServer` on the selected host. It
    reads the installed state back from `listMcpServers` and from the agent's installed skills, so a
