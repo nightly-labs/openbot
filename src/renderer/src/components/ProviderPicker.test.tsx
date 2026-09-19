@@ -154,4 +154,19 @@ describe("ProviderPicker", () => {
     expect(downloading.view.getByText("40%")).toBeTruthy();
     expect(downloading.view.queryByText("Free")).toBeNull();
   });
+
+  // Main wraps the download in the install that activates the CLI, and holds the provider
+  // "connecting" for the whole of it, so this is the state of every real download.
+  it("reports the percentage rather than Connecting while a connecting provider downloads", () => {
+    const { view } = renderPicker([
+      {
+        ...openCode,
+        connectionState: "connecting",
+        runtimeStatus: runtime({ phase: "downloading", progress: 40, version: null }),
+      },
+    ]);
+
+    expect(view.getByText("40%")).toBeTruthy();
+    expect(view.queryByText("Connecting")).toBeNull();
+  });
 });

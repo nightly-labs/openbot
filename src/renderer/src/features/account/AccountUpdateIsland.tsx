@@ -2,6 +2,7 @@ import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateActivePhase, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { Button, Download, RefreshCw, Spinner } from "../../components/ui";
+import { createDigitRoll } from "../../digit-roll";
 import { errorMessage as formatErrorMessage } from "../../error-message";
 import { rendererDuration } from "../conversation/activity-timing";
 
@@ -25,23 +26,12 @@ interface UpdateProgressValueProps {
 }
 
 function UpdateProgressValue(props: UpdateProgressValueProps) {
-  let digitGroup: HTMLSpanElement | undefined;
-  const characters = () => `${props.value}`.split("");
-
-  createEffect(
-    () => ({ active: props.active, value: props.value }),
-    ({ active }) => {
-      if (!active || !digitGroup) return;
-
-      digitGroup.classList.remove("is-animating");
-      void digitGroup.offsetHeight;
-      digitGroup.classList.add("is-animating");
-    },
-  );
+  const roll = createDigitRoll(() => props.value, { animate: () => props.active });
+  const characters = () => `${roll.displayed()}`.split("");
 
   return (
     <span class="account-update-island__progress-value">
-      <span ref={digitGroup} class="account-update-island__progress-digits t-digit-group">
+      <span ref={roll.ref} class="account-update-island__progress-digits t-digit-group">
         <For each={characters()}>
           {(character, index) => {
             const stagger = () => {
