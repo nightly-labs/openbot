@@ -1,11 +1,88 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  normalizeSidebarPeopleOrder,
+  readSidebarPeopleOrder,
+  SIDEBAR_PEOPLE_ORDER_STORAGE_KEY,
+  writeSidebarPeopleOrder,
+} from "./sidebar-people-order";
+import {
   normalizeSidebarPinnedItems,
   readSidebarPins,
   reownSidebarPinnedItems,
   SIDEBAR_PINS_STORAGE_KEY,
   writeSidebarPins,
 } from "./sidebar-pins";
+import { readSidebarCollapsed, SIDEBAR_COLLAPSED_STORAGE_KEY, writeSidebarCollapsed } from "./sidebar-sections";
+
+describe("sidebar collapsed sections", () => {
+  it("reads separate server lists and removes duplicates and invalid values", () => {
+    const storage = {
+      getItem: vi.fn(() =>
+        JSON.stringify({
+          local: ["people", "demo", "demo", null, ""],
+          team: ["unassigned"],
+          empty: [null],
+        }),
+      ),
+      setItem: vi.fn(),
+    };
+
+    expect(readSidebarCollapsed(storage)).toEqual({
+      local: ["people", "demo"],
+      team: ["unassigned"],
+    });
+  });
+
+  it("returns an empty map for damaged storage", () => {
+    expect(readSidebarCollapsed({ getItem: () => "not-json", setItem: vi.fn() })).toEqual({});
+  });
+
+  it("writes the versioned preference without blocking on storage errors", () => {
+    const storage = { getItem: vi.fn(), setItem: vi.fn() };
+    const collapsed = { local: ["people"], team: ["demo"] };
+    writeSidebarCollapsed(collapsed, storage);
+    expect(storage.setItem).toHaveBeenCalledWith(SIDEBAR_COLLAPSED_STORAGE_KEY, JSON.stringify(collapsed));
+
+    expect(() =>
+      writeSidebarCollapsed(collapsed, {
+        getItem: vi.fn(),
+        setItem: () => {
+          throw new Error("full");
+        },
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe("sidebar people order", () => {
+  it("normalizes duplicate and empty member IDs", () => {
+    expect(normalizeSidebarPeopleOrder([" alice ", "", "bob", "alice"])).toEqual(["alice", "bob"]);
+  });
+
+  it("reads separate server orders and ignores damaged storage", () => {
+    const storage = {
+      getItem: vi.fn(() => JSON.stringify({ local: ["alice", "alice", null], team: ["bob"] })),
+      setItem: vi.fn(),
+    };
+    expect(readSidebarPeopleOrder(storage)).toEqual({ local: ["alice"], team: ["bob"] });
+    expect(readSidebarPeopleOrder({ getItem: () => "not-json", setItem: vi.fn() })).toEqual({});
+  });
+
+  it("writes without blocking when storage is unavailable", () => {
+    const order = { local: ["alice", "bob"] };
+    const storage = { getItem: vi.fn(), setItem: vi.fn() };
+    writeSidebarPeopleOrder(order, storage);
+    expect(storage.setItem).toHaveBeenCalledWith(SIDEBAR_PEOPLE_ORDER_STORAGE_KEY, JSON.stringify(order));
+    expect(() =>
+      writeSidebarPeopleOrder(order, {
+        getItem: vi.fn(),
+        setItem: () => {
+          throw new Error("full");
+        },
+      }),
+    ).not.toThrow();
+  });
+});
 
 describe("sidebar pins", () => {
   it("keeps unique chats of both kinds and removes legacy person pins", () => {

@@ -14,13 +14,7 @@ export interface PickerModelGroup {
   models: PickerModel[];
 }
 
-/**
- * Anything the provider names Free first, then the rest.
- *
- * There is no "runs on this computer" tier: a custom endpoint is keyed by a name the user types, so
- * the id says nothing about where the model runs. A remote host named `ollama` would earn the label
- * and a loopback endpoint named anything else would not, and the label is a privacy claim.
- */
+/** Free tier first; id says nothing about locality. */
 function modelTier(model: PickerModel): 0 | 1 {
   return model.free ? 0 : 1;
 }
@@ -49,19 +43,14 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
         id: model.id,
         name,
         service: separator < 0 ? "" : model.name.slice(0, separator),
-        // Only label models the free tier covers; unknown pricing stays unlabelled.
-        // Shared with the catalog order, so the badge and the default agree on what is free.
+        // Free-tier label only; shared with catalog order so badge and default agree.
         free: model.provider === "opencode" && isFreeOpencodeModel(model.id, name),
         variants: variants.has(model.id) ? [{ id: model.id, name: "Default" }, ...(variants.get(model.id) ?? [])] : [],
       };
     });
 }
 
-/**
- * One group per service, ordered by the best tier it holds. Keying the group by tier as well as by
- * service printed the same service twice - "OpenCode Zen" once for its free models and again for
- * its paid ones - so the tier now decides order and the row badge carries the pricing.
- */
+/** One group per service, ordered by best tier; tier orders, badge carries pricing. */
 export function groupPickerModels(models: PickerModel[], search: string): PickerModelGroup[] {
   const query = search.trim().toLowerCase();
   const groups = new Map<string, PickerModelGroup>();

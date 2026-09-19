@@ -14,23 +14,9 @@ import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 
 /**
- * Opening things: an agent chat, a direct conversation, one message inside
- * either, and the global search that finds them.
- *
- * This is the leaf, and it is a context rather than a set of loose functions
- * because of what `selectAgent` does. One call writes to agents (setup dialog,
- * active id, chat-open revision), to conversation (history pruning, reply
- * indicators, the read-tracking sets) and to direct messages (typing, selection)
- * - three domains, none of which may reach into the others. A command that
- * spans domains belongs below all of them, where it can read every one it needs
- * and nothing can read it back. That is also why nothing here is imported by
- * another context: an edge inward is a cycle, and `noImportCycles` is an error.
- *
- * `messageFocusRequest` is the `{ id, nonce }` request signal the renderer uses
- * elsewhere: the transcript is not this domain's to scroll, so it publishes
- * which message wants focus and the view reacts. The nonce carries the case of
- * focusing the same message twice.
- *
+ * Cross-domain open/select commands (agent chat, direct conversation, message focus, global
+ * search). Leaf context below agents/conversation/direct-messages so one call can write to
+ * all three without cycles (`noImportCycles` is an error). See docs/ARCHITECTURE.md.
  * Ungated - see `app-providers.tsx`.
  */
 const Navigation = createSimpleContext({

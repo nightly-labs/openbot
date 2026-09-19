@@ -615,8 +615,7 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    // The channel turn runs on another thread, so this agent reports no turn of its own and no
-    // started delivery. Without the hold the chat shows an idle agent and no sign of the message.
+    // Channel-task hold explains the idle agent with no delivery of its own.
     emitAgentEvent?.({ type: "queue-changed", snapshot: { agentId: "chief", deliveries: [waiting], hold } });
     const queue = await screen.findByRole("region", { name: "Message queue" });
     within(queue).getByRole("group", { name: "Queued message 1: Read the report" });
@@ -624,15 +623,14 @@ describe("OpenBot connected desktop shell", () => {
       await screen.findByRole("status", { name: "Chief is working: Working in Project launch" }),
     ).toBeInTheDocument();
 
-    // The same assignment reserves the host for every agent, but only the one it belongs to is
-    // working. The others are waiting, and their chat has to say what for.
+    // Same hold reserves the host: only the owning agent reads as working.
     await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound, Outbound specialist/ }));
     await screen.findByRole("heading", { name: "Sales Outbound" });
     const salesQueue = await screen.findByRole("region", { name: "Message queue" });
     expect(within(salesQueue).getByText("Waiting - Chief is working in Project launch")).toBeVisible();
     expect(screen.queryByRole("status", { name: /^Sales Outbound is working/u })).not.toBeInTheDocument();
 
-    // The same wait after a fresh read of the queue, which is what a reload and a reconnect do.
+    // Same wait survives a fresh queue read (reload/reconnect).
     await fireEvent.click(screen.getByRole("button", { name: /Chief, Chief of staff/ }));
     const reloaded = await screen.findByRole("region", { name: "Message queue" });
     within(reloaded).getByRole("group", { name: "Queued message 1: Read the report" });
@@ -640,7 +638,7 @@ describe("OpenBot connected desktop shell", () => {
       await screen.findByRole("status", { name: "Chief is working: Working in Project launch" }),
     ).toBeInTheDocument();
 
-    // The channel work ended: the delivery is the agent's own running turn now, and nothing waits.
+    // Channel work ended: the delivery is the agent's own running turn now.
     emitAgentEvent?.({
       type: "queue-changed",
       snapshot: {

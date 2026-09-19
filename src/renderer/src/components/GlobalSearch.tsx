@@ -65,8 +65,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
   let searchRequest = 0;
 
   const agentResults = createMemo<GlobalSearchResult[]>(() => props.agents.map((agent) => ({ kind: "agent", agent })));
-  // Search text is built once per candidate list change, not once per
-  // candidate per keystroke: the filter below runs on every input.
+  // Search text memoized per list change; the filter runs on every input.
   const agentSearchTexts = createMemo(
     () => new Map(agentResults().map((result) => [resultKey(result), resultSearchText(result)])),
   );

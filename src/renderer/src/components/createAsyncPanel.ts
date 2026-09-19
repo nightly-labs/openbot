@@ -7,15 +7,7 @@ interface AsyncPanel {
   loading: boolean;
 }
 
-/**
- * The three fields every remote-backed panel carries: the list load, the one action in flight, and
- * the message the last failure left behind. They are one record because a panel is in exactly one
- * of these situations at a time - three signals let it be loading, busy and errored at once - and
- * because `run` writes `error` on every call, which a caller would otherwise have to remember.
- *
- * `describeError` turns a rejection into the message the panel shows, so the domain keeps its own
- * wording. Read through the returned store; write through the named mutations.
- */
+/** One record for load/action/error; `run` reports rejection as error. */
 export function createAsyncPanel(describeError: (cause: unknown) => string) {
   const [panel, setPanel] = createStore<AsyncPanel>({ busy: null, error: null, loading: false });
 
@@ -37,11 +29,7 @@ export function createAsyncPanel(describeError: (cause: unknown) => string) {
     });
   }
 
-  /**
-   * Clears the error, awaits `work`, and reports a rejection as the panel's error rather than
-   * letting it escape. `undefined` is the failure result, so a caller applies what it got only
-   * when it got something.
-   */
+  /** Awaits `work`; rejection becomes panel error, `undefined` on failure. */
   async function run<T>(work: () => Promise<T>): Promise<T | undefined> {
     setError(null);
     try {
