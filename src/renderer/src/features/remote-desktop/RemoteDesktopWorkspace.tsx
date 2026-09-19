@@ -238,7 +238,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
               <AgentAvatar
                 seed={`${props.server.id}:remote-desktop-connecting`}
                 hue={215}
-                motion="connecting"
+                mood="connecting"
                 class="remote-desktop-connecting-avatar"
               />
               <strong>Connecting…</strong>

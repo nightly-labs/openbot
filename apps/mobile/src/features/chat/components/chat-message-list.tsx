@@ -27,7 +27,7 @@ import type { QuestionPromptController } from "@/features/chat/components/use-qu
 import { type ChatMessage, indexChatMessages } from "@/features/chat/model/chat-messages";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
-import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
 import { mentionDraft } from "../model/chat-mentions";
@@ -457,7 +457,7 @@ export function ChatMessageList({
             seed={activityAgent.avatarSeed}
             size={36}
             disconnected={!online}
-            working={animateMessages && Boolean(activity && activity.phase !== "waiting")}
+            mood={animateMessages ? agentActivityMood(activity) : "idle"}
             animateIdle={animateMessages}
           />
         ) : null}

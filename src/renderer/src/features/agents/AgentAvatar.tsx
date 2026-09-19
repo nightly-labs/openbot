@@ -4,20 +4,23 @@ import {
   BotEngine,
   type BotFrame,
   DEMI_VIEWBOX,
-  defaultCycle,
   makeBlock,
   POSES,
   RAYON,
-  type StateId,
 } from "@norbert_bodziony/bloub";
+import {
+  type AvatarMood,
+  avatarMoodIsBusy,
+  avatarMoodPresentation,
+  type ShapeSafeStateId,
+} from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarHue } from "@openbot/contracts/ipc";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId } from "../../bloub-avatar";
-import { TypingDots } from "../../components/TypingDots";
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 
-const DEFAULT_CYCLE: Block[] = defaultCycle().blocks;
 // An avatar is 24 to 40 px of morphing blob, and every drawn frame costs a style
 // recalculation, a layout and a paint. Left at the screen's rate, two visible
 // avatars measured 30% of the renderer process and 24% of the GPU process; a cap
@@ -25,17 +28,31 @@ const DEFAULT_CYCLE: Block[] = defaultCycle().blocks;
 // its clock uncapped, so the animation is drawn less often, never delayed.
 const AVATAR_FPS = 30;
 const SIDEBAR_MOTION_HOLD_FACTOR = 1.25;
-const IDLE_CYCLE: Block[] = [slowerBlock("idle")];
-const WORKING_CYCLE: Block[] = [slowerBlock("orbit")];
-const CONNECTING_CYCLE: Block[] = [makeBlock("orbit"), makeBlock("swirl")];
+
+// The resting montage, played on hover and wherever an avatar is shown off. Every block is
+// shape-safe, so the personality is in the face - a blink, a wink, a widening of the eyes - and
+// the silhouette the seed chose is on screen the whole way through. It used to be bloub's
+// `defaultCycle()`, which walks the whole catalogue and turns the avatar into an egg, a hexagon
+// and a comet on the way past.
+const DEFAULT_CYCLE: Block[] = [
+  slowerBlock("idle"),
+  makeBlock("wink"),
+  slowerBlock("idle"),
+  makeBlock("wide"),
+  slowerBlock("idle"),
+];
+
+// The pose the decor rings are sampled from. They are drawn around the avatar rather than played
+// on it, because `orbit` is not shape-safe: as a state it replaces the body with its own.
+const RING_POSE = "orbit";
 
 // The motions that rest until the pointer or focus arrives. `idle` is here
 // because it is what a sidebar row shows while its agent does nothing, and the
 // sidebar is not virtualized, so every row animates for as long as the list is
 // on screen. A profile of an idle window found four `idle` avatars driving 83
 // style recalculations a second, and that did not fall when the window lost
-// focus or was minimized. `working` and `connecting` keep animating: motion is
-// the only sidebar signal that an agent runs.
+// focus or was minimized. A mood that carries its own motion keeps animating:
+// motion is the only sidebar signal that an agent runs.
 const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
 
 // Read from the avatar upwards: the first of these is its hover group. A `[tabindex]` element that
@@ -43,7 +60,7 @@ const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
 // composite widget states its own group with `data-avatar-hover`.
 const HOVER_GROUP = "[data-avatar-hover], button, a, [role='button'], [role='link'], [role='menuitem']";
 
-function slowerBlock(state: StateId): Block {
+function slowerBlock(state: ShapeSafeStateId): Block {
   const block = makeBlock(state);
   return { ...block, duration: block.duration * SIDEBAR_MOTION_HOLD_FACTOR };
 }
@@ -54,9 +71,10 @@ interface AgentAvatarProps {
   hue?: AvatarHue | null;
   url?: string | null;
   motion?: AvatarMotion;
+  /** What the agent is doing. It chooses the face, never the silhouette. */
+  mood?: AvatarMood;
   cycleOffset?: number;
   animationOffset?: number;
-  animationState?: StateId;
   shape?: SupportedAvatarSilhouetteId;
   class?: string;
   style?: Record<string, string>;
@@ -67,6 +85,8 @@ export function AgentAvatar(props: AgentAvatarProps) {
   const hue = () => (props.hue !== undefined ? props.hue : (props.agent?.avatarHue ?? null));
   const motion = () => props.motion ?? "hover";
   const url = () => (props.url !== undefined ? props.url : (props.agent?.avatarUrl ?? null));
+  const mood = (): AvatarMood => props.mood ?? "idle";
+  const presentation = () => avatarMoodPresentation(mood());
   const [imageFailed, setImageFailed] = createSignal(false);
   createEffect(
     () => url(),
@@ -75,6 +95,14 @@ export function AgentAvatar(props: AgentAvatarProps) {
     },
   );
   const className = () => `agent-avatar agent-avatar-motion-${motion()} ${props.class ?? ""}`;
+  // The custom property rides with the attribute rather than being set on every avatar: the
+  // keyframe is an infinite animation, and a selector that matched all of them would start one
+  // behind every resting row in the sidebar.
+  const breathe = () => (presentation().breathe > 0 ? String(presentation().breathe) : undefined);
+  const style = (): Record<string, string> => {
+    const amount = breathe();
+    return amount ? { ...props.style, "--agent-avatar-breathe": amount } : { ...props.style };
+  };
   return (
     <Show
       when={url() && !imageFailed()}
@@ -83,34 +111,30 @@ export function AgentAvatar(props: AgentAvatarProps) {
           seed={seed()}
           hue={hue()}
           motion={motion()}
+          mood={mood()}
           cycleOffset={props.cycleOffset}
           animationOffset={props.animationOffset}
-          animationState={props.animationState}
           shape={props.shape}
+          breathe={breathe()}
           class={className()}
-          style={props.style}
+          style={style()}
         />
       }
     >
       <span
         class={`${className()} agent-avatar-custom`}
-        style={props.style}
-        data-avatar={props.animationState === "thinking" ? "dots" : "image"}
-        data-animation-state={props.animationState}
+        style={style()}
+        data-avatar="image"
+        data-mood={mood()}
+        data-breathe={breathe()}
         aria-hidden="true"
       >
-        {/* A photo cannot morph, so the Bloub's own activity decor is drawn around it:
-            `thinking` hides the body behind three dots, every other state flies its rings. */}
-        <Show when={props.animationState !== "thinking"} fallback={<TypingDots class="agent-avatar-dots" />}>
-          <Show
-            when={props.animationState}
-            fallback={<AvatarImage url={url()} onFailed={() => setImageFailed(true)} />}
-          >
-            {(animationState) => (
-              <OrbitedAvatarImage url={url()} animationState={animationState()} onFailed={() => setImageFailed(true)} />
-            )}
-          </Show>
-        </Show>
+        {/* A photo cannot wear an expression, so the Bloub's own decor carries the mood around it.
+            A working agent used to hide behind three dots, which hid the one thing the person
+            chose; it now keeps its face and flies the same rings the generated avatar does. */}
+        <AvatarRings when={presentation().rings}>
+          <AvatarImage url={url()} onFailed={() => setImageFailed(true)} />
+        </AvatarRings>
       </span>
     </Show>
   );
@@ -120,38 +144,31 @@ function AvatarImage(props: { url: string | null; onFailed: () => void }) {
   return <img src={props.url ?? ""} alt="" draggable={false} onError={() => props.onFailed()} />;
 }
 
-// A pose whose decor a photo can wear. `burst` and `wide` carry theirs in the
-// body and the face, which a photo replaces, so they would leave it still for
-// the whole turn; they borrow the orbit rings instead. Asked of the engine
-// rather than listed here, so a pose that gains or loses rings upstream needs
-// no edit.
-function ringPose(state: StateId): StateId {
-  return new BotEngine(RAYON, state).sample(POSES[state]).arcs.length > 0 ? state : "orbit";
+/**
+ * The rings an orbiting Bloub flies, around the avatar instead of in place of it.
+ *
+ * They come from the engine rather than from CSS so that a custom avatar and a generated one in
+ * the same row carry the same decor: the same ellipses at the same speed, each split into the half
+ * behind the head and the half in front of it. What sits between those halves - a photo or the
+ * Bloub's own body - is what makes them read as orbits.
+ *
+ * Sampling them from a second engine is what lets a working avatar keep its silhouette. `orbit` as
+ * a *state* is not shape-safe: it replaces the body with its own. Taking only `frame.arcs` from it
+ * leaves that body behind and keeps the motion.
+ */
+function AvatarRings(props: { when: boolean; children: JSX.Element }) {
+  return (
+    <Show when={props.when} fallback={props.children}>
+      <OrbitRings>{props.children}</OrbitRings>
+    </Show>
+  );
 }
 
-// The rings an orbiting Bloub flies, around a photo instead of a body. They come
-// from the engine rather than from CSS so that a custom avatar and a generated one
-// in the same row carry the same decor: the same ellipses at the same speed, each
-// split into the half behind the head and the half in front of it. The image sits
-// between those halves, which is what makes them read as orbits.
-function OrbitedAvatarImage(props: { url: string | null; animationState: StateId; onFailed: () => void }) {
-  let pose = ringPose(props.animationState);
-  let elapsed = POSES[pose];
+function OrbitRings(props: { children: JSX.Element }) {
+  let elapsed = POSES[RING_POSE];
   let ringsSeen = false;
-  const engine = new BotEngine(RAYON, pose);
-  const [frame, setFrame] = createSignal(engine.sample(elapsed), { equals: false });
-
-  createEffect(
-    () => props.animationState,
-    (state) => {
-      const next = ringPose(state);
-      // The effect also runs on mount, where the engine already holds the pose.
-      if (next === pose) return;
-      pose = next;
-      ringsSeen = false;
-      engine.reset(next, elapsed);
-    },
-  );
+  const engine = new BotEngine(RAYON, RING_POSE);
+  const [arcs, setArcs] = createSignal<BotFrame["arcs"]>(engine.sample(elapsed).arcs, { equals: false });
 
   onSettled(() => {
     if (prefersReducedMotion()) return;
@@ -165,18 +182,16 @@ function OrbitedAvatarImage(props: { url: string | null; animationState: StateId
       if (elapsed - drawnAt < 1 / AVATAR_FPS) return;
       drawnAt = elapsed;
       let sampled = engine.sample(elapsed);
-      // A pose plays once, and its rings fade out before it ends — orbit holds
-      // them for 3.6s of a 4.3s block. The body keeps the generated avatar alive
-      // through that tail; a photo would simply stop. So the pose restarts on the
-      // frame its rings run out, which is the engine's own measure of the cycle
-      // rather than a duration restated here.
+      // A pose plays once, and its rings fade out before it ends - orbit holds them for 3.6s of a
+      // 4.3s block. So the pose restarts on the frame its rings run out, which is the engine's own
+      // measure of the cycle rather than a duration restated here.
       if (ringsSeen && sampled.arcs.length === 0) {
         ringsSeen = false;
-        engine.reset(pose, elapsed);
+        engine.reset(RING_POSE, elapsed);
         sampled = engine.sample(elapsed);
       }
       ringsSeen ||= sampled.arcs.length > 0;
-      setFrame(sampled);
+      setArcs(sampled.arcs);
     };
     handle = requestAnimationFrame(step);
     return () => cancelAnimationFrame(handle);
@@ -184,9 +199,9 @@ function OrbitedAvatarImage(props: { url: string | null; animationState: StateId
 
   return (
     <>
-      <AvatarArcs arcs={frame().arcs} half="back" />
-      <AvatarImage url={props.url} onFailed={props.onFailed} />
-      <AvatarArcs arcs={frame().arcs} half="front" />
+      <AvatarArcs arcs={arcs()} half="back" />
+      {props.children}
+      <AvatarArcs arcs={arcs()} half="front" />
     </>
   );
 }
@@ -239,26 +254,33 @@ function GeneratedAvatar(props: {
   seed: string;
   hue: AvatarHue | null;
   motion: AvatarMotion;
+  mood: AvatarMood;
   cycleOffset?: number;
   animationOffset?: number;
-  animationState?: StateId;
   shape?: SupportedAvatarSilhouetteId;
+  breathe?: string;
   class: string;
   style?: Record<string, string>;
 }) {
   let element: HTMLSpanElement | undefined;
   const [interacting, setInteracting] = createSignal(false);
   const [reducedMotion, setReducedMotion] = createSignal(prefersReducedMotion());
-  const frozenAt = props.animationState ? POSES[props.animationState] : 0;
+  const presentation = createMemo(() => avatarMoodPresentation(props.mood));
   const profile = createMemo(() => bloubAvatarProfile(props.seed, props.hue));
+  // The silhouette and the colour are identity and come only from the seed. The mood may lend the
+  // face an expression; when it does not, the seeded one is the resting face.
+  const appearance = createMemo(() => ({
+    shape: props.shape ?? profile().shape,
+    color: profile().color,
+    expression: presentation().expression ?? profile().expression,
+  }));
   const cycle = createMemo(() => offsetCycle(DEFAULT_CYCLE, props.cycleOffset ?? 0));
+  // A mood that carries its own motion has to be seen without being pointed at; the resting moods
+  // keep the hover gating that the perf note above is about.
   const animated = () =>
-    !reducedMotion() && (Boolean(props.animationState) || !STATIC_MOTIONS.has(props.motion) || interacting());
+    !reducedMotion() && (avatarMoodIsBusy(props.mood) || !STATIC_MOTIONS.has(props.motion) || interacting());
   const motionCycle = () => {
-    if (props.animationState) return [slowerBlock(props.animationState)];
-    if (props.motion === "connecting") return CONNECTING_CYCLE;
-    if (props.motion === "idle") return IDLE_CYCLE;
-    if (props.motion === "working") return WORKING_CYCLE;
+    if (props.mood !== "idle") return [slowerBlock(presentation().state)];
     return cycle();
   };
 
@@ -297,9 +319,9 @@ function GeneratedAvatar(props: {
   const avatar = () => (
     <BloubBot
       size={100}
-      shape={props.shape ?? profile().shape}
-      color={profile().color}
-      expression={profile().expression}
+      shape={appearance().shape}
+      color={appearance().color}
+      expression={appearance().expression}
       cycle={motionCycle()}
       playing={true}
       fps={AVATAR_FPS}
@@ -315,30 +337,33 @@ function GeneratedAvatar(props: {
       class={`${props.class} agent-avatar-bloub`}
       style={props.style}
       data-avatar="generated"
-      data-animation-state={props.animationState}
+      data-mood={props.mood}
+      data-breathe={props.breathe}
       aria-hidden="true"
     >
-      <Show
-        when={animated()}
-        fallback={
-          // A frozen Bloub frame cannot finish a shape morph. Recreate it when the profile changes.
-          <Show when={profile()} keyed>
-            {(appearance) => (
-              <BloubBot
-                size={100}
-                shape={props.shape ?? appearance.shape}
-                color={appearance.color}
-                expression={appearance.expression}
-                frozenAt={frozenAt}
-                ariaLabel=""
-                class="bloub-avatar-svg"
-              />
-            )}
-          </Show>
-        }
-      >
-        {avatar()}
-      </Show>
+      <AvatarRings when={presentation().rings}>
+        <Show
+          when={animated()}
+          fallback={
+            // A frozen Bloub frame cannot finish a morph. Recreate it when the appearance changes.
+            <Show when={appearance()} keyed>
+              {(frozen) => (
+                <BloubBot
+                  size={100}
+                  shape={frozen.shape}
+                  color={frozen.color}
+                  expression={frozen.expression}
+                  frozenAt={POSES[presentation().state]}
+                  ariaLabel=""
+                  class="bloub-avatar-svg"
+                />
+              )}
+            </Show>
+          }
+        >
+          {avatar()}
+        </Show>
+      </AvatarRings>
     </span>
   );
 }

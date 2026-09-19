@@ -4,6 +4,7 @@ import { DirectConversation } from "../../lazy-views";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
 import { useAgentActions } from "../agents/agent-actions";
+import { computeAgentAvatarMoods } from "../agents/agent-avatar-mood";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
@@ -34,7 +35,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { setSkillsMarketplaceOpen } = useSettings();
   const { agentList, activeAgent, agentSetupDraft, duplicatingAgentIds, openBotSetup } = useAgents();
   const { editAgent, duplicateAgent, deleteAgent } = useAgentActions();
-  const { activeTurns, queues } = useTurns();
+  const { activeTurns, queues, failedTurns, pendingPrompts, pendingApprovals } = useTurns();
   const { unreadReplies, recentReplies } = useConversation();
   const { directPeople } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
@@ -68,6 +69,20 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     }),
   );
 
+  /* The badge says what an agent is doing; the face says how it is going. They read the same
+   * signals, and `isAgentWorking` is shared between them, so the two cannot disagree. */
+  const agentMoods = createMemo(() =>
+    computeAgentAvatarMoods({
+      agentIds: agentList().map((agent) => agent.id),
+      activeTurns: activeTurns(),
+      queues: queues(),
+      failedTurns: failedTurns(),
+      pendingPrompts: pendingPrompts(),
+      pendingApprovals: pendingApprovals(),
+      recentReplies: recentReplies(),
+    }),
+  );
+
   return (
     <Sidebar
       channels={visibleChannels()}
@@ -91,6 +106,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       directThreads={directThreads()}
       activeDirectMemberId={activeDirectMemberId()}
       agentStates={sidebarAgentStates()}
+      agentMoods={agentMoods()}
       layout={sidebarLayout()}
       layoutMutable={activeServerSupportsCapability("sidebar-layout")}
       collapsedSectionIds={collapsedSidebarSectionIds()}
