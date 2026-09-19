@@ -55,6 +55,7 @@ const PERMISSION_TIMEOUT_MS = 10_000;
  */
 const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
+const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
 
 /**
  * The grants the driver needs, in the order the panel lists them.
@@ -309,6 +310,7 @@ export class CuaDriverRuntime {
         ...process.env,
         [EMBEDDED_ENV]: "1",
         [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
+        ...waylandEnvironment(this.#options.platform),
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -384,6 +386,22 @@ function ungranted(platform: NodeJS.Platform): ComputerUsePermission[] {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Turns on the driver's Wayland backend, on a Wayland session that has not decided already.
+ *
+ * The driver treats X11 as its supported Linux desktop and keeps the native Wayland backend behind
+ * this variable. Without it a Wayland session falls back to XWayland, where the driver sees only the
+ * XWayland clients and misses every native application on the screen. OpenBot starts the daemon, so
+ * OpenBot is what has to say which desktop it woke up on.
+ *
+ * A value the user set already is left alone, so the fallback stays reachable when a compositor
+ * handles the native backend badly.
+ */
+function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
+  if (platform !== "linux" || process.env[WAYLAND_ENV] !== undefined) return {};
+  return process.env.XDG_SESSION_TYPE === "wayland" ? { [WAYLAND_ENV]: "1" } : {};
 }
 
 /**

@@ -69,6 +69,14 @@ and Windows uses `irm https://cua.ai/driver/install.ps1 | iex` in PowerShell.
 `bun run cua-driver:doctor` reports which binary OpenBot would use, and `OPENBOT_CUA_DRIVER_PATH`
 selects a different one.
 
+On Linux the driver reads the desktop through AT-SPI, so it needs the session bus of the desktop it
+is to drive. A daemon started from a container, from `runuser`, or as root against another user's
+session finds an empty accessibility tree, and `get_window_state` reports `degraded`. X11 is the
+driver's fully supported Linux session. On Wayland OpenBot starts the driver with
+`CUA_DRIVER_RS_ENABLE_WAYLAND=1`; set that variable yourself to `0` if your compositor works better
+through XWayland. Window rectangles under GNOME also need the driver's own `winrects@cua` shell
+extension, which its installer refreshes but does not enable for you.
+
 If the panel reports that permissions are needed, open **System Settings → Privacy & Security** and
 grant both **Screen & System Audio Recording** and **Accessibility**, then press **Check again**. A
 development build asks for the grants as **Electron**, not as OpenBot, because the development binary

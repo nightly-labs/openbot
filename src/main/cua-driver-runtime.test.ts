@@ -17,6 +17,7 @@ const STAND_IN_DAEMON = ["/bin/sleep", "30"] as const;
 const directories: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
@@ -181,6 +182,31 @@ describe("CuaDriverRuntime", () => {
     });
     await expect(tooDeep.driver.start()).rejects.toThrow(/107/);
     expect(tooDeep.spawned).toHaveLength(0);
+  });
+
+  // The driver keeps its native Wayland backend behind a variable, and without it a Wayland session
+  // falls back to XWayland, where the driver sees only XWayland clients and misses every native
+  // window. OpenBot starts the daemon, so OpenBot is what knows which session it woke up on.
+  it("turns on the Wayland backend on a Wayland session, and leaves an X11 one alone", async () => {
+    vi.stubEnv("XDG_SESSION_TYPE", "wayland");
+    const wayland = await runtime({ platform: "linux" });
+    await wayland.driver.start();
+    expect(wayland.spawned[0].options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("1");
+
+    vi.stubEnv("XDG_SESSION_TYPE", "x11");
+    const x11 = await runtime({ platform: "linux" });
+    await x11.driver.start();
+    expect(x11.spawned[0].options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBeUndefined();
+  });
+
+  // A user who turned the backend off did so because their compositor handles it badly.
+  it("leaves a Wayland choice the user made already", async () => {
+    vi.stubEnv("XDG_SESSION_TYPE", "wayland");
+    vi.stubEnv("CUA_DRIVER_RS_ENABLE_WAYLAND", "0");
+    const { driver, spawned } = await runtime({ platform: "linux" });
+    await driver.start();
+
+    expect(spawned[0].options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("0");
   });
 
   // Windows and Linux put no permission between a program and the desktop it already runs on. An
