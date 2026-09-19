@@ -71,11 +71,12 @@ const Providers = createSimpleContext({
       return window.openbot.openExternal(descriptor.installGuideLink);
     }
 
-    function openProviderSignInGuide(provider: AgentProviderId): Promise<void> {
-      if (provider === "claude") return window.openbot.openExternal("claude-sign-in");
-      return connectProvider(provider);
-    }
-
+    /**
+     * Signs the user in to one provider, through that provider's own login: Codex opens a browser,
+     * Claude and Grok run their CLI's OAuth command, and OpenCode is asked again. Every sign-in
+     * entry point calls this - the composer notice, the model picker, onboarding and settings - so
+     * none of them leaves the user to read a documentation page and sign in in a terminal.
+     */
     async function connectProvider(provider: AgentProviderId): Promise<void> {
       if (refreshingProviders()) return;
       const analytics = desktopAnalytics.scope();
@@ -130,7 +131,6 @@ const Providers = createSimpleContext({
       applyAgentStatus,
       connectProvider,
       openProviderInstallGuide,
-      openProviderSignInGuide,
       refreshAgentProviders,
     };
   },
