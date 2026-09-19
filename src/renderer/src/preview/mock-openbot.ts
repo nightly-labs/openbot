@@ -2023,6 +2023,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => inviteListeners.delete(listener);
       },
     },
+    plugins: {
+      // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
     host: {
       getStatus: async () => clone(hostStatus),
       configure: async (input: ConfigureHostInput) => {

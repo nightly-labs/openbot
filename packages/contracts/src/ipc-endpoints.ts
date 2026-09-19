@@ -308,6 +308,13 @@ export const IPC_ENDPOINTS = {
     setEnabled: request(IPC_CHANNELS.serversSetMcpServerEnabled),
     test: request(IPC_CHANNELS.serversTestMcpServer),
   },
+  // The plugin deep link, its own group because its registrar holds the pending link rather than a
+  // service. `takePendingListing` is what a window that finished loading after the link arrived
+  // asks for; `openListing` is the same slug pushed to a window that was already there.
+  plugins: {
+    takePendingListing: request(IPC_CHANNELS.pluginsTakePendingListing),
+    openListing: event(IPC_CHANNELS.pluginsOpenListing),
+  },
   host: {
     getStatus: request(IPC_CHANNELS.hostGetStatus),
     configure: request(IPC_CHANNELS.hostConfigure),

@@ -5,7 +5,7 @@
   "description": "PostHog lets agents query events and funnels, inspect feature flags, and summarize what changed after a release. A personal API key from the project settings goes into one Authorization header.",
   "category": "data-analytics",
   "creatorName": "posthog.com",
-  "iconUrl": "https://posthog.com/favicon.ico",
+  "iconUrl": "https://app.posthog.com/static/icons/apple-touch-icon.png",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-funnel", "text": "How does the signup funnel look for the last 14 days?" },
@@ -17,7 +17,7 @@
       "id": "app-posthog-mcp",
       "name": "PostHog",
       "description": "Event, funnel, and feature-flag access, over PostHog's MCP server with a personal API key.",
-      "iconUrl": "https://posthog.com/favicon.ico",
+      "iconUrl": "https://app.posthog.com/static/icons/apple-touch-icon.png",
       "server": {
         "name": "posthog",
         "transport": "http",

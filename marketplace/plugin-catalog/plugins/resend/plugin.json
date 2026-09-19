@@ -5,7 +5,7 @@
   "description": "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
   "category": "automation",
   "creatorName": "resend.com",
-  "iconUrl": "https://resend.com/favicon.ico",
+  "iconUrl": "https://resend.com/static/favicons/favicon.ico",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-send", "text": "Send the launch announcement draft to the beta list." },
@@ -17,7 +17,7 @@
       "id": "app-resend-mcp",
       "name": "Resend",
       "description": "Email sending and delivery checks, over a local MCP server with a Resend API key.",
-      "iconUrl": "https://resend.com/favicon.ico",
+      "iconUrl": "https://resend.com/static/favicons/favicon.ico",
       "server": {
         "name": "resend",
         "transport": "stdio",

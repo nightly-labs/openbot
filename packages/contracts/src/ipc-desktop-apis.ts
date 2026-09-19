@@ -408,6 +408,15 @@ export interface ServersDesktopApi {
   onInvite: (listener: (inviteUrl: string) => void) => () => void;
 }
 
+/**
+ * The plugin deep link. Both carry a slug, never a listing: the catalog is already in the renderer,
+ * and a link that carried the listing itself would let the address bar describe what gets installed.
+ */
+export interface PluginsDesktopApi {
+  takePendingListing: () => Promise<string | null>;
+  onOpenListing: (listener: (slug: string) => void) => () => void;
+}
+
 export interface HostDesktopApi {
   getStatus: () => Promise<HostStatus>;
   configure: (input: ConfigureHostInput) => Promise<HostStatus>;
@@ -535,6 +544,7 @@ export interface OpenBotDesktopApi {
   update: UpdateDesktopApi;
   maintenance: MaintenanceDesktopApi;
   servers: ServersDesktopApi;
+  plugins: PluginsDesktopApi;
   host: HostDesktopApi;
   remoteDesktop: RemoteDesktopDesktopApi;
 }

@@ -5,7 +5,7 @@
   "description": "Canva lets users create and edit designs in words, search their own design library, upload and organize assets, export in the format a channel needs, and leave comments where the work is. Each user signs in to their own Canva account, and the agent can do what that account can do.",
   "category": "design",
   "creatorName": "canva.com",
-  "iconUrl": "https://static.canva.com/static/images/favicon.ico",
+  "iconUrl": "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-recent-design", "text": "Show me my most recently edited Canva design." },
@@ -17,7 +17,7 @@
       "id": "app-canva-mcp",
       "name": "Canva",
       "description": "Design creation and editing, library search, asset and brand management, exports, and comments, over one MCP server.",
-      "iconUrl": "https://static.canva.com/static/images/favicon.ico",
+      "iconUrl": "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
       "server": {
         "name": "canva",
         "transport": "stdio",

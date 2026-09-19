@@ -10,6 +10,22 @@ export const SKILL_CATEGORIES = [
 ] as const;
 
 export type SkillCategory = (typeof SKILL_CATEGORIES)[number];
+
+/**
+ * What a category is called where a person reads it. Here rather than in the renderer because the
+ * public plugin pages name the same categories, and two lists would drift the first time one is
+ * renamed.
+ */
+export const SKILL_CATEGORY_LABELS: Record<SkillCategory, string> = {
+  coding: "Coding",
+  design: "Design",
+  "data-analytics": "Data & Analytics",
+  documents: "Documents",
+  productivity: "Productivity",
+  research: "Research",
+  automation: "Automation",
+  other: "Other",
+};
 export type SkillReviewStatus = "pending" | "approved" | "rejected";
 export type InstalledSkillState = "installed" | "update-available" | "modified" | "needs-repair";
 
