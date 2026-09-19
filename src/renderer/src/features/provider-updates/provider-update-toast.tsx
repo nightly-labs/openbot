@@ -1,8 +1,9 @@
 import { ProviderLogo } from "@openbot/brand";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createRoot, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { createRoot, createSignal, Show } from "solid-js";
 import { Progress, TOAST_DURATION, toast } from "../../components/ui";
+import { createDigitRoll } from "../../digit-roll";
 import { type ProviderUpdate, type ProviderUpdatePresentation, presentProviderUpdate } from "./provider-update";
 
 /**
@@ -46,39 +47,13 @@ function providerIcon(provider: AgentProviderId): JSX.Element {
   return <ProviderLogo provider={provider} class="provider-update-toast-logo" />;
 }
 
-/** Batch rapid progress events so the number has time to settle between changes.
- * The progressbar still reports the current value to assistive technology.
- */
+/** The progressbar beside it still reports the current value to assistive technology. */
 function ProviderUpdatePercent(props: { percent: number }): JSX.Element {
-  const [displayed, setDisplayed] = createSignal(untrack(() => props.percent));
-  let latest = untrack(() => props.percent);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let digitGroup: HTMLSpanElement | undefined;
-
-  createEffect(
-    () => props.percent,
-    (percent) => {
-      latest = percent;
-      if (timer !== undefined || percent === untrack(displayed)) return;
-      // Use the newest value, not a queue of obsolete download events.
-      timer = setTimeout(() => {
-        timer = undefined;
-        setDisplayed(latest);
-      }, 400);
-    },
-  );
-  onCleanup(() => clearTimeout(timer));
-
-  createEffect(displayed, () => {
-    if (!digitGroup) return;
-    digitGroup.classList.remove("is-animating");
-    void digitGroup.offsetHeight;
-    digitGroup.classList.add("is-animating");
-  });
+  const roll = createDigitRoll(() => props.percent);
 
   return (
-    <span ref={digitGroup} class="provider-update-toast-percent t-digit-group" aria-hidden="true">
-      <span class="t-digit">{displayed()}%</span>
+    <span ref={roll.ref} class="provider-update-toast-percent t-digit-group" aria-hidden="true">
+      <span class="t-digit">{roll.displayed()}%</span>
     </span>
   );
 }

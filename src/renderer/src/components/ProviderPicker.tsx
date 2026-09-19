@@ -563,17 +563,17 @@ function providerStatusLabel(
   runtimeStatus?: ProviderRuntimeStatus,
   updatable = false,
 ): string {
-  if (connecting && state !== "available") return translate("provider.status.connecting");
-  // Ahead of both "Connected" and "Ready": an offer the row does not show is an
-  // offer the user never sees, and "ready" is the phase every update starts from.
-  if (updatable) return translate("provider.status.updateAvailable");
-  // A download outranks "Connected": an update runs on a provider that is connected already, so
-  // reporting the connection instead would hide both the progress the Cancel button reverses and
-  // the failure the Retry button beside it answers.
+  // A download outranks every connection word, including "Connecting": main holds the provider in
+  // that state for the whole install it wraps around the download, so reporting the connection
+  // instead would hide the progress the Cancel button beside it reverses for its full length.
   if (runtimeStatus?.phase === "downloading") {
     return `${Math.round(Math.max(0, Math.min(100, runtimeStatus.progress ?? 0)))}%`;
   }
   if (runtimeStatus?.phase === "finishing") return translate("provider.status.settingUp");
+  if (connecting && state !== "available") return translate("provider.status.connecting");
+  // Ahead of both "Connected" and "Ready": an offer the row does not show is an
+  // offer the user never sees, and "ready" is the phase every update starts from.
+  if (updatable) return translate("provider.status.updateAvailable");
   if (runtimeStatus?.phase === "download-error") return translate("provider.status.downloadFailed");
   if (state === "available") return translate("provider.status.connected");
   if (runtimeStatus?.phase === "not-downloaded") return translate("provider.status.notDownloaded");
@@ -591,10 +591,13 @@ function providerVisualState(
   runtimeStatus?: ProviderRuntimeStatus,
   updatable = false,
 ): ProviderVisualState {
+  const phase = runtimeStatus?.phase;
+  // Same order as the label: the install main runs around a download keeps the provider
+  // "connecting", and the row says what the download is doing until it ends.
+  if (phase === "downloading" || phase === "finishing") return phase;
   if (connecting && state !== "available") return "connecting";
   if (updatable) return "update-available";
-  const phase = runtimeStatus?.phase;
-  if (phase === "downloading" || phase === "finishing" || phase === "download-error") return phase;
+  if (phase === "download-error") return phase;
   if (state === "available") return "available";
   return phase ?? state;
 }
