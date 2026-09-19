@@ -59,13 +59,15 @@ platforms.
 
 ## Computer Use is unavailable
 
-Computer Use needs the `cua-driver` binary. On macOS it also needs the Screen Recording and
-Accessibility permissions; Windows and Linux ask for no permission, so there a driver that answers is
-ready. OpenBot starts the driver itself; it does not bypass the macOS prompts.
+Computer Use needs the `cua-driver` binary. An installed release carries it, so the panel reporting
+a missing driver means a development build, or a file that was removed. On macOS it also needs the
+Screen Recording and Accessibility permissions; Windows and Linux ask for no permission, so there a
+driver that answers is ready. OpenBot starts the driver itself; it does not bypass the macOS prompts.
 
 If the panel reports that the driver is missing, install it with the command the panel shows, then
 press **Check again**. The command is different on each desktop: macOS and Linux use a shell script,
-and Windows uses `irm https://cua.ai/driver/install.ps1 | iex` in PowerShell.
+and Windows uses `irm https://cua.ai/driver/install.ps1 | iex` in PowerShell. In a checkout,
+`bun run prepare:cua-driver` writes the same pinned build the release ships.
 `bun run cua-driver:doctor` reports which binary OpenBot would use, and `OPENBOT_CUA_DRIVER_PATH`
 selects a different one.
 

@@ -41,6 +41,7 @@ index-*.css
 .claude/worktrees/
 .claude/settings.local.json
 /build/cloudflared/
+/build/cua-driver/
 /build/codex/
 /build/claude/
 /build/grok/

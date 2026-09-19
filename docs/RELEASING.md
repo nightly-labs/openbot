@@ -120,6 +120,34 @@ Run it on a version bump only. A bump also needs the Windows checks in
 published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
 before release.
 
+## Pin the Computer Use driver
+
+`native-runtime.lock.json` pins `cua-driver`, the third-party binary that gives every provider
+Computer Use, by release tag, asset SHA-256, and one SHA-256 for each file OpenBot ships. Unlike the
+provider CLIs, the driver is packaged rather than downloaded on demand, so the release carries it and
+the user installs nothing.
+
+```bash
+bun run pin:cua-driver 0.28.2
+```
+
+The script downloads all three `-binary` release assets, hashes each shipped file, and refuses a
+release that renamed an asset or dropped a file. It prints the block for review instead of rewriting
+the lock, so paste it over the `cuaDriver` entry. Use the versioned `cua-driver-rs-v*` tags; the
+`nightly-cua-driver-rs-v*` tags are rebuilt daily and are not a pin.
+
+`bun run prepare:cua-driver` then writes `build/cua-driver/<platform>/<arch>` from the pin, verifying
+every digest before and after it installs, and `electron-builder.yml` copies that directory to
+`resources/cua-driver/<platform>/<arch>`. Every `package`, `package:*`, `dist:*` and `dist:release`
+run does this first. Each installer carries only its own target's driver, and the package verifiers
+check both that the driver is present and that no other platform's is.
+
+On macOS the driver arrives signed by Cua AI with the hardened runtime, a secure timestamp, and the
+Automation entitlement. `mac.signIgnore` keeps that signature: re-signing it under OpenBot's
+inherited entitlements would drop the entitlement and break the driver's Automation route.
+Notarization accepts a nested binary signed by another Developer ID team, and
+`verify-macos-package.ts` fails if the Cua AI authority or the hardened runtime flag is ever lost.
+
 ## Publish a version
 
 Start from a clean, up-to-date `main` branch. For the first release, `package.json` and

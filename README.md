@@ -25,7 +25,7 @@ messaging in one desktop app.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
 - Shared desktop channel chats with one task owner, explicit delegation, shared history, and Stop, Resume, Reassign, Archive, and Restore controls.
 - A persistent embedded browser that agents can open, inspect, and control.
-- Optional Computer Use on macOS, Windows and Linux through `cua-driver`, which OpenBot starts as its own child process and gives to every provider.
+- Optional Computer Use on macOS, Windows and Linux through the `cua-driver` binary in the release, which OpenBot starts as its own child process and gives to every provider.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.
 - Local data and privacy-safe diagnostics exports from the account menu.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
@@ -114,8 +114,8 @@ On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
 
 Bun and Node.js are not required when using an installed release. Optional Computer Use works on
-macOS, Windows and Linux. Only macOS asks for a permission for it: Screen Recording and
-Accessibility.
+macOS, Windows and Linux, and the release carries the driver, so there is nothing to install. Only
+macOS asks for a permission for it: Screen Recording and Accessibility.
 
 OpenBot uses the existing local CLI login. It does not copy provider credentials. Grok's
 `XAI_API_KEY` and per-session MCP bearer tokens are never persisted or logged.
@@ -241,6 +241,8 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary. |
+| `bun run prepare:cua-driver` | Write the pinned Computer Use driver to `build/cua-driver/<platform>/<arch>`, verifying every SHA-256 in `native-runtime.lock.json`. Name another target with `bun scripts/install-cua-driver.ts <platform> <arch>`. Every packaging command runs this first. |
+| `bun run pin:cua-driver <version>` | Print a new `cuaDriver` block for `native-runtime.lock.json` from a published `cua-driver` release. Downloads all three targets and hashes each shipped file. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |

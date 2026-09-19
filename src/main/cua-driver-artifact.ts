@@ -49,9 +49,10 @@ export function isSupportedCuaDriverTarget(platform: NodeJS.Platform, architectu
  * binary must never throw out of startup. Every candidate is checked for the execute bit rather
  * than for existence, because a half-extracted download is a file that cannot be spawned.
  *
- * Packaged builds are expected to carry the binary under `resources/cua-driver`. Nothing writes it
- * there yet; the pin belongs in `native-runtime.lock.json` with the other runtimes, and this
- * function is the seam that will read it.
+ * A packaged build carries the binary under `resources/cua-driver/<platform>/<architecture>`, and a
+ * checkout under `build/cua-driver/<platform>/<architecture>`. `scripts/install-cua-driver.ts`
+ * writes the second path from the pin in `native-runtime.lock.json`, and `electron-builder.yml`
+ * copies it to the first. A hand-installed driver is still found, one candidate later.
  */
 export async function resolveCuaDriver(input: CuaDriverArtifactInput): Promise<string | null> {
   if (!isSupportedCuaDriverTarget(input.platform, input.architecture)) return null;

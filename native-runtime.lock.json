@@ -165,6 +165,46 @@
       }
     }
   },
+  "cuaDriver": {
+    "repository": "https://github.com/trycua/cua",
+    "tag": "cua-driver-rs-v0.28.2",
+    "version": "0.28.2",
+    "license": "MIT",
+    "licenseSha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
+    "artifacts": {
+      "darwin-arm64": {
+        "asset": "cua-driver-rs-0.28.2-darwin-universal-binary.tar.gz",
+        "assetSha256": "386db225a3080714a0f9f935525e61efaf46709587ef8b94dd2df81aeb2f6daa",
+        "downloadBytes": 43629843,
+        "files": {
+          "cua-driver": "af30d29cf33bd3bbda1330be7225b18881ea4c5af6df374e08627914b5ac334d",
+          "cua-cursor-theme": "0febe861479183e8eca3296921035cbf54abaae88d81f711797776a9cd0ded03"
+        }
+      },
+      "linux-x64": {
+        "asset": "cua-driver-rs-0.28.2-linux-x86_64-binary.tar.gz",
+        "assetSha256": "a1d99fd04bb4927ef5ffdbe60eb91ed8b51a2bab60e10fc604a75bd59ce69c3e",
+        "downloadBytes": 30603028,
+        "files": {
+          "cua-driver": "3739101d072bdfdd83b7e70b3a16d9271f6eb124e7c5e69b3406f20f0910a4ca",
+          "cua-cursor-theme": "21e483f9e5986dcd19a4c665de4b23ef413e981a20abfc35940138cdcf286ddb",
+          "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
+          "wayland-helper/README.md": "0c38155388bdb5b3a276c4d434fbc5311ed7bb775ae6b04969f50de81c8c2703",
+          "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
+          "wayland-helper/winrects@cua/extension.js": "27aac56799574ecd201e810d32772d3695d8b6ace5ab4a68d026648009004eed"
+        }
+      },
+      "win32-x64": {
+        "asset": "cua-driver-rs-0.28.2-windows-x86_64-binary.zip",
+        "assetSha256": "1f4bfceeab64cb7f56be7aad774c3dc2d2910d1427e4be1d79939c706e8029ba",
+        "downloadBytes": 29085823,
+        "files": {
+          "cua-driver.exe": "dbbd52d75759900155fbf3d5f0a13c759a12d06ef17338b88b3f2b8b9c1ef8dc",
+          "cua-cursor-theme.exe": "5b1d9421217edbdeafa4b2b77029217b0ba0e6e3fc449d5afdf87fccfd85637d"
+        }
+      }
+    }
+  },
   "remoteDesktop": {
     "recipeVersion": 9,
     "sunshine": {

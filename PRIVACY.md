@@ -256,11 +256,12 @@ give an agent a task you would not allow a local command-line tool to perform.
 On first launch, OpenBot explains this access and does not start the agent services until you
 explicitly accept it. The acceptance record stays in OpenBot's local application-support directory.
 
-Computer Use is provided by `cua-driver`, a local binary that you install and that OpenBot starts as
-its own child process. It stops when OpenBot stops. Because OpenBot starts it directly, macOS
-attributes the Screen Recording and Accessibility grants to OpenBot, and macOS keeps control of the
-prompts. Windows and Linux ask for no such grant. Screen contents and accessibility trees that an agent reads through the driver go to that
-agent's provider, the same as any other message content.
+Computer Use is provided by `cua-driver`, a local binary that OpenBot ships and starts as its own
+child process. It starts only when you open the Computer Use panel or an agent uses the function, and
+it stops when OpenBot stops. Because OpenBot starts it directly, macOS attributes the Screen Recording
+and Accessibility grants to OpenBot, and macOS keeps control of the prompts. Windows and Linux ask for
+no such grant. Screen contents and accessibility trees that an agent reads through the driver go to
+that agent's provider, the same as any other message content.
 
 The driver is third-party software with its own product analytics, which are **on by default** and are
 not OpenBot's. It sends the driver version, the operating system, a random installation identifier, and
