@@ -1555,11 +1555,14 @@ a {
 @media (max-width: 640px) {
   .landing-header {
     min-height: 68px;
+    flex-wrap: wrap;
     gap: 12px;
+    row-gap: 10px;
     padding: 15px 16px;
   }
 
   .landing-brand {
+    flex-shrink: 0;
     gap: 8px;
     font-size: 15px;
   }
@@ -1570,7 +1573,9 @@ a {
   }
 
   .landing-navigation {
+    flex-wrap: wrap;
     gap: 7px;
+    row-gap: 7px;
   }
 
   .landing-navigation .landing-button-sm {
@@ -1834,7 +1839,9 @@ a {
    `place-items` is what centres that title without a second positioned layer. */
 .post-featured-art,
 .post-card-art,
-.post-article-art {
+.post-article-art,
+.plugin-card-art,
+.plugin-prompts-card {
   position: relative;
   display: grid;
   place-items: center;
@@ -1864,6 +1871,13 @@ a {
   border-radius: 14px;
 }
 
+/* Squarer than an article card: what sits in the middle is a mark rather than a
+   line of words, and a wide frame leaves it stranded in empty colour. */
+.plugin-card-art {
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+}
+
 /* Layer order inside the frame, bottom to top: the CSS approximation and the
    generated PNG are two backgrounds of this element, and the shader canvas is
    prepended by the library at z-index -1, which paints over a background but
@@ -1871,6 +1885,14 @@ a {
 .post-gradient {
   position: absolute;
   inset: 0;
+  /* Clipped three ways, for the one picture. The canvas is prepended at z-index -1,
+     and Firefox on a GPU gives it a compositing layer of its own: a layer is not cut
+     by an ancestor's rounded corner, so the picture stayed square inside a round card.
+     `isolation` keeps the negative layer in this host rather than in a stacking context
+     further up, `overflow` cuts it here, and the corner on the canvas itself is what
+     rounds the layer when the other two are composited around it. */
+  isolation: isolate;
+  overflow: hidden;
   border-radius: inherit;
   background-position: center;
   background-size: cover;
@@ -1881,6 +1903,7 @@ a {
    a frame, and it arrives as a fade: the picture underneath it is the same first
    frame, so a reader sees the artwork start to move rather than change. */
 .post-gradient > canvas {
+  border-radius: inherit;
   opacity: 0;
   transition: opacity var(--openbot-duration-slow) var(--openbot-ease-out);
 }
@@ -2509,5 +2532,779 @@ a {
   .post-media-toggle {
     transition: none;
     transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   /plugins and /plugins/<slug>.
+
+   The index reads as a sibling of /news and /guides, and it is built from the
+   same parts: the article frame, the gradient that runs in it under a pointer,
+   and the per-card reveal. A listing is recognised before it is read, so the
+   mark is the largest thing on a card and the words under it are only the two a
+   reader needs to choose. Nothing about a card's shape moves.
+
+   The listing page is built from the same parts, and from the article page's
+   column as well: it opens on the picture the card a reader pressed was already
+   carrying, under the back link, the title and the standfirst that /news and
+   /guides set. Only the rules below are its own, and they are the ones that turn
+   the boxed lists it used to draw into text. A later change to an article page's
+   type scale moves this page with it, which is the point of borrowing the
+   classes rather than copying them. */
+
+.plugin-intro {
+  margin-top: clamp(28px, 3.5vw, 50px);
+}
+
+.plugin-intro-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: clamp(30px, 3.4vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.plugin-grid-section {
+  margin-top: clamp(32px, 4vw, 48px);
+}
+
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(18px, 2vw, 26px);
+}
+
+.plugin-card {
+  display: block;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.plugin-card:focus-visible {
+  border-radius: 24px;
+  outline: 3px solid var(--openbot-border-focus);
+  outline-offset: 4px;
+}
+
+/* One colour on a gradient that is a different colour on every card. The shadow
+   is what keeps it readable where the picture behind it is pale: the mark has no
+   plate under it, so the frame stays a picture rather than a tile. */
+.plugin-logo {
+  position: relative;
+  /* The gradient host listens for pointerenter, and it is this mark's sibling
+     rather than its ancestor. Without this, crossing onto the mark counts as
+     leaving the artwork and throws the shader away where the pointer rests. */
+  pointer-events: none;
+  color: var(--openbot-text-primary);
+  filter: drop-shadow(0 1px 6px rgb(0 0 0 / 35%));
+}
+
+/* Sized against the frame rather than the viewport: the card is widest where the
+   grid has folded to one column, which is exactly where a mark set in viewport
+   units would be at its smallest. */
+.plugin-card-logo {
+  width: auto;
+  max-width: 58%;
+  height: 20%;
+}
+
+/* An upright mark takes more of the frame's height than a wide one, so that the
+   two kinds read as the same size on a row of cards: a wide mark spends its size
+   on width, and an upright one has only height to spend it on. */
+.plugin-card-logo.plugin-logo-upright {
+  height: 34%;
+}
+
+/* The listing's own icon on a card, sized against the frame like the drawn mark
+   beside it. It is square art already, so it takes the logo corner and no plate:
+   what is behind it is the gradient, which is the card's picture. */
+.plugin-card-icon {
+  position: relative;
+  height: 40%;
+  border-radius: var(--openbot-radius-logo);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
+
+/* The letter a plugin falls back to when its mark is not drawn yet. Type cannot
+   be sized against the frame the way a mark is, so it takes a clamp; the letter
+   is a stand-in for a path that is on its way, not a listing's resting state. */
+.plugin-logo-letter {
+  display: grid;
+  place-items: center;
+  font-size: clamp(34px, 3.8vw, 48px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Both text lines under a card share one shape: what a reader asks on the left,
+   what answers it on the right, and the gap between the two ends doing the work a
+   separator would. `baseline` rather than `center`, because the two ends of a line
+   are set at different sizes and centring them would leave neither on the line. */
+.plugin-card-meta,
+.plugin-card-headline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plugin-card-meta {
+  margin-top: 14px;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+}
+
+.plugin-card-version {
+  flex: none;
+  letter-spacing: var(--openbot-tracking-wide);
+}
+
+/* One end of each line gives way first, and it is whichever end a reader can lose:
+   the publisher's own name on the meta line, the sentence about the plugin on the
+   one below. Truncating is what keeps a card the height of the two beside it. */
+.plugin-card-publisher,
+.plugin-card-tagline {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plugin-card-tagline {
+  text-align: right;
+}
+
+/* The switches over the grid and the tags under a card carry the same words, but
+   they are not the same object: one is pressed and one is read. So the switch
+   takes the size and the shape of every other button on the site, and the card
+   tag stays a label. The words are what ties them together. */
+.plugin-filters {
+  /* A fieldset draws a border and reserves room for a legend the page hides. */
+  margin-inline: 0;
+  border: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: clamp(20px, 2.4vw, 30px);
+}
+
+.plugin-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.plugin-tag {
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  padding: 5px 11px;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  letter-spacing: var(--openbot-tracking-wide);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* The metrics of `.landing-button-sm`, written out rather than borrowed: the
+   shared class paints an icon box on every button that wears it, and a filter has
+   no icon to put in it. Everything a reader can compare - the height, the padding,
+   the pill, the weight, the rest and pressed colours - is the button family's. */
+.plugin-tag-button {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  padding: 0 17px;
+  color: var(--openbot-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: var(--openbot-tracking-wide);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  /* Colour, and a press. A filter row is read before it is used, so the motion
+     that belongs on it is the motion every other button here already has. */
+  transition:
+    border-color var(--openbot-duration-normal) ease,
+    background-color var(--openbot-duration-normal) ease,
+    color var(--openbot-duration-normal) ease,
+    transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+/* Pressed is the only state that fills a switch in, and it fills it the way a
+   primary button is filled. A switch a reader can turn off has to look different
+   from one that was never on, and the grid behind it has already changed, so the
+   fill confirms what happened rather than announcing it. */
+.plugin-tag-button[aria-pressed="true"] {
+  border-color: var(--openbot-surface-light);
+  background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
+}
+
+.plugin-tag-button:active {
+  transform: scale(0.97);
+}
+
+.plugin-tag-button:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
+}
+
+.plugin-empty {
+  margin: 0;
+  color: var(--openbot-text-dim);
+  font-size: 14px;
+}
+
+.plugin-card-headline {
+  margin-top: 5px;
+}
+
+.plugin-card-title {
+  flex: none;
+  color: var(--openbot-text-secondary);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.plugin-card-tagline {
+  color: var(--openbot-text-dim);
+  font-size: 13px;
+}
+
+/* Per card, ordered by --plugin-card-index, so the grid arrives as a sweep. */
+.plugin-grid-section[data-revealed="false"] .plugin-card {
+  opacity: 0;
+}
+
+.plugin-grid-section[data-revealed="true"] .plugin-card {
+  animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--plugin-card-index, 0) * 80ms);
+}
+
+/* Larger against its frame than a card's mark is against its own: this frame is
+   the width of the column and a mark sized for a card would sit lost in it. Both
+   are measured against the frame rather than the viewport, so neither shrinks on
+   the narrow screen where the picture is at its widest. */
+.plugin-hero-logo {
+  width: auto;
+  max-width: 44%;
+  height: 26%;
+}
+
+/* The title and the button share a line, so the space between the two ends of it is
+   what separates them. Below the width that holds both, the button wraps under the
+   title rather than crushing it. The row carries the title's own top margin, so that
+   margin is not inside the item the row centres the button against. */
+.plugin-hero-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 20px;
+  margin-top: 18px;
+}
+
+/* Smaller than an article's title. This one is read against a tile rather than across a
+   column, and at the article's size the two lines beside the mark stand taller than it. */
+.plugin-hero-row .post-article-title {
+  min-width: 0;
+  margin-top: 0;
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.1;
+}
+
+/* The mark, the name and the line under it are one thing, so they travel together when the
+   button wraps below them. */
+.plugin-hero-heading {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 1.6vw, 20px);
+  min-width: 0;
+}
+
+/* What the mark stands beside: the name and the one line that says what the listing does. */
+.plugin-hero-text {
+  min-width: 0;
+}
+
+/* Closer than an article's standfirst sits under its title: here the two lines are one
+   block against the mark, and the article's gap would leave the mark between them. */
+.plugin-hero-standfirst {
+  margin-top: 4px;
+  font-size: clamp(14px, 1.3vw, 16px);
+  line-height: 1.4;
+}
+
+/* The listing's mark as an icon rather than as artwork: the frame further down is
+   21/9 and reads as a picture, and a reader deciding whether to install something
+   looks for a square. Same gradient as that frame, at the size of an app icon. */
+.plugin-hero-mark {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: clamp(56px, 6vw, 76px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-logo);
+  background: var(--openbot-glass-surface);
+  /* Decoration, like every other frame on this page: it takes no pointer. */
+  pointer-events: none;
+}
+
+/* The listing's own icon, filling the tile: an icon a developer publishes is already
+   drawn as a square, so it is given the whole square rather than inset in it. The plate
+   and its hairline go with the same reasoning as the row's. */
+.plugin-hero-mark-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.plugin-hero-mark:has(.plugin-hero-mark-icon) {
+  border-color: transparent;
+  background: none;
+}
+
+/* Sized against the tile rather than the viewport, the way a card's mark is. */
+.plugin-hero-mark-logo {
+  width: auto;
+  max-width: 64%;
+  height: 32%;
+}
+
+/* Against the right edge of the column, opposite the tags: the block above is
+   read from the left, and the one thing on it a reader acts on is the one thing
+   that is not. It wraps back under the tags before the column gets too narrow
+   to hold both. */
+.plugin-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* The download offer, as the small modal it is: the visitor has just asked for the app and
+   nothing happened, so this is the only thing on the page worth reading. Same panel the
+   download menu is built from - sidebar surface, strong hairline, overlay shadow - because
+   it is the same kind of surface, lifted off the page rather than drawn into it. */
+.plugin-dialog {
+  width: min(380px, calc(100vw - 32px));
+  margin: auto;
+  padding: 22px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-sidebar);
+  box-shadow: var(--openbot-shadow-overlay);
+  color: var(--openbot-text-primary);
+  animation: plugin-dialog-enter var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+@keyframes plugin-dialog-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The page stays visible behind it, because the visitor is deciding whether to leave it. */
+.plugin-dialog::backdrop {
+  background: var(--openbot-dialog-overlay);
+  backdrop-filter: blur(6px);
+}
+
+.plugin-dialog-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.plugin-dialog-copy {
+  margin: 8px 0 0;
+  color: var(--openbot-text-dim);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* The way out on the left and the way on to the right, which is the order the rest of the
+   site puts a pair of actions in. */
+.plugin-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.plugin-dialog-dismiss {
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: none;
+  color: var(--openbot-text-dim);
+  font: inherit;
+  font-size: 13px;
+  transition: color var(--openbot-duration-fast) ease;
+}
+
+/* The ring the site's buttons take, rather than the browser's own box. */
+.plugin-dialog-dismiss:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
+}
+
+.plugin-body {
+  margin-top: clamp(32px, 4vw, 48px);
+}
+
+.plugin-description {
+  margin: 0;
+  color: var(--openbot-text-readable);
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.plugin-section {
+  margin-top: clamp(32px, 4vw, 48px);
+}
+
+/* The heading the app's plugin detail sets, rather than the uppercase eyebrow this
+   page used: the section's name at reading size, with its count in a box beside it. */
+.plugin-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--openbot-text-primary);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* A count is one or two digits. A box that is square at one digit holds every count
+   at one width, so a section with 2 rows and one with 12 draw the same shape. */
+.plugin-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding-inline: 6px;
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-glass-surface);
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The app draws its prompts on the plugin's own artwork, so this card is that screen:
+   the gradient fills it and the requests sit on plates over it. It is one of the
+   artwork frames above rather than a card that copies them - the same rule, the same
+   corner as the picture further up this column, and the same clipping of the shader,
+   which is the whole reason it is declared there and not here. */
+.plugin-prompts-card {
+  border-radius: 14px;
+  padding: clamp(16px, 2.4vw, 24px);
+}
+
+.plugin-prompts {
+  /* Over the canvas, which the shader library prepends at z-index -1: that paints
+     above a background but below anything in the card that is positioned. */
+  position: relative;
+  /* Given back what the frame rule turns off for artwork. These are sentences a
+     reader copies, so the list takes the pointer even though the frame does not. */
+  pointer-events: auto;
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+/* One frame around the whole list, like the app's item group: the rows share a
+   border and a surface, and a single hairline separates each pair. No gap - a gap
+   would leave that hairline floating between two rows rather than between them. */
+.plugin-rows {
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+}
+
+/* One request as the app draws it: the plugin's chip, then the line a reader would
+   type. The plate is opaque because the colour behind it is a different colour on
+   every listing, and no transparent surface is legible on all of them. */
+.plugin-prompt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
+  padding: 12px;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* The chip the app puts in front of a prompt: this is the plugin the request would
+   be sent to, said once per line rather than in a heading above the list. */
+.plugin-prompt-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-glass-surface);
+  padding: 3px 10px 3px 6px;
+  color: var(--openbot-text-primary);
+  font-size: 13px;
+}
+
+/* Set by height alone, so a wide wordmark stays a wordmark instead of being letterboxed
+   into a square. The shadow the marks carry over artwork is dropped here: the plate under
+   this one is opaque, so it has nothing to lift off. */
+.plugin-prompt-mark {
+  width: auto;
+  max-width: 56px;
+  height: 14px;
+  font-size: 12px;
+  filter: none;
+}
+
+.plugin-prompt-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.plugin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.plugin-rows > .plugin-row + .plugin-row {
+  border-top: 1px solid var(--openbot-border-strong);
+}
+
+/* What kind of thing the row is, in a tile the height of its two lines of type. The
+   app draws the thing's own icon here; this page draws a glyph, because that icon
+   lives on a developer's own servers and the site fetches nothing from one. */
+/* The square is this plate, not the picture on it. A listing's icon is usually a mark on
+   a transparent ground - Canva's is a circle - so an icon left to draw its own shape reads
+   as whatever shape its developer chose. A lighter plate under it, inset far enough to be
+   seen at every edge, is what makes every row open on the same square. */
+.plugin-row-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-glass-surface);
+  padding: 5px;
+  color: var(--openbot-accent-text);
+}
+
+.plugin-row-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* A listing's own icon is a picture of any proportion - one of them is a favicon - and it
+   is drawn here as the rounded square an icon is everywhere else in the product. `cover`
+   is what makes the square: a wide picture is trimmed to it rather than left floating in
+   a frame at the height its proportion allows. */
+.plugin-icon {
+  display: block;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+/* The icon is the tile. An icon a developer publishes is drawn as a square already - both
+   in the catalog are - so it takes the whole plate rather than sitting inset in one, and a
+   picture that is not square is trimmed to it. */
+.plugin-row-icon .plugin-icon {
+  width: 100%;
+  height: 100%;
+}
+
+/* The plate is for the glyph. A row that draws a real icon drops the inset and the hairline
+   with it, which would otherwise read as a frame around a picture that has its own edge. */
+.plugin-row-icon:has(.plugin-icon) {
+  border-color: transparent;
+  background: none;
+  padding: 0;
+}
+
+/* On the chip the icon sits on a line of type, so it takes the height of one. */
+.plugin-prompt-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.plugin-row-text {
+  min-width: 0;
+}
+
+.plugin-row-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.plugin-row-copy {
+  margin: 2px 0 0;
+  color: var(--openbot-text-dim);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.plugin-facts {
+  margin: 0;
+  display: grid;
+  gap: 0;
+}
+
+.plugin-fact {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--openbot-glass-surface);
+  font-size: 14px;
+}
+
+.plugin-fact dt {
+  color: var(--openbot-text-dim);
+}
+
+.plugin-fact dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--openbot-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.plugin-fact-link {
+  color: var(--openbot-text-secondary);
+  text-decoration: none;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+@media (max-width: 900px) {
+  .plugin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .plugin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plugin-fact {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plugin-card,
+  .plugin-dialog-dismiss {
+    cursor: pointer;
+  }
+
+  /* An explicit scale rather than `none`, for the reason the article titles give:
+     the resting element and the moving layer otherwise rasterise on different
+     pixels, and the mark looks like it jumps as the growth ends. */
+  .plugin-card-logo,
+  .plugin-card-icon {
+    transform: scale(1);
+    transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+    will-change: transform;
+  }
+
+  .plugin-tag-button:hover:not([aria-pressed="true"]) {
+    border-color: var(--openbot-text-dim);
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
+
+  .plugin-tag-button[aria-pressed="true"]:hover {
+    background: var(--openbot-text-primary);
+  }
+
+  .plugin-card:hover .plugin-card-logo,
+  .plugin-card:hover .plugin-card-icon {
+    transform: scale(1.06);
+  }
+
+  .plugin-card:hover .plugin-card-title,
+  .plugin-dialog-dismiss:hover,
+  .plugin-fact-link:hover {
+    color: var(--openbot-text-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plugin-grid-section[data-revealed] .plugin-card {
+    opacity: 1;
+    animation: none;
+  }
+
+  .plugin-card,
+  .plugin-card-title,
+  .plugin-card-art,
+  .plugin-fact-link {
+    transition: none;
+  }
+
+  .plugin-card-logo,
+  .plugin-card-icon,
+  .plugin-tag-button {
+    transition: none;
+    transform: none;
+  }
+
+  .plugin-dialog {
+    animation: none;
   }
 }

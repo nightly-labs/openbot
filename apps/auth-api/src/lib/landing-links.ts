@@ -13,6 +13,7 @@ export const OPENBOT_LINKS = {
   downloadFromOtherPage: "/#download",
   news: "/news",
   guides: "/guides",
+  plugins: "/plugins",
   releases: "https://github.com/nightly-labs/openbot/releases",
   repository: "https://github.com/nightly-labs/openbot",
   license: "https://github.com/nightly-labs/openbot/blob/main/LICENSE",
@@ -36,7 +37,7 @@ export type FooterLink =
   | {
       readonly label: string;
       readonly external: false;
-      readonly to: "/" | "/news" | "/guides";
+      readonly to: "/" | "/news" | "/guides" | "/plugins";
       readonly hash?: string;
     };
 
@@ -52,6 +53,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "Download", external: false, to: "/", hash: "download" },
       { label: "News", external: false, to: "/news" },
       { label: "Guides", external: false, to: "/guides" },
+      { label: "Plugins", external: false, to: "/plugins" },
       { label: "Releases", external: true, href: OPENBOT_LINKS.releases },
       { label: "Source code", external: true, href: OPENBOT_LINKS.repository },
       { label: "License", external: true, href: OPENBOT_LINKS.license },

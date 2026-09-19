@@ -12,7 +12,7 @@
       "slug": "canva",
       "version": "1.0.0",
       "featured": true,
-      "detailSha256": "b2fde1db15795e96eee4c7098518ff92c09958e8d474d2c247741ace3e06b3ce"
+      "detailSha256": "1a048ae478be8b622d4a2e387ec3318ea7962884a6aadbb4b724d947fb7c1aca"
     },
     {
       "slug": "github",
@@ -60,7 +60,7 @@
       "slug": "posthog",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "b60b8e25c76aac5c02cb24d47bc2549c8e9e4e962a2ba54b2d7de0c3738f2279"
+      "detailSha256": "a4127ec0a7415dccbd2e57aa928e6ed3b6acc0913f1c02ea03bd10206333f173"
     },
     {
       "slug": "airtable",
@@ -84,7 +84,7 @@
       "slug": "resend",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "8361ba20bd66a24032d777ddac44507d5f0fa44afae212869f25c0912ae949e4"
+      "detailSha256": "06a649d220a6858a9856ff36661fe20c47219216235507778924b1c3e7c4b5ca"
     }
   ]
 }

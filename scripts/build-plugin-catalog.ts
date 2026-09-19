@@ -559,6 +559,7 @@ function renderWorkerModule(spec: PluginCatalogSpec, plugins: PluginDetail[]): s
   const index = {
     schemaVersion: spec.schemaVersion,
     catalogVersion: spec.catalogVersion,
+    updatedAt: spec.updatedAt,
     plugins: plugins.map((plugin) => ({
       slug: plugin.slug,
       version: plugin.version,
@@ -576,6 +577,8 @@ function renderWorkerModule(spec: PluginCatalogSpec, plugins: PluginDetail[]): s
 export interface PluginCatalogIndex {
   schemaVersion: number;
   catalogVersion: string;
+  /** When the catalog last changed. The public site dates its listing pages by it. */
+  updatedAt: string;
   plugins: Array<{ slug: string; version: string; featured: boolean; detailSha256: string }>;
 }
 

@@ -2526,10 +2526,14 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
     // already took. A caller told only that the action timed out repeats a send that half happened,
     // which in a spreadsheet enters the same data twice -- so the error has to carry how far it got,
     // and that number has to be the truth rather than a guess.
+    //
+    // The budget has to expire part way through, which four thousand keystrokes make certain, and it
+    // has to leave room for the lease and the first keys: a deadline that expires before a single
+    // keystroke reports a truthful nought and proves nothing about partial progress.
     const timedOut = await callBrowserTool(browser, "type", {
       tabId: gridTab.id,
       text: "y".repeat(4_000),
-      timeoutMs: 20,
+      timeoutMs: 250,
     });
     const reported = /timed out after (\d+) of 4000 characters/.exec(toolError(timedOut));
     if (timedOut.success || !reported) {

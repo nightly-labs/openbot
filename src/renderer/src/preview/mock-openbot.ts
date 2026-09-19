@@ -158,14 +158,7 @@ export interface MockOpenBotOptions {
   customProviders?: CustomProviderSummary[];
 }
 
-/**
- * What the OpenCode CLI would report for one endpoint, read from the endpoint itself. Preview
- * composes these into `listModels()` instead of putting them in `STORY_MODELS`, which several
- * stories read directly as their whole catalogue.
- *
- * OpenCode names a custom model `<provider name>/<model name>` and ids it
- * `<provider id>/<model id>`.
- */
+/** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): AgentModelOption[] {
   return provider.models.map((model) => ({
     provider: "opencode",
@@ -206,11 +199,7 @@ export interface MockOpenBotControls {
   dispose: () => void;
 }
 
-/**
- * The preview build has no main process to read a file, so it answers with the same fixtures that
- * the file preview stories use. A path with no fixture keeps the unsupported shape, which is what
- * the panel shows for a kind it cannot render.
- */
+/** Preview file fixtures; a path with no fixture keeps the unsupported shape. */
 function mockFilePreview(path: string, fallbackName: string): FilePreview {
   return (
     filePreviewForPath(path) ?? {
@@ -2028,6 +2017,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onInvite: (listener) => {
         inviteListeners.add(listener);
         return () => inviteListeners.delete(listener);
+      },
+    },
+    plugins: {
+      // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
       },
     },
     host: {

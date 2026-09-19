@@ -22,6 +22,7 @@ export default defineConfig({
       "test/landing-glow.test.tsx",
       "test/landing-reveal.test.tsx",
       "test/content.test.tsx",
+      "test/plugins-page.test.tsx",
     ],
   },
 });

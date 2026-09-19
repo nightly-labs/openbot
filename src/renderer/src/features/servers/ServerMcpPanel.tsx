@@ -42,10 +42,7 @@ import {
   normalizeMcpConfig,
 } from "./mcp-servers";
 
-/**
- * The state of the form's save bar. The dialog reads it inside its own footer, so every read tracks
- * the panel's store and the bar stays current without the panel reporting the form again.
- */
+/** Save-bar state, read live by the dialog footer. */
 export interface McpPanelSaveBar {
   message: string;
   /** True when `message` reports a failed save rather than the state of the draft. */
@@ -55,7 +52,7 @@ export interface McpPanelSaveBar {
   saveDisabled: boolean;
 }
 
-/** What the form view is, so the dialog header can name it and the dialog footer can hold its save bar. */
+/** Form view descriptor for the dialog header/footer. */
 export interface McpPanelDetail {
   title: string;
   back: () => void;
@@ -72,27 +69,18 @@ export interface ServerMcpPanelProps {
   menuMount?: HTMLElement;
   /** Reports the form view, so the header shows a breadcrumb instead of the panel holding a back row. */
   onDetailChange?: (detail: McpPanelDetail | null) => void;
-  /**
-   * Why the list is empty, when the read failed rather than found nothing. The panel must not
-   * answer a failed read with "No MCP servers yet.": that sentence says the server holds none.
-   */
+  /** Empty-list reason when the read failed; a failed read must not say "No MCP servers yet." */
   loadError?: string | null;
-  /** Reads the list again. Without it the error has no way out except closing the dialog. */
+  /** Re-read the list; without it the error has no way out except closing the dialog. */
   onRetryLoad?: () => void;
   onSave: (config: McpServerConfig) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onSetEnabled: (id: string, enabled: boolean) => Promise<void>;
-  /**
-   * Connects once with the configuration given and answers what it found. The configuration is
-   * passed whole, not by id, so the form can test a draft that was never saved.
-   */
+  /** Test an unsaved draft config. */
   onTest: (config: McpServerConfig) => Promise<McpTestResult>;
 }
 
-/**
- * One record rather than a signal each: opening the form writes `view`, `editingId`, `draft` and
- * `touched` together, and going back rewrites the same four, so they are one concern.
- */
+/** One record for form view/edit/draft/touched, which change together. */
 interface McpPanelState {
   view: "list" | "form";
   /** `null` in the form view means the user is connecting a new server. */
@@ -107,22 +95,13 @@ interface McpPanelState {
   busy: string | null;
   error: string;
   /**
-   * What each row's test found, keyed by MCP server id. A row with no entry was never tested.
-   *
-   * Each answer carries the configuration it was measured for, because a saved edit and a test race
-   * each other both ways: a row edited after a passing test would otherwise keep reporting the
-   * endpoint it no longer holds, and a test sent before the edit answers after it.
+   * Row test answers keyed by server id. Each carries the config it was measured for: edits and
+   * tests race both ways, so a stale pass must not describe the edited endpoint.
    */
   tests: Record<string, { test: McpTestState; config: McpServerConfig }>;
   /** The form's own test, which answers for the draft on screen and not for any stored row. */
   formTest: McpTestState | null;
-  /**
-   * The configuration that test was run with.
-   *
-   * A test is a question about one set of settings, and the user can edit a field while it is
-   * answered. Kept beside the answer so the panel can tell whether the answer still describes what
-   * the form shows, rather than reporting a working connection for settings nobody tried.
-   */
+  /** The config the form test ran with; a test only describes the settings it measured. */
   formTestConfig: McpServerConfig | null;
 }
 
@@ -148,22 +127,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   let draftTestRun = 0;
 
   const errors = createMemo(() => mcpConfigErrors(state.draft));
-  /**
-   * The form's test result while it still describes the form.
-   *
-   * An edit to any field answers the question again, so a result measured before it says nothing
-   * about what is on screen now. Compared rather than cleared on each keystroke: typing a value
-   * back as it was leaves the answer that was measured for it true.
-   */
+  /** Form test result while it still describes the form; typing a value back restores it. */
   const formTest = createMemo(() =>
     state.formTestConfig && !mcpConfigChanged(state.draft, state.formTestConfig) ? state.formTest : null,
   );
-  /**
-   * A row's test result while it still describes what that row holds, on the same rule as `formTest`.
-   *
-   * The switch is left out of the comparison: it decides which agents are given the server, not what
-   * the connection is, and a test answers even for a server that is turned off.
-   */
+  /** Row test result while it still describes the row; the enabled switch is not compared. */
   const rowTest = (config: McpServerConfig): McpTestState | undefined => {
     const entry = state.tests[config.id];
     if (!entry || mcpConfigChanged({ ...config, enabled: entry.config.enabled }, entry.config)) return undefined;
@@ -198,10 +166,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     }
   }
 
-  /**
-   * A test takes no `busy` latch: it is a question about one server, it can take as long as the
-   * deadline allows, and a slow server must not stop the user from saving or removing another.
-   */
+  /** Tests run without the busy latch so a slow server never blocks saving another. */
   async function runTest(config: McpServerConfig): Promise<McpTestState> {
     try {
       const result = await props.onTest(config);
@@ -247,7 +212,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.view = "form";
       current.editingId = config?.id ?? null;
       current.draft = draft;
-      // A copy, not the same object: the form edits `draft` in place, and the baseline has to hold still.
+      // Copy, not alias: the form edits `draft` in place while the baseline holds still.
       current.baseline = mcpConfigDraft(draft);
       current.touched = false;
       current.error = "";
@@ -255,7 +220,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.formTestConfig = null;
     });
     draftTestRun += 1;
-    // Read from the argument, not the store: a store write is not visible to a read in the same tick.
+    // Store writes are not visible to reads in the same tick: read from the argument.
     props.onDetailChange?.({
       title: config ? EDIT_TITLE : CONNECT_TITLE,
       back: backToList,

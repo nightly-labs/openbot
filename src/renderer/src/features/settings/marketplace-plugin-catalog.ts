@@ -85,7 +85,7 @@ const CANVA: MarketplacePluginDetail = {
     "Canva lets users create and edit designs in words, search their own design library, upload and organize assets, export in the format a channel needs, and leave comments where the work is. Each user signs in to their own Canva account, and the agent can do what that account can do.",
   category: "design",
   creatorName: "canva.com",
-  iconUrl: "https://static.canva.com/static/images/favicon.ico",
+  iconUrl: "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
   version: "1.0.0",
   prompts: [
     { id: "prompt-recent-design", text: "Show me my most recently edited Canva design." },
@@ -98,7 +98,7 @@ const CANVA: MarketplacePluginDetail = {
       name: "Canva",
       description:
         "Design creation and editing, library search, asset and brand management, exports, and comments, over one MCP server.",
-      iconUrl: "https://static.canva.com/static/images/favicon.ico",
+      iconUrl: "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
       server: {
         name: "canva",
         transport: "stdio",
@@ -429,7 +429,7 @@ const POSTHOG: MarketplacePluginDetail = {
     "PostHog lets agents query events and funnels, inspect feature flags, and summarize what changed after a release. A personal API key from the project settings goes into one Authorization header.",
   category: "data-analytics",
   creatorName: "posthog.com",
-  iconUrl: "https://posthog.com/favicon.ico",
+  iconUrl: "https://app.posthog.com/static/icons/apple-touch-icon.png",
   version: "1.0.0",
   prompts: [
     { id: "prompt-funnel", text: "How does the signup funnel look for the last 14 days?" },
@@ -441,7 +441,7 @@ const POSTHOG: MarketplacePluginDetail = {
       id: "app-posthog-mcp",
       name: "PostHog",
       description: "Event, funnel, and feature-flag access, over PostHog's MCP server with a personal API key.",
-      iconUrl: "https://posthog.com/favicon.ico",
+      iconUrl: "https://app.posthog.com/static/icons/apple-touch-icon.png",
       server: {
         name: "posthog",
         transport: "http",
@@ -647,7 +647,7 @@ const RESEND: MarketplacePluginDetail = {
     "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
   category: "automation",
   creatorName: "resend.com",
-  iconUrl: "https://resend.com/favicon.ico",
+  iconUrl: "https://resend.com/static/favicons/favicon.ico",
   version: "1.0.0",
   prompts: [
     { id: "prompt-send", text: "Send the launch announcement draft to the beta list." },
@@ -659,7 +659,7 @@ const RESEND: MarketplacePluginDetail = {
       id: "app-resend-mcp",
       name: "Resend",
       description: "Email sending and delivery checks, over a local MCP server with a Resend API key.",
-      iconUrl: "https://resend.com/favicon.ico",
+      iconUrl: "https://resend.com/static/favicons/favicon.ico",
       server: {
         name: "resend",
         transport: "stdio",

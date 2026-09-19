@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { describe, expect, it, vi } from "vitest";
+import { AttachmentCards } from "./AttachmentCards";
 import { attachmentReferenceBadge, attachmentReferenceTone } from "./AttachmentReference";
 import { messageFileReferences } from "./FileReference";
 
@@ -111,5 +113,27 @@ describe("messageFileReferences", () => {
         [attachment],
       ),
     ).toEqual([]);
+  });
+});
+
+describe("AttachmentCards download", () => {
+  it("sends the download action for the selected file", async () => {
+    const card = {
+      id: "brief",
+      name: "launch-brief.md",
+      size: 1_024,
+      kind: "file" as const,
+      mimeType: "text/markdown",
+      previewKind: "text" as const,
+      previewUrl: null,
+    };
+    const onAction = vi.fn();
+    render(() => <AttachmentCards attachments={[card]} onPreview={vi.fn()} onAction={onAction} />);
+
+    const download = await screen.findByRole("button", { name: "Download launch-brief.md" });
+    await fireEvent.click(download);
+
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(onAction).toHaveBeenCalledWith(card, "download");
   });
 });

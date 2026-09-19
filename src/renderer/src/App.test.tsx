@@ -1016,6 +1016,51 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.connectProvider).toHaveBeenCalledWith("codex"));
   });
 
+  it("starts the Claude login from the composer notice rather than opening a page", async () => {
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValueOnce([
+      { ...AGENTS[0], provider: "claude", model: "claude-sonnet-5" },
+    ]);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({
+      type: "status",
+      status: {
+        ...signedOutCodexStatus(),
+        providers: [{ id: "claude" as const, state: "sign-in-required" as const, version: "2.1.246", message: null }],
+      },
+    });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Sign in to Claude" }));
+
+    // Claude signs in through its own CLI login, so the button connects the provider. It used to
+    // open the authentication docs, which left the user to finish the sign-in themselves.
+    await waitFor(() => expect(window.openbot.connectProvider).toHaveBeenCalledWith("claude"));
+    expect(window.openbot.openExternal).not.toHaveBeenCalled();
+  });
+
+  it("offers no composer sign-in for OpenCode, whose key is pasted in settings", async () => {
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValueOnce([
+      { ...AGENTS[0], provider: "opencode", model: "opencode/big-pickle" },
+    ]);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+
+    emitAgentEvent?.({
+      type: "status",
+      status: {
+        ...signedOutCodexStatus(),
+        providers: [{ id: "opencode" as const, state: "sign-in-required" as const, version: "1.0.0", message: null }],
+      },
+    });
+
+    // The notice would carry a button that starts nothing: OpenCode has no login to open, only a
+    // key to paste in settings. The composer still takes the draft.
+    expect(await screen.findByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in to OpenCode" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign in required")).not.toBeInTheDocument();
+  });
+
   it("states a spent plan window above the composer, and drops it when the window ends", async () => {
     const resetsAt = Math.floor(Date.now() / 1_000) + 3_600;
     vi.mocked(window.openbot.agent.getUsage).mockResolvedValue({

@@ -102,6 +102,36 @@ the `media-attachments` capability; released protocol adapters keep their existi
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
+### Tab lifetime
+
+The agent decides when a tab closes. Nothing closes a tab when a turn ends: `close_tab` is the only
+cleanup path, and the prompt asks the agent to use it once a task no longer needs the tab. A tab
+therefore outlives its turn by design, which is what lets the next turn in the same thread carry on in
+the page the last one left, and what lets the user read the result afterwards.
+
+There is no user-owned tab. A tab carries `ownerThreadId` and `ownerAgentId`, and an agent may read
+and close any tab in its own thread, including one the user opened there. The one hard block is a
+takeover: while the user holds a tab, no agent tool touches it. That is enforced in
+`BrowserHost.#requireToolTab`, which is the lowest point every tab-bearing tool passes through, so it
+holds for callers that never reach `AgentService` -- the view gateway and remote hosts. The agent-wide
+refusal in `AgentService` stays beside it rather than being folded in: it also covers `open` and
+`list_tabs`, which name no tab, and it answers with a refusal instead of an error.
+
+| Event | Tabs |
+| --- | --- |
+| Turn succeeds | Stay open unless the agent called `close_tab`. |
+| Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
+| Retry | Same thread and agent, so the same tabs are still reachable. |
+| Restart | Restored from the browser's own state file. |
+| Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. |
+| Takeover held | No agent tool touches that tab, `close_tab` included. |
+
+Deleting an agent is the one sweep, and it exists because those tabs are otherwise unreachable: no
+agent passes the owner check for them, and the renderer lists tabs per agent, so they would hold a
+view the user cannot see to close, across restarts. Closing is idempotent -- `close()` returns early
+on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
+can never name a tab that took its place.
+
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`
 streams the tab through CDP, and the gateway sends each frame as bytes and dispatches the pointer and
@@ -957,4 +987,4 @@ files the message already has, and adds new ones.
 
 A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
 
-See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Only the last part of that design runs today: the Plugins tab reads a literal catalog in the renderer, installs the listing's pinned skills into the chosen agent, and saves its app as a host-global MCP server. The catalog files, the Worker routes, the cache in the main process, uninstall, and the links are still design.
+See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Plugins tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, the literal in `packages/contracts/src/plugin-catalog.ts`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.

@@ -1360,6 +1360,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       logger.warn("Agent deletion failed.", { stage });
       throw new Error("The agent data could not be removed completely. Retry deleting the agent.");
     }
+    await this.#closeBrowserTabsForAgent(agent);
     this.#conversation.forgetAgent(agent.id);
     this.#turn.forgetAgent(agent.id);
     this.#drain.forgetAgent(agent.id);
@@ -1372,6 +1373,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
     }
     this.#compaction.forgetAgent(agent.id);
+  }
+
+  /**
+   * A deleted agent's tabs are reachable by nobody: no agent passes the host's owner check for them,
+   * and the renderer lists tabs per agent, so they hold a view the user cannot even see to close.
+   * They also survive a restart, because the browser persists its tabs outside `openbot.db`.
+   *
+   * The owner test matches the renderer's, so a tab the user could see under this agent is a tab this
+   * closes -- including a legacy tab carrying only the thread id. Runs after the agent record is
+   * already gone, so a failure here must not fail the deletion the user asked for.
+   */
+  async #closeBrowserTabsForAgent(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
+    const owned = this.#browser
+      .listTabs()
+      .filter((tab) =>
+        tab.ownerAgentId
+          ? tab.ownerAgentId === agent.id
+          : Boolean(agent.threadId && tab.ownerThreadId === agent.threadId),
+      );
+    let closed = 0;
+    for (const tab of owned) {
+      try {
+        await this.#browser.close(tab.id);
+        closed += 1;
+      } catch (error) {
+        logger.warn("Could not close a deleted agent's browser tab.", { error });
+      }
+    }
+    if (closed > 0) logger.info("Closed a deleted agent's browser tabs.", { agentId: agent.id, count: closed });
   }
 
   async initialize(): Promise<void> {

@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import solidPlugin from "@solidjs/vite-plugin";
 import { configDefaults, defineConfig } from "vitest/config";
-import { NODE_TEST_TIMEOUT_MS } from "./src/backend/test-deadlines";
+import { TEST_TIMEOUT_MS } from "./src/backend/test-deadlines";
 
 export default defineConfig({
   plugins: [solidPlugin()],
@@ -42,7 +42,7 @@ export default defineConfig({
           // Strictly longer than the harness deadline, so a stalled wait fails
           // with the predicate that never held rather than with vitest's
           // generic "test timed out" - see src/backend/test-deadlines.ts.
-          testTimeout: NODE_TEST_TIMEOUT_MS,
+          testTimeout: TEST_TIMEOUT_MS,
           // The file name routes the file, so the project is never a decision:
           // `*.test.ts` runs here without a DOM, `*.test.tsx` needs JSX and
           // gets jsdom, and `*.dom.test.ts` is the narrow case of needing a DOM
@@ -77,6 +77,10 @@ export default defineConfig({
           // faster option is not used here.
           pool: "vmThreads",
           environment: "jsdom",
+          // Strictly longer than the DOM wait deadline, for the reason the node
+          // project states: a slow runner should fail with the query that never
+          // matched, not with vitest's generic "test timed out".
+          testTimeout: TEST_TIMEOUT_MS,
           // The `*.dom.test.ts` half of the include mirrors the node project's exclude of the same
           // pattern, so a DOM test lands here wherever it lives: a page script the main process
           // injects needs a document as much as a renderer module does.

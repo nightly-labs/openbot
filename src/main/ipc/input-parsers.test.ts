@@ -125,7 +125,6 @@ describe("app IPC input parsing", () => {
     expect(parseMacPermission("screen-recording")).toBe("screen-recording");
     expect(parseMacPermission("accessibility")).toBe("accessibility");
     expect(parseExternalDestination("claude-install")).toBe("claude-install");
-    expect(parseExternalDestination("claude-sign-in")).toBe("claude-sign-in");
     expect(parseAnalyticsPreference({ enabled: false })).toEqual({ enabled: false });
     expect(parseUpdatePreference({ autoDownload: false })).toEqual({ autoDownload: false });
     expect(parseUpdatePreference({ autoDownload: true })).toEqual({ autoDownload: true });

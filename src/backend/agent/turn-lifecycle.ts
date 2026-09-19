@@ -40,6 +40,8 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
   onDocumentChanged(listener: (tabId: string, documentIds: ReadonlySet<string>) => void): () => void;
   clearControls(): void;
   endControl(threadId: string, turnId: string): void;
+  /** Deleting an agent closes the tabs it owned, which nothing else can reach once it is gone. */
+  close(tabId: string): Promise<void>;
 }
 
 export interface TurnHooks {
