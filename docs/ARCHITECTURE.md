@@ -110,6 +110,54 @@ outside the per-tab operation queue, so watching never delays a tool call. `brow
 the client half, and it reuses the Remote Desktop websocket tunnel rather than adding a WebRTC channel.
 The `browser-view` capability says whether a host has both.
 
+## Computer Use
+
+Computer Use is `cua-driver`, a third-party MIT binary, and OpenBot owns how it runs.
+`cua-driver-runtime.ts` in the main process starts one long-lived `serve` daemon and holds it; each
+provider CLI spawns its own short-lived `cua-driver mcp --socket` proxy against that daemon. All
+screen capture, accessibility reads, and input posting happen inside the daemon, so the proxy's own
+identity does not matter.
+
+The daemon is spawned directly, and never through `open(1)` or `NSWorkspace`. macOS finds the
+responsible process by walking up the launch chain, so a direct spawn puts OpenBot at the top of it
+and the user grants Screen Recording and Accessibility to OpenBot rather than to somebody else's
+helper. `CUA_DRIVER_EMBEDDED=1` tells the driver to stay on that path instead of relaunching itself
+as its own application. Anything that launches the daemon another way breaks the attribution, which
+is the reason the earlier Codex helper was replaced. The daemon starts lazily, on the first state
+read, so a user who never opens the panel is never asked for a grant.
+
+The control socket lives in the private per-user runtime directory, mode `0o700`, not in `/tmp`:
+whoever reaches it can drive the whole desktop. It cannot live under `userData`, because
+`sockaddr_un.sun_path` holds 104 bytes on macOS and an isolated development profile spends most of
+them on the worktree hash. Windows uses a named pipe, which has no such limit.
+
+One MCP entry reaches every provider. `CuaDriverRuntime.mcpServerConfig()` returns a config only
+while the daemon runs, and `AgentService.enabledMcpServers()` appends it, which is the one function
+Codex, Claude, and ACP all read. Two properties keep it there: the name is not in
+`RESERVED_MCP_SERVER_NAMES`, which is a drop filter rather than a marker, and `workingDirectory`
+stays empty, because ACP has no field for one and Codex accepts none, so an entry with one would
+vanish for two providers with no error. Codex staleness needs no separate signal, because
+`toolFingerprint` already folds the MCP entries and a changed fingerprint forces a replacement
+session.
+
+`capabilities.computerUse` is pushed by main from the daemon's own permission answer. It is no
+longer probed from Codex `plugin/list`, which is why the capability now reports the same state for
+every provider.
+
+The driver is packaged, not downloaded on demand, so it is pinned in `native-runtime.lock.json` like
+the other native runtimes rather than managed like a provider CLI. The pinned file list is an
+allowlist: `scripts/install-cua-driver.ts` copies only the named paths and checks each digest, so an
+upstream layout change fails the build instead of shipping a surprise file. Each installer carries
+only its own target. On macOS `mac.signIgnore` keeps the vendor's Developer ID signature, because
+re-signing under OpenBot's inherited entitlements would drop the Automation entitlement the driver
+needs. `resolveCuaDriver` still finds a hand-installed driver after the packaged one, so a developer
+can point `OPENBOT_CUA_DRIVER_PATH` at another build.
+
+Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
+`CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something
+a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot
+would refuse.
+
 ## Provider CLI updates
 
 The runtime manager downloads and verifies the CLI version pinned by OpenBot. The provider runtime
