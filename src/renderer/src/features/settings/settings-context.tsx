@@ -34,6 +34,12 @@ const Settings = createSimpleContext({
 
     const [analyticsPreferenceLoaded, setAnalyticsPreferenceLoaded] = createSignal<boolean | null>(null);
     const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = createSignal(false);
+    /**
+     * The plugin an `openbot://plugins/<slug>` link asked for, held beside the open flag because the
+     * marketplace is loaded lazily: the slug has to outlive the chunk load that shows it. It is a
+     * slug and never a listing, so the link cannot describe what the user is about to install.
+     */
+    const [pendingPluginSlug, setPendingPluginSlug] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(DEFAULT_GENERAL_SETTINGS);
     let appSettingsRestoreTarget: HTMLElement | null = null;
@@ -207,6 +213,8 @@ const Settings = createSimpleContext({
       openAppSettings,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
+      pendingPluginSlug,
+      setPendingPluginSlug,
     };
   },
 });

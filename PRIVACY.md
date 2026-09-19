@@ -243,6 +243,10 @@ Network traffic can also occur when:
 - an installed build checks GitHub Releases for updates;
 - a user opens an explicitly labeled external support or setup link.
 
+Plugin pages on openbot.run show each listing's own icon. The page asks `openbot.run` for that
+picture, and the website fetches it there from the address the plugin catalog holds, so reading a
+plugin page does not connect your browser to the plugin developer's servers.
+
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
 

@@ -67,8 +67,8 @@ path in the profile if you keep the AppImage outside the usual locations. Do not
 `--no-sandbox`: that removes the boundary between a renderer and the rest of the computer.
 
 On the first start from an AppImage, OpenBot writes `~/.local/share/applications/openbot.desktop`
-and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` invitation link open the
-app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
+and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` link - an invitation, or
+a plugin listing - open the app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
 
 Voice prompts and remote desktop are not available on Linux.
 
@@ -325,7 +325,7 @@ Cloudflare Workers
 - `src/backend` owns provider adapters, persistence, message scheduling, transfers, and the browser host.
 - `src/preload` exposes only the typed `window.openbot` API.
 - `src/renderer` contains the SolidJS interface.
-- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations.
+- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the plugin pages at `/plugins` and `/plugins/<slug>`.
 - `packages/contracts` contains process-boundary contracts, shared limits, and pure validation.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and

@@ -1379,5 +1379,70 @@ describe("SkillsMarketplaceModal", () => {
       expect(await screen.findByRole("button", { name: "Installed" })).toBeDisabled();
       expect(window.openbot.agent.saveMcpServer).not.toHaveBeenCalled();
     });
+
+    /**
+     * The deep link. A web page can name a listing, and that is all it can do: the page it opens
+     * still asks the user to install, against an agent they pick.
+     */
+    it("opens the listing a link names without installing it", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(),
+      };
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[plugin]}
+          pluginServerId="local"
+          initialPluginSlug="aave"
+        />
+      ));
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      expect(screen.getByText(plugin.description)).toBeInTheDocument();
+      expect(window.openbot.agent.saveMcpServer).not.toHaveBeenCalled();
+    });
+
+    it("says a link names no listing this catalog holds, and offers the list", async () => {
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[plugin]}
+          pluginServerId="local"
+          initialPluginSlug="not-a-plugin"
+        />
+      ));
+
+      expect(await screen.findByText("This plugin is not in the OpenBot catalog.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Browse plugins" }));
+
+      expect(await screen.findByRole("button", { name: "View Aave details" })).toBeInTheDocument();
+    });
+
+    it("copies the address the public page answers on", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[plugin]}
+          pluginServerId="local"
+        />
+      ));
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith("https://openbot.run/plugins/aave"));
+    });
   });
 });

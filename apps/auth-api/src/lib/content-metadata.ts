@@ -6,6 +6,7 @@
 // Each function takes `siteUrl`, the site that served the page. It is required, so
 // that no route can forget it and send a preview's social card to production.
 
+import type { MarketplacePluginDetail } from "@openbot/contracts/ipc-plugin-catalog";
 import {
   articleArtPath,
   articleOgImageUrl,
@@ -15,6 +16,7 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "./content-collection";
+import { PLUGINS_DESCRIPTION, PLUGINS_TITLE, pluginIndexUrl, pluginUrl } from "./plugins";
 import {
   OPENBOT_SITE_TITLE,
   OPENBOT_SITE_URL,
@@ -165,5 +167,82 @@ export function collectionStructuredData(collection: ContentCollection, siteUrl:
       author: { "@type": "Person", name: article.author },
       url: articleUrl(collection, article.slug, siteUrl),
     })),
+  };
+}
+
+/**
+ * The plugin pages. They carry the site's own social card rather than a generated one: the artwork
+ * pipeline in `content-images.ts` draws articles, and a listing is not an article. The structured
+ * data is `SoftwareApplication`, which is what a plugin is.
+ */
+export function pluginsIndexHead(siteUrl: string) {
+  const url = pluginIndexUrl(siteUrl);
+
+  return {
+    meta: [
+      { title: PLUGINS_TITLE },
+      { name: "description", content: PLUGINS_DESCRIPTION },
+      { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "OpenBot" },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:url", content: url },
+      { property: "og:title", content: PLUGINS_TITLE },
+      { property: "og:description", content: PLUGINS_DESCRIPTION },
+      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: PLUGINS_TITLE },
+      { name: "twitter:description", content: PLUGINS_DESCRIPTION },
+      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+    ],
+    links: [{ rel: "canonical", href: url }],
+  };
+}
+
+export function pluginHead(plugin: MarketplacePluginDetail, siteUrl: string) {
+  const url = pluginUrl(plugin.slug, siteUrl);
+  const title = `${plugin.name} — OpenBot plugins`;
+
+  return {
+    meta: [
+      { title },
+      { name: "description", content: plugin.tagline },
+      { "script:ld+json": pluginStructuredData(plugin, siteUrl) },
+      { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "OpenBot" },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:url", content: url },
+      { property: "og:title", content: title },
+      { property: "og:description", content: plugin.tagline },
+      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: plugin.tagline },
+      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+    ],
+    links: [{ rel: "canonical", href: url }],
+  };
+}
+
+/**
+ * The listing as schema.org sees it. `softwareVersion` is the developer's own string, and the
+ * offer says free because installing a plugin costs nothing; what the developer's own service
+ * charges is between the reader and the developer, so nothing here claims otherwise.
+ */
+export function pluginStructuredData(plugin: MarketplacePluginDetail, siteUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: plugin.name,
+    description: plugin.description,
+    applicationCategory: "DeveloperApplication",
+    softwareVersion: plugin.version,
+    author: { "@type": "Organization", name: plugin.creatorName },
+    isPartOf: { "@type": "SoftwareApplication", name: "OpenBot", url: OPENBOT_SITE_URL },
+    mainEntityOfPage: { "@type": "WebPage", "@id": pluginUrl(plugin.slug, siteUrl) },
+    url: pluginUrl(plugin.slug, siteUrl),
   };
 }

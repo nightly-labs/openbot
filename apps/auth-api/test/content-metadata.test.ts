@@ -13,7 +13,14 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "../src/lib/content-collection";
-import { articleHead, type articleStructuredData } from "../src/lib/content-metadata";
+import {
+  articleHead,
+  type articleStructuredData,
+  pluginHead,
+  pluginStructuredData,
+  pluginsIndexHead,
+} from "../src/lib/content-metadata";
+import { pluginIndexUrl, pluginUrl, SITE_PLUGINS } from "../src/lib/plugins";
 import { OPENBOT_SITE_URL } from "../src/lib/site-metadata";
 import { contentRssXml, contentSitemapXml } from "../src/server/content-feed";
 
@@ -99,8 +106,36 @@ describe.each(COLLECTION_CASES)("%s head tags", (_name, collection) => {
   });
 });
 
+describe("plugin pages", () => {
+  const plugin = SITE_PLUGINS[0];
+  if (!plugin) throw new Error("The catalog must hold at least one plugin.");
+
+  it("names its own address as the canonical one, on the site that served it", () => {
+    expect(pluginHead(plugin, OPENBOT_SITE_URL).links).toContainEqual({
+      rel: "canonical",
+      href: pluginUrl(plugin.slug),
+    });
+    expect(pluginHead(plugin, PREVIEW_SITE_URL).links).toContainEqual({
+      rel: "canonical",
+      href: `${PREVIEW_SITE_URL}plugins/${plugin.slug}`,
+    });
+    expect(pluginsIndexHead(OPENBOT_SITE_URL).links).toContainEqual({ rel: "canonical", href: pluginIndexUrl() });
+  });
+
+  it("describes the listing as the software it is", () => {
+    expect(pluginStructuredData(plugin, OPENBOT_SITE_URL)).toMatchObject({
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: plugin.name,
+      softwareVersion: plugin.version,
+      author: { "@type": "Organization", name: plugin.creatorName },
+      url: pluginUrl(plugin.slug),
+    });
+  });
+});
+
 describe("sitemap", () => {
-  it("lists the home page, every index and every article once", () => {
+  it("lists the home page, every index, every article and every plugin once", () => {
     const xml = contentSitemapXml();
     const urls = [
       OPENBOT_SITE_URL,
@@ -108,6 +143,8 @@ describe("sitemap", () => {
         collectionIndexUrl(collection),
         ...collection.articles.map((article) => articleUrl(collection, article.slug)),
       ]),
+      pluginIndexUrl(),
+      ...SITE_PLUGINS.map((plugin) => pluginUrl(plugin.slug)),
     ];
 
     for (const url of urls) {
