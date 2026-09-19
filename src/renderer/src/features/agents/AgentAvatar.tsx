@@ -273,6 +273,7 @@ function GeneratedAvatar(props: {
     shape: props.shape ?? profile().shape,
     color: profile().color,
     expression: presentation().expression ?? profile().expression,
+    state: presentation().state,
   }));
   const cycle = createMemo(() => offsetCycle(DEFAULT_CYCLE, props.cycleOffset ?? 0));
   // A mood that carries its own motion has to be seen without being pointed at; the resting moods
@@ -345,7 +346,9 @@ function GeneratedAvatar(props: {
         <Show
           when={animated()}
           fallback={
-            // A frozen Bloub frame cannot finish a morph. Recreate it when the appearance changes.
+            /* A frozen Bloub frame cannot finish a morph, and the engine reads `state` only when it
+               is built, so a mood change has to rebuild the bot. Keying on the appearance, state
+               included, does both: `frozenAt` alone would sample the seeded idle face. */
             <Show when={appearance()} keyed>
               {(frozen) => (
                 <BloubBot
@@ -353,7 +356,8 @@ function GeneratedAvatar(props: {
                   shape={frozen.shape}
                   color={frozen.color}
                   expression={frozen.expression}
-                  frozenAt={POSES[presentation().state]}
+                  state={frozen.state}
+                  frozenAt={POSES[frozen.state]}
                   ariaLabel=""
                   class="bloub-avatar-svg"
                 />
