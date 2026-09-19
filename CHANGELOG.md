@@ -5,6 +5,35 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-19
+
+### Added
+
+- Show a host's browser tab live to a remote member, with pointer and key input back to the page.
+- Connect an MCP server before it is installed: the install dialog tests the configuration, and
+  only a configuration that answers is saved.
+- Open a Marketplace plugin from an `openbot://plugins/<slug>` link on its own detail page.
+- Publish plugin pages on openbot.run from the shipped catalog: fourteen listings, each with its
+  own mark.
+- Give each agent one silhouette and a face that matches the work, in the sidebar and the activity
+  indicator.
+
+### Changed
+
+- Define when an agent's browser tabs close: no tab closes when a turn ends, the agent uses
+  close_tab when a task no longer needs the tab, and deleting an agent closes its tabs.
+- Show the download percent while a provider connects, with Cancel during the download and Retry
+  on failure.
+- Grow the plugin catalog to fourteen simple-auth listings: GitHub, Linear, Notion, Figma, Sentry,
+  Context7, Stripe, PostHog, Airtable, Firecrawl, Brave Search, Resend.
+- Name the shared tables "Tables" in agent settings.
+
+### Fixed
+
+- Let the embedded browser copy: pages can write to the clipboard on user gesture, and right-click
+  offers copy link, copy image address, cut, copy, paste, and select all with full link targets.
+- Align the Usage header icon with the provider logos.
+
 ## [0.13.0] - 2026-09-18
 
 ### Added
