@@ -2780,6 +2780,35 @@
   padding: 9px 7px;
 }
 
+.provider-model-rail-tooltip-trigger {
+  display: flex;
+}
+
+.provider-model-rail-tooltip {
+  z-index: var(--openbot-layer-popover);
+  display: flex;
+  max-width: min(240px, calc(100vw - 16px));
+  flex-direction: column;
+  gap: var(--openbot-space-0-5);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.provider-model-rail-tooltip small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+}
+
 .provider-model-rail-button {
   display: grid;
   width: 36px;
