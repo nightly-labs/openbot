@@ -64,19 +64,27 @@ export async function resolveCuaDriver(input: CuaDriverArtifactInput): Promise<s
 }
 
 /**
- * The driver's own product analytics, which are off for every copy OpenBot starts.
+ * The two calls the driver makes to its own vendor, off for every copy OpenBot starts.
  *
- * The driver ships with them on, and OpenBot now ships the driver, so a user who never chose the
- * driver would otherwise send a vendor that is not OpenBot a record of each tool call. The driver
- * reads the environment before its own configuration, so this decides the question: nothing a
- * process inherits can turn the analytics back on, and OpenBot writes no file, so a driver the user
- * runs themselves keeps the setting they gave it.
+ * `CUA_DRIVER_RS_TELEMETRY_ENABLED` stops the product analytics. The driver ships with them on, and
+ * OpenBot now ships the driver, so a user who never chose the driver would otherwise send a vendor
+ * that is not OpenBot a record of each tool call.
  *
- * This is set last, after any inherited environment, at every place that runs the binary: the
- * daemon, the MCP proxy each provider spawns, the permission probe, and the doctor script.
+ * `CUA_DRIVER_RS_UPDATE_CHECK` stops the release check `serve` makes at startup. OpenBot pins the
+ * driver in `native-runtime.lock.json` and packages that exact build, so the answer could only offer
+ * the user an update OpenBot would refuse: on macOS the binary sits inside a signed application
+ * bundle, and replacing it would break the signature. Off, the daemon also writes no
+ * `~/.cua-driver/version_check.json`.
+ *
+ * The driver reads the environment before its own configuration, so these decide the question:
+ * nothing a process inherits can turn them back on, and OpenBot writes no file, so a driver the user
+ * runs themselves keeps the settings they gave it. This is why both are spread last, after any
+ * inherited environment, at every place that runs the binary: the daemon, the MCP proxy each
+ * provider spawns, the permission probe, and the doctor script.
  */
-export const CUA_DRIVER_TELEMETRY_OFF: Readonly<Record<string, string>> = {
+export const CUA_DRIVER_VENDOR_CALLS_OFF: Readonly<Record<string, string>> = {
   CUA_DRIVER_RS_TELEMETRY_ENABLED: "0",
+  CUA_DRIVER_RS_UPDATE_CHECK: "0",
 };
 
 /** The file name, which carries an extension only where the operating system needs one. */

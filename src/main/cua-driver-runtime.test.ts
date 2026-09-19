@@ -94,18 +94,23 @@ describe("CuaDriverRuntime", () => {
     expect(spawned[0].options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
   });
 
-  it("turns the driver's own analytics off, because OpenBot ships the driver and the user did not choose it", async () => {
+  it("makes neither call the driver makes to its own vendor, because OpenBot ships the driver and pins it", async () => {
     // Set in the inherited environment, which the daemon spawn copies first. OpenBot ships the
-    // driver, so its analytics stay off whatever a process it inherits from asks for.
+    // driver, so the analytics and the release check stay off whatever a process it inherits from
+    // asks for.
     vi.stubEnv("CUA_DRIVER_RS_TELEMETRY_ENABLED", "1");
+    vi.stubEnv("CUA_DRIVER_RS_UPDATE_CHECK", "1");
     const { driver, spawned } = await runtime();
     await driver.start();
 
     expect(spawned[0].options.env.CUA_DRIVER_RS_TELEMETRY_ENABLED).toBe("0");
-    expect(driver.mcpServerConfig()?.env).toContainEqual({
-      key: "CUA_DRIVER_RS_TELEMETRY_ENABLED",
-      value: "0",
-    });
+    expect(spawned[0].options.env.CUA_DRIVER_RS_UPDATE_CHECK).toBe("0");
+    // The providers spawn their own proxy, so the entry they are handed must carry them too.
+    expect(driver.mcpServerConfig()?.env).toEqual([
+      { key: "CUA_DRIVER_EMBEDDED", value: "1" },
+      { key: "CUA_DRIVER_RS_TELEMETRY_ENABLED", value: "0" },
+      { key: "CUA_DRIVER_RS_UPDATE_CHECK", value: "0" },
+    ]);
   });
 
   it("starts one daemon however many callers ask at once", async () => {
@@ -126,10 +131,7 @@ describe("CuaDriverRuntime", () => {
     // with one would vanish for two of the three providers with no error.
     expect(config?.workingDirectory).toBe("");
     expect(config?.args).toEqual(["mcp", "--socket", driver.socketPath()]);
-    expect(config?.env).toEqual([
-      { key: "CUA_DRIVER_EMBEDDED", value: "1" },
-      { key: "CUA_DRIVER_RS_TELEMETRY_ENABLED", value: "0" },
-    ]);
+    expect(config?.env.map((entry) => entry.key)).toContain("CUA_DRIVER_EMBEDDED");
   });
 
   it("stops the daemon it started", async () => {
