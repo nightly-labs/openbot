@@ -1750,7 +1750,9 @@ async function runBackgroundScenario(browser: BrowserHost, origin: string): Prom
   const failures: string[] = [];
   try {
     // Neither page has been displayed. A different agent now owns the active tab.
-    await browser.screenshot(tab.id).catch((error) => failures.push(`capture: ${String(error)}`));
+    // No capture here: a hidden view has no compositor surface under xvfb, so
+    // `capturePage` reports UnknownVizError. Captures of displayed tabs are
+    // proven in the main flow.
     try {
       const first = await browser.snapshot(tab.id);
       const input = first.elements.find((element) => element.name === "Task");
