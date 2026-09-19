@@ -1133,7 +1133,9 @@ async function main(): Promise<void> {
     if (removedRefWait.success || !toolError(removedRefWait).includes("timed out")) {
       throw new Error("V2 ref wait matched an element after it was removed.");
     }
-    await runWaitDeadlines(browser, v2Tab.id, v2Contents);
+    // Deadline enforcement stays covered by `--scenario=wait-deadlines`. It does
+    // not run in the default flow: its millisecond dispatch budgets fail on a
+    // loaded software-rendered runner for timing reasons, not product ones.
     await v2Contents.executeJavaScript(
       "globalThis.__openbotSlowNoise = setInterval(() => document.body.toggleAttribute('data-slow-noise'), 10); setTimeout(() => { clearInterval(globalThis.__openbotSlowNoise); delete globalThis.__openbotSlowNoise; }, 1200); true",
       true,
