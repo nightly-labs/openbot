@@ -27,7 +27,7 @@ import type {
   AppInfo,
   AppSetupState,
   CentralAuthDesktopApi,
-  ComputerUseMacSetupState,
+  ComputerUseState,
   ExportResult,
   ExternalDestination,
   MacPermissionId,
@@ -498,11 +498,8 @@ export interface OpenBotDesktopApi {
   onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
   onOpenSettings: (listener: () => void) => () => void;
   dynamicIsland: DynamicIslandDesktopApi;
-  getComputerUseMacSetupState: () => Promise<ComputerUseMacSetupState>;
-  openComputerUsePermissionSetup: (permission: MacPermissionId) => Promise<ComputerUseMacSetupState>;
-  startComputerUseHelperDrag: () => Promise<void>;
-  revealComputerUseHelper: () => Promise<void>;
-  closeComputerUsePermissionSetup: () => Promise<void>;
+  getComputerUseState: () => Promise<ComputerUseState>;
+  openComputerUsePermissionPane: (permission: MacPermissionId) => Promise<ComputerUseState>;
   openExternal: (destination: ExternalDestination) => Promise<void>;
   connectProvider: (provider: AgentProviderId) => Promise<AgentStatus>;
   refreshAgentProviders: () => Promise<AgentStatus>;

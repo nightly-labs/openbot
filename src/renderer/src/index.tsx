@@ -1,6 +1,5 @@
 import { render } from "@solidjs/web";
 import { App } from "./App";
-import { ComputerUseSetupSurface } from "./features/computer-use/ComputerUseSetupSurface";
 import { DynamicIslandSurface } from "./features/dynamic-island/DynamicIslandSurface";
 import "./styles.css";
 
@@ -11,14 +10,4 @@ if (!root) {
 }
 
 const surface = new URLSearchParams(window.location.search).get("surface");
-render(
-  () =>
-    surface === "dynamic-island" ? (
-      <DynamicIslandSurface />
-    ) : surface === "computer-use-setup" ? (
-      <ComputerUseSetupSurface />
-    ) : (
-      <App />
-    ),
-  root,
-);
+render(() => (surface === "dynamic-island" ? <DynamicIslandSurface /> : <App />), root);

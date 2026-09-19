@@ -22,6 +22,7 @@ import type {
   BrowserTab,
   CentralAuthState,
   CentralAuthUser,
+  ComputerUseState,
   ConfigureHostInput,
   ConversationMessage,
   ConversationSnapshot,
@@ -40,6 +41,7 @@ import type {
   InstalledSkill,
   InviteSummary,
   JoinServerInput,
+  MacPermissionId,
   MarketplaceSkillDetail,
   OpenAttachmentInput,
   OpenBotDesktopApi,
@@ -243,6 +245,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let setupState = clone<AppSetupState>(
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
   );
+  const grantedComputerUsePermissions = new Set<MacPermissionId>();
+  const computerUseState = (): ComputerUseState => {
+    const permissions = (["screen-recording", "accessibility"] as const).map((id) => ({
+      id,
+      granted: grantedComputerUsePermissions.has(id),
+    }));
+    return {
+      status: permissions.every(({ granted }) => granted) ? "ready" : "permissions-required",
+      permissions,
+      message: null,
+    };
+  };
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
@@ -620,21 +634,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
     },
-    getComputerUseMacSetupState: async () => ({
-      status: "available",
-      helperName: "Codex Computer Use",
-      helperIconDataUrl: null,
-      message: null,
-    }),
-    openComputerUsePermissionSetup: async () => ({
-      status: "available",
-      helperName: "Codex Computer Use",
-      helperIconDataUrl: null,
-      message: null,
-    }),
-    startComputerUseHelperDrag: async () => undefined,
-    revealComputerUseHelper: async () => undefined,
-    closeComputerUsePermissionSetup: async () => undefined,
+    getComputerUseState: async () => computerUseState(),
+    // The preview grants the permission the pane was opened for, because the panel's whole job is
+    // to show the answer changing. A mock that always reported the same state would make every
+    // story of this panel look identical.
+    openComputerUsePermissionPane: async (permission) => {
+      grantedComputerUsePermissions.add(permission);
+      return computerUseState();
+    },
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),

@@ -1,38 +1,37 @@
-import type { ComputerUseMacSetupState } from "@openbot/contracts/ipc";
+import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
 import { onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Toaster, toast } from "../src/components/ui";
 import { ComputerUseMacSetup } from "../src/features/computer-use/ComputerUseMacSetup";
-import { ComputerUseSetupSurface } from "../src/features/computer-use/ComputerUseSetupSurface";
 import { createMockOpenBot } from "./mock-openbot";
 
-const availableState: ComputerUseMacSetupState = {
-  status: "available",
-  helperName: "Codex Computer Use",
-  helperIconDataUrl: null,
+function permissions(granted: readonly MacPermissionId[]): ComputerUseState["permissions"] {
+  return (["screen-recording", "accessibility"] as const).map((id) => ({ id, granted: granted.includes(id) }));
+}
+
+const permissionsRequired: ComputerUseState = {
+  status: "permissions-required",
+  permissions: permissions([]),
   message: null,
 };
 
-function MockedSetup(props: { state?: ComputerUseMacSetupState; error?: Error; loading?: boolean }) {
+function MockedSetup(props: { state?: ComputerUseState; error?: Error; loading?: boolean }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
-  mock.api.getComputerUseMacSetupState = props.loading
+  mock.api.getComputerUseState = props.loading
     ? () => new Promise(() => undefined)
     : props.error
       ? async () => {
           throw props.error;
         }
-      : async () => props.state ?? availableState;
+      : async () => props.state ?? permissionsRequired;
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();
-    toast.dismiss();
     window.openbot = previousApi;
   });
   return (
     <main class="foundation-story foundation-interaction-stage">
       <ComputerUseMacSetup platform="darwin" variant="compact" />
-      <Toaster />
     </main>
   );
 }
@@ -46,22 +45,33 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Available: Story = {
+export const PermissionsRequired: Story = {
   render: () => <MockedSetup />,
+};
+
+export const PartlyGranted: Story = {
+  render: () => <MockedSetup state={{ ...permissionsRequired, permissions: permissions(["screen-recording"]) }} />,
+};
+
+export const Ready: Story = {
+  render: () => (
+    <MockedSetup
+      state={{ status: "ready", permissions: permissions(["screen-recording", "accessibility"]), message: null }}
+    />
+  ),
 };
 
 export const Loading: Story = {
   render: () => <MockedSetup loading />,
 };
 
-export const HelperMissing: Story = {
+export const DriverMissing: Story = {
   render: () => (
     <MockedSetup
       state={{
-        status: "unavailable",
-        helperName: "Codex Computer Use",
-        helperIconDataUrl: null,
-        message: "Codex Computer Use is not installed. Install or enable the Computer Use plugin, then try again.",
+        status: "driver-missing",
+        permissions: permissions([]),
+        message: "Install the Computer Use driver, then check again.",
       }}
     />
   ),
@@ -69,22 +79,4 @@ export const HelperMissing: Story = {
 
 export const Failure: Story = {
   render: () => <MockedSetup error={new Error("OpenBot could not check Computer Use.")} />,
-};
-
-export const DragHelper: Story = {
-  render: () => {
-    const previousApi = window.openbot;
-    const mock = createMockOpenBot();
-    window.openbot = mock.api;
-    onCleanup(() => {
-      mock.dispose();
-      window.openbot = previousApi;
-    });
-    return (
-      <div style={{ width: "360px", height: "300px" }}>
-        <ComputerUseSetupSurface />
-      </div>
-    );
-  },
-  parameters: { layout: "centered" },
 };

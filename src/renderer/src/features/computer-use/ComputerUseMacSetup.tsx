@@ -1,4 +1,4 @@
-import type { ComputerUseMacSetupState, DesktopPlatform, MacPermissionId } from "@openbot/contracts/ipc";
+import type { ComputerUseState, DesktopPlatform, MacPermissionId } from "@openbot/contracts/ipc";
 import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import {
   Alert,
@@ -24,7 +24,6 @@ import {
   SettingsSection,
   Skeleton,
   TriangleAlert,
-  toast,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 
@@ -32,6 +31,9 @@ export interface ComputerUseMacSetupProps {
   platform: DesktopPlatform;
   variant: "settings" | "compact";
 }
+
+/** What the user must install, when this computer has no driver. Shown, never run for them. */
+const DRIVER_INSTALL_COMMAND = '/bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"';
 
 const PERMISSIONS: ReadonlyArray<{
   id: MacPermissionId;
@@ -42,31 +44,34 @@ const PERMISSIONS: ReadonlyArray<{
   {
     id: "screen-recording",
     title: "Screen Recording",
-    description: "Lets Computer Use see app windows.",
+    description: "Lets OpenBot see app windows.",
     icon: Monitor,
   },
   {
     id: "accessibility",
     title: "Accessibility",
-    description: "Lets Computer Use click and type.",
+    description: "Lets OpenBot click and type.",
     icon: MousePointer2,
   },
 ];
 
 export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
   const desktopApi = window.openbot;
-  const [state, setState] = createSignal<ComputerUseMacSetupState | null>(null);
+  const [state, setState] = createSignal<ComputerUseState | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [busyPermission, setBusyPermission] = createSignal<MacPermissionId | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   let disposed = false;
+
+  const granted = (permission: MacPermissionId): boolean =>
+    state()?.permissions.some((entry) => entry.id === permission && entry.granted) ?? false;
 
   async function loadState(): Promise<void> {
     if (props.platform !== "darwin" || loading()) return;
     setLoading(true);
     setError(null);
     try {
-      const next = await desktopApi.getComputerUseMacSetupState();
+      const next = await desktopApi.getComputerUseState();
       if (!disposed) setState(next);
     } catch (cause) {
       if (!disposed) setError(errorMessage(cause, "OpenBot could not check Computer Use."));
@@ -76,18 +81,12 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
   }
 
   async function openPermission(permission: MacPermissionId): Promise<void> {
-    if (busyPermission() || state()?.status !== "available") return;
+    if (busyPermission()) return;
     setBusyPermission(permission);
     setError(null);
     try {
-      const next = await desktopApi.openComputerUsePermissionSetup(permission);
-      if (disposed) return;
-      setState(next);
-      if (next.status === "available") {
-        toast.success("System Settings opened", {
-          description: "Drag the Computer Use app into the list to finish setup.",
-        });
-      }
+      const next = await desktopApi.openComputerUsePermissionPane(permission);
+      if (!disposed) setState(next);
     } catch (cause) {
       if (!disposed) setError(errorMessage(cause, "OpenBot could not open System Settings."));
     } finally {
@@ -98,8 +97,12 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
   onSettled(() => void loadState());
   onCleanup(() => {
     disposed = true;
-    void desktopApi.closeComputerUsePermissionSetup().catch(() => undefined);
   });
+
+  const showPermissions = () => {
+    const status = state()?.status;
+    return status === "permissions-required" || status === "ready";
+  };
 
   const content = () => (
     <>
@@ -121,11 +124,28 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
         </ItemGroup>
       </Show>
 
-      <Show
-        when={
-          state()?.status === "unavailable" || state()?.status === "unsupported" || (!loading() && error() !== null)
-        }
-      >
+      <Show when={state()?.status === "driver-missing"}>
+        <Alert tone="warning" class="computer-use-alert" role="status">
+          <AlertIcon>
+            <TriangleAlert />
+          </AlertIcon>
+          <AlertContent>
+            <AlertTitle>Install the Computer Use driver</AlertTitle>
+            <AlertDescription>
+              Run this in Terminal, then check again.
+              <code class="computer-use-install-command">{DRIVER_INSTALL_COMMAND}</code>
+            </AlertDescription>
+          </AlertContent>
+          <AlertActions>
+            <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
+              <RefreshCw aria-hidden="true" />
+              Check again
+            </Button>
+          </AlertActions>
+        </Alert>
+      </Show>
+
+      <Show when={state()?.status === "unsupported" || state()?.status === "error" || (!loading() && error() !== null)}>
         <Alert tone="warning" class="computer-use-alert" role="status">
           <AlertIcon>
             <TriangleAlert />
@@ -133,10 +153,7 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
           <AlertContent>
             <AlertTitle>Computer Use isn’t available yet</AlertTitle>
             <AlertDescription>
-              {errorMessage(
-                state()?.message ?? error(),
-                "OpenBot could not find the Computer Use helper. Open Computer Use settings to check the setup.",
-              )}
+              {errorMessage(state()?.message ?? error(), "OpenBot could not start the Computer Use driver.")}
             </AlertDescription>
           </AlertContent>
           <AlertActions>
@@ -148,51 +165,24 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
         </Alert>
       </Show>
 
-      <Show when={state()?.status === "available"}>
-        <Show when={props.variant === "settings"}>
-          <SettingsSection title="Computer Use helper">
-            <ItemGroup class="settings-modal-card computer-use-card">
-              <Item class="settings-modal-row computer-use-helper-row">
-                <ItemMedia class="computer-use-helper-media">
-                  <Show
-                    when={state()?.helperIconDataUrl}
-                    fallback={<Monitor class="computer-use-fallback-icon" aria-hidden="true" />}
-                  >
-                    {(source) => <img src={source()} alt="" />}
-                  </Show>
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{state()?.helperName}</ItemTitle>
-                  <ItemDescription>Controls apps for OpenBot.</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Badge variant="success-light">
-                    <CircleCheck aria-hidden="true" />
-                    Available
-                  </Badge>
-                </ItemActions>
-              </Item>
-            </ItemGroup>
-          </SettingsSection>
-        </Show>
-
+      <Show when={showPermissions()}>
         <Show
           when={props.variant === "settings"}
-          fallback={<PermissionGroup actionLabel="Set up" busy={busyPermission()} onOpen={openPermission} />}
+          fallback={<PermissionGroup busy={busyPermission()} granted={granted} onOpen={openPermission} />}
         >
           <SettingsSection title="System permissions" description="Permissions are managed by macOS.">
-            <PermissionGroup actionLabel="Open settings" busy={busyPermission()} onOpen={openPermission} />
+            <PermissionGroup busy={busyPermission()} granted={granted} onOpen={openPermission} />
           </SettingsSection>
         </Show>
       </Show>
 
-      <Show when={error() && state()?.status === "available"}>
+      <Show when={error() && showPermissions()}>
         <Alert tone="danger" class="computer-use-alert" role="alert">
           <AlertIcon>
             <Info />
           </AlertIcon>
           <AlertContent>
-            <AlertTitle>Couldn’t open Computer Use setup</AlertTitle>
+            <AlertTitle>Couldn’t open System Settings</AlertTitle>
             <AlertDescription>{error()}</AlertDescription>
           </AlertContent>
         </Alert>
@@ -224,8 +214,8 @@ export function ComputerUseMacSetup(props: ComputerUseMacSetupProps) {
 }
 
 function PermissionGroup(props: {
-  actionLabel: string;
   busy: MacPermissionId | null;
+  granted: (permission: MacPermissionId) => boolean;
   onOpen: (permission: MacPermissionId) => Promise<void>;
 }) {
   return (
@@ -243,17 +233,27 @@ function PermissionGroup(props: {
                 <ItemDescription>{permission.description}</ItemDescription>
               </ItemContent>
               <ItemActions>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  loading={props.busy === permission.id}
-                  loadingLabel="Opening…"
-                  disabled={props.busy !== null}
-                  onClick={() => void props.onOpen(permission.id)}
+                <Show
+                  when={props.granted(permission.id)}
+                  fallback={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      loading={props.busy === permission.id}
+                      loadingLabel="Opening…"
+                      disabled={props.busy !== null}
+                      onClick={() => void props.onOpen(permission.id)}
+                    >
+                      Open settings
+                    </Button>
+                  }
                 >
-                  {props.actionLabel}
-                </Button>
+                  <Badge variant="success-light">
+                    <CircleCheck aria-hidden="true" />
+                    Granted
+                  </Badge>
+                </Show>
               </ItemActions>
             </Item>
           );

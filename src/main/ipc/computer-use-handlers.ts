@@ -1,23 +1,40 @@
-// The macOS screen-recording and accessibility permission flow.
+// The macOS screen-recording and accessibility permission flow for the Computer Use driver.
 
-import type { ComputerUseMacSetupWindowController } from "../computer-use-mac-setup-window";
+import type { CuaDriverRuntime } from "../cua-driver-runtime";
+import { MAC_PERMISSION_URLS } from "../mac-permission-urls";
 import { parseMacPermission } from "./app-inputs";
-import { eventHandler, handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 
 export interface ComputerUseIpcDependencies {
-  computerUseMacSetup: ComputerUseMacSetupWindowController;
+  cuaDriver: CuaDriverRuntime | null;
+  openExternal: (url: string) => Promise<void>;
 }
 
+/**
+ * Two endpoints, both answering with the whole state.
+ *
+ * Opening a pane returns the state again rather than nothing, because the user grants the
+ * permission in System Settings and comes back: re-reading on the way out is what lets the panel
+ * show the new answer without a second call.
+ */
 export function computerUseIpcHandlers({
-  computerUseMacSetup,
+  cuaDriver,
+  openExternal,
 }: ComputerUseIpcDependencies): Pick<IpcGroupHandlers, "computerUse"> {
+  const state = () =>
+    cuaDriver?.state() ??
+    Promise.resolve({
+      status: "unsupported" as const,
+      permissions: [],
+      message: "Computer Use is available on macOS.",
+    });
   return {
     computerUse: {
-      getMacSetupState: handler(() => computerUseMacSetup.getState()),
-      openMacPermissionSetup: payloadHandler(parseMacPermission, (parsed) => computerUseMacSetup.open(parsed)),
-      startHelperDrag: eventHandler((event) => computerUseMacSetup.startDrag(event.sender)),
-      revealHelper: handler(() => computerUseMacSetup.revealHelper()),
-      closeMacPermissionSetup: handler(() => computerUseMacSetup.close()),
+      getState: handler(state),
+      openPermissionPane: payloadHandler(parseMacPermission, async (permission) => {
+        await openExternal(MAC_PERMISSION_URLS[permission]);
+        return state();
+      }),
     },
   };
 }
