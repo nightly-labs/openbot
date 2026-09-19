@@ -166,6 +166,7 @@
     "test:team-live": "electron scripts/team-webrtc-live-smoke-app",
     "test:remote-desktop-runtime": "bun scripts/remote-desktop-runtime-smoke.ts",
     "codex:doctor": "bun scripts/codex-doctor.ts",
+    "cua-driver:doctor": "bun scripts/cua-driver-doctor.ts",
     "skills:review": "bun scripts/review-skills.ts",
     "marketplace:seed:local": "bun scripts/publish-production-catalog.ts --local --apply",
     "marketplace:build": "bun scripts/build-production-catalog.ts",
