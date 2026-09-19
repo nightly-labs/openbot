@@ -16,6 +16,7 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { cuaDriverTelemetryEnvironment } from "./cua-driver-artifact";
 import { stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
@@ -201,7 +202,10 @@ export class CuaDriverRuntime {
       enabled: true,
       command: executable,
       args: ["mcp", "--socket", this.socketPath()],
-      env: [{ key: EMBEDDED_ENV, value: "1" }],
+      env: [
+        { key: EMBEDDED_ENV, value: "1" },
+        ...Object.entries(cuaDriverTelemetryEnvironment(process.env)).map(([key, value]) => ({ key, value })),
+      ],
       envPassthrough: [...environmentPassthrough(this.#options.platform)],
       workingDirectory: "",
       url: "",
@@ -309,6 +313,7 @@ export class CuaDriverRuntime {
       env: {
         ...process.env,
         [EMBEDDED_ENV]: "1",
+        ...cuaDriverTelemetryEnvironment(process.env),
         [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
         ...waylandEnvironment(this.#options.platform),
       },
@@ -472,7 +477,11 @@ async function readPermissionsOverMcp(
   const transport = new StdioClientTransport({
     command: config.command,
     args: config.args,
-    env: { ...getDefaultEnvironment(), [EMBEDDED_ENV]: "1" },
+    env: {
+      ...getDefaultEnvironment(),
+      [EMBEDDED_ENV]: "1",
+      ...cuaDriverTelemetryEnvironment(process.env),
+    },
     stderr: "ignore",
   });
   const timer = new AbortController();

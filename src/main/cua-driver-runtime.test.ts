@@ -94,6 +94,13 @@ describe("CuaDriverRuntime", () => {
     expect(spawned[0].options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
   });
 
+  it("turns the driver's own analytics off, because OpenBot ships the driver and the user did not choose it", async () => {
+    const { driver, spawned } = await runtime();
+    await driver.start();
+
+    expect(spawned[0].options.env.CUA_DRIVER_RS_TELEMETRY_ENABLED).toBe("0");
+  });
+
   it("starts one daemon however many callers ask at once", async () => {
     const { driver, spawned } = await runtime();
     await Promise.all([driver.start(), driver.start(), driver.start()]);
@@ -112,7 +119,10 @@ describe("CuaDriverRuntime", () => {
     // with one would vanish for two of the three providers with no error.
     expect(config?.workingDirectory).toBe("");
     expect(config?.args).toEqual(["mcp", "--socket", driver.socketPath()]);
-    expect(config?.env).toEqual([{ key: "CUA_DRIVER_EMBEDDED", value: "1" }]);
+    expect(config?.env).toEqual([
+      { key: "CUA_DRIVER_EMBEDDED", value: "1" },
+      { key: "CUA_DRIVER_RS_TELEMETRY_ENABLED", value: "0" },
+    ]);
   });
 
   it("stops the daemon it started", async () => {

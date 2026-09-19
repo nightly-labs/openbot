@@ -263,12 +263,19 @@ and Accessibility grants to OpenBot, and macOS keeps control of the prompts. Win
 no such grant. Screen contents and accessibility trees that an agent reads through the driver go to
 that agent's provider, the same as any other message content.
 
-The driver is third-party software with its own product analytics, which are **on by default** and are
-not OpenBot's. It sends the driver version, the operating system, a random installation identifier, and
-a bucketed record of each tool call to its vendor. It does not send screen contents, window or
-application names, typed text, or the content of a tool result. OpenBot does not turn these analytics
-on or off for you. To turn them off, run `cua-driver telemetry disable`; `cua-driver telemetry status`
-reports the current setting. The driver also asks GitHub for a newer release.
+The driver is third-party software with its own product analytics, which its vendor turns on by
+default and which are not OpenBot's. They would send the driver version, the operating system, a
+random installation identifier, and a bucketed record of each tool call to that vendor. They never
+send screen contents, window or application names, typed text, or the content of a tool result.
+
+**OpenBot turns these analytics off.** Every copy of the driver OpenBot starts gets
+`CUA_DRIVER_RS_TELEMETRY_ENABLED=0`, so the driver sends the vendor nothing. OpenBot sets this on the
+process it starts and does not write to your driver configuration, so a driver you run yourself keeps
+the setting you gave it. To send the analytics after all, export
+`CUA_DRIVER_RS_TELEMETRY_ENABLED=1` before you start OpenBot; a variable you set wins.
+`cua-driver telemetry status` reports the setting a command sees.
+
+The driver also asks GitHub for a newer release.
 
 ## Exports
 

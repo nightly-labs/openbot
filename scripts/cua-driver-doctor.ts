@@ -8,7 +8,7 @@ import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
-import { resolveCuaDriver } from "../src/main/cua-driver-artifact";
+import { cuaDriverTelemetryEnvironment, resolveCuaDriver } from "../src/main/cua-driver-artifact";
 
 const run = promisify(execFile);
 
@@ -41,7 +41,10 @@ if (!executable) {
   process.exitCode = 1;
 } else {
   try {
-    const { stdout, stderr } = await run(executable, ["doctor"], { timeout: 20_000 });
+    const { stdout, stderr } = await run(executable, ["doctor"], {
+      timeout: 20_000,
+      env: { ...process.env, ...cuaDriverTelemetryEnvironment(process.env) },
+    });
     // Machine-readable: doctor result JSON consumed by tooling.
     process.stdout.write(
       `${JSON.stringify({ ok: true, executable, doctor: stdout.trim() || stderr.trim() }, null, 2)}\n`,
