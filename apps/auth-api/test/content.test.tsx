@@ -17,6 +17,7 @@ import {
   type CollectionArticle,
   type ContentCollection,
 } from "../src/lib/content-collection";
+import { PLUGIN_INDEX_ROUTE } from "../src/lib/plugins";
 import { loadGuide } from "../src/routes/guides/$slug";
 import { loadNewsArticle } from "../src/routes/news/$slug";
 
@@ -52,6 +53,7 @@ function createTestRouter() {
     createRoute({ getParentRoute: () => rootRoute, path: "/news/$slug" }),
     createRoute({ getParentRoute: () => rootRoute, path: "/guides" }),
     createRoute({ getParentRoute: () => rootRoute, path: "/guides/$slug" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/plugins" }),
   ]);
   return createRouter({ routeTree: rootRoute });
 }
@@ -178,6 +180,7 @@ describe("landing header", () => {
     for (const collection of CONTENT_COLLECTIONS) {
       expect(navigation.getByRole("link", { name: collection.name })).toHaveAttribute("href", collection.indexRoute);
     }
+    expect(navigation.getByRole("link", { name: "Plugins" })).toHaveAttribute("href", PLUGIN_INDEX_ROUTE);
   });
 });
 
