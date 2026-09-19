@@ -7,6 +7,13 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [0.14.1] - 2026-09-19
 
+### Changed
+
+- Sign in to Claude from the composer notice, which opens the OAuth window instead of the
+  authentication documentation. OpenCode, whose key is pasted in settings, no longer raises a
+  notice with a button that starts nothing.
+- Name the provider under each mark in the header model picker rail, with its state below the name.
+
 ### Fixed
 
 - Ship the 0.14.0 work, which no build carried: that release stopped while it was being packaged,
