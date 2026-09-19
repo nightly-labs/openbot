@@ -40,6 +40,7 @@ import {
   SelectValue,
   SlidersHorizontal,
   Tabs,
+  Tooltip,
 } from "./ui";
 import { cx } from "./ui/utils";
 
@@ -71,6 +72,10 @@ type RailId = AgentProviderId | "custom";
 const CUSTOM_RAIL = "custom" as const;
 
 const PROVIDERS: readonly RailId[] = [...PICKER_PROVIDERS, CUSTOM_RAIL];
+
+/** Long enough that sweeping the rail does not flash a name per mark. */
+const RAIL_TOOLTIP_OPEN_DELAY = 150;
+
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
   const [search, setSearch] = createSignal("");
@@ -219,38 +224,57 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 {(provider) => {
                   const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider);
                   return (
-                    <Tabs.Trigger
-                      ref={(element) => providerButtons.set(provider, element)}
-                      value={provider}
-                      class={[
-                        "provider-model-rail-button",
-                        {
-                          "provider-model-rail-button-selected": railProvider() === provider,
-                          "provider-model-rail-button-unavailable": status().state !== "available",
-                        },
-                      ]}
-                      aria-label={`${railName(provider)}: ${railSummary(provider, status())}`}
-                      title={`${railName(provider)} · ${railSummary(provider, status())}`}
-                      onClick={(event) => {
-                        const target = event.currentTarget;
-                        selectRailProvider(provider);
-                        queueMicrotask(() => target.focus({ preventScroll: true }));
-                      }}
-                      onKeyDown={(event) => {
-                        const delta =
-                          event.key === "ArrowDown" || event.key === "ArrowRight"
-                            ? 1
-                            : event.key === "ArrowUp" || event.key === "ArrowLeft"
-                              ? -1
-                              : 0;
-                        if (!delta) return;
-                        const current = PROVIDERS.indexOf(provider);
-                        const next = PROVIDERS[(current + delta + PROVIDERS.length) % PROVIDERS.length];
-                        if (next) providerButtons.get(next)?.focus();
-                      }}
+                    // The rail shows a mark alone, so hovering one names it. Focus needs no tooltip:
+                    // tabs activate on focus, and the panel heading beside them names the tab.
+                    // The name sits to the left, off the panel, and only flips right when the
+                    // window edge leaves no room there.
+                    <Tooltip.Root
+                      placement="left"
+                      gutter={8}
+                      openDelay={RAIL_TOOLTIP_OPEN_DELAY}
+                      closeDelay={0}
+                      skipDelayDuration={300}
                     >
-                      <ProviderMark provider={provider} large />
-                    </Tabs.Trigger>
+                      <Tooltip.Trigger as="div" class="provider-model-rail-tooltip-trigger">
+                        <Tabs.Trigger
+                          ref={(element) => providerButtons.set(provider, element)}
+                          value={provider}
+                          class={[
+                            "provider-model-rail-button",
+                            {
+                              "provider-model-rail-button-selected": railProvider() === provider,
+                              "provider-model-rail-button-unavailable": status().state !== "available",
+                            },
+                          ]}
+                          aria-label={`${railName(provider)}: ${railSummary(provider, status())}`}
+                          onClick={(event) => {
+                            const target = event.currentTarget;
+                            selectRailProvider(provider);
+                            queueMicrotask(() => target.focus({ preventScroll: true }));
+                          }}
+                          onKeyDown={(event) => {
+                            const delta =
+                              event.key === "ArrowDown" || event.key === "ArrowRight"
+                                ? 1
+                                : event.key === "ArrowUp" || event.key === "ArrowLeft"
+                                  ? -1
+                                  : 0;
+                            if (!delta) return;
+                            const current = PROVIDERS.indexOf(provider);
+                            const next = PROVIDERS[(current + delta + PROVIDERS.length) % PROVIDERS.length];
+                            if (next) providerButtons.get(next)?.focus();
+                          }}
+                        >
+                          <ProviderMark provider={provider} large />
+                        </Tabs.Trigger>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content class="provider-model-rail-tooltip">
+                          <strong>{railName(provider)}</strong>
+                          <small>{railSummary(provider, status())}</small>
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
                   );
                 }}
               </For>
