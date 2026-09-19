@@ -16,7 +16,7 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { cuaDriverTelemetryEnvironment } from "./cua-driver-artifact";
+import { CUA_DRIVER_TELEMETRY_OFF } from "./cua-driver-artifact";
 import { stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
@@ -204,7 +204,7 @@ export class CuaDriverRuntime {
       args: ["mcp", "--socket", this.socketPath()],
       env: [
         { key: EMBEDDED_ENV, value: "1" },
-        ...Object.entries(cuaDriverTelemetryEnvironment(process.env)).map(([key, value]) => ({ key, value })),
+        ...Object.entries(CUA_DRIVER_TELEMETRY_OFF).map(([key, value]) => ({ key, value })),
       ],
       envPassthrough: [...environmentPassthrough(this.#options.platform)],
       workingDirectory: "",
@@ -313,7 +313,7 @@ export class CuaDriverRuntime {
       env: {
         ...process.env,
         [EMBEDDED_ENV]: "1",
-        ...cuaDriverTelemetryEnvironment(process.env),
+        ...CUA_DRIVER_TELEMETRY_OFF,
         [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
         ...waylandEnvironment(this.#options.platform),
       },
@@ -480,7 +480,7 @@ async function readPermissionsOverMcp(
     env: {
       ...getDefaultEnvironment(),
       [EMBEDDED_ENV]: "1",
-      ...cuaDriverTelemetryEnvironment(process.env),
+      ...CUA_DRIVER_TELEMETRY_OFF,
     },
     stderr: "ignore",
   });

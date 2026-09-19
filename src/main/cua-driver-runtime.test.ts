@@ -95,10 +95,17 @@ describe("CuaDriverRuntime", () => {
   });
 
   it("turns the driver's own analytics off, because OpenBot ships the driver and the user did not choose it", async () => {
+    // Set in the inherited environment, which the daemon spawn copies first. OpenBot ships the
+    // driver, so its analytics stay off whatever a process it inherits from asks for.
+    vi.stubEnv("CUA_DRIVER_RS_TELEMETRY_ENABLED", "1");
     const { driver, spawned } = await runtime();
     await driver.start();
 
     expect(spawned[0].options.env.CUA_DRIVER_RS_TELEMETRY_ENABLED).toBe("0");
+    expect(driver.mcpServerConfig()?.env).toContainEqual({
+      key: "CUA_DRIVER_RS_TELEMETRY_ENABLED",
+      value: "0",
+    });
   });
 
   it("starts one daemon however many callers ask at once", async () => {

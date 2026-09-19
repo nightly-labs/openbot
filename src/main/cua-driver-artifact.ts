@@ -64,25 +64,20 @@ export async function resolveCuaDriver(input: CuaDriverArtifactInput): Promise<s
 }
 
 /**
- * The driver's own product analytics, which OpenBot turns off for every copy it starts.
+ * The driver's own product analytics, which are off for every copy OpenBot starts.
  *
  * The driver ships with them on, and OpenBot now ships the driver, so a user who never chose the
- * driver would otherwise send a vendor that is not OpenBot a record of each tool call. Turning them
- * off through the environment decides one process and writes nothing, so OpenBot never edits the
- * setting the user keeps for their own copy of the driver.
+ * driver would otherwise send a vendor that is not OpenBot a record of each tool call. The driver
+ * reads the environment before its own configuration, so this decides the question: nothing a
+ * process inherits can turn the analytics back on, and OpenBot writes no file, so a driver the user
+ * runs themselves keeps the setting they gave it.
  *
- * A variable the user already exports wins, because the driver reads the environment before its own
- * configuration: this sets a default, and does not take the choice away from somebody who wants the
- * analytics on.
- *
- * Every place that runs the binary must pass this: the daemon, the MCP proxy each provider spawns,
- * the permission probe, and the doctor script.
+ * This is set last, after any inherited environment, at every place that runs the binary: the
+ * daemon, the MCP proxy each provider spawns, the permission probe, and the doctor script.
  */
-export const CUA_DRIVER_TELEMETRY_ENV = "CUA_DRIVER_RS_TELEMETRY_ENABLED";
-
-export function cuaDriverTelemetryEnvironment(environment: NodeJS.ProcessEnv): Record<string, string> {
-  return { [CUA_DRIVER_TELEMETRY_ENV]: environment[CUA_DRIVER_TELEMETRY_ENV] ?? "0" };
-}
+export const CUA_DRIVER_TELEMETRY_OFF: Readonly<Record<string, string>> = {
+  CUA_DRIVER_RS_TELEMETRY_ENABLED: "0",
+};
 
 /** The file name, which carries an extension only where the operating system needs one. */
 function executableName(platform: NodeJS.Platform): "cua-driver" | "cua-driver.exe" {

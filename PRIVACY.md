@@ -268,12 +268,11 @@ default and which are not OpenBot's. They would send the driver version, the ope
 random installation identifier, and a bucketed record of each tool call to that vendor. They never
 send screen contents, window or application names, typed text, or the content of a tool result.
 
-**OpenBot turns these analytics off.** Every copy of the driver OpenBot starts gets
-`CUA_DRIVER_RS_TELEMETRY_ENABLED=0`, so the driver sends the vendor nothing. OpenBot sets this on the
-process it starts and does not write to your driver configuration, so a driver you run yourself keeps
-the setting you gave it. To send the analytics after all, export
-`CUA_DRIVER_RS_TELEMETRY_ENABLED=1` before you start OpenBot; a variable you set wins.
-`cua-driver telemetry status` reports the setting a command sees.
+**OpenBot turns these analytics off, always.** Every copy of the driver OpenBot starts gets
+`CUA_DRIVER_RS_TELEMETRY_ENABLED=0`, so the driver sends the vendor nothing. The driver reads the
+environment before its own configuration, and OpenBot sets the variable last, so nothing can turn
+them back on for a driver OpenBot started. OpenBot writes no file, so a driver you run yourself keeps
+the setting you gave it.
 
 The driver also asks GitHub for a newer release.
 
