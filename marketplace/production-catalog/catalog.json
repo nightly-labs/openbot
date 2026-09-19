@@ -137,6 +137,24 @@
       "category": "other",
       "source": "openbot",
       "featured": false
+    },
+    {
+      "slug": "aiscrubber",
+      "category": "coding",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "safegen",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "skillary",
+      "category": "productivity",
+      "source": "openbot",
+      "featured": false
     }
   ],
   "agents": [
