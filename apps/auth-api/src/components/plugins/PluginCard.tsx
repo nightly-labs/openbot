@@ -1,12 +1,12 @@
-import type { MarketplacePluginDetail } from "@openbot/contracts/ipc-plugin-catalog";
 import { Link } from "@tanstack/solid-router";
-import { For } from "solid-js";
-import { PLUGIN_DETAIL_ROUTE, pluginTags } from "../../lib/plugins";
+import { For, Show } from "solid-js";
+import { PLUGIN_DETAIL_ROUTE, pluginTags, type SitePlugin } from "../../lib/plugins";
 import { ArticleGradient } from "../content/ArticleGradient";
-import { PluginLogo } from "./PluginLogo";
+import { PluginIcon } from "./PluginIcon";
+import { hasPluginLogo, PluginLogo } from "./PluginLogo";
 
 export interface PluginCardProps {
-  plugin: MarketplacePluginDetail;
+  plugin: SitePlugin;
   /** Position in the grid, used only to stagger the reveal. */
   index: number;
 }
@@ -36,7 +36,22 @@ export function PluginCard(props: PluginCardProps) {
         {/* The name is the only colour input: it hashes to one of the gradient's colour families,
             so two listings never open on the same picture and the catalog carries no colour. */}
         <ArticleGradient title={props.plugin.name} mode="hover" hoverTarget={() => root} />
-        <PluginLogo slug={props.plugin.slug} name={props.plugin.name} class="plugin-card-logo" />
+        {/* The drawn mark where this page holds one, because it is one colour on a gradient that is
+            a different colour on every card, and it is our own bytes. For every other listing the
+            catalog's icon is fetched through this origin, and a listing with neither keeps the
+            letter, so a card is never a bare gradient. */}
+        <Show
+          when={hasPluginLogo(props.plugin.slug)}
+          fallback={
+            <PluginIcon
+              slug={props.plugin.slug}
+              class="plugin-card-icon"
+              fallback={<PluginLogo slug={props.plugin.slug} name={props.plugin.name} class="plugin-card-logo" />}
+            />
+          }
+        >
+          <PluginLogo slug={props.plugin.slug} name={props.plugin.name} class="plugin-card-logo" />
+        </Show>
       </div>
       {/* The same tags the filters over the grid switch on, so a reader can see on a card why it
           survived a selection. They say nothing the two lines below repeat. */}

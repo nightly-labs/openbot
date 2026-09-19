@@ -41,15 +41,19 @@ const firstPlugin = () => {
 };
 
 describe("plugins index", () => {
-  // Also what keeps the card's artwork out of its name: the mark and the gradient inside the link
-  // are hidden from assistive technology, so a single `getByRole` still resolves one link per
-  // listing rather than failing on a name the decoration repeated.
+  /* One card per listing, in the catalog's own order, each naming its plugin and leading to that
+     plugin's page. The cards are found by where they lead rather than by their name, because a
+     listing's tagline can carry another listing's name and a search by text would find two cards. */
   it("offers every plugin in the catalog as a link to its own page", () => {
     renderPage(() => <PluginsIndexPage />);
 
-    for (const plugin of SITE_PLUGINS) {
-      const link = screen.getByRole("link", { name: (name) => name.includes(plugin.name) });
-      expect(link).toHaveAttribute("href", pluginPath(plugin.slug));
+    const cards = screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/plugins/"));
+
+    expect(cards.map((card) => card.getAttribute("href"))).toEqual(
+      SITE_PLUGINS.map((plugin) => pluginPath(plugin.slug)),
+    );
+    for (const [index, plugin] of SITE_PLUGINS.entries()) {
+      expect(cards[index]).toHaveTextContent(plugin.name);
     }
   });
 
@@ -64,13 +68,19 @@ describe("plugins index", () => {
     flush();
 
     expect(design).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("link", { name: (name) => name.includes("Canva") })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: (name) => name.includes("Canva") })).toHaveAttribute(
+      "href",
+      "/plugins/canva",
+    );
     expect(screen.queryByRole("link", { name: (name) => name.includes("Aave") })).not.toBeInTheDocument();
 
     fireEvent.click(design);
     flush();
 
-    expect(screen.getByRole("link", { name: (name) => name.includes("Aave") })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: (name) => name.includes("Aave") })).toHaveAttribute(
+      "href",
+      "/plugins/aave",
+    );
   });
 
   /* `All` is the way back, and it is the only switch a reader can press without having pressed
@@ -83,7 +93,7 @@ describe("plugins index", () => {
     expect(all).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.click(screen.getByRole("button", { name: "Design" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sign-in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Coding" }));
     flush();
 
     expect(all).toHaveAttribute("aria-pressed", "false");
@@ -142,21 +152,23 @@ describe("plugin page", () => {
     expect(pluginExternalHref("https://canva.com")).toBe("https://canva.com/");
   });
 
-  /* The address of an app's MCP server is the one thing the app knows that this page must not print.
-     A reader who learns it can add the server by hand and skip every check the install makes. */
-  it("never prints the address of a plugin's MCP server", () => {
+  /* How an app's MCP server is reached - its address, or the command it runs - is the one thing the
+     app knows that this page must not print. A reader who learns it can add the server by hand and
+     skip every check the install makes. */
+  it("never prints how a plugin's MCP server is reached", () => {
     for (const plugin of SITE_PLUGINS) {
       const { container } = renderPage(() => <PluginPage plugin={plugin} />);
 
       for (const app of plugin.apps) {
-        if (app.server.url) expect(container.textContent).not.toContain(app.server.url);
+        const reach = app.server.transport === "http" ? app.server.url : app.server.command;
+        expect(container.textContent).not.toContain(reach);
       }
 
       cleanup();
     }
   });
 
-  it("offers the download only after the reader asks the app to open", () => {
+  it("offers the download only after the reader asks the app to open", async () => {
     vi.useFakeTimers();
     const plugin = firstPlugin();
     renderPage(() => <PluginPage plugin={plugin} />);
@@ -167,7 +179,9 @@ describe("plugin page", () => {
     vi.advanceTimersByTime(2000);
     flush();
 
-    expect(screen.getByRole("link", { name: /^Download for / })).toBeInTheDocument();
+    /* The dialog shows itself once it is in the document, which is a microtask after the mount,
+       and a closed dialog holds nothing a reader can reach. */
+    await vi.waitFor(() => expect(screen.getByRole("link", { name: /^Download for / })).toBeInTheDocument());
   });
 
   /* Hiding the tab is what happens when the app really does take over, so the offer to download is

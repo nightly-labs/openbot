@@ -1,12 +1,12 @@
-import { MARKETPLACE_PLUGINS } from "@openbot/contracts/plugin-catalog";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SITE_PLUGINS } from "../src/lib/plugins";
 import { pluginIconResponse } from "../src/server/plugin-icon";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const plugin = MARKETPLACE_PLUGINS[0];
+const plugin = SITE_PLUGINS[0];
 if (!plugin) throw new Error("The catalog must hold at least one plugin.");
 
 /** Records every address the handler reaches for, which is the point of most of these tests. */

@@ -11,7 +11,7 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "../lib/content-collection";
-import { pluginIndexUrl, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
+import { PLUGINS_UPDATED_AT, pluginIndexUrl, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
 import { OPENBOT_SITE_TITLE, OPENBOT_SITE_URL } from "../lib/site-metadata";
 
 /**
@@ -37,15 +37,6 @@ function latestSitePublishedAt(): string {
   return CONTENT_COLLECTIONS.map(latestPublishedAt).toSorted().at(-1) ?? "2026-01-01";
 }
 
-/** The newest listing date, for the index entry. */
-function latestPluginUpdatedAt(): string {
-  return (
-    SITE_PLUGINS.map((plugin) => plugin.updatedAt)
-      .toSorted()
-      .at(-1) ?? "2026-01-01"
-  );
-}
-
 export function contentSitemapXml(): string {
   const entries = [
     { loc: OPENBOT_SITE_URL, lastmod: latestSitePublishedAt(), priority: "1.0" },
@@ -58,11 +49,11 @@ export function contentSitemapXml(): string {
       })),
     ]),
     /* The plugin pages hold no secret, unlike /join, so they are indexed like any article. Each
-       entry's date is the listing's own `updatedAt`, which is what changes when a developer ships. */
-    { loc: pluginIndexUrl(), lastmod: latestPluginUpdatedAt(), priority: "0.8" },
+       entry's date is the catalog's own, which is what changes when a listing ships. */
+    { loc: pluginIndexUrl(), lastmod: PLUGINS_UPDATED_AT, priority: "0.8" },
     ...SITE_PLUGINS.map((plugin) => ({
       loc: pluginUrl(plugin.slug),
-      lastmod: plugin.updatedAt,
+      lastmod: PLUGINS_UPDATED_AT,
       priority: "0.7",
     })),
   ];

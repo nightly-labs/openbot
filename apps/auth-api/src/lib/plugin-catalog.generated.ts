@@ -8,12 +8,15 @@
 export interface PluginCatalogIndex {
   schemaVersion: number;
   catalogVersion: string;
+  /** When the catalog last changed. The public site dates its listing pages by it. */
+  updatedAt: string;
   plugins: Array<{ slug: string; version: string; featured: boolean; detailSha256: string }>;
 }
 
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
+  updatedAt: "2026-09-19T00:00:00.000Z",
   plugins: [
     {
       slug: "aave",
@@ -25,7 +28,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "canva",
       version: "1.0.0",
       featured: true,
-      detailSha256: "b2fde1db15795e96eee4c7098518ff92c09958e8d474d2c247741ace3e06b3ce",
+      detailSha256: "1a048ae478be8b622d4a2e387ec3318ea7962884a6aadbb4b724d947fb7c1aca",
     },
     {
       slug: "github",
@@ -73,7 +76,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "posthog",
       version: "1.0.0",
       featured: false,
-      detailSha256: "b60b8e25c76aac5c02cb24d47bc2549c8e9e4e962a2ba54b2d7de0c3738f2279",
+      detailSha256: "a4127ec0a7415dccbd2e57aa928e6ed3b6acc0913f1c02ea03bd10206333f173",
     },
     {
       slug: "airtable",
@@ -97,7 +100,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "resend",
       version: "1.0.0",
       featured: false,
-      detailSha256: "8361ba20bd66a24032d777ddac44507d5f0fa44afae212869f25c0912ae949e4",
+      detailSha256: "06a649d220a6858a9856ff36661fe20c47219216235507778924b1c3e7c4b5ca",
     },
   ],
 };
@@ -178,7 +181,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       "Canva lets users create and edit designs in words, search their own design library, upload and organize assets, export in the format a channel needs, and leave comments where the work is. Each user signs in to their own Canva account, and the agent can do what that account can do.",
     category: "design",
     creatorName: "canva.com",
-    iconUrl: "https://static.canva.com/static/images/favicon.ico",
+    iconUrl: "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
     version: "1.0.0",
     prompts: [
       { id: "prompt-recent-design", text: "Show me my most recently edited Canva design." },
@@ -191,7 +194,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         name: "Canva",
         description:
           "Design creation and editing, library search, asset and brand management, exports, and comments, over one MCP server.",
-        iconUrl: "https://static.canva.com/static/images/favicon.ico",
+        iconUrl: "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
         server: {
           name: "canva",
           transport: "stdio",
@@ -475,7 +478,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       "PostHog lets agents query events and funnels, inspect feature flags, and summarize what changed after a release. A personal API key from the project settings goes into one Authorization header.",
     category: "data-analytics",
     creatorName: "posthog.com",
-    iconUrl: "https://posthog.com/favicon.ico",
+    iconUrl: "https://app.posthog.com/static/icons/apple-touch-icon.png",
     version: "1.0.0",
     prompts: [
       { id: "prompt-funnel", text: "How does the signup funnel look for the last 14 days?" },
@@ -487,7 +490,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-posthog-mcp",
         name: "PostHog",
         description: "Event, funnel, and feature-flag access, over PostHog's MCP server with a personal API key.",
-        iconUrl: "https://posthog.com/favicon.ico",
+        iconUrl: "https://app.posthog.com/static/icons/apple-touch-icon.png",
         server: {
           name: "posthog",
           transport: "http",
@@ -669,7 +672,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
     category: "automation",
     creatorName: "resend.com",
-    iconUrl: "https://resend.com/favicon.ico",
+    iconUrl: "https://resend.com/static/favicons/favicon.ico",
     version: "1.0.0",
     prompts: [
       { id: "prompt-send", text: "Send the launch announcement draft to the beta list." },
@@ -681,7 +684,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-resend-mcp",
         name: "Resend",
         description: "Email sending and delivery checks, over a local MCP server with a Resend API key.",
-        iconUrl: "https://resend.com/favicon.ico",
+        iconUrl: "https://resend.com/static/favicons/favicon.ico",
         server: {
           name: "resend",
           transport: "stdio",

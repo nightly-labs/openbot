@@ -10,15 +10,56 @@
  * `"link"` leaves for the browser and comes back with a grant, `"key"` is a value typed into a
  * header or an environment variable. A new way in is a new `kind` here, not a flag on this one.
  *
- * The flow shapes are in `@openbot/contracts/ipc`, because a listing declares them and the
- * openbot.run page reads the same declaration to say whether a plugin wants a sign-in or a key.
- * What stays here is what only this side does: the form state, and writing a typed value into the
- * configuration that connects.
+ * This sits beside `marketplace-plugins.ts` because the plugin listing is the only thing that reads
+ * it today. It moves out the day `ServerMcpPanel` offers the same guided connect.
  */
 
-import type { McpAuthField, McpConnectFlow, McpKeyValue, McpServerConfig } from "@openbot/contracts/ipc";
+import type { McpKeyValue, McpServerConfig } from "@openbot/contracts/ipc";
 
-export type { McpAuth, McpAuthField, McpConnectFlow, McpKeyFlow, McpLinkFlow } from "@openbot/contracts/ipc";
+/** One credential the user pastes. */
+export interface McpAuthField {
+  id: string;
+  /** What the input is called on screen, as the server's own documentation calls it. */
+  label: string;
+  /** The http header the value is sent in. */
+  header?: string;
+  /** The environment variable the value is set as, for a stdio server. */
+  env?: string;
+  /**
+   * Written in front of the typed value, so the user pastes the token the server gave them and not
+   * the scheme word in front of it. `"Bearer "` is the usual one; the space is part of the string.
+   */
+  prefix?: string;
+  placeholder?: string;
+  /** Where this value is found, in the user's own account. */
+  hint?: string;
+}
+
+interface McpConnectFlowBase {
+  id: string;
+  /** What this way in is called where the ways are listed side by side. */
+  label: string;
+}
+
+/** Sign-in in the browser. The exchange happens in the main process; no secret reaches this side. */
+export interface McpLinkFlow extends McpConnectFlowBase {
+  kind: "link";
+}
+
+/** A credential the user pastes, or two. */
+export interface McpKeyFlow extends McpConnectFlowBase {
+  kind: "key";
+  fields: McpAuthField[];
+  /** The page the key is created on. Opened externally; never fetched here. */
+  docsUrl?: string | null;
+  docsLabel?: string;
+}
+
+export type McpConnectFlow = McpLinkFlow | McpKeyFlow;
+
+/** Every way into one server. The first is the one the dialog opens on. Empty is a server that
+ *  asks for nothing, which still connects: a server that is down is found before an agent has it. */
+export type McpAuth = McpConnectFlow[];
 
 /** What the user has typed in the current flow, keyed by field id. */
 export type McpAuthValues = Record<string, string>;

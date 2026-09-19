@@ -27,7 +27,6 @@ export * from "./ipc-host-analytics";
 export * from "./ipc-hosted-sites";
 export * from "./ipc-marketplace-agents";
 export * from "./ipc-mcp-servers";
-export * from "./ipc-plugin-catalog";
 export * from "./ipc-queue";
 export * from "./ipc-routines";
 export * from "./ipc-shared-tables";

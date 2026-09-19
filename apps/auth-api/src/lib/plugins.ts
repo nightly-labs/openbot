@@ -1,16 +1,33 @@
 // The public plugin pages, over the catalog the desktop app installs from.
 //
-// The listings come from `@openbot/contracts/plugin-catalog`, which is the same array the app's
-// Plugins tab reads. That is the point of the page: an address a reader can open says exactly what
-// the app would show them, and it cannot drift, because there is nothing here to drift from.
+// The listings are `./plugin-catalog.generated`, which `scripts/build-plugin-catalog.ts` writes
+// from `marketplace/plugin-catalog/` - the same source the app's Plugins tab is built from. That is
+// the point of the page: an address a reader can open says exactly what the app would show them,
+// and it cannot drift, because both sides are generated from one folder.
 //
 // This module holds no JSX, for the same reason `content-collection.ts` holds none: it is read by
 // the sitemap, which runs outside the renderer.
 
-import type { MarketplacePluginDetail } from "@openbot/contracts/ipc-plugin-catalog";
 import { SKILL_CATEGORY_LABELS } from "@openbot/contracts/ipc-skills";
-import { findMarketplacePlugin, MARKETPLACE_PLUGINS } from "@openbot/contracts/plugin-catalog";
+import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
+import { PLUGIN_CATALOG_DETAILS, PLUGIN_CATALOG_INDEX, type PluginCatalogDetail } from "./plugin-catalog.generated";
 import { OPENBOT_SITE_URL } from "./site-metadata";
+
+/**
+ * One listing as the pages read it: what the generator writes, and the two facts the index carries
+ * rather than the detail - whether the catalog leads with it, and the address that opens it here.
+ */
+export interface SitePlugin extends PluginCatalogDetail {
+  featured: boolean;
+  /** The listing address "Copy link" writes out, not the developer's own site. */
+  shareUrl: string;
+}
+
+/** One skill of a listing, once it is known to be shaped like one. */
+export interface SitePluginSkill {
+  slug: string;
+  description: string;
+}
 
 /**
  * The routes, spelled out rather than built, so a route the generated tree does not hold is a type
@@ -23,11 +40,49 @@ export const PLUGINS_TITLE = "Plugins — OpenBot";
 export const PLUGINS_DESCRIPTION =
   "Apps and skills an OpenBot agent can use. Open a plugin in the app, and decide there what it connects to.";
 
-/** Newest listing first is not a thing here: the order is the order the catalog declares. */
-export const SITE_PLUGINS: readonly MarketplacePluginDetail[] = MARKETPLACE_PLUGINS;
+/** Newest listing first is not a thing here: the order is the order the index declares. */
+export const SITE_PLUGINS: readonly SitePlugin[] = PLUGIN_CATALOG_INDEX.plugins.flatMap((entry) => {
+  const detail = PLUGIN_CATALOG_DETAILS[entry.slug];
+  return detail ? [{ ...detail, featured: entry.featured, shareUrl: createPluginShareUrl(entry.slug) }] : [];
+});
 
-export function findPlugin(slug: string): MarketplacePluginDetail | null {
-  return findMarketplacePlugin(slug);
+/**
+ * When the catalog last changed, as the catalog itself states it. Every listing shares the date,
+ * because the catalog is written and published as one document; the sitemap dates its plugin pages
+ * by it rather than by a per-listing date no source holds.
+ */
+export const PLUGINS_UPDATED_AT = PLUGIN_CATALOG_INDEX.updatedAt;
+
+export function findPlugin(slug: string): SitePlugin | null {
+  return SITE_PLUGINS.find((plugin) => plugin.slug === slug) ?? null;
+}
+
+/**
+ * What the app's own listing calls this kind of plugin. The generated catalog states the category
+ * as a string, because it is written by hand in `marketplace/plugin-catalog/`; a word the app has
+ * no label for is shown as it was written rather than as `undefined`.
+ */
+export function pluginCategoryLabel(category: string): string {
+  const labels: Record<string, string> = SKILL_CATEGORY_LABELS;
+  return labels[category] ?? category;
+}
+
+/**
+ * The skills a listing installs beside its app. The generated detail holds them as unknown, so each
+ * one is read here rather than trusted: a listing whose skills arrive in a shape this page does not
+ * know loses the section instead of the page losing its meaning.
+ */
+export function pluginSkills(plugin: SitePlugin): SitePluginSkill[] {
+  return plugin.skills.flatMap((skill) =>
+    typeof skill === "object" &&
+    skill !== null &&
+    "slug" in skill &&
+    typeof skill.slug === "string" &&
+    "description" in skill &&
+    typeof skill.description === "string"
+      ? [{ slug: skill.slug, description: skill.description }]
+      : [],
+  );
 }
 
 export function pluginPath(slug: string): string {
@@ -89,9 +144,10 @@ export function pluginExternalHref(url: string | null): string | null {
 /**
  * Which question a tag answers. The group is what makes a set of them filter the way a reader
  * expects: two tags from one group widen a result, and two tags from different groups narrow it.
- * Without it, picking `Design` and `Data & Analytics` would ask for a plugin that is both.
+ * Without it, picking `Design` and `Data & Analytics` would ask for a plugin that is both. One
+ * group is the whole list today, and the type says so rather than keeping a name nothing carries.
  */
-export type PluginTagGroup = "category" | "install";
+export type PluginTagGroup = "category";
 
 export interface PluginTag {
   group: PluginTagGroup;
@@ -100,21 +156,16 @@ export interface PluginTag {
 }
 
 /**
- * The short facts a listing carries, each read off the catalog rather than written for the card:
- * what kind of plugin it is, and whether a reader has to bring an account to it.
+ * The one short fact a listing carries, read off the catalog rather than written for the card: what
+ * kind of plugin it is.
  *
- * Sign-in is the one a reader most wants before opening a listing, because it is the difference
- * between an install that finishes on its own and one that waits for a browser. A server declares it
- * by carrying an `auth` step, so this reads the servers rather than a field a catalog could forget
- * to set. The counts are left off on purpose: every listing today ships one app and no skill, so a
- * tag saying so would tell a reader nothing and would grow stale the day that changes.
+ * Nothing else earns a pill. The counts do not: every listing today ships one app and no skill, so a
+ * tag saying so would tell a reader nothing. Whether the plugin asks for a sign-in does not either:
+ * the app states that at the moment it matters, which is the install itself, and a pill here only
+ * made two listings look different before a reader had any use for the difference.
  */
-export function pluginTags(plugin: MarketplacePluginDetail): PluginTag[] {
-  const needsSignIn = plugin.apps.some((app) => (app.server.auth?.length ?? 0) > 0);
-  return [
-    { group: "category", label: SKILL_CATEGORY_LABELS[plugin.category] },
-    { group: "install", label: needsSignIn ? "Sign-in" : "No sign-in" },
-  ];
+export function pluginTags(plugin: SitePlugin): PluginTag[] {
+  return [{ group: "category", label: pluginCategoryLabel(plugin.category) }];
 }
 
 /**
@@ -122,7 +173,7 @@ export function pluginTags(plugin: MarketplacePluginDetail): PluginTag[] {
  * are built from the listings rather than from a list of their own, so a filter can never offer a
  * tag that no plugin has, and a new listing brings its filter with it.
  */
-export function pluginTagFilters(plugins: readonly MarketplacePluginDetail[]): PluginTag[] {
+export function pluginTagFilters(plugins: readonly SitePlugin[]): PluginTag[] {
   const seen = new Map<string, PluginTag>();
   for (const plugin of plugins) {
     for (const tag of pluginTags(plugin)) {
@@ -136,7 +187,7 @@ export function pluginTagFilters(plugins: readonly MarketplacePluginDetail[]): P
  * Whether a listing survives a selection. Nothing selected keeps every listing; otherwise a listing
  * has to answer each group that was asked about, with any one of that group's chosen tags.
  */
-export function matchesPluginTags(plugin: MarketplacePluginDetail, selected: readonly string[]): boolean {
+export function matchesPluginTags(plugin: SitePlugin, selected: readonly string[]): boolean {
   if (selected.length === 0) return true;
 
   const carried = new Set(pluginTags(plugin).map((tag) => tag.label));

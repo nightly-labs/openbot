@@ -1,11 +1,17 @@
-import type { MarketplacePluginDetail } from "@openbot/contracts/ipc-plugin-catalog";
-import { SKILL_CATEGORY_LABELS } from "@openbot/contracts/ipc-skills";
 import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
-import { PLUGIN_INDEX_ROUTE, pluginExternalHref, pluginLinkText, pluginPath } from "../../lib/plugins";
+import {
+  PLUGIN_INDEX_ROUTE,
+  pluginCategoryLabel,
+  pluginExternalHref,
+  pluginLinkText,
+  pluginPath,
+  pluginSkills,
+  type SitePlugin,
+} from "../../lib/plugins";
 import { ArticleGradient } from "../content/ArticleGradient";
 import { ContentHeader } from "../content/ContentHeader";
 import { LandingFooter } from "../landing/LandingFooter";
@@ -50,7 +56,7 @@ function PluginRow(props: { icon: LandingIconName; title: string; description: s
 }
 
 export interface PluginPageProps {
-  plugin: MarketplacePluginDetail;
+  plugin: SitePlugin;
 }
 
 /**
@@ -68,6 +74,8 @@ export interface PluginPageProps {
  */
 export function PluginPage(props: PluginPageProps) {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, pluginPath(props.plugin.slug)));
+
+  const skills = () => pluginSkills(props.plugin);
 
   const links = () =>
     [
@@ -185,10 +193,10 @@ export function PluginPage(props: PluginPageProps) {
               </PluginSection>
             </Show>
 
-            <Show when={props.plugin.skills.length > 0}>
-              <PluginSection id="plugin-skills-title" title="Skills" count={props.plugin.skills.length}>
+            <Show when={skills().length > 0}>
+              <PluginSection id="plugin-skills-title" title="Skills" count={skills().length}>
                 <ul class="plugin-rows">
-                  <For each={props.plugin.skills}>
+                  <For each={skills()}>
                     {(skill) => <PluginRow icon="blocks" title={skill.slug} description={skill.description} />}
                   </For>
                 </ul>
@@ -204,7 +212,7 @@ export function PluginPage(props: PluginPageProps) {
                 </div>
                 <div class="plugin-fact">
                   <dt>Category</dt>
-                  <dd>{SKILL_CATEGORY_LABELS[props.plugin.category]}</dd>
+                  <dd>{pluginCategoryLabel(props.plugin.category)}</dd>
                 </div>
                 <div class="plugin-fact">
                   <dt>Version</dt>

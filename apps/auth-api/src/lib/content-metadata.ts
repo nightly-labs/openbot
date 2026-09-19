@@ -6,7 +6,6 @@
 // Each function takes `siteUrl`, the site that served the page. It is required, so
 // that no route can forget it and send a preview's social card to production.
 
-import type { MarketplacePluginDetail } from "@openbot/contracts/ipc-plugin-catalog";
 import {
   articleArtPath,
   articleOgImageUrl,
@@ -16,7 +15,7 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "./content-collection";
-import { PLUGINS_DESCRIPTION, PLUGINS_TITLE, pluginIndexUrl, pluginUrl } from "./plugins";
+import { PLUGINS_DESCRIPTION, PLUGINS_TITLE, pluginIndexUrl, pluginUrl, type SitePlugin } from "./plugins";
 import {
   OPENBOT_SITE_TITLE,
   OPENBOT_SITE_URL,
@@ -200,7 +199,7 @@ export function pluginsIndexHead(siteUrl: string) {
   };
 }
 
-export function pluginHead(plugin: MarketplacePluginDetail, siteUrl: string) {
+export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
   const title = `${plugin.name} — OpenBot plugins`;
 
@@ -232,7 +231,7 @@ export function pluginHead(plugin: MarketplacePluginDetail, siteUrl: string) {
  * offer says free because installing a plugin costs nothing; what the developer's own service
  * charges is between the reader and the developer, so nothing here claims otherwise.
  */
-export function pluginStructuredData(plugin: MarketplacePluginDetail, siteUrl: string) {
+export function pluginStructuredData(plugin: SitePlugin, siteUrl: string) {
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",

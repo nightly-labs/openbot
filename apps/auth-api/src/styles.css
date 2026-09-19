@@ -2604,6 +2604,24 @@ a {
   height: 20%;
 }
 
+/* An upright mark takes more of the frame's height than a wide one, so that the
+   two kinds read as the same size on a row of cards: a wide mark spends its size
+   on width, and an upright one has only height to spend it on. */
+.plugin-card-logo.plugin-logo-upright {
+  height: 34%;
+}
+
+/* The listing's own icon on a card, sized against the frame like the drawn mark
+   beside it. It is square art already, so it takes the logo corner and no plate:
+   what is behind it is the gradient, which is the card's picture. */
+.plugin-card-icon {
+  position: relative;
+  height: 40%;
+  border-radius: var(--openbot-radius-logo);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
+
 /* The letter a plugin falls back to when its mark is not drawn yet. Type cannot
    be sized against the frame the way a mark is, so it takes a clamp; the letter
    is a stand-in for a path that is on its way, not a listing's resting state. */
@@ -2875,16 +2893,80 @@ a {
   gap: 10px;
 }
 
-.plugin-download-hint {
+/* The download offer, as the small modal it is: the visitor has just asked for the app and
+   nothing happened, so this is the only thing on the page worth reading. Same panel the
+   download menu is built from - sidebar surface, strong hairline, overlay shadow - because
+   it is the same kind of surface, lifted off the page rather than drawn into it. */
+.plugin-dialog {
+  width: min(380px, calc(100vw - 32px));
+  margin: auto;
+  padding: 22px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-sidebar);
+  box-shadow: var(--openbot-shadow-overlay);
+  color: var(--openbot-text-primary);
+  animation: plugin-dialog-enter var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+@keyframes plugin-dialog-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The page stays visible behind it, because the visitor is deciding whether to leave it. */
+.plugin-dialog::backdrop {
+  background: var(--openbot-dialog-overlay);
+  backdrop-filter: blur(6px);
+}
+
+.plugin-dialog-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.plugin-dialog-copy {
+  margin: 8px 0 0;
+  color: var(--openbot-text-dim);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* The way out on the left and the way on to the right, which is the order the rest of the
+   site puts a pair of actions in. */
+.plugin-dialog-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  margin: 14px 0 0;
+  margin-top: 20px;
+}
+
+.plugin-dialog-dismiss {
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: none;
   color: var(--openbot-text-dim);
+  font: inherit;
   font-size: 13px;
-  line-height: 1.5;
+  transition: color var(--openbot-duration-fast) ease;
+}
+
+/* The ring the site's buttons take, rather than the browser's own box. */
+.plugin-dialog-dismiss:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 
 .plugin-body {
@@ -3160,14 +3242,16 @@ a {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .plugin-card {
+  .plugin-card,
+  .plugin-dialog-dismiss {
     cursor: pointer;
   }
 
   /* An explicit scale rather than `none`, for the reason the article titles give:
      the resting element and the moving layer otherwise rasterise on different
      pixels, and the mark looks like it jumps as the growth ends. */
-  .plugin-card-logo {
+  .plugin-card-logo,
+  .plugin-card-icon {
     transform: scale(1);
     transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
     will-change: transform;
@@ -3183,11 +3267,13 @@ a {
     background: var(--openbot-text-primary);
   }
 
-  .plugin-card:hover .plugin-card-logo {
+  .plugin-card:hover .plugin-card-logo,
+  .plugin-card:hover .plugin-card-icon {
     transform: scale(1.06);
   }
 
   .plugin-card:hover .plugin-card-title,
+  .plugin-dialog-dismiss:hover,
   .plugin-fact-link:hover {
     color: var(--openbot-text-primary);
   }
@@ -3207,8 +3293,13 @@ a {
   }
 
   .plugin-card-logo,
+  .plugin-card-icon,
   .plugin-tag-button {
     transition: none;
     transform: none;
+  }
+
+  .plugin-dialog {
+    animation: none;
   }
 }
