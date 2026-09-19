@@ -25,11 +25,11 @@ import { localSkillTools } from "./local-skill-tools";
  * when - see `teardown-registry.ts` for why shutdown here is not the reverse of construction.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import type {
   AgentStatus,
   AppVariant,
@@ -155,16 +155,31 @@ function profileDigest(userDataPath: string): string {
 /**
  * Where the driver listens, which each desktop names differently.
  *
- * On macOS and Linux it is a Unix socket in the per-user temporary directory, not in the user data
- * directory: a socket path may hold about a hundred characters, and an isolated development profile
- * spends 64 of them on a worktree hash alone. Both systems give each user their own temporary
- * directory, readable by nobody else. On Windows it is a named pipe, which is a name rather than a
- * path and so has no such limit. The digest keeps two profiles on one computer apart.
+ * The socket is a control channel to a process that can drive the whole desktop, so where it sits
+ * decides who may reach it.
+ *
+ * On macOS the temporary directory is already private per user (`/var/folders/…`, mode `0700`). On
+ * Linux `os.tmpdir()` is usually the shared, world-writable `/tmp`, where another local user can
+ * create our directory before we do, so `XDG_RUNTIME_DIR` is used first: the login session owns it,
+ * it is mode `0700`, and it is removed at logout. The temporary directory stays as the fallback for
+ * a session that has none, and the runtime refuses a directory this user does not own either way.
+ *
+ * The user data directory cannot hold it: a socket path may hold about a hundred characters, and an
+ * isolated development profile spends 64 of them on a worktree hash alone.
+ *
+ * On Windows it is a named pipe, which is a name in a kernel namespace rather than a path, so it has
+ * no length limit and no directory to protect. It gets a random name instead of the profile digest:
+ * Windows lets a second process add an instance to an existing pipe name, so a predictable name
+ * could be taken by another local process before the driver starts, and a name it cannot guess
+ * cannot be taken. Nothing persists the name; the daemon and its proxies are given it directly.
  */
 function cuaDriverEndpoint(platform: NodeJS.Platform, digest: string): CuaDriverEndpoint {
-  return platform === "win32"
-    ? { kind: "windows-pipe", name: `\\\\.\\pipe\\openbot-cua-${digest}` }
-    : { kind: "unix-socket", directory: join(tmpdir(), `openbot-cua-${digest}`) };
+  if (platform === "win32") return { kind: "windows-pipe", name: `\\\\.\\pipe\\openbot-cua-${randomUUID()}` };
+  const runtimeDirectory = process.env.XDG_RUNTIME_DIR?.trim();
+  const parent = platform === "linux" && runtimeDirectory && isAbsolute(runtimeDirectory) ? runtimeDirectory : tmpdir();
+  // The digest keeps two profiles on one computer apart, and keeps the name stable so a socket left
+  // by a crashed run is found and removed rather than accumulating.
+  return { kind: "unix-socket", directory: join(parent, `openbot-cua-${digest}`) };
 }
 
 const TEARDOWN_ORDER = {

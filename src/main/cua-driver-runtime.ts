@@ -2,7 +2,7 @@
 // providers spawn against it.
 
 import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
+import { lstat, mkdir, rm } from "node:fs/promises";
 import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -297,8 +297,10 @@ export class CuaDriverRuntime {
 
       // `0o700`, because the socket inside is a control channel to a process that can drive the
       // whole desktop. The per-user runtime directory is already private; this keeps it private if
-      // the caller ever names somewhere else.
+      // the caller ever names somewhere else. The mode applies only to a directory this call
+      // creates, which is why what is already there is inspected below rather than trusted.
       await mkdir(endpoint.directory, { recursive: true, mode: 0o700 });
+      await assertPrivateDirectory(endpoint.directory);
       await this.#removeSocket();
     }
     const child = this.#spawn(executable, ["serve", "--socket", socketPath], {
@@ -382,6 +384,31 @@ function ungranted(platform: NodeJS.Platform): ComputerUsePermission[] {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Refuses a socket directory this user does not privately own.
+ *
+ * `mkdir` succeeds without complaint when the directory is already there, and applies its mode only
+ * to one it creates. On a shared temporary directory another local user can therefore put ours in
+ * place first, and then read or replace the socket a process that drives the whole desktop listens
+ * on. Anything not owned by this user, or writable by anyone else, is refused rather than used.
+ *
+ * Windows reaches none of this: a named pipe has a security descriptor rather than a directory.
+ */
+async function assertPrivateDirectory(directory: string): Promise<void> {
+  const stats = await lstat(directory);
+  if (!stats.isDirectory()) {
+    throw new Error(`The Computer Use socket directory ${directory} is not a directory.`);
+  }
+  // `getuid` is absent on Windows, which never calls this.
+  const uid = process.getuid?.();
+  if (uid !== undefined && stats.uid !== uid) {
+    throw new Error(`The Computer Use socket directory ${directory} belongs to another user.`);
+  }
+  if ((stats.mode & 0o077) !== 0) {
+    throw new Error(`The Computer Use socket directory ${directory} is open to other users.`);
+  }
 }
 
 /**

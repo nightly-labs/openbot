@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -68,6 +68,20 @@ describe("CuaDriverRuntime", () => {
     const { driver, spawned } = await runtime({ endpoint: { kind: "unix-socket", directory: tooDeep } });
 
     await expect(driver.start()).rejects.toThrow(/103/);
+    expect(spawned).toHaveLength(0);
+  });
+
+  // `mkdir` applies its mode only to a directory it creates. On Linux the temporary directory is
+  // usually the shared `/tmp`, so another local user can put ours there first and then read or
+  // replace the socket that controls the whole desktop.
+  it("refuses a socket directory other users can write to, rather than serve the control channel in it", async () => {
+    const shared = join(tmpdir(), `cua-driver-shared-${process.pid}`);
+    directories.push(shared);
+    await mkdir(shared, { recursive: true });
+    await chmod(shared, 0o777);
+    const { driver, spawned } = await runtime({ endpoint: { kind: "unix-socket", directory: shared } });
+
+    await expect(driver.start()).rejects.toThrow(/open to other users/);
     expect(spawned).toHaveLength(0);
   });
 
