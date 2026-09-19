@@ -6,6 +6,7 @@ import type {
   AttachmentImportEvent,
   BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
+  BrowserTab,
   CentralAuthState,
   ConversationPage,
   DirectMessageRealtimeEvent,
@@ -986,6 +987,45 @@ export function presenceMember(id: string, email: string, name: string): TeamPre
     online: true,
     typingAgentId: null,
   };
+}
+
+export function browserTab(id: string, title: string, overrides: Partial<BrowserTab> = {}): BrowserTab {
+  return {
+    id,
+    title,
+    url: "https://example.com",
+    loading: false,
+    ownerAgentId: "chief",
+    ownerThreadId: "thread-chief",
+    ...overrides,
+  };
+}
+
+export function agentReply(id: string, text: string, createdAt: string): ConversationPage["messages"][number] {
+  return { id, author: "assistant", text, createdAt, status: "completed" };
+}
+
+/**
+ * A conversation page whose last message is unread, which is what the read-state tests all start from.
+ *
+ * `firstUnreadMessageId` follows the last message rather than taking a value of its own, because a
+ * page carrying an unread count and an unrelated first-unread id is a state the host never sends,
+ * and a test that builds one asserts against a screen the user cannot reach.
+ */
+export function unreadConversationPage(
+  agentId: string,
+  messages: ConversationPage["messages"],
+  overrides: Partial<ConversationPage> = {},
+): ConversationPage {
+  return testConversationPage(agentId, messages, {
+    revision: 2,
+    readState: {
+      unreadCount: 1,
+      firstUnreadMessageId: messages.at(-1)?.id ?? null,
+      throughMessageId: null,
+    },
+    ...overrides,
+  });
 }
 
 export function attachment(id: string, name: string, kind: "image" | "pdf") {

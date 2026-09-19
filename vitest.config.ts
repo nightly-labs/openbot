@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import solidPlugin from "@solidjs/vite-plugin";
 import { configDefaults, defineConfig } from "vitest/config";
 import { TEST_TIMEOUT_MS } from "./src/backend/test-deadlines";
+import BalancedSequencer from "./tools/vitest/balanced-sequencer";
 
 export default defineConfig({
   plugins: [solidPlugin()],
@@ -15,6 +16,9 @@ export default defineConfig({
     // Every spy, global patch and fake timer a test file installs is undone
     // after each test, in both projects, so nothing depends on file order.
     restoreMocks: true,
+    // Only `shard()` is overridden, so a local run orders files exactly as before. See the
+    // sequencer for why `--shard` alone splits this suite badly.
+    sequence: { sequencer: BalancedSequencer },
     onConsoleLog(log) {
       // Solid 2 RC dependencies still emit this dev-only diagnostic while
       // their components initialize. Keep other console output visible.
