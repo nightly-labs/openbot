@@ -167,6 +167,7 @@ function AvatarRings(props: { when: boolean; children: JSX.Element }) {
 function OrbitRings(props: { children: JSX.Element }) {
   let elapsed = POSES[RING_POSE];
   let ringsSeen = false;
+  let anchor: SVGSVGElement | undefined;
   const engine = new BotEngine(RAYON, RING_POSE);
   const [arcs, setArcs] = createSignal<BotFrame["arcs"]>(engine.sample(elapsed).arcs, { equals: false });
 
@@ -193,23 +194,50 @@ function OrbitRings(props: { children: JSX.Element }) {
       ringsSeen ||= sampled.arcs.length > 0;
       setArcs(sampled.arcs);
     };
-    handle = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(handle);
+    const stop = () => {
+      if (!handle) return;
+      cancelAnimationFrame(handle);
+      handle = 0;
+    };
+    const start = () => {
+      if (handle) return;
+      // The clock restarts from the next frame, so a row that scrolls back in resumes where it
+      // stopped rather than jumping forward by the time it spent out of sight.
+      previousFrameAt = 0;
+      handle = requestAnimationFrame(step);
+    };
+    // A `BloubBot` pauses itself off screen through its own observer. These rings are our loop, so
+    // without the same gate every working row in a long sidebar keeps sampling an engine and
+    // writing paths that nobody can see.
+    const observer =
+      anchor && window.IntersectionObserver
+        ? new IntersectionObserver(([entry]) => {
+            if (entry?.isIntersecting) start();
+            else stop();
+          })
+        : undefined;
+    if (observer && anchor) observer.observe(anchor);
+    else start();
+    return () => {
+      observer?.disconnect();
+      stop();
+    };
   });
 
   return (
     <>
-      <AvatarArcs arcs={arcs()} half="back" />
+      <AvatarArcs arcs={arcs()} half="back" ref={(element) => (anchor = element)} />
       {props.children}
       <AvatarArcs arcs={arcs()} half="front" />
     </>
   );
 }
 
-function AvatarArcs(props: { arcs: BotFrame["arcs"]; half: "back" | "front" }) {
+function AvatarArcs(props: { arcs: BotFrame["arcs"]; half: "back" | "front"; ref?: (element: SVGSVGElement) => void }) {
   const gradientId = createUniqueId();
   return (
     <svg
+      ref={props.ref}
       class="agent-avatar-arcs"
       viewBox={`${-DEMI_VIEWBOX} ${-DEMI_VIEWBOX} ${DEMI_VIEWBOX * 2} ${DEMI_VIEWBOX * 2}`}
       fill="none"
