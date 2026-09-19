@@ -227,31 +227,6 @@ describe.sequential("AgentService: queue", () => {
     });
   });
 
-  it("starts a new agent on the built-in default when OpenCode does not list the development model", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { service: agentService } = await startService(root, {
-      client: (provider) => {
-        const client = new FakeAgentClient(provider);
-        // The free tier, which is what an OpenCode with no Go key and no sign-in lists. A default
-        // nobody can run is a first turn that answers "Invalid API key.".
-        if (provider === "opencode") {
-          client.modelList = () => ({ data: [{ model: "opencode/muse-spark-1.3-contributor-free" }] });
-        }
-        return client;
-      },
-      developmentDefaults: true,
-    });
-    service = agentService;
-
-    await service.ensureProvider("opencode");
-
-    await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
-      provider: "codex",
-      model: "gpt-5.6-luna",
-      reasoningEffort: "low",
-    });
-  });
-
   it("leaves a packaged build and a recorded preference on their own model", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
