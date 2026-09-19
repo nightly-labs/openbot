@@ -90,7 +90,7 @@ export const en = {
   "settings.tab.general.title": "General",
   "settings.tab.general.description": "Control how OpenBot behaves on this computer.",
   "settings.tab.computerUse.title": "Computer Use",
-  "settings.tab.computerUse.description": "Allow OpenBot to see and interact with apps on this Mac.",
+  "settings.tab.computerUse.description": "Allow OpenBot to see and interact with apps on this computer.",
   "settings.tab.profile.title": "Profile",
   "settings.tab.profile.description": "Manage how you appear in OpenBot.",
   "settings.tab.mobileConnect.title": "Mobile Connect",

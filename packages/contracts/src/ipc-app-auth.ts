@@ -168,12 +168,38 @@ export interface CentralAuthDesktopApi {
 
 export type MacPermissionId = "screen-recording" | "accessibility";
 
-export type ComputerUseMacSetupStatus = "available" | "unavailable" | "unsupported";
+/**
+ * How far Computer Use is from working, as one value the panel switches on.
+ *
+ * `driver-missing` and `permissions-required` are both "not yet", and they are separate because the
+ * user's next action differs: one installs a program, the other opens System Settings. `error` is
+ * what the panel shows when the driver is there and answered with something else, which a status
+ * that only said "not ready" would hide.
+ */
+export const COMPUTER_USE_STATUSES = [
+  "unsupported",
+  "driver-missing",
+  "permissions-required",
+  "ready",
+  "error",
+] as const;
 
-export interface ComputerUseMacSetupState {
-  status: ComputerUseMacSetupStatus;
-  helperName: string;
-  helperIconDataUrl: string | null;
+export type ComputerUseStatus = (typeof COMPUTER_USE_STATUSES)[number];
+
+export interface ComputerUsePermission {
+  id: MacPermissionId;
+  granted: boolean;
+}
+
+/**
+ * What the Computer Use panel draws.
+ *
+ * The permissions are a list rather than two fields so the panel can render them in one loop, and
+ * so a driver that gains a third grant needs no new shape here.
+ */
+export interface ComputerUseState {
+  status: ComputerUseStatus;
+  permissions: readonly ComputerUsePermission[];
   message: string | null;
 }
 

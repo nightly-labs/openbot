@@ -10,7 +10,9 @@ import {
   type AppLanguagePreference,
   type AttachmentImportEvent,
   type BrowserPreview,
-  type ComputerUseMacSetupState,
+  COMPUTER_USE_STATUSES,
+  type ComputerUsePermission,
+  type ComputerUseState,
   type ConversationMessage,
   type ConversationPage,
   type ConversationReadState,
@@ -129,22 +131,31 @@ function invokeAgentForServer<TResult>(
   return ipcRenderer.invoke(channel, request).then(decoder);
 }
 
-function decodeComputerUseMacSetupState(value: unknown): ComputerUseMacSetupState {
+function decodeComputerUseState(value: unknown): ComputerUseState {
   if (
     !isDynamicRecord(value) ||
-    !isOneOf(["available", "unavailable", "unsupported"] as const, value.status) ||
-    !isString(value.helperName) ||
-    (value.helperIconDataUrl !== null && !isString(value.helperIconDataUrl)) ||
+    !isOneOf(COMPUTER_USE_STATUSES, value.status) ||
+    !Array.isArray(value.permissions) ||
     (value.message !== null && !isString(value.message))
   ) {
-    throw new Error("Invalid Computer Use macOS setup state.");
+    throw new Error("Invalid Computer Use state.");
   }
   return {
     status: value.status,
-    helperName: value.helperName,
-    helperIconDataUrl: value.helperIconDataUrl,
+    permissions: value.permissions.map(decodeComputerUsePermission),
     message: value.message,
   };
+}
+
+function decodeComputerUsePermission(value: unknown): ComputerUsePermission {
+  if (
+    !isDynamicRecord(value) ||
+    !isOneOf(["screen-recording", "accessibility"] as const, value.id) ||
+    typeof value.granted !== "boolean"
+  ) {
+    throw new Error("Invalid Computer Use permission.");
+  }
+  return { id: value.id, granted: value.granted };
 }
 
 function rememberActiveServer<T extends { id: string; active: boolean }[]>(servers: T): T {
@@ -817,14 +828,9 @@ const openbotApi: OpenBotDesktopApi = {
     },
     setInteractive: (input) => ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandSetInteractive, input).then(decodeVoid),
   },
-  getComputerUseMacSetupState: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseGetMacSetupState).then(decodeComputerUseMacSetupState),
-  openComputerUsePermissionSetup: (permission) =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseOpenMacPermissionSetup, permission).then(decodeComputerUseMacSetupState),
-  startComputerUseHelperDrag: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseStartHelperDrag).then(decodeVoid),
-  revealComputerUseHelper: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseRevealHelper).then(decodeVoid),
-  closeComputerUsePermissionSetup: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseCloseMacPermissionSetup).then(decodeVoid),
+  getComputerUseState: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseGetState).then(decodeComputerUseState),
+  openComputerUsePermissionPane: (permission) =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseOpenPermissionPane, permission).then(decodeComputerUseState),
   openExternal: (destination) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, destination),
   connectProvider: (provider) => ipcRenderer.invoke(IPC_CHANNELS.connectProvider, provider),
   // Decoded, unlike its two neighbours: this reply is read straight after the user's own CLI was

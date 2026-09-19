@@ -4,7 +4,7 @@ import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
-import { app, BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
+import { app, BrowserWindow, dialog, powerMonitor, protocol, screen, shell } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
@@ -285,7 +285,7 @@ function registerIpcHandlers({
   marketplaceAgents,
   voice,
   dynamicIsland,
-  computerUseMacSetup,
+  cuaDriver,
   analytics,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -310,7 +310,7 @@ function registerIpcHandlers({
       setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
-    ...computerUseIpcHandlers({ computerUseMacSetup }),
+    ...computerUseIpcHandlers({ cuaDriver, openExternal: (url) => shell.openExternal(url) }),
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials }),
     ...voiceIpcHandlers({ voice }),
     ...accountIpcHandlers({ centralAuth, host }),

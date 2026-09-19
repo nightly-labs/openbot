@@ -6,6 +6,7 @@ import type {
   AgentPromptResolution,
   RespondToBrowserTakeoverInput,
 } from "@openbot/contracts/ipc";
+import { COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
@@ -46,7 +47,7 @@ export function mcpElicitationQuestion(params: unknown): AgentPromptQuestion | n
   const requestedSchema = getRecord(params, "requestedSchema");
   const properties = getRecord(requestedSchema, "properties");
   if (
-    serverName !== "computer-use" ||
+    serverName !== COMPUTER_USE_MCP_SERVER_NAME ||
     (mode !== "form" && mode !== "openai/form") ||
     !message ||
     !requestedSchema ||

@@ -45,7 +45,12 @@ await Promise.all([
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/streamer.exe")),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/static/stream.html")),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/SHA256SUMS.txt")),
+  access(resolve(resourcesPath, "cua-driver/win32/x64/cua-driver.exe")),
+  access(resolve(resourcesPath, "cua-driver/win32/x64/cua-cursor-theme.exe")),
+  access(resolve(resourcesPath, "cua-driver/win32/x64/LICENSE.md")),
 ]);
+// Only this platform's driver ships, so a shared `extraResources` entry is a loud failure.
+await Promise.all(["darwin", "linux"].map((name) => assertAbsent(resolve(resourcesPath, "cua-driver", name))));
 await Promise.all(["codex", "claude", "grok"].map((name) => assertAbsent(resolve(resourcesPath, name))));
 await assertAbsent(resolve(resourcesPath, "cloudflared"));
 await assertAbsent(resolve(resourcesPath, "app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-win32-x64"));

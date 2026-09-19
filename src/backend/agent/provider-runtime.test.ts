@@ -660,6 +660,25 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  // Computer Use used to come from a Codex `plugin/list` probe, so every activation recomputed it
+  // and a provider that was not Codex set it back to `unavailable`. The driver is now this app's
+  // own child, and no provider knows anything about it.
+  it("keeps the pushed Computer Use capability across a provider connection", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, "DONE", true, true),
+    });
+    await service.initialize();
+    service.setComputerUseCapability("ready");
+
+    await service.connectProvider("codex", async () => undefined);
+
+    expect(service.getStatus().capabilities.computerUse).toBe("ready");
+  });
+
   it("cancels a ChatGPT login that does not complete", async () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];

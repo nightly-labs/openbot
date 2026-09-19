@@ -59,9 +59,31 @@ platforms.
 
 ## Computer Use is unavailable
 
-Computer Use requires a compatible local Codex plugin plus macOS Screen Recording and Accessibility
-permissions. Open **System Settings → Privacy & Security**, grant the permissions requested by the
-plugin, then restart OpenBot. OpenBot does not bypass macOS prompts or plugin safety hand-offs.
+Computer Use needs the `cua-driver` binary. An installed release carries it, so the panel reporting
+a missing driver means a development build, or a file that was removed. On macOS it also needs the
+Screen Recording and Accessibility permissions; Windows and Linux ask for no permission, so there a
+driver that answers is ready. OpenBot starts the driver itself; it does not bypass the macOS prompts.
+
+If the panel reports that the driver is missing, install it with the command the panel shows, then
+press **Check again**. The command is different on each desktop: macOS and Linux use a shell script,
+and Windows uses `irm https://cua.ai/driver/install.ps1 | iex` in PowerShell. In a checkout,
+`bun run prepare:cua-driver` writes the same pinned build the release ships.
+`bun run cua-driver:doctor` reports which binary OpenBot would use, and `OPENBOT_CUA_DRIVER_PATH`
+selects a different one.
+
+On Linux the driver reads the desktop through AT-SPI, so it needs the session bus of the desktop it
+is to drive. A daemon started from a container, from `runuser`, or as root against another user's
+session finds an empty accessibility tree, and `get_window_state` reports `degraded`. X11 is the
+driver's fully supported Linux session. On Wayland OpenBot starts the driver with
+`CUA_DRIVER_RS_ENABLE_WAYLAND=1`; set that variable yourself to `0` if your compositor works better
+through XWayland. Window rectangles under GNOME also need the driver's own `winrects@cua` shell
+extension, which its installer refreshes but does not enable for you.
+
+If the panel reports that permissions are needed, open **System Settings → Privacy & Security** and
+grant both **Screen & System Audio Recording** and **Accessibility**, then press **Check again**. A
+development build asks for the grants as **Electron**, not as OpenBot, because the development binary
+is the responsible process. For the same reason a development grant does not carry over to an
+installed release, and each build must be granted once.
 
 ## A chat is missing after an update
 

@@ -8,6 +8,7 @@ import type {
   AgentProviderStatus,
   AgentStatus,
   AgentSummary,
+  CapabilityState,
   CustomProviderRestart,
 } from "@openbot/contracts/ipc";
 import {
@@ -36,8 +37,6 @@ import {
   decodeAccountReadResult,
   decodeModelListResponse,
   decodeRecordResponse,
-  getArray,
-  isRecord,
   type ModelListResponse,
 } from "./../protocol";
 import {
@@ -813,8 +812,14 @@ export class ProviderRuntime implements ProviderPort {
     }
   }
 
-  /** Router arm: the bundled computer-use MCP server changed state. */
-  setComputerUseCapability(computerUse: "ready" | "setup-required"): void {
+  /**
+   * Pushed by the main process, which owns the Computer Use driver.
+   *
+   * Nothing here probes for it. The capability follows the driver daemon and its macOS grants, not
+   * a provider: the driver reaches Codex, Claude and the ACP providers through one MCP entry, so a
+   * value derived from any single client would be wrong for the other two.
+   */
+  setComputerUseCapability(computerUse: CapabilityState): void {
     this.#setStatus({ capabilities: { ...this.#status.capabilities, computerUse } });
   }
 
@@ -1063,8 +1068,6 @@ export class ProviderRuntime implements ProviderPort {
               ? "codex"
               : provider;
           const primaryAccount = this.#accounts.get(primaryProvider);
-          const codexClient = this.#clients.get("codex");
-          const computerUse = codexClient ? await this.#probeComputerUse(codexClient) : "unavailable";
           this.#conversation.clearLoadedThreads();
           this.#setStatus({
             phase: "ready",
@@ -1076,7 +1079,9 @@ export class ProviderRuntime implements ProviderPort {
               message: null,
               email: account.email ?? null,
             }),
-            capabilities: { chat: "ready", browser: "ready", computerUse },
+            // Carried through, not recomputed: Computer Use belongs to the driver the main process
+            // owns, and a provider connecting says nothing about it.
+            capabilities: { ...this.#status.capabilities, chat: "ready", browser: "ready" },
             message: null,
           });
           // Only with a catalogue this client itself reported. Discovery that failed leaves the
@@ -1523,19 +1528,12 @@ export class ProviderRuntime implements ProviderPort {
       cliVersion: this.#cli.get(primaryProvider)?.version ?? null,
       auth: requireProviderDriver(primaryProvider).authState(primaryAccount ?? null),
       providers: finalProviderStatuses,
-      capabilities: {
-        chat: "ready",
-        browser: "ready",
-        computerUse: this.#clients.has("codex") ? this.#status.capabilities.computerUse : "unavailable",
-      },
+      capabilities: { ...this.#status.capabilities, chat: "ready", browser: "ready" },
       message: null,
     });
     const refreshRuntime = async (): Promise<void> => {
       const codexClient = this.#clients.get("codex");
-      const [freshCatalogs, computerUse] = await Promise.all([
-        this.#refreshModelCatalog(),
-        codexClient ? this.#probeComputerUse(codexClient) : Promise.resolve("unavailable" as const),
-      ]);
+      const freshCatalogs = await this.#refreshModelCatalog();
       for (const provider of activated) {
         const client = this.#clients.get(provider);
         // The same condition as the other activation site: a stale catalogue proves nothing about
@@ -1544,11 +1542,9 @@ export class ProviderRuntime implements ProviderPort {
           this.#hooks.onProviderActivated(provider, this.#configRevisions.get(client) ?? 0);
         }
       }
-      if (codexClient === this.#clients.get("codex")) {
-        this.#setStatus({
-          capabilities: { ...this.#status.capabilities, computerUse },
-        });
-      }
+      // The catalogue is read off the status, so discovery that found new models has to publish one.
+      // This used to ride along with a Computer Use probe that no longer exists.
+      this.#setStatus({});
       if (codexClient) void this.#refreshUsage(codexClient).catch(() => undefined);
       if (options.notifyReady !== false) await this.#hooks.onProvidersReady();
     };
@@ -1750,27 +1746,6 @@ export class ProviderRuntime implements ProviderPort {
     );
     this.#models = discovered.flatMap((entry) => entry.models);
     return new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider));
-  }
-
-  async #probeComputerUse(client: AgentClient): Promise<"ready" | "setup-required" | "unavailable"> {
-    try {
-      const result = await client.request("plugin/list", { cwds: [] }, decodeRecordResponse, 5_000);
-      for (const marketplace of getArray(result, "marketplaces")) {
-        for (const plugin of getArray(marketplace, "plugins")) {
-          if (!isRecord(plugin)) continue;
-          if (
-            (plugin.id === "computer-use@openai-bundled" || plugin.name === "computer-use") &&
-            plugin.installed === true &&
-            plugin.enabled === true
-          ) {
-            return "ready";
-          }
-        }
-      }
-      return "unavailable";
-    } catch {
-      return "unavailable";
-    }
   }
 
   async #refreshUsage(client: AgentClient, model?: string, emit = true): Promise<AccountUsage> {

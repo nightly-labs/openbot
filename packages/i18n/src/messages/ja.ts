@@ -84,7 +84,7 @@ export const ja = {
   "settings.tab.general.title": "一般",
   "settings.tab.general.description": "このコンピュータでの OpenBot の動作を設定します。",
   "settings.tab.computerUse.title": "コンピュータ操作",
-  "settings.tab.computerUse.description": "この Mac のアプリを OpenBot が見て操作できるようにします。",
+  "settings.tab.computerUse.description": "このコンピュータのアプリを OpenBot が見て操作できるようにします。",
   "settings.tab.profile.title": "プロフィール",
   "settings.tab.profile.description": "OpenBot での自分の表示を設定します。",
   "settings.tab.mobileConnect.title": "モバイル接続",

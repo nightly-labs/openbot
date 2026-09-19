@@ -89,11 +89,8 @@ export const IPC_ENDPOINTS = {
     setInteractive: request(IPC_CHANNELS.dynamicIslandSetInteractive),
   },
   computerUse: {
-    getMacSetupState: request(IPC_CHANNELS.computerUseGetMacSetupState),
-    openMacPermissionSetup: request(IPC_CHANNELS.computerUseOpenMacPermissionSetup),
-    startHelperDrag: request(IPC_CHANNELS.computerUseStartHelperDrag),
-    revealHelper: request(IPC_CHANNELS.computerUseRevealHelper),
-    closeMacPermissionSetup: request(IPC_CHANNELS.computerUseCloseMacPermissionSetup),
+    getState: request(IPC_CHANNELS.computerUseGetState),
+    openPermissionPane: request(IPC_CHANNELS.computerUseOpenPermissionPane),
   },
   skills: {
     localList: request(IPC_CHANNELS.skillsLocalList),

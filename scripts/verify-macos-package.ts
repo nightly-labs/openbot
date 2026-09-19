@@ -34,6 +34,7 @@ const plistPath = resolve(contentsPath, "Info.plist");
 const whisperExecutablePath = resolve(resourcesPath, "whisper/bin/whisper-cli");
 const whisperModelPath = resolve(resourcesPath, "whisper/model/ggml-medium-q5_0.bin");
 const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin/arm64");
+const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin/arm64");
 // The database host is spawned by path as its own process, so it has to survive the asar unchanged.
 // Packed into app.asar it would still be readable, but `utilityProcess` cannot start it from there.
 const databaseHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/agent-database-host.js");
@@ -62,7 +63,16 @@ await Promise.all([
   access(resolve(remoteRuntimePath, "streamer")),
   access(resolve(remoteRuntimePath, "static/stream.html")),
   access(resolve(remoteRuntimePath, "SHA256SUMS.txt")),
+  access(resolve(cuaDriverPath, "cua-driver")),
+  access(resolve(cuaDriverPath, "cua-cursor-theme")),
+  access(resolve(cuaDriverPath, "LICENSE.md")),
 ]);
+// Only this Mac's driver ships. A `from: build/cua-driver` that forgot the target would put the
+// Windows and Linux builds in every installer.
+await Promise.all(["win32", "linux"].map((name) => assertAbsent(resolve(resourcesPath, "cua-driver", name))));
+// `signIgnore` keeps the driver's own Developer ID signature, and with it the Automation
+// entitlement that re-signing under OpenBot's inherited entitlements would drop.
+assertCuaDriverSignature(resolve(cuaDriverPath, "cua-driver"));
 await verifyPackagedIcon(packagedIconPath, sourceIconPath);
 await Promise.all(["codex", "claude", "grok"].map((name) => assertAbsent(resolve(resourcesPath, name))));
 await assertAbsent(resolve(resourcesPath, "cloudflared"));
@@ -162,6 +172,17 @@ async function verifyPackagedIcon(packagedPath: string, sourcePath: string): Pro
     await Promise.all(EXPECTED_MACOS_ICON_FILES.map((name) => access(join(iconSetPath, name))));
   } finally {
     await rm(iconRoot, { recursive: true, force: true });
+  }
+}
+
+/** The Computer Use driver keeps the signature it was published with, not OpenBot's. */
+function assertCuaDriverSignature(binary: string): void {
+  const description = run("codesign", ["-dvvv", binary], true);
+  if (!description.includes("Authority=Developer ID Application: Cua AI, Inc. (YCK386LBJ7)")) {
+    throw new Error("The Computer Use driver no longer carries the Cua AI Developer ID signature.");
+  }
+  if (!description.includes("flags=0x10000(runtime)")) {
+    throw new Error("The Computer Use driver is not signed with the hardened runtime.");
   }
 }
 

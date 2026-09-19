@@ -84,14 +84,13 @@ describe("OnboardingFlow", () => {
 
   it("requests optional macOS permissions before continuing", async () => {
     const view = renderFlow();
-    const openPermission = vi.spyOn(activeMock?.api ?? window.openbot, "openComputerUsePermissionSetup");
+    const openPermission = vi.spyOn(activeMock?.api ?? window.openbot, "openComputerUsePermissionPane");
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     expect(await view.findByRole("heading", { name: "OpenBot might control your computer" })).toBeInTheDocument();
-    await waitFor(() => expect(view.getAllByRole("button", { name: "Set up" })).toHaveLength(2));
+    await waitFor(() => expect(view.getAllByRole("button", { name: "Open settings" })).toHaveLength(2));
 
-    await fireEvent.click(view.getAllByRole("button", { name: "Set up" })[0]);
+    await fireEvent.click(view.getAllByRole("button", { name: "Open settings" })[0]);
     await waitFor(() => expect(openPermission).toHaveBeenCalledWith("screen-recording"));
-    expect(await view.findByText("System Settings opened")).toBeInTheDocument();
 
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     expect(await view.findByRole("heading", { name: "Give each agent a job" })).toBeInTheDocument();

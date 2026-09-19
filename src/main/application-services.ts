@@ -25,22 +25,25 @@ import { localSkillTools } from "./local-skill-tools";
  * when - see `teardown-registry.ts` for why shutdown here is not the reverse of construction.
  */
 
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 import type {
   AgentStatus,
   AppVariant,
   BrowserDisplayState,
+  CapabilityState,
   CentralAuthState,
+  ComputerUseState,
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
+import { app, type BrowserWindow, safeStorage, screen } from "electron";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
@@ -54,8 +57,8 @@ import { readAnalyticsPreference } from "./analytics-preference-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
-import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
-import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
+import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
+import { type CuaDriverEndpoint, CuaDriverRuntime } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
 import {
   applyDevelopmentRemoteAccount,
@@ -70,7 +73,6 @@ import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   createDynamicIslandWindow,
-  loadComputerUseMacSetupRenderer,
   loadDynamicIslandRenderer,
   type MainWindowController,
   showMainWindow,
@@ -81,6 +83,7 @@ import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
+import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
@@ -128,6 +131,57 @@ const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
  * construction sequence. The gaps leave room to insert one without renumbering.
  */
+/**
+ * What the Computer Use driver is told to record as its host, for its own logs.
+ *
+ * Advisory only: `cua-driver` does not treat it as a trust signal, and it cannot, because any
+ * process can set the variable. The development value is honest about the fact that a dev run is
+ * the Electron binary - which is also the name macOS shows in the Privacy & Security panes, and the
+ * reason a dev grant does not carry over to a packaged build.
+ */
+const PACKAGED_BUNDLE_IDENTIFIER = "app.openbot.desktop";
+const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
+
+/**
+ * A short, stable name for this profile, so two profiles on one computer never share a socket.
+ *
+ * The digest is only a name. Nothing reads it back, and it guards nothing: the directory mode and
+ * the per-user temporary directory are what keep the socket private.
+ */
+function profileDigest(userDataPath: string): string {
+  return createHash("sha256").update(userDataPath).digest("hex").slice(0, 12);
+}
+
+/**
+ * Where the driver listens, which each desktop names differently.
+ *
+ * The socket is a control channel to a process that can drive the whole desktop, so where it sits
+ * decides who may reach it.
+ *
+ * On macOS the temporary directory is already private per user (`/var/folders/…`, mode `0700`). On
+ * Linux `os.tmpdir()` is usually the shared, world-writable `/tmp`, where another local user can
+ * create our directory before we do, so `XDG_RUNTIME_DIR` is used first: the login session owns it,
+ * it is mode `0700`, and it is removed at logout. The temporary directory stays as the fallback for
+ * a session that has none, and the runtime refuses a directory this user does not own either way.
+ *
+ * The user data directory cannot hold it: a socket path may hold about a hundred characters, and an
+ * isolated development profile spends 64 of them on a worktree hash alone.
+ *
+ * On Windows it is a named pipe, which is a name in a kernel namespace rather than a path, so it has
+ * no length limit and no directory to protect. It gets a random name instead of the profile digest:
+ * Windows lets a second process add an instance to an existing pipe name, so a predictable name
+ * could be taken by another local process before the driver starts, and a name it cannot guess
+ * cannot be taken. Nothing persists the name; the daemon and its proxies are given it directly.
+ */
+function cuaDriverEndpoint(platform: NodeJS.Platform, digest: string): CuaDriverEndpoint {
+  if (platform === "win32") return { kind: "windows-pipe", name: `\\\\.\\pipe\\openbot-cua-${randomUUID()}` };
+  const runtimeDirectory = process.env.XDG_RUNTIME_DIR?.trim();
+  const parent = platform === "linux" && runtimeDirectory && isAbsolute(runtimeDirectory) ? runtimeDirectory : tmpdir();
+  // The digest keeps two profiles on one computer apart, and keeps the name stable so a socket left
+  // by a crashed run is found and removed rather than accumulating.
+  return { kind: "unix-socket", directory: join(parent, `openbot-cua-${digest}`) };
+}
+
 const TEARDOWN_ORDER = {
   updater: 10,
   dynamicIsland: 20,
@@ -135,6 +189,7 @@ const TEARDOWN_ORDER = {
   browserPictureInPicture: 40,
   browserView: 45,
   providerRuntimes: 50,
+  cuaDriver: 55,
   remoteServers: 60,
   voice: 70,
   remoteDesktop: 80,
@@ -190,7 +245,7 @@ export interface ApplicationServices {
   marketplaceAgents: AgentMarketplaceService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
-  computerUseMacSetup: ComputerUseMacSetupWindowController;
+  cuaDriver: CuaDriverRuntime;
   analytics: HostAnalytics;
   teamStore: TeamStore;
   /**
@@ -201,6 +256,13 @@ export interface ApplicationServices {
   appliedAccount: CentralAuthState;
   /** Left un-awaited on purpose: the account settles in the background while the app opens. */
   centralAuthInitialization: Promise<CentralAuthState>;
+}
+
+/** How the driver's own state reads as the capability the Team API projects. */
+function computerUseCapability(state: ComputerUseState): CapabilityState {
+  if (state.status === "ready") return "ready";
+  if (state.status === "permissions-required") return "setup-required";
+  return "unavailable";
 }
 
 export async function createApplicationServices({
@@ -218,17 +280,6 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   prepareForUpdateInstall,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
-  const computerUseMacSetupService = new ComputerUseMacSetupService({
-    getIconDataUrl: async (path) => (await app.getFileIcon(path, { size: "normal" })).toDataURL(),
-  });
-  const computerUseMacSetup = new ComputerUseMacSetupWindowController({
-    service: computerUseMacSetupService,
-    createWindow: windows.createComputerUseMacSetupWindow,
-    loadWindow: loadComputerUseMacSetupRenderer,
-    openExternal: (url) => shell.openExternal(url),
-    revealPath: (path) => shell.showItemInFolder(path),
-    loadDragIcon: (path) => app.getFileIcon(path, { size: "normal" }),
-  });
   // The one forward reference left in this function: the controller is built at the top of
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
@@ -443,6 +494,34 @@ export async function createApplicationServices({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
   });
+  // Resolved at startup, started only when something asks for Computer Use: starting the daemon is
+  // what makes macOS ask for the grants, and a user who never opens the panel must never be asked.
+  const cuaDriverExecutable = await resolveCuaDriver({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    sourceRoot: resolve(__dirname, "../.."),
+    platform: process.platform,
+    architecture: process.arch,
+    homeDirectory: homedir(),
+    pathVariable: process.env.PATH ?? null,
+    overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
+    installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
+    localAppDataDirectory: process.env.LOCALAPPDATA,
+    applicationsDirectory: "/Applications",
+  });
+  const cuaDriver = new CuaDriverRuntime({
+    executable: cuaDriverExecutable,
+    endpoint: cuaDriverEndpoint(process.platform, profileDigest(app.getPath("userData"))),
+    supported: isSupportedCuaDriverTarget(process.platform, process.arch),
+    hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
+    platform: process.platform,
+    onDiagnostic: (message) => {
+      void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);
+    },
+  });
+  // After the provider runtimes, which hold the `cua-driver mcp` children that talk to this
+  // daemon: stopping it first would leave them reading a socket nothing answers.
+  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => cuaDriver.stop());
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -470,10 +549,20 @@ export async function createApplicationServices({
       // into the object being constructed; nothing calls it before the constructor returns.
       mcpServers: () => service.enabledMcpServers(),
     },
+    // Appended to the stored servers at each spawn, so the same tools reach Codex, Claude and the
+    // ACP providers. Null until the daemon runs, which is what keeps a machine with no driver from
+    // handing every provider a command it cannot start.
+    computerUseMcpServer: () => cuaDriver.mcpServerConfig(),
     localSkillTools: () => localSkillTools(skills),
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // The capability and the tool list both follow the daemon, and nothing else can tell them: no
+  // provider probe reaches the driver, because the driver is this process's child.
+  cuaDriver.onStateChanged((state) => {
+    service.setComputerUseCapability(computerUseCapability(state));
+    service.notifyComputerUseChanged();
+  });
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   await sidebarLayout.reconcileAgents(service.sidebarChatIds());
@@ -776,7 +865,7 @@ export async function createApplicationServices({
     marketplaceAgents,
     voice,
     dynamicIsland,
-    computerUseMacSetup,
+    cuaDriver,
     analytics,
     teamStore,
     appliedAccount: signedInState,

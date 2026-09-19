@@ -7,6 +7,7 @@ import type {
   BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
   CentralAuthState,
+  ComputerUseState,
   ConversationPage,
   DirectMessageRealtimeEvent,
   DirectTypingRealtimeEvent,
@@ -83,6 +84,16 @@ const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
     message: null,
     fullAccess: true,
   },
+};
+
+/** A fresh Mac: the driver is there and neither grant has been given yet. */
+const COMPUTER_USE_STATE: ComputerUseState = {
+  status: "permissions-required",
+  permissions: [
+    { id: "screen-recording", granted: false },
+    { id: "accessibility", granted: false },
+  ],
+  message: null,
 };
 
 const defaultMatchMedia = window.matchMedia;
@@ -441,21 +452,8 @@ export function installOpenbotStub(): void {
         completed: true,
         preferredProvider,
       })),
-      getComputerUseMacSetupState: vi.fn().mockResolvedValue({
-        status: "available",
-        helperName: "Codex Computer Use",
-        helperIconDataUrl: null,
-        message: null,
-      }),
-      openComputerUsePermissionSetup: vi.fn().mockResolvedValue({
-        status: "available",
-        helperName: "Codex Computer Use",
-        helperIconDataUrl: null,
-        message: null,
-      }),
-      startComputerUseHelperDrag: vi.fn().mockResolvedValue(undefined),
-      revealComputerUseHelper: vi.fn().mockResolvedValue(undefined),
-      closeComputerUsePermissionSetup: vi.fn().mockResolvedValue(undefined),
+      getComputerUseState: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
+      openComputerUsePermissionPane: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
       openExternal: vi.fn().mockResolvedValue(undefined),
       // One channel, so the mock has to answer for whichever provider the caller names:
       // each response marks that provider connecting and reports its own CLI version.

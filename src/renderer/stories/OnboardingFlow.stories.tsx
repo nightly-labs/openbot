@@ -90,10 +90,12 @@ function MockedOnboardingFlow(props: { args: Parameters<typeof OnboardingFlow>[0
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
   if (props.permissions) {
-    mock.api.getComputerUseMacSetupState = async () => ({
-      status: "available",
-      helperName: "Codex Computer Use",
-      helperIconDataUrl: null,
+    mock.api.getComputerUseState = async () => ({
+      status: "permissions-required",
+      permissions: [
+        { id: "screen-recording", granted: false },
+        { id: "accessibility", granted: false },
+      ],
       message: null,
     });
   }

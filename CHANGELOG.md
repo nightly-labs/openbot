@@ -5,6 +5,24 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Give every agent Computer Use, on every desktop. OpenBot ships and runs the `cua-driver` binary
+  itself, and hands the same tools to Codex, Claude, and Grok, so GUI control no longer belongs to
+  one provider. macOS, Windows, and Linux all show the panel; only macOS asks for a permission.
+
+### Changed
+
+- Ask for the Screen Recording and Accessibility permissions for OpenBot itself. OpenBot starts the
+  driver as its own child process, so the grants go to OpenBot rather than to a helper application
+  signed by somebody else, and there is no longer an application to drag into System Settings. A
+  grant given to the old Codex helper does not carry over.
+
+### Removed
+
+- Remove the separately installed Codex Computer Use plugin and its setup window. Nothing to install
+  by hand: the release carries the driver.
+
 ## [0.14.1] - 2026-09-19
 
 ### Changed
