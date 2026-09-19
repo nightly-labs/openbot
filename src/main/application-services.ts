@@ -507,6 +507,7 @@ export async function createApplicationServices({
     overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
     installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
     localAppDataDirectory: process.env.LOCALAPPDATA,
+    applicationsDirectory: "/Applications",
   });
   const cuaDriver = new CuaDriverRuntime({
     executable: cuaDriverExecutable,

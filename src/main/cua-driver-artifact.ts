@@ -33,6 +33,8 @@ export interface CuaDriverArtifactInput {
   installDirectory?: string;
   /** `%LOCALAPPDATA%`. Read only on Windows, where the installer writes below it. */
   localAppDataDirectory?: string;
+  /** `/Applications`. Read only on macOS, where the driver's real binary is inside a bundle there. */
+  applicationsDirectory?: string;
 }
 
 /** Whether this computer is one the driver is published for, which is not whether it is installed. */
@@ -84,6 +86,13 @@ function* candidatePaths(input: CuaDriverArtifactInput): Generator<string> {
   // script uses a junction below the per-user program directory, so that an upgrade retargets a
   // junction and needs no administrator. Its vendor folder was renamed in driver v0.2.14, and the
   // installer migrates a legacy install only when it is run again, so both names are read here.
+  // macOS keeps the real binary in an application bundle and puts only a symlink in `~/.local/bin`.
+  // A user who moved the bundle in by hand, or who cleared `~/.local/bin`, still has a driver.
+  const applications = input.applicationsDirectory?.trim();
+  if (input.platform === "darwin" && applications) {
+    yield join(applications, "CuaDriver.app", "Contents", "MacOS", name);
+  }
+
   if (input.platform === "win32") {
     const localAppData = input.localAppDataDirectory?.trim() || join(input.homeDirectory, "AppData", "Local");
     yield join(localAppData, "Programs", "Cua", "cua-driver", "bin", name);

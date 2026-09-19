@@ -121,6 +121,13 @@ describe("resolveCuaDriver", () => {
     ).resolves.toBe(installed);
   });
 
+  // The macOS installer puts the real binary in an application bundle and only a symlink in
+  // `~/.local/bin`, so a cleared `~/.local/bin` must not read as "no driver".
+  it("reads the macOS application bundle", async () => {
+    const installed = await writeExecutable("apps", "CuaDriver.app", "Contents", "MacOS", "cua-driver");
+    await expect(resolveCuaDriver(input({ applicationsDirectory: join(root, "apps") }))).resolves.toBe(installed);
+  });
+
   // A target upstream publishes nothing for has nothing to install, so the resolver must not report a
   // file that happens to sit in the right place.
   it("returns null for a target the driver is not published for", async () => {
