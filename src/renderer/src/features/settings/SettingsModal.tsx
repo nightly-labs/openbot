@@ -29,7 +29,7 @@ import {
   UserRound,
 } from "../../components/ui";
 import { useI18n } from "../../i18n-context";
-import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
+import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import type { GeneralSettingsValue } from "./app-settings";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 import { SaveBarDock, SettingsDialogShell } from "./SettingsDialogShell";
@@ -287,21 +287,19 @@ export function SettingsModal(props: SettingsModalProps) {
         }
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
-            {navItems
-              .filter((item) => item.value !== "computer-use" || props.appInfo?.platform === "darwin")
-              .map((item) => {
-                const NavIcon = item.icon;
-                return (
-                  <Tabs.Trigger
-                    class="settings-modal-nav-item"
-                    value={item.value}
-                    aria-current={activeTab() === item.value ? "page" : undefined}
-                  >
-                    <NavIcon aria-hidden="true" />
-                    <span>{i18n.t(item.titleKey)}</span>
-                  </Tabs.Trigger>
-                );
-              })}
+            {navItems.map((item) => {
+              const NavIcon = item.icon;
+              return (
+                <Tabs.Trigger
+                  class="settings-modal-nav-item"
+                  value={item.value}
+                  aria-current={activeTab() === item.value ? "page" : undefined}
+                >
+                  <NavIcon aria-hidden="true" />
+                  <span>{i18n.t(item.titleKey)}</span>
+                </Tabs.Trigger>
+              );
+            })}
           </Tabs.List>
         }
       >
@@ -325,7 +323,7 @@ export function SettingsModal(props: SettingsModalProps) {
         </Tabs.Content>
 
         <Tabs.Content value="computer-use" class="settings-modal-tab-panel" data-tab="computer-use">
-          <ComputerUseMacSetup platform={props.appInfo?.platform ?? "darwin"} variant="settings" />
+          <ComputerUseSetup platform={props.appInfo?.platform ?? "darwin"} variant="settings" />
         </Tabs.Content>
 
         <Tabs.Content value="profile" class="settings-modal-tab-panel" data-tab="profile">

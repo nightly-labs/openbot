@@ -25,7 +25,7 @@ messaging in one desktop app.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
 - Shared desktop channel chats with one task owner, explicit delegation, shared history, and Stop, Resume, Reassign, Archive, and Restore controls.
 - A persistent embedded browser that agents can open, inspect, and control.
-- Optional Computer Use on macOS through `cua-driver`, which OpenBot starts as its own child process and gives to every provider.
+- Optional Computer Use on macOS, Windows and Linux through `cua-driver`, which OpenBot starts as its own child process and gives to every provider.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.
 - Local data and privacy-safe diagnostics exports from the account menu.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
@@ -113,8 +113,9 @@ show these agents.
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
 
-Bun and Node.js are not required when using an installed release. Screen Recording and Accessibility
-permissions are needed only for optional Computer Use, and only on macOS.
+Bun and Node.js are not required when using an installed release. Optional Computer Use works on
+macOS, Windows and Linux. Only macOS asks for a permission for it: Screen Recording and
+Accessibility.
 
 OpenBot uses the existing local CLI login. It does not copy provider credentials. Grok's
 `XAI_API_KEY` and per-session MCP bearer tokens are never persisted or logged.

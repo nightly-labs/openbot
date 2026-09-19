@@ -259,7 +259,7 @@ explicitly accept it. The acceptance record stays in OpenBot's local application
 Computer Use is provided by `cua-driver`, a local binary that you install and that OpenBot starts as
 its own child process. It stops when OpenBot stops. Because OpenBot starts it directly, macOS
 attributes the Screen Recording and Accessibility grants to OpenBot, and macOS keeps control of the
-prompts. Screen contents and accessibility trees that an agent reads through the driver go to that
+prompts. Windows and Linux ask for no such grant. Screen contents and accessibility trees that an agent reads through the driver go to that
 agent's provider, the same as any other message content.
 
 The driver is third-party software with its own product analytics, which are **on by default** and are

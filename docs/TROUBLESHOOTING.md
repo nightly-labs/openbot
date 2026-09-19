@@ -59,12 +59,15 @@ platforms.
 
 ## Computer Use is unavailable
 
-Computer Use needs the `cua-driver` binary, plus the macOS Screen Recording and Accessibility
-permissions. OpenBot starts the driver itself; it does not bypass the macOS prompts.
+Computer Use needs the `cua-driver` binary. On macOS it also needs the Screen Recording and
+Accessibility permissions; Windows and Linux ask for no permission, so there a driver that answers is
+ready. OpenBot starts the driver itself; it does not bypass the macOS prompts.
 
 If the panel reports that the driver is missing, install it with the command the panel shows, then
-press **Check again**. `bun run cua-driver:doctor` reports which binary OpenBot would use, and
-`OPENBOT_CUA_DRIVER_PATH` selects a different one.
+press **Check again**. The command is different on each desktop: macOS and Linux use a shell script,
+and Windows uses `irm https://cua.ai/driver/install.ps1 | iex` in PowerShell.
+`bun run cua-driver:doctor` reports which binary OpenBot would use, and `OPENBOT_CUA_DRIVER_PATH`
+selects a different one.
 
 If the panel reports that permissions are needed, open **System Settings → Privacy & Security** and
 grant both **Screen & System Audio Recording** and **Accessibility**, then press **Check again**. A
