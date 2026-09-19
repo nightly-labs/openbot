@@ -1,0 +1,50 @@
+{
+  "slug": "airtable",
+  "name": "Airtable",
+  "tagline": "Bases and records",
+  "description": "Airtable lets agents list bases, read and update records, and summarize table contents. An API key from the account page is passed to the local server as one environment variable.",
+  "category": "data-analytics",
+  "creatorName": "airtable.com",
+  "iconUrl": "https://airtable.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-bases", "text": "What bases do I have access to?" },
+    { "id": "prompt-records", "text": "Summarize the launch tracker table." },
+    { "id": "prompt-update", "text": "Mark the shipped features as done in the roadmap base." }
+  ],
+  "apps": [
+    {
+      "id": "app-airtable-mcp",
+      "name": "Airtable",
+      "description": "Base listing and record access, over a local MCP server with an Airtable API key.",
+      "iconUrl": "https://airtable.com/favicon.ico",
+      "server": {
+        "name": "airtable",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "airtable-mcp-server"],
+        "auth": [
+          {
+            "id": "airtable-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "token",
+                "label": "API key",
+                "env": "AIRTABLE_API_KEY",
+                "hint": "Airtable account page → API"
+              }
+            ],
+            "docsUrl": "https://airtable.com/developers/web/api/introduction",
+            "docsLabel": "Get a key"
+          }
+        ]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.airtable.com",
+  "privacyPolicyUrl": "https://www.airtable.com/privacy",
+  "termsUrl": "https://www.airtable.com/tos"
+}

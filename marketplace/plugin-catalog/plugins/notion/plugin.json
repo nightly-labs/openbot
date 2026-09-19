@@ -1,0 +1,34 @@
+{
+  "slug": "notion",
+  "name": "Notion",
+  "tagline": "Docs and knowledge base",
+  "description": "Notion lets agents read and write pages, search the workspace, and keep meeting notes and specs where the team already works. Each user signs in to their own Notion account through the browser.",
+  "category": "productivity",
+  "creatorName": "notion.so",
+  "iconUrl": "https://www.notion.so/images/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-spec", "text": "Find the current launch spec and summarize the open questions." },
+    { "id": "prompt-meeting-notes", "text": "Turn these bullets into a structured meeting note in my team space." },
+    { "id": "prompt-update-doc", "text": "Update the onboarding doc with the new release checklist." }
+  ],
+  "apps": [
+    {
+      "id": "app-notion-mcp",
+      "name": "Notion",
+      "description": "Page search, reading, writing, and workspace navigation, over Notion's MCP server with browser sign-in.",
+      "iconUrl": "https://www.notion.so/images/favicon.ico",
+      "server": {
+        "name": "notion",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "mcp-remote@latest", "https://mcp.notion.com/mcp"],
+        "auth": [{ "id": "notion-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.notion.so",
+  "privacyPolicyUrl": "https://www.notion.so/privacy",
+  "termsUrl": "https://www.notion.so/terms"
+}
