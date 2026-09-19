@@ -1341,7 +1341,8 @@ function IslandAvatar(props: { agent: DynamicIslandAgentIdentity; working?: bool
       // is actually in. `"hover"` holds the resting pose and brings the agent back the
       // moment a pointer reaches the island, so the motion is there when someone is
       // looking at it. Work still animates on its own.
-      motion={props.working ? "working" : "hover"}
+      motion="hover"
+      mood={props.working ? "working" : "idle"}
       shape="cercle"
       class="dynamic-island-surface-avatar"
     />

@@ -1,15 +1,5 @@
-import type { StateId } from "@norbert_bodziony/bloub";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
-
-export const AGENT_ACTIVITY_ANIMATIONS = [
-  "thinking",
-  "orbit",
-  "comet",
-  "swirl",
-  "burst",
-  "wide",
-] as const satisfies readonly StateId[];
 
 export const AGENT_ACTIVITY_LABELS = [
   "Working on it…",
@@ -27,28 +17,30 @@ export const AGENT_ACTIVITY_LABELS = [
 const FACTUAL_ACTIVITY_LABELS = AGENT_ACTIVITY_LABELS.slice(0, 7);
 const PLAYFUL_ACTIVITY_LABELS = AGENT_ACTIVITY_LABELS.slice(7);
 
-export interface AgentActivityPresentation {
-  animation: (typeof AGENT_ACTIVITY_ANIMATIONS)[number];
-  label: (typeof AGENT_ACTIVITY_LABELS)[number];
-}
+export type AgentActivityLabel = (typeof AGENT_ACTIVITY_LABELS)[number];
 
-export function nextAgentActivityPresentation(
-  previous?: AgentActivityPresentation,
+/**
+ * The line the indicator shows while an agent works.
+ *
+ * Only the wording is drawn. The avatar used to draw an animation from here too, which is how a
+ * turn could turn the agent into a comet and the next one into a burst of particles: a silhouette
+ * is identity, so it is not something to shuffle. The face now follows the `working` mood like
+ * every other avatar in the app.
+ */
+export function nextAgentActivityLabel(
+  previous?: AgentActivityLabel,
   random: () => number = Math.random,
-): AgentActivityPresentation {
-  return {
-    animation: pickDifferent(AGENT_ACTIVITY_ANIMATIONS, previous?.animation, random),
-    label: pickActivityLabel(previous?.label, random),
-  };
+): AgentActivityLabel {
+  return pickActivityLabel(previous, random);
 }
 
 export function AgentActivityIndicator(props: {
   agent: AgentProfile | undefined;
   detail?: string | null;
-  presentation: AgentActivityPresentation;
+  label: AgentActivityLabel;
   phase?: "active" | "exiting";
 }) {
-  const label = () => props.detail ?? props.presentation.label;
+  const label = () => props.detail ?? props.label;
   return (
     <div class="agent-activity-entry" data-state={props.phase ?? "active"}>
       <span
@@ -59,12 +51,7 @@ export function AgentActivityIndicator(props: {
         aria-label={`${props.agent?.name ?? "Agent"} is working: ${label()}`}
       />
       <section class="agent-activity-content" aria-label="Current activity">
-        <AgentAvatar
-          agent={props.agent}
-          motion="working"
-          animationState={props.presentation.animation}
-          class="agent-activity-avatar"
-        />
+        <AgentAvatar agent={props.agent} mood="working" class="agent-activity-avatar" />
         <span class="agent-activity-label">{label()}</span>
       </section>
     </div>
@@ -80,10 +67,7 @@ function pickDifferent<T>(items: readonly T[], previous: T | undefined, random: 
   return selected;
 }
 
-function pickActivityLabel(
-  previous: AgentActivityPresentation["label"] | undefined,
-  random: () => number,
-): AgentActivityPresentation["label"] {
+function pickActivityLabel(previous: AgentActivityLabel | undefined, random: () => number): AgentActivityLabel {
   const tone = random();
   const pool = Number.isFinite(tone) && tone >= 0.7 ? PLAYFUL_ACTIVITY_LABELS : FACTUAL_ACTIVITY_LABELS;
   return pickDifferent(pool, previous, random);

@@ -1,5 +1,6 @@
 import { BotEngine, COLOR_BY_ID } from "@norbert_bodziony/bloub";
 import { bloubAvatarProfile } from "@openbot/brand/bloub-avatar";
+import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { memo, useId, useMemo } from "react";
 import Animated, { type DerivedValue, useAnimatedProps } from "react-native-reanimated";
@@ -12,6 +13,7 @@ import {
   useConnectionAppearance,
 } from "@/features/workspace/components/use-connection-appearance";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import { AgentPhoto, type AgentPhotoProps } from "./agent-photo";
 
 interface BloubAvatarProps extends AgentPhotoProps {
@@ -52,13 +54,13 @@ export function BloubAvatar({ agentId, serverId: hostId, hue, seed, size = 54, a
       size={size}
       animateIdle={animateIdle}
       disconnected={disconnected}
-      working={!disconnected && Boolean(activity && activity.phase !== "waiting")}
+      mood={disconnected ? "idle" : agentActivityMood(activity)}
     />
   );
 }
 
 export const BloubAvatarPreview = memo(function BloubAvatarPreview(
-  props: Omit<BloubAvatarProps, "agentId"> & AgentPhotoProps & { disconnected?: boolean; working?: boolean },
+  props: Omit<BloubAvatarProps, "agentId"> & AgentPhotoProps & { disconnected?: boolean; mood?: AvatarMood },
 ) {
   return (
     <AgentPhoto {...props} size={props.size ?? 54}>
@@ -72,13 +74,13 @@ const AnimatedAvatarPreview = memo(function AnimatedAvatarPreview({
   seed,
   size = 54,
   disconnected = false,
-  working = false,
+  mood = "idle",
   animateIdle = true,
-}: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean; working?: boolean }) {
+}: Omit<BloubAvatarProps, "agentId"> & { disconnected?: boolean; mood?: AvatarMood }) {
   const appearance = useConnectionAppearance(disconnected);
   const colorProps = useAnimatedProps(() => ({ values: [appearance.get().saturation] }));
   const appearanceProps = useAnimatedProps(() => ({ opacity: appearance.get().opacity }));
-  const frame = useBloubActivityFrame(seed, working, animateIdle && !disconnected);
+  const frame = useBloubActivityFrame(seed, mood, animateIdle && !disconnected);
   const bodyProps = useAnimatedProps(() => frame.get().body);
   const maskId = `bloub-${useId().replaceAll(":", "")}`;
   const color = getBloubAvatarColor(seed, hue);

@@ -229,7 +229,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const activity = createActivityStore({
     props,
     activeDeliveries,
-    agentActivityPresentations: resources.agentActivityPresentations,
+    agentActivityLabels: resources.agentActivityLabels,
   });
   const { renderedAgentActivity, agentActivitySpaceReserved, setAgentActivitySpaceReserved, agentActivity } = activity;
   const browser = createBrowserStore({
