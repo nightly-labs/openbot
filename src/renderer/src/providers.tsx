@@ -7,23 +7,10 @@ import { useServers } from "./features/servers/servers-context";
 import { createSimpleContext } from "./simple-context";
 
 /**
- * The three coding providers behind an agent - Codex, Claude and Grok - as two
- * separate things the renderer has to reconcile.
- *
- * `providerRuntimes` is the newer, managed path: main downloads a runtime and
- * pushes a revisioned snapshot. `connect*`/`refreshAgentProviders` is the older
- * path, where the provider is already installed and only its sign-in state
- * matters; it reports through `AgentStatus`. Which one a build has is decided by
- * `window.openbot.providerRuntimes` being present at all, which is why every
- * consumer picks its handlers through `providerRuntimeDownloadsAvailable()`.
- *
- * Ungated - `FALLBACK_PROVIDER_RUNTIMES` is a usable snapshot, and the agent
- * status this reads through `useAgents()` has its own fallback.
- *
- * Nested under `agents` because both paths end in an `AgentStatus`:
- * `applyAgentStatus` lives here rather than there because the only thing it does
- * beyond storing the status is close out the connect attempts this domain
- * started. Depending outward on `agents` keeps that edge one-way.
+ * Coding providers (Codex, Claude, Grok) as two paths the renderer reconciles: managed
+ * `providerRuntimes` snapshots from main, and the older installed-CLI sign-in state via
+ * `AgentStatus`. Consumers pick handlers through `providerRuntimeDownloadsAvailable()`.
+ * Nested under `agents` so the edge stays one-way; see docs/ARCHITECTURE.md.
  */
 const Providers = createSimpleContext({
   name: "Providers",

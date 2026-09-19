@@ -1,7 +1,29 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import { fireEvent, render, screen } from "@solidjs/testing-library";
+import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DataTable } from "./DataTable";
+import { MarkdownFilePreview } from "./MarkdownFilePreview";
 import { RichMessageText } from "./RichMessageText";
+
+const previewCallbacks = {
+  onSelectAgent: vi.fn(),
+  onOpenLink: vi.fn(),
+  onOpenSharedFile: vi.fn(),
+  onOpenWorkspaceFile: vi.fn(),
+};
+
+function renderPreview(body: string) {
+  return render(() => (
+    <MarkdownFilePreview
+      body={body}
+      agents={[]}
+      renderedClass="message-markdown"
+      statusClass="markdown-status"
+      truncatedClass="markdown-truncated"
+      {...previewCallbacks}
+    />
+  ));
+}
 
 const originalMatchMedia = window.matchMedia;
 
@@ -158,5 +180,59 @@ describe("RichMessageText tooltips", () => {
     await fireEvent.click(reference);
     expect(onOpenAttachment).toHaveBeenCalledWith(attachment);
     expect(await screen.findByRole("tooltip")).toHaveTextContent(attachment.name);
+  });
+});
+
+describe("DataTable", () => {
+  it("renders an accessible semantic table and treats cell markup as text", () => {
+    render(() => (
+      <DataTable
+        table={{
+          type: "table",
+          headers: ["Model", "Context"],
+          alignments: ["left", "right"],
+          rows: [["<strong>gpt-4o</strong>", "128k"]],
+        }}
+      />
+    ));
+
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(2);
+    expect(within(table).getAllByRole("cell")).toHaveLength(2);
+    expect(within(table).getByText("<strong>gpt-4o</strong>")).toBeInTheDocument();
+    expect(table.querySelector("strong")).toBeNull();
+  });
+});
+
+describe("MarkdownFilePreview", () => {
+  it("renders common Markdown elements and safe links", async () => {
+    renderPreview(
+      [
+        "# Release notes",
+        "",
+        "Use **bold** and *emphasis*.",
+        "",
+        "| Name | Status |",
+        "| --- | --- |",
+        "| Preview | Ready |",
+        "",
+        "[OpenBot](https://openbot.run)",
+      ].join("\n"),
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "Release notes" })).toBeInTheDocument();
+    expect(screen.getByText("bold").tagName).toBe("STRONG");
+    expect(screen.getByText("emphasis").tagName).toBe("EM");
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "OpenBot" })).toBeInTheDocument();
+  });
+
+  it("escapes raw HTML and drops unsafe links", () => {
+    renderPreview("<script>alert('xss')</script>\n\n[unsafe](javascript:alert('xss'))");
+
+    expect(screen.queryByRole("script")).not.toBeInTheDocument();
+    expect(screen.getByText("<script>alert('xss')</script>")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "unsafe" })).not.toBeInTheDocument();
+    expect(screen.getByText("unsafe")).toBeInTheDocument();
   });
 });
