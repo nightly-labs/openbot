@@ -1,6 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   buildPluginCatalog,
   defaultPluginCatalogPaths,
@@ -10,6 +11,12 @@ import {
 
 const paths = defaultPluginCatalogPaths();
 
+const temporaryRoots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
 describe("plugin catalog source", () => {
   it("loads fourteen listings in catalog order", async () => {
     const { spec, plugins } = await loadPluginCatalog(paths.sourceRoot);
@@ -18,20 +25,45 @@ describe("plugin catalog source", () => {
     expect(plugins).toHaveLength(14);
   });
 
-  it("regenerates byte-identical outputs", async () => {
-    const renderer = await readFile(paths.rendererPath, "utf8");
-    const worker = await readFile(paths.workerPath, "utf8");
-    const catalog = await readFile(join(paths.snapshotDir, "catalog.json"), "utf8");
-    await buildPluginCatalog();
-    await expect(readFile(paths.rendererPath, "utf8")).resolves.toBe(renderer);
-    await expect(readFile(paths.workerPath, "utf8")).resolves.toBe(worker);
-    await expect(readFile(join(paths.snapshotDir, "catalog.json"), "utf8")).resolves.toBe(catalog);
+  it("matches the checked-in outputs byte for byte, without touching the repository", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-plugin-catalog-test-"));
+    temporaryRoots.push(root);
+    const generated = {
+      sourceRoot: paths.sourceRoot,
+      rendererPath: join(root, "marketplace-plugin-catalog.ts"),
+      workerPath: join(root, "plugin-catalog.generated.ts"),
+      snapshotDir: join(root, "snapshot"),
+    };
+    await buildPluginCatalog({ paths: generated });
+    await expect(readFile(generated.rendererPath, "utf8")).resolves.toBe(await readFile(paths.rendererPath, "utf8"));
+    await expect(readFile(generated.workerPath, "utf8")).resolves.toBe(await readFile(paths.workerPath, "utf8"));
+    // A stale detail file from a removed plugin must fail here rather than
+    // survive beside the fresh outputs, so the file sets are compared too.
+    const fresh = (await listFiles(generated.snapshotDir)).sort();
+    const checkedIn = (await listFiles(paths.snapshotDir)).sort();
+    expect(checkedIn).toEqual(fresh);
+    for (const file of fresh) {
+      await expect(readFile(join(generated.snapshotDir, file), "utf8")).resolves.toBe(
+        await readFile(join(paths.snapshotDir, file), "utf8"),
+      );
+    }
   });
 
   it("passes --check on the checked-in tree", async () => {
     await expect(buildPluginCatalog({ check: true })).resolves.toMatchObject({ plugins: 14 });
   });
 });
+
+async function listFiles(root: string, relative = ""): Promise<string[]> {
+  const entries = await readdir(join(root, relative), { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const child = relative ? `${relative}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) files.push(...(await listFiles(root, child)));
+    else files.push(child);
+  }
+  return files;
+}
 
 interface TestAuthField {
   id: string;
