@@ -22,6 +22,7 @@ import {
   paramsRecord,
   protocolMessages,
   startAgentTestFixture,
+  startService,
   stopAgentTestFixture,
   stores,
   waitFor,
@@ -54,15 +55,12 @@ afterEach(async () => {
 
 describe.sequential("AgentService: providers", () => {
   it("runs a channel turn in a separate session and returns to the unchanged normal conversation", async () => {
-    const { store, mailbox } = stores(root);
-    const client = new FakeAgentClient("codex", "CODEX_DONE");
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService, store } = await startService(root, {
+      provider: "codex",
+      output: "CODEX_DONE",
       preferredProvider: "codex",
-      clientFactory: () => client,
     });
-    await service.initialize();
+    service = agentService;
     await service.sendMessage({ agentId: "chief", text: "This is my normal conversation." });
     await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
     const agent = service.listAgents().find((item) => item.id === "chief");
@@ -117,15 +115,16 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("resumes a channel session after the profile or the memories of the agent change", async () => {
-    const { store, mailbox } = stores(root);
-    const client = new FakeAgentClient("codex", "CODEX_DONE");
-    service = createTestService({
+    const {
+      service: agentService,
+      client,
       store,
-      mailbox,
+    } = await startService(root, {
+      provider: "codex",
+      output: "CODEX_DONE",
       preferredProvider: "codex",
-      clientFactory: () => client,
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     const actor = { id: "human", name: "Alex" };
     await service.channels.command(
@@ -208,15 +207,13 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("keeps an agent with active channel work from being deleted", async () => {
-    const { store, mailbox } = stores(root);
-    const client = new FakeAgentClient("codex", "", false);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService, store } = await startService(root, {
+      provider: "codex",
+      output: "",
+      autoComplete: false,
       preferredProvider: "codex",
-      clientFactory: () => client,
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     await service.channels.command(
       {
@@ -788,15 +785,11 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("removes private handoff files immediately when replacement session binding fails", async () => {
-    const { store, mailbox } = stores(root);
-    const client = new FakeAgentClient("codex");
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService, store } = await startService(root, {
+      provider: "codex",
       preferredProvider: "codex",
-      clientFactory: () => client,
     });
-    await service.initialize();
+    service = agentService;
     await service.sendMessage({ agentId: "chief", text: "Private history for the replacement session." });
     await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
     const original = store.activeProviderSession("chief")?.externalSessionId;
@@ -876,12 +869,8 @@ describe.sequential("AgentService: providers", () => {
 
   it("moves an agent off a removed endpoint onto a model OpenCode still lists", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         // OpenCode reports a custom endpoint's model as `<endpoint id>/<model id>`, beside its own.
         if (provider === "opencode") {
@@ -889,8 +878,9 @@ describe.sequential("AgentService: providers", () => {
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
 
@@ -909,12 +899,8 @@ describe.sequential("AgentService: providers", () => {
   // models of an endpoint already removed are therefore still listed, and must not be chosen.
   it("never falls back onto an endpoint removed earlier in the same OpenCode process", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         // Two endpoints and no OpenCode model of its own, so the fallback for one removal is the other
         // endpoint, and the fallback for the second removal must leave OpenCode altogether.
@@ -923,8 +909,9 @@ describe.sequential("AgentService: providers", () => {
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await service.ensureProvider("codex");
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
@@ -947,19 +934,16 @@ describe.sequential("AgentService: providers", () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     // No Codex CLI, so the built-in fallback reports `not-installed` and connecting to it throws.
     process.env.OPENBOT_CODEX_PATH = join(root, "absent-codex");
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         // Every OpenCode model belongs to the endpoint being removed, so there is nothing to move to.
         if (provider === "opencode") client.modelList = () => ({ data: [{ model: "lmstudio/local-llm" }] });
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
 
@@ -985,20 +969,17 @@ describe.sequential("AgentService: providers", () => {
   // next removal may still move agents onto it.
   it("keeps an endpoint selectable when its own removal was never written", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await service.ensureProvider("codex");
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "studio/local-llm" });
@@ -1023,20 +1004,17 @@ describe.sequential("AgentService: providers", () => {
   // it after the file that defines it is gone.
   it("hides a removed endpoint's models from the catalogue and from selection", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     expect(service.listModels().map((model) => model.id)).toContain("studio/local-llm");
 
@@ -1059,20 +1037,17 @@ describe.sequential("AgentService: providers", () => {
   // would leave one agent on the endpoint that the removal has already finished with.
   it("refuses a model of an endpoint whose removal is still running", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
 
@@ -1220,20 +1195,17 @@ describe.sequential("AgentService: providers", () => {
 
   it("keeps an endpoint out while its removal is still being written", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
 
     // The file write is held, so the saved endpoints are still the ones a process spawning now reads.
     let releaseWrite: () => void = () => undefined;
@@ -1484,20 +1456,17 @@ describe.sequential("AgentService: providers", () => {
   // that read the save answers, those models belong to the old URL, not to the endpoint just saved.
   it("keeps a saved id out until a process that read the save answers", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
 
@@ -1513,20 +1482,17 @@ describe.sequential("AgentService: providers", () => {
   // An id saved again is served again, whatever the CLI did with the removal before it.
   it("offers an endpoint's models again after the id is saved a second time", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         if (provider === "opencode") {
           client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
         }
         return client;
       },
+      preferredProvider: "opencode",
     });
-    await service.initialize();
+    service = agentService;
     await service.ensureProvider("codex");
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
@@ -1720,9 +1686,8 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("creates a bounded runtime snapshot for reconnecting clients", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({ store, mailbox });
-    await service.initialize();
+    const { service: agentService, store } = await startService(root);
+    service = agentService;
     await store.getOrCreate("chief");
 
     expect(service.getRuntimeSnapshot()).toMatchObject({
@@ -1740,9 +1705,8 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("resolves only regular files inside the shared directory", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({ store, mailbox });
-    await service.initialize();
+    const { service: agentService, store } = await startService(root);
+    service = agentService;
 
     const nested = join(store.sharedRoot, "nested");
     const sharedFile = join(nested, "report.csv");
@@ -1763,9 +1727,8 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("opens a historical routine message that only exists in the mailbox", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({ store, mailbox });
-    await service.initialize();
+    const { service: agentService, store, mailbox } = await startService(root);
+    service = agentService;
     await store.getOrCreate("chief");
     await store.ensureThreadId("chief");
     const receipt = await mailbox.enqueue({
@@ -1795,9 +1758,8 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("resolves only regular files inside the selected agent workspace", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({ store, mailbox });
-    await service.initialize();
+    const { service: agentService, store } = await startService(root);
+    service = agentService;
 
     const agent = await store.createAgent(CREATE_AGENT_INPUT);
     const appDirectory = join(agent.workspacePath, "app");
@@ -1853,18 +1815,15 @@ describe.sequential("AgentService: providers", () => {
     const source = join(root, "start-types.d.ts");
     await writeFile(source, "export type Start = true;\n");
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
+    const { service: agentService } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);
         return client;
       },
+      preferredProvider: "codex",
     });
-    await service.initialize();
+    service = agentService;
     const [draft] = await service.prepareAttachments([source]);
 
     await service.sendMessage({
@@ -1882,18 +1841,15 @@ describe.sequential("AgentService: providers", () => {
 
   it("expands agent and skill tags before sending text to the agent", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);
         return client;
       },
+      preferredProvider: "codex",
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("research", "Research Lead", "Research partner");
 
     await service.sendMessage({
@@ -1908,9 +1864,8 @@ describe.sequential("AgentService: providers", () => {
   });
 
   it("creates independent full-access threads with browser and OpenBot tools", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({ store, mailbox });
-    await service.initialize();
+    const { service: agentService, store } = await startService(root);
+    service = agentService;
 
     expect(service.getStatus()).toMatchObject({
       phase: "ready",
@@ -2042,18 +1997,15 @@ describe.sequential("AgentService: providers", () => {
   it("reads usage for the selected agent provider and prefers its model-specific bucket", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);
         return client;
       },
+      preferredProvider: "codex",
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     await service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-luna" });
     const codex = clients.get("codex");
@@ -2104,18 +2056,15 @@ describe.sequential("AgentService: providers", () => {
   it("reads account-wide usage from every connected provider", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
+    const { service: agentService } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);
         return client;
       },
+      preferredProvider: "codex",
     });
-    await service.initialize();
+    service = agentService;
     const codex = clients.get("codex");
     const claude = clients.get("claude");
     if (!codex || !claude) throw new Error("Test clients were not created.");
@@ -2164,19 +2113,16 @@ describe.sequential("AgentService: providers", () => {
       return { success: true, contentItems: [] };
     };
     const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      browser,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);
         return client;
       },
+      browser,
+      preferredProvider: "codex",
     });
-    await service.initialize();
+    service = agentService;
     await service.sendMessage({ agentId: "chief", text: "Browse" });
     await waitFor(() => Boolean(store.activeProviderSession("chief")));
 

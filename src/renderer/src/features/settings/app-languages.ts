@@ -12,16 +12,9 @@ import { APP_LANGUAGES, type AppLanguage } from "@openbot/contracts/ipc";
  */
 export interface AppLanguageOption {
   readonly id: AppLanguage;
-  /**
-   * The language's own name for itself, because a person looking for their language reads it in
-   * that language and not in English. The system row is the exception: it names a setting, so
-   * `LanguageSelect` draws it from the catalog instead and this value is never shown.
-   */
+  /** The language's own name for itself. Unused for `"system"`: `LanguageSelect` translates that row. */
   readonly label: string;
-  /**
-   * The tag for the `lang` attribute on the row. It makes a screen reader speak the native name
-   * with the correct voice. `"system"` has none: its label is in the interface language.
-   */
+  /** The `lang` attribute, so a screen reader speaks the native name in the right voice. */
   readonly lang?: string;
 }
 

@@ -36,12 +36,9 @@ function toastId(provider: AgentProviderId): string {
 }
 
 /**
- * The mark the provider row already shows, in the slot a toast keeps for a status glyph.
- *
- * Three providers can offer an update, so which one this is deserves to be the first thing read, and
- * a check mark on the success would say nothing the title does not. It carries its own brand colour,
- * which is also why nothing here uses `toast.success` or `toast.error`: the only thing a toast type
- * changes in this design system is the tint of the icon a provider mark has replaced.
+ * The provider mark stands in the slot a toast keeps for a status glyph: with three providers able
+ * to offer an update, which one this is reads before the outcome does. Nothing here uses
+ * `toast.success` or `toast.error`, whose only effect is to tint the icon this mark has replaced.
  */
 function providerIcon(provider: AgentProviderId): JSX.Element {
   return <ProviderLogo provider={provider} class="provider-update-toast-logo" />;
@@ -59,13 +56,10 @@ function ProviderUpdatePercent(props: { percent: number }): JSX.Element {
 }
 
 /**
- * What is under the title: one line that names the state, and - while the update is running - the
- * bar that reports it.
- *
- * The bar takes the row the action button occupies in every other state, so the box a user pressed
- * Update on answers in the same place, and the reserved row is never empty. Downloading fills the
- * bar to the percentage beside it; "Setting up" has no measurable end, so the bar is indeterminate
- * and the percentage goes away rather than sitting at a number that has stopped moving.
+ * One line naming the state, and - while the update runs - the bar reporting it, in the row the
+ * action button holds otherwise, so the box the user pressed Update on answers in the same place.
+ * "Setting up" has no measurable end, so its bar is indeterminate and the percentage goes away
+ * rather than sitting at a number that has stopped moving.
  */
 function ProviderUpdateDetail(props: {
   provider: AgentProviderId;
@@ -93,14 +87,11 @@ function ProviderUpdateDetail(props: {
 }
 
 /**
- * What the one button says - start the update, or try the failed one again - while it stays the same
- * button, so that nothing under the reader is rebuilt to change a word.
- *
- * A state with nothing to offer leaves a marker instead of a word, and `provider-updates.css` takes
- * the button out of the layout when it finds one. Sonner renders its action button for as long as an
- * action exists, and an action it has been given cannot be taken away without replacing the whole
- * notification; hiding it is what a finished update needs, and it also keeps a button with no name
- * out of the accessibility tree.
+ * What the one button says - Update, or Retry - while staying the same button, so no word changes
+ * rebuild anything under the reader. Sonner renders its action button for as long as an action
+ * exists and cannot be given up without replacing the notification, so a state with nothing to
+ * offer leaves a marker `provider-updates.css` uses to take the button out of the layout and out
+ * of the accessibility tree.
  */
 function ProviderUpdateActionLabel(props: { presentation: ProviderUpdatePresentation }): JSX.Element {
   return (
