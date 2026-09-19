@@ -239,6 +239,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
+| `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |

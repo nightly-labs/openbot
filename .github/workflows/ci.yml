@@ -60,9 +60,19 @@ jobs:
     # ubuntu-latest gives 4 vCPUs, so vitest runs 3 workers and the job is
     # CPU-bound. The three test suites run in parallel jobs so the short
     # site-router and remote suites no longer wait for the desktop suite.
-    name: Tests (desktop)
+    #
+    # The desktop suite is the long pole of the three, so it is split again
+    # across shards that run as their own runners. The split is by recorded
+    # duration rather than vitest's own file-size one - see
+    # tools/vitest/balanced-sequencer.ts for why, and run `bun run
+    # test:durations` when the two shards below stop finishing together.
+    name: Tests (desktop ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,7 +83,7 @@ jobs:
           install: ignore-scripts
 
       - name: Run desktop tests
-        run: bun run test:desktop
+        run: bun run test:desktop -- --shard=${{ matrix.shard }}/2
 
   tests-sites:
     name: Tests (sites)

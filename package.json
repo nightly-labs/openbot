@@ -150,6 +150,7 @@
     "check:staged": "biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",
     "test": "bun run test:desktop && bun run test:api && bun run test:sites && bun run test:remote",
     "test:desktop": "vitest run",
+    "test:durations": "bun scripts/test-durations.ts",
     "test:api": "bun run --cwd apps/auth-api test",
     "test:contracts": "bun run --cwd packages/contracts test",
     "test:sites": "bun run --cwd apps/site-router test",
