@@ -1,4 +1,5 @@
 import { createEffect, createSignal, Show } from "solid-js";
+import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -53,10 +54,14 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
   );
 }
 
-export function SidebarPinnedAvatar(props: { agent: AgentProfile; agentState: () => SidebarAgentState | undefined }) {
+export function SidebarPinnedAvatar(props: {
+  agent: AgentProfile;
+  mood: AvatarMood;
+  agentState: () => SidebarAgentState | undefined;
+}) {
   return (
     <span class="agent-row-avatar sidebar-pinned-avatar">
-      <AgentAvatar agent={props.agent} motion={props.agentState()?.kind === "working" ? "working" : "idle"} />
+      <AgentAvatar agent={props.agent} motion="idle" mood={props.mood} />
       <SidebarAgentIndicator state={props.agentState} />
     </span>
   );

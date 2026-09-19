@@ -1,0 +1,51 @@
+{
+  "slug": "firecrawl",
+  "name": "Firecrawl",
+  "tagline": "Web extraction and search",
+  "description": "Firecrawl lets agents scrape pages, extract structured data, and search the web through one API. An API key from the Firecrawl dashboard is passed to the local server as one environment variable.",
+  "category": "research",
+  "creatorName": "firecrawl.dev",
+  "iconUrl": "https://www.firecrawl.dev/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-scrape", "text": "Extract the pricing table from this page as structured data." },
+    { "id": "prompt-research", "text": "Research competitor pricing and cite each source page." },
+    { "id": "prompt-monitor", "text": "What changed on our changelog page this month?" }
+  ],
+  "apps": [
+    {
+      "id": "app-firecrawl-mcp",
+      "name": "Firecrawl",
+      "description": "Page scraping, extraction, and web search, over a local MCP server with a Firecrawl API key.",
+      "iconUrl": "https://www.firecrawl.dev/favicon.ico",
+      "server": {
+        "name": "firecrawl",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "firecrawl-mcp"],
+        "auth": [
+          {
+            "id": "firecrawl-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "token",
+                "label": "API key",
+                "env": "FIRECRAWL_API_KEY",
+                "prefix": "",
+                "hint": "Firecrawl dashboard → API keys"
+              }
+            ],
+            "docsUrl": "https://docs.firecrawl.dev",
+            "docsLabel": "Get a key"
+          }
+        ]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.firecrawl.dev",
+  "privacyPolicyUrl": "https://www.firecrawl.dev/privacy",
+  "termsUrl": "https://www.firecrawl.dev/terms"
+}

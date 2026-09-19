@@ -310,8 +310,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return value;
                 };
                 const runtimeAction = () => {
-                  if (available() || status().connectionState === "connecting") return undefined;
+                  // Ahead of the connection states: main holds the provider "connecting" for the
+                  // whole install it wraps around a download, and Cancel is the only way to stop
+                  // the download this panel started.
                   if (runtime()?.phase === "downloading") return "Cancel" as const;
+                  if (available() || status().connectionState === "connecting") return undefined;
                   if (runtime()?.phase === "ready") return "Connect" as const;
                   if (runtime()?.phase === "download-error") return "Retry" as const;
                   if (runtime()?.phase === "not-downloaded") return "Download" as const;

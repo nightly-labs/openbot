@@ -1,7 +1,7 @@
 import { createMemo, For } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { type AgentActivityPresentation, nextAgentActivityPresentation } from "../conversation/AgentActivity";
+import { type AgentActivityLabel, nextAgentActivityLabel } from "../conversation/AgentActivity";
 
 /** One agent the channel is waiting on. The profile is missing while the agent list has no such id. */
 export interface ChannelWorker {
@@ -40,12 +40,12 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
       .sort()
       .join(","),
   );
-  let previous: AgentActivityPresentation | undefined;
-  // A new set of workers is a new turn of the channel, so it gets an animation and a label of its
-  // own. The same set keeps what it had, and the row does not flicker as messages arrive.
-  const presentation = createMemo<AgentActivityPresentation>(() => {
+  let previous: AgentActivityLabel | undefined;
+  // A new set of workers is a new turn of the channel, so it gets a label of its own. The same set
+  // keeps what it had, and the row does not flicker as messages arrive.
+  const label = createMemo<AgentActivityLabel>(() => {
     key();
-    previous = nextAgentActivityPresentation(previous);
+    previous = nextAgentActivityLabel(previous);
     return previous;
   });
   const sentence = () => channelActivitySentence(props.workers.map((worker) => worker.name));
@@ -56,7 +56,7 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        aria-label={`${sentence()}: ${presentation().label}`}
+        aria-label={`${sentence()}: ${label()}`}
       />
       <section class="agent-activity-content channel-activity-content" aria-label="Current activity">
         <div class="channel-activity-faces">
@@ -65,14 +65,13 @@ export function ChannelActivityIndicator(props: { workers: ChannelWorker[] }) {
               <AgentAvatar
                 agent={worker.agent}
                 seed={worker.agent ? undefined : worker.id}
-                motion="working"
-                animationState={presentation().animation}
+                mood="working"
                 class="agent-activity-avatar"
               />
             )}
           </For>
         </div>
-        <span class="agent-activity-label">{presentation().label}</span>
+        <span class="agent-activity-label">{label()}</span>
       </section>
     </div>
   );

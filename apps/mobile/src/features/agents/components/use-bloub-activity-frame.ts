@@ -1,4 +1,5 @@
 import { BotEngine } from "@norbert_bodziony/bloub";
+import { type AvatarMood, avatarMoodIsBusy } from "@openbot/brand/bloub-avatar-motion";
 import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
@@ -27,11 +28,20 @@ interface Playback {
   preparing?: boolean;
 }
 
-export function useBloubActivityFrame(seed: string, working: boolean, animateIdle = true) {
+/**
+ * The frames to draw for an agent's avatar.
+ *
+ * The mood picks the face, which reaches the player through the geometry, so a change of mood
+ * takes the same morph path as a change of appearance and the face glides into place. Only a busy
+ * mood runs the working loop; the rest settle and hold. Mobile draws no orbit rings, so `working`
+ * here is the working face and the wide-eyed beat rather than the rings the desktop turns.
+ */
+export function useBloubActivityFrame(seed: string, mood: AvatarMood, animateIdle = true) {
   const focused = useIsFocused();
   const reducedMotion = useReducedMotion();
   const [playing, setPlaying] = useState(false);
-  const geometry = useMemo(() => bloubActivityGeometry(seed), [seed]);
+  const busy = avatarMoodIsBusy(mood);
+  const geometry = useMemo(() => bloubActivityGeometry(seed, mood), [seed, mood]);
   const previousGeometry = useRef(geometry);
   const morph = useRef<{ from: typeof geometry; to: typeof geometry } | null>(null);
   const rest = useMemo(
@@ -89,11 +99,11 @@ export function useBloubActivityFrame(seed: string, working: boolean, animateIdl
   useEffect(() => {
     const previous = previousGeometry.current;
     previousGeometry.current = geometry;
-    if (reducedMotion || !focused || (!working && !animateIdle)) {
+    if (reducedMotion || !focused || (!busy && !animateIdle)) {
       morph.current = null;
       setPlaying(false);
       playback.set({ frames: [rest], index: 0, loopStart: null });
-    } else if (!working && previous.key !== geometry.key) {
+    } else if (!busy && previous.key !== geometry.key) {
       const current = playback.get();
       const from = morph.current
         ? bloubMorphGeometry(morph.current.from, morph.current.to, Math.floor(current.index) / FPS)
@@ -106,7 +116,7 @@ export function useBloubActivityFrame(seed: string, working: boolean, animateIdl
         playback.set({ frames, index: 0, loopStart: null });
         setPlaying(true);
       });
-    } else if (working) {
+    } else if (busy) {
       morph.current = null;
       // Reuse sampled paths across the header, activity row, and later working turns.
       setPlaying(false);
@@ -133,11 +143,11 @@ export function useBloubActivityFrame(seed: string, working: boolean, animateIdl
         setPlaying(true);
       });
     }
-  }, [focused, geometry, playback, reducedMotion, rest, startIdle, working, animateIdle]);
+  }, [busy, focused, geometry, playback, reducedMotion, rest, startIdle, animateIdle]);
 
   useEffect(() => {
     idleFrames.current = null;
-    if (!animateIdle || working || reducedMotion || !focused) return;
+    if (!animateIdle || busy || reducedMotion || !focused) return;
     const cancel = prepareBloubIdleFrames(geometry, (frames) => {
       idleFrames.current = frames;
       const current = playback.get();
@@ -147,7 +157,7 @@ export function useBloubActivityFrame(seed: string, working: boolean, animateIdl
       cancel();
       idleFrames.current = null;
     };
-  }, [animateIdle, focused, geometry, playback, reducedMotion, startIdle, working]);
+  }, [animateIdle, busy, focused, geometry, playback, reducedMotion, startIdle]);
 
   return useDerivedValue(() => {
     const current = playback.get();

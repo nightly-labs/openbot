@@ -248,6 +248,24 @@ function preparedActivity(geometry: ReturnType<typeof bloubActivityGeometry>) {
   return ready;
 }
 
+it("keeps each agent's own silhouette through the working cycle", () => {
+  // "shape-one" is a triangle and "shape-two" a cloud. The cycle used to open on `thinking`,
+  // which draws its own body, so both agents played the same column of dots while they worked.
+  const triangle = preparedActivity(bloubActivityGeometry("shape-one", "working"));
+  const cloud = preparedActivity(bloubActivityGeometry("shape-two", "working"));
+  expect(triangle).toHaveLength(cloud.length);
+  const shared = triangle.filter((frame, index) => frame.body.d === cloud[index]?.body.d);
+  expect(shared).toEqual([]);
+});
+
+it("wears the working face while it works and the resting face when it stops", () => {
+  const resting = bloubActivityGeometry("shape-one");
+  const working = bloubActivityGeometry("shape-one", "working");
+  expect(working.radii).toEqual(resting.radii);
+  expect(working.key).not.toBe(resting.key);
+  expect(working.expression).not.toEqual(resting.expression);
+});
+
 it("shares pending avatar preparation without blocking activity startup or any idle batch", () => {
   const geometry = bloubActivityGeometry("agent-test");
   const idle = idleQueue();

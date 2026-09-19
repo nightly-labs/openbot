@@ -108,7 +108,11 @@ export function SidebarPinnedGroup() {
                         <Match when={item.chat.kind === "agent" ? item.chat.agent : undefined}>
                           {(agent) => (
                             <>
-                              <SidebarPinnedAvatar agent={agent()} agentState={() => props.agentStates[agent().id]} />
+                              <SidebarPinnedAvatar
+                                agent={agent()}
+                                mood={props.agentMoods[agent().id] ?? "idle"}
+                                agentState={() => props.agentStates[agent().id]}
+                              />
                               <span class="agent-row-copy sidebar-pinned-copy">
                                 <strong class="sidebar-pinned-name" title={name()}>
                                   {name()}

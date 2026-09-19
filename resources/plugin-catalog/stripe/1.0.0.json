@@ -1,0 +1,34 @@
+{
+  "slug": "stripe",
+  "name": "Stripe",
+  "tagline": "Payments and billing review",
+  "description": "Stripe lets agents look up payments, customers, and invoices, and draft payment links, in the account the signed-in user can reach. Each user signs in to their own Stripe account through the browser.",
+  "category": "other",
+  "creatorName": "stripe.com",
+  "iconUrl": "https://stripe.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-payment", "text": "Look up this payment and explain why it failed." },
+    { "id": "prompt-customer", "text": "Summarize this customer's invoices and outstanding balance." },
+    { "id": "prompt-link", "text": "Draft a payment link for the Pro plan at 49 per month." }
+  ],
+  "apps": [
+    {
+      "id": "app-stripe-mcp",
+      "name": "Stripe",
+      "description": "Payment, customer, and invoice lookup, over Stripe's MCP server with browser sign-in.",
+      "iconUrl": "https://stripe.com/favicon.ico",
+      "server": {
+        "name": "stripe",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "mcp-remote@latest", "https://mcp.stripe.com"],
+        "auth": [{ "id": "stripe-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://stripe.com",
+  "privacyPolicyUrl": "https://stripe.com/privacy",
+  "termsUrl": "https://stripe.com/ssa",
+  "skills": []
+}

@@ -1,7 +1,7 @@
 .skills-marketplace-backdrop {
   position: fixed;
   inset: 0;
-  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover));
+  z-index: var(--openbot-layer-dialog-host);
   display: grid;
   place-items: center;
   padding: var(--openbot-space-4);
@@ -26,7 +26,7 @@
 }
 
 .marketplace-menu {
-  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover) + 1);
+  z-index: calc(var(--openbot-layer-dialog-host) + 1);
 }
 
 /* Dialog chrome, on the agent Skills dialog's own values: a 48px row, a rule under it, the title on

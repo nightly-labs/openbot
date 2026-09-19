@@ -3,8 +3,11 @@
  *
  * One story each, driven by controls, rather than a story per state: the dialog's states are what a
  * server answers with, so answering differently is the whole difference between them. The connection
- * reads the configuration it is given - a wrong key fails, a grant from the sign-in passes - so the
- * header and environment writes are under review here as much as the layout.
+ * reads the configuration it is given - a wrong key fails, no key passes where none is asked for -
+ * so the header and environment writes are under review here as much as the layout.
+ *
+ * A sign-in has no separate answer to give here. The browser round trip belongs to the bridge the
+ * listing installs, behind the same connect attempt, so "never answers" is what waiting looks like.
  */
 
 import type { McpServerConfig, McpTestResult } from "@openbot/contracts/ipc";
@@ -43,7 +46,6 @@ export function keyFlowFor(entry: MarketplacePluginApp): McpKeyFlow {
 
 /** The key the story server accepts. Anything else is a key the server refuses. */
 export const GOOD_KEY = "good-key";
-export const GRANT = "Bearer granted-in-the-browser";
 
 /** What the server does with this attempt. Every state of the dialog is one of these answers. */
 export type ConnectOutcome = "connects" | "refuses" | "unreachable" | "never answers";
@@ -59,18 +61,9 @@ export function connectAs(outcome: ConnectOutcome, name: string) {
     if (outcome === "never answers") return new Promise<McpTestResult>(() => {});
     if (outcome === "unreachable") throw new Error(`${name} did not answer at that address.`);
     const sent = (config.transport === "stdio" ? config.env[0]?.value : config.headers[0]?.value) ?? "";
-    if (outcome === "refuses" || (sent !== "" && !sent.endsWith(GOOD_KEY) && sent !== GRANT))
+    if (outcome === "refuses" || (sent !== "" && !sent.endsWith(GOOD_KEY)))
       return { toolCount: 0, error: `${name} refused the credential: 401 Unauthorized.` };
     return { toolCount: 14, error: null };
-  };
-}
-
-/** The sign-in the main process performs. It answers with the configuration that carries the grant. */
-export function signInAs(cancelled: boolean, slow: boolean) {
-  return async (config: McpServerConfig): Promise<McpServerConfig> => {
-    if (slow) return new Promise<McpServerConfig>(() => {});
-    if (cancelled) throw new Error("The sign-in window was closed.");
-    return { ...config, headers: [{ key: "Authorization", value: GRANT }] };
   };
 }
 

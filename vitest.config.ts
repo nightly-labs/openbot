@@ -54,6 +54,7 @@ export default defineConfig({
             "src/preload/**/*.test.ts",
             "src/renderer/**/*.test.ts",
             "scripts/**/*.test.ts",
+            "packages/brand/**/*.test.ts",
             "packages/contracts/**/*.test.ts",
             "packages/i18n/**/*.test.ts",
             "packages/logging/**/*.test.ts",

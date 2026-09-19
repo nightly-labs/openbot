@@ -41,14 +41,14 @@ import type { MarketplacePluginPrompt, MarketplacePluginDetail as PluginDetail }
  * A listing icon, falling back to a mark when the art is missing or fails to load - the same
  * fallback the skill card uses, so a plugin with no icon reads as a listing rather than as a hole.
  */
-export function PluginIcon(props: { iconUrl: string | null; fallback?: "plugin" | "skill" }) {
+export function PluginIcon(props: { iconUrl: string | null; fallback?: "plugin" | "skill"; class?: string }) {
   const [failedUrl, setFailedUrl] = createSignal<string | null>(null);
   const iconUrl = createMemo(() => {
     const url = props.iconUrl;
     return url && failedUrl() !== url ? url : null;
   });
   return (
-    <span class="skills-marketplace-icon">
+    <span class={props.class ? `skills-marketplace-icon ${props.class}` : "skills-marketplace-icon"}>
       <Show when={iconUrl()} fallback={props.fallback === "skill" ? <Blocks /> : <Puzzle />} keyed>
         {(url) => <img src={url} alt="" onError={() => setFailedUrl(url)} />}
       </Show>
