@@ -151,6 +151,7 @@ function SkillsMarketplace() {
           onAgentInstalled={openInstalledMarketplaceAgent}
           plugins={MARKETPLACE_PLUGINS}
           initialPluginSlug={pendingPluginSlug() ?? undefined}
+          onInitialPluginSlugConsumed={() => setPendingPluginSlug(null)}
           /* A plugin's app is an MCP server, which the host holds. Only a local server takes one
              here, as the agents list does, so a remote server browses the listings and installs
              nothing. */

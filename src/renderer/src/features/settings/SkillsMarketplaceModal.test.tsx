@@ -1454,6 +1454,73 @@ describe("SkillsMarketplaceModal", () => {
       expect(await screen.findByRole("button", { name: "View Aave details" })).toBeInTheDocument();
     });
 
+    it("reopens the same listing when its link arrives again after leaving it", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(),
+      };
+      const [slug, setSlug] = createSignal<string | null>("aave");
+      const consumed = vi.fn();
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[plugin]}
+          pluginServerId="local"
+          initialPluginSlug={slug() ?? undefined}
+          onInitialPluginSlugConsumed={() => {
+            consumed();
+            setSlug(null);
+          }}
+        />
+      ));
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      await waitFor(() => expect(consumed).toHaveBeenCalled());
+      await waitFor(() => expect(slug()).toBeNull());
+
+      fireEvent.click(screen.getByRole("button", { name: "Marketplace" }));
+      expect(await screen.findByRole("button", { name: "View Aave details" })).toBeInTheDocument();
+
+      setSlug("aave");
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      expect(screen.getByText(plugin.description)).toBeInTheDocument();
+    });
+
+    it("forgets the open page when a link names no listing, so browsing returns to the list", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(),
+      };
+      const [slug, setSlug] = createSignal<string | null>("aave");
+      render(() => (
+        <SkillsMarketplaceModal
+          open
+          agents={[{ id: "writer", name: "Writer" }]}
+          activeAgentId="writer"
+          onOpenChange={vi.fn()}
+          plugins={[plugin]}
+          pluginServerId="local"
+          initialPluginSlug={slug() ?? undefined}
+          onInitialPluginSlugConsumed={() => setSlug(null)}
+        />
+      ));
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+
+      setSlug("not-a-plugin");
+      expect(await screen.findByText("This plugin is not in the OpenBot catalog.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Browse plugins" }));
+
+      expect(await screen.findByRole("button", { name: "View Aave details" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Install plugin" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Marketplace" })).toBeNull();
+    });
+
     it("copies the address the public page answers on", async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });

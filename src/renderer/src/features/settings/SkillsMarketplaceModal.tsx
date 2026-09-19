@@ -114,6 +114,11 @@ interface SkillsMarketplaceModalProps {
    * it never installs, so what a link can do is show a user a listing they then decide about.
    */
   initialPluginSlug?: string;
+  /**
+   * Runs after the modal consumes `initialPluginSlug`. The owner clears the pending slug there, so
+   * a second link to the same listing reads as a new request instead of no change.
+   */
+  onInitialPluginSlugConsumed?: () => void;
 }
 
 type Tab = "discover" | "mine";
@@ -254,10 +259,16 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     () => (props.open ? props.initialPluginSlug : undefined),
     (slug) => {
       if (!slug) return;
+      // A link replaces the page on screen: without this, an unknown slug leaves the previous
+      // plugin set, and leaving its notice returns to that page with the header already gone.
+      setOpenPlugin(null);
       selectKind("plugins");
       const plugin = (props.plugins ?? []).find((candidate) => candidate.slug === slug);
       setMissingPluginSlug(plugin ? null : slug);
       if (plugin) showPlugin(plugin);
+      // The page holds this listing now, so the owner forgets the link: the same slug arriving
+      // again changes the signal from nothing, and this effect runs for it.
+      props.onInitialPluginSlugConsumed?.();
     },
   );
 
