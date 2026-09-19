@@ -1555,11 +1555,14 @@ a {
 @media (max-width: 640px) {
   .landing-header {
     min-height: 68px;
+    flex-wrap: wrap;
     gap: 12px;
+    row-gap: 10px;
     padding: 15px 16px;
   }
 
   .landing-brand {
+    flex-shrink: 0;
     gap: 8px;
     font-size: 15px;
   }
@@ -1570,7 +1573,9 @@ a {
   }
 
   .landing-navigation {
+    flex-wrap: wrap;
     gap: 7px;
+    row-gap: 7px;
   }
 
   .landing-navigation .landing-button-sm {

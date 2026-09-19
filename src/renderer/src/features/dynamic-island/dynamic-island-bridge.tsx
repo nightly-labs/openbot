@@ -16,29 +16,15 @@ import { useServers } from "../servers/servers-context";
 import { useDynamicIsland } from "./dynamic-island-context";
 
 /**
- * The two directions the macOS Dynamic Island talks in, for the server the user
- * is actually looking at: the projection out to main, and the actions coming
- * back.
+ * Island bridge for the visible server: projects workspace state out to main and handles
+ * actions coming back. Split from `dynamic-island.tsx` (which owns the coordinator above the
+ * per-server domains) so the coordinator survives a server switch while the projection stays
+ * scoped to the active server. See docs/ARCHITECTURE.md.
  *
- * `dynamic-island.tsx` sits above every per-server domain and cannot read them -
- * it holds the coordinator and the background-server events. This is its
- * counterpart at the bottom of the tree, where the nine signals the projection
- * needs are readable. Splitting them is what keeps the coordinator alive across a
- * server switch while the projection stays scoped to the active one.
- *
- * The projection is withheld until the scope reports `loaded()`. Without that, a
- * mount would publish the new server's id next to a half-filled workspace for
- * exactly as long as its loads take. The flag is a boolean rather than a server
- * id because the scope it belongs to *is* one server: it starts false on every
- * mount and cannot describe the wrong one.
- *
- * Actions arrive for *any* server, including one that is not active, which is why
- * `handleDynamicIslandAction` may switch before it can act - and why it then
- * republishes the action through `server-switch.tsx` instead of finishing it: the
- * switch disposes this bridge, so the scope that lands has to run the rest. The
- * two that never need a switch - answering a prompt and responding to an
- * approval - resolve against the coordinator directly and republish, so a reply
- * from the island is reflected before the renderer has caught up.
+ * Projection waits for scope `loaded()` to avoid publishing a new server id next to a
+ * half-filled workspace. Cross-server actions republish through `server-switch.tsx` because
+ * the switch disposes this bridge; prompt answers and approval responses resolve directly
+ * against the coordinator so the island reflects before the renderer catches up.
  */
 export function DynamicIslandBridge() {
   const platform = usePlatform();

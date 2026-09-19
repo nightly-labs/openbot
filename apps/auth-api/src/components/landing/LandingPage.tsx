@@ -40,6 +40,9 @@ export function LandingPage() {
           <Link class="landing-header-link" to="/guides">
             Guides
           </Link>
+          <Link class="landing-header-link" to="/plugins">
+            Plugins
+          </Link>
           <Button
             href={OPENBOT_LINKS.contact}
             target="_blank"

@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { DEFAULT_GENERAL_SETTINGS } from "./app-settings";
 import { SettingsModal } from "./SettingsModal";
+import { isOpenSettingsShortcut } from "./settings-shortcut";
 
 const account: CentralAuthUser = {
   id: "user-1",
@@ -938,5 +939,31 @@ describe("SettingsModal", () => {
     // Free badge is gone, leaving the single runtime Connected.
     await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(1));
     expect(screen.queryByText("Free")).toBeNull();
+  });
+});
+
+describe("isOpenSettingsShortcut", () => {
+  it("accepts Command+, and Control+,", () => {
+    expect(isOpenSettingsShortcut({ key: ",", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false })).toBe(
+      true,
+    );
+    expect(isOpenSettingsShortcut({ key: ",", metaKey: false, ctrlKey: true, altKey: false, shiftKey: false })).toBe(
+      true,
+    );
+  });
+
+  it("does not claim a plain comma or a modified shortcut", () => {
+    expect(isOpenSettingsShortcut({ key: ",", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false })).toBe(
+      false,
+    );
+    expect(isOpenSettingsShortcut({ key: ",", metaKey: true, ctrlKey: false, altKey: true, shiftKey: false })).toBe(
+      false,
+    );
+    expect(isOpenSettingsShortcut({ key: ",", metaKey: true, ctrlKey: false, altKey: false, shiftKey: true })).toBe(
+      false,
+    );
+    expect(isOpenSettingsShortcut({ key: ".", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false })).toBe(
+      false,
+    );
   });
 });

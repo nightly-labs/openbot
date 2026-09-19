@@ -21,19 +21,13 @@ import { type AvatarMotion, bloubAvatarProfile, type SupportedAvatarSilhouetteId
 import { prefersReducedMotion } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
 
-// An avatar is 24 to 40 px of morphing blob, and every drawn frame costs a style
-// recalculation, a layout and a paint. Left at the screen's rate, two visible
-// avatars measured 30% of the renderer process and 24% of the GPU process; a cap
-// the eye cannot see on a shape this small gives most of that back. bloub keeps
-// its clock uncapped, so the animation is drawn less often, never delayed.
+// Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
+// for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
 const AVATAR_FPS = 30;
 const SIDEBAR_MOTION_HOLD_FACTOR = 1.25;
 
-// The resting montage, played on hover and wherever an avatar is shown off. Every block is
-// shape-safe, so the personality is in the face - a blink, a wink, a widening of the eyes - and
-// the silhouette the seed chose is on screen the whole way through. It used to be bloub's
-// `defaultCycle()`, which walks the whole catalogue and turns the avatar into an egg, a hexagon
-// and a comet on the way past.
+// Resting montage shown on hover: shape-safe blocks only, so the seeded silhouette stays
+// on screen while the face carries the personality (blink, wink, wide eyes).
 const DEFAULT_CYCLE: Block[] = [
   slowerBlock("idle"),
   makeBlock("wink"),
@@ -42,22 +36,17 @@ const DEFAULT_CYCLE: Block[] = [
   slowerBlock("idle"),
 ];
 
-// The pose the decor rings are sampled from. They are drawn around the avatar rather than played
-// on it, because `orbit` is not shape-safe: as a state it replaces the body with its own.
+// Decor rings are sampled from the `orbit` pose, not played as a state: `orbit`
+// replaces the body, while sampling only `frame.arcs` keeps the silhouette.
 const RING_POSE = "orbit";
 
-// The motions that rest until the pointer or focus arrives. `idle` is here
-// because it is what a sidebar row shows while its agent does nothing, and the
-// sidebar is not virtualized, so every row animates for as long as the list is
-// on screen. A profile of an idle window found four `idle` avatars driving 83
-// style recalculations a second, and that did not fall when the window lost
-// focus or was minimized. A mood that carries its own motion keeps animating:
-// motion is the only sidebar signal that an agent runs.
+// Motions that rest until pointer/focus arrives. The sidebar is not virtualized, so every
+// row would otherwise animate on screen; idle-window profiles showed 83 recalcs/s from
+// four resting avatars. A mood with its own motion keeps animating as the busy signal.
 const STATIC_MOTIONS: ReadonlySet<AvatarMotion> = new Set(["hover", "idle"]);
 
-// Read from the avatar upwards: the first of these is its hover group. A `[tabindex]` element that
-// matches none of them, such as the dialog or a scroll region, is too wide to be one. An item of a
-// composite widget states its own group with `data-avatar-hover`.
+// Hover group lookup: the first `[data-avatar-hover]`/control ancestor, since dialogs and
+// scroll regions with `[tabindex]` are too wide to count as one.
 const HOVER_GROUP = "[data-avatar-hover], button, a, [role='button'], [role='link'], [role='menuitem']";
 
 function slowerBlock(state: ShapeSafeStateId): Block {
@@ -145,16 +134,8 @@ function AvatarImage(props: { url: string | null; onFailed: () => void }) {
 }
 
 /**
- * The rings an orbiting Bloub flies, around the avatar instead of in place of it.
- *
- * They come from the engine rather than from CSS so that a custom avatar and a generated one in
- * the same row carry the same decor: the same ellipses at the same speed, each split into the half
- * behind the head and the half in front of it. What sits between those halves - a photo or the
- * Bloub's own body - is what makes them read as orbits.
- *
- * Sampling them from a second engine is what lets a working avatar keep its silhouette. `orbit` as
- * a *state* is not shape-safe: it replaces the body with its own. Taking only `frame.arcs` from it
- * leaves that body behind and keeps the motion.
+ * Orbit rings drawn around the avatar instead of in place of it, sampled from a second
+ * engine so a working avatar keeps its silhouette (`orbit` as a state is not shape-safe).
  */
 function AvatarRings(props: { when: boolean; children: JSX.Element }) {
   return (

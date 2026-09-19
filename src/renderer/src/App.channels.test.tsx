@@ -525,15 +525,11 @@ it("keeps a queued settings save on the channel it was made in", async () => {
   expect(saves.map((input) => input.type === "save" && input.update === true)).toEqual([true, true]);
 });
 
-/**
- * A channel with one task that the service stopped and wrote a reason on. The stub does not run
- * the automatic assignment limit, so the stopped task arrives through the read.
- */
+/** Stopped task via read; the stub skips the automatic assignment limit. */
 const STOPPED_TASK_REASON = "The automatic assignment limit was reached. Continue or reassign this task.";
 it("shows a channel read that lands while more changes are still arriving", async () => {
   const chat = await openSavedChannel();
-  // Every streamed chunk of a member publishes a change, and each read of a channel is two calls.
-  // Hold every read open, so the events overtake them the way streaming does.
+  // Hold every read open so events overtake them the way streaming does (see channels-context).
   const gates: Array<() => void> = [];
   const originalRead = window.openbot.agent.readChannel;
   vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => {
@@ -553,9 +549,7 @@ it("shows a channel read that lands while more changes are still arriving", asyn
   await waitFor(() => expect(gates).toHaveLength(1));
   for (const revision of [2, 3, 4]) emitAgentEvent?.({ type: "channels-changed", channelId: "channel-test", revision });
 
-  // The read that is already running answers for the changes behind it, so the reader sees the
-  // message. Starting a read for each event and keeping only the newest showed nothing until the
-  // writing stopped.
+  // The running read answers for the changes behind it (see channels-context).
   gates[0]?.();
   await within(chat).findByRole("article", { name: "Message from You" });
   expect(within(chat).getByRole("article", { name: "Message from You" })).toHaveTextContent("Prepare the report");
@@ -758,8 +752,7 @@ it("addresses a channel member only while the request names one", async () => {
     expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "send", recipientAgentId: "chief" })),
   );
 
-  // The composer keeps no recipient of its own, so the next request returns to the coordinator. A
-  // recipient that outlives the message that named it silently addresses every later request.
+  // The composer keeps no recipient of its own; a stale one would address every later request.
   await waitFor(() => expect(composer).toHaveTextContent(""));
   composer.textContent = "Add the rollback step";
   await fireEvent.input(composer);
@@ -771,10 +764,7 @@ it("addresses a channel member only while the request names one", async () => {
   );
 });
 
-/**
- * The routing window as the renderer sees it: a root task that no member owns yet. The lead runs
- * that turn, and `state` chooses whether routing is still open or ended without an owner.
- */
+/** Routing window: a root task no member owns yet. */
 async function openChannelWhileRouting(state: "queued" | "paused") {
   await window.openbot.agent.channelCommand({
     type: "save",
