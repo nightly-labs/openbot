@@ -55,6 +55,12 @@
       "featured": false
     },
     {
+      "slug": "anti-slop-review",
+      "category": "coding",
+      "source": "openbot",
+      "featured": true
+    },
+    {
       "slug": "interface-critique",
       "category": "design",
       "source": "openbot",

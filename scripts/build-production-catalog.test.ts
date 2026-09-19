@@ -25,7 +25,7 @@ describe("production marketplace catalog", () => {
     );
     const catalog = await readCatalog(join(first, "catalog.json"));
     const skills = catalog.skills;
-    expect(skills).toHaveLength(20);
+    expect(skills).toHaveLength(21);
     for (const value of skills) {
       const bytes = new Uint8Array(await readFile(join(first, value.bundle)));
       const bundle = unzipSync(bytes);
