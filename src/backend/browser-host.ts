@@ -91,6 +91,17 @@ const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
  */
 const OPERATION_UNWIND_GRACE_MS = 1_000;
 /**
+ * How long past its deadline an operation gets before the backstop timer answers for it.
+ *
+ * An operation carries the same deadline and reports what it managed to do with it: typing states
+ * how many characters reached the page, so a caller knows what not to send twice. A backstop that
+ * expires at the same millisecond as that check is a race, and the generic message wins it often
+ * enough that the caller loses the count. The backstop is there for an operation that does not
+ * unwind itself at all, so it starts after the operation's own last chance to answer, and the wait
+ * it adds is short beside the ten seconds an action gets by default.
+ */
+const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+/**
  * How long enumerating a tab's documents may take before it is unwound. It runs off a navigation
  * rather than a tool call, so no caller is waiting on it and nothing else supplies a deadline -- but
  * it is queued on the tab, so whatever the agent does next waits behind it.
@@ -1365,7 +1376,7 @@ export class BrowserHost {
       onOperationStarted?.(operationCompletion);
       const boundedOperation = withTimeout(
         operationCompletion,
-        Math.max(0, deadline - Date.now()),
+        Math.max(0, deadline - Date.now()) + OPERATION_DEADLINE_BACKSTOP_MS,
         timeoutMessage,
       ).catch(async (error) => {
         if (!isTimeoutError(error)) throw error;
