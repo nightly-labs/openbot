@@ -17,6 +17,7 @@ All notable changes to OpenBot will be documented here. The project follows
   own mark.
 - Give each agent one silhouette and a face that matches the work, in the sidebar and the activity
   indicator.
+- List Marketplace plugins in the landing header on openbot.run.
 
 ### Changed
 
