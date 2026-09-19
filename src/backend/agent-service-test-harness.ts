@@ -354,6 +354,7 @@ export function fakeBrowser(tabs: BrowserTab[] = [], uploadTarget = { inputId: "
     // block-bodied replacement can satisfy, and replacing one is the whole point of the plain property.
     beginTakeover: async (_tabId: string): Promise<void> => undefined,
     endTakeover: (_tabId: string): void => undefined,
+    close: async (_tabId: string): Promise<void> => undefined,
     resolveUploadTarget: async (_params: DynamicToolCallParams) => uploadTarget,
     handleDynamicTool: async (_params: DynamicToolCallParams, hooks?: BrowserUploadHooks) => {
       hooks?.onUploadTargetResolved?.(uploadTarget.inputId, uploadTarget.documentId);
