@@ -325,6 +325,11 @@
   --openbot-layer-dropdown: 40;
   --openbot-layer-popover: 60;
   --openbot-layer-dialog: 100;
+  /* A dialog that opens other surfaces over itself, such as the marketplace. Its own menus take
+     one above it, and a dialog it opens takes two, so the order is stated once here instead of
+     being re-derived by arithmetic at each surface - where a tie is decided by insertion order,
+     and the surface opened last wins only by accident. */
+  --openbot-layer-dialog-host: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover));
   --openbot-layer-toast: 120;
 }
 

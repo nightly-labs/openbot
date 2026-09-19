@@ -3,10 +3,10 @@
  * before it is saved anywhere.
  */
 
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, createStore, For, Show } from "solid-js";
 import { Button, ExternalLink, Field, Input, ShieldCheck, Text } from "../../components/ui";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
-import { applyMcpFlow, type McpKeyFlow, mcpFlowComplete } from "./mcp-connect-auth";
+import { applyMcpFlow, type McpAuthValues, type McpKeyFlow, mcpFlowComplete } from "./mcp-connect-auth";
 
 export interface McpKeyDialogProps extends McpConnectBaseProps {
   /** The credentials this server asks for, as its listing declares them. */
@@ -16,8 +16,12 @@ export interface McpKeyDialogProps extends McpConnectBaseProps {
 }
 
 export function McpKeyDialog(props: McpKeyDialogProps) {
-  const { state, setState, busy, forget, attempt } = createConnectRun(props);
-  const complete = createMemo(() => mcpFlowComplete(props.flow, state.values));
+  const { state, busy, forget, attempt } = createConnectRun(props);
+  /* The form, which only this way in has: what is typed, and whether the user has tried to connect
+     with it yet. The second gates the "fill this in" copy, so an untouched dialog asks rather than
+     complains. */
+  const [form, setForm] = createStore<{ values: McpAuthValues; touched: boolean }>({ values: {}, touched: false });
+  const complete = createMemo(() => mcpFlowComplete(props.flow, form.values));
   /* The page the key is made on, when the flow names one and the caller can open it. */
   const docs = createMemo(() => {
     const url = props.flow.docsUrl;
@@ -25,18 +29,18 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
   });
 
   function edit(id: string, value: string) {
-    setState((current) => {
+    setForm((current) => {
       current.values[id] = value;
     });
     forget();
   }
 
   function submit() {
-    setState((current) => {
+    setForm((current) => {
       current.touched = true;
     });
     if (!complete()) return;
-    void attempt("connecting", async () => applyMcpFlow(props.subject.config, props.flow, state.values));
+    void attempt(async () => applyMcpFlow(props.subject.config, props.flow, form.values));
   }
 
   return (
@@ -56,7 +60,7 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
           type="submit"
           loading={busy()}
           loadingLabel="Connecting…"
-          disabled={busy() || (state.touched && !complete())}
+          disabled={busy() || (form.touched && !complete())}
         >
           {state.phase === "failed" ? "Try again" : "Connect"}
         </Button>
@@ -73,14 +77,14 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
                   label={field.label}
                   description={field.hint}
                   required={true}
-                  error={state.touched && !(state.values[field.id] ?? "").trim() ? "Required." : undefined}
+                  error={form.touched && !(form.values[field.id] ?? "").trim() ? "Required." : undefined}
                 >
                   <Input
                     type="password"
                     autocomplete="off"
                     spellcheck={false}
                     placeholder={field.placeholder}
-                    value={state.values[field.id] ?? ""}
+                    value={form.values[field.id] ?? ""}
                     disabled={busy()}
                     onValueChange={(value) => edit(field.id, value)}
                   />

@@ -36,7 +36,6 @@ import {
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { PluginIcon } from "./MarketplacePluginDetail";
-import type { McpAuthValues } from "./mcp-connect-auth";
 
 /** What is being connected, in the words the listing uses for it. */
 export interface McpConnectSubject {
@@ -60,32 +59,28 @@ export interface McpConnectBaseProps {
 /**
  * One record, because these move together: an attempt writes `phase` and clears `error`, and a
  * refusal writes both. A connection that worked leaves no state behind - the dialog has closed.
+ *
+ * What the user typed is not here. Only the key dialog has a form, so only it holds one; the shell
+ * holds what every way in has, which is an attempt and what it came back with.
  */
 export interface ConnectState {
-  phase: "idle" | "signing-in" | "connecting" | "failed";
-  values: McpAuthValues;
+  phase: "idle" | "connecting" | "failed";
   error: string;
-  /** Gates the "fill this in" copy until the user has tried to connect. */
-  touched: boolean;
 }
 
 /**
- * The attempt, which both dialogs run the same way: authorize, connect, and either hand the working
- * configuration over or say what came back.
+ * The attempt, which both dialogs run the same way: build the configuration, connect with it, and
+ * either hand the working one over or say what came back.
  *
- * `authorize` is the part that differs - a browser round trip, or the typed values written into the
- * configuration. Every write is guarded by the attempt count, so an answer that arrives after the
- * user changed the credential is dropped: it describes what was sent, not what is on screen.
+ * `authorize` is the part that differs - today the typed values written into the configuration, or
+ * the configuration as the listing states it. Every write is guarded by the attempt count, so an
+ * answer that arrives after the user changed the credential is dropped: it describes what was sent,
+ * not what is on screen.
  */
 export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "onConnected">) {
-  const [state, setState] = createStore<ConnectState>({
-    phase: "idle",
-    values: {},
-    error: "",
-    touched: false,
-  });
+  const [state, setState] = createStore<ConnectState>({ phase: "idle", error: "" });
   let run = 0;
-  const busy = () => state.phase === "signing-in" || state.phase === "connecting";
+  const busy = () => state.phase === "connecting";
 
   function forget() {
     // The credential changed, so the previous refusal describes one that is no longer being offered.
@@ -95,20 +90,16 @@ export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "on
     });
   }
 
-  async function attempt(start: ConnectState["phase"], authorize: () => Promise<McpServerConfig | undefined>) {
+  async function attempt(authorize: () => Promise<McpServerConfig>) {
     if (busy()) return;
     const started = ++run;
     setState((current) => {
-      current.phase = start;
+      current.phase = "connecting";
       current.error = "";
     });
     try {
       const authorized = await authorize();
       if (started !== run) return;
-      if (!authorized) throw new Error("That sign-in did not finish.");
-      setState((current) => {
-        current.phase = "connecting";
-      });
       const result = await props.onTest(authorized);
       if (started !== run) return;
       if (result.error) {
@@ -128,7 +119,7 @@ export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "on
     }
   }
 
-  return { state, setState, busy, forget, attempt };
+  return { state, busy, forget, attempt };
 }
 
 export interface McpConnectShellProps extends Pick<McpConnectBaseProps, "open" | "subject" | "onCancel"> {
@@ -163,7 +154,7 @@ export function McpConnectShell(props: McpConnectShellProps) {
                   <AppLogo variant="production" animation="look-around" />
                 </span>
                 <span class="mcp-connect-dots" />
-                <PluginIcon iconUrl={props.subject.iconUrl} />
+                <PluginIcon iconUrl={props.subject.iconUrl} class="mcp-connect-mark-icon" />
               </div>
               <Dialog.Title class="mcp-connect-title">Connect {props.subject.name}</Dialog.Title>
               <Dialog.Description class="mcp-connect-description">{props.description}</Dialog.Description>

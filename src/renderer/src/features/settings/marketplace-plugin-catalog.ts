@@ -30,12 +30,12 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
     name: app.server.name,
     transport: app.server.transport,
     enabled: true,
-    command: app.server.command ?? "",
-    args: [...(app.server.args ?? [])],
+    command: app.server.transport === "stdio" ? app.server.command : "",
+    args: app.server.transport === "stdio" ? [...app.server.args] : [],
     env: [],
     envPassthrough: [],
     workingDirectory: "",
-    url: app.server.url,
+    url: app.server.transport === "http" ? app.server.url : "",
     headers: [],
   };
 }
@@ -138,7 +138,6 @@ const CANVA: MarketplacePluginDetail = {
       server: {
         name: "canva",
         transport: "stdio",
-        url: "",
         command: "npx",
         args: ["-y", "mcp-remote@latest", "https://mcp.canva.com/mcp"],
         auth: [{ id: "canva-oauth", kind: "link", label: "Sign in" }],
