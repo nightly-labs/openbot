@@ -25,7 +25,15 @@ try {
   if (buildCode !== 0) throw new Error("Unable to build browser smoke test.");
 
   const electron = join(projectRoot, "node_modules", ".bin", "electron");
-  const exitCode = await run(electron, [outputPath, `--smoke-root=${smokeRoot}`, ...process.argv.slice(2)], true);
+  // Ubuntu CI runners block unprivileged user namespaces, so Chromium's
+  // sandbox cannot start there. The smoke test proves browser behavior, not
+  // sandboxing, so it disables the sandbox on Linux only.
+  const electronFlags = process.platform === "linux" ? ["--no-sandbox"] : [];
+  const exitCode = await run(
+    electron,
+    [...electronFlags, outputPath, `--smoke-root=${smokeRoot}`, ...process.argv.slice(2)],
+    true,
+  );
   if (exitCode !== 0) {
     process.exitCode = exitCode;
   } else if (!process.argv.some((argument) => argument.startsWith("--scenario="))) {
@@ -56,6 +64,7 @@ try {
         const phaseExitCode = await run(
           electron,
           [
+            ...electronFlags,
             outputPath,
             `--smoke-root=${persistenceRoot}`,
             `--persistence-origin=${persistenceOrigin}`,
