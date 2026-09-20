@@ -168,7 +168,10 @@ them on the worktree hash. Windows uses a named pipe, which has no such limit; i
 because Windows lets a second process add an instance to a name it can guess, and it is kept in the
 profile so that it is random once rather than once per launch. The endpoint has to hold still: it
 reaches each proxy as an argument, and the arguments are folded into the stored Codex tool
-fingerprint, so a name that moves at each launch replaces every session after a restart.
+fingerprint, so a name that moves at each launch replaces every session after a restart. The command
+has to hold still for the same reason: the packaged Linux build is an AppImage, whose resources are
+mounted somewhere else at each launch, so there the proxies are given a link below the profile that
+the runtime points at this run's driver.
 
 One MCP entry reaches every provider. `CuaDriverRuntime.mcpServerConfig()` returns a config only
 while the daemon runs, and `AgentService.enabledMcpServers()` appends it, which is the one function

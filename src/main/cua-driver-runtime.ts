@@ -3,7 +3,7 @@
 
 import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { dirname, isAbsolute, join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -199,6 +199,31 @@ async function windowsPipeName(userDataPath: string): Promise<string> {
   return name;
 }
 
+export interface CuaDriverCommandAliasInput {
+  platform: NodeJS.Platform;
+  isPackaged: boolean;
+  /** `APPIMAGE`, which only an AppImage run sets. */
+  appImagePath?: string | null;
+  userDataPath: string;
+}
+
+/**
+ * A path that holds still for the MCP command, for the one build whose own files do not.
+ *
+ * An AppImage mounts its resources in a new temporary directory at each launch, so the packaged
+ * driver sits somewhere else every time. That path reaches each proxy as the command, the command is
+ * folded into the stored Codex tool fingerprint, and a fingerprint that moves replaces every session
+ * after a restart, which loses what the provider held privately. The path also dies with the mount,
+ * so a session that kept the old one could not start a proxy at all.
+ *
+ * The runtime links this path to the driver at each start, so the command stays the same and always
+ * names the mount this run uses. Every other build has a path that already stays, and gets none.
+ */
+export function cuaDriverCommandAlias(input: CuaDriverCommandAliasInput): string | null {
+  if (input.platform !== "linux" || !input.isPackaged || !input.appImagePath?.trim()) return null;
+  return join(input.userDataPath, "cua-driver", "cua-driver");
+}
+
 export interface CuaDriverRuntimeOptions {
   /** The resolved executable, or `null` when this computer has none. */
   executable: string | null;
@@ -210,6 +235,12 @@ export interface CuaDriverRuntimeOptions {
    * installation is to restart OpenBot.
    */
   resolveExecutable?: () => Promise<string | null>;
+  /**
+   * Where to link the executable, so the MCP command is the same at each launch.
+   *
+   * Null for a build whose driver path already stays. See `cuaDriverCommandAlias`.
+   */
+  commandAlias?: string | null;
   endpoint: CuaDriverEndpoint;
   /**
    * Whether the driver is published for this computer at all, which is not whether it is installed.
@@ -237,6 +268,8 @@ export class CuaDriverRuntime {
   #announcedMcpServer = "";
   /** True while the entry is allowed to move without the providers being told. See `warmUp`. */
   #quiet = false;
+  /** What the proxies are told to run: the alias once it is linked, the executable otherwise. */
+  #command: string | null = null;
   #child: ChildProcess | null = null;
   #starting: Promise<void> | null = null;
   #stopping: Promise<void> | null = null;
@@ -273,14 +306,14 @@ export class CuaDriverRuntime {
    * would drop this entry with no error if it carried one.
    */
   mcpServerConfig(): McpServerConfig | null {
-    const executable = this.#executable;
-    if (!executable || !this.running()) return null;
+    const command = this.#command ?? this.#executable;
+    if (!command || !this.running()) return null;
     return {
       id: COMPUTER_USE_MCP_SERVER_ID,
       name: COMPUTER_USE_MCP_SERVER_NAME,
       transport: "stdio",
       enabled: true,
-      command: executable,
+      command,
       args: ["mcp", "--socket", this.socketPath()],
       env: [
         { key: EMBEDDED_ENV, value: "1" },
@@ -453,6 +486,7 @@ export class CuaDriverRuntime {
       await assertPrivateDirectory(endpoint.directory);
       await this.#removeSocket();
     }
+    this.#command = await this.#linkCommandAlias(executable);
     const child = this.#spawn(executable, ["serve", "--socket", socketPath], {
       cwd: dirname(executable),
       env: {
@@ -511,6 +545,28 @@ export class CuaDriverRuntime {
   #pipeDiagnostics(child: ChildProcess): void {
     for (const stream of [child.stdout, child.stderr]) {
       stream?.on("data", (chunk: Buffer) => this.#options.onDiagnostic?.(chunk.toString("utf8")));
+    }
+  }
+
+  /**
+   * Points the alias at this run's executable, and reports the path the proxies should run.
+   *
+   * A link that cannot be made is not fatal: a driver reachable by its real path is better than no
+   * Computer Use at all, and the cost is the replacement session this alias exists to avoid.
+   */
+  async #linkCommandAlias(executable: string): Promise<string> {
+    const alias = this.#options.commandAlias;
+    if (!alias) return executable;
+    try {
+      await mkdir(dirname(alias), { recursive: true, mode: 0o700 });
+      await rm(alias, { force: true });
+      await symlink(executable, alias);
+      return alias;
+    } catch (error) {
+      this.#options.onDiagnostic?.(
+        `OpenBot: the Computer Use driver link could not be written. ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      return executable;
     }
   }
 

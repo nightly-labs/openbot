@@ -57,7 +57,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
-import { CuaDriverRuntime, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
+import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
 import {
   applyDevelopmentRemoteAccount,
@@ -472,6 +472,14 @@ export async function createApplicationServices({
   const cuaDriver = new CuaDriverRuntime({
     executable: await resolveCuaDriverExecutable(),
     resolveExecutable: resolveCuaDriverExecutable,
+    // Linux ships as an AppImage, whose mount is somewhere else at each launch, so the command the
+    // proxies are given is a link below the profile rather than the path inside the mount.
+    commandAlias: cuaDriverCommandAlias({
+      platform: process.platform,
+      isPackaged: app.isPackaged,
+      appImagePath: process.env.APPIMAGE,
+      userDataPath: app.getPath("userData"),
+    }),
     endpoint: await resolveCuaDriverEndpoint({
       platform: process.platform,
       userDataPath: app.getPath("userData"),

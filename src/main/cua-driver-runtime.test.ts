@@ -1,12 +1,14 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  type CuaDriverCommandAliasInput,
   CuaDriverRuntime,
   type CuaDriverRuntimeOptions,
+  cuaDriverCommandAlias,
   readPermissionResult,
   resolveCuaDriverEndpoint,
   type SpawnDriverOptions,
@@ -514,6 +516,39 @@ describe("CuaDriverRuntime", () => {
 
       expect(onLinux.kind === "unix-socket" && onLinux.directory.startsWith("/run/user/1000/")).toBe(true);
       expect(noSession.kind === "unix-socket" && noSession.directory.startsWith("/tmp/")).toBe(true);
+    });
+  });
+
+  // The packaged Linux build is an AppImage, which mounts its resources somewhere else at each
+  // launch. The command reaches the stored Codex tool fingerprint, so a path that moves replaces
+  // every session after a restart, and the old path is gone with the mount it named.
+  describe("cuaDriverCommandAlias", () => {
+    it("holds the command still for an AppImage, and leaves every other build alone", () => {
+      const onAppImage: CuaDriverCommandAliasInput = {
+        platform: "linux",
+        isPackaged: true,
+        appImagePath: "/home/jane/Applications/OpenBot.AppImage",
+        userDataPath: "/home/jane/.config/OpenBot",
+      };
+
+      expect(cuaDriverCommandAlias(onAppImage)).toBe("/home/jane/.config/OpenBot/cua-driver/cua-driver");
+      expect(cuaDriverCommandAlias({ ...onAppImage, appImagePath: "  " })).toBeNull();
+      expect(cuaDriverCommandAlias({ ...onAppImage, isPackaged: false })).toBeNull();
+      expect(cuaDriverCommandAlias({ ...onAppImage, platform: "darwin" })).toBeNull();
+    });
+
+    it("gives the proxies the link, and the link the driver of this run", async () => {
+      const profile = await mkdtemp(join(tmpdir(), "cua-profile-"));
+      directories.push(profile);
+      const alias = join(profile, "cua-driver", "cua-driver");
+      const { driver } = await runtime({ commandAlias: alias, executable: process.execPath });
+
+      await driver.start();
+
+      expect(driver.mcpServerConfig()?.command).toBe(alias);
+      expect(await realpath(alias)).toBe(await realpath(process.execPath));
+
+      await driver.stop();
     });
   });
 });
