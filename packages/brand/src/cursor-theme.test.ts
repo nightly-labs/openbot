@@ -5,6 +5,8 @@ import { openbotCursorThemeSource } from "./cursor-theme";
 // checked here: a broken edit would otherwise reach a release build before anything said so.
 describe("openbotCursorThemeSource", () => {
   const source = openbotCursorThemeSource();
+  /** How far a rounded corner opens from the corner it replaces, in canvas units. */
+  const CORNER_WIDTH = 6;
 
   it("draws on the canvas the driver profile fixes", () => {
     expect(source["cua/theme.json"].canvas).toEqual({ width: 128, height: 128, fps: 30 });
@@ -27,8 +29,13 @@ describe("openbotCursorThemeSource", () => {
     for (const animation of [source["a/pointer.json"], source["a/pulse.json"]]) {
       const arrow = animation.layers.find((layer) => layer.nm === "arrow");
       expect(arrow?.ks.p.k).toEqual([hotspot.x, hotspot.y, 0]);
-      const tip = arrow?.shapes.find((shape) => shape.ty === "sh")?.ks.k.v[0];
-      expect(tip).toEqual([0, 0]);
+      const points = arrow?.shapes.find((shape) => shape.ty === "sh")?.ks.k.v ?? [];
+      // The tip corner is rounded, so the path opens a corner's width away from the origin and the
+      // outline carries the drawing back over it. Nothing may cross to the other side.
+      expect(Math.min(...points.map(([x, y]) => Math.hypot(x, y)))).toBeLessThan(CORNER_WIDTH);
+      for (const [x, y] of points) {
+        expect(Math.min(x, y)).toBeGreaterThanOrEqual(0);
+      }
     }
   });
 

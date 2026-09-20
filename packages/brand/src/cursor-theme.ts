@@ -57,23 +57,39 @@ const TIP = { x: 38, y: 41 } as const;
 /**
  * The arrow, as the corners of a closed path with its tip at the origin.
  *
- * These are the proportions of a desktop pointer, so the drawing reads as a cursor at a glance and
- * not as a marker that happens to sit near one.
+ * It is a dart: two wings from the tip and a notch between them, the shape the driver's own cursor
+ * draws. A desktop pointer says "this is your mouse"; the dart says that something else is driving
+ * this computer, which is the whole job of this drawing.
  */
 const ARROW = [
   [0, 0],
-  [0, 21.5],
-  [5.4, 16.6],
-  [9.1, 24.8],
-  [12.8, 23.1],
-  [9.2, 15.2],
-  [16.2, 15.2],
+  [45, 20],
+  [27, 31],
+  [14, 49],
 ] as const;
 /** How much of the canvas the arrow takes. */
-const ARROW_SCALE = 1.9;
+const ARROW_SCALE = 0.86;
+/** How round each corner is, which is what keeps the dart soft rather than sharp. */
+const ARROW_CORNER = 5 * ARROW_SCALE;
 /** The middle of the arrow, which is what a glow grows around. */
-const ARROW_CENTRE = { x: 8.1 * ARROW_SCALE, y: 12.4 * ARROW_SCALE } as const;
-const ARROW_OUTLINE_WIDTH = 3.4;
+const ARROW_CENTRE = { x: 21.5 * ARROW_SCALE, y: 25 * ARROW_SCALE } as const;
+const ARROW_OUTLINE_WIDTH = 4.4;
+
+/**
+ * The four chips beside the tip, as the middle of each one.
+ *
+ * They are the driver's own mark for a computer the agent holds, and they sit off the tip so that
+ * they never cover what is under it.
+ */
+const CHIPS = [
+  [-21, -1],
+  [-10, -1],
+  [-21, 10],
+  [-10, 10],
+] as const;
+const CHIP_SIZE = 7 * ARROW_SCALE;
+const CHIP_CORNER = 2.4 * ARROW_SCALE;
+const CHIP_OUTLINE_WIDTH = 2;
 
 /**
  * The glow behind the arrow: the same shape, larger, in weaker copies of the accent.
@@ -82,14 +98,18 @@ const ARROW_OUTLINE_WIDTH = 3.4;
  * faint enough that the sum reads as a halo rather than as an outline.
  */
 const GLOW = [
-  { scale: 152, opacity: 12 },
-  { scale: 130, opacity: 20 },
-  { scale: 114, opacity: 30 },
+  { scale: 158, opacity: 7 },
+  { scale: 146, opacity: 9 },
+  { scale: 134, opacity: 11 },
+  { scale: 122, opacity: 14 },
+  { scale: 110, opacity: 18 },
 ] as const;
 
 /** The mark the click draws on the point, in the same accent-and-outline treatment. */
 const MARK_DIAMETER = 16;
 const MARK_OUTLINE_WIDTH = 3;
+/** How far a Bezier control point travels toward a corner to draw a circular arc. */
+const CIRCULAR_TANGENT = 0.5523;
 const PULSE_FRAMES = 15;
 const STEADY_FRAMES = 30;
 
@@ -125,6 +145,15 @@ interface CursorPath {
   };
 }
 
+/** A rounded square, which is what a chip is. */
+interface CursorRectangle {
+  readonly ty: "rc";
+  readonly d: 1;
+  readonly s: { readonly a: 0; readonly k: readonly [number, number] };
+  readonly p: { readonly a: 0; readonly k: readonly [number, number] };
+  readonly r: { readonly a: 0; readonly k: number };
+}
+
 /** A circle. The profile refuses a group, so every shape sits directly on a layer. */
 interface CursorEllipse {
   readonly ty: "el";
@@ -149,7 +178,7 @@ interface CursorFill {
   readonly r: 1;
 }
 
-type CursorShape = CursorPath | CursorEllipse | CursorStroke | CursorFill;
+type CursorShape = CursorPath | CursorRectangle | CursorEllipse | CursorStroke | CursorFill;
 
 /** A layer's own transform, the only place the profile allows a keyframe. */
 interface CursorTransform {
@@ -224,9 +253,10 @@ export interface CursorThemeSource {
  * `scripts/build-cursor-theme.ts` writes these into an archive and hands it to
  * `cua-cursor-theme build`, which validates and compiles them. The drawing follows the driver's own
  * cursor, because that shape is what a user already reads as "something else is driving this
- * computer": a pointer over a larger pointer-shaped glow, with a white outline. Only the colour is
- * OpenBot's. The driver's own cursor cannot simply be recoloured - it is built into the binary and
- * a theme owns the twelve action drawings only - so the treatment is drawn again here.
+ * computer": a rounded dart on a soft glow of the same shape, under a white outline, with four
+ * chips beside its tip. Only the colour is OpenBot's. The driver's own cursor cannot simply be
+ * recoloured - it is built into the binary and a theme owns the twelve action drawings only - so
+ * the treatment is drawn again here.
  *
  * The profile is narrow: no groups, no gradients, no geometry animation, and only a layer's own
  * transform may hold keyframes. So the glow is stacked flat copies, and the click animates the
@@ -298,9 +328,29 @@ function pulseAnimation(): CursorAnimation {
  */
 function cursorLayers(frames: number, firstIndex = 1): readonly CursorLayer[] {
   return [
-    arrowLayer(firstIndex, frames),
-    ...GLOW.map((step, offset) => glowLayer(firstIndex + 1 + offset, frames, step)),
+    chipLayer(firstIndex, frames),
+    arrowLayer(firstIndex + 1, frames),
+    ...GLOW.map((step, offset) => glowLayer(firstIndex + 2 + offset, frames, step)),
   ];
+}
+
+/** The chips, drawn in one layer because they share their treatment and never move apart. */
+function chipLayer(index: number, frames: number): CursorLayer {
+  return shapeLayer("chips", index, frames, [
+    ...CHIPS.map((chip) => chipShape(chip)),
+    stroke(OUTLINE, CHIP_OUTLINE_WIDTH),
+    fill(ACCENT, 100),
+  ]);
+}
+
+function chipShape([x, y]: readonly number[]): CursorRectangle {
+  return {
+    ty: "rc",
+    d: 1,
+    s: { a: 0, k: [CHIP_SIZE, CHIP_SIZE] },
+    p: { a: 0, k: [x * ARROW_SCALE, y * ARROW_SCALE] },
+    r: { a: 0, k: CHIP_CORNER },
+  };
 }
 
 /** The arrow itself: accent, under a white outline that carries it over any wallpaper. */
@@ -334,10 +384,42 @@ function markLayer(index: number, frames: number): CursorLayer {
   ]);
 }
 
+/**
+ * The dart, with an arc in place of each corner.
+ *
+ * Every corner becomes two points, one on each edge, and the two tangents between them bend toward
+ * the corner they replace. `CIRCULAR_TANGENT` is the share of that distance a Bezier needs to pass
+ * for a circle; it is the same number a rounded rectangle uses.
+ */
 function arrowPath(): CursorPath {
   const corners = ARROW.map(([x, y]) => [x * ARROW_SCALE, y * ARROW_SCALE]);
-  const flat = corners.map(() => [0, 0]);
-  return { ty: "sh", d: 1, ks: { a: 0, k: { c: true, v: corners, i: flat, o: flat } } };
+  const v: number[][] = [];
+  const i: number[][] = [];
+  const o: number[][] = [];
+  for (const [index, corner] of corners.entries()) {
+    const previous = corners[(index - 1 + corners.length) % corners.length];
+    const next = corners[(index + 1) % corners.length];
+    const start = towards(corner, previous);
+    const end = towards(corner, next);
+    v.push(start, end);
+    i.push([0, 0], scaled(corner, end, CIRCULAR_TANGENT));
+    o.push(scaled(corner, start, CIRCULAR_TANGENT), [0, 0]);
+  }
+  return { ty: "sh", d: 1, ks: { a: 0, k: { c: true, v, i, o } } };
+}
+
+/** The point on the edge where the corner's arc begins, at most halfway along that edge. */
+function towards(corner: readonly number[], neighbour: readonly number[]): number[] {
+  const dx = neighbour[0] - corner[0];
+  const dy = neighbour[1] - corner[1];
+  const length = Math.hypot(dx, dy);
+  const step = Math.min(ARROW_CORNER, length / 2) / length;
+  return [corner[0] + dx * step, corner[1] + dy * step];
+}
+
+/** The tangent from a point on the arc toward the corner it replaces, as Lottie wants it: relative. */
+function scaled(corner: readonly number[], point: readonly number[], share: number): number[] {
+  return [(corner[0] - point[0]) * share, (corner[1] - point[1]) * share];
 }
 
 function stroke(colour: readonly number[], width: number): CursorStroke {
