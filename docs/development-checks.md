@@ -37,7 +37,7 @@ Its main jobs are:
 | Job | Runner | Commands |
 | --- | --- | --- |
 | Check | `ubuntu-latest` | `bun run check:desktop:static` |
-| Browser smoke | `macos-14` | `bun run test:browser` |
+| Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
 | Tests | `ubuntu-latest` | `bun run test:desktop`, `bun run test:sites`, `bun run test:remote` |
 | Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api` |
@@ -49,10 +49,10 @@ These long suites belong in CI; local desktop runs can reach their time limits u
 
 `bun run check:desktop` still runs everything: it is `check:desktop:static`, which holds the UI
 check, the lint, the desktop typecheck and the build, followed by the browser smoke test. CI is
-the only caller that splits them, because only the smoke test needs a macOS runner, and it was 83s
-of the 141s the two took in series there. The smoke test builds its own Electron entry point and
-reads nothing the build writes, so the order between the halves is free. `release.yml` keeps the
-whole of `check:desktop` on one macOS runner, where it checks the machine that builds the release.
+the only caller that splits them. The smoke test starts the real Electron binary, so it runs under
+xvfb on Ubuntu rather than on a macOS runner, and reads nothing the build writes, so the order
+between the halves is free. `release.yml` keeps the whole of `check:desktop` on one macOS runner,
+where it checks the machine that builds the release.
 
 `setup-bun` restores the Bun package store before installing. The key falls back through
 `restore-keys`, so a lockfile change re-downloads only what moved. The Electron download is

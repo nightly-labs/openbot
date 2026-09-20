@@ -240,6 +240,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
+| `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
 | `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary. |
 | `bun run prepare:cua-driver` | Write the pinned Computer Use driver to `build/cua-driver/<platform>/<arch>`, verifying every SHA-256 in `native-runtime.lock.json`. Name another target with `bun scripts/install-cua-driver.ts <platform> <arch>`. Every packaging command runs this first. |
 | `bun run pin:cua-driver <version>` | Print a new `cuaDriver` block for `native-runtime.lock.json` from a published `cua-driver` release. Downloads all three targets and hashes each shipped file. |

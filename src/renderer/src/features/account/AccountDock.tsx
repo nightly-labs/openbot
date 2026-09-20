@@ -52,6 +52,14 @@ interface AccountDockProps {
 }
 
 const USAGE_REFRESH_TIMEOUT_MS = 12_000;
+/** How old a reading may get while it is on screen before it is fetched again. */
+const USAGE_AUTO_REFRESH_MS = 5 * 60_000;
+/**
+ * The poll asks more often than it refreshes, and each tick compares the age of
+ * the reading. A tick right after a manual refresh then costs nothing, instead of
+ * pushing the next automatic one out to almost ten minutes.
+ */
+const USAGE_AUTO_REFRESH_CHECK_MS = 30_000;
 
 function AnimatedUsagePercentage(props: { value: number | null }) {
   let digitGroup: HTMLSpanElement | undefined;
@@ -103,6 +111,7 @@ export function AccountDock(props: AccountDockProps) {
   let usageRequestGeneration = 0;
   let usageRequestTargetKey: string | null = null;
   let usageRequestRevision = -1;
+  let lastUsageRefreshAt = 0;
   let legacyTrigger: HTMLButtonElement | undefined;
   let menuTrigger: HTMLButtonElement | undefined;
   let usageTrigger: HTMLButtonElement | undefined;
@@ -170,6 +179,34 @@ export function AccountDock(props: AccountDockProps) {
     },
   );
 
+  /**
+   * The figure ages: it counts down a provider's window, so a number read minutes
+   * after it arrived is wrong. This polls while the reading is on screen - the
+   * hybrid chip always shows it, and either popover shows the rows - and stays
+   * quiet otherwise, because a background refresh the user cannot see only costs
+   * a provider call. A hidden window does not poll either; coming back to it
+   * refreshes at once when the interval has passed.
+   */
+  const usagePollingActive = createMemo(
+    () => Boolean(props.usageTargetKey) && props.usageReady && (hybridLayout() || menuOpen() || usageOpen()),
+  );
+
+  createEffect(usagePollingActive, (active) => {
+    if (!active) return;
+    function refreshWhenDue() {
+      if (document.hidden || usageLoading()) return;
+      if (Date.now() - lastUsageRefreshAt < USAGE_AUTO_REFRESH_MS) return;
+      void refreshUsage();
+    }
+    refreshWhenDue();
+    const timer = window.setInterval(refreshWhenDue, USAGE_AUTO_REFRESH_CHECK_MS);
+    document.addEventListener("visibilitychange", refreshWhenDue);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenDue);
+    };
+  });
+
   createEffect(
     () => props.updateStatus.phase,
     () => {
@@ -197,6 +234,7 @@ export function AccountDock(props: AccountDockProps) {
     )
       return;
     const generation = ++usageRequestGeneration;
+    lastUsageRefreshAt = Date.now();
     usageRequestTargetKey = targetKey;
     usageRequestRevision = revision;
     setUsageLoading(true);

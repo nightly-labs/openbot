@@ -20,6 +20,7 @@ import {
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
+import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import type { AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
@@ -938,6 +939,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           id,
           header: getString(property, "title") ?? id,
           question: getString(property, "description") ?? getString(params, "message") ?? "ACP needs more information.",
+          isSecret: secretElicitationField(id, property),
           options: elicitationOptions(property),
         },
       ];
@@ -947,6 +949,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         id: "response",
         header: "ACP",
         question: getString(params, "message") ?? "ACP needs confirmation.",
+        isSecret: false,
         options: null,
       });
     }
@@ -1216,37 +1219,6 @@ function printableInput(value: unknown): string | null {
 function bestPermissionOption(options: PermissionOption[], accepted: boolean): PermissionOption | null {
   const kinds = accepted ? ["allow_once", "allow_always"] : ["reject_once", "reject_always"];
   return kinds.flatMap((kind) => options.filter((option) => option.kind === kind))[0] ?? null;
-}
-
-function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
-  if (Array.isArray(property.oneOf)) {
-    return property.oneOf.filter(isRecord).flatMap((option) => {
-      const value = getString(option, "const");
-      if (!value) return [];
-      return [{ label: getString(option, "title") ?? value, description: getString(option, "description") ?? "" }];
-    });
-  }
-  if (Array.isArray(property.enum)) {
-    return property.enum.filter(isString).map((value) => ({ label: value, description: "" }));
-  }
-  if (property.type === "boolean") {
-    return [
-      { label: "Yes", description: "" },
-      { label: "No", description: "" },
-    ];
-  }
-  return null;
-}
-
-function elicitationValue(property: DynamicRecord | undefined, answers: string[]): ElicitationContentValue {
-  if (!property) return answers[0] ?? "";
-  if (property.type === "array") return answers;
-  if (property.type === "boolean") return /^(yes|true|1)$/i.test(answers[0] ?? "");
-  if (property.type === "number" || property.type === "integer") {
-    const parsed = Number(answers[0]);
-    return Number.isFinite(parsed) ? parsed : (answers[0] ?? "");
-  }
-  return answers[0] ?? "";
 }
 
 function isDynamicToolResult(value: unknown): value is DynamicToolResult {

@@ -109,6 +109,22 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument());
   });
 
+  it("re-reads usage on its own while the dock keeps it on screen", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(() => <App />);
+      await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1));
+
+      await vi.advanceTimersByTimeAsync(4 * 60_000);
+      expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(90_000);
+      await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("loads usage lazily when the account menu hides it", async () => {
     vi.mocked(window.openbot.getAppInfo).mockResolvedValue({
       name: "OpenBot",

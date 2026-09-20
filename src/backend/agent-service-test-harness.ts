@@ -375,6 +375,77 @@ export function createTestService(
   return new AgentService({ browser: fakeBrowser(), requestTimeoutMs: 30_000, ...options });
 }
 
+/**
+ * The service every test here starts from: stores under `root`, and `initialize()` already awaited.
+ *
+ * Whether the agents get a fake client or the real spawned CLI is the caller's choice, and the two
+ * are not interchangeable - a `clientFactory` is what keeps a case from starting a child process.
+ * Passing any of `provider`, `output`, `autoComplete` or `client` installs the fake; passing none of
+ * them leaves `clientFactory` unset, so the service spawns the fake CLI that `startAgentTestFixture`
+ * wrote. `provider` names the client's provider only: which provider the service prefers stays
+ * `preferredProvider`, passed through, because the two are not the same choice.
+ *
+ * `client` is built eagerly, so a case can arm it before the first turn reaches it - which is what
+ * the hand-written preamble did by constructing the client above `createTestService`. `clients`
+ * collects every client handed out, in order, and `clientFor` answers with the most recent one for a
+ * provider, which is the question the per-provider `Map` in these files was built to answer.
+ */
+export interface StartServiceOptions extends Partial<Omit<AgentServiceOptions, "store" | "mailbox">> {
+  /** Installs the fake client, and names the provider it answers as. */
+  provider?: AgentProvider;
+  /** The fake client's completion marker. Left unset, each provider uses its own default. */
+  output?: string;
+  autoComplete?: boolean;
+  /** Builds the client for a provider, for the cases that vary it per provider. */
+  client?: (provider: AgentProvider) => FakeAgentClient;
+}
+
+export interface StartedService {
+  service: AgentService;
+  /** The client for the preferred provider. Meaningless when no fake was installed. */
+  client: FakeAgentClient;
+  clients: FakeAgentClient[];
+  clientFor: (provider: AgentProvider) => FakeAgentClient | undefined;
+  store: AgentStore;
+  mailbox: MailboxStore;
+}
+
+export async function startService(root: string, options: StartServiceOptions = {}): Promise<StartedService> {
+  const { provider, output, autoComplete, client: build, ...serviceOptions } = options;
+  const fake = provider !== undefined || output !== undefined || autoComplete !== undefined || build !== undefined;
+  const preferred = provider ?? serviceOptions.preferredProvider ?? "codex";
+  const { store, mailbox } = stores(root);
+  const client = new FakeAgentClient(preferred, output, autoComplete);
+  const clients: FakeAgentClient[] = [];
+  const service = createTestService({
+    store,
+    mailbox,
+    ...(fake
+      ? {
+          clientFactory: (requested: AgentProvider) => {
+            const made = build
+              ? build(requested)
+              : requested === preferred
+                ? client
+                : new FakeAgentClient(requested, output, autoComplete);
+            clients.push(made);
+            return made;
+          },
+        }
+      : {}),
+    ...serviceOptions,
+  });
+  await service.initialize();
+  return {
+    service,
+    client,
+    clients,
+    clientFor: (wanted) => clients.findLast((made) => made.provider === wanted),
+    store,
+    mailbox,
+  };
+}
+
 export function nextRoutinesChanged(agentService: AgentService, agentId: string): Promise<void> {
   return new Promise((resolve) => {
     const listener = (event: AgentEvent) => {
