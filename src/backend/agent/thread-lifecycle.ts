@@ -292,8 +292,8 @@ export class ThreadLifecycle {
   }
 
   /**
-   * Codex takes its MCP servers in the thread configuration rather than as dynamic tools, and only
-   * stdio ones - see `codexMcpServers`. Every other provider gets nothing here.
+   * Codex takes its MCP servers in the thread configuration rather than as dynamic tools - see
+   * `codexMcpServers`. Every other provider gets nothing here.
    */
   private async codexConfig(
     client: AgentClient,
