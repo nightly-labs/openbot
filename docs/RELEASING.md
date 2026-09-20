@@ -27,7 +27,9 @@ Create the `release` environment in `nightly-labs/openbot`, then add these envir
 - `CSC_LINK` — a base64-encoded Developer ID Application `.p12` file.
 - `MAC_PROVISIONING_PROFILE` — the base64-encoded Developer ID provisioning profile for
   `app.openbot.desktop`, with the `applinks:openbot.run` entitlement.
-- `CSC_KEY_PASSWORD` — the `.p12` export password.
+- `CSC_KEY_PASSWORD` — the application `.p12` export password.
+- `CSC_INSTALLER_LINK` — a base64-encoded **Developer ID Installer** `.p12` file for team `ZTRDTUL87R`.
+- `CSC_INSTALLER_KEY_PASSWORD` — the installer `.p12` export password.
 - `APPLE_ID` — the Apple Account used for notarization.
 - `APPLE_APP_SPECIFIC_PASSWORD` — a dedicated app-specific password for `notarytool`.
 - `APPLE_TEAM_ID` — the Apple Developer team ID.
@@ -160,7 +162,7 @@ The workflow:
 1. verifies the tag matches `package.json`;
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
 3. runs the complete offline repository check;
-4. builds signed and notarized ARM64 DMG and ZIP artifacts on a GitHub macOS runner;
+4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on the same GitHub macOS runner;
 5. builds an unsigned Windows x64 NSIS installer on a GitHub Windows runner;
 6. builds an unsigned Linux x64 AppImage on a GitHub Ubuntu 24.04 runner, with the launch check under
    `xvfb-run`;
@@ -207,7 +209,7 @@ Before creating the first tag or any later release:
 0. run the Team API compatibility matrix for every protocol that remains in the adapter registry. The matrix must cover an older client with the new host, the new client with an older host, matching versions, no shared protocol, capability omission, unknown optional events, and malformed known events. Do not reduce this matrix because a protocol is old or because many application versions separate the peers. Confirm that each supported protocol still has unchanged client and host fixtures;
 
 1. run `bun run release:preflight` and resolve every reported release-secret or repository gate;
-2. confirm the `release` environment contains all six macOS secrets above; Windows and Linux remain
+2. confirm the `release` environment contains all eight macOS secrets above; Windows and Linux remain
    unsigned;
 3. confirm the production `/join` page and Apple association file pass the deployment checks in CI;
 4. run `bun install --frozen-lockfile` and `bun run check` from a clean clone;
@@ -248,3 +250,62 @@ After publishing `v0.1.0`, keep one installed copy and use the first signed patc
 end-to-end updater acceptance test: check, download, restart, and confirm the version changed without
 losing local agents or queues. This cannot be proven with an unsigned development build because macOS
 updaters require both versions to share a valid Developer ID signature.
+
+## Managed-host release package
+
+The normal DMG remains the desktop application. The optional Host PKG installs managed-host
+infrastructure only. Both use the validated `v<VERSION>` tag and the exact same source commit.
+The macOS job fails if Host compilation, signing, payload verification, notarization, stapling,
+or checksum generation fails; it never publishes a release with the Host package silently omitted.
+
+Expected macOS assets:
+
+```text
+OpenBot-<VERSION>-arm64.dmg
+OpenBot-<VERSION>-arm64.zip
+OpenBot-Host-<VERSION>-arm64.pkg
+latest-mac.yml
+SHA256SUMS-macos.txt
+OpenBot-<VERSION>-macos.spdx.json
+OpenBot-Host-<VERSION>-macos.spdx.json
+OpenBot-<VERSION>-macos.sigstore.json
+```
+
+The macOS checksum file covers the DMG, ZIP, and Host PKG. The existing provenance step consumes
+that file, so all three artifacts are attested against the same tag, commit, and release run.
+The existing publish job downloads `release-macos` and publishes the PKG with the other assets.
+`latest-mac.yml` still describes only Electron application updates; a `.pkg` reference is rejected.
+
+After verifying OpenBot.app, the macOS job:
+
+1. runs native account tests without creating users;
+2. imports the application and installer certificates into a temporary, isolated keychain;
+3. compiles standalone ARM64 `host-manager` and `openbot-host` executables with Bun, and the native
+   account helper with Swift; no target-machine runtime or compiler is required;
+4. signs all executables with **Developer ID Application**, hardened runtime and timestamp, and
+   checks their fixed identifiers and team `ZTRDTUL87R`;
+5. creates the fixed root:wheel package payload and signs the PKG with **Developer ID Installer**;
+6. expands it and rejects extra files, symlinks, unsafe modes/owners, version mismatches, changed
+   installer scripts, unexpected destinations, or non-system dynamic runtime dependencies;
+7. submits the PKG through `notarytool`, waits for `Accepted`, staples it, then requires successful
+   `pkgutil --check-signature`, `spctl --assess --type install`, and `stapler validate`;
+8. generates checksums and the Host payload SBOM, attests provenance, and uploads the PKG.
+
+The Bun executables need only `com.apple.security.cs.allow-jit` for JavaScriptCore's ARM64 JIT.
+The native account helper has no special entitlements. Library validation, executable-page
+protection, and the hardened runtime remain enabled. CI launches the signed standalone binaries
+with a system-only PATH and exercises a hot JavaScript loop before publication. Do not copy broad
+example Bun entitlements that disable these protections. If the pinned Bun version cannot pass
+these checks, stop the release and investigate; do not weaken the flags to obtain a signature.
+
+The release keychain and imported `.p12` files are deleted at step exit. The installer identity is
+mandatory and distinct from the application identity; add both new secrets before tagging. Never
+publish an unsigned Host package. The test fixture package is temporary, unsigned, never installed,
+and never uploaded as a release asset.
+
+CI does not install the root daemon or create tenant accounts on the runner. Package expansion,
+BOM ownership/mode verification, plist/signature checks, standalone smoke checks, and mocked CLI
+checks run there. Actual signed PKG installation/upgrade, new-account login, private-home isolation,
+and two-user Aqua relaunch remain the [target-host acceptance gate](multi-tenant-hosting.md#target-host-acceptance-required-before-paying-client-use).
+No tenant-data backup is made. Infrastructure updates require administrator installation of a
+newer signed Host PKG; the daemon never replaces itself.

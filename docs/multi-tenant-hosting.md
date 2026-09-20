@@ -23,9 +23,10 @@ A tenant can deliberately share its own files; that is outside the private-accou
 
 The application and all its real contents must be root-owned with no group/public write bits
 and no access-granting ACLs. `/Applications` must also be root-owned and not writable by a
-tenant. The current verifier requires mode `0755` or stricter on that parent, including removal
-of group write permission. Framework symlinks must remain inside the application. The setup
-refuses unsafe permissions; it does not change tenant data or silently repair an unsafe bundle.
+tenant. The system `admin` group may write to that parent; public or tenant-group write access is rejected.
+Framework symlinks must remain inside the application. Initial setup accepts a signed app owned
+by root or the installing administrator, then removes group/public write access and assigns it
+to root. It refuses a tenant-owned or publicly writable bundle. It never changes tenant data.
 
 Remote Desktop reserves separate Sunshine port families and Moonlight WebRTC ranges. Each fixed
 WebRTC UDP range has a TCP reservation at its first port until the runtime stops. This keeps
@@ -60,7 +61,10 @@ The helper itself is updated separately by an administrator, not by a tenant or 
 /Library/Application Support/OpenBot/HostManager/    root:wheel 0755
   config.json       root:wheel 0644; managed flag and registered numeric UIDs
   state.json        root:wheel 0644; phase, cycle, version, timestamp, error
-  host-manager      root:wheel 0755; compiled helper
+  host-manager      root:wheel 0755; compiled daemon
+  openbot-host      root:wheel 0755; administrator CLI
+  create-tenants    root:wheel 0755; native account helper
+  host-release.json root:wheel 0644; release version, source commit, architecture
   openbot-relaunch.sh root:wheel 0755
   private/          root:wheel 0700; download and read-only DMG mount
   tenants/          root:wheel 0755
@@ -84,88 +88,107 @@ the app, and the daemon does not coordinate updates. Normal desktop update contr
 `managed: true`, all tenant update controls are disabled, including downloads and installation.
 The host download does not use or change a tenant's `autoDownload` preference.
 
-## Installation
+## Production installation
 
-### Create tenant accounts automatically
+Normal desktop users need only `OpenBot-<VERSION>-arm64.dmg`. Managed multi-tenant hosts also
+need `OpenBot-Host-<VERSION>-arm64.pkg` from the same GitHub Release. The Host package contains
+standalone ARM64 executables, the global Aqua LaunchAgent, the root LaunchDaemon, and the
+`/usr/local/bin/openbot-host` administrator command. The target Mac needs no Git checkout, Bun,
+Node, Xcode, or compilation.
 
-For new accounts, compile the administrator setup tool from a trusted checkout as an
-unprivileged developer. This requires the Xcode Command Line Tools:
+1. Download the normal DMG and the Host PKG from the same release.
+2. Open the DMG and copy OpenBot.app to `/Applications`. Quit OpenBot before initial host setup.
+3. Open the Host PKG in Installer, or run the command below with the downloaded filename.
+4. Create and register the new Standard accounts. Save the passwords shown at completion.
+5. Log into `client-acme` once and sign into that client's OpenBot and providers.
+6. Use Fast User Switching, log into `client-bravo`, and configure that client's OpenBot.
+7. Run verification as the host administrator.
 
 ```sh
-xcrun swiftc -parse-as-library scripts/macos-tenant-setup.swift -o /tmp/openbot-create-tenants
-sudo /tmp/openbot-create-tenants client-acme client-bravo
+sudo installer -pkg "$HOME/Downloads/OpenBot-Host-<VERSION>-arm64.pkg" -target /
+sudo /usr/local/bin/openbot-host setup --create-user client-acme --create-user client-bravo
+sudo /usr/local/bin/openbot-host verify
 ```
 
-The command creates local Standard users with unique UIDs, independent generated passwords,
-and new empty `0700` homes under `/Users`. Use lowercase account names, starting with a letter,
-with at most 31 letters, digits, hyphens, or underscores. Existing accounts, group membership
-names, and home paths (including symlinks) cause setup to stop. It never resets an existing
-password, changes an existing home, or deletes an account to recover from failure.
+Replace `<VERSION>` with the downloaded release version. `/usr/local/bin` is a standard PATH
+location; the absolute command also works when an administrator's PATH omits it.
 
-Passwords contain 192 random bits and are sent directly to Apple's OpenDirectory API in memory.
-They are not placed in command arguments, environment variables, stdout, or error messages.
-Before creating accounts, the tool saves a new root-owned `0600` credential file at
-`/private/var/root/openbot-tenant-credentials-<UUID>.json`. The terminal shows only this path and
-successful account names. Retrieve the passwords as the administrator, deliver each password
-to its tenant through your secure credential channel, and remove the file when no longer needed.
-Do not attach this file to diagnostics or commit it to the repository.
+For existing Standard accounts with private homes, use:
 
-A failed batch can leave some accounts or empty homes created. The credential file retains all
-planned passwords, including accounts that were not created. Inspect the partial setup as the
-administrator; the command stops at the first failure and will not overwrite it on retry.
-Do not run other account-creation tools at the same time. The tool serializes its own invocations,
-but macOS does not provide a transaction across independent administrator tools.
+```sh
+sudo openbot-host setup --tenant client-acme --tenant client-bravo
+```
 
-This is a one-time setup tool, separate from the update daemon. It does not enroll accounts with
-the Host Manager, enable automatic login, grant administrator rights, or grant Secure Token or
-FileVault unlock rights. Log each account into a GUI session before enrollment. If the host uses
-FileVault, its administrator must unlock it after a restart. Verify account login, private home
-permissions, and lack of administrator membership on the target Mac before tenant use.
+The flags may be mixed. Use distinct lowercase names, starting with a letter, with at most 31
+letters, digits, hyphens or underscores. `--create-user` refuses existing accounts, old group
+membership names, and existing home paths. `--tenant` never changes an existing password or home.
+A `setup --dry-run` checks installation, accounts, and the already-secured application without
+creating accounts or changing configuration. Actual initial setup can secure an administrator-owned
+DMG copy. Setup refuses existing host registration; it is not an account-reset command.
 
-The native tests use temporary files and a fake account service. They do not create users:
+Only the administrator needs sudo. Setup creates empty `0700` homes and verifies Standard
+membership before registration. It grants no sudo, Full Disk Access, automatic login, Secure Token,
+or FileVault unlock rights. An administrator must unlock a FileVault-protected host after reboot.
+
+Passwords contain 192 random bits. The native account tool sends them to OpenDirectory in memory,
+then to the administrator CLI through a captured pipe; they never enter process arguments,
+environment variables, host configuration, or logs. At successful setup completion, the CLI shows
+each password once on the controlling terminal, separately from redirected stdout. A terminal is
+required before new-account setup starts. Deliver each password through your secure credential
+channel. The CLI uses a new root-owned `0600` recovery file under `/private/var/root` during setup
+and removes it after password presentation. If setup fails, keep that file until the administrator
+has recovered the partial accounts. Do not attach it to diagnostics or commit it to a repository.
+
+A failed batch may leave accounts, empty homes, or registration created. Setup stops at the first
+failure and never deletes accounts or overwrites existing registration on retry. Do not run other
+account tools or a package upgrade concurrently. A crash can leave the root-owned
+`setup-in-progress` directory; an administrator must resolve the partial setup before removing it.
+
+The package installs the LaunchAgent globally in `/Library/LaunchAgents`. Logged-out users load
+it at their next Aqua login; setup does not need every user logged in. The per-user wrapper checks
+only its own UID. Acme running cannot prevent Bravo from launching. A 15-second retry covers
+session startup and failed launches. No tenant GUI app is launched from root with `sudo -u`.
+Every registered tenant must eventually be running and healthy for automatic app updates.
+
+## Verification
+
+`sudo openbot-host verify` checks the application signature and permissions, all host executable
+signatures, fixed launchd definitions, daemon state, root-owned config/state, and each tenant's
+Standard membership and home metadata. It also creates harmless files in a temporary host
+verification area, tests access as each tenant in both directions, and removes that area.
+It does not recursively inspect homes, read tenant filenames/content, or print credentials.
+The temporary-area test supplements, but does not replace, the actual home-boundary acceptance
+check below. A failed check gives a nonzero exit status. Run verification after setup and upgrades.
+
+## Host infrastructure upgrades
+
+Install a newer signed and notarized Host PKG as administrator. The installer refuses unsafe
+existing paths and active/interrupted maintenance. It stops the daemon before replacing host
+executables and starts it again when configuration exists. Initial package installation does not
+start an unconfigured daemon. Existing config, state and tenant status directories are outside the
+package payload and remain in place. A failed package installation can leave the daemon stopped;
+resolve the package failure and run verification before returning the host to service.
+
+OpenBot.app continues to update through the Host Manager. The Host Manager does not update itself,
+download a Host PKG, or alter its own executable. A newer application may run with an older Host
+package. Initial setup requires the matching or a newer application. Host PKGs are never listed in
+`latest-mac.yml` and normal desktop users never receive them through Electron auto-update.
+
+## Developer validation
+
+The repository-only `scripts/install-host-update-agent.sh` remains a development setup path.
+Production uses the release PKG and installed CLI. Release CI builds the binaries from the same
+release commit as OpenBot.app. Native tests use a fake account service and temporary files:
 
 ```sh
 xcrun swiftc -parse-as-library -D TENANT_SETUP_TESTS scripts/macos-tenant-setup.swift scripts/macos-tenant-setup-tests.swift -o /tmp/openbot-tenant-setup-tests
 /tmp/openbot-tenant-setup-tests
+bun run test:desktop -- scripts/openbot-host.test.ts scripts/verify-host-installer.test.ts scripts/host-manager.test.ts
 ```
 
-### Install host management
-
-Use a trusted checkout. As an unprivileged developer, build the standalone helper:
-
-```sh
-bun install --frozen-lockfile
-bun build scripts/host-manager.ts --compile --outfile /tmp/openbot-host-manager
-```
-
-On the target Apple Silicon Mac, install a signed OpenBot build that contains the tenant client,
-set the application and home permissions above, and log each tenant into a GUI session. Then:
-
-```sh
-sudo scripts/install-host-update-agent.sh --managed /tmp/openbot-host-manager client-acme client-bravo
-```
-
-Only administrator setup needs sudo. The script checks Standard membership and private home metadata for accounts under `/Users/<name>`.
-It never opens home contents. The script installs the common LaunchAgent under
-`/Library/LaunchAgents`; it does not write into tenant homes. A logged-out user's agent loads at
-its next GUI login. Every registered tenant must be running and healthy before automatic
-maintenance can complete. The installer refuses existing configuration instead of overwriting it.
-If testing an older version of this PR, remove its per-user relaunch job from each tenant's own
-session before enrollment; the old `/Users/Shared/OpenBot/updates` protocol is not used.
-
-Verify the jobs and the application metadata:
-
-```sh
-sudo launchctl print system/app.openbot.host-manager
-launchctl print gui/$(id -u)/app.openbot.desktop.relaunch
-ls -ld /Applications/OpenBot.app
-ls -le /Applications/OpenBot.app/Contents/MacOS/OpenBot
-```
-
-The per-user wrapper checks only its current UID. Acme running cannot prevent Bravo from
-launching. A 15-second retry covers delayed GUI startup and a failed `open` attempt. No
-`sudo -u tenant open` is used. A tenant startup checks host state before it starts its services. The wrapper calls the helper's
-nonprivileged `--relaunch` path; it checks executable paths and filters by the current UID.
+macOS tests build and expand an unsigned fixture package without installing it. Production package
+verification also requires Developer ID signatures, notarization, stapling, an exact ownership/mode
+manifest, standalone launch checks without Bun/Node in PATH, and the expected source scripts.
 
 ## State and recovery
 

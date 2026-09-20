@@ -419,10 +419,9 @@ respective products and services.
 
 ### Shared macOS hosts
 
-For one native Standard user per tenant, use the optional administrator-installed
-[Host Manager](docs/multi-tenant-hosting.md). Build it with
-`bun build scripts/host-manager.ts --compile --outfile /tmp/openbot-host-manager`, then follow
-that guide's permissions and installation steps. Tenant users do not need sudo. The target-host
-acceptance checks are required before this configuration is used for paying clients.
-The guide also includes an administrator command to create new Standard accounts with generated
-passwords and private homes: [automatic account setup](docs/multi-tenant-hosting.md#create-tenant-accounts-automatically).
+For one native Standard user per tenant, install the normal OpenBot DMG and the optional
+`OpenBot-Host-<VERSION>-arm64.pkg` from the same release. The Host package provides
+`sudo openbot-host setup --create-user client-acme --create-user client-bravo` and
+`sudo openbot-host verify`. No Git checkout, Bun, or compilation is required on the host.
+Normal desktop users need only the DMG. See the [host deployment guide](docs/multi-tenant-hosting.md)
+for existing-user enrollment, password handling, package upgrades, and required target-host checks.

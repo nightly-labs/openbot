@@ -1,4 +1,4 @@
-// Administrator-only provisioning. This executable is never installed in the Host Manager.
+// Administrator-only provisioning. The Host Manager daemon never calls this executable.
 import Darwin
 import Foundation
 import OpenDirectory
@@ -34,7 +34,8 @@ func generateTenantPassword() throws -> String {
     return "Aa1!" + Data(bytes).base64EncodedString()
 }
 
-func provisionTenants(_ names: [String], using setup: TenantAccountSetup) throws {
+@discardableResult
+func provisionTenants(_ names: [String], using setup: TenantAccountSetup) throws -> [TenantCredential] {
     try validateTenantNames(names)
     let uids = try setup.preflight(names)
     guard uids.count == names.count, Set(uids).count == uids.count, uids.allSatisfy({ $0 >= 501 })
@@ -45,6 +46,7 @@ func provisionTenants(_ names: [String], using setup: TenantAccountSetup) throws
     // Persist first: even a partial failure must not lose the generated credentials.
     try setup.saveCredentials(credentials)
     for credential in credentials { try setup.createAccount(credential) }
+    return credentials
 }
 
 // Descriptor-based operations never follow an existing tenant home or credential symlink.
@@ -115,9 +117,11 @@ final class MacTenantAccountSetup: TenantAccountSetup {
     private let users: Int32
     private let secrets: Int32
     private let lock: Int32
+    private let quiet: Bool
     let credentialFilename = "openbot-tenant-credentials-\(UUID().uuidString).json"
 
-    init() throws {
+    init(quiet: Bool = false) throws {
+        self.quiet = quiet
         // All ancestors are fixed system directories, never supplied by a tenant.
         for path in ["/", "/private", "/private/var", "/private/var/run"] {
             let fd = try openPrivateSetupDirectory(path, owner: 0)
@@ -173,7 +177,7 @@ final class MacTenantAccountSetup: TenantAccountSetup {
 
     func saveCredentials(_ credentials: [TenantCredential]) throws {
         try writeNewCredentialFile(credentials, directory: secrets, name: credentialFilename)
-        print("Credentials saved in /private/var/root/\(credentialFilename)")
+        if !quiet { print("Credentials saved in /private/var/root/\(credentialFilename)") }
     }
 
     func createAccount(_ credential: TenantCredential) throws {
@@ -205,7 +209,7 @@ final class MacTenantAccountSetup: TenantAccountSetup {
         try record.synchronize()
         try record.verifyPassword(credential.password)
         try requireStandardUser(credential.username)
-        print("Created Standard user: \(credential.username)")
+        if !quiet { print("Created Standard user: \(credential.username)") }
     }
 }
 
@@ -231,20 +235,29 @@ func requireStandardUser(_ name: String) throws {
 @main
 enum TenantSetupCommand {
     static func main() {
-        let names = Array(CommandLine.arguments.dropFirst())
+        var names = Array(CommandLine.arguments.dropFirst())
         if names == ["--help"] {
             print("Usage: sudo openbot-create-tenants <new-standard-user>...")
             return
         }
+        let json = names.first == "--json"
+        if json { names.removeFirst() }
         guard getuid() == 0, geteuid() == 0 else {
             fputs("Account creation requires an administrator running this command with sudo.\n", stderr)
             exit(1)
         }
         do {
             try validateTenantNames(names)
-            let setup = try MacTenantAccountSetup()
-            try provisionTenants(names, using: setup)
-            print("Account setup complete. Log each user into a GUI session, then enroll them with the host installer.")
+            let setup = try MacTenantAccountSetup(quiet: json)
+            let credentials = try provisionTenants(names, using: setup)
+            if json {
+                struct Result: Encodable { let credentials: [TenantCredential]; let credentialFile: String }
+                let data = try JSONEncoder().encode(Result(credentials: credentials,
+                    credentialFile: "/private/var/root/\(setup.credentialFilename)"))
+                FileHandle.standardOutput.write(data)
+            } else {
+                print("Account setup complete. Log each user into a GUI session, then enroll them with the host installer.")
+            }
         } catch {
             // Directory-service errors can contain credential data. Never print the raw error.
             fputs("Account setup stopped. Existing accounts are not reset. If a credential file was saved, keep it and inspect the partial setup as administrator before retrying.\n", stderr)

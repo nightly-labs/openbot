@@ -11,20 +11,35 @@ export const SHARED_APP = "/Applications/OpenBot.app";
 const STAGING = "/Applications/.openbot-host-stage";
 const PRIVATE = join(HOST_MANAGER_DIRECTORY, "private");
 const SIGNING_REQUIREMENT =
-  'anchor apple generic and identifier "app.openbot.desktop" and certificate leaf[subject.OU] = "ZTRDTUL87R"';
+  '=anchor apple generic and identifier "app.openbot.desktop" and certificate leaf[subject.OU] = "ZTRDTUL87R"';
 const releaseSchema = z.object({
   tag_name: z.string().regex(/^v?\d+\.\d+\.\d+$/),
   draft: z.literal(false),
   prerelease: z.literal(false),
 });
 
-async function command(file: string, args: string[], timeout = 60_000): Promise<string> {
+export async function hostCommand(file: string, args: string[], timeout = 60_000): Promise<string> {
   const result = await exec(file, args, {
     timeout,
     maxBuffer: 8 * 1024 * 1024,
     env: { PATH: "/usr/bin:/bin:/usr/sbin:/sbin" },
   });
   return result.stdout.trim();
+}
+const command = hostCommand;
+
+/** The system Applications directory normally permits administrators (group 80) to install apps. */
+export async function verifySharedAppParent(): Promise<void> {
+  await verifyHostPath("/");
+  const info = await lstat("/Applications");
+  if (
+    !info.isDirectory() ||
+    info.uid !== 0 ||
+    (info.mode & 0o002) !== 0 ||
+    ((info.mode & 0o020) !== 0 && info.gid !== 80)
+  )
+    throw new Error("Unsafe Applications directory.");
+  await verifyNoWriteAcl("/Applications");
 }
 
 export async function verifyNoWriteAcl(path: string): Promise<void> {
@@ -84,7 +99,7 @@ export async function verifyBundleTree(root: string, requireRootOwner: boolean):
     throw new Error("Bundle has access-granting ACLs.");
 }
 
-async function verifySignature(app: string): Promise<void> {
+export async function verifySignature(app: string): Promise<void> {
   await command("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R", SIGNING_REQUIREMENT, app]);
   await command("/usr/sbin/spctl", ["--assess", "--type", "execute", app]);
 }
@@ -129,7 +144,7 @@ export function macHostOperations(): HostManagerOperations {
       return bundleVersion();
     },
     stageLatest: async () => {
-      await verifyHostPath("/Applications");
+      await verifySharedAppParent();
       await verifyBundleTree(SHARED_APP, true);
       await verifySignature(SHARED_APP);
       const response = await fetch("https://api.github.com/repos/nightly-labs/openbot/releases/latest", {
@@ -189,7 +204,7 @@ export function macHostOperations(): HostManagerOperations {
       return version;
     },
     install: async (version) => {
-      await verifyHostPath("/Applications");
+      await verifySharedAppParent();
       await verifyHostPath(STAGING);
       const staged = join(STAGING, "OpenBot.app");
       await verifyBundleTree(staged, true);

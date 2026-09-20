@@ -946,6 +946,13 @@ See [plugin distribution and sharing](plugin-distribution.md) for the catalog sh
 `scripts/macos-tenant-setup.swift` is a separate administrator command for new Standard accounts.
 It uses OpenDirectory directly, creates only new empty homes, and stores generated credentials
 in a new root-only file before account creation. It is not installed or called by the daemon.
+The Host PKG installs this as `create-tenants`, alongside the standalone `openbot-host` CLI.
+`openbot-host-service.ts` owns setup/verification sequencing; `openbot-host-macos.ts` owns OS
+operations. Passwords cross only the native helper's captured pipe and the administrator's tty,
+not the host protocol. The root-only recovery file is removed after successful presentation.
+`build-host-installer.ts` and `verify-host-installer.ts` own release packaging and the exact
+payload manifest. Package installation preserves host registration and state; only the application
+is automatically updated. A Host Manager upgrade requires an administrator-installed signed PKG.
 
 The optional standalone root helper (`scripts/host-manager.ts`) uses the lifecycle in
 `src/main/host-manager.ts` and fixed macOS operations in `scripts/host-manager-macos.ts`.
