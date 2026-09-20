@@ -37,6 +37,9 @@ const Updates = createSimpleContext({
     async function runAction(): Promise<void> {
       const analytics = desktopAnalytics.scope();
       const current = status();
+      // Host-managed tenants never act: the host owns check, download and install timing.
+      // The button is disabled too; this is the second lock for callers that reach past it.
+      if (current.managedByHost === true) return;
       const phase = current.phase;
       if (phase === "ready") {
         try {

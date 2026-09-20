@@ -1,3 +1,4 @@
+import { recordRestartActivity } from "../backend/restart-activity";
 // The host's side of the live browser view: a session a member asks for, a socket that carries the
 // frames, and the pointer and key input that comes back on it.
 //
@@ -85,6 +86,15 @@ export class BrowserViewGateway {
     return true;
   }
 
+  /** Views with a live socket. Created but never opened views do not hold anything. */
+  activeViewCount(): number {
+    let count = 0;
+    for (const session of this.#sessions.values()) {
+      if (session.socket) count += 1;
+    }
+    return count;
+  }
+
   async revokeTeamSession(teamSessionId: string): Promise<void> {
     for (const session of [...this.#sessions.values()]) {
       if (session.teamSessionId === teamSessionId) await this.#closeSession(session, "Team access ended.");
@@ -129,6 +139,7 @@ export class BrowserViewGateway {
   async #connect(session: ManagedViewSession, client: Ws.WebSocket): Promise<void> {
     if (session.socket) session.socket.close(1000, "The browser view moved to a new connection.");
     session.socket = client;
+    recordRestartActivity();
     client.on("message", (data, binary) => {
       if (binary || session.socket !== client) return;
       void this.#handleInput(session, data);

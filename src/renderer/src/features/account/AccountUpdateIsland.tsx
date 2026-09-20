@@ -69,12 +69,18 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
   );
   const downloading = createMemo(() => phase() === "downloading");
   const busy = createMemo(() => actionPending() || isUpdateBusyPhase(phase()));
+  // Host-managed tenants watch the status but never act on it.
+  const managed = createMemo(() => props.updateStatus.managedByHost === true);
   const ready = createMemo(() => !failed() && (phase() === "ready" || phase() === "installing"));
   const progress = createMemo(() => {
     const value = props.updateStatus.progress;
     return value === null ? null : Math.min(100, Math.max(0, Math.round(value)));
   });
-  const actionLabel = createMemo(() => (failed() ? "Retry" : ready() ? "Restart" : "Download"));
+  const actionLabel = createMemo(() => {
+    if (managed()) return "Managed by host";
+    if (failed()) return "Retry";
+    return ready() ? "Restart" : "Download";
+  });
   const busyLabel = createMemo(() => {
     if (actionPending() && failed()) return "Retrying";
     if (downloading() && progress() !== null) return null;
@@ -82,6 +88,7 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     return "Starting";
   });
   const accessibleActionLabel = createMemo(() => {
+    if (managed()) return "Update managed by host";
     if (actionPending() && failed()) return "Retrying update";
     if (downloading() && progress() !== null) return `Downloading update, ${progress()}%`;
     if (phase() === "installing" || (actionPending() && ready())) return "Restarting to update";
@@ -123,7 +130,7 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
   );
 
   async function runUpdateAction(): Promise<void> {
-    if (!open() || busy()) return;
+    if (!open() || busy() || managed()) return;
     setActionPending(true);
     try {
       await props.onUpdateAction();
@@ -164,7 +171,7 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
             class="account-update-island__action"
             aria-label={accessibleActionLabel()}
             aria-busy={busy() ? "true" : undefined}
-            disabled={!open() || busy()}
+            disabled={!open() || busy() || managed()}
             onClick={() => void runUpdateAction()}
           >
             <span class="account-update-island__action-content">

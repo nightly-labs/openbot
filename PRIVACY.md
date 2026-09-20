@@ -362,3 +362,20 @@ local application storage. This lets it recover the held draft after restart. Ne
 releases the host hold merely because the editor closes or disconnects. The host also preserves
 attachment drafts released by edit cancellation or message deletion until they are sent or
 discarded. This lets a disconnected desktop recover its saved composer backup after host restart.
+
+## Optional macOS Host Manager
+
+An administrator can install a local Host Manager for several native macOS users. It reads only
+registered UIDs, process IDs, application versions, restart readiness, timestamps, and health
+booleans through separate local status directories. It does not read or back up tenant homes,
+workspaces, databases, provider directories, browser data, or conversations. It requests release
+metadata and application downloads from the fixed OpenBot GitHub repository; those requests
+expose the host's network address to GitHub. It sends no tenant status or tenant content to GitHub.
+
+The separate, optional administrator account-setup command creates new local Standard users and
+empty private homes. It saves generated login passwords in a root-only file under
+`/private/var/root` for the administrator to retrieve. It does not transmit those credentials or
+include them in logs. The installed administrator CLI shows each password once on the controlling terminal after setup,
+then removes the recovery file. A failed setup retains that root-only file for administrator recovery.
+The administrator controls secure password delivery. Host verification reads home metadata only
+and tests cross-user access using harmless temporary files outside tenant homes.

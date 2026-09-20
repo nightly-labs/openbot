@@ -42,6 +42,7 @@ export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attach
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
+import { recordRestartActivity } from "./restart-activity";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 interface StoredMessage {
@@ -305,6 +306,7 @@ export class MailboxStore {
     }));
 
     this.#state.messages.push(message);
+    recordRestartActivity();
     this.#state.deliveries.push(...deliveries);
     if (input.idempotencyKey) this.#state.idempotency[input.idempotencyKey] = messageId;
     this.#state.drafts = this.#state.drafts.filter((draft) => !(input.draftIds ?? []).includes(draft.id));
