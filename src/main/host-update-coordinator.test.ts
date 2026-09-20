@@ -11,7 +11,7 @@ const uid = process.getuid?.() ?? 501;
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
-async function fixture() {
+async function fixture(platform: NodeJS.Platform = "darwin") {
   const directory = await mkdtemp(join(process.cwd(), ".host-client-test-"));
   directories.push(directory);
   await mkdir(join(directory, "tenants"), { mode: 0o755 });
@@ -22,6 +22,7 @@ async function fixture() {
   const managed = vi.fn();
   let now = 1_000_000;
   const client = new HostUpdateCoordinator({
+    platform,
     directory,
     hostUid: uid,
     uid,
@@ -47,6 +48,15 @@ async function fixture() {
 }
 
 describe("tenant host-status client", () => {
+  it.each(["win32", "linux"] as const)("does not read host files on %s", async (platform) => {
+    const f = await fixture(platform);
+    await writeFile(join(f.directory, "config.json"), "invalid host configuration");
+    await f.client.tick();
+    expect(f.managed).toHaveBeenCalledWith(false);
+    expect(f.stop).not.toHaveBeenCalled();
+    await expect(readFile(join(f.directory, "tenants", String(uid), "status.json"))).rejects.toThrow();
+  });
+
   it("does nothing when host management is absent or disabled", async () => {
     const f = await fixture();
     await f.client.tick();

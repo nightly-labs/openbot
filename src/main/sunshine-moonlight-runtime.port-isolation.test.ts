@@ -435,6 +435,29 @@ describe("sunshine port family helpers", () => {
       releaseWebRtcPortRange(first);
     }
   });
+
+  it("reserves unused WebRTC ranges across independent processes", async () => {
+    const first = await allocateWebRtcPortRange();
+    try {
+      const output = execFileSync(
+        "bun",
+        [
+          "-e",
+          `
+        import { allocateWebRtcPortRange, releaseWebRtcPortRange } from "./src/main/sunshine-moonlight-runtime.ts";
+        const range = await allocateWebRtcPortRange();
+        console.log(JSON.stringify(range));
+        releaseWebRtcPortRange(range);
+      `,
+        ],
+        { cwd: process.cwd(), encoding: "utf8", timeout: 10_000 },
+      );
+      const second = z.object({ min: z.number(), max: z.number() }).parse(JSON.parse(output));
+      expect(second.min > first.max || second.max < first.min).toBe(true);
+    } finally {
+      releaseWebRtcPortRange(first);
+    }
+  });
 });
 
 describe("Sunshine port isolation", () => {

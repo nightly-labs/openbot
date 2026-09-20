@@ -266,6 +266,27 @@ describe("UpdateService", () => {
     expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
   });
 
+  it("keeps the app running when the sibling scan fails", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    const service = createService(updater, {
+      platform: "darwin",
+      beforeInstall,
+      checkSiblingInstances: async () => {
+        throw new Error("scan failed");
+      },
+    });
+    service.start(false);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    await expect(service.installUpdate()).rejects.toThrow("scan failed");
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    expect(service.getStatus().phase).toBe("ready");
+  });
+
   it("refuses tenant installs in host-managed mode and restores manual updates when disabled", async () => {
     const updater = new FakeUpdater();
     const beforeInstall = vi.fn(async () => undefined);

@@ -82,7 +82,9 @@ export interface MoonlightWebRtcPortRange {
 // allocations apart; the bind probes below are what keeps them apart from other processes and
 // other macOS users.
 const claimedSunshineBasePorts = new Set<number>();
-const claimedWebRtcRanges: MoonlightWebRtcPortRange[] = [];
+// Hold one TCP listener at the first port of each fixed UDP range for its whole lifetime.
+// The kernel makes this reservation exclusive across processes and macOS users. Media uses UDP.
+const webRtcReservations = new Map<number, ReturnType<typeof createTcpServer>>();
 
 /** Reserve a Sunshine base port whose whole port family is free on loopback. */
 export async function allocateSunshineBasePort(): Promise<number> {
@@ -112,29 +114,30 @@ export function releaseSunshineBasePort(basePort: number): void {
 }
 
 /** Reserve a block of consecutive UDP ports for one Moonlight WebRTC streamer. */
-export async function allocateWebRtcPortRange(
-  size: number = MOONLIGHT_WEBRTC_RANGE_SIZE,
-): Promise<MoonlightWebRtcPortRange> {
+export async function allocateWebRtcPortRange(): Promise<MoonlightWebRtcPortRange> {
+  const size = MOONLIGHT_WEBRTC_RANGE_SIZE;
   for (let min = MOONLIGHT_WEBRTC_RANGE_START; min + size - 1 <= 65_535; min += size) {
     const max = min + size - 1;
-    if (claimedWebRtcRanges.some((range) => min <= range.max && range.min <= max)) continue;
     const range = { min, max };
-    claimedWebRtcRanges.push(range);
+    let reservation: ReturnType<typeof createTcpServer> | null = null;
     try {
-      if (await udpRangeFree(range)) return range;
+      reservation = await listenTcp(min);
+      reservation.on("connection", (socket) => socket.destroy());
+      if (await udpRangeFree(range)) {
+        webRtcReservations.set(min, reservation);
+        return range;
+      }
     } catch {
       // Probe failures mean "not free" here as well.
     }
-    releaseWebRtcPortRange(range);
+    if (reservation) await new Promise<void>((resolve) => reservation?.close(() => resolve()));
   }
   throw new Error("Could not reserve a free Moonlight WebRTC port range for Remote Desktop.");
 }
 
 export function releaseWebRtcPortRange(range: MoonlightWebRtcPortRange): void {
-  const index = claimedWebRtcRanges.findIndex(
-    (candidate) => candidate.min === range.min && candidate.max === range.max,
-  );
-  if (index >= 0) claimedWebRtcRanges.splice(index, 1);
+  webRtcReservations.get(range.min)?.close();
+  webRtcReservations.delete(range.min);
 }
 
 async function sunshinePortFamilyFree(basePort: number): Promise<boolean> {

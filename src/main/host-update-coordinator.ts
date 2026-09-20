@@ -15,6 +15,7 @@ import {
 import type { RestartReadiness } from "./update-readiness";
 
 interface HostUpdateCoordinatorOptions {
+  platform?: NodeJS.Platform;
   directory?: string;
   hostUid?: number;
   uid: number;
@@ -43,6 +44,7 @@ export class HostUpdateCoordinator {
   }
 
   start(): void {
+    if ((this.#options.platform ?? process.platform) !== "darwin") return;
     if (this.#timer) return;
     this.#timer = setInterval(() => {
       void this.tick().catch(() =>
@@ -71,6 +73,10 @@ export class HostUpdateCoordinator {
   }
 
   async #tick(): Promise<void> {
+    if ((this.#options.platform ?? process.platform) !== "darwin") {
+      this.#options.setManagedByHost(false);
+      return;
+    }
     const directory = this.#options.directory ?? HOST_MANAGER_DIRECTORY;
     const hostUid = this.#options.hostUid ?? 0;
     const config = await readHostConfig(directory, hostUid);

@@ -22,13 +22,12 @@ interface SiblingScanInput {
  * already rules out a second process for the same macOS user, so every match is effectively
  * another tenant's session; the uid is reported so the refusal can say so.
  *
- * A failed scan resolves to "no evidence of siblings" rather than blocking the update: `ps`
- * failing is a broken host, not proof another session is running.
+ * A failed scan blocks installation: failure is not proof that the shared bundle is unused.
  */
 export async function listSiblingOpenBotInstances(input: SiblingScanInput): Promise<OpenBotSiblingInstance[]> {
   const platform = input.platform ?? process.platform;
   if (platform !== "darwin" && platform !== "linux") return [];
-  const output = await (input.listProcesses ?? listProcessesWithPs)();
+  const output = await (input.listProcesses ?? (() => listProcessesWithPs(platform)))();
   return parseSiblingInstances(output, input);
 }
 
@@ -45,20 +44,19 @@ export function parseSiblingInstances(
     const uid = Number(match[2]);
     const command = match[3] ?? "";
     if (pid === input.currentPid) continue;
-    // The executable path itself, or the path followed by arguments. Prefix matching without
-    // the argument boundary would mistake a helper
-    // (`.../OpenBot.app/Contents/Frameworks/...`) for the main process, and every Electron
-    // session runs helpers, so that mistake would block every update.
     if (command !== input.executablePath && !command.startsWith(`${input.executablePath} `)) continue;
     siblings.push({ pid, uid });
   }
   return siblings;
 }
 
-function listProcessesWithPs(): Promise<string> {
-  return new Promise((resolve) => {
-    execFile("ps", ["-ax", "-o", "pid=,uid=,command="], (error, stdout) => {
-      resolve(error ? "" : stdout);
+function listProcessesWithPs(platform: NodeJS.Platform): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // macOS comm is the executable path; Linux comm is only a truncated name.
+    const columns = platform === "darwin" ? "pid=,uid=,comm=" : "pid=,uid=,args=";
+    execFile("/bin/ps", ["-ax", "-o", columns], (error, stdout) => {
+      if (error) reject(new Error("Could not verify other OpenBot sessions. Try again before installing."));
+      else resolve(stdout);
     });
   });
 }

@@ -3,6 +3,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { listSiblingOpenBotInstances, parseSiblingInstances } from "./update-sibling-instances";
 
+const processMock = vi.hoisted(() => ({ execFile: vi.fn() }));
+vi.mock("node:child_process", () => processMock);
+
 const EXECUTABLE = "/Applications/OpenBot.app/Contents/MacOS/OpenBot";
 
 const PS_OUTPUT = [
@@ -40,6 +43,21 @@ describe("parseSiblingInstances", () => {
 });
 
 describe("listSiblingOpenBotInstances", () => {
+  it("blocks installation when the OS process command fails", async () => {
+    processMock.execFile.mockImplementation(
+      (_file: string, _args: string[], callback: (error: Error, stdout: string) => void) => {
+        callback(new Error("output buffer overflow"), "");
+      },
+    );
+    await expect(
+      listSiblingOpenBotInstances({ executablePath: EXECUTABLE, currentPid: 101, platform: "darwin" }),
+    ).rejects.toThrow("Could not verify other OpenBot sessions");
+    expect(processMock.execFile).toHaveBeenCalledWith(
+      "/bin/ps",
+      ["-ax", "-o", "pid=,uid=,comm="],
+      expect.any(Function),
+    );
+  });
   it("scans with ps on macOS", async () => {
     const listProcesses = vi.fn(async () => PS_OUTPUT);
     const siblings = await listSiblingOpenBotInstances({
@@ -52,14 +70,17 @@ describe("listSiblingOpenBotInstances", () => {
     expect(siblings).toEqual([{ pid: 202, uid: 502 }]);
   });
 
-  it("treats a failed scan as no evidence of siblings", async () => {
-    const siblings = await listSiblingOpenBotInstances({
-      executablePath: EXECUTABLE,
-      currentPid: 101,
-      platform: "darwin",
-      listProcesses: async () => "",
-    });
-    expect(siblings).toEqual([]);
+  it("rejects a failed scan instead of reporting no siblings", async () => {
+    await expect(
+      listSiblingOpenBotInstances({
+        executablePath: EXECUTABLE,
+        currentPid: 101,
+        platform: "darwin",
+        listProcesses: async () => {
+          throw new Error("scan failed");
+        },
+      }),
+    ).rejects.toThrow("scan failed");
   });
 
   it("does not scan where ps is unavailable", async () => {

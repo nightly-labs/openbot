@@ -27,7 +27,9 @@ tenant. The current verifier requires mode `0755` or stricter on that parent, in
 of group write permission. Framework symlinks must remain inside the application. The setup
 refuses unsafe permissions; it does not change tenant data or silently repair an unsafe bundle.
 
-Remote Desktop reserves separate Sunshine port families and Moonlight WebRTC ranges. Stored
+Remote Desktop reserves separate Sunshine port families and Moonlight WebRTC ranges. Each fixed
+WebRTC UDP range has a TCP reservation at its first port until the runtime stops. This keeps
+separate processes from selecting the same range before streaming begins. Stored
 Moonlight endpoints are recreated when the allocated port changes. The local Moonlight
 header has a random per-process credential, stored only in the private runtime config; automatic
 password-based administrator enrollment is disabled. Sunshine credentials use the pinned native
