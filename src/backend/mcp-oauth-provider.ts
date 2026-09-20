@@ -291,18 +291,27 @@ export class McpOAuth implements McpOAuthAuthority {
   #provider(resource: string, state: string | null, isAbandoned: () => boolean = () => false): McpOAuthClientProvider {
     const generation = this.#generations.get(resource) ?? 0;
     const storage = this.#options.storage;
-    // The store as this run saw it: reads answer from disk, but a write lands only while no
-    // `forget` has removed the server - and no abandon has ended the run - since this provider
-    // was built.
+    // The store as this run saw it: reads answer from disk, but a write or a removal lands only
+    // while no `forget` has removed the server - and no abandon has ended the run - since this
+    // provider was built.
+    const ensureCurrent = (): void => {
+      if ((this.#generations.get(resource) ?? 0) !== generation)
+        throw new Error("The MCP sign-in was forgotten while it was running.");
+      if (isAbandoned()) throw new Error("The MCP sign-in was abandoned.");
+    };
     const guarded: McpOAuthStorage = {
       read: (candidate) => storage.read(candidate),
       write: async (candidate, record) => {
-        if ((this.#generations.get(resource) ?? 0) !== generation)
-          throw new Error("The MCP sign-in was forgotten while it was running.");
-        if (isAbandoned()) throw new Error("The MCP sign-in was abandoned.");
+        ensureCurrent();
         await storage.write(candidate, record);
       },
-      clear: (candidate) => storage.clear(candidate),
+      // Removal is guarded exactly as a write is. The SDK answers `invalid_client` by calling
+      // `invalidateCredentials("all")`, so a refusal that arrives after this attempt ended would
+      // otherwise delete the account a later sign-in had already stored.
+      clear: async (candidate) => {
+        ensureCurrent();
+        await storage.clear(candidate);
+      },
     };
     return new McpOAuthClientProvider({
       resource,
@@ -548,10 +557,10 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  * directly. Redirects are followed by hand for that reason - `fetch` would follow them itself and
  * never say where it went.
  */
-function secureOAuthFetch(signal: AbortSignal): FetchLike {
+export function secureOAuthFetch(signal?: AbortSignal): FetchLike {
   return async (input, init) => {
     let url = new URL(input instanceof URL ? input.toString() : input);
-    let request: RequestInit = { ...init, signal, redirect: "manual" };
+    let request: RequestInit = { ...init, ...(signal ? { signal } : {}), redirect: "manual" };
     for (let hop = 0; ; hop++) {
       if (!isSecureEndpoint(url))
         throw new Error(`The OAuth endpoint ${url.origin} is not https, so the credentials were not sent.`);
@@ -560,10 +569,24 @@ function secureOAuthFetch(signal: AbortSignal): FetchLike {
       // Not a redirect this follows: the SDK reads the answer, including a 3xx that names nowhere.
       if (location === null) return response;
       if (hop >= MAX_OAUTH_REDIRECTS) throw new Error("The OAuth endpoint redirected too many times.");
-      url = new URL(location, url);
+      const next = new URL(location, url);
+      // Following by hand means the stripping `fetch` would have done is this loop's job now. A
+      // token request carries `Authorization: Basic` for a client with a secret, and the form
+      // holding the code or the refresh token in its body; neither belongs to an origin the first
+      // one only pointed at. Discovery carries neither, so an issuer may still redirect to the
+      // authorization server that answers for it.
+      if (next.origin !== url.origin && carriesCredential(request))
+        throw new Error(`The OAuth endpoint redirected to ${next.origin}, so the credentials were not forwarded.`);
+      url = next;
       request = redirected(request, response.status);
     }
   };
+}
+
+/** Whether this request would hand the next origin something only the first one should have. */
+function carriesCredential(request: RequestInit): boolean {
+  if (request.body !== undefined && request.body !== null) return true;
+  return new Headers(request.headers).has("authorization");
 }
 
 /** Where a credential may be sent: an https endpoint, or one on the user's own machine. */

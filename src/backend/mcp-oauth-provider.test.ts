@@ -54,6 +54,10 @@ interface FakeServerOptions {
   tokenUrl?: string;
   /** Answers the code exchange with a refusal that quotes back what the request carried. */
   quoteCredentialsOnTokenError?: boolean;
+  /** Redirects the token endpoint to another address, to check what the next hop is handed. */
+  redirectTokenTo?: string;
+  /** Refuses every bearer token, so a stored one that looks valid still ends in a 401. */
+  rejectEveryToken?: boolean;
   /** The protected-resource metadata URL the 401 challenge advertises. */
   advertisedPrmPath?: string;
   /** Authorization servers the default protected-resource metadata names. */
@@ -62,7 +66,7 @@ interface FakeServerOptions {
 
 async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeServer> {
   const { quoteTokenOnError = false, hangToken = false, delayTokenMs = 0 } = options;
-  const { quoteCredentialsOnTokenError = false } = options;
+  const { quoteCredentialsOnTokenError = false, rejectEveryToken = false } = options;
   const state: { registrations: number; tokenRequests: URLSearchParams[]; refreshToken: string } = {
     registrations: 0,
     tokenRequests: [],
@@ -106,6 +110,12 @@ async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeSer
         return;
       }
       if (path === "/token") {
+        // A token endpoint that moved. 307 keeps the method and the body, which is what makes the
+        // next origin a place the code or the refresh token would otherwise arrive at.
+        if (options.redirectTokenTo !== undefined) {
+          response.writeHead(307, { location: options.redirectTokenTo }).end();
+          return;
+        }
         const form = new URLSearchParams(await readBody(request));
         state.tokenRequests.push(form);
         // An authorization server that takes the connection and never answers. The request is
@@ -156,8 +166,9 @@ async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeSer
         return;
       }
       if (
-        request.headers.authorization !== `Bearer ${ACCESS_TOKEN}` &&
-        request.headers.authorization !== `Bearer ${REFRESHED_TOKEN}`
+        rejectEveryToken ||
+        (request.headers.authorization !== `Bearer ${ACCESS_TOKEN}` &&
+          request.headers.authorization !== `Bearer ${REFRESHED_TOKEN}`)
       ) {
         response.writeHead(401, {
           "www-authenticate": `Bearer resource_metadata="${base}${advertisedPrm}"`,
@@ -586,6 +597,29 @@ describe("signing in to an http MCP server", () => {
     expect(storage.read("https://mcp.example.com/mcp")).toBeNull();
   });
 
+  it("refuses a credential removal from an abandoned sign-in", async () => {
+    // The SDK answers `invalid_client` by invalidating everything. A probe that timed out, a user
+    // who signed in again, and only then the old attempt's refusal arriving, would otherwise take
+    // the account the new sign-in had just stored.
+    const storage = memoryStorage();
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("Nothing is signed in here."),
+    });
+    const stale = oauth.signIn("https://mcp.example.com/mcp");
+    if (!stale) throw new Error("The example server cannot be signed in to.");
+    stale.abandon();
+    const fresh: McpOAuthRecord = { tokens: { access_token: "the-new-token", token_type: "Bearer" } };
+    storage.records.set("https://mcp.example.com/mcp", fresh);
+
+    // Optional on the SDK's interface, and the whole subject of this test.
+    const { invalidateCredentials } = stale.provider;
+    if (!invalidateCredentials) throw new Error("The provider cannot invalidate credentials.");
+    await expect(invalidateCredentials.call(stale.provider, "all")).rejects.toThrow("The MCP sign-in was abandoned.");
+    expect(storage.read("https://mcp.example.com/mcp")).toEqual(fresh);
+  });
+
   it("keeps the token it just minted out of the failure it reports", async () => {
     const server = await fakeServer({ quoteTokenOnError: true });
     const storage = memoryStorage();
@@ -646,6 +680,84 @@ describe("signing in to an http MCP server", () => {
     const verifier = server.tokenRequests[0]?.get("code_verifier");
     expect(verifier).toBeTruthy();
     expect(result.error).not.toContain(verifier);
+  });
+
+  it("guards the refresh the transport starts after a 401 on a stored token", async () => {
+    // The transport does OAuth of its own. A token this probe believed was still valid, refused by
+    // the server, makes the transport spend the refresh token and the client secret through its
+    // own fetch - the path the two explicit exchanges do not cover.
+    const server = await fakeServer({ rejectEveryToken: true, tokenUrl: "http://auth.example.com/token" });
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", client_secret: "test-secret", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      // Well inside its life, so nothing refreshes before the connection: only the 401 does.
+      obtainedAt: Date.now(),
+      discovery: { authorizationServerUrl: server.base },
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    // What actually left this machine. The probe falls back to an interactive sign-in after the
+    // 401, and that path is guarded already - so the error text alone would not say whether the
+    // transport's own refresh was stopped. Only the requests answer that.
+    const requested: string[] = [];
+    const realFetch = globalThis.fetch;
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      requested.push(input instanceof Request ? input.url : input.toString());
+      return realFetch(input, init);
+    });
+    try {
+      const result = await testMcpServer(config(server.url), 10_000, undefined, oauth);
+      expect(result.toolCount).toBe(0);
+      // The refresh token and the client secret were never offered to the plain-text endpoint the
+      // discovery document named.
+      expect(requested.filter((url) => url.startsWith("http://auth.example.com"))).toEqual([]);
+      expect(server.tokenRequests).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("does not forward the token request to the origin a redirect names", async () => {
+    // `fetch` strips `Authorization` across origins by itself; following redirects by hand means
+    // this loop has to, and a token request also carries the code in its body.
+    const received: { authorization?: string; body: string }[] = [];
+    const elsewhere = createServer((request, response) => {
+      void (async () => {
+        received.push({ authorization: request.headers.authorization, body: await readBody(request) });
+        sendJson(response, 200, { access_token: "leaked", token_type: "Bearer" });
+      })();
+    });
+    await new Promise<void>((resolve) => elsewhere.listen(0, "127.0.0.1", resolve));
+    const address = elsewhere.address();
+    if (address === null || typeof address === "string") throw new Error("The second server has no port.");
+    try {
+      // A different port is a different origin, which is what the check is about.
+      const server = await fakeServer({ redirectTokenTo: `http://127.0.0.1:${address.port}/token` });
+      const oauth = new McpOAuth({
+        storage: memoryStorage(),
+        redirectUrl: "openbot://mcp-auth",
+        openExternal: async (url) => {
+          oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+        },
+        signInTimeoutMs: 10_000,
+      });
+
+      const result = await testMcpServer(config(server.url), 10_000, undefined, oauth);
+      expect(result.toolCount).toBe(0);
+      expect(result.error).toContain("redirected to");
+      // The origin the redirect named was never asked for anything at all.
+      expect(received).toHaveLength(0);
+    } finally {
+      await new Promise<void>((resolve) => elsewhere.close(() => resolve()));
+    }
   });
 
   it("spends the stored token the next time rather than signing in again", async () => {

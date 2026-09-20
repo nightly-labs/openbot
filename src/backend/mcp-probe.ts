@@ -6,7 +6,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import type { McpOAuthAuthority, McpSignIn } from "./mcp-oauth-provider";
+import { type McpOAuthAuthority, type McpSignIn, secureOAuthFetch } from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
   type McpToolRuntimes,
@@ -196,8 +196,16 @@ function createTransport(server: ResolvedMcpServer, authProvider?: OAuthClientPr
     const headers = authProvider
       ? Object.fromEntries(config.headers.map(({ key, value }) => [key, value]))
       : mcpHandoffHeaders(server);
+    /*
+     * The transport does OAuth of its own: a 401 on a token this probe believed was still valid
+     * makes it call `auth()` through its own fetch, which spends the refresh token and the client
+     * secret at the discovered endpoint. That is the same exchange the explicit paths guard, so it
+     * gets the same fetch - without it a discovery document could name a plain-text token endpoint
+     * and this one request would still honour it. A provider is only attached to a URL that already
+     * passed `normalizeResource`, so the guard refuses nothing this probe could otherwise reach.
+     */
     return new StreamableHTTPClientTransport(new URL(config.url), {
-      ...(authProvider ? { authProvider } : {}),
+      ...(authProvider ? { authProvider, fetch: secureOAuthFetch() } : {}),
       requestInit: { headers },
     });
   }
