@@ -19,6 +19,19 @@ describe("openbotCursorThemeSource", () => {
     expect(hotspot.y).toBeLessThan(canvas.height);
   });
 
+  // The driver holds a fixed point of the canvas over the target and does not read the hotspot, so
+  // the drawing is what puts the tip on the button. A tip that leaves that point is a cursor the
+  // user sees miss what it presses, and nothing else in the build says so.
+  it("draws the tip of every arrow on the hotspot", () => {
+    const { hotspot } = source["cua/theme.json"];
+    for (const animation of [source["a/pointer.json"], source["a/pulse.json"]]) {
+      const arrow = animation.layers.find((layer) => layer.nm === "arrow");
+      expect(arrow?.ks.p.k).toEqual([hotspot.x, hotspot.y, 0]);
+      const tip = arrow?.shapes.find((shape) => shape.ty === "sh")?.ks.k.v[0];
+      expect(tip).toEqual([0, 0]);
+    }
+  });
+
   it("gives each action an animation the archive carries", () => {
     const named = new Set(source["manifest.json"].animations.map((entry) => entry.id));
     for (const action of Object.values(source["cua/theme.json"].actions)) {

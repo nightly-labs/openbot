@@ -39,8 +39,20 @@ const ACCENT = [0, 0.486, 0.969, 1] as const;
 const OUTLINE = [1, 1, 1, 1] as const;
 /** The canvas the profile fixes: any other size or rate is refused. */
 const CANVAS = { width: 128, height: 128, fps: 30 } as const;
-/** The hotspot, which is where the arrow's tip is drawn. */
-const TIP = { x: CANVAS.width / 2, y: CANVAS.height / 2 } as const;
+/**
+ * Where the arrow's tip is drawn, which is the point the driver holds over the target.
+ *
+ * The driver does not read the hotspot of the manifest when it draws. It holds one fixed point of
+ * the canvas over the agent's position, and its own cursor is drawn on that point. A tip on the
+ * middle of the canvas is therefore drawn about 8 points down and to the right of the target, which
+ * a user sees as a cursor that misses the button it presses. The point is measured from the
+ * pinned driver: move the cursor to a known position, capture the overlay window alone, because a
+ * full-screen capture leaves the overlay out, and read where the tip lands.
+ *
+ * The hotspot below names this same point, so the cursor is correct for this driver and for one
+ * that reads the hotspot.
+ */
+const TIP = { x: 38, y: 41 } as const;
 
 /**
  * The arrow, as the corners of a closed path with its tip at the origin.
