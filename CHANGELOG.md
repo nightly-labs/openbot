@@ -5,6 +5,8 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-20
+
 ### Added
 
 - Start an MCP server on a computer that has no Node. OpenBot downloads Bun 1.4.2, a JavaScript
@@ -13,22 +15,44 @@ All notable changes to OpenBot will be documented here. The project follows
 - Say why an MCP server did not reach an agent. A command this computer does not have, and a
   working directory the provider cannot carry, each raise one notice naming the server and the
   reason, and the panel states the working-directory limit before the server is saved.
+- Answer a question an MCP server asks, on every provider. A server that needs a field gets one
+  question for each field it requests, with the typed value it asked for, a secret hidden as it is
+  entered, and a decline that names the field the server cannot do without.
+- Invite people with a permanent link, in the new **Perma link** tab of server settings. The link
+  is reusable and never expires, so it suits a channel or a document rather than one person. A host
+  keeps at most five, each one is revoked from the same tab, and a permanent link cannot be bound
+  to an email address. Single-use invitations are unchanged. A server that speaks an older Team API
+  does not offer the tab, because that protocol carries no permanent link.
+- Update OpenBot for every account on a shared Mac from one place, with the new Host package.
+  An administrator installs it, and the Mac then downloads a release once, waits until every
+  signed-in account is idle, installs it one time, and starts OpenBot again for each account. A
+  managed account shows the host's progress and never installs on its own. The package is signed
+  and notarized on its own, and it installs managed-host infrastructure only: the DMG is still the
+  application. The installer also creates Standard accounts for tenants.
 
 ### Changed
 
-- Give Claude and Codex agents only the MCP servers in Settings. A server declared in
-  `~/.claude/settings.json`, in a project `.mcp.json`, by a plugin, in agent frontmatter or in
-  `~/.codex/config.toml` no longer reaches an agent. Add it in OpenBot to keep it. A notice says
-  this once. OpenCode and Grok document no equivalent setting, so their agents can still start
-  servers from their own files, which the panel now states.
+- **A server declared outside OpenBot no longer reaches a Claude or Codex agent. Add it in
+  Settings, MCP to keep it.** This covers `~/.claude/settings.json`, a project `.mcp.json`, a
+  plugin, agent frontmatter and `~/.codex/config.toml`. Nothing is deleted: the declaration stays
+  in its own file and OpenBot does not read it. A notice says this once. OpenCode and Grok document
+  no equivalent setting, so their agents can still start servers from their own files, which the
+  panel now states.
+- **Sign in again once after upgrading to reach Canva, Figma, Linear, Notion, Sentry or Stripe.**
+  The six listings now connect over HTTP and OpenBot holds the OAuth client itself: it opens the
+  browser, keeps the tokens in the operating system's secret storage, and adds the header when it
+  hands the server to a provider. No third-party bridge program is downloaded or started. A bridge
+  that already holds a token keeps it in its own folder, which OpenBot does not read, so the sign-in
+  does not carry over. Removing the server forgets its sign-in, and the tokens are redacted on every
+  log and export path like every other secret.
 - Replace a Codex thread that started before this release once, keeping its conversation and its
   history, so the tools the agent has match the panel.
-- Sign in to Canva, Figma, Linear, Notion, Sentry and Stripe from OpenBot itself. The six listings
-  connect over HTTP, and OpenBot holds the OAuth client: it opens the browser, keeps the tokens in
-  the operating system's secret storage, and adds the header when it hands the server to a provider.
-  No third-party bridge program is downloaded or started, and the tokens are redacted on every log
-  and export path like every other secret. Sign in again once after upgrading; a bridge that already
-  holds a token keeps it in its own folder, which OpenBot does not read.
+- Re-read a provider's remaining usage while the figure is on screen, so a window that counts down
+  no longer reads minutes out of date. The dock, the account menu and the usage popover refresh a
+  reading that is five minutes old. Nothing is read while no view shows the figure, and a hidden
+  window reads again when it comes back.
+- Run two Remote Desktop sessions at the same time on a shared Mac. Each signed-in account gets its
+  own port range, so one session no longer takes the ports the other needs.
 
 ## [0.14.1] - 2026-09-19
 
