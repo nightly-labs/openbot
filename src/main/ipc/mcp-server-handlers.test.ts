@@ -13,6 +13,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { describe, expect, it, vi } from "vitest";
 import { NO_MCP_TOOL_RUNTIMES } from "../../backend/mcp-provider-shapes";
+import type { ResponseDecoder } from "../remote-host-decoding";
+import type { RemoteRequestInit } from "../remote-server-client";
+import { REMOTE_REQUEST_TIMEOUT_MS } from "../remote-server-http";
 import { registerIpcGroup } from "./define-ipc-group";
 import { mcpServerIpcHandlers } from "./mcp-server-handlers";
 
@@ -66,7 +69,9 @@ function httpConfig(): McpServerConfig {
 function setup(options: { ensureToolRuntimesReady?: () => Promise<void> }): {
   ensureToolRuntimesReady: ReturnType<typeof vi.fn>;
   testMcpServer: ReturnType<typeof vi.fn>;
+  remoteCalls: RemoteRequestInit[];
   test: (config: McpServerConfig) => Promise<McpTestResult>;
+  testRemote: (config: McpServerConfig) => Promise<McpTestResult>;
 } {
   registrations.clear();
   const testMcpServer = vi.fn(async (): Promise<McpTestResult> => ({ toolCount: 2, error: null }));
@@ -77,9 +82,19 @@ function setup(options: { ensureToolRuntimesReady?: () => Promise<void> }): {
     setMcpServerEnabled: () => [],
     testMcpServer,
   };
+  const remoteCalls: RemoteRequestInit[] = [];
   const remoteServers = {
     supportsCapability: () => true,
-    request: vi.fn(),
+    // Generic like the manager: the host answers what the codec below decodes.
+    request: async <T>(
+      _serverId: string,
+      _path: string,
+      decoder: ResponseDecoder<T>,
+      init?: RemoteRequestInit,
+    ): Promise<T> => {
+      if (init) remoteCalls.push(init);
+      return decoder({ toolCount: 1, error: null });
+    },
   };
   const ensureToolRuntimesReady = vi.fn(options.ensureToolRuntimesReady ?? (async () => undefined));
   registerIpcGroup(
@@ -97,11 +112,14 @@ function setup(options: { ensureToolRuntimesReady?: () => Promise<void> }): {
   return {
     ensureToolRuntimesReady,
     testMcpServer,
+    remoteCalls,
     // Decoded with the production codec, so the test reads what the renderer would.
     test: (config) =>
       Promise.resolve(listener(TRUSTED_EVENT, { serverId: LOCAL_SERVER_ID, payload: { config } })).then(
         decodeMcpTestResult,
       ),
+    testRemote: (config) =>
+      Promise.resolve(listener(TRUSTED_EVENT, { serverId: "remote-1", payload: { config } })).then(decodeMcpTestResult),
   };
 }
 
@@ -148,5 +166,18 @@ describe("mcpServerIpcHandlers test", () => {
 
     await expect(test(stdioConfig())).resolves.toEqual({ toolCount: 2, error: null });
     expect(testMcpServer).toHaveBeenCalledOnce();
+  });
+
+  it("gives a remote test a deadline that covers the host preparation", async () => {
+    // The host may wait out the runtime download before its own probe deadline even starts.
+    // The default request limit would report a timeout for a download that is still running,
+    // before the host probes anything.
+    const { ensureToolRuntimesReady, testMcpServer, remoteCalls, testRemote } = setup({});
+
+    await expect(testRemote(stdioConfig())).resolves.toEqual({ toolCount: 1, error: null });
+    expect(ensureToolRuntimesReady).not.toHaveBeenCalled();
+    expect(testMcpServer).not.toHaveBeenCalled();
+    expect(remoteCalls).toHaveLength(1);
+    expect(remoteCalls[0]?.timeoutMs).toBeGreaterThan(REMOTE_REQUEST_TIMEOUT_MS);
   });
 });

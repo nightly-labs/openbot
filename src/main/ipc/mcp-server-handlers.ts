@@ -18,6 +18,7 @@ import {
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import type { TestMcpServerOptions } from "../../backend/agent-service";
+import { MCP_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -89,6 +90,13 @@ interface McpServerIpcDependencies {
 
 /** How long a connection test waits for the managed runtimes before probing without them. */
 const TOOL_RUNTIME_TEST_WAIT_MS = 60_000;
+
+/**
+ * The remote Test deadline: the host may wait out the preparation above before its own probe
+ * deadline even starts, so the caller's request must cover both. Without this the 15-second
+ * request limit reports a timeout for a download that is still running, before the host probes.
+ */
+const REMOTE_TEST_TIMEOUT_MS = TOOL_RUNTIME_TEST_WAIT_MS + MCP_PROBE_TIMEOUT_MS + 20_000;
 
 /**
  * Waits for the download, but never past the deadline, and never as an error. Failure and
@@ -183,6 +191,7 @@ export function mcpServerIpcHandlers({
             return remoteServers.request(serverId, MCP_ROUTES.test, decodeMcpTestResult, {
               method: "POST",
               body: parsed,
+              timeoutMs: REMOTE_TEST_TIMEOUT_MS,
             });
           },
         });
