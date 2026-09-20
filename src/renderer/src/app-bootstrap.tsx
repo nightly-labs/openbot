@@ -1,6 +1,8 @@
 import { createEffect, flush, onSettled } from "solid-js";
+import { toast } from "./components/ui";
 import { useAuth } from "./features/account/account-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
+import { takeMcpConfigDoorNotice } from "./features/servers/mcp-servers";
 import { useServers } from "./features/servers/servers-context";
 import { useSettings } from "./features/settings/settings-context";
 
@@ -19,6 +21,10 @@ import { useSettings } from "./features/settings/settings-context";
  *
  * A plugin link is the same problem with a shorter answer: it opens the
  * marketplace on one listing, and installs nothing.
+ *
+ * The MCP notice below belongs here for the same reason: the MCP list is
+ * machine-scoped, the notice is owed once per computer and not once per
+ * workspace, and it has to reach a user who never opens the MCP panel.
  */
 export function AppBootstrap() {
   const { centralAuth } = useAuth();
@@ -60,6 +66,21 @@ export function AppBootstrap() {
       unsubscribePlugin();
     };
   });
+
+  /*
+   * Said once, because the release it describes takes servers away: Claude is now started with
+   * `strictMcpConfig` and Codex with the names in its own file turned off, so a server the user
+   * declared outside OpenBot stops reaching their agents. There is no opt-out to point at, so the
+   * notice names the files and says what to do instead.
+   */
+  createEffect(
+    () => setupState(),
+    (setup) => {
+      if (!setup) return;
+      const notice = takeMcpConfigDoorNotice(setup.completed);
+      if (notice) toast.warning(notice.title, { description: notice.description });
+    },
+  );
 
   createEffect(
     () => ({

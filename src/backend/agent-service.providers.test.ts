@@ -4,7 +4,12 @@ import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import { type AgentEvent, COMPUTER_USE_MCP_SERVER_ID, COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
+  type McpServerConfig,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
@@ -27,7 +32,7 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
-import { loginShellPath } from "./mcp-provider-shapes";
+import { loginShellPath, type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
@@ -375,6 +380,110 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // A server Codex cannot be given used to vanish: the adapter skipped it, the provider never saw
+  // it, and so nothing anywhere failed. The user is told once, and told again only if they change
+  // the list - not once per turn.
+  it("reports the MCP server Codex cannot start in a working directory, once", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    const events: AgentEvent[] = [];
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Local SQLite",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "/tmp",
+        url: "",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const reported = events.filter((event) => event.type === "error" && event.code === "mcp_server_not_started");
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toMatchObject({
+      agentId: undefined,
+      message: expect.stringContaining('did not get the MCP server "Local SQLite"'),
+    });
+
+    // Reported, and still not sent: the point of the report is that the server is missing.
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(paramsRecord(starts.at(-1)?.params)?.config).toBe(undefined);
+
+    await service.sendMessage({ agentId: "chief", text: "Again." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    expect(events.filter((event) => event.type === "error" && event.code === "mcp_server_not_started")).toHaveLength(1);
+  });
+
+  /* The token OpenBot mints is never on a row, so the stored configuration cannot name it. It still
+     reaches a provider process, and that process quotes what it sent when a request fails. */
+  it("hands a signed-in http server its bearer token and keeps that token out of the error it causes", async () => {
+    const { store, mailbox } = stores(root);
+    const token = "minted-access-token-abc";
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
+      // Quoted bare, the way a CLI reports the request it failed on. No shared pattern covers it:
+      // only the value itself, remembered at hand-off, can take it out again.
+      if (method === "turn/start") throw new Error(`upstream refused the token ${token}`);
+    });
+    const events: AgentEvent[] = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+      credentials: {
+        apiKey: () => null,
+        customProviders: () => [],
+        mcpServers: () => [],
+        mcpOAuth: {
+          accessToken: async (url) => (url === "https://mcp.example.com/mcp" ? token : null),
+          signIn: () => null,
+          forget: async () => undefined,
+        },
+      },
+    });
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Signed in",
+        transport: "http",
+        enabled: true,
+        command: "",
+        args: [],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "https://mcp.example.com/mcp",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "failed"));
+
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({
+      mcp_servers: {
+        "Signed in": { url: "https://mcp.example.com/mcp", http_headers: { Authorization: `Bearer ${token}` } },
+      },
+    });
+    const reported = events.filter((event) => event.type === "error");
+    expect(reported.length).toBeGreaterThan(0);
+    for (const event of reported) expect(event.message).not.toContain(token);
+    expect(service.listQueue("chief").deliveries.at(-1)?.error ?? "").not.toContain(token);
+  });
+
   // A manifest written by an older adapter holds the same stored set as today, so the fingerprint
   // has to carry the adapter: without it the stale session resumes forever with the servers it
   // was given. A manifest that matches nothing - deleted or predating the version - forces the
@@ -407,9 +516,147 @@ describe.sequential("AgentService: providers", () => {
     expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
   });
 
+  // A session started before Bun finished downloading drops its `npx` servers, while the
+  // configured set alone reads unchanged. The tool fingerprint folds the runtimes in as well, so
+  // the next turn replaces the session once its servers can actually start - without it the old
+  // session would resume forever with the tools it was given.
+  it("replaces a Codex session started before the tool runtime was ready", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    let toolRuntimes: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+      credentials: {
+        apiKey: () => null,
+        customProviders: () => [],
+        mcpServers: () => [],
+        mcpToolRuntimes: () => toolRuntimes,
+      },
+    });
+    await service.initialize();
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Npx tool",
+        transport: "stdio",
+        enabled: true,
+        command: "npx",
+        args: ["-y", "some-tool"],
+        // An isolated `PATH` stands in for a machine with no Node: the command is looked up in
+        // this list, so `npx` is missing until the managed runtime joins it.
+        env: [{ key: "PATH", value: "/nonexistent-test-dir" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!firstSession) throw new Error("The Codex session did not start.");
+    // No runtime yet, so the server is dropped from the session while the stored row stays.
+    const firstStart = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(firstStart?.params)?.config ?? {}).not.toHaveProperty("mcp_servers");
+
+    // Bun finishes downloading between the turns. Nothing about the stored set changed.
+    toolRuntimes = { binDirectories: ["/tmp/fake-bun-bin"], commandAliases: { npx: "/tmp/fake-bun-bin/bunx" } };
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    const config = paramsRecord(starts.at(-1)?.params)?.config;
+    expect(isDynamicRecord(config) ? config.mcp_servers : undefined).toMatchObject({
+      "Npx tool": expect.anything(),
+    });
+  });
+
   // Save, remove and toggle all go through the same refresh, so one of them proves the mechanism.
   // Without it a loaded session keeps the tools it was given until the app restarts: the reason the
   // test above had to stop and start the service to see its new server.
+  // A managed tool runtime becoming ready spends the same refresh: sessions that dropped their
+  // stdio servers before it finished downloading are replaced on the next turn.
+  it("starts a fresh provider session after the tool runtimes become ready", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+    });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!firstSession) throw new Error("The Codex session did not start.");
+
+    service.refreshAllAgentRuntimes();
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+  });
+
+  // Two rows on one URL are one account to the server: removing either row keeps the other's
+  // sign-in. Compared normalized, as the store keys it - a trailing slash names the same account.
+  it("keeps the shared sign-in until the last row on its URL is removed", async () => {
+    const { store, mailbox } = stores(root);
+    const forget = vi.fn(async (_url: string) => undefined);
+    service = createTestService({
+      store,
+      mailbox,
+      credentials: {
+        apiKey: () => null,
+        customProviders: () => [],
+        mcpServers: () => [],
+        mcpOAuth: {
+          accessToken: async () => null,
+          signIn: () => null,
+          forget,
+        },
+      },
+    });
+    await service.initialize();
+    const httpConfig = (name: string, url: string): McpServerConfig => ({
+      id: "",
+      name,
+      transport: "http",
+      enabled: true,
+      command: "",
+      args: [],
+      env: [],
+      envPassthrough: [],
+      workingDirectory: "",
+      url,
+      headers: [],
+    });
+    const [first] = service.saveMcpServer({ config: httpConfig("Stripe", "https://mcp.stripe.com") });
+    const [second] = service
+      .saveMcpServer({ config: httpConfig("Stripe copy", "https://mcp.stripe.com/") })
+      .filter((config) => config.name === "Stripe copy");
+    if (!first || !second) throw new Error("The Stripe rows were not saved.");
+
+    service.removeMcpServer({ mcpServerId: first.id });
+    expect(forget).not.toHaveBeenCalled();
+
+    service.removeMcpServer({ mcpServerId: second.id });
+    expect(forget).toHaveBeenCalledTimes(1);
+    expect(forget).toHaveBeenCalledWith("https://mcp.stripe.com/");
+  });
+
   it("starts a fresh provider session for the next turn after an MCP server changes", async () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
@@ -519,6 +766,78 @@ describe.sequential("AgentService: providers", () => {
 
     driverRunning = false;
     expect(service.enabledMcpServers()).toEqual([]);
+  });
+
+  /*
+   * The second door. Codex merges the servers of `~/.codex/config.toml` into the set it is given,
+   * so a name there reaches an agent without passing the MCP panel, and two computers holding the
+   * same OpenBot settings answer "which servers does my agent have" differently.
+   *
+   * The replacement half is not decoration: nothing tells OpenBot that the file changed, Codex
+   * ignores MCP configuration on resume, and a session that keeps the old set makes the panel a
+   * lie until the app restarts.
+   */
+  it("turns off the MCP servers Codex declares in its own file, and replaces a session when they change", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    // `Filesystem` is in both places, and the panel's entry is the one that wins: a name the user
+    // can see and edit must not resolve to a command from a file OpenBot does not show.
+    client.configRead = {
+      config: {
+        mcp_servers: { "Local notes": { command: "/usr/bin/notes" }, Filesystem: { command: "/usr/bin/other" } },
+      },
+    };
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+    });
+    await service.initialize();
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Filesystem",
+        transport: "stdio",
+        enabled: true,
+        command: "/bin/echo",
+        args: ["ready"],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!firstSession) throw new Error("The Codex session did not start.");
+    const starts = () => client.requests.filter((request) => request.method === "thread/start");
+    // The file's own name carries no command, which is what turning it off means, and OpenBot's
+    // entry is whole.
+    expect(paramsRecord(starts().at(-1)?.params)?.config).toEqual({
+      mcp_servers: {
+        "Local notes": { enabled: false },
+        Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() },
+      },
+    });
+
+    client.configRead = {
+      config: {
+        mcp_servers: { "Local notes": { command: "/usr/bin/notes" }, Scratch: { command: "/usr/bin/scratch" } },
+      },
+    };
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+    expect(starts()).toHaveLength(2);
+    expect(paramsRecord(starts().at(-1)?.params)?.config).toMatchObject({
+      mcp_servers: { "Local notes": { enabled: false }, Scratch: { enabled: false } },
+    });
   });
 
   // The same refresh asks one question of each thread: is a turn running on it. `readConversation`
@@ -2003,7 +2322,7 @@ describe.sequential("AgentService: providers", () => {
         "You may list, read, create, edit, move, and delete files and run local commands in both directories.",
       );
       expect(params.developerInstructions).toContain("For every browser task");
-      expect(params.developerInstructions).toContain(`Use ${COMPUTER_USE_MCP_SERVER_NAME} only for GUI tasks`);
+      expect(params.developerInstructions).toContain(`Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task`);
       expect(params.developerInstructions).toContain("When you use openbot_browser");
       expect(params.developerInstructions).toContain("openbot.create_routine");
       expect(params.developerInstructions).toContain("Never use ChatGPT Sites");

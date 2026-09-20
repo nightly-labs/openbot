@@ -141,6 +141,12 @@ export const McpList: Story = {
     await expectVisible(await body.findByText("Disabled"));
     await expect(body.getAllByText("Enabled")).toHaveLength(3);
     await expect(body.getByRole("switch", { name: "Enable Figma" })).not.toBeChecked();
+
+    // Local SQLite is the only fixture that names a working directory, and only Claude can carry
+    // one. The row says so without a test having been run, because it reads the stored
+    // configuration rather than a connection.
+    await expectVisible(await body.findByText(/Claude only/u));
+    await expect(body.getAllByText(/Claude only/u)).toHaveLength(1);
   },
 };
 

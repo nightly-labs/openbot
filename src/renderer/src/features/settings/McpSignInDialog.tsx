@@ -4,10 +4,12 @@
  * that opens a browser does.
  *
  * Nothing about the sign-in happens here, and nothing about it is faked here either. The connect
- * attempt is what starts it: the listing installs as a bridge that holds an OAuth client, and that
- * bridge opens the browser and keeps the token beside itself. So this dialog is the shell, the
- * server's own words, and one button. The day the main process signs in for itself, the exchange
- * goes in front of `onTest`, and the states on screen stay as they read.
+ * attempt is what starts it: the test the main process runs opens the browser, waits for the grant
+ * to come back on `openbot://mcp-auth`, and only then answers. So this dialog is the shell, the
+ * server's own words, and one button, and `busy()` covers the whole trip rather than a request.
+ *
+ * A grant is a secret, so it never reaches this side. What comes back is the same pass or fail a
+ * test of any other server gives.
  */
 
 import { Show } from "solid-js";

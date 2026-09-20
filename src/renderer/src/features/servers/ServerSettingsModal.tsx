@@ -102,6 +102,11 @@ export interface ServerSettingsModalProps {
   mcpServers?: McpServerConfig[];
   /** Why the MCP list is empty, when the read failed rather than found nothing. */
   mcpLoadError?: string | null;
+  /**
+   * What the managed runtime under a STDIO server is doing, when there is anything to say. The
+   * caller decides: it describes this computer, and this dialog also opens for a remote server.
+   */
+  mcpToolRuntimeNote?: string | null;
   onRetryMcpServers?: () => void;
   onSaveMcpServer?: (config: McpServerConfig) => Promise<void>;
   onRemoveMcpServer?: (id: string) => Promise<void>;
@@ -753,6 +758,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 canManage={canManageMcp()}
                 menuMount={modalElement()}
                 loadError={props.mcpLoadError}
+                toolRuntimeNote={props.mcpToolRuntimeNote}
                 onRetryLoad={props.onRetryMcpServers}
                 onDetailChange={setMcpDetail}
                 onSave={(config) => props.onSaveMcpServer?.(config) ?? Promise.resolve()}

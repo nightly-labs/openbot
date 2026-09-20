@@ -131,7 +131,14 @@ import { type ConversationMarkerExclusions, ConversationReadStore } from "./conv
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { McpHandoffLog } from "./mcp-handoff-log";
+import { type McpOAuthAuthority, normalizeResource } from "./mcp-oauth-provider";
 import { testMcpServer } from "./mcp-probe";
+import {
+  type McpAuthorizationSource,
+  type McpServerDrop,
+  type McpToolRuntimeSource,
+  NO_MCP_TOOL_RUNTIMES,
+} from "./mcp-provider-shapes";
 import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
 import { McpServerStore } from "./mcp-server-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
@@ -164,6 +171,20 @@ export interface ResolvedSharedFile {
   path: string;
   name: string;
   size: number;
+}
+
+/**
+ * Whether a person is in front of this test.
+ *
+ * Only an interactive test may open a browser for a sign-in. The same method answers the remote
+ * Team API, where opening a window on the host machine would be a surprise nobody asked for. A
+ * remote test still spends the host's stored sign-ins: the administrator tests the host's servers,
+ * not their own, and a stored token that works locally must work for them too.
+ */
+export interface TestMcpServerOptions {
+  interactive?: boolean;
+  /** Spend stored credentials without opening a browser. Implied by `interactive`. */
+  storedCredentials?: boolean;
 }
 
 export interface AgentServiceOptions {
@@ -252,10 +273,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #mcpServers: McpServerStore;
   readonly #computerUseMcpServer: () => McpServerConfig | null;
   /**
+   * What OpenBot downloaded for the MCP servers, read at each use. It travels with the credentials
+   * because both are the main process's knowledge of this machine, and because the clients already
+   * take that object; this field is only for the two readers that are not a client: the Test button
+   * and the Codex thread configuration.
+   */
+  readonly #mcpToolRuntimes: McpToolRuntimeSource;
+  /**
+   * The sign-ins this machine holds for http MCP servers, or `null` when nothing signs in - a test
+   * harness, and a build with no secret storage. It travels with the credentials for the same
+   * reason as the runtimes above.
+   */
+  readonly #mcpOAuth: McpOAuthAuthority | null;
+  /** The bearer token for one configuration, asked at every hand-off and never written to a row. */
+  readonly #mcpAuthorization: McpAuthorizationSource;
+  /**
    * What has already been handed to a provider process, kept for redaction. Declared here because
    * both hand-off paths - the client credentials and `enabledMcpServers` - start in this class.
    */
   readonly #mcpHandoff = new McpHandoffLog();
+  /**
+   * Every drop already reported, so a provider that respawns each turn does not repeat itself.
+   * Cleared whenever the MCP list changes, because the user is then owed a fresh answer.
+   */
+  readonly #reportedMcpDrops = new Set<string>();
   readonly #providers: ProviderRuntime;
   readonly #prepareAgentWorkspace: (agent: AgentSummary) => Promise<void>;
   readonly #hostedSites: HostedSiteCoordinator;
@@ -304,6 +345,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
     // given that callback.
     this.#mcpServers = new McpServerStore(store.database);
+    this.#mcpToolRuntimes = () => credentials.mcpToolRuntimes?.() ?? NO_MCP_TOOL_RUNTIMES;
+    this.#mcpOAuth = credentials.mcpOAuth ?? null;
+    this.#mcpAuthorization = async (config) => {
+      const token = (await this.#mcpOAuth?.accessToken(config.url)) ?? null;
+      // The one place a minted token is known before it leaves this process. The row never holds
+      // it, so this is what lets `#redactMcp` keep it out of a provider's own report of a failure.
+      if (token) this.#mcpHandoff.recordSecret(token);
+      return token;
+    };
     this.#sidebarLayout = sidebarLayout;
     this.#profileSave = new ProfileSave(store, {
       create: (input, configure) =>
@@ -429,6 +479,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         // after the user edits them. This is the second of the two ways one leaves; the other is
         // `enabledMcpServers`, which the Codex thread configuration reads.
         mcpServers: () => this.#mcpHandoff.record(credentials.mcpServers()),
+        reportMcpDrops: (provider, drops) => this.#reportMcpDrops(provider, drops),
+        mcpAuthorization: this.#mcpAuthorization,
       },
       mcpHandoff: this.#mcpHandoff,
       redactMcp: (text) => this.#redactMcp(text),
@@ -517,11 +569,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       compaction: this.#compaction,
       // Read at each spawn, not now: the store is built further down this constructor.
       mcpServers: () => this.enabledMcpServers(),
+      mcpToolRuntimes: () => this.#mcpToolRuntimes(),
+      mcpAuthorization: this.#mcpAuthorization,
       hooks: {
         logRecovery: (agentId, provider, outcome) =>
           logger.warn("Recovered an unavailable provider session.", { agentId, provider, outcome }),
         logReleaseFailure: (provider, error) =>
           logger.warn("Could not close a replaced provider session.", { provider, error }),
+        reportMcpDrops: (provider, drops) => this.#reportMcpDrops(provider, drops),
       },
     });
     this.#boot = new BootRecovery({
@@ -920,8 +975,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   removeMcpServer(input: RemoveMcpServerInput): McpServerConfig[] {
+    const removed = this.#mcpServers.list().find((config) => config.id === input.mcpServerId);
     this.#mcpServers.remove(input.mcpServerId);
-    return this.#mcpServersChanged();
+    const list = this.#mcpServersChanged();
+    /*
+     * A row that goes takes its sign-in with it: a refresh token nothing can reach again is a secret
+     * kept for no reason. Only when no row is left naming the same account, because two rows on one
+     * URL are one account to the server and dropping it would sign the other one out too. Compared
+     * normalized, as the store keys it: `https://mcp.stripe.com` and `https://mcp.stripe.com/` share
+     * one credential, and removing either row must keep the other's.
+     */
+    const removedResource = removed?.transport === "http" ? normalizeResource(removed.url) : null;
+    if (
+      removed &&
+      removedResource &&
+      !list.some((config) => config.transport === "http" && normalizeResource(config.url) === removedResource)
+    ) {
+      void this.#mcpOAuth?.forget(removed.url);
+    }
+    return list;
   }
 
   setMcpServerEnabled(input: SetMcpServerEnabledInput): McpServerConfig[] {
@@ -937,8 +1009,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * thread and its history are untouched - only the private provider session is replaced.
    */
   #mcpServersChanged(): McpServerConfig[] {
+    // A user who edits a server and does not fix it has to be told again. Without this the first
+    // report of a run would be the only one, and an edit that changed nothing would look like a fix.
+    this.#reportedMcpDrops.clear();
     this.#threads.refreshAllAgentRuntimes();
     return this.listMcpServers();
+  }
+
+  /**
+   * Marks every agent's provider session for refresh, spent before its next turn.
+   *
+   * The mark is what a managed tool runtime becoming ready spends: a session that dropped its
+   * `npx` servers before Bun finished downloading is replaced once they can start. Mid-turn
+   * sessions keep the mark until the turn ends, and the public threads and their histories stay.
+   */
+  refreshAllAgentRuntimes(): void {
+    this.#threads.refreshAllAgentRuntimes();
   }
 
   /**
@@ -948,12 +1034,27 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * is saved. It is validated here first: a name this machine reserves, or a missing command, is a
    * sentence rather than a connection attempt.
    */
-  async testMcpServer(input: TestMcpServerInput): Promise<McpTestResult> {
+  async testMcpServer(input: TestMcpServerInput, options: TestMcpServerOptions = {}): Promise<McpTestResult> {
     const config = normalizeMcpConfig(input.config);
     const errors = mcpConfigErrors(config);
     const firstError = errors.name ?? errors.command ?? errors.url;
     if (firstError) throw new Error(firstError);
-    return testMcpServer(config);
+    // A browser only opens when a person is waiting for it. The remote Team API route asks for the
+    // same test and gets the silent answer, because nobody is at this machine to finish a sign-in.
+    // The stored sign-ins are still spent: without them the probe cannot read or refresh the host's
+    // token, and a remote administrator gets a false 401 for a server local agents use. `signIn`
+    // stays `null`, so a 401 the stored token cannot fix is reported rather than waited on.
+    const stored = this.#mcpOAuth;
+    const silent: McpOAuthAuthority | undefined =
+      !options.interactive && options.storedCredentials && stored
+        ? {
+            accessToken: (url) => stored.accessToken(url),
+            signIn: () => null,
+            forget: (url) => stored.forget(url),
+          }
+        : undefined;
+    const oauth = options.interactive ? (stored ?? undefined) : silent;
+    return testMcpServer(config, undefined, this.#mcpToolRuntimes(), oauth);
   }
 
   /**
@@ -1443,6 +1544,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
+    // Rows installed from the old catalog's `mcp-remote` bridge definitions reach their servers
+    // natively from here on. Exact matches only; anything the user changed stays as it is.
+    this.#mcpServers.migrateCatalogBridgesToHttp();
     this.channels.restoreDeliveryLinks();
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
@@ -2383,6 +2487,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       success: true,
       contentItems: [{ type: "inputText", text: JSON.stringify(receipt) }],
     };
+  }
+
+  /**
+   * What a provider was not given, said once.
+   *
+   * The event carries no `agentId` on purpose. The MCP list is machine-scoped, so every agent on
+   * this machine has the same problem: with an id the renderer would put a banner in each of ten
+   * conversations, and without one it shows a single deduped toast, which is what this is.
+   *
+   * Nothing is stored. A drop is a fact about one hand-off, and a stored one would be a claim about
+   * right now that nothing keeps true - the same reason the panel holds no health state.
+   */
+  #reportMcpDrops(provider: AgentProvider, drops: readonly McpServerDrop[]): void {
+    for (const drop of drops) {
+      const key = [provider, drop.name, drop.reason, drop.detail].join("\u0000");
+      if (this.#reportedMcpDrops.has(key)) continue;
+      this.#reportedMcpDrops.add(key);
+      logger.warn("An MCP server was not given to a provider.", {
+        provider,
+        server: drop.name,
+        reason: drop.reason,
+        detail: this.#redactMcp(drop.detail),
+      });
+      this.#emitError(
+        "mcp_server_not_started",
+        `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
+      );
+    }
   }
 
   #emitError(code: string, error: unknown, agentId?: string): void {

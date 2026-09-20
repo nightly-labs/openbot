@@ -18,7 +18,14 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import type { ClaudeCliInfo } from "./cli";
-import { claudeMcpServers, type McpServerSource, usableMcpServers } from "./mcp-provider-shapes";
+import {
+  claudeMcpServers,
+  type McpAuthorizationSource,
+  type McpDropReporter,
+  type McpServerSource,
+  type McpToolRuntimeSource,
+  usableMcpServers,
+} from "./mcp-provider-shapes";
 import { OPENBOT_TOOL_DEFINITIONS } from "./openbot-tools";
 import {
   type AccountRateLimitsReadResult,
@@ -122,6 +129,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #readSessionMessages: SessionHistoryReader;
   readonly #requestTimeoutMs: number;
   readonly #mcpServers: McpServerSource;
+  readonly #reportMcpDrops: McpDropReporter | undefined;
+  readonly #mcpToolRuntimes: McpToolRuntimeSource | undefined;
+  readonly #mcpAuthorization: McpAuthorizationSource | undefined;
   readonly #threads = new Map<string, ThreadRuntime>();
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
@@ -134,6 +144,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     readSessionMessages: SessionHistoryReader = getSessionMessages,
     requestTimeoutMs = 30_000,
     mcpServers: McpServerSource = () => [],
+    reportMcpDrops?: McpDropReporter,
+    mcpToolRuntimes?: McpToolRuntimeSource,
+    mcpAuthorization?: McpAuthorizationSource,
   ) {
     super();
     this.#cli = cli;
@@ -141,6 +154,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#readSessionMessages = readSessionMessages;
     this.#requestTimeoutMs = requestTimeoutMs;
     this.#mcpServers = mcpServers;
+    this.#reportMcpDrops = reportMcpDrops;
+    this.#mcpToolRuntimes = mcpToolRuntimes;
+    this.#mcpAuthorization = mcpAuthorization;
   }
 
   get running(): boolean {
@@ -397,12 +413,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // OpenBot's own servers spread last: Claude keys this record by name, so a user configuration
     // that reached one of those names would take the agent's own tools away. Profile generation
     // asks one question and must not act, so it gets neither set.
-    const mcpServers = config.profileGeneration
-      ? {}
-      : {
-          ...claudeMcpServers(await usableMcpServers(this.#mcpServers())),
-          ...this.#createOpenBotServers(threadId),
-        };
+    const handoff = config.profileGeneration
+      ? null
+      : claudeMcpServers(await usableMcpServers(this.#mcpServers(), this.#mcpToolRuntimes?.(), this.#mcpAuthorization));
+    if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
+    const mcpServers = handoff ? { ...handoff.servers, ...this.#createOpenBotServers(threadId) } : {};
     const claudeQuery = this.#createQuery({
       prompt: input,
       options: {
@@ -418,6 +433,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         },
         ...(config.profileGeneration ? { tools: [] } : {}),
         settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
+        // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user
+        // settings, plugin and agent-frontmatter servers into the record above, so two computers
+        // with the same OpenBot settings give their agents different tools and "which servers does
+        // my agent have" has no answer. `settingSources` stays as it is: the flag takes away MCP
+        // and nothing else, so permissions and hooks still load from those files.
+        strictMcpConfig: true,
         permissionMode: "default",
         includePartialMessages: true,
         persistSession: config.persistSession,

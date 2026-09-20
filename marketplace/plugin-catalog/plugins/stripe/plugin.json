@@ -20,9 +20,8 @@
       "iconUrl": "https://stripe.com/favicon.ico",
       "server": {
         "name": "stripe",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "mcp-remote@latest", "https://mcp.stripe.com"],
+        "transport": "http",
+        "url": "https://mcp.stripe.com",
         "auth": [{ "id": "stripe-oauth", "kind": "link", "label": "Sign in" }]
       }
     }

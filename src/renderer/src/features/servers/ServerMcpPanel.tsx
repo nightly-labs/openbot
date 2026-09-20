@@ -36,6 +36,7 @@ import {
   mcpConfigDraft,
   mcpConfigErrors,
   mcpConfigIsValid,
+  mcpProviderLimitNote,
   mcpStatusLabel,
   mcpStatusVariant,
   mcpTestMessage,
@@ -71,6 +72,14 @@ export interface ServerMcpPanelProps {
   onDetailChange?: (detail: McpPanelDetail | null) => void;
   /** Empty-list reason when the read failed; a failed read must not say "No MCP servers yet." */
   loadError?: string | null;
+  /**
+   * One sentence about the managed runtime a STDIO server is started with, or nothing.
+   *
+   * Not a health claim about any server, and not stored: it is what the download on this computer
+   * is doing right now, and the panel only repeats it. The caller leaves it out for a remote
+   * server, whose host holds its own runtime.
+   */
+  toolRuntimeNote?: string | null;
   /** Re-read the list; without it the error has no way out except closing the dialog. */
   onRetryLoad?: () => void;
   onSave: (config: McpServerConfig) => Promise<void>;
@@ -288,7 +297,14 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       <SettingsSection
         class="server-mcp-section"
         title="MCP servers"
-        description="Model Context Protocol servers give this server’s agents extra tools."
+        /*
+         * The second sentence is the panel telling the truth about its own reach. Claude is
+         * started with `strictMcpConfig` and Codex is started with the names in its own file
+         * turned off, so for those two this list is the whole set. OpenCode and Grok document
+         * no such flag, and guessing a key name would fail silently at the next turn, so the
+         * limit is stated rather than hidden.
+         */
+        description="Model Context Protocol servers give this server’s agents extra tools. Claude and Codex agents get only the servers in this list; OpenCode and Grok agents can also start servers from their own configuration files."
         actions={
           <Show when={props.servers.length > 0}>
             <Button type="button" size="sm" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
@@ -302,6 +318,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           <Text class="server-mcp-error" variant="caption" tone="danger" role="alert">
             {state.error}
           </Text>
+        </Show>
+        <Show when={props.toolRuntimeNote}>
+          {(note) => (
+            <Text class="server-mcp-runtime-note" variant="caption" tone="muted">
+              {note()}
+            </Text>
+          )}
         </Show>
         <Show
           when={props.servers.length > 0}
@@ -355,6 +378,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       </div>
                       <Show when={test()?.status === "failed" && test()}>
                         {(failed) => <ItemDescription>{mcpTestMessage(failed())}</ItemDescription>}
+                      </Show>
+                      {/* Only when no failure is shown: a test the user just ran answers about this
+                          server now, and the standing limit must not push it out of the slot. */}
+                      <Show when={test()?.status !== "failed" && mcpProviderLimitNote(config())}>
+                        {(note) => <ItemDescription>{note()}</ItemDescription>}
                       </Show>
                     </ItemContent>
                     <ItemActions>
@@ -600,12 +628,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               </McpRowList>
 
               {/* The limit is named here, before the save, because it cannot be fixed afterwards:
-                  the ACP protocol carries no working directory and the Codex configuration shape
-                  for one is unconfirmed, so only Claude and the test can honour this field. The
-                  other providers skip such a server rather than start it somewhere else. */}
+                  the ACP schema carries no working directory, and no key for one survived testing
+                  against the pinned Codex app-server, so only Claude and the test honour this
+                  field. The other providers skip such a server rather than start it somewhere
+                  else, and say so: the row keeps the note, and the hand-off reports the skip. */}
               <Field
                 label="Working directory"
-                description="Claude agents and the connection test start the server here. Leave it empty to give this server to every provider: the other providers cannot set a directory, so they skip a server that names one."
+                description="Claude agents and the connection test start the server here. Leave it empty to give this server to every provider: no other provider can set a directory, so it skips a server that names one."
               >
                 <Input
                   size="md"
@@ -626,7 +655,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             <SettingsSection
               class="server-mcp-section"
               title="Endpoint"
-              description="Codex agents cannot use an HTTP MCP server. Every other provider can."
+              description="Every provider can use an HTTP MCP server."
             >
               <Field label="Server URL" error={visible("url")}>
                 <Input

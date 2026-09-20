@@ -18,6 +18,11 @@ const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptRoot, "..");
 
 const slugPattern = /^[a-z0-9][a-z0-9-]{0,62}$/u;
+/**
+ * The sign-in bridge runs a third-party program on the user's machine. `@latest` would make every
+ * launch a fresh, unreviewed download that no release can be audited against, so the catalog names
+ * one version and moves it only in a reviewed commit.
+ */
 const secretPattern =
   /(ghp_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,}|sk-(?:live|test|proj)-[A-Za-z0-9]{8,}|xox[bpas]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|phx_[A-Za-z0-9]{8,}|re_[A-Za-z0-9]{8,})/u;
 
@@ -293,14 +298,9 @@ function parseServer(slug: string, value: unknown): PluginServer {
       throw new Error(`Plugin ${slug} server needs a command and args.`);
     }
     const args = value.args.every(isString) ? [...value.args] : [];
-    const server: PluginStdioServer = auth
+    return auth
       ? { name: value.name, transport: "stdio", command: value.command, args, auth }
       : { name: value.name, transport: "stdio", command: value.command, args };
-    const bridge = server.auth?.some((flow) => flow.kind === "link") ?? false;
-    if (bridge && (args[0] !== "-y" || args[1] !== "mcp-remote@latest" || args.length < 3 || !isHttpsUrl(args[2]))) {
-      throw new Error(`Plugin ${slug} sign-in bridge must run npx -y mcp-remote@latest <https url>.`);
-    }
-    return server;
   }
   throw new Error(`Plugin ${slug} server needs a known transport.`);
 }
@@ -315,7 +315,12 @@ function parseFlow(slug: string, value: unknown, transport: unknown): PluginAuth
   if (!isDynamicRecord(value) || !isString(value.id) || !isString(value.label) || !value.id || !value.label) {
     throw new Error(`Plugin ${slug} has an invalid auth flow.`);
   }
-  if (value.kind === "link") return { id: value.id, kind: "link", label: value.label };
+  if (value.kind === "link") {
+    // OpenBot holds the OAuth client itself and adds the header at hand-off, which it can only do
+    // for an http server. A stdio listing asking for a sign-in would be asking for a bridge program.
+    if (transport !== "http") throw new Error(`Plugin ${slug} sign-in needs an http server.`);
+    return { id: value.id, kind: "link", label: value.label };
+  }
   if (value.kind !== "key" || !Array.isArray(value.fields) || value.fields.length === 0 || value.fields.length > 2) {
     throw new Error(`Plugin ${slug} has an invalid auth flow.`);
   }

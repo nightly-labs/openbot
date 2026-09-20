@@ -1,7 +1,7 @@
 import { createInviteUrl } from "@openbot/contracts/invite-links";
 import { createOpenBotPluginUrl, createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { describe, expect, it } from "vitest";
-import { findDeepLink, parseDeepLink } from "./deep-link-router";
+import { findDeepLink, MCP_OAUTH_REDIRECT_URL, parseDeepLink } from "./deep-link-router";
 
 const invitePayload = {
   apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/",
@@ -47,6 +47,33 @@ describe("the deep link router", () => {
     expect(parseDeepLink(localInvite, { allowLocalDevelopmentApiUrl: true })).toEqual({
       kind: "invite",
       url: localInvite,
+    });
+  });
+
+  describe("the MCP sign-in return leg", () => {
+    it("reads a grant and its state", () => {
+      expect(parseDeepLink(`${MCP_OAUTH_REDIRECT_URL}?code=grant-abc&state=run-xyz`)).toEqual({
+        kind: "mcp-auth",
+        state: "run-xyz",
+        code: "grant-abc",
+      });
+    });
+
+    it.each([
+      ["no code", `${MCP_OAUTH_REDIRECT_URL}?state=run-xyz`],
+      ["no state", `${MCP_OAUTH_REDIRECT_URL}?code=grant-abc`],
+      ["an error instead of a grant", `${MCP_OAUTH_REDIRECT_URL}?error=access_denied&state=run-xyz`],
+      ["nothing at all", MCP_OAUTH_REDIRECT_URL],
+      ["another scheme", "https://openbot.run/mcp-auth?code=grant-abc&state=run-xyz"],
+    ])("gives nothing for %s", (_reason, value) => {
+      expect(parseDeepLink(value)).toBeNull();
+    });
+
+    /* A plugin link carries no query, so the host it owns cannot be reached with a grant on it -
+       which is what keeps the grant out of the one kind that is forwarded to a renderer. */
+    it("never reads a plugin link as a grant", () => {
+      expect(parseDeepLink(`${createOpenBotPluginUrl("canva")}?code=grant-abc&state=run-xyz`)).toBeNull();
+      expect(parseDeepLink(createOpenBotPluginUrl("canva"))).toEqual({ kind: "plugin", slug: "canva" });
     });
   });
 

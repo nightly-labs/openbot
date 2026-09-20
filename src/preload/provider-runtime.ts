@@ -2,13 +2,19 @@ import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/co
 import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSnapshot {
-  if (!isDynamicRecord(value) || !isNumber(value.revision) || !isDynamicRecord(value.providers)) {
+  if (
+    !isDynamicRecord(value) ||
+    !isNumber(value.revision) ||
+    !isDynamicRecord(value.providers) ||
+    !isDynamicRecord(value.toolRuntimes)
+  ) {
     throw new Error("Invalid provider runtime response.");
   }
   const providers = value.providers;
-  // One line per managed provider, and the object literal is what enumerates them: a provider added
-  // to `ManagedProviderId` without a line here is a compile error naming it, so a new provider can
-  // never arrive at the renderer undecoded.
+  const toolRuntimes = value.toolRuntimes;
+  // One line per managed runtime, and the object literals are what enumerate them: an id added to
+  // `ManagedProviderId` or `ManagedToolRuntimeId` without a line here is a compile error naming it,
+  // so a new runtime can never arrive at the renderer undecoded.
   return {
     revision: value.revision,
     providers: {
@@ -17,6 +23,7 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       grok: decodeProviderRuntimeStatus(providers.grok),
       opencode: decodeProviderRuntimeStatus(providers.opencode),
     },
+    toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };
 }
 

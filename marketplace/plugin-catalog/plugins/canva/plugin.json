@@ -20,9 +20,8 @@
       "iconUrl": "https://static.canva.com/static/images/apple-touch-icon-180x180.png",
       "server": {
         "name": "canva",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "mcp-remote@latest", "https://mcp.canva.com/mcp"],
+        "transport": "http",
+        "url": "https://mcp.canva.com/mcp",
         "auth": [{ "id": "canva-oauth", "kind": "link", "label": "Sign in" }]
       }
     }

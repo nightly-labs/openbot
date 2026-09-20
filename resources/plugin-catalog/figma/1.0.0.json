@@ -20,9 +20,8 @@
       "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
       "server": {
         "name": "figma",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "mcp-remote@latest", "https://mcp.figma.com/mcp"],
+        "transport": "http",
+        "url": "https://mcp.figma.com/mcp",
         "auth": [{ "id": "figma-oauth", "kind": "link", "label": "Sign in" }]
       }
     }

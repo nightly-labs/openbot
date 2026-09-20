@@ -213,6 +213,10 @@ provider logs are outside the OpenBot application database and its daily mainten
   manage Codex credentials.
 - `~/.claude` is owned by Claude CLI and contains its login and session data. OpenBot does not copy
   or manage Claude credentials.
+- The MCP sign-ins are kept in `~/Library/Application Support/OpenBot`, encrypted by the operating
+  system's secret storage in the same way as provider API keys. One record per server address holds
+  the client registration and the access and refresh tokens. Removing the server in settings deletes
+  its record. These values are redacted from logs, exports and diagnostics.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. All agents share the embedded browser profile, including cookies and website sessions.
@@ -240,6 +244,10 @@ Network traffic can also occur when:
 - a user or an agent visits a page in the embedded browser;
 - a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
 - a locally installed Codex plugin connects to its service;
+- an MCP server the user enabled is reached at its own address, and, when that server asks for a
+  sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
+  the grant the browser returns, and to renew the token. Nothing about the user's agents,
+  conversations or files is sent in those requests;
 - an installed build checks GitHub Releases for updates;
 - a user opens an explicitly labeled external support or setup link.
 

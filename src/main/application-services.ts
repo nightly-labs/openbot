@@ -40,14 +40,15 @@ import type {
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import { app, type BrowserWindow, safeStorage, screen } from "electron";
+import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { MailboxStore } from "../backend/mailbox-store";
+import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { TeamChatStore } from "../backend/team-chat-store";
 import { AgentInitializationGate } from "./agent-initialization";
@@ -60,6 +61,7 @@ import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } fr
 import { isSupportedCuaDriverTarget, resolveCuaCursorTheme, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
+import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
 import {
   applyDevelopmentRemoteAccount,
   type DevelopmentRemoteRole,
@@ -79,6 +81,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
+import { McpOAuthStore } from "./mcp-oauth-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
@@ -129,6 +132,8 @@ const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
+/** The MCP sign-ins. Separate from the keys above: a key is typed by the user, a token is not. */
+const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -188,6 +193,8 @@ export interface ApplicationServices {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
+  /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
+  mcpOAuth: McpOAuth;
   mailbox: MailboxStore;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
@@ -417,8 +424,14 @@ export async function createApplicationServices({
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
     }),
     downloadRoot: join(app.getPath("userData"), "provider-runtimes", ".downloads"),
-    updateRuntime: async (provider, install) => {
-      await service.updateProviderCli(provider, install);
+    updateRuntime: async (runtime, install) => {
+      // A tool runtime has no client to swap: the MCP servers are started per thread and read the
+      // managed path at the next spawn, so installing it is the whole of the update.
+      if (isManagedToolRuntime(runtime)) {
+        await install();
+        return;
+      }
+      await service.updateProviderCli(runtime, install);
     },
   });
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
@@ -457,6 +470,29 @@ export async function createApplicationServices({
   if (credentialLoadError) {
     logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
   }
+  /*
+   * The MCP sign-ins, in their own file with the same cipher. `mcp-remote` used to keep these where
+   * OpenBot could not redact them; here they are covered by the same rule as every other secret.
+   *
+   * Unreadable is not fatal, for the same reason as the keys above: every signed-in server asks for
+   * a sign-in again, and nothing else on this machine stops working.
+   */
+  const mcpOAuthStore = new McpOAuthStore(join(app.getPath("userData"), MCP_OAUTH_FILE), {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value) => safeStorage.decryptString(value),
+  });
+  const mcpOAuthLoadError = await mcpOAuthStore.load();
+  if (mcpOAuthLoadError) {
+    logger.warn(`OpenBot could not read the MCP sign-in file (${mcpOAuthLoadError.name}). It was left unchanged.`);
+  }
+  const mcpOAuth = new McpOAuth({
+    storage: mcpOAuthStore,
+    openExternal: (url) => shell.openExternal(url),
+    redirectUrl: MCP_OAUTH_REDIRECT_URL,
+  });
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
@@ -536,6 +572,13 @@ export async function createApplicationServices({
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
       // into the object being constructed; nothing calls it before the constructor returns.
       mcpServers: () => service.enabledMcpServers(),
+      // The floor under those servers: the `bin` of every managed tool runtime, appended after the
+      // user's own `PATH`, so a machine with no Node can still start `npx some-server` and a machine
+      // that has one keeps the build it installed.
+      mcpToolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+      // The bearer token for an http server, minted here and spent by the provider process. The
+      // service asks for one at each hand-off; only a test the user pressed may open a browser.
+      mcpOAuth,
     },
     // Appended to the stored servers at each spawn, so the same tools reach Codex, Claude and the
     // ACP providers. Null until the daemon runs, which is what keeps a machine with no driver from
@@ -563,6 +606,15 @@ export async function createApplicationServices({
   // written by a run that had this same entry.
   const computerUseWarmUp = cuaDriver.warmUp();
   computerUseWarmUp.catch(() => undefined);
+  /*
+   * Where the decision put the download: onboarding, which is the screen this start is about to
+   * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for
+   * one here too, but only when this machine already has an MCP server to start.
+   *
+   * Nothing waits for it and nothing reports it. MCP is optional, so a failed download must not
+   * reach onboarding; a server that cannot start is reported at hand-off like any other.
+   */
+  if (!setupState.completed || service.enabledMcpServers().length > 0) providerRuntimes.ensureToolRuntimes();
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   await sidebarLayout.reconcileAgents(service.sidebarChatIds());
@@ -584,6 +636,13 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
+  // A tool runtime that becomes ready changes what the MCP servers resolve to, for every
+  // provider: sessions that dropped their stdio servers before it finished downloading are
+  // marked for refresh, and the deferred mechanism spends the mark before each agent's next
+  // turn. Provider CLI updates change no MCP resolution, so only tool runtimes refresh.
+  providerRuntimes.on("ready", (runtime) => {
+    if (isManagedToolRuntime(runtime)) service.refreshAllAgentRuntimes();
+  });
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),
@@ -628,6 +687,13 @@ export async function createApplicationServices({
     channels: service.channels,
     // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
     mcpServers: service,
+    // The host's Team API routes share the IPC handlers' runtime preparation: a first server
+    // saved, enabled, or tested remotely must start and await the managed download like a local one.
+    mcpToolRuntimePreparation: {
+      startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
+      ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
+      toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+    },
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),
@@ -896,6 +962,7 @@ export async function createApplicationServices({
     service,
     providerRuntimes,
     providerCredentials,
+    mcpOAuth,
     mailbox,
     browser,
     browserPictureInPicture,
