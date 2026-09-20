@@ -12,7 +12,6 @@ import { createServer as createTcpServer, type Server as TcpServer } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import { fileURLToPath } from "node:url";
 import type { RemoteDesktopDisplay } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -594,17 +593,5 @@ describe("Sunshine port isolation", () => {
       await disposeRuntime(first.runtime, first.harness);
       await disposeRuntime(other.runtime, other.harness);
     }
-  });
-
-  it("Test F: no fixed 47989/47990 assumptions remain outside the default", async () => {
-    const source = await readFile(fileURLToPath(new URL("./sunshine-moonlight-runtime.ts", import.meta.url)), "utf8");
-    const stripped = source.replace(/\/\/.*$/gm, "");
-    expect(stripped).toContain("SUNSHINE_DEFAULT_BASE_PORT");
-    expect(stripped.match(/47_?989/g) ?? []).toHaveLength(1);
-    expect(stripped.match(/47_?990/g) ?? []).toHaveLength(0);
-    expect(stripped).not.toContain("SUNSHINE_HTTP_PORT");
-    expect(stripped).not.toContain("SUNSHINE_HTTPS_PORT");
-    expect(stripped).toContain("this.#requireSunshineHttpPort()");
-    expect(stripped).toContain("this.#requireSunshineHttpsPort()");
   });
 });

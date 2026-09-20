@@ -17,7 +17,7 @@ export async function relaunchManagedTenant(
   const config = await readHostConfig(directory, hostUid);
   if (!config?.managed || !config.tenants.includes(uid)) return;
   const state = await readOwnedJson(join(directory, "state.json"), hostUid, hostStateSchema);
-  if (state.phase !== "released" || !state.version) return;
+  if ((state.phase !== "released" && state.phase !== "aborted") || !state.version) return;
   if ((await operations.runningTenants()).some((running) => running.uid === uid)) return;
   if ((await operations.installedVersion()) !== state.version)
     throw new Error("Installed release does not match host state.");
@@ -27,7 +27,7 @@ export async function relaunchManagedTenant(
   if (
     !latestConfig?.managed ||
     !latestConfig.tenants.includes(uid) ||
-    latest.phase !== "released" ||
+    latest.phase !== state.phase ||
     latest.cycle !== state.cycle ||
     latest.version !== state.version
   )

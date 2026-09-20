@@ -62,6 +62,14 @@ export class HostManager {
     await writeProtocolJson(join(this.#directory, "state.json"), this.#state);
   }
 
+  async #abort(error: string): Promise<void> {
+    // A shutdown can be partial. Only a verified, untouched installation may restart those tenants.
+    const version =
+      this.#state.phase === "stopping" ? await this.#operations.installedVersion().catch(() => null) : null;
+    this.#state = { ...this.#state, version };
+    await this.#publish("aborted", error);
+  }
+
   async #tick(): Promise<void> {
     const config = await readHostConfig(this.#directory, this.#hostUid);
     if (!config?.managed) {
@@ -111,10 +119,9 @@ export class HostManager {
       else if (this.#state.phase === "stopping") await this.#waitForExit(config);
     } catch {
       // Deliberately omit exception text: OS command output and tenant input are not diagnostics.
-      await this.#publish(
-        this.#state.phase === "installing" ? "failed" : "aborted",
-        `Host update failed during ${this.#state.phase}. Verify bundle ownership, signing, tenant status and free disk space before resetting state.`,
-      );
+      const message = `Host update failed during ${this.#state.phase}. Verify bundle ownership, signing, tenant status and free disk space before resetting state.`;
+      if (this.#state.phase === "installing") await this.#publish("failed", message);
+      else await this.#abort(message);
     }
   }
 
@@ -135,7 +142,7 @@ export class HostManager {
       this.#idle.clear();
     this.#lastTick = now;
     if (now - this.#phaseStartedAt > 7_200_000) {
-      await this.#publish("aborted", "Tenants did not remain idle for five minutes within two hours.");
+      await this.#abort("Tenants did not remain idle for five minutes within two hours.");
       return;
     }
     const running = await this.#operations.runningTenants();
@@ -172,7 +179,7 @@ export class HostManager {
 
   async #waitForExit(config: HostManagerConfig): Promise<void> {
     if (this.#now() - this.#phaseStartedAt > 120_000) {
-      await this.#publish("aborted", "Tenant shutdown timed out. No application replacement was started.");
+      await this.#abort("Tenant shutdown timed out. No application replacement was started.");
       return;
     }
     // A stopped marker is not proof. Wait for the real OS process list, including unregistered users.

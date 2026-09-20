@@ -193,13 +193,17 @@ manifest, standalone launch checks without Bun/Node in PATH, and the expected so
 ## State and recovery
 
 Read `state.json` as the administrator. Phases are `idle`, `downloading`, `waiting`, `stopping`,
-`installing`, `released`, `aborted`, and `failed`. The installed version is announced only in `released`,
+`installing`, `released`, `aborted`, and `failed`. A new installed version is announced in `released`,
 after checking `CFBundleShortVersionString` on the actual shared bundle. A download or a return
 from an installer call is never treated as success.
 
 A two-hour idle timeout, two-minute shutdown timeout, or ten-minute health timeout records an
 error. A failure before replacement uses `aborted`: the old bundle stays in place and tenants
-can still start it manually. A network failure cannot prevent core app use. A failed or interrupted installation blocks automatic relaunch and further installation.
+can still start it manually. If shutdown was partial, the host verifies the unchanged installed
+bundle and records its version in `aborted`. Aqua agents can then restart stopped tenants after
+their own signature/version check. If verification fails, the version is null and no automatic
+restart occurs. A network failure cannot prevent core app use. A failed or interrupted installation
+blocks automatic relaunch and further installation.
 Stop the system job, inspect application-only staging and the installed signature/version, and
 resolve the error. After all tenants are stopped and the bundle is verified, an administrator can
 reset `state.json` to `idle` with a new empty cycle and null version, then restart the system job.

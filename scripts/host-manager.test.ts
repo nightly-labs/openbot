@@ -239,6 +239,12 @@ describe("privileged host update lifecycle", () => {
     f.advance(120_001);
     await f.manager.tick();
     expect((await f.state()).error).toContain("shutdown timed out");
+    expect((await f.state()).version).toBe("0.1.0");
+    expect(f.install).not.toHaveBeenCalled();
+    const open = vi.fn(async () => undefined);
+    f.setRunning([{ uid: uid + 1, pid: 456 }]);
+    await relaunchManagedTenant(uid, { ...f.operations, open }, f.directory, uid);
+    expect(open).toHaveBeenCalledOnce();
     const healthy = await fixture();
     await healthy.manager.tick();
     await healthy.idle();
@@ -247,6 +253,23 @@ describe("privileged host update lifecycle", () => {
     healthy.advance(600_001);
     await healthy.manager.tick();
     expect((await healthy.state()).error).toContain("health reports");
+  });
+
+  it("does not restart an aborted shutdown when the existing app cannot be verified", async () => {
+    const f = await fixture();
+    await f.manager.tick();
+    await f.idle();
+    f.operations.installedVersion = async () => {
+      throw new Error("signature verification failed");
+    };
+    f.advance(120_001);
+    await f.manager.tick();
+    expect((await f.state()).version).toBeNull();
+    const open = vi.fn(async () => undefined);
+    f.setRunning([]);
+    await relaunchManagedTenant(uid, { ...f.operations, open }, f.directory, uid);
+    expect(open).not.toHaveBeenCalled();
+    expect(f.install).not.toHaveBeenCalled();
   });
 
   it("rejects hard links instead of reading tenant content through them", async () => {
