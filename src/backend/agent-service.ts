@@ -130,7 +130,7 @@ import { type ConversationMarkerExclusions, ConversationReadStore } from "./conv
 import { mergeConversationSnapshots } from "./conversation-snapshots";
 import type { MailboxStore } from "./mailbox-store";
 import { McpHandoffLog } from "./mcp-handoff-log";
-import type { McpOAuthAuthority } from "./mcp-oauth-provider";
+import { type McpOAuthAuthority, normalizeResource } from "./mcp-oauth-provider";
 import { testMcpServer } from "./mcp-probe";
 import {
   type McpAuthorizationSource,
@@ -933,10 +933,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const list = this.#mcpServersChanged();
     /*
      * A row that goes takes its sign-in with it: a refresh token nothing can reach again is a secret
-     * kept for no reason. Only when no row is left naming the same address, because two rows on one
-     * URL are one account to the server and dropping it would sign the other one out too.
+     * kept for no reason. Only when no row is left naming the same account, because two rows on one
+     * URL are one account to the server and dropping it would sign the other one out too. Compared
+     * normalized, as the store keys it: `https://mcp.stripe.com` and `https://mcp.stripe.com/` share
+     * one credential, and removing either row must keep the other's.
      */
-    if (removed?.transport === "http" && !list.some((config) => config.url === removed.url)) {
+    const removedResource = removed?.transport === "http" ? normalizeResource(removed.url) : null;
+    if (
+      removed &&
+      removedResource &&
+      !list.some((config) => config.transport === "http" && normalizeResource(config.url) === removedResource)
+    ) {
       void this.#mcpOAuth?.forget(removed.url);
     }
     return list;
@@ -960,6 +967,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#reportedMcpDrops.clear();
     this.#threads.refreshAllAgentRuntimes();
     return this.listMcpServers();
+  }
+
+  /**
+   * Marks every agent's provider session for refresh, spent before its next turn.
+   *
+   * The mark is what a managed tool runtime becoming ready spends: a session that dropped its
+   * `npx` servers before Bun finished downloading is replaced once they can start. Mid-turn
+   * sessions keep the mark until the turn ends, and the public threads and their histories stay.
+   */
+  refreshAllAgentRuntimes(): void {
+    this.#threads.refreshAllAgentRuntimes();
   }
 
   /**

@@ -10,19 +10,40 @@ import {
   MCP_SERVERS_CAPABILITY,
   type McpServerConfig,
   type McpTestResult,
+  type RemoveMcpServerInput,
+  type SaveMcpServerInput,
+  type SetMcpServerEnabledInput,
+  type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
+import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
-import type { AgentService } from "../../backend/agent-service";
+import type { TestMcpServerOptions } from "../../backend/agent-service";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
-import type { RemoteServerManager } from "../remote-server-manager";
+import type { ResponseDecoder } from "../remote-host-decoding";
+import type { RemoteRequestInit } from "../remote-server-client";
 import { parseAgentRequest } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { parseRemoveMcpServer, parseSaveMcpServer, parseSetMcpServerEnabled, parseTestMcpServer } from "./mcp-inputs";
 import { routeToServer } from "./route-to-server";
 
+/** The AgentService members this registrar reaches, and nothing else. */
+export interface McpServerService {
+  listMcpServers(): McpServerConfig[];
+  saveMcpServer(input: SaveMcpServerInput): McpServerConfig[];
+  removeMcpServer(input: RemoveMcpServerInput): McpServerConfig[];
+  setMcpServerEnabled(input: SetMcpServerEnabledInput): McpServerConfig[];
+  testMcpServer(input: TestMcpServerInput, options?: TestMcpServerOptions): Promise<McpTestResult>;
+}
+
+/** The RemoteServerManager members this registrar reaches, and nothing else. */
+export interface McpRemoteServers {
+  supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
+  request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
+}
+
 interface McpServerIpcDependencies {
-  service: AgentService;
-  remoteServers: RemoteServerManager;
+  service: McpServerService;
+  remoteServers: McpRemoteServers;
   /**
    * Fetches the tool runtimes an MCP server is started with, if this machine does not hold them
    * yet. Onboarding asks for them first; this covers the user who was already past onboarding when
@@ -45,14 +66,16 @@ interface McpServerIpcDependencies {
 const TOOL_RUNTIME_TEST_WAIT_MS = 60_000;
 
 /**
- * Waits for the download, but never past the deadline. A stalled transfer keeps downloading for
- * the next attempt; its failure is not this test's, so the probe still runs and reports what this
- * machine starts.
+ * Waits for the download, but never past the deadline, and never as an error. Failure and
+ * timeout both continue to the probe, which reports what this machine starts: the download keeps
+ * running for the next attempt, and a command the runtime was never going to provide - `python`
+ * on a machine without it - is still tested on its own merits.
  */
 async function awaitToolRuntimes(ensure: () => Promise<void>): Promise<void> {
-  const ready = ensure();
+  // Caught before the race: a rejection that reaches `Promise.race` itself would skip the probe
+  // and report a runtime download error instead of checking the configured command.
+  const ready = ensure().catch(() => undefined);
   await Promise.race([ready, new Promise((resolve) => setTimeout(resolve, TOOL_RUNTIME_TEST_WAIT_MS))]);
-  void ready.catch(() => undefined);
 }
 
 export function mcpServerIpcHandlers({

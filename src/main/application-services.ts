@@ -547,6 +547,13 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
+  // A tool runtime that becomes ready changes what the MCP servers resolve to, for every
+  // provider: sessions that dropped their stdio servers before it finished downloading are
+  // marked for refresh, and the deferred mechanism spends the mark before each agent's next
+  // turn. Provider CLI updates change no MCP resolution, so only tool runtimes refresh.
+  providerRuntimes.on("ready", (runtime) => {
+    if (isManagedToolRuntime(runtime)) service.refreshAllAgentRuntimes();
+  });
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),

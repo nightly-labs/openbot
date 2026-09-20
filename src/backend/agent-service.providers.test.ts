@@ -4,7 +4,7 @@ import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import type { AgentEvent } from "@openbot/contracts/ipc";
+import type { AgentEvent, McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
@@ -578,6 +578,80 @@ describe.sequential("AgentService: providers", () => {
   // Save, remove and toggle all go through the same refresh, so one of them proves the mechanism.
   // Without it a loaded session keeps the tools it was given until the app restarts: the reason the
   // test above had to stop and start the service to see its new server.
+  // A managed tool runtime becoming ready spends the same refresh: sessions that dropped their
+  // stdio servers before it finished downloading are replaced on the next turn.
+  it("starts a fresh provider session after the tool runtimes become ready", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+    });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!firstSession) throw new Error("The Codex session did not start.");
+
+    service.refreshAllAgentRuntimes();
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+  });
+
+  // Two rows on one URL are one account to the server: removing either row keeps the other's
+  // sign-in. Compared normalized, as the store keys it - a trailing slash names the same account.
+  it("keeps the shared sign-in until the last row on its URL is removed", async () => {
+    const { store, mailbox } = stores(root);
+    const forget = vi.fn(async (_url: string) => undefined);
+    service = createTestService({
+      store,
+      mailbox,
+      credentials: {
+        apiKey: () => null,
+        customProviders: () => [],
+        mcpServers: () => [],
+        mcpOAuth: {
+          accessToken: async () => null,
+          signIn: () => null,
+          forget,
+        },
+      },
+    });
+    await service.initialize();
+    const httpConfig = (name: string, url: string): McpServerConfig => ({
+      id: "",
+      name,
+      transport: "http",
+      enabled: true,
+      command: "",
+      args: [],
+      env: [],
+      envPassthrough: [],
+      workingDirectory: "",
+      url,
+      headers: [],
+    });
+    const [first] = service.saveMcpServer({ config: httpConfig("Stripe", "https://mcp.stripe.com") });
+    const [second] = service
+      .saveMcpServer({ config: httpConfig("Stripe copy", "https://mcp.stripe.com/") })
+      .filter((config) => config.name === "Stripe copy");
+    if (!first || !second) throw new Error("The Stripe rows were not saved.");
+
+    service.removeMcpServer({ mcpServerId: first.id });
+    expect(forget).not.toHaveBeenCalled();
+
+    service.removeMcpServer({ mcpServerId: second.id });
+    expect(forget).toHaveBeenCalledTimes(1);
+    expect(forget).toHaveBeenCalledWith("https://mcp.stripe.com/");
+  });
+
   it("starts a fresh provider session for the next turn after an MCP server changes", async () => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
