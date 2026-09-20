@@ -136,6 +136,36 @@ describe("McpOAuthStore", () => {
     expect(reopened.read(NOTION)).toEqual(record("notion-access"));
   });
 
+  it("refuses a registration while encrypted records cannot be read", async () => {
+    const { path, store } = await createStore();
+    await store.write(LINEAR, record("linear-access"));
+    await store.write(NOTION, record("notion-access"));
+    const source = await readFile(path, "utf8");
+    // A keychain that refuses once. `saveClientInformation` runs before the user signs in and
+    // carries no tokens, so storing it would delete every unrelated credential even if the user
+    // cancels. The sign-in fails instead and the file stays as it is.
+    const refusing = new McpOAuthStore(path, {
+      ...cipher,
+      decrypt: () => {
+        throw new Error("System secret storage is unavailable.");
+      },
+    });
+    expect(await refusing.load()).toBeInstanceOf(Error);
+
+    await expect(
+      refusing.write("https://mcp.figma.com/mcp", {
+        client: { client_id: "new-client", redirect_uris: ["openbot://mcp-auth"] },
+      }),
+    ).rejects.toThrow("The MCP sign-in file is unreadable.");
+    expect(await readFile(path, "utf8")).toBe(source);
+
+    // And once the keychain answers again, both sign-ins are still there.
+    const reopened = new McpOAuthStore(path, cipher);
+    expect(await reopened.load()).toBeNull();
+    expect(reopened.read(LINEAR)).toEqual(record("linear-access"));
+    expect(reopened.read(NOTION)).toEqual(record("notion-access"));
+  });
+
   it("reads the file again when the keychain has started answering", async () => {
     const { path, store } = await createStore();
     await store.write(LINEAR, record("linear-access"));

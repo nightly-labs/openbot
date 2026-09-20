@@ -38,6 +38,12 @@ export class McpOAuthStore implements McpOAuthStorage {
   #loaded = false;
   /** Why the file could not be read. Kept until a sign-in replaces the whole envelope. */
   #loadError: Error | null = null;
+  /**
+   * The encrypted records the file held when it could not be decrypted. Kept so a change that
+   * cannot read them refuses rather than writing them away; cleared on a successful read or write.
+   * `null` when the file held nothing worth keeping (missing or unparseable).
+   */
+  #unreadableServers: Record<string, string> | null = null;
   /** The change in progress, so a read-modify-write never overlaps another. See `#enqueue`. */
   #queue: Promise<void> = Promise.resolve();
 
@@ -56,6 +62,7 @@ export class McpOAuthStore implements McpOAuthStorage {
   async load(): Promise<Error | null> {
     this.#records = new Map();
     this.#loadError = null;
+    this.#unreadableServers = null;
     try {
       this.#records = await this.#read();
     } catch (error) {
@@ -74,6 +81,14 @@ export class McpOAuthStore implements McpOAuthStorage {
   write(resource: string, record: McpOAuthRecord): Promise<void> {
     return this.#enqueue(async () => {
       await this.#reloadIfUnreadable();
+      // A registration (`saveClientInformation`) carries no tokens and runs before the user signs
+      // in. When the file holds encrypted records this build cannot read, replacing it here would
+      // delete unrelated credentials even if the user cancels. Refuse instead: the retry above
+      // already gave a temporarily locked keychain its chance, and a corrupt file (nothing to
+      // keep) still takes the replacement path below.
+      if (this.#loadError && this.#unreadableServers) {
+        throw new Error("The MCP sign-in file is unreadable.");
+      }
       const next = this.#editableRecords();
       // An empty record is the absence of one. `invalidateCredentials("all")` arrives as a clear, and
       // dropping everything about a server arrives here as an object with nothing in it.
@@ -132,8 +147,9 @@ export class McpOAuthStore implements McpOAuthStorage {
   }
 
   /**
-   * A copy to change. An unreadable envelope starts from empty: nothing in it can be decrypted, so
-   * the sign-in the user has just finished replaces the whole file.
+   * A copy to change. A file with nothing worth keeping (missing or unparseable) starts from
+   * empty, so the sign-in the user has just finished replaces it. A file holding encrypted
+   * records never reaches here: `write` refuses above rather than writing them away.
    */
   #editableRecords(): Map<string, McpOAuthRecord> {
     if (!this.#loaded) throw new Error("The MCP sign-in store is not loaded.");
@@ -149,6 +165,7 @@ export class McpOAuthStore implements McpOAuthStorage {
     else await this.#write(next);
     this.#records = next;
     this.#loadError = null;
+    this.#unreadableServers = null;
   }
 
   async #read(): Promise<Map<string, McpOAuthRecord>> {
@@ -156,19 +173,37 @@ export class McpOAuthStore implements McpOAuthStorage {
     try {
       source = await readFile(this.#path, "utf8");
     } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") return new Map();
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        this.#unreadableServers = null;
+        return new Map();
+      }
       throw error;
     }
     if (source.length > MAX_ENVELOPE_BYTES) throw new Error("The MCP sign-in file is too large.");
-    const envelope = envelopeSchema.parse(JSON.parse(source));
-    const records = new Map<string, McpOAuthRecord>();
-    for (const [resource, encrypted] of Object.entries(envelope.servers)) {
-      records.set(
-        resource,
-        mcpOAuthRecordSchema.parse(JSON.parse(this.#cipher.decrypt(Buffer.from(encrypted, "base64")))),
-      );
+    let envelope: { version: 1; servers: Record<string, string> };
+    try {
+      envelope = envelopeSchema.parse(JSON.parse(source));
+    } catch {
+      // Nothing in it can be decrypted, so nothing is kept: a sign-in that succeeds replaces it.
+      this.#unreadableServers = null;
+      throw new Error("The MCP sign-in file is unreadable.");
     }
-    return records;
+    try {
+      const records = new Map<string, McpOAuthRecord>();
+      for (const [resource, encrypted] of Object.entries(envelope.servers)) {
+        records.set(
+          resource,
+          mcpOAuthRecordSchema.parse(JSON.parse(this.#cipher.decrypt(Buffer.from(encrypted, "base64")))),
+        );
+      }
+      this.#unreadableServers = null;
+      return records;
+    } catch {
+      // The envelope parsed but a record did not decrypt: the encrypted records stay on disk and
+      // in this stash, so a change refuses rather than writing them away.
+      this.#unreadableServers = { ...envelope.servers };
+      throw new Error("The MCP sign-in file is unreadable.");
+    }
   }
 
   async #write(records: Map<string, McpOAuthRecord>): Promise<void> {
