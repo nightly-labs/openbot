@@ -5,7 +5,7 @@ export interface HostManagerConfig {
 }
 
 export interface HostUpdateState {
-  phase: "idle" | "downloading" | "waiting" | "stopping" | "installing" | "released" | "failed";
+  phase: "idle" | "downloading" | "waiting" | "stopping" | "installing" | "released" | "aborted" | "failed";
   cycle: string;
   version: string | null;
   updatedAt: number;

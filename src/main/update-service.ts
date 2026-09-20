@@ -301,6 +301,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       installing: "installing",
       released: "up-to-date",
       failed: "error",
+      aborted: "error",
     } as const;
     if (
       this.#status.phase === phases[state.phase] &&
@@ -312,7 +313,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       phase: phases[state.phase],
       availableVersion: state.version,
       message: state.error,
-      errorCode: state.phase === "failed" ? "install_failed" : null,
+      errorCode: state.phase === "failed" || state.phase === "aborted" ? "install_failed" : null,
       progress: null,
     });
   }

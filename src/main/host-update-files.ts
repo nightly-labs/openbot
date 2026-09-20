@@ -25,7 +25,7 @@ export const hostConfigSchema: z.ZodType<HostManagerConfig> = z
   .strict();
 export const hostStateSchema: z.ZodType<HostUpdateState> = z
   .object({
-    phase: z.enum(["idle", "downloading", "waiting", "stopping", "installing", "released", "failed"]),
+    phase: z.enum(["idle", "downloading", "waiting", "stopping", "installing", "released", "aborted", "failed"]),
     cycle: z.string().max(64),
     version: version.nullable(),
     updatedAt: z.number().nonnegative(),

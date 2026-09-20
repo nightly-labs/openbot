@@ -88,7 +88,7 @@ export class HostManager {
       if (this.#state.phase !== "released") await this.#publish("idle");
       this.#phaseStartedAt = this.#now();
     }
-    if (this.#state.phase === "failed") return;
+    if (this.#state.phase === "failed" || this.#state.phase === "aborted") return;
     try {
       if (this.#state.phase === "released") {
         await this.#checkHealth(config);
@@ -112,7 +112,7 @@ export class HostManager {
     } catch {
       // Deliberately omit exception text: OS command output and tenant input are not diagnostics.
       await this.#publish(
-        "failed",
+        this.#state.phase === "installing" ? "failed" : "aborted",
         `Host update failed during ${this.#state.phase}. Verify bundle ownership, signing, tenant status and free disk space before resetting state.`,
       );
     }
@@ -135,7 +135,7 @@ export class HostManager {
       this.#idle.clear();
     this.#lastTick = now;
     if (now - this.#phaseStartedAt > 7_200_000) {
-      await this.#publish("failed", "Tenants did not remain idle for five minutes within two hours.");
+      await this.#publish("aborted", "Tenants did not remain idle for five minutes within two hours.");
       return;
     }
     const running = await this.#operations.runningTenants();
@@ -172,7 +172,7 @@ export class HostManager {
 
   async #waitForExit(config: HostManagerConfig): Promise<void> {
     if (this.#now() - this.#phaseStartedAt > 120_000) {
-      await this.#publish("failed", "Tenant shutdown timed out. No application replacement was started.");
+      await this.#publish("aborted", "Tenant shutdown timed out. No application replacement was started.");
       return;
     }
     // A stopped marker is not proof. Wait for the real OS process list, including unregistered users.

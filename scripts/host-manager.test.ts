@@ -92,6 +92,16 @@ describe("privileged host update lifecycle", () => {
     expect((await f.state()).phase).toBe("idle");
   });
 
+  it("keeps the old application available when staging fails", async () => {
+    const f = await fixture();
+    f.operations.stageLatest = async () => {
+      throw new Error("offline");
+    };
+    await f.manager.tick();
+    expect((await f.state()).phase).toBe("aborted");
+    expect(f.install).not.toHaveBeenCalled();
+  });
+
   it("does not publish success before the bundle version matches", async () => {
     const f = await fixture();
     f.install.mockImplementation(async () => undefined);
