@@ -12,6 +12,11 @@ export class AgentInitializationGate {
     return this.#pending !== null && !this.#settled;
   }
 
+  /** True only after initialization resolves successfully, never before start or after rejection. */
+  get succeeded(): boolean {
+    return this.#settled && this.#pending !== null;
+  }
+
   start(): Promise<void> {
     if (!this.#pending) {
       this.#settled = false;

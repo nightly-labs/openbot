@@ -135,6 +135,7 @@ import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
 import { McpServerStore } from "./mcp-server-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
+import { recordAgentRestartActivity } from "./restart-activity";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
@@ -2374,6 +2375,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emit(event: AgentEvent): void {
+    recordAgentRestartActivity(event);
     if (this.channels?.event(event)) return;
     this.emit("event", event);
   }

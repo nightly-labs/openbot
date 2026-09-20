@@ -16,7 +16,7 @@ export interface RestartReadinessInput {
   activeFileTransfers: boolean;
   /** The updater itself is checking, downloading or installing. */
   updaterBusy: boolean;
-  /** First initialization — including database migrations — is still running. */
+  /** First initialization — including database migrations — has not succeeded yet. */
   initializationPending: boolean;
 }
 

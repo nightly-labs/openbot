@@ -1,3 +1,4 @@
+import { restartActivityGeneration } from "../backend/restart-activity";
 // @vitest-environment node
 
 import { createServer, type IncomingMessage } from "node:http";
@@ -104,6 +105,7 @@ describe("the live browser view on a host", () => {
     const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
     expect(gateway.activeViewCount()).toBe(0);
 
+    const before = restartActivityGeneration();
     const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
       headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
     });
@@ -111,6 +113,7 @@ describe("the live browser view on a host", () => {
     await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(1));
     socket.close();
     await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
+    expect(restartActivityGeneration()).toBeGreaterThan(before);
     await gateway.stop();
   });
 });

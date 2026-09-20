@@ -12,6 +12,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
+import { recordRestartActivity } from "./restart-activity";
 import { collapseMissedOccurrences } from "./routine-schedule";
 import type { RoutineDueSource } from "./routine-timer";
 
@@ -257,6 +258,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
   }
 
   async #issue(run: ChannelRoutineRun): Promise<ChannelRoutineRun> {
+    recordRestartActivity();
     if (!run.requestMessageId) throw new Error("The routine run has no request message.");
     try {
       await this.#channels.command(

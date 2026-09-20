@@ -949,4 +949,8 @@ The optional standalone root helper (`scripts/host-manager.ts`) uses the lifecyc
 The local protocol types live in `packages/contracts/src/host-manager.ts`; bounded file parsing
 and owner checks live in `src/main/host-update-files.ts`. Only the helper publishes host control
 state or replaces the shared application. It has no dependency on tenant storage services.
+The tenant process owns an in-memory activity generation in `src/backend/restart-activity.ts`.
+Backend work and main-process sessions advance it, so work between status polls resets the idle
+grace. This counter contains no user data and is never sent to the host. Health and restart
+readiness remain false until agent initialization succeeds.
 See [multi-tenant hosting](multi-tenant-hosting.md) for installation, permissions, and acceptance.

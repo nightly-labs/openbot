@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentService } from "./agent-service";
 import { startAgentTestFixture, startService, stopAgentTestFixture } from "./agent-service-test-harness";
+import { restartActivityGeneration } from "./restart-activity";
 
 let root: string;
 let service: AgentService | null = null;
@@ -27,11 +28,13 @@ describe.sequential("AgentService: restart activity", () => {
     const started = await startService(root, { provider: "codex" });
     service = started.service;
     await started.store.getOrCreate("chief");
+    const before = restartActivityGeneration();
     await started.mailbox.enqueue({
       sender: { kind: "user" },
       recipientAgentIds: ["chief"],
       text: "Hold the restart",
     });
     expect(service.hasActiveWork().length).toBeGreaterThan(0);
+    expect(restartActivityGeneration()).toBeGreaterThan(before);
   });
 });

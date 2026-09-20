@@ -1,3 +1,4 @@
+import { recordRestartActivity } from "../backend/restart-activity";
 // The host's side of the live browser view: a session a member asks for, a socket that carries the
 // frames, and the pointer and key input that comes back on it.
 //
@@ -138,6 +139,7 @@ export class BrowserViewGateway {
   async #connect(session: ManagedViewSession, client: Ws.WebSocket): Promise<void> {
     if (session.socket) session.socket.close(1000, "The browser view moved to a new connection.");
     session.socket = client;
+    recordRestartActivity();
     client.on("message", (data, binary) => {
       if (binary || session.socket !== client) return;
       void this.#handleInput(session, data);

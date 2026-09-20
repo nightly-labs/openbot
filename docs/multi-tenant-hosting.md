@@ -73,6 +73,10 @@ Reads use `O_NOFOLLOW`; writes use exclusive temporary files and atomic rename. 
 writes inside a tenant status directory. Missing, stale, malformed, or unregistered state cannot
 remove a tenant from the maintenance set. There is no world-writable directory and no election.
 
+Work events reset the tenant's five-minute idle grace even when a task finishes between status
+polls. The tenant also checks its own full idle grace before it accepts a stop request. Health
+and restart readiness remain false before initialization and after an initialization failure.
+
 With `managed: false` or no admin configuration, the host client does not publish status or stop
 the app, and the daemon does not coordinate updates. Normal desktop update controls return. With
 `managed: true`, all tenant update controls are disabled, including downloads and installation.

@@ -46,6 +46,7 @@ import {
   type ProviderClientContext,
   requireProviderDriver,
 } from "./../provider-drivers";
+import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -617,6 +618,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#providerStarts.delete(provider);
       });
       this.#providerStarts.set(provider, start);
+      recordRestartActivity();
     }
     await start;
     if (this.#clients.has(provider)) return;
@@ -648,6 +650,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#providerStarts.delete(provider);
       });
       this.#providerStarts.set(provider, start);
+      recordRestartActivity();
     }
     await start;
     return this.status();
@@ -746,6 +749,7 @@ export class ProviderRuntime implements ProviderPort {
         );
       }
       this.#replacingCli.add(provider);
+      recordRestartActivity();
       try {
         await change();
       } catch (error) {
@@ -771,6 +775,7 @@ export class ProviderRuntime implements ProviderPort {
       const previousExecutable = this.#bundledExecutables[provider];
       this.#setProviderConnectionState(provider, "connecting");
       this.#replacingCli.add(provider);
+      recordRestartActivity();
       try {
         const executable = await install();
         this.#bundledExecutables[provider] = executable;
@@ -893,6 +898,7 @@ export class ProviderRuntime implements ProviderPort {
         result = await command();
       });
     this.#providerConnectionCommands.set(provider, current);
+    recordRestartActivity();
     try {
       await current;
       return result;
@@ -1214,6 +1220,7 @@ export class ProviderRuntime implements ProviderPort {
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
     this.#replacingCli.add(provider);
+    recordRestartActivity();
     try {
       cli = await this.#resolveProviderCli(provider);
       const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
@@ -1244,6 +1251,7 @@ export class ProviderRuntime implements ProviderPort {
       });
       const pending: PendingCliLogin = { child, cli, task: null };
       this.#cliLogins.set(provider, pending);
+      recordRestartActivity();
       pending.task = waitForSuccessfulProcess(child, command.timeoutMs)
         .then(() => this.#completeCliLogin(provider, pending))
         .catch((error) => this.#failCliLogin(provider, pending, error));
@@ -1335,6 +1343,7 @@ export class ProviderRuntime implements ProviderPort {
       timer.unref?.();
       pending = { client, cli, loginId: login.loginId, timer, completing: false };
       this.#codexLogin = pending;
+      recordRestartActivity();
       client.once("exit", () => {
         if (this.#codexLogin?.client === client) {
           void this.#failCodexLogin(this.#codexLogin, "ChatGPT connection stopped. Try again.");

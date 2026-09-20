@@ -11,6 +11,7 @@ import {
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
   TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES,
 } from "@openbot/contracts/team-protocol/v2";
+import { recordRestartActivity } from "../backend/restart-activity";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 
 const FILE_CHUNK_BYTES = 60 * 1024;
@@ -123,6 +124,7 @@ export class TeamWebRtcFileTransfer {
       cancelled: null,
     };
     this.#outgoing.set(transferKey(peerId, transferId), transfer);
+    recordRestartActivity();
     try {
       await this.#sendWithResume(transfer);
       return transferId;
@@ -222,6 +224,7 @@ export class TeamWebRtcFileTransfer {
         await mkdir(this.#directory, { recursive: true, mode: 0o700 });
         const path = join(this.#directory, `${frame.transferId}.part`);
         const file = await open(path, "w", 0o600);
+        recordRestartActivity();
         this.#incoming.set(key, {
           peerId,
           transferId: frame.transferId,

@@ -2,6 +2,7 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { recordRestartActivity } from "../backend/restart-activity";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { hostConfigSchema, readOwnedJson, writeProtocolJson } from "./host-update-files";
 
@@ -19,19 +20,30 @@ async function fixture() {
   await writeProtocolJson(join(directory, "state.json"), state);
   const stop = vi.fn(async () => undefined);
   const managed = vi.fn();
+  let now = 1_000_000;
   const client = new HostUpdateCoordinator({
     directory,
     hostUid: uid,
     uid,
     pid: 123,
     currentVersion: "0.1.0",
-    now: () => 1_000_000,
+    now: () => now,
     describeReadiness: () => ({ safeToRestart: true, reasons: [] }),
     checkHealth: async () => ({ ok: true, checks: [] }),
     setManagedByHost: managed,
   });
   client.setStopHandler(stop);
-  return { directory, state, stop, managed, client };
+  return {
+    directory,
+    state,
+    stop,
+    managed,
+    client,
+    advance: (ms: number) => {
+      now += ms;
+    },
+    now: () => now,
+  };
 }
 
 describe("tenant host-status client", () => {
@@ -48,6 +60,10 @@ describe("tenant host-status client", () => {
   it("reports only its own status and requests cooperative shutdown once", async () => {
     const f = await fixture();
     await writeProtocolJson(join(f.directory, "config.json"), { managed: true, tenants: [uid] });
+    await f.client.tick();
+    expect(f.stop).not.toHaveBeenCalled();
+    f.advance(300_000);
+    await writeProtocolJson(join(f.directory, "state.json"), { ...f.state, updatedAt: f.now() });
     await Promise.all([f.client.tick(), f.client.tick()]);
     expect(f.stop).toHaveBeenCalledOnce();
     expect(JSON.parse(await readFile(join(f.directory, "tenants", String(uid), "status.json"), "utf8"))).toMatchObject({
@@ -56,7 +72,29 @@ describe("tenant host-status client", () => {
       safeToRestart: true,
       healthy: true,
     });
-    expect(JSON.parse(await readFile(join(f.directory, "state.json"), "utf8"))).toEqual(f.state);
+    expect(JSON.parse(await readFile(join(f.directory, "state.json"), "utf8"))).toEqual({
+      ...f.state,
+      updatedAt: f.now(),
+    });
+  });
+
+  it("resets local idle grace after work that finishes between polls and vetoes an old stop", async () => {
+    const f = await fixture();
+    await writeProtocolJson(join(f.directory, "config.json"), { managed: true, tenants: [uid] });
+    await f.client.tick();
+    f.advance(300_000);
+    recordRestartActivity();
+    await writeProtocolJson(join(f.directory, "state.json"), { ...f.state, updatedAt: f.now() });
+    await f.client.tick();
+    expect(f.stop).not.toHaveBeenCalled();
+    expect(JSON.parse(await readFile(join(f.directory, "tenants", String(uid), "status.json"), "utf8"))).toMatchObject({
+      safeToRestart: true,
+      idleSince: f.now(),
+    });
+    f.advance(300_000);
+    await writeProtocolJson(join(f.directory, "state.json"), { ...f.state, updatedAt: f.now() });
+    await f.client.tick();
+    expect(f.stop).toHaveBeenCalledOnce();
   });
 
   it("rejects a symlinked admin config and a writable admin config", async () => {

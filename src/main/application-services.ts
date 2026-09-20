@@ -777,7 +777,7 @@ export async function createApplicationServices({
       activeBrowserControls: browser.getControlState().sessions.length,
       activeFileTransfers: remoteServers.hasActiveTransfers(),
       updaterBusy: !updater.getStatus().managedByHost && isUpdateBusyPhase(updater.getStatus().phase),
-      initializationPending: agentInitialization.pending,
+      initializationPending: !agentInitialization.succeeded,
     });
   const hostUpdateCoordinator = new HostUpdateCoordinator({
     uid: typeof process.getuid === "function" ? process.getuid() : 0,
@@ -788,13 +788,13 @@ export async function createApplicationServices({
     setHostState: (state) => updater.setHostState(state),
     onDiagnostic: (message) => logger.warn(message),
     checkHealth: async () => {
-      if (agentInitialization.pending) return { ok: false, checks: ["initialization-pending"] };
+      if (!agentInitialization.succeeded) return { ok: false, checks: ["initialization-not-ready"] };
       try {
         service.listAgents();
       } catch {
         return { ok: false, checks: ["agent-list-failed"] };
       }
-      return { ok: true, checks: ["initialization-settled", "agent-list"] };
+      return { ok: true, checks: ["initialization-succeeded", "agent-list"] };
     },
   });
   await hostUpdateCoordinator.tick();

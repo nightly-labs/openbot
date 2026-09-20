@@ -13,6 +13,7 @@ import type {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type * as Ws from "ws";
 import { z } from "zod";
+import { recordRestartActivity } from "../backend/restart-activity";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { SunshineMoonlightRuntime, type SunshineMoonlightRuntimeState } from "./sunshine-moonlight-runtime";
 
@@ -301,6 +302,7 @@ export class RemoteScreenGateway {
       if (!update || update.sessionId !== session.snapshot.id) {
         return sendText(response, 400, "Remote viewer state is invalid.");
       }
+      if (update.state === "connected") recordRestartActivity();
       session.snapshot.phase = update.state;
       session.snapshot.message =
         update.message ??
@@ -389,6 +391,7 @@ export class RemoteScreenGateway {
           streamStartAllowed = true;
           for (const frame of pendingClientFrames.splice(0)) upstream.send(frame.data, { binary: frame.binary });
           pendingClientBytes = 0;
+          recordRestartActivity();
           session.snapshot.phase = "connected";
           session.snapshot.message = "Remote control connected.";
           this.#audit(session, "started");

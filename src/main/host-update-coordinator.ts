@@ -1,7 +1,9 @@
 import { join } from "node:path";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
+import { restartActivityGeneration } from "../backend/restart-activity";
 import {
   HOST_HEARTBEAT_TIMEOUT_MS,
+  HOST_IDLE_GRACE_MS,
   HOST_MANAGER_DIRECTORY,
   HOST_POLL_MS,
   hostStateSchema,
@@ -34,6 +36,7 @@ export class HostUpdateCoordinator {
   #stopHandler: (() => Promise<void>) | null = null;
   #stopRequested = false;
   #idleSince: number | null = null;
+  #activityGeneration = restartActivityGeneration();
 
   constructor(options: HostUpdateCoordinatorOptions) {
     this.#options = options;
@@ -82,6 +85,9 @@ export class HostUpdateCoordinator {
     const state = await readOwnedJson(join(directory, "state.json"), hostUid, hostStateSchema);
     this.#options.setHostState?.(state);
     const now = (this.#options.now ?? Date.now)();
+    const activityGeneration = restartActivityGeneration();
+    if (activityGeneration !== this.#activityGeneration) this.#idleSince = null;
+    this.#activityGeneration = activityGeneration;
     const readiness = this.#options.describeReadiness();
     if (!readiness.safeToRestart) this.#idleSince = null;
     else this.#idleSince ??= now;
@@ -101,7 +107,15 @@ export class HostUpdateCoordinator {
       return;
     }
     if (now < state.updatedAt || now - state.updatedAt > HOST_HEARTBEAT_TIMEOUT_MS) return;
-    if (!this.#options.describeReadiness().safeToRestart || this.#stopRequested || !this.#stopHandler) return;
+    // A short operation after the host's last observation must also veto an already-issued stop.
+    if (this.#idleSince === null || now - this.#idleSince < HOST_IDLE_GRACE_MS) return;
+    if (
+      restartActivityGeneration() !== activityGeneration ||
+      !this.#options.describeReadiness().safeToRestart ||
+      this.#stopRequested ||
+      !this.#stopHandler
+    )
+      return;
     this.#stopRequested = true;
     try {
       await this.#stopHandler();

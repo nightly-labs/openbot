@@ -23,6 +23,7 @@ import type { AgentStore } from "../agent-store";
 import { sortConversationMessages } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
+import { recordRestartActivity } from "../restart-activity";
 import { collapseMissedOccurrences } from "../routine-schedule";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import { type ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
@@ -470,6 +471,7 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   async #enqueueRun(run: RoutineRun): Promise<void> {
+    recordRestartActivity();
     const validateRecipient = this.#mailbox.prepareDelivery([run.agentId]);
     const agent = await this.#store.getOrCreate(run.agentId);
     try {
