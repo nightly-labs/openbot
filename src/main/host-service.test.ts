@@ -88,6 +88,7 @@ async function createHostService(
           createRemoteDesktopRuntime: () => ({
             start: async () => ({
               baseUrl: "http://127.0.0.1:9",
+              authHeader: "X-Test-Remote",
               hostId: 1,
               hostIds: [1],
               desktopAppId: 1,

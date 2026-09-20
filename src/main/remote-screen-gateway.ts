@@ -19,7 +19,6 @@ import { SunshineMoonlightRuntime, type SunshineMoonlightRuntimeState } from "./
 const GRANT_TTL_MS = 60_000;
 export const REMOTE_DESKTOP_MAX_SESSIONS = 4;
 const VIEWER_COOKIE = "openbotRemoteViewer";
-const MOONLIGHT_HEADER = "X-OpenBot-Remote-User";
 const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;
 const MAX_TIMER_DELAY_MS = 2_147_000_000;
@@ -362,11 +361,12 @@ export class RemoteScreenGateway {
       socket.destroy();
       return;
     }
+    const authHeader = this.#runtimeState.authHeader;
     this.#webSockets.handleUpgrade(request, socket, head, (client) => {
       const upstreamUrl = new URL("/api/host/stream", this.#runtimeState?.baseUrl);
       upstreamUrl.protocol = "ws:";
       const upstream = new webSockets.WebSocket(upstreamUrl, {
-        headers: { [MOONLIGHT_HEADER]: moonlightRuntimeUser(session) },
+        headers: { [authHeader]: moonlightRuntimeUser(session) },
       });
       const pendingClientFrames: Array<{ data: Ws.RawData; binary: boolean }> = [];
       let pendingClientBytes = 0;
@@ -569,6 +569,7 @@ export class RemoteScreenGateway {
       return;
     }
     const target = new URL(`${upstreamPath}${search}`, this.#runtimeState.baseUrl);
+    const authHeader = this.#runtimeState.authHeader;
     await new Promise<void>((resolve) => {
       const upstream = httpRequest(
         target,
@@ -577,7 +578,7 @@ export class RemoteScreenGateway {
           headers: {
             accept: request.headers.accept ?? "*/*",
             "content-type": request.headers["content-type"] ?? "application/octet-stream",
-            [MOONLIGHT_HEADER]: moonlightRuntimeUser(session),
+            [authHeader]: moonlightRuntimeUser(session),
           },
         },
         (upstreamResponse) => {

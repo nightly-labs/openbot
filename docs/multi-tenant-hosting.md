@@ -1,105 +1,163 @@
 # Multi-tenant hosting on one Mac
 
-This guide covers operation of several isolated OpenBot tenants on one Apple Silicon Mac.
-Each tenant is one native macOS Standard user with one OpenBot instance. The macOS
-account is the security boundary. No VMs, no Docker, no Tailscale for client access:
-clients connect through the Team API with WebRTC and the operator's STUN/TURN servers.
+Use one native macOS **Standard user** and one OpenBot instance per tenant. The shared
+application is `/Applications/OpenBot.app`. Client connections use the existing Team API,
+WebRTC, and the operator's STUN/TURN infrastructure. No VM or Docker is involved.
 
-## What is shared and what is not
+This setup protects tenant files through macOS ownership and permissions. It does **not**
+provide resource isolation against a hostile tenant: native users share CPU, memory, storage
+capacity, and the network namespace. A tenant can consume resources or occupy ports. An idle
+update requires cooperation from every registered tenant; one tenant can block maintenance.
+Do not promise independent availability on a shared native host.
 
-Shared across tenants on one Mac:
+## Data and permissions
 
-- `/Applications/OpenBot.app` — one application bundle for all tenants.
-- The host network namespace — two macOS users still share loopback ports.
-- The public IP address and the operator's STUN/TURN infrastructure.
+Before enrollment, the administrator must create each Standard account with a private home:
+owner is that tenant, mode `0700`, and no ACL that grants another tenant access. Check home
+metadata without opening tenant content. Do not share writable groups or grant Full Disk Access
+or administrator rights to tenants. Do not enable shared folders for tenant content.
 
-Separate per tenant (per macOS user, enforced by file ownership and macOS permissions):
+The home boundary protects `~/OpenBot`, OpenBot's database and browser profiles under
+`~/Library/Application Support/OpenBot`, `.codex`, `.claude`, credentials, and conversations.
+A tenant can deliberately share its own files; that is outside the private-account policy.
 
-- `~/Library/Application Support/OpenBot/` — database (`openbot.db`), Team host
-  identity, provider credentials, logs, remote desktop state.
-- `~/OpenBot/` — agents, workspaces, shared files.
-- `~/.codex`, `~/.claude` — provider logins and provider session state.
-- `~/Library/Caches/app.openbot.desktop.ShipIt/` — per-user update staging.
-- Sunshine/Moonlight ports — each OpenBot instance reserves a disjoint Sunshine
-  port family and a disjoint Moonlight WebRTC range at Remote Desktop start.
+The application and all its real contents must be root-owned with no group/public write bits
+and no access-granting ACLs. `/Applications` must also be root-owned and not writable by a
+tenant. The current verifier requires mode `0755` or stricter on that parent, including removal
+of group write permission. Framework symlinks must remain inside the application. The setup
+refuses unsafe permissions; it does not change tenant data or silently repair an unsafe bundle.
 
-## Upgrades are host-wide maintenance
+Remote Desktop reserves separate Sunshine port families and Moonlight WebRTC ranges. Stored
+Moonlight endpoints are recreated when the allocated port changes. The local Moonlight
+header has a random per-process credential, stored only in the private runtime config; automatic
+password-based administrator enrollment is disabled. Sunshine credentials use the pinned native
+runtime's salted hash file format, so plaintext passwords do not appear in process arguments.
 
-Replacing `/Applications/OpenBot.app` while another tenant's OpenBot process runs
-from it breaks that session. OpenBot coordinates this in the application:
+## Host Manager boundary
 
-- Every instance reports restart safety (`safeToRestart` with reasons: agent turns,
-  queued deliveries, drains, routine runs, channel work, provider processes, connected
-  Remote Desktop streams, live browser views, browser control sessions, moving file
-  transfers, updater work, pending initialization). Open tabs and connected Team API
-  clients alone never block; they reconnect after the restart.
-- One instance leads through lock files in `/Users/Shared/OpenBot/updates/`. It waits
-  until every tenant stayed safe continuously for the idle grace period (5 minutes),
-  tells everyone to stop, waits until all stopped, replaces the bundle once through
-  its own updater, and publishes the release marker.
-- Each tenant quits itself when told and safe. A per-user LaunchAgent watches the
-  release marker and reopens OpenBot inside that tenant's GUI session.
-- After relaunch each tenant probes itself (initialization settled, agent list
-  readable) and reports health; the host writes `alert-<version>.json` when a tenant
-  is missing or unhealthy, or when tenants never go idle within 2 hours.
-- A tenant install outside this flow stays refused while siblings run, and in managed
-  mode tenants never install on their own at all.
+A standalone compiled helper runs as the root LaunchDaemon `app.openbot.host-manager`.
+Its entry point is `scripts/host-manager.ts`. It owns only these functions:
 
-### One-time host setup
+1. Read the admin configuration and non-sensitive tenant status.
+2. Download the latest stable Apple Silicon release from the fixed OpenBot GitHub repository.
+3. Check code signing, notarization assessment, bundle version, ownership, and permissions.
+4. Wait for every registered tenant to report safe status for five minutes.
+5. Publish a stop request; each tenant rechecks its own state and quits itself.
+6. Verify through the OS process list that all OpenBot main processes have exited.
+7. Replace the shared bundle, then verify its signature, permissions, and installed version.
+8. Publish `released`; per-user LaunchAgents start OpenBot in their existing Aqua sessions.
+9. Collect fresh health reports, or record a host error.
 
-As an administrator, with the tenant users already created and logged in:
-
-```bash
-sudo scripts/install-host-update-agent.sh --managed client-acme client-bravo
-```
-
-This creates the shared coordination directory, installs the relaunch wrapper and the
-per-user relaunch agents, seeds the release marker, and drops the host-managed flag
-(`/Library/Application Support/OpenBot/host-managed.json`). Tenants then show update
-status with a "Managed by host" action instead of install buttons. Delete the flag to
-return to self-serve updates (the sibling refusal still applies).
-
-### What the administrator watches
+The helper never opens a tenant home, workspace, database, provider directory, browser profile,
+conversation, or attachment. It does not copy or back up tenant data. It reads executable paths
+and UIDs from `ps`, not process arguments. Downloads and app-only staging are root-private.
+The retired application is removed after verification; it is never used for automatic rollback.
+The helper itself is updated separately by an administrator, not by a tenant or downloaded code.
 
 ```text
-/Users/Shared/OpenBot/updates/
-  intent.json        waiting | stopping | installing | done | aborted, with reason
-  release.json       latest installed version
-  health-<uid>.json  per-tenant self report after relaunch
-  alert-<version>.json  complete flag plus per-tenant results
+/Library/Application Support/OpenBot/HostManager/    root:wheel 0755
+  config.json       root:wheel 0644; managed flag and registered numeric UIDs
+  state.json        root:wheel 0644; phase, cycle, version, timestamp, error
+  host-manager      root:wheel 0755; compiled helper
+  openbot-relaunch.sh root:wheel 0755
+  private/          root:wheel 0700; download and read-only DMG mount
+  tenants/          root:wheel 0755
+    <uid>/          tenant:wheel 0700; parent entry cannot be replaced by tenant
+      status.json   tenant-owned; status for that UID only
 ```
 
-An `aborted` intent means tenants never went idle: work with them, or stop OpenBot
-in every tenant account and install from one tenant manually. An incomplete alert
-means a tenant did not return: check that tenant's session and logs, and do not
-replace the bundle again until it is healthy. There is no automatic rollback:
-downgrading under migrated databases is not safe, so failures stay on disk and
-stay visible instead.
+Tenant status contains UID, PID, version, heartbeat, idle state, update cycle, and a health
+boolean. No user paths, activity text, prompts, or error details cross this interface. The host
+checks the file owner's UID, bounded size, regular-file type, single link, and permissions.
+Reads use `O_NOFOLLOW`; writes use exclusive temporary files and atomic rename. The host never
+writes inside a tenant status directory. Missing, stale, malformed, or unregistered state cannot
+remove a tenant from the maintenance set. There is no world-writable directory and no election.
 
-### Manual procedure (unmanaged hosts)
+With `managed: false` or no admin configuration, the host client does not publish status or stop
+the app, and the daemon does not coordinate updates. Normal desktop update controls return. With
+`managed: true`, all tenant update controls are disabled, including downloads and installation.
+The host download does not use or change a tenant's `autoDownload` preference.
 
-```text
-1. Tell all tenants about the maintenance window.
-2. Stop OpenBot in every tenant account (quit the app, do not only switch users).
-3. Confirm no OpenBot process remains for any tenant UID:
+## Installation
 
-   ps -ax -o pid,uid,command | grep -F "OpenBot.app/Contents/MacOS/OpenBot" | grep -v grep
+Use a trusted checkout. As an unprivileged developer, build the standalone helper:
 
-4. Install the update from one tenant's OpenBot: check for updates, download,
-   restart into it. The install is refused while any sibling still runs.
-5. Start that tenant, confirm version, agents, conversations, Team host.
-6. Start the next tenant, confirm the same.
+```sh
+bun install --frozen-lockfile
+bun build scripts/host-manager.ts --compile --outfile /tmp/openbot-host-manager
 ```
 
-## Recovery
+On the target Apple Silicon Mac, install a signed OpenBot build that contains the tenant client,
+set the application and home permissions above, and log each tenant into a GUI session. Then:
 
-- Normal reboot, power failure, macOS update reboot: log each tenant user in
-  again (FileVault stays on; no automatic unlock), then start OpenBot in each
-  session. Fast User Switching keeps the other session alive.
-- OpenBot crash: restart OpenBot in that tenant's session only. The other
-  tenant is not affected.
-- Individual client logout: that tenant's OpenBot stops with the session.
-  Log the user in again and start OpenBot.
-- Failed update: the refusing message names the cause. When every other
-  session stopped and the install still fails, quit and reopen OpenBot in the
-  installing tenant and try again; the update stays ready.
+```sh
+sudo scripts/install-host-update-agent.sh --managed /tmp/openbot-host-manager client-acme client-bravo
+```
+
+Only administrator setup needs sudo. The script checks Standard membership and private home metadata for accounts under `/Users/<name>`.
+It never opens home contents. The script installs the common LaunchAgent under
+`/Library/LaunchAgents`; it does not write into tenant homes. A logged-out user's agent loads at
+its next GUI login. Every registered tenant must be running and healthy before automatic
+maintenance can complete. The installer refuses existing configuration instead of overwriting it.
+If testing an older version of this PR, remove its per-user relaunch job from each tenant's own
+session before enrollment; the old `/Users/Shared/OpenBot/updates` protocol is not used.
+
+Verify the jobs and the application metadata:
+
+```sh
+sudo launchctl print system/app.openbot.host-manager
+launchctl print gui/$(id -u)/app.openbot.desktop.relaunch
+ls -ld /Applications/OpenBot.app
+ls -le /Applications/OpenBot.app/Contents/MacOS/OpenBot
+```
+
+The per-user wrapper checks only its current UID. Acme running cannot prevent Bravo from
+launching. A 15-second retry covers delayed GUI startup and a failed `open` attempt. No
+`sudo -u tenant open` is used. A tenant startup checks host state before it starts its services. The wrapper calls the helper's
+nonprivileged `--relaunch` path; it checks executable paths and filters by the current UID.
+
+## State and recovery
+
+Read `state.json` as the administrator. Phases are `idle`, `downloading`, `waiting`, `stopping`,
+`installing`, `released`, and `failed`. The installed version is announced only in `released`,
+after checking `CFBundleShortVersionString` on the actual shared bundle. A download or a return
+from an installer call is never treated as success.
+
+A two-hour idle timeout, two-minute shutdown timeout, or ten-minute health timeout records an
+error. A failed or interrupted installation blocks automatic relaunch and further installation.
+Stop the system job, inspect application-only staging and the installed signature/version, and
+resolve the error. After all tenants are stopped and the bundle is verified, an administrator can
+reset `state.json` to `idle` with a new empty cycle and null version, then restart the system job.
+Do not reset state while a replacement is running. Do not downgrade after a tenant has migrated
+its database. No tenant-data backup is created or assumed.
+
+To disable management, stop the system daemon and atomically set `managed` to `false` in the
+root-owned configuration. Tenants regain ordinary desktop controls. The shared root-owned
+application still requires administrator maintenance; do not make it tenant-writable. To enable
+management again, verify that no maintenance was interrupted before restarting the daemon.
+
+## Target-host acceptance (required before paying-client use)
+
+This is not replaced by tests that run under one UID:
+
+- From Acme, attempts to list/read/create/replace a harmless test file in Bravo's private home
+  must fail; repeat in the opposite direction. Each tenant creates its own test file.
+- Both tenants must fail to create or remove a test entry in the shared app and to replace its
+  executable. Check ACLs as well as mode bits. Do not modify an actual executable for this test.
+- Confirm that each tenant cannot create another UID's status, replace host config/state, or
+  replace its parent status directory with a symlink.
+- Run both Remote Desktop sessions, restart in reverse order, and confirm both reach their own
+  screen. Try a request with the other session's local Moonlight header and confirm rejection.
+- Exercise busy agents, provider activity, queued channel work, file transfers, browser control,
+  and Remote Desktop. Each blocks maintenance; busy status resets the five-minute grace.
+- Set both tenant download preferences off. Confirm one host download still occurs while they work.
+- Use a signed newer build. Confirm all tenants exit, bundle replacement completes, and only then
+  `released` appears. Confirm Acme-first and Bravo-first relaunch in their own Aqua sessions.
+- Simulate a stopped daemon during maintenance and a failed version verification. Confirm no
+  success marker or automatic relaunch, and check the host error.
+- Confirm fresh health reports for the new version. Disable and re-enable management and verify
+  that unmanaged mode never requests automatic tenant shutdown.
+
+The development computer used for this change has no `/Applications/OpenBot.app`, no native
+Remote Desktop runtime artifact, and no two-tenant acceptance setup. Actual signing assessment,
+DMG installation, cross-UID permissions, and Aqua relaunch still require this target-host run.

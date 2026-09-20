@@ -1,102 +1,76 @@
 #!/bin/sh
-# Installs the host-managed update plumbing on a shared Mac.
-#
-# Usage (as an administrator):
-#   sudo scripts/install-host-update-agent.sh [--managed] <tenant-user>...
-#
-# What it does:
-#   1. Creates /Users/Shared/OpenBot/updates, writable by every tenant (sticky bit kept,
-#      so tenants cannot delete each other's coordination files).
-#   2. Installs the relaunch wrapper to /Library/Application Support/OpenBot/.
-#   3. Seeds an empty release.json so per-user agents load (WatchPaths needs the file).
-#   4. With --managed, drops the host-managed marker: tenants report update status but
-#      never install on their own.
-#   5. Installs and loads the relaunch LaunchAgent for each named tenant user.
-#
-# Tenants must already exist as Standard users. Run this while they are logged in so the
-# agents load now; otherwise they load at next login. Removing --managed (deleting the
-# marker) returns tenants to self-serve updates.
+# Administrator setup. Build the standalone helper as an unprivileged developer first:
+# bun build scripts/host-manager.ts --compile --outfile /tmp/openbot-host-manager
+# sudo scripts/install-host-update-agent.sh --managed /tmp/openbot-host-manager client-acme client-bravo
 set -eu
-
-MANAGED=0
-USERS=""
-
-for arg in "$@"; do
-  case "$arg" in
-    --managed) MANAGED=1 ;;
-    -h|--help)
-      sed -n '2,20p' "$0"
-      exit 0
-      ;;
-    *) USERS="$USERS $arg" ;;
-  esac
-done
-
-if [ -z "$USERS" ]; then
-  echo "usage: sudo $0 [--managed] <tenant-user>..." >&2
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+if [ "$(id -u)" -ne 0 ] || [ "${1:-}" != --managed ] || [ "$#" -lt 3 ]; then
+  echo "usage: sudo $0 --managed <compiled-helper> <standard-user>..." >&2
   exit 1
 fi
+shift
+HELPER=$1
+shift
+ASSETS=$(cd "$(dirname "$0")/../build/macos/host-updates" && pwd)
+ROOT='/Library/Application Support/OpenBot/HostManager'
 
-if [ "$(id -u)" -ne 0 ]; then
-  echo "run as an administrator (sudo)." >&2
+check_dir() {
+  [ ! -L "$1" ] && [ -d "$1" ] && [ "$(stat -f %u "$1")" = 0 ] || exit 1
+  mode=$(stat -f %Lp "$1")
+  [ "$((0$mode & 0022))" -eq 0 ] || { echo "Remove group/public write access from $1 first." >&2; exit 1; }
+  if ls -lde "$1" | grep -Eq '[0-9]+:.*allow.*(write|append|add_file|add_subdirectory|delete|chown)'; then
+    echo "Remove writable ACLs from $1 first." >&2
+    exit 1
+  fi
+}
+for path in / /Library '/Library/Application Support' /Library/LaunchAgents /Library/LaunchDaemons; do check_dir "$path"; done
+for path in '/Library/Application Support/OpenBot' "$ROOT"; do
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then mkdir -m 755 "$path"; fi
+  check_dir "$path"
+done
+if [ -e "$ROOT/config.json" ] || [ -L "$ROOT/config.json" ]; then
+  echo 'Host Manager is already configured. Stop its system job before changing registration.' >&2
   exit 1
 fi
-
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-REPO_ASSETS="$SCRIPT_DIR/../build/macos/host-updates"
-
-SHARED_DIR="/Users/Shared/OpenBot/updates"
-SUPPORT_DIR="/Library/Application Support/OpenBot"
-MARKER="$SUPPORT_DIR/host-managed.json"
-RELEASE="$SHARED_DIR/release.json"
-AGENT_LABEL="app.openbot.desktop.relaunch"
-
-mkdir -p "$SHARED_DIR"
-chmod 1777 "$SHARED_DIR"
-mkdir -p "$SUPPORT_DIR"
-
-install -m 755 "$REPO_ASSETS/openbot-relaunch.sh" "$SUPPORT_DIR/openbot-relaunch.sh"
-
-if [ ! -f "$RELEASE" ]; then
-  printf '{"version":"0.0.0","releasedAt":0,"wave":1}\n' > "$RELEASE"
-  chmod 644 "$RELEASE"
-fi
-
-if [ "$MANAGED" -eq 1 ]; then
-  printf '{"managed":true}\n' > "$MARKER"
-  chmod 644 "$MARKER"
-  echo "host-managed marker installed: tenants will not install on their own."
-fi
-
-for user in $USERS; do
-  if ! id "$user" >/dev/null 2>&1; then
-    echo "unknown user: $user (skipped)." >&2
-    continue
+UIDS=''
+for tenant in "$@"; do
+  case "$tenant" in ''|-*|*[!a-zA-Z0-9_-]*) echo 'Invalid tenant account name.' >&2; exit 1;; esac
+  tenant_uid=$(id -u "$tenant")
+  [ "$tenant_uid" -ge 501 ] || exit 1
+  membership=$(dseditgroup -o checkmember -m "$tenant" admin)
+  if printf '%s\n' "$membership" | grep -q '^yes'; then
+    echo "Tenant $tenant must be a Standard user." >&2
+    exit 1
   fi
-  home=$(eval echo "~$user")
-  agent_dir="$home/Library/LaunchAgents"
-  mkdir -p "$agent_dir"
-  install -m 644 "$REPO_ASSETS/$AGENT_LABEL.plist" "$agent_dir/$AGENT_LABEL.plist"
-  chown "$user" "$agent_dir/$AGENT_LABEL.plist"
-  uid=$(id -u "$user")
-  if launchctl bootstrap "gui/$uid" "$agent_dir/$AGENT_LABEL.plist" 2>/dev/null; then
-    echo "relaunch agent loaded for $user."
-  else
-    echo "relaunch agent installed for $user; it loads at next login."
+  # Metadata only. Never open, scan, copy or modify any tenant content.
+  tenant_home="/Users/$tenant"
+  [ "$(dscl . -read "/Users/$tenant" NFSHomeDirectory)" = "NFSHomeDirectory: $tenant_home" ] || exit 1
+  [ ! -L "$tenant_home" ] && [ -d "$tenant_home" ] && [ "$(stat -f %u "$tenant_home")" = "$tenant_uid" ] || exit 1
+  home_mode=$(stat -f %Lp "$tenant_home")
+  [ "$((0$home_mode & 0077))" -eq 0 ] || { echo "Set a private 0700 home for $tenant before enrollment." >&2; exit 1; }
+  if ls -lde "$tenant_home" | grep -Eq '[0-9]+:.*allow'; then
+    echo "Remove access-granting home ACLs for $tenant before enrollment." >&2
+    exit 1
+  fi
+  UIDS="$UIDS $tenant_uid"
+done
+# The operator supplies trusted compiled code. Never compile repository hooks as root.
+[ -f "$HELPER" ] && [ ! -L "$HELPER" ] || exit 1
+for destination in "$ROOT/host-manager" "$ROOT/openbot-relaunch.sh" /Library/LaunchAgents/app.openbot.desktop.relaunch.plist /Library/LaunchDaemons/app.openbot.host-manager.plist; do
+  [ ! -e "$destination" ] && [ ! -L "$destination" ] || { echo "Existing installation asset: $destination" >&2; exit 1; }
+done
+install -o root -g wheel -m 755 "$HELPER" "$ROOT/host-manager"
+install -o root -g wheel -m 755 "$ASSETS/openbot-relaunch.sh" "$ROOT/openbot-relaunch.sh"
+# UIDS contains only numbers returned by id above.
+# shellcheck disable=SC2086
+"$ROOT/host-manager" --setup $UIDS
+install -o root -g wheel -m 644 "$ASSETS/app.openbot.desktop.relaunch.plist" /Library/LaunchAgents/app.openbot.desktop.relaunch.plist
+install -o root -g wheel -m 644 "$ASSETS/app.openbot.host-manager.plist" /Library/LaunchDaemons/app.openbot.host-manager.plist
+launchctl bootstrap system /Library/LaunchDaemons/app.openbot.host-manager.plist
+for tenant in "$@"; do
+  tenant_uid=$(id -u "$tenant")
+  if ! launchctl bootstrap "gui/$tenant_uid" /Library/LaunchAgents/app.openbot.desktop.relaunch.plist; then
+    echo "LaunchAgent for $tenant will load at the next GUI login."
   fi
 done
-
-echo "verification:"
-echo -n "  shared dir: "
-ls -ld "$SHARED_DIR"
-for user in $USERS; do
-  if id "$user" >/dev/null 2>&1; then
-    uid=$(id -u "$user")
-    echo -n "  agent for $user: "
-    if sudo -u "$user" launchctl print "gui/$uid/$AGENT_LABEL" >/dev/null 2>&1; then
-      echo "loaded."
-    else
-      echo "installed, not loaded (loads at next login)."
-    fi
-  fi
-done
+ls -ld /Applications/OpenBot.app "$ROOT"

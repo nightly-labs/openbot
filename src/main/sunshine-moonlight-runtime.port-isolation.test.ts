@@ -1,5 +1,4 @@
-import { execFileSync, type spawn as nodeSpawn } from "node:child_process";
-import { EventEmitter } from "node:events";
+import { ChildProcess, execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import {
@@ -12,6 +11,7 @@ import { createServer as createHttpsServer, type Server as HttpsServer } from "n
 import { createServer as createTcpServer, type Server as TcpServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import type { RemoteDesktopDisplay } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
@@ -21,12 +21,14 @@ import {
   allocateSunshineBasePort,
   allocateWebRtcPortRange,
   type MoonlightWebRtcPortRange,
+  type RemoteRuntimeSpawn,
   releaseSunshineBasePort,
   releaseWebRtcPortRange,
   SUNSHINE_DEFAULT_BASE_PORT,
   SunshineMoonlightRuntime,
   sunshineHttpPortForBase,
   sunshineHttpsPortForBase,
+  sunshinePasswordHash,
   sunshinePortFamiliesOverlap,
 } from "./sunshine-moonlight-runtime";
 
@@ -74,11 +76,11 @@ async function readBody(request: IncomingMessage): Promise<string> {
   });
 }
 
-class FakeChild extends EventEmitter {
+class FakeChild extends ChildProcess {
   exitCode: number | null = null;
   killed = false;
-  stdout = new EventEmitter();
-  stderr = new EventEmitter();
+  stdout = new PassThrough();
+  stderr = new PassThrough();
   readonly #onKill: () => void;
 
   constructor(onKill: () => void = () => undefined) {
@@ -105,13 +107,14 @@ interface Harness {
   stateDirectory: string;
   hosts: Array<{ host_id: number; paired: "Paired" | "NotPaired" }>;
   nextHostId: number;
+  authHeader: string;
   observedSunshineHttpPorts: number[];
   sunshineHits: Array<{ path: string; localPort: number }>;
   pinBodies: string[];
   pinSubmitted: Deferred<void>;
   servers: Array<HttpServer | HttpsServer>;
   serverErrors: unknown[];
-  spawn: typeof nodeSpawn;
+  spawn: RemoteRuntimeSpawn;
   closeAll(): Promise<void>;
 }
 
@@ -198,12 +201,27 @@ const moonlightPairRequestSchema = z.object({ host_id: z.number().int() });
 const moonlightConfigFileSchema = z.object({
   moonlight: z.object({ default_http_port: z.number().int() }),
   webrtc: z.object({ port_range: z.object({ min: z.number().int(), max: z.number().int() }) }),
-  web_server: z.object({ bind_address: z.string() }),
+  web_server: z.object({
+    bind_address: z.string(),
+    forwarded_header: z.object({ username_header: z.string() }),
+    first_login_create_admin: z.boolean(),
+  }),
 });
 
 function moonlightHandler(harness: Harness): (request: IncomingMessage, response: ServerResponse) => void {
   return (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    if (!request.headers[harness.authHeader.toLowerCase()]) {
+      response.writeHead(401);
+      response.end();
+      return;
+    }
+    if (request.method === "DELETE" && url.pathname === "/api/host") {
+      harness.hosts = harness.hosts.filter((host) => String(host.host_id) !== url.searchParams.get("host_id"));
+      response.writeHead(200);
+      response.end();
+      return;
+    }
     const jsonLine = (value: unknown): void => {
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(`${JSON.stringify(value)}\n`);
@@ -265,6 +283,7 @@ function createHarness(stateDirectory: string): Harness {
     stateDirectory,
     hosts: [],
     nextHostId: 1,
+    authHeader: "",
     observedSunshineHttpPorts: [],
     sunshineHits: [],
     pinBodies: [],
@@ -276,13 +295,9 @@ function createHarness(stateDirectory: string): Harness {
       await Promise.all(harness.servers.map((server) => closeServer(server)));
     },
   };
-  function createHarnessSpawn(): typeof nodeSpawn {
+  function createHarnessSpawn(): RemoteRuntimeSpawn {
     const spawn = (executable: string, args: string[]): FakeChild => {
-      if (args.includes("--creds")) {
-        const child = new FakeChild();
-        queueMicrotask(() => child.complete(0));
-        return child;
-      }
+      if (args.some((arg) => arg.includes("test-password"))) throw new Error("Password exposed in child arguments.");
       if (executable === TEST_PATHS.sunshine) {
         const config = readFileSync(args[0] ?? "", "utf8");
         const base = Number(/^\s*port\s*=\s*(\d+)\s*$/m.exec(config)?.[1]);
@@ -310,6 +325,10 @@ function createHarness(stateDirectory: string): Harness {
         return child;
       }
       if (executable === TEST_PATHS.moonlightWebServer) {
+        const configPath = args[args.indexOf("--config-path") + 1];
+        harness.authHeader = moonlightConfigFileSchema.parse(
+          JSON.parse(readFileSync(configPath, "utf8")),
+        ).web_server.forwarded_header.username_header;
         const address = args[args.indexOf("--bind-address") + 1] ?? "";
         const port = Number(address.split(":").pop());
         if (!Number.isInteger(port)) throw new Error("Fake Moonlight did not receive a bind address.");
@@ -330,8 +349,7 @@ function createHarness(stateDirectory: string): Harness {
       }
       throw new Error(`Unexpected spawn in test: ${executable} ${(args ?? []).join(" ")}`);
     };
-    // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the spawned Sunshine/Moonlight surface.
-    return spawn as unknown as typeof nodeSpawn;
+    return spawn;
   }
   return harness;
 }
@@ -372,6 +390,12 @@ async function blockTcp(port: number): Promise<TcpServer> {
 }
 
 describe("sunshine port family helpers", () => {
+  it("writes the credential digest required by the pinned Sunshine build", () => {
+    expect(sunshinePasswordHash("password", "salt")).toBe(
+      "997B60F3DD238B10ECDEDC2805F9E3DCB42A5AFAC089909AC1EA18895CB8377A",
+    );
+  });
+
   it("derives the HTTP/HTTPS pair from one base port", () => {
     expect(sunshineHttpPortForBase(SUNSHINE_DEFAULT_BASE_PORT)).toBe(47_989);
     expect(sunshineHttpsPortForBase(SUNSHINE_DEFAULT_BASE_PORT)).toBe(47_990);
@@ -462,7 +486,7 @@ describe("Sunshine port isolation", () => {
       try {
         expect(runtime.sunshineHttpPort).not.toBeNull();
         expect(runtime.sunshineHttpPort).not.toBe(SUNSHINE_DEFAULT_BASE_PORT);
-        expect(harness.observedSunshineHttpPorts).toEqual([runtime.sunshineHttpPort]);
+        expect(new Set(harness.observedSunshineHttpPorts)).toEqual(new Set([runtime.sunshineHttpPort]));
       } finally {
         await disposeRuntime(runtime, harness);
       }
@@ -504,7 +528,7 @@ describe("Sunshine port isolation", () => {
         expect(first.runtime.state).toBeNull();
         expect(second.runtime.state).not.toBeNull();
         const authenticate = await fetch(`${secondBaseUrl}/api/authenticate`, {
-          headers: { "X-OpenBot-Remote-User": "openbot-remote-slot-1" },
+          headers: { [second.harness.authHeader]: "openbot-remote-slot-1" },
         });
         expect(authenticate.ok).toBe(true);
         await expect(fetch(first.runtime.state?.baseUrl ?? "http://127.0.0.1:1/")).rejects.toThrow();
@@ -512,7 +536,7 @@ describe("Sunshine port isolation", () => {
         await first.runtime.start();
         expect(first.runtime.state).not.toBeNull();
         const stillThere = await fetch(`${secondBaseUrl}/api/authenticate`, {
-          headers: { "X-OpenBot-Remote-User": "openbot-remote-slot-1" },
+          headers: { [second.harness.authHeader]: "openbot-remote-slot-1" },
         });
         expect(stillThere.ok).toBe(true);
       } finally {
@@ -520,6 +544,32 @@ describe("Sunshine port isolation", () => {
       }
     } finally {
       await disposeRuntime(first.runtime, first.harness);
+    }
+  });
+
+  it("recreates persisted hosts after another runtime claims the old port", async () => {
+    const first = await createStartedRuntime();
+    const oldPort = first.runtime.sunshineHttpPort;
+    await first.runtime.stop();
+    await first.harness.closeAll();
+    const other = await createStartedRuntime();
+    try {
+      first.harness.observedSunshineHttpPorts = [];
+      await first.runtime.start();
+      expect(first.runtime.sunshineHttpPort).not.toBe(oldPort);
+      expect(new Set(first.harness.observedSunshineHttpPorts)).toEqual(new Set([first.runtime.sunshineHttpPort]));
+      const denied = await fetch(`${first.runtime.state?.baseUrl}/api/authenticate`, {
+        headers: { "X-OpenBot-Remote-User": "openbot-remote-slot-1" },
+      });
+      expect(denied.status).toBe(401);
+      expect(first.harness.authHeader).not.toBe(other.harness.authHeader);
+      const config = moonlightConfigFileSchema.parse(
+        JSON.parse(await readFile(join(first.harness.stateDirectory, "moonlight-config.json"), "utf8")),
+      );
+      expect(config.web_server.first_login_create_admin).toBe(false);
+    } finally {
+      await disposeRuntime(first.runtime, first.harness);
+      await disposeRuntime(other.runtime, other.harness);
     }
   });
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { UpdateBusyPhase, UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
+import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import type { OpenBotSiblingInstance } from "./update-sibling-instances";
 
 /** Only the part of electron-updater's cancellation token this service depends on. */
@@ -272,15 +273,48 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (enabled && this.#options.enabled && this.#status.phase === "available") void this.downloadUpdate();
   }
 
-  /**
-   * Marks this instance host-managed: tenants report status but never install on their own.
-   * The flag only ever appears in the reported status; it changes no phase and interrupts
-   * nothing, so flipping it mid-download is safe.
-   */
+  /** Host-managed sessions display host state and never invoke the tenant updater. */
   setManagedByHost(managed: boolean): void {
     if (this.#managedByHost === managed) return;
     this.#managedByHost = managed;
+    if (!managed) {
+      this.#downloadedVersion = null;
+      this.#setStatus({
+        phase: this.#options.enabled ? "idle" : "unsupported",
+        availableVersion: null,
+        progress: null,
+        message: null,
+        errorCode: null,
+      });
+      if (this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
+    }
     this.#setStatus({});
+  }
+
+  setHostState(state: HostUpdateState): void {
+    if (!this.#managedByHost) return;
+    const phases = {
+      idle: "up-to-date",
+      downloading: "downloading",
+      waiting: "ready",
+      stopping: "ready",
+      installing: "installing",
+      released: "up-to-date",
+      failed: "error",
+    } as const;
+    if (
+      this.#status.phase === phases[state.phase] &&
+      this.#status.availableVersion === state.version &&
+      this.#status.message === state.error
+    )
+      return;
+    this.#setStatus({
+      phase: phases[state.phase],
+      availableVersion: state.version,
+      message: state.error,
+      errorCode: state.phase === "failed" ? "install_failed" : null,
+      progress: null,
+    });
   }
 
   /**
@@ -293,7 +327,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   }
 
   async #check(joinOutstandingRequest: boolean): Promise<UpdateStatus> {
-    if (!this.#options.enabled || this.#teardownCommitted) return this.getStatus();
+    if (this.#managedByHost || !this.#options.enabled || this.#teardownCommitted) return this.getStatus();
     if (["checking", "downloading", "ready", "installing"].includes(this.#status.phase)) {
       return this.getStatus();
     }
@@ -347,6 +381,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   }
 
   async downloadUpdate(): Promise<UpdateStatus> {
+    if (this.#managedByHost) return this.getStatus();
     if (!this.#options.enabled || this.#teardownCommitted || !this.#canDownload()) return this.getStatus();
     // Same deduplication applies to downloads, and starting a second attempt while the abandoned one
     // is still unsettled is also what would let its buffered events be read as the new attempt's.
@@ -393,18 +428,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     await this.#install();
   }
 
-  /**
-   * The host coordinator's install: same one-shot path as the tenant action, but allowed on a
-   * managed instance. The sibling check still runs — a tenant that came back early must block
-   * the bundle replacement exactly like a tenant that never left.
-   */
-  async installHostUpdate(): Promise<void> {
-    if (!this.#canInstall() || this.#installStarted) {
-      throw new Error("An update is not ready to install.");
-    }
-    await this.#install();
-  }
-
   async #install(): Promise<void> {
     // Replacing the application bundle while another login session runs OpenBot from it breaks
     // that session, so refuse before the one-shot install latch and before shutdown preparation.
@@ -413,6 +436,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (siblings.length > 0) {
       throw new Error(SIBLING_SESSION_MESSAGE);
     }
+    if (this.#managedByHost) throw new Error(MANAGED_HOST_MESSAGE);
+    if (!this.#canInstall() || this.#installStarted) throw new Error("An update is not ready to install.");
     const generation = ++this.#installGeneration;
     this.#activeInstall = generation;
     this.#installStarted = true;
@@ -536,7 +561,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #armPhaseTimer(): void {
     this.#clearPhaseTimer();
     const timeoutMs = this.#phaseTimeoutMs();
-    if (timeoutMs === null) return;
+    if (this.#managedByHost || timeoutMs === null) return;
     this.#phaseTimer = setTimeout(() => {
       this.#phaseTimer = null;
       this.#failStalledPhase();

@@ -1,5 +1,5 @@
-import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
-import { randomBytes, timingSafeEqual, X509Certificate } from "node:crypto";
+import { type ChildProcess, spawn as nodeSpawn, type SpawnOptions } from "node:child_process";
+import { createHash, randomBytes, timingSafeEqual, X509Certificate } from "node:crypto";
 import { createSocket } from "node:dgram";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest, type IncomingMessage, type Server } from "node:http";
@@ -12,7 +12,6 @@ import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { stopRemoteProcess } from "./remote-diagnostics";
 
-const MOONLIGHT_USER_HEADER = "X-OpenBot-Remote-User";
 const MOONLIGHT_STREAMER_SLOTS = 4;
 // First candidate for Sunshine's base port. Sunshine derives its whole port family from this one
 // `port` value, so every OpenBot instance must claim a disjoint family: two macOS users share one
@@ -215,11 +214,13 @@ const sunshineDisplaysSchema = z.object({
 });
 
 interface MoonlightRequestInit {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "DELETE";
   body?: string;
 }
 
 export interface SunshineMoonlightRuntimeState {
+  /** Private local credential; never send it to clients or diagnostics. */
+  authHeader: string;
   baseUrl: string;
   hostId: number;
   hostIds: number[];
@@ -228,6 +229,8 @@ export interface SunshineMoonlightRuntimeState {
   selectedDisplayId: string | null;
 }
 
+export type RemoteRuntimeSpawn = (executable: string, args: string[], options: SpawnOptions) => ChildProcess;
+
 interface SunshineMoonlightRuntimeOptions {
   paths: RemoteDesktopRuntimePaths;
   stateDirectory: string;
@@ -235,7 +238,7 @@ interface SunshineMoonlightRuntimeOptions {
   credentials: { username: string; password: string };
   getDisplays: () => RemoteDesktopDisplay[];
   getIceServers: () => Promise<RemoteDesktopIceServer[]>;
-  spawnProcess?: typeof nodeSpawn;
+  spawnProcess?: RemoteRuntimeSpawn;
   onDiagnostic?: (source: "sunshine" | "moonlight", message: string) => void;
   allocateSunshineBasePort?: () => Promise<number>;
   allocateMoonlightPort?: () => Promise<number>;
@@ -244,13 +247,14 @@ interface SunshineMoonlightRuntimeOptions {
 
 export class SunshineMoonlightRuntime {
   readonly #options: SunshineMoonlightRuntimeOptions;
-  readonly #spawn: typeof nodeSpawn;
+  readonly #spawn: RemoteRuntimeSpawn;
   #sunshine: ChildProcess | null = null;
   #moonlight: ChildProcess | null = null;
   #iceServer: Server | null = null;
   #iceToken = "";
   #state: SunshineMoonlightRuntimeState | null = null;
   #screenCaptureDenied = false;
+  readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
   #selectedDisplayId: string | null = null;
   #starting: Promise<SunshineMoonlightRuntimeState> | null = null;
   #sunshineBasePort: number | null = null;
@@ -379,10 +383,10 @@ export class SunshineMoonlightRuntime {
           this.#ownsWebRtcRange = true;
         }
       }
-      await this.#writeMoonlightConfig();
       await this.#writeIceHelper();
       await this.#setSunshineCredentials();
       await this.#startSunshineWithRetry();
+      await this.#writeMoonlightConfig();
       const displays = await this.#getSunshineDisplays();
       if (!this.#selectedDisplayId || !displays.some((display) => display.id === this.#selectedDisplayId)) {
         this.#selectedDisplayId = displays.find((display) => display.primary)?.id ?? displays[0]?.id ?? null;
@@ -393,7 +397,7 @@ export class SunshineMoonlightRuntime {
       await waitForHttp(
         `http://127.0.0.1:${moonlightPort}/api/authenticate`,
         {
-          headers: { [MOONLIGHT_USER_HEADER]: moonlightSlotUser(1) },
+          headers: { [this.#moonlightHeader]: moonlightSlotUser(1) },
         },
         this.#moonlight,
       );
@@ -401,6 +405,7 @@ export class SunshineMoonlightRuntime {
       const paired = await this.#bootstrapMoonlight(moonlightPort);
       this.#state = {
         baseUrl: `http://127.0.0.1:${moonlightPort}`,
+        authHeader: this.#moonlightHeader,
         ...paired,
         displays,
         selectedDisplayId: this.#selectedDisplayId,
@@ -482,8 +487,8 @@ export class SunshineMoonlightRuntime {
         certificate: null,
         url_path_prefix: "",
         session_cookie_secure: false,
-        forwarded_header: { username_header: MOONLIGHT_USER_HEADER, auto_create_missing_user: true },
-        first_login_create_admin: true,
+        forwarded_header: { username_header: this.#moonlightHeader, auto_create_missing_user: true },
+        first_login_create_admin: false,
         first_login_assign_global_hosts: true,
         default_user_id: null,
         default_role_id: null,
@@ -511,19 +516,21 @@ export class SunshineMoonlightRuntime {
     const contents =
       this.#options.platform === "win32"
         ? "@powershell.exe -NoProfile -NonInteractive -Command \"Invoke-RestMethod -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL | ConvertTo-Json -Compress\"\r\n"
-        : '#!/bin/sh\nexec /usr/bin/curl --fail --silent --show-error --header "Authorization: Bearer $OPENBOT_ICE_HELPER_TOKEN" "$OPENBOT_ICE_HELPER_URL"\n';
+        : `#!/bin/sh\nprintf 'header = "Authorization: Bearer %s"\\nurl = "%s"\\n' "$OPENBOT_ICE_HELPER_TOKEN" "$OPENBOT_ICE_HELPER_URL" | /usr/bin/curl --fail --silent --show-error --config -\n`;
     await writeFile(path, contents, { mode: 0o700 });
     if (this.#options.platform !== "win32") await chmod(path, 0o700);
   }
 
   async #setSunshineCredentials(): Promise<void> {
-    const configPath = join(this.#options.stateDirectory, "sunshine.conf");
-    await runProcess(
-      this.#spawn,
-      this.#options.paths.sunshine,
-      [configPath, "--creds", this.#options.credentials.username, this.#options.credentials.password],
-      dirname(this.#options.paths.sunshine),
-    );
+    // Matches pinned Sunshine http::save_user_creds and util::Hex (reversed SHA-256,
+    // uppercase). Do not pass the plaintext password through globally visible argv.
+    const salt = randomBytes(16).toString("hex");
+    const password = sunshinePasswordHash(this.#options.credentials.password, salt);
+    const path = join(this.#options.stateDirectory, "sunshine-credentials.json");
+    await writeFile(path, JSON.stringify({ username: this.#options.credentials.username, salt, password }), {
+      mode: 0o600,
+    });
+    if (this.#options.platform !== "win32") await chmod(path, 0o600);
   }
 
   // Probing a free family and starting Sunshine cannot be atomic, so a rival process can take
@@ -577,8 +584,6 @@ export class SunshineMoonlightRuntime {
         join(this.#options.stateDirectory, "moonlight-config.json"),
         "--bind-address",
         `127.0.0.1:${port}`,
-        "--forwarded-header",
-        MOONLIGHT_USER_HEADER,
         "--streamer-path",
         this.#options.paths.moonlightStreamer,
         "run",
@@ -599,20 +604,39 @@ export class SunshineMoonlightRuntime {
 
   async #bootstrapMoonlight(port: number): Promise<{ hostId: number; hostIds: number[]; desktopAppId: number }> {
     const baseUrl = `http://127.0.0.1:${port}`;
+    const endpointPath = join(this.#options.stateDirectory, "moonlight-endpoint.json");
+    const endpoint = await readFile(endpointPath, "utf8")
+      .then((text) => z.object({ port: z.number().int() }).parse(JSON.parse(text)))
+      .catch(() => null);
+    const endpointChanged = endpoint?.port !== this.#requireSunshineHttpPort();
     const hostIds: number[] = [];
     for (let slot = 1; slot <= MOONLIGHT_STREAMER_SLOTS; slot += 1) {
       const user = moonlightSlotUser(slot);
-      const hosts = (await moonlightJson(baseUrl, "/api/hosts", moonlightHostsSchema, {}, user)).hosts;
+      const hosts = (await moonlightJson(baseUrl, "/api/hosts", moonlightHostsSchema, this.#moonlightHeader, {}, user))
+        .hosts;
       this.#options.onDiagnostic?.(
         "moonlight",
         `OpenBot: found ${hosts.length} local Moonlight hosts for streamer slot ${slot}.\n`,
       );
-      let host = hosts.find((candidate) => Number.isInteger(candidate.host_id));
+      // Stored hosts keep their original port. Recreate the managed endpoint before pairing,
+      // including when another user claimed this runtime's previous port after restart.
+      for (const previous of endpointChanged ? hosts : []) {
+        const deleted = await moonlightHttpResponse(
+          baseUrl,
+          `/api/host?host_id=${previous.host_id}`,
+          { method: "DELETE" },
+          user,
+          this.#moonlightHeader,
+        );
+        deleted.resume();
+      }
+      let host = endpointChanged ? undefined : hosts[0];
       if (!host) {
         const created = await moonlightJson(
           baseUrl,
           "/api/host",
           moonlightCreatedHostSchema,
+          this.#moonlightHeader,
           {
             method: "POST",
             body: JSON.stringify({ address: "127.0.0.1", http_port: this.#requireSunshineHttpPort() }),
@@ -620,10 +644,6 @@ export class SunshineMoonlightRuntime {
           user,
         );
         host = created.host;
-        this.#options.onDiagnostic?.(
-          "moonlight",
-          `OpenBot: created local host ${host.host_id} for streamer slot ${slot}.\n`,
-        );
       }
       if (host.paired !== "Paired") {
         this.#options.onDiagnostic?.(
@@ -636,10 +656,18 @@ export class SunshineMoonlightRuntime {
       hostIds.push(host.host_id);
     }
     const apps = (
-      await moonlightJson(baseUrl, `/api/apps?host_id=${hostIds[0]}`, moonlightAppsSchema, {}, moonlightSlotUser(1))
+      await moonlightJson(
+        baseUrl,
+        `/api/apps?host_id=${hostIds[0]}`,
+        moonlightAppsSchema,
+        this.#moonlightHeader,
+        {},
+        moonlightSlotUser(1),
+      )
     ).apps;
     const desktop = apps.find((app) => app.title.toLowerCase() === "desktop") ?? apps[0];
     if (!desktop) throw new Error("Sunshine did not publish the Desktop application.");
+    await writeFile(endpointPath, JSON.stringify({ port: this.#requireSunshineHttpPort() }), { mode: 0o600 });
     return { hostId: hostIds[0], hostIds, desktopAppId: desktop.app_id };
   }
 
@@ -670,7 +698,7 @@ export class SunshineMoonlightRuntime {
     const response = await requestStream(
       `${baseUrl}/api/pair`,
       {
-        [MOONLIGHT_USER_HEADER]: user,
+        [this.#moonlightHeader]: user,
         "Content-Type": "application/json",
         "Content-Length": String(Buffer.byteLength(body)),
       },
@@ -715,7 +743,7 @@ export class SunshineMoonlightRuntime {
   }
 
   async #assertEmbeddedPermissions(baseUrl: string, user: string): Promise<void> {
-    const { role } = await moonlightJson(baseUrl, "/api/role", moonlightRoleSchema, {}, user);
+    const { role } = await moonlightJson(baseUrl, "/api/role", moonlightRoleSchema, this.#moonlightHeader, {}, user);
     if (role.permissions.allow_transport_webrtc !== true || role.permissions.allow_transport_websockets !== false) {
       throw new Error("Moonlight Web is not an OpenBot embedded build.");
     }
@@ -756,7 +784,7 @@ export class SunshineMoonlightRuntime {
       stream?.on("data", (chunk) => {
         const message = chunk.toString("utf8");
         if (source === "sunshine" && saidCaptureDenied(message)) this.#screenCaptureDenied = true;
-        this.#options.onDiagnostic?.(source, message);
+        this.#options.onDiagnostic?.(source, message.replaceAll(this.#moonlightHeader, "[REDACTED]"));
       });
     }
   }
@@ -766,10 +794,11 @@ async function moonlightJson<T>(
   baseUrl: string,
   path: string,
   schema: z.ZodType<T>,
+  authHeader: string,
   init: MoonlightRequestInit = {},
   user = moonlightSlotUser(1),
 ): Promise<T> {
-  const response = await moonlightHttpResponse(baseUrl, path, init, user);
+  const response = await moonlightHttpResponse(baseUrl, path, init, user, authHeader);
   let buffer = "";
   for await (const chunk of response) {
     buffer += Buffer.from(chunk).toString("utf8");
@@ -788,10 +817,11 @@ async function moonlightHttpResponse(
   path: string,
   init: MoonlightRequestInit,
   user: string,
+  authHeader: string,
 ): Promise<IncomingMessage> {
   const body = init.body ?? "";
   const headers: Record<string, string> = {
-    [MOONLIGHT_USER_HEADER]: user,
+    [authHeader]: user,
     "Content-Type": "application/json",
     ...(body ? { "Content-Length": String(Buffer.byteLength(body)) } : {}),
   };
@@ -969,25 +999,20 @@ async function reservePort(): Promise<number> {
   return address.port;
 }
 
-async function runProcess(
-  spawnProcess: typeof nodeSpawn,
-  executable: string,
-  args: string[],
-  cwd?: string,
-): Promise<void> {
-  const child = spawnProcess(executable, args, { cwd, stdio: "ignore", windowsHide: true });
-  await new Promise<void>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("exit", (code) =>
-      code === 0 ? resolve() : reject(new Error(`Runtime setup exited with code ${code}.`)),
-    );
-  });
-}
-
 function arrayUrls(urls: string | string[]): string[] {
   return Array.isArray(urls) ? urls : [urls];
 }
 
 function moonlightSlotUser(slot: number): string {
   return `openbot-remote-slot-${slot}`;
+}
+
+/** Pinned Sunshine http::save_user_creds / util::Hex encoding. */
+export function sunshinePasswordHash(password: string, salt: string): string {
+  return createHash("sha256")
+    .update(password + salt)
+    .digest()
+    .reverse()
+    .toString("hex")
+    .toUpperCase();
 }

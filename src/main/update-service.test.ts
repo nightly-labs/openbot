@@ -266,7 +266,7 @@ describe("UpdateService", () => {
     expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
   });
 
-  it("refuses tenant installs in host-managed mode but allows the host install", async () => {
+  it("refuses tenant installs in host-managed mode and restores manual updates when disabled", async () => {
     const updater = new FakeUpdater();
     const beforeInstall = vi.fn(async () => undefined);
     makeUpdateAvailable(updater);
@@ -286,9 +286,53 @@ describe("UpdateService", () => {
     expect(updater.quitAndInstall).not.toHaveBeenCalled();
     expect(service.getStatus().phase).toBe("ready");
 
-    await service.installHostUpdate();
+    service.setManagedByHost(false);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    await service.installUpdate();
     expect(beforeInstall).toHaveBeenCalledOnce();
     expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+  });
+
+  it("serializes concurrent install requests after the sibling scan", async () => {
+    const updater = new FakeUpdater();
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    let finishScan: (value: readonly OpenBotSiblingInstance[]) => void = () => undefined;
+    const scan = new Promise<readonly OpenBotSiblingInstance[]>((resolve) => {
+      finishScan = resolve;
+    });
+    let finishPrepare: () => void = () => undefined;
+    const prepare = new Promise<void>((resolve) => {
+      finishPrepare = resolve;
+    });
+    const beforeInstall = vi.fn(() => prepare);
+    const service = createService(updater, { beforeInstall, checkSiblingInstances: () => scan });
+    service.start(false);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    const first = service.installUpdate();
+    const second = service.installUpdate();
+    const rejected = expect(second).rejects.toThrow("not ready");
+    finishScan([]);
+    await rejected;
+    expect(beforeInstall).toHaveBeenCalledOnce();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    finishPrepare();
+    await first;
+    expect(updater.quitAndInstall).toHaveBeenCalledOnce();
+  });
+
+  it("does not use tenant download preferences in managed mode", async () => {
+    const updater = new FakeUpdater();
+    const service = createService(updater, { autoDownload: false });
+    service.start(false);
+    service.setManagedByHost(true);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    expect(updater.checkForUpdates).not.toHaveBeenCalled();
+    expect(updater.downloadUpdate).not.toHaveBeenCalled();
+    expect(service.getAutoDownload()).toBe(false);
   });
 
   it("reports errors for the active update stage without raw provider details", async () => {

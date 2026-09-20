@@ -416,3 +416,11 @@ See [NOTICE](NOTICE) for attribution and third-party notices.
 OpenBot is an independent source-available project and is not affiliated with, endorsed by, or
 sponsored by OpenAI. OpenAI, ChatGPT, and Codex are used only to describe compatibility with their
 respective products and services.
+
+### Shared macOS hosts
+
+For one native Standard user per tenant, use the optional administrator-installed
+[Host Manager](docs/multi-tenant-hosting.md). Build it with
+`bun build scripts/host-manager.ts --compile --outfile /tmp/openbot-host-manager`, then follow
+that guide's permissions and installation steps. Tenant users do not need sudo. The target-host
+acceptance checks are required before this configuration is used for paying clients.

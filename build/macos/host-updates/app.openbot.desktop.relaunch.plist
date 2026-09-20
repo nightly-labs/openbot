@@ -1,28 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <!--
-    Per-tenant relaunch agent for host-managed OpenBot updates. Installed once per tenant
-    user into ~/Library/LaunchAgents by scripts/install-host-update-agent.sh (run as admin).
-
-    The leader publishes release.json after replacing /Applications/OpenBot.app; launchd
-    fires this agent inside each logged-in tenant's GUI session, and the wrapper opens the
-    new build there. No polling, no root process, no `sudo -u ... open`: the agent already
-    runs in the right Aqua session. Tenants that are not logged in start OpenBot at next
-    login through the normal Login Item.
-  -->
-  <key>Label</key>
-  <string>app.openbot.desktop.relaunch</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/Library/Application Support/OpenBot/openbot-relaunch.sh</string>
-  </array>
-  <key>WatchPaths</key>
-  <array>
-    <string>/Users/Shared/OpenBot/updates/release.json</string>
-  </array>
-  <key>RunAtLoad</key>
-  <false/>
-</dict>
-</plist>
+<plist version="1.0"><dict>
+  <key>Label</key><string>app.openbot.desktop.relaunch</string>
+  <key>ProgramArguments</key><array><string>/Library/Application Support/OpenBot/HostManager/openbot-relaunch.sh</string></array>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>15</integer>
+  <key>ProcessType</key><string>Background</string>
+</dict></plist>

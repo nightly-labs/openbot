@@ -776,7 +776,7 @@ export async function createApplicationServices({
       hostBlockers: host.describeRestartBlockers(),
       activeBrowserControls: browser.getControlState().sessions.length,
       activeFileTransfers: remoteServers.hasActiveTransfers(),
-      updaterBusy: isUpdateBusyPhase(updater.getStatus().phase),
+      updaterBusy: !updater.getStatus().managedByHost && isUpdateBusyPhase(updater.getStatus().phase),
       initializationPending: agentInitialization.pending,
     });
   const hostUpdateCoordinator = new HostUpdateCoordinator({
@@ -784,12 +784,9 @@ export async function createApplicationServices({
     pid: process.pid,
     currentVersion,
     describeReadiness: describeRestartReadiness,
-    getReadyVersion: () => {
-      const status = updater.getStatus();
-      return status.phase === "ready" ? status.availableVersion : null;
-    },
     setManagedByHost: (managed) => updater.setManagedByHost(managed),
-    install: () => updater.installHostUpdate(),
+    setHostState: (state) => updater.setHostState(state),
+    onDiagnostic: (message) => logger.warn(message),
     checkHealth: async () => {
       if (agentInitialization.pending) return { ok: false, checks: ["initialization-pending"] };
       try {
@@ -800,6 +797,7 @@ export async function createApplicationServices({
       return { ok: true, checks: ["initialization-settled", "agent-list"] };
     },
   });
+  await hostUpdateCoordinator.tick();
   hostUpdateCoordinator.start();
   teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
     hostUpdateCoordinator.stop(),

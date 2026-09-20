@@ -16,6 +16,7 @@ import {
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
+import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
@@ -483,6 +484,10 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
+      if (!(await hostAllowsTenantLaunch())) {
+        app.quit();
+        return;
+      }
       await ensureMacApplicationPresence(
         process.platform,
         (policy) => app.setActivationPolicy(policy),
@@ -563,11 +568,8 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directTyping", forwardDirectTyping);
       updater.on("status", forwardUpdateStatus);
       updater.start();
-      // Host-managed updates: this instance quits itself when the coordinator's intent says
-      // stopping and its own readiness agrees. The stopped marker goes down before shutdown
-      // preparation, so the leader sees it even as this process tears itself down.
-      built.hostUpdateCoordinator.setStopHandler(async (version) => {
-        await built.hostUpdateCoordinator.markStopped(version);
+      // Each tenant quits only itself. The host verifies process exit independently.
+      built.hostUpdateCoordinator.setStopHandler(async () => {
         await prepareForUpdateInstall();
         app.quit();
       });
