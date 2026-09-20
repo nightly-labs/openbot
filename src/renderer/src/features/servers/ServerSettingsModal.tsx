@@ -224,6 +224,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const objectUrls: string[] = [];
 
   const local = () => props.server.kind === "local";
+  /**
+   * Permanent links need a transport that carries the flag: local IPC or the account
+   * plane. The frozen Team API projections strip it on legacy HTTP, where even two
+   * updated peers would silently mint single-use, so the tab stays hidden there.
+   */
+  const permanentSupported = () => local() || props.server.apiUrl === null;
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
   const canEditIdentity = () => local();
   const canManage = () => configured() && (local() || props.server.role === "admin" || props.server.role === "owner");
@@ -1104,7 +1110,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             <SlidingTabs.List aria-label="Invitation method">
               <SlidingTabs.Trigger value="email">Email</SlidingTabs.Trigger>
               <SlidingTabs.Trigger value="link">Invite link</SlidingTabs.Trigger>
-              <SlidingTabs.Trigger value="perma">Perma link</SlidingTabs.Trigger>
+              <Show when={permanentSupported()}>
+                <SlidingTabs.Trigger value="perma">Perma link</SlidingTabs.Trigger>
+              </Show>
             </SlidingTabs.List>
           }
         >

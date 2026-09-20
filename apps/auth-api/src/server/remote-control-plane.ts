@@ -352,22 +352,7 @@ export class RemoteControlPlane {
     if (permanent && input.email?.trim()) throw invalid("permanent invite email");
     if (permanent && input.expiresInSeconds !== undefined) throw invalid("permanent invite lifetime");
     const now = this.#now();
-    if (permanent) {
-      const existing = await this.#database
-        .prepare(
-          `SELECT COUNT(*) AS count FROM remote_invites
-           WHERE host_id = ? AND max_uses IS NULL AND revoked_at IS NULL`,
-        )
-        .bind(input.hostId)
-        .first<{ count: number }>();
-      if ((existing?.count ?? 0) >= MAX_PERMANENT_INVITES_PER_HOST) {
-        throw new RemoteControlPlaneError(
-          429,
-          "invite_limit_reached",
-          "Revoke a permanent invitation link before creating another one.",
-        );
-      }
-    } else {
+    if (!permanent) {
       const outstanding = await this.#database
         .prepare(
           `SELECT COUNT(*) AS count FROM remote_invites
@@ -392,24 +377,66 @@ export class RemoteControlPlane {
     const inviteId = crypto.randomUUID();
     const token = randomToken();
     const expiresAt = permanent ? PERSISTENT_SESSION_EXPIRES_AT : now + ttl * 1_000;
+    if (permanent) {
+      // The count and the insert are one statement: two concurrent requests cannot both
+      // read below the cap and then both insert.
+      const created = await this.#database
+        .prepare(
+          `INSERT INTO remote_invites(
+             invite_id, host_id, token_hash, email, role, created_by_user_id, expires_at, created_at,
+             max_uses, use_count
+           )
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0
+           WHERE (
+             SELECT COUNT(*) FROM remote_invites
+             WHERE host_id = ? AND max_uses IS NULL AND revoked_at IS NULL
+           ) < ?`,
+        )
+        .bind(
+          inviteId,
+          input.hostId,
+          await sha256(token),
+          email,
+          input.role,
+          user.id,
+          expiresAt,
+          now,
+          input.hostId,
+          MAX_PERMANENT_INVITES_PER_HOST,
+        )
+        .run();
+      if ((created.meta.changes ?? 0) !== 1) {
+        throw new RemoteControlPlaneError(
+          429,
+          "invite_limit_reached",
+          "Revoke a permanent invitation link before creating another one.",
+        );
+      }
+      return { inviteId, token, expiresAt, permanent, useCount: 0 };
+    }
+    const outstanding = await this.#database
+      .prepare(
+        `SELECT COUNT(*) AS count FROM remote_invites
+         WHERE host_id = ? AND max_uses IS NOT NULL
+           AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`,
+      )
+      .bind(input.hostId, now)
+      .first<{ count: number }>();
+    if ((outstanding?.count ?? 0) >= MAX_OUTSTANDING_INVITES_PER_HOST) {
+      throw new RemoteControlPlaneError(
+        429,
+        "invite_limit_reached",
+        "Revoke or use an active invitation before creating another one.",
+      );
+    }
     await this.#database
       .prepare(
         `INSERT INTO remote_invites(
            invite_id, host_id, token_hash, email, role, created_by_user_id, expires_at, created_at,
            max_uses, use_count
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)`,
       )
-      .bind(
-        inviteId,
-        input.hostId,
-        await sha256(token),
-        email,
-        input.role,
-        user.id,
-        expiresAt,
-        now,
-        permanent ? null : 1,
-      )
+      .bind(inviteId, input.hostId, await sha256(token), email, input.role, user.id, expiresAt, now)
       .run();
     return { inviteId, token, expiresAt, permanent, useCount: 0 };
   }

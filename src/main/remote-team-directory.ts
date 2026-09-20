@@ -182,6 +182,9 @@ export class RemoteTeamDirectory {
       }
       return result;
     }
+    // The frozen Team API projections strip `permanent` on this transport, so the request
+    // would silently mint single-use. Fail loudly instead of handing back the wrong kind.
+    if (input.permanent) throw new Error("This server connection does not support permanent invitation links.");
     return this.#request(serverId, TEAM_API_ROUTES.team.invites, decodeInviteSummary, { method: "POST", body: input });
   }
 

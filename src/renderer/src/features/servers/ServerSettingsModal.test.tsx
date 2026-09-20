@@ -713,7 +713,8 @@ describe("ServerSettingsModal", () => {
     render(() => (
       <ServerSettingsModal
         {...props({
-          server: remoteServer,
+          // An account-plane host reports no HTTP origin, which is what carries the flag.
+          server: { ...remoteServer, apiUrl: null },
           hostStatus: null,
           members,
           invites: [
@@ -741,5 +742,13 @@ describe("ServerSettingsModal", () => {
     expect(screen.getByText(/Never expires · 3 joins/)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Copy link" })).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("hides the permanent tab on legacy HTTP hosts whose wire strips the flag", async () => {
+    render(() => <ServerSettingsModal {...props({ server: remoteServer, hostStatus: null, members })} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    expect(screen.getByRole("tab", { name: "Email" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Invite link" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Perma link" })).not.toBeInTheDocument();
   });
 });
