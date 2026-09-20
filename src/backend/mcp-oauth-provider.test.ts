@@ -36,7 +36,7 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
   response.end(JSON.stringify(body));
 }
 
-async function startFakeServer(): Promise<FakeServer> {
+async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
   const state: { registrations: number; tokenRequests: URLSearchParams[] } = { registrations: 0, tokenRequests: [] };
   let base = "";
   const server: Server = createServer((request, response) => {
@@ -100,6 +100,16 @@ async function startFakeServer(): Promise<FakeServer> {
       const message: { id?: number; method?: string } = JSON.parse(body);
       if (message.id === undefined) {
         response.writeHead(202).end();
+        return;
+      }
+      if (quoteTokenOnError) {
+        // A server that reports a failure by quoting the credential it was shown. Rare, and the
+        // reason the probe cannot redact only what the row holds: this token is on no row.
+        sendJson(response, 200, {
+          jsonrpc: "2.0",
+          id: message.id,
+          error: { code: -32603, message: `the workspace rejected ${ACCESS_TOKEN}` },
+        });
         return;
       }
       sendJson(response, 200, {
@@ -172,8 +182,8 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-async function fakeServer(): Promise<FakeServer> {
-  const server = await startFakeServer();
+async function fakeServer(quoteTokenOnError = false): Promise<FakeServer> {
+  const server = await startFakeServer(quoteTokenOnError);
   servers.push(server);
   return server;
 }
@@ -204,6 +214,26 @@ describe("signing in to an http MCP server", () => {
     expect(authorize.searchParams.get("redirect_uri")).toBe("openbot://mcp-auth");
     expect(server.tokenRequests[0]?.get("code_verifier")).toBeTruthy();
     expect(storage.read(server.url)?.tokens?.access_token).toBe(ACCESS_TOKEN);
+  });
+
+  it("keeps the token it just minted out of the failure it reports", async () => {
+    const server = await fakeServer(true);
+    const storage = memoryStorage();
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    // This machine had signed in to nothing, so the row holds no credential and the token the
+    // failing request carried was minted between the two attempts. The panel shows this sentence.
+    const result = await testMcpServer(config(server.url), 10_000, undefined, oauth);
+    expect(result.toolCount).toBe(0);
+    expect(result.error).not.toContain(ACCESS_TOKEN);
+    expect(result.error).toContain("the workspace rejected •••");
   });
 
   it("spends the stored token the next time rather than signing in again", async () => {

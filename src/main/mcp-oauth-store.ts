@@ -38,6 +38,8 @@ export class McpOAuthStore implements McpOAuthStorage {
   #loaded = false;
   /** Why the file could not be read. Kept until a sign-in replaces the whole envelope. */
   #loadError: Error | null = null;
+  /** The change in progress, so a read-modify-write never overlaps another. See `#enqueue`. */
+  #queue: Promise<void> = Promise.resolve();
 
   constructor(path: string, cipher: SecretCipher) {
     this.#path = path;
@@ -69,21 +71,41 @@ export class McpOAuthStore implements McpOAuthStorage {
     return this.#records.get(resource) ?? null;
   }
 
-  async write(resource: string, record: McpOAuthRecord): Promise<void> {
-    const next = this.#editableRecords();
-    // An empty record is the absence of one. `invalidateCredentials("all")` arrives as a clear, and
-    // dropping everything about a server arrives here as an object with nothing in it.
-    if (record.client === undefined && record.tokens === undefined) next.delete(resource);
-    else next.set(resource, record);
-    await this.#commit(next);
+  write(resource: string, record: McpOAuthRecord): Promise<void> {
+    return this.#enqueue(async () => {
+      const next = this.#editableRecords();
+      // An empty record is the absence of one. `invalidateCredentials("all")` arrives as a clear, and
+      // dropping everything about a server arrives here as an object with nothing in it.
+      if (record.client === undefined && record.tokens === undefined) next.delete(resource);
+      else next.set(resource, record);
+      await this.#commit(next);
+    });
   }
 
-  async clear(resource: string): Promise<void> {
-    if (!this.#loaded) throw new Error("The MCP sign-in store is not loaded.");
-    if (!this.#loadError && !this.#records.has(resource)) return;
-    const next = this.#editableRecords();
-    next.delete(resource);
-    await this.#commit(next);
+  clear(resource: string): Promise<void> {
+    return this.#enqueue(async () => {
+      if (!this.#loaded) throw new Error("The MCP sign-in store is not loaded.");
+      if (!this.#loadError && !this.#records.has(resource)) return;
+      const next = this.#editableRecords();
+      next.delete(resource);
+      await this.#commit(next);
+    });
+  }
+
+  /**
+   * One change at a time, from the copy to the rename.
+   *
+   * A hand-off resolves every server at once, so two servers whose tokens both need refreshing
+   * reach here together. Each change copies the records, and both copies would be taken before
+   * either commit: the second write would drop the first one's rotated token, and both would write
+   * and rename the same temporary file. Chaining makes the copy a change starts from the one the
+   * change before it wrote.
+   */
+  #enqueue(change: () => Promise<void>): Promise<void> {
+    const result = this.#queue.then(change, change);
+    // A change that fails must not fail the one after it; its own caller still sees the rejection.
+    this.#queue = result.catch(() => undefined);
+    return result;
   }
 
   /**

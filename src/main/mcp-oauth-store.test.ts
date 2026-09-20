@@ -72,6 +72,19 @@ describe("McpOAuthStore", () => {
     expect(reopened.read(NOTION)).toEqual(record("notion-access"));
   });
 
+  it("keeps both tokens when two servers refresh at once", async () => {
+    const { path, store } = await createStore();
+    // One hand-off resolves every server together, so two expiring tokens are refreshed side by
+    // side. Each change copies the records before it writes: unqueued, the second copy is taken
+    // before the first commit and the rotated token of one server is written away by the other.
+    await Promise.all([store.write(LINEAR, record("linear-access")), store.write(NOTION, record("notion-access"))]);
+
+    const reopened = new McpOAuthStore(path, cipher);
+    expect(await reopened.load()).toBeNull();
+    expect(reopened.read(LINEAR)).toEqual(record("linear-access"));
+    expect(reopened.read(NOTION)).toEqual(record("notion-access"));
+  });
+
   it("treats an empty record as no record at all", async () => {
     const { path, store } = await createStore();
     await store.write(LINEAR, record("linear-access"));

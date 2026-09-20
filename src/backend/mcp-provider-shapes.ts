@@ -189,10 +189,17 @@ export async function usableMcpServer(
  *
  * Last, not first: see `McpToolRuntimes`. A directory already on the list is not added again, so a
  * user who put the managed `bin` on their own `PATH` keeps the position they chose for it.
+ *
+ * Exported for its own test, like `pickWindowsExecutable`: the case that matters is the one this
+ * machine cannot reach, a `null` path, which is every Windows machine.
  */
-function appendToolRuntimes(path: string | null, binDirectories: readonly string[]): string | null {
+export function appendToolRuntimes(path: string | null, binDirectories: readonly string[]): string | null {
   if (binDirectories.length === 0) return path;
-  const entries = path ? path.split(delimiter) : [];
+  // `null` means "wherever this process would look", which is what naming a directory here takes
+  // away: from this point the value is the whole search path, and anything left out of it is gone.
+  // Windows is where that bites, because it has no login shell to ask and so is always `null`: the
+  // user's own `npx`, `python` and `uvx` would all disappear behind the one managed directory.
+  const entries = (path ?? process.env.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
   for (const directory of binDirectories) if (!entries.includes(directory)) entries.push(directory);
   return entries.join(delimiter);
 }

@@ -5,6 +5,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   acpMcpServers,
+  appendToolRuntimes,
   claudeMcpServers,
   clearMcpCommandCache,
   codexMcpServers,
@@ -255,6 +256,19 @@ describe("resolveMcpCommand", () => {
   it("takes a path the user wrote as written, without a lookup", async () => {
     expect(await resolveMcpCommand("/usr/local/bin/server")).toBe("/usr/local/bin/server");
     expect(await resolveMcpCommand("  ")).toBeNull();
+  });
+});
+
+describe("appendToolRuntimes", () => {
+  it("keeps the inherited PATH when there is no login shell to ask", () => {
+    // Windows always arrives here with `null`: `loginShellPath` has no equivalent there. Naming the
+    // managed directory turns the value into the whole search path, so an inherited `PATH` left out
+    // of it is gone - with it the user's own `npx`, `python` and `uvx`.
+    const inherited = process.env.PATH ?? "";
+    expect(appendToolRuntimes(null, ["/managed/bin"])).toBe(
+      [...inherited.split(delimiter).filter((entry) => entry.length > 0), "/managed/bin"].join(delimiter),
+    );
+    expect(appendToolRuntimes(null, [])).toBeNull();
   });
 });
 

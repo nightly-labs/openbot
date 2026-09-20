@@ -87,10 +87,10 @@ export async function probeMcpServer(
    * which reads the configuration, cannot know it. A transport reports a failure by quoting what it
    * sent, and this is the one reader that would otherwise put a bearer token on the user's screen.
    */
-  const failure = (error: unknown): McpProbeResult => ({
+  const failure = async (error: unknown): Promise<McpProbeResult> => ({
     toolCount: 0,
     error: boundedError(
-      redactMcpValues(describeMcpError(error, config, timeoutMs), server.authorization ? [server.authorization] : []),
+      redactMcpValues(describeMcpError(error, config, timeoutMs), await probeSecrets(server, signIn)),
     ),
   });
 
@@ -110,6 +110,21 @@ export async function probeMcpServer(
       return failure(retry);
     }
   }
+}
+
+/**
+ * Every bearer token this probe could have sent.
+ *
+ * `server.authorization` is the one read before the connection, and on a first sign-in it is
+ * `null`: the token the retry spends is minted in between, by the sign-in itself. Asking the
+ * provider for it after the failure is what keeps a server that quotes the credential it refused
+ * from putting that credential on the panel.
+ */
+async function probeSecrets(server: UsableMcpServer, signIn: McpSignIn | null): Promise<string[]> {
+  const values = server.authorization ? [server.authorization] : [];
+  const minted = await signIn?.provider.tokens();
+  if (minted?.access_token) values.push(minted.access_token);
+  return values;
 }
 
 /** One connection, from the handshake to the tool count, closed again whatever it answered. */
