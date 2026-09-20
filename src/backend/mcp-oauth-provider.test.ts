@@ -50,6 +50,10 @@ interface FakeServerOptions {
   delayTokenMs?: number;
   /** Overrides the authorization endpoint the metadata advertises. */
   authorizeUrl?: string;
+  /** Overrides the token endpoint the metadata advertises. */
+  tokenUrl?: string;
+  /** Answers the code exchange with a refusal that quotes back what the request carried. */
+  quoteCredentialsOnTokenError?: boolean;
   /** The protected-resource metadata URL the 401 challenge advertises. */
   advertisedPrmPath?: string;
   /** Authorization servers the default protected-resource metadata names. */
@@ -58,6 +62,7 @@ interface FakeServerOptions {
 
 async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeServer> {
   const { quoteTokenOnError = false, hangToken = false, delayTokenMs = 0 } = options;
+  const { quoteCredentialsOnTokenError = false } = options;
   const state: { registrations: number; tokenRequests: URLSearchParams[]; refreshToken: string } = {
     registrations: 0,
     tokenRequests: [],
@@ -86,7 +91,7 @@ async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeSer
         sendJson(response, 200, {
           issuer: base,
           authorization_endpoint: options.authorizeUrl ?? `${base}/authorize`,
-          token_endpoint: `${base}/token`,
+          token_endpoint: options.tokenUrl ?? `${base}/token`,
           registration_endpoint: `${base}/register`,
           response_types_supported: ["code"],
           grant_types_supported: ["authorization_code", "refresh_token"],
@@ -121,6 +126,16 @@ async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeSer
             token_type: "Bearer",
             expires_in: 3600,
             refresh_token: state.refreshToken,
+          });
+          return;
+        }
+        // An authorization server that states its refusal by quoting the request back. The SDK
+        // makes `error_description` the message of the error it throws, so every value named here
+        // reaches the panel unless the sign-in's own ledger redacts it first.
+        if (quoteCredentialsOnTokenError) {
+          sendJson(response, 400, {
+            error: "invalid_request",
+            error_description: `rejected code ${form.get("code")} with verifier ${form.get("code_verifier")}`,
           });
           return;
         }
@@ -589,6 +604,48 @@ describe("signing in to an http MCP server", () => {
     expect(result.toolCount).toBe(0);
     expect(result.error).not.toContain(ACCESS_TOKEN);
     expect(result.error).toContain("the workspace rejected •••");
+  });
+
+  it("refuses a token endpoint that is not https, and sends the grant nowhere", async () => {
+    // Discovery is the server's own document, and the SDK posts the code, the verifier and the
+    // refresh token to whatever it names. `normalizeResource` cleared the MCP address; only the
+    // fetch guard covers this one.
+    const server = await fakeServer({ tokenUrl: "http://auth.example.com/token" });
+    const oauth = new McpOAuth({
+      storage: memoryStorage(),
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    const result = await testMcpServer(config(server.url), 10_000, undefined, oauth);
+    expect(result.toolCount).toBe(0);
+    expect(result.error).toContain("not https");
+    // The exchange never left this machine: nothing carrying the grant was sent at all.
+    expect(server.tokenRequests).toHaveLength(0);
+  });
+
+  it("redacts the code and the verifier from a refusal that quotes them", async () => {
+    const server = await fakeServer({ quoteCredentialsOnTokenError: true });
+    const oauth = new McpOAuth({
+      storage: memoryStorage(),
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    const result = await testMcpServer(config(server.url), 10_000, undefined, oauth);
+    expect(result.toolCount).toBe(0);
+    // Both are credentials until the exchange ends, and the store holds neither by now: the
+    // exchange failed, so only what the attempt itself recorded can mask them.
+    expect(result.error).not.toContain(GRANT);
+    const verifier = server.tokenRequests[0]?.get("code_verifier");
+    expect(verifier).toBeTruthy();
+    expect(result.error).not.toContain(verifier);
   });
 
   it("spends the stored token the next time rather than signing in again", async () => {

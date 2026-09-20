@@ -25,6 +25,7 @@ import {
   type OAuthTokens,
   OAuthTokensSchema,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
 
 /** What one server's sign-in leaves behind, and all of it: nothing else is kept between runs. */
@@ -99,6 +100,14 @@ export interface McpSignIn {
   complete: () => Promise<void>;
   /** Ends a wait nothing will answer, so a cancelled sign-in leaves no entry behind. */
   abandon: () => void;
+  /**
+   * Every secret this attempt sent or received, for the reader that has to redact a failure.
+   *
+   * Collected as the exchange runs rather than read from the store afterwards: the SDK clears the
+   * record on the refusals it recovers from, so by the time an error is described the value that
+   * was actually spent is already gone from disk.
+   */
+  secrets: () => string[];
 }
 
 /**
@@ -179,7 +188,7 @@ export class McpOAuth implements McpOAuthAuthority {
     // stored token is the best answer left, and the server is the right place for the refusal.
     const exchange = auth(this.#provider(resource, null), {
       serverUrl: resource,
-      fetchFn: (url, init) => fetch(url, { ...init, signal: controller.signal }),
+      fetchFn: secureOAuthFetch(controller.signal),
     })
       .then(
         () => undefined,
@@ -230,6 +239,9 @@ export class McpOAuth implements McpOAuthAuthority {
         const controller = new AbortController();
         try {
           const code = await withSignInDeadline(grant, this.#options.signInTimeoutMs ?? MCP_SIGN_IN_TIMEOUT_MS);
+          // The grant is a credential until it is spent, and a token endpoint that refuses it
+          // commonly quotes it back in `error_description`.
+          provider.recordSecret(code);
           // The grant waited on the person; the trade waits on the server, and on nothing else.
           // Without this a hung token endpoint holds the test past its own deadline after the user
           // has done everything right.
@@ -237,7 +249,7 @@ export class McpOAuth implements McpOAuthAuthority {
             auth(provider, {
               serverUrl: resource,
               authorizationCode: code,
-              fetchFn: (url, init) => fetch(url, { ...init, signal: controller.signal }),
+              fetchFn: secureOAuthFetch(controller.signal),
             }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
             "The sign-in response did not arrive in time.",
@@ -248,6 +260,7 @@ export class McpOAuth implements McpOAuthAuthority {
         }
       },
       abandon,
+      secrets: () => provider.secrets(),
     };
   }
 
@@ -275,7 +288,7 @@ export class McpOAuth implements McpOAuthAuthority {
   }
 
   /** A `state` makes the provider interactive; `null` keeps it silent. */
-  #provider(resource: string, state: string | null, isAbandoned: () => boolean = () => false): OAuthClientProvider {
+  #provider(resource: string, state: string | null, isAbandoned: () => boolean = () => false): McpOAuthClientProvider {
     const generation = this.#generations.get(resource) ?? 0;
     const storage = this.#options.storage;
     // The store as this run saw it: reads answer from disk, but a write lands only while no
@@ -323,6 +336,15 @@ interface ClientProviderOptions {
 class McpOAuthClientProvider implements OAuthClientProvider {
   readonly #options: ClientProviderOptions;
   #codeVerifier: string | null = null;
+  /**
+   * Every secret this attempt has handled, kept for redaction and nothing else.
+   *
+   * A token endpoint states a refusal in `error_description`, and the SDK makes that text the
+   * message of the error it throws - so a server that quotes the credential it rejected puts that
+   * credential in an `McpTestResult.error` on the user's screen. Reading the store at that moment
+   * is too late: `invalidateCredentials` has often already dropped the value the attempt spent.
+   */
+  readonly #secrets = new Set<string>();
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
@@ -357,19 +379,39 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   clientInformation(): OAuthClientInformationFull | undefined {
-    return this.#record().client;
+    const client = this.#record().client;
+    this.recordSecret(client?.client_secret);
+    return client;
   }
 
   async saveClientInformation(information: OAuthClientInformationFull): Promise<void> {
+    this.recordSecret(information.client_secret);
     await this.#save({ client: information });
   }
 
   tokens(): OAuthTokens | undefined {
-    return this.#record().tokens;
+    const tokens = this.#record().tokens;
+    this.#recordTokens(tokens);
+    return tokens;
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
+    this.#recordTokens(tokens);
     await this.#save({ tokens, obtainedAt: Date.now() });
+  }
+
+  /** What this attempt must never quote back. Short values are left to `redactMcpValues`. */
+  recordSecret(value: string | undefined): void {
+    if (value) this.#secrets.add(value);
+  }
+
+  secrets(): string[] {
+    return [...this.#secrets];
+  }
+
+  #recordTokens(tokens: OAuthTokens | undefined): void {
+    this.recordSecret(tokens?.access_token);
+    this.recordSecret(tokens?.refresh_token);
   }
 
   /**
@@ -411,6 +453,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   saveCodeVerifier(codeVerifier: string): void {
+    this.recordSecret(codeVerifier);
     this.#codeVerifier = codeVerifier;
   }
 
@@ -479,6 +522,64 @@ function isLoopback(hostname: string): boolean {
 function isAuthorizationUrlSafe(url: URL): boolean {
   if (url.protocol === "https:") return true;
   return url.protocol === "http:" && isLoopback(url.hostname);
+}
+
+/**
+ * How many hops an OAuth endpoint may redirect through before this gives up. Enough for the
+ * ordinary canonicalising hop - a bare host to its `www`, a metadata path to its real home - and
+ * far short of a loop.
+ */
+const MAX_OAUTH_REDIRECTS = 5;
+
+/** The redirects that carry the request on, and keep their method and body when they do. */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+/**
+ * The fetch every OAuth exchange goes through.
+ *
+ * `normalizeResource` checks the MCP server's own address, and `isAuthorizationUrlSafe` checks
+ * where the browser is sent - but neither covers where the credentials themselves go. Discovery
+ * answers with addresses of its own, and the SDK posts the authorization code, the PKCE verifier
+ * and the refresh token to whatever `token_endpoint` the metadata names. An https server whose
+ * document names `http://auth.example.com/token` would put all three on the wire in clear text.
+ *
+ * So the check is here, where every request passes, and it is applied to each hop rather than to
+ * the first one alone: a redirect to a plain-text address leaks exactly as much as naming it
+ * directly. Redirects are followed by hand for that reason - `fetch` would follow them itself and
+ * never say where it went.
+ */
+function secureOAuthFetch(signal: AbortSignal): FetchLike {
+  return async (input, init) => {
+    let url = new URL(input instanceof URL ? input.toString() : input);
+    let request: RequestInit = { ...init, signal, redirect: "manual" };
+    for (let hop = 0; ; hop++) {
+      if (!isSecureEndpoint(url))
+        throw new Error(`The OAuth endpoint ${url.origin} is not https, so the credentials were not sent.`);
+      const response = await fetch(url, request);
+      const location = REDIRECT_STATUSES.has(response.status) ? response.headers.get("location") : null;
+      // Not a redirect this follows: the SDK reads the answer, including a 3xx that names nowhere.
+      if (location === null) return response;
+      if (hop >= MAX_OAUTH_REDIRECTS) throw new Error("The OAuth endpoint redirected too many times.");
+      url = new URL(location, url);
+      request = redirected(request, response.status);
+    }
+  };
+}
+
+/** Where a credential may be sent: an https endpoint, or one on the user's own machine. */
+function isSecureEndpoint(url: URL): boolean {
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && isLoopback(url.hostname);
+}
+
+/**
+ * The next hop's request. RFC 9110 turns 301, 302 and 303 into a bodyless `GET`; 307 and 308 keep
+ * the method and the body, which is what a token endpoint that moved needs.
+ */
+function redirected(request: RequestInit, status: number): RequestInit {
+  if (status === 307 || status === 308) return request;
+  const { body: _body, ...rest } = request;
+  return { ...rest, method: "GET" };
 }
 
 /** Whether the stored access token is inside the margin, or already past its life. */
