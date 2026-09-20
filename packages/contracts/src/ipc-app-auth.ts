@@ -64,6 +64,11 @@ export interface UpdateStatus {
   checkedAt: string | null;
   message: string | null;
   errorCode: UpdateFailureCode | null;
+  /**
+   * True on a Mac whose host manages updates for every tenant. The tenant UI hides its own
+   * install, download and check actions but keeps showing the status; absent means unmanaged.
+   */
+  managedByHost?: boolean;
 }
 
 export type UpdateFailureCode = "check_failed" | "download_failed" | "install_failed";

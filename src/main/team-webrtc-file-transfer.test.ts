@@ -10,6 +10,7 @@ import {
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { restartActivityGeneration } from "../backend/restart-activity";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
@@ -100,6 +101,31 @@ describe("TeamWebRtcFileTransfer", () => {
     );
     bridge.emit("data", "host-1", "files", chunk("transfer-2", 2, new Uint8Array([1, 2])));
     await expect(waiting).rejects.toThrow("offset");
+    await transfers.stop();
+  });
+
+  it("reports a moving transfer and goes quiet after pickup", async () => {
+    const bridge = new FakeBridge();
+    const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
+    expect(transfers.hasActiveTransfers()).toBe(false);
+    transfers.setPeerAuthenticated("host-1", true);
+    const bytes = new TextEncoder().encode("hello-world");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const before = restartActivityGeneration();
+    const complete = transfers.receive("host-1", "transfer-1");
+    bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
+    await vi.waitFor(() => expect(transfers.hasActiveTransfers()).toBe(true));
+    bridge.emit("data", "host-1", "files", chunk("transfer-1", 0, bytes));
+    bridge.emit(
+      "data",
+      "host-1",
+      "files",
+      encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId: "transfer-1" }),
+    );
+    await expect(complete).resolves.toMatchObject({ transferId: "transfer-1" });
+    await transfers.consume("host-1", "transfer-1");
+    expect(transfers.hasActiveTransfers()).toBe(false);
+    expect(restartActivityGeneration()).toBeGreaterThan(before);
     await transfers.stop();
   });
 

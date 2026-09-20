@@ -88,6 +88,7 @@ async function createHostService(
           createRemoteDesktopRuntime: () => ({
             start: async () => ({
               baseUrl: "http://127.0.0.1:9",
+              authHeader: "X-Test-Remote",
               hostId: 1,
               hostIds: [1],
               desktopAppId: 1,
@@ -240,6 +241,8 @@ describe("HostService account binding", () => {
         expiresAt: Date.now() + 60_000,
         usedAt: null,
         revokedAt: null,
+        permanent: false,
+        useCount: 0,
       },
     ]);
 
@@ -398,6 +401,8 @@ describe("HostService account binding", () => {
       inviteId: "invite-1",
       token: "invite-token-that-is-long-enough-for-a-link",
       expiresAt: Date.now() + 60_000,
+      permanent: false,
+      useCount: 0,
     });
     await settled;
 

@@ -69,6 +69,8 @@ const meta = {
       role: input.role,
       usedAt: null,
       email: input.email ?? null,
+      permanent: input.permanent ?? false,
+      useCount: 0,
     })),
     onUpdateMember: fn(async () => undefined),
     onRemoveMember: fn(async () => undefined),

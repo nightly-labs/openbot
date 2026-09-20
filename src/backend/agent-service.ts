@@ -142,6 +142,7 @@ import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
 import { McpServerStore } from "./mcp-server-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
+import { recordAgentRestartActivity } from "./restart-activity";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
@@ -813,6 +814,40 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...this.#attention.runtimeAttention(),
       failedTurns: [...this.#turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
     });
+  }
+
+  /**
+   * Why this instance must not restart right now, or empty when nothing holds it. Read-only:
+   * every source below is also what the drain loop and the shutdown path consult, so the answer
+   * agrees with what stopping would interrupt. Scheduled future routine runs do not count; they
+   * resume from durable rows after a restart.
+   */
+  hasActiveWork(): string[] {
+    const reasons: string[] = [];
+    for (const [, snapshot] of this.#conversation.activeSnapshots()) {
+      if (snapshot.activeTurnId && !this.#conversation.isExecutionThread(snapshot.threadId)) {
+        reasons.push("agent-turn");
+        break;
+      }
+    }
+    if (this.listAgents().some((agent) => this.#mailbox.hasUnfinishedDelivery(agent.id))) {
+      reasons.push("queued-delivery");
+    }
+    // A scheduled drain with nothing behind it is a no-op microtask, not work: only an
+    // in-flight drain carrying an unfinished delivery or a live turn holds the restart.
+    for (const agent of this.listAgents()) {
+      if (
+        this.#drain.taskFor(agent.id) &&
+        (this.#mailbox.hasUnfinishedDelivery(agent.id) || this.#conversation.workingSnapshot(agent.id)?.activeTurnId)
+      ) {
+        reasons.push("drain-task");
+        break;
+      }
+    }
+    if (this.#routines.hasActiveRuns() || this.#channelRoutines.hasActiveRuns()) reasons.push("routine-run");
+    if (this.channels.hasActiveWork()) reasons.push("channel-work");
+    if (this.#providers.activeProcessCount() > 0) reasons.push("provider-process");
+    return reasons;
   }
 
   listMemories(agentId: string): AgentMemory[] {
@@ -2472,6 +2507,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #emit(event: AgentEvent): void {
+    recordAgentRestartActivity(event);
     if (this.channels?.event(event)) return;
     this.emit("event", event);
   }

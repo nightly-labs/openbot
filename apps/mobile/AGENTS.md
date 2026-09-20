@@ -3,8 +3,7 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 ## Execution and verification limits
 
 - `bun run lint` and `bun run typecheck` are the default checks here and need no permission. Each covers the whole app in seconds, so narrowing them to changed files buys nothing and hides a break in one of the packages the app imports. Run both before you call a task done and before a PR.
-- Everything slower than those two needs explicit user permission for that exact command: builds, packaging, signing, submission, deployment, EAS commands, iOS simulator or Android emulator runs, device runs, and native development clients. One permission authorizes one command and nothing that follows it.
-- If a requested workflow needs a command from that list, explain the limitation and wait for permission. Never substitute a broader command or run one implicitly.
+- Everything slower than those two is a wider check: builds, packaging, signing, submission, deployment, EAS commands, iOS simulator or Android emulator runs, device runs, and native development clients. [Get approval for the specific command](../../AGENTS.md#pull-requests). Never substitute a broader command or run one implicitly.
 
 ## Design system and native chrome
 

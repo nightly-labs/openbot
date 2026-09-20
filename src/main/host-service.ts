@@ -114,8 +114,8 @@ interface HostServiceOptions {
   remoteControlPlaneUrl?: string;
   createRemoteInvite?: (
     hostId: string,
-    input: { role: "admin" | "member"; email?: string },
-  ) => Promise<{ inviteId: string; token: string; expiresAt: number }>;
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
+  ) => Promise<{ inviteId: string; token: string; expiresAt: number; permanent: boolean; useCount: number }>;
   listRemoteInvites?: (hostId: string) => Promise<
     Array<{
       inviteId: string;
@@ -124,6 +124,8 @@ interface HostServiceOptions {
       expiresAt: number;
       usedAt: number | null;
       revokedAt: number | null;
+      permanent: boolean;
+      useCount: number;
     }>
   >;
   revokeRemoteInvite?: (inviteId: string) => Promise<void>;
@@ -278,6 +280,21 @@ export class HostService extends EventEmitter<HostEvents> {
   async recheckScreenRecording(): Promise<HostStatus> {
     await this.#remoteScreen.recheckScreenRecording();
     return this.getStatus();
+  }
+
+  /**
+   * Why the Team host half of this instance must not restart right now. A session still
+   * connecting never blocks: only a connected stream, a live browser view, or a moving file
+   * transfer holds the restart. Agent work is reported by AgentService, not here.
+   */
+  describeRestartBlockers(): string[] {
+    const reasons: string[] = [];
+    if (this.#remoteScreen.list().some((session) => session.phase === "connected")) {
+      reasons.push("remote-desktop");
+    }
+    if (this.#browserView.activeViewCount() > 0) reasons.push("browser-view");
+    if (this.#webrtcGateway?.hasActiveTransfers()) reasons.push("file-transfer");
+    return reasons;
   }
 
   /**
@@ -765,6 +782,8 @@ export class HostService extends EventEmitter<HostEvents> {
             email: invite.email,
             expiresAt: new Date(invite.expiresAt).toISOString(),
             usedAt: invite.usedAt === null ? null : new Date(invite.usedAt).toISOString(),
+            permanent: invite.permanent,
+            useCount: invite.useCount,
           }));
       });
     }
@@ -884,6 +903,8 @@ export class HostService extends EventEmitter<HostEvents> {
         usedAt: null,
         inviteUrl,
         email: input.email ?? null,
+        permanent: invite.permanent,
+        useCount: invite.useCount,
       };
       if (input.email) {
         try {
@@ -912,7 +933,7 @@ export class HostService extends EventEmitter<HostEvents> {
     // not create an invite at all.
     const localApiUrl = this.#localApiUrl();
     if (!localApiUrl) throw new Error("Make this OpenBot public before creating an invite.");
-    const invite = await this.#options.store.createInvite(input.role, input.email);
+    const invite = await this.#options.store.createInvite(input.role, input.email, { permanent: input.permanent });
     const inviteUrl = createInviteUrl(
       {
         apiUrl: localApiUrl,
@@ -929,6 +950,8 @@ export class HostService extends EventEmitter<HostEvents> {
       usedAt: null,
       inviteUrl,
       email: invite.email,
+      permanent: invite.permanent,
+      useCount: invite.useCount,
     };
     if (invite.email) {
       try {

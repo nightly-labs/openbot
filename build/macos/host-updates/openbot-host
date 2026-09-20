@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+exec /usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  '/Library/Application Support/OpenBot/HostManager/openbot-host' "$@"

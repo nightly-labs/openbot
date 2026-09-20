@@ -16,6 +16,7 @@ import {
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
+import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
@@ -521,6 +522,10 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
+      if (!(await hostAllowsTenantLaunch())) {
+        app.quit();
+        return;
+      }
       await ensureMacApplicationPresence(
         process.platform,
         (policy) => app.setActivationPolicy(policy),
@@ -601,6 +606,11 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directTyping", forwardDirectTyping);
       updater.on("status", forwardUpdateStatus);
       updater.start();
+      // Each tenant quits only itself. The host verifies process exit independently.
+      built.hostUpdateCoordinator.setStopHandler(async () => {
+        await prepareForUpdateInstall();
+        app.quit();
+      });
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);

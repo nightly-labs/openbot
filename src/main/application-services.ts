@@ -37,7 +37,7 @@ import type {
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS, isManagedToolRuntime } from "@openbot/contracts/ipc";
+import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
@@ -67,6 +67,7 @@ import {
 import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
+import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -99,6 +100,7 @@ import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { readUpdatePreference } from "./update-preference-store";
+import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
   createDisabledUpdateAdapter,
   isValidSemver,
@@ -106,6 +108,7 @@ import {
   type UpdateAdapter,
   UpdateService,
 } from "./update-service";
+import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 
@@ -135,6 +138,7 @@ const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
  */
 const TEARDOWN_ORDER = {
   updater: 10,
+  hostUpdateCoordinator: 12,
   dynamicIsland: 20,
   browser: 30,
   browserPictureInPicture: 40,
@@ -181,6 +185,9 @@ export interface ApplicationServices {
   browserPictureInPicture: BrowserPictureInPicture;
   browserView: BrowserViewClient;
   updater: UpdateService;
+  /** Point-in-time restart safety for host-managed updates. Nothing holds the instance when empty. */
+  describeRestartReadiness: () => RestartReadiness;
+  hostUpdateCoordinator: HostUpdateCoordinator;
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
@@ -809,6 +816,18 @@ export async function createApplicationServices({
     enabled: updaterEnabled,
     autoDownload: updatePreference.autoDownload,
     beforeInstall: prepareForUpdateInstall,
+    // Packaged runs share one application bundle across macOS users. Installing while another
+    // login session runs OpenBot from that bundle would replace it underneath that session, so
+    // the service refuses the install until every sibling session stopped. Unpackaged runs never
+    // enable updates, so there is nothing to guard there.
+    checkSiblingInstances: app.isPackaged
+      ? () =>
+          listSiblingOpenBotInstances({
+            executablePath: app.getPath("exe"),
+            currentPid: process.pid,
+            platform: process.platform,
+          })
+      : undefined,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
     // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
@@ -816,6 +835,39 @@ export async function createApplicationServices({
       process.platform === "darwin" ? join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt") : undefined,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => updater.stop());
+  const agentInitialization = new AgentInitializationGate(() => service.initialize());
+  const describeRestartReadiness = (): RestartReadiness =>
+    checkRestartReadiness({
+      agentWork: service.hasActiveWork(),
+      hostBlockers: host.describeRestartBlockers(),
+      activeBrowserControls: browser.getControlState().sessions.length,
+      activeFileTransfers: remoteServers.hasActiveTransfers(),
+      updaterBusy: !updater.getStatus().managedByHost && isUpdateBusyPhase(updater.getStatus().phase),
+      initializationPending: !agentInitialization.succeeded,
+    });
+  const hostUpdateCoordinator = new HostUpdateCoordinator({
+    uid: typeof process.getuid === "function" ? process.getuid() : 0,
+    pid: process.pid,
+    currentVersion,
+    describeReadiness: describeRestartReadiness,
+    setManagedByHost: (managed) => updater.setManagedByHost(managed),
+    setHostState: (state) => updater.setHostState(state),
+    onDiagnostic: (message) => logger.warn(message),
+    checkHealth: async () => {
+      if (!agentInitialization.succeeded) return { ok: false, checks: ["initialization-not-ready"] };
+      try {
+        service.listAgents();
+      } catch {
+        return { ok: false, checks: ["agent-list-failed"] };
+      }
+      return { ok: true, checks: ["initialization-succeeded", "agent-list"] };
+    },
+  });
+  await hostUpdateCoordinator.tick();
+  hostUpdateCoordinator.start();
+  teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
+    hostUpdateCoordinator.stop(),
+  );
 
   return {
     service,
@@ -831,7 +883,9 @@ export async function createApplicationServices({
     analyticsPreferenceFile,
     updatePreferenceFile,
     language,
-    agentInitialization: new AgentInitializationGate(() => service.initialize()),
+    agentInitialization,
+    hostUpdateCoordinator,
+    describeRestartReadiness,
     sidebarLayout,
     host,
     remoteDesktop,

@@ -45,6 +45,7 @@ describe("remote control plane migration", () => {
 
     database.exec(readFileSync(new URL("../migrations/0012_remote_control_plane.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0013_remote_session_lifecycle.sql", import.meta.url), "utf8"));
+    database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
 
     expect(database.prepare("SELECT host_id, owner_user_id, auth_epoch FROM remote_hosts").all()).toEqual([
       { host_id: "host-1", owner_user_id: "owner", auth_epoch: 1 },
@@ -395,6 +396,7 @@ describe("RemoteControlPlane", () => {
     `);
     database.exec(readFileSync(new URL("../migrations/0012_remote_control_plane.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0013_remote_session_lifecycle.sql", import.meta.url), "utf8"));
+    database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
     database
       .prepare(
         `INSERT INTO remote_memberships(
@@ -491,6 +493,7 @@ describe("RemoteControlPlane", () => {
     database.exec(readFileSync(new URL("../migrations/0013_remote_session_lifecycle.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0017_mobile_session_security.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0018_remote_device_sessions.sql", import.meta.url), "utf8"));
+    database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
     const pair = await generateKeyPair("ES256", { extractable: true });
     const privateJwk = await exportJWK(pair.privateKey);
     const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", use: "sig", alg: "ES256" };
@@ -751,6 +754,154 @@ describe("RemoteControlPlane", () => {
     await expect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member" })).rejects.toMatchObject({
       code: "invite_limit_reached",
     });
+  });
+});
+
+describe("permanent invitation links", () => {
+  it("stays single-use for invitations written before the permanent-links migration", () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec("PRAGMA foreign_keys = ON");
+      database.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY);
+        CREATE TABLE team_tunnels (
+          server_id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id),
+          tunnel_id TEXT,
+          tunnel_name TEXT NOT NULL,
+          api_hostname TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          machine_token_hash TEXT
+        );
+        INSERT INTO users(id) VALUES ('owner');
+        INSERT INTO team_tunnels(
+          server_id, user_id, tunnel_name, api_hostname, status, created_at, updated_at, machine_token_hash
+        ) VALUES ('host-1', 'owner', 'Studio Mac', 'old.example.test', 'active', 100, 200, 'machine-hash');
+      `);
+      database.exec(readFileSync(new URL("../migrations/0012_remote_control_plane.sql", import.meta.url), "utf8"));
+      database.exec(readFileSync(new URL("../migrations/0013_remote_session_lifecycle.sql", import.meta.url), "utf8"));
+      database
+        .prepare(
+          `INSERT INTO remote_invites(
+            invite_id, host_id, token_hash, email, role, created_by_user_id, expires_at, created_at
+          ) VALUES ('legacy', 'host-1', 'legacy-hash', NULL, 'member', 'owner', 999999999, 1)`,
+        )
+        .run();
+      database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
+      // An INSERT from a Worker that does not know the new columns keeps working.
+      database
+        .prepare(
+          `INSERT INTO remote_invites(
+            invite_id, host_id, token_hash, email, role, created_by_user_id, expires_at, created_at
+          ) VALUES ('deployed-gap', 'host-1', 'gap-hash', NULL, 'member', 'owner', 999999999, 2)`,
+        )
+        .run();
+      expect(database.prepare("SELECT max_uses, use_count FROM remote_invites ORDER BY invite_id").all()).toEqual([
+        { max_uses: 1, use_count: 0 },
+        { max_uses: 1, use_count: 0 },
+      ]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("accepts many joins on one permanent link and caps permanent links separately", async () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec("PRAGMA foreign_keys = ON");
+      database.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY);
+        CREATE TABLE team_tunnels (
+          server_id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id),
+          tunnel_name TEXT NOT NULL,
+          api_hostname TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          machine_token_hash TEXT
+        );
+        INSERT INTO users(id) VALUES ('owner'), ('alice'), ('bob');
+        INSERT INTO team_tunnels(
+          server_id, user_id, tunnel_name, api_hostname, status, created_at, updated_at, machine_token_hash
+        ) VALUES ('host-1', 'owner', 'Studio Mac', 'old.example.test', 'active', 100, 200, 'machine-hash');
+      `);
+      database.exec(readFileSync(new URL("../migrations/0012_remote_control_plane.sql", import.meta.url), "utf8"));
+      database.exec(readFileSync(new URL("../migrations/0013_remote_session_lifecycle.sql", import.meta.url), "utf8"));
+      database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
+      const pair = await generateKeyPair("ES256", { extractable: true });
+      const privateJwk = await exportJWK(pair.privateKey);
+      const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", use: "sig", alg: "ES256" };
+      const controlPlane = new RemoteControlPlane(
+        {
+          DB: sqliteD1(database),
+          REMOTE_TICKET_PRIVATE_JWK: JSON.stringify({ ...privateJwk, kid: "test-key", alg: "ES256" }),
+          REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [publicJwk] }),
+          REMOTE_TICKET_KEY_ID: "test-key",
+        },
+        { now: () => 1_000 },
+      );
+      const owner = { id: "owner", email: "owner@example.com", name: null, avatarUrl: null };
+      const alice = { id: "alice", email: "alice@example.com", name: null, avatarUrl: null };
+      const bob = { id: "bob", email: "bob@example.com", name: null, avatarUrl: null };
+
+      await expect(
+        controlPlane.createInvite(owner, {
+          hostId: "host-1",
+          role: "member",
+          email: "alice@example.com",
+          permanent: true,
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+      await expect(
+        controlPlane.createInvite(owner, {
+          hostId: "host-1",
+          role: "member",
+          expiresInSeconds: 3_600,
+          permanent: true,
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+
+      const invite = await controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true });
+      expect(invite).toMatchObject({ permanent: true, useCount: 0 });
+      expect(invite.expiresAt).toBeGreaterThan(8_000_000_000_000_000);
+      await expect(controlPlane.previewInvite(invite.token)).resolves.toMatchObject({
+        permanent: true,
+        emailBound: false,
+      });
+
+      await expect(controlPlane.acceptInvite(alice, invite.token)).resolves.toMatchObject({
+        hostId: "host-1",
+        role: "member",
+      });
+      await expect(controlPlane.acceptInvite(bob, invite.token)).resolves.toMatchObject({
+        hostId: "host-1",
+        role: "member",
+      });
+      expect(
+        database.prepare("SELECT use_count, used_at FROM remote_invites WHERE invite_id = ?").get(invite.inviteId),
+      ).toEqual({ use_count: 2, used_at: null });
+      await expect(controlPlane.listInvites("owner", "host-1")).resolves.toEqual([
+        expect.objectContaining({ inviteId: invite.inviteId, permanent: true, useCount: 2, usedAt: null }),
+      ]);
+
+      for (let index = 1; index < 5; index += 1) {
+        await controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true });
+      }
+      await expect(
+        controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true }),
+      ).rejects.toMatchObject({ code: "invite_limit_reached" });
+      // Permanent links do not consume the single-use budget.
+      await expect(controlPlane.createInvite(owner, { hostId: "host-1", role: "member" })).resolves.toBeDefined();
+
+      await controlPlane.revokeInvite("owner", invite.inviteId);
+      await expect(controlPlane.previewInvite(invite.token)).rejects.toMatchObject({ code: "invite_invalid" });
+      await expect(controlPlane.acceptInvite(alice, invite.token)).rejects.toMatchObject({ code: "invite_invalid" });
+    } finally {
+      database.close();
+    }
   });
 });
 

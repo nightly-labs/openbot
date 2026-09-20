@@ -4,6 +4,27 @@ export const OPENBOT_INVITE_ORIGIN = "https://openbot.run";
 export const OPENBOT_INVITE_PATH = "/join";
 export const OPENBOT_CONTROL_PLANE_ORIGIN = "https://api.openbot.run";
 
+/**
+ * The finite deadline a permanent invitation carries. Invitation expiry travels the
+ * released Team API and D1 schemas as a plain timestamp, so "never expires" is a
+ * Date-compatible maximum rather than null. Matches `PERSISTENT_SESSION_EXPIRES_AT`.
+ */
+export const PERMANENT_INVITE_EXPIRES_AT_MS = 8_640_000_000_000_000;
+
+export function permanentInviteExpiresAt(): string {
+  return new Date(PERMANENT_INVITE_EXPIRES_AT_MS).toISOString();
+}
+
+/**
+ * Whether an expiry timestamp is the never-expires sentinel. The frozen Team API
+ * projections strip the `permanent` flag on the wire, so a client that only sees the
+ * timestamp still recognizes a permanent link by its deadline.
+ */
+export function isNeverExpiringInvite(value: string): boolean {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && parsed >= PERMANENT_INVITE_EXPIRES_AT_MS;
+}
+
 const INVITE_FIELDS = ["api", "fingerprint", "invite", "server"] as const;
 const BASE64URL_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,64}$/u;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
