@@ -1,4 +1,4 @@
-import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 import { readJsonObject } from "../../../../../server/json-body";
 import {
@@ -29,7 +29,8 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/invites")({
           if (
             (body.role !== "admin" && body.role !== "member") ||
             !(body.email === undefined || body.email === null || isString(body.email)) ||
-            !(body.expiresInSeconds === undefined || isNumber(body.expiresInSeconds))
+            !(body.expiresInSeconds === undefined || isNumber(body.expiresInSeconds)) ||
+            !(body.permanent === undefined || isBoolean(body.permanent))
           ) {
             return apiError(400, "invalid_remote_request", "The invitation is invalid.");
           }
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/invites")({
               role: body.role,
               email: body.email,
               expiresInSeconds: body.expiresInSeconds,
+              permanent: body.permanent,
             }),
             201,
           );

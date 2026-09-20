@@ -1873,6 +1873,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: "member",
         expiresAt: "2026-09-19T10:00:00.000Z",
         emailBound: false,
+        permanent: false,
       }),
       takePendingInvite: async () => null,
       login: async (input) => {
@@ -1917,6 +1918,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: input.role,
         usedAt: null,
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       setTyping: async (_input: SetTeamTypingInput) => undefined,
       onPresence: (listener, serverId) => {
@@ -2083,6 +2086,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         usedAt: null,
         inviteUrl: "https://openbot.run/join?invite=mock-invite",
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       onEvent: (listener) => {
         hostListeners.add(listener);

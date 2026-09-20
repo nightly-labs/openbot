@@ -210,7 +210,11 @@ const ServerSettings = createSimpleContext({
       }
     }
 
-    async function createServerInvite(input: { role: "admin" | "member"; email?: string }): Promise<InviteSummary> {
+    async function createServerInvite(input: {
+      role: "admin" | "member";
+      email?: string;
+      permanent?: boolean;
+    }): Promise<InviteSummary> {
       const server = serverSettingsTarget();
       if (!server) throw new Error("This server is not available.");
       const analytics = desktopAnalytics.scope();

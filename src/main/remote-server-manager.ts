@@ -449,6 +449,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         role: preview.role,
         expiresAt: new Date(preview.expiresAt).toISOString(),
         emailBound: preview.emailBound,
+        permanent: preview.permanent,
       };
     }
     const identity = await this.#client.verifyIdentity(invite.apiUrl, invite.serverId, invite.fingerprint);
@@ -708,7 +709,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return this.#team.revokeInvite(serverId, inviteId);
   }
 
-  createInvite(serverId: string, input: { role: "admin" | "member"; email?: string }): Promise<InviteSummary> {
+  createInvite(
+    serverId: string,
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
+  ): Promise<InviteSummary> {
     return this.#team.createInvite(serverId, input);
   }
 

@@ -61,8 +61,8 @@ interface TeamWebRtcClientTransportOptions {
   endSession: (sessionId: string) => Promise<void>;
   createInvite: (
     hostId: string,
-    input: { role: "admin" | "member"; email?: string },
-  ) => Promise<{ inviteId: string; token: string; expiresAt: number }>;
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
+  ) => Promise<{ inviteId: string; token: string; expiresAt: number; permanent: boolean; useCount: number }>;
   listInvites: (hostId: string) => Promise<RemoteInviteRecord[]>;
   previewInvite: (token: string) => Promise<RemoteInvitePreview>;
   acceptInvite: (token: string) => Promise<{ hostId: string; membershipId: string; role: "admin" | "member" }>;

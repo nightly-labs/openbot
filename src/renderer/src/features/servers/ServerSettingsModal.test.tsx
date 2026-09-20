@@ -126,6 +126,8 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
       usedAt: null,
       inviteUrl: "https://studio.example.com/invite/new",
       email: input.email ?? null,
+      permanent: input.permanent ?? false,
+      useCount: 0,
     })),
     onUpdateMember: vi.fn(async () => undefined),
     onRemoveMember: vi.fn(async () => undefined),
@@ -519,13 +521,15 @@ describe("ServerSettingsModal", () => {
   });
 
   it("lets a remote administrator invite, search, revoke, and change member roles", async () => {
-    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string }) => ({
+    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => ({
       id: "invite-new",
       role: input.role,
       expiresAt: "2099-01-01T00:00:00.000Z",
       usedAt: null,
       inviteUrl: "https://studio.example.com/invite/new",
       email: input.email ?? null,
+      permanent: input.permanent ?? false,
+      useCount: 0,
     }));
     const onUpdateMember = vi.fn(async () => undefined);
     const onRevokeInvite = vi.fn(async () => undefined);
@@ -542,6 +546,8 @@ describe("ServerSettingsModal", () => {
               expiresAt: "2099-01-01T00:00:00.000Z",
               usedAt: null,
               email: "pending@example.com",
+              permanent: false,
+              useCount: 0,
             },
           ],
           onCreateInvite,
@@ -629,6 +635,8 @@ describe("ServerSettingsModal", () => {
       expiresAt: "2099-01-01T00:00:00.000Z",
       usedAt: null,
       email: null,
+      permanent: false,
+      useCount: 0,
       inviteUrl: "https://openbot.run/join?invite=live",
     };
     const [invites, setInvites] = createSignal<TeamInviteSummary[]>([invite]);
@@ -650,13 +658,15 @@ describe("ServerSettingsModal", () => {
   });
 
   it("associates invite validation with the email field and creates invite links", async () => {
-    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string }) => ({
+    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => ({
       id: "invite-new",
       role: input.role,
       expiresAt: "2099-01-01T00:00:00.000Z",
       usedAt: null,
       inviteUrl: "https://studio.example.com/invite/new",
       email: input.email ?? null,
+      permanent: input.permanent ?? false,
+      useCount: 0,
     }));
     render(() => (
       <ServerSettingsModal {...props({ server: remoteServer, hostStatus: null, members, onCreateInvite })} />
@@ -687,5 +697,58 @@ describe("ServerSettingsModal", () => {
     expect(screen.queryByRole("img", { name: "Invitation QR code" })).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Create new invitation link" }));
     await waitFor(() => expect(onCreateInvite).toHaveBeenCalledTimes(2));
+  });
+
+  it("creates a permanent link that lists as never expiring", async () => {
+    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => ({
+      id: "invite-perma",
+      role: input.role,
+      expiresAt: "+275760-09-13T00:00:00.000Z",
+      usedAt: null,
+      inviteUrl: "https://studio.example.com/invite/perma",
+      email: null,
+      permanent: true,
+      useCount: 0,
+    }));
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          // An account-plane host reports no HTTP origin, which is what carries the flag.
+          server: { ...remoteServer, apiUrl: null },
+          hostStatus: null,
+          members,
+          invites: [
+            {
+              id: "invite-perma",
+              role: "member",
+              expiresAt: "+275760-09-13T00:00:00.000Z",
+              usedAt: null,
+              email: null,
+              permanent: true,
+              useCount: 3,
+            },
+          ],
+          onCreateInvite,
+        })}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    await fireEvent.click(screen.getByRole("tab", { name: "Perma link" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create link" }));
+    await waitFor(() => expect(onCreateInvite).toHaveBeenCalledWith({ role: "member", permanent: true }));
+
+    expect(await screen.findByText("Permanent invitation link")).toBeInTheDocument();
+    expect(screen.getByText(/Never expires · 3 joins/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("hides the permanent tab on legacy HTTP hosts whose wire strips the flag", async () => {
+    render(() => <ServerSettingsModal {...props({ server: remoteServer, hostStatus: null, members })} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    expect(screen.getByRole("tab", { name: "Email" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Invite link" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Perma link" })).not.toBeInTheDocument();
   });
 });

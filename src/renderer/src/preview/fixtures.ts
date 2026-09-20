@@ -517,6 +517,8 @@ export const STORY_INVITES: TeamInviteSummary[] = [
     expiresAt: "2026-08-29T10:00:00.000Z",
     usedAt: null,
     email: "new-person@example.com",
+    permanent: false,
+    useCount: 0,
   },
 ];
 
