@@ -352,23 +352,6 @@ export class RemoteControlPlane {
     if (permanent && input.email?.trim()) throw invalid("permanent invite email");
     if (permanent && input.expiresInSeconds !== undefined) throw invalid("permanent invite lifetime");
     const now = this.#now();
-    if (!permanent) {
-      const outstanding = await this.#database
-        .prepare(
-          `SELECT COUNT(*) AS count FROM remote_invites
-           WHERE host_id = ? AND max_uses IS NOT NULL
-             AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`,
-        )
-        .bind(input.hostId, now)
-        .first<{ count: number }>();
-      if ((outstanding?.count ?? 0) >= MAX_OUTSTANDING_INVITES_PER_HOST) {
-        throw new RemoteControlPlaneError(
-          429,
-          "invite_limit_reached",
-          "Revoke or use an active invitation before creating another one.",
-        );
-      }
-    }
     const ttl = input.expiresInSeconds ?? 7 * 24 * 60 * 60;
     if (!permanent && (!Number.isSafeInteger(ttl) || ttl < 300 || ttl > 30 * 24 * 60 * 60)) {
       throw invalid("invite lifetime");
