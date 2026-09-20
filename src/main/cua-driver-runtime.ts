@@ -773,7 +773,10 @@ async function readPermissionsOverMcp(
   const timer = new AbortController();
   const deadline = setTimeout(() => timer.abort(), PERMISSION_TIMEOUT_MS);
   try {
-    await client.connect(transport);
+    // The handshake is inside the deadline, not before it. A proxy that starts and then never
+    // answers `initialize` would otherwise wait for nothing, and the warm-up holds the agents back
+    // until this returns, so a driver that never speaks would keep every agent down.
+    await client.connect(transport, { signal: timer.signal });
     if (requiredPermissions(platform).length === 0) {
       await client.listTools(undefined, { signal: timer.signal });
       return [];
