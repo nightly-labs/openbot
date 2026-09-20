@@ -260,10 +260,12 @@ describe("CuaDriverRuntime", () => {
     expect(seen).toEqual(["ready"]);
   });
 
-  // Replacing a provider session ends the idle conversations with it, so the tool set has to have
-  // moved. A grant given while the daemon serves leaves the entry exactly as it was, and a stop
-  // this process asked for is the teardown, where the stored sessions are left for the next run.
-  it("reports the MCP entry when it appears, not when a grant changes and not when it is stopped", async () => {
+  // Opening the panel starts the daemon before any grant exists, and the warm-up stops an ungranted
+  // daemon at the next start. Handing the entry over in between would put it in the tool fingerprint
+  // of every session spawned meanwhile, and each of those would be replaced after the restart for a
+  // tool set the user never changed. A stop this process asked for is the teardown, where the stored
+  // sessions are left for the next run.
+  it("hands the providers nothing until the grants are in place, and stays quiet when it is stopped", async () => {
     let granted = false;
     const { driver } = await runtime({
       readPermissions: async () => [
@@ -276,11 +278,14 @@ describe("CuaDriverRuntime", () => {
       entries += 1;
     });
 
-    await driver.state();
-    expect(entries).toBe(1);
+    await expect(driver.state()).resolves.toMatchObject({ status: "permissions-required" });
+    expect(driver.running()).toBe(true);
+    expect(driver.mcpServerForProviders()).toBeNull();
+    expect(entries).toBe(0);
 
     granted = true;
     await expect(driver.state()).resolves.toMatchObject({ status: "ready" });
+    expect(driver.mcpServerForProviders()).not.toBeNull();
     expect(entries).toBe(1);
 
     await driver.stop();
@@ -303,7 +308,7 @@ describe("CuaDriverRuntime", () => {
     driver.onMcpServerChanged(() => {
       entries += 1;
     });
-    await driver.start();
+    await driver.state();
     expect(entries).toBe(1);
 
     // The runtime's own `exit` listener was added first, so it has run by the time this one does.
@@ -341,7 +346,7 @@ describe("CuaDriverRuntime", () => {
     const granted = await runtime();
     await granted.driver.warmUp();
     expect(granted.driver.running()).toBe(true);
-    expect(granted.driver.mcpServerConfig()).not.toBeNull();
+    expect(granted.driver.mcpServerForProviders()).not.toBeNull();
 
     const ungranted = await runtime({
       readPermissions: async () => [
@@ -351,7 +356,7 @@ describe("CuaDriverRuntime", () => {
     });
     await ungranted.driver.warmUp();
     expect(ungranted.driver.running()).toBe(false);
-    expect(ungranted.driver.mcpServerConfig()).toBeNull();
+    expect(ungranted.driver.mcpServerForProviders()).toBeNull();
 
     await granted.driver.stop();
   });

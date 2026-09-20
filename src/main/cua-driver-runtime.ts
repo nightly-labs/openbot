@@ -307,7 +307,11 @@ export class CuaDriverRuntime {
   }
 
   /**
-   * What the providers are handed, or `null` while there is nothing to hand them.
+   * How to reach the running daemon over MCP, or `null` while there is nothing to reach.
+   *
+   * This is the address, not the decision of who may have it: the panel asks the daemon what it may
+   * do through this entry, before any grant exists. `mcpServerForProviders` decides what an agent
+   * is given.
    *
    * The command is absolute, so `resolveMcpCommand` accepts it without a login shell. The working
    * directory stays empty on purpose: ACP has no field for one and Codex accepts none, so both
@@ -334,6 +338,19 @@ export class CuaDriverRuntime {
     };
   }
 
+  /**
+   * What an agent's provider is handed, which is nothing until the grants are in place.
+   *
+   * Tools an ungranted daemon would refuse are worth nothing to an agent, and handing them over has
+   * a cost: the entry enters the tool fingerprint of every session spawned while the panel keeps an
+   * ungranted daemon alive, and the warm-up stops that daemon at the next start, so each of those
+   * sessions would be replaced although the user changed nothing. Reading the state instead of the
+   * process makes the panel and the warm-up agree: below `ready` there is no entry either way.
+   */
+  mcpServerForProviders(): McpServerConfig | null {
+    return this.#state.status === "ready" ? this.mcpServerConfig() : null;
+  }
+
   onStateChanged(listener: (state: ComputerUseState) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
@@ -350,9 +367,10 @@ export class CuaDriverRuntime {
    * privately. So this reports only the two moments that leave a live session holding a tool set
    * that is not the one it would be given now.
    *
-   * Three things it is quiet for. A grant changes the state while the daemon serves the same entry.
-   * The warm-up at startup settles the entry the stored sessions were already using. A stop this
-   * process asked for happens at teardown, where the sessions are being left for the next run.
+   * Two things it is quiet for. The warm-up at startup settles the entry the stored sessions were
+   * already using. A stop this process asked for happens at teardown, where the sessions are being
+   * left for the next run. A state that moves below `ready` and back while the daemon keeps serving
+   * is not quiet, because the entry goes with it.
    */
   onMcpServerChanged(listener: () => void): () => void {
     this.#mcpListeners.add(listener);
@@ -584,7 +602,7 @@ export class CuaDriverRuntime {
   }
 
   #announceMcpServer(): void {
-    const config = this.mcpServerConfig();
+    const config = this.mcpServerForProviders();
     const announced = config ? [config.command, ...config.args].join(" ") : "";
     if (announced === this.#announcedMcpServer) return;
     this.#announcedMcpServer = announced;
@@ -599,14 +617,17 @@ export class CuaDriverRuntime {
   /**
    * Tells the listeners, and only when the answer is not the one they hold already.
    *
-   * A listener replaces every agent's provider session, because the tool set changed. Reopening the
-   * panel asks the driver the same question again, and repeating an unchanged answer would end each
-   * agent's session for nothing.
+   * Reopening the panel asks the driver the same question again, and repeating an unchanged answer
+   * would update the capability and reconsider the entry for nothing.
+   *
+   * The entry is announced from here, after the state listeners, because it follows the state: a
+   * grant is what puts the tools in an agent's hands, and losing one takes them back.
    */
   #publish(state: ComputerUseState): ComputerUseState {
     if (sameState(this.#state, state)) return this.#state;
     this.#state = state;
     for (const listener of this.#listeners) listener(state);
+    this.#announceMcpServer();
     return state;
   }
 }
