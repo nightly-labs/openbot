@@ -374,6 +374,19 @@ async function readLoginShellPath(): Promise<string | null> {
 }
 
 /**
+ * Whether testing this configuration is worth waiting for the managed tool runtimes.
+ *
+ * An http test waits for nothing, and neither does a stdio command this machine already resolves -
+ * an installed interpreter, an absolute path, the user's own `npx`. Only a command nothing on the
+ * search list names may arrive with the download, so only that one waits for it.
+ */
+export async function needsManagedRuntime(config: McpServerConfig, tools: McpToolRuntimes): Promise<boolean> {
+  if (config.transport !== "stdio") return false;
+  const resolved = await usableMcpServer(config, tools);
+  return resolved.error !== undefined && resolved.reason === "command_not_found";
+}
+
+/**
  * The environment a stdio MCP server is launched with, `PATH` included.
  *
  * The login shell that found the command holds the `PATH` that makes it run: an `npx` or `uvx`

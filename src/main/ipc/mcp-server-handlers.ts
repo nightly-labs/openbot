@@ -13,6 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import type { AgentService } from "../../backend/agent-service";
+import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { parseAgentRequest } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
@@ -36,6 +37,22 @@ interface McpServerIpcDependencies {
    * reports what the machine can actually start.
    */
   ensureToolRuntimesReady: () => Promise<void>;
+  /** What the managed store holds right now, so an installed command waits for no download. */
+  toolRuntimes: () => McpToolRuntimes;
+}
+
+/** How long a connection test waits for the managed runtimes before probing without them. */
+const TOOL_RUNTIME_TEST_WAIT_MS = 60_000;
+
+/**
+ * Waits for the download, but never past the deadline. A stalled transfer keeps downloading for
+ * the next attempt; its failure is not this test's, so the probe still runs and reports what this
+ * machine starts.
+ */
+async function awaitToolRuntimes(ensure: () => Promise<void>): Promise<void> {
+  const ready = ensure();
+  await Promise.race([ready, new Promise((resolve) => setTimeout(resolve, TOOL_RUNTIME_TEST_WAIT_MS))]);
+  void ready.catch(() => undefined);
 }
 
 export function mcpServerIpcHandlers({
@@ -43,6 +60,7 @@ export function mcpServerIpcHandlers({
   remoteServers,
   startToolRuntimes,
   ensureToolRuntimesReady,
+  toolRuntimes,
 }: McpServerIpcDependencies): Pick<IpcGroupHandlers, "mcpServers"> {
   /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
@@ -105,9 +123,11 @@ export function mcpServerIpcHandlers({
           // remote branch below carries no such flag; the route it reaches spends the host's stored
           // credentials instead, and still opens nothing.
           local: async () => {
-            // Only a stdio test needs a runtime. An http test waits for no download, and a failed
-            // one is not a test failure: the probe still runs and reports what this machine starts.
-            if (parsed.config.transport === "stdio") await ensureToolRuntimesReady().catch(() => undefined);
+            // Only a command nothing on this machine names waits for the download: an installed
+            // interpreter or the user's own `npx` probes at once, and even the wait is bounded.
+            if (await needsManagedRuntime(parsed.config, toolRuntimes())) {
+              await awaitToolRuntimes(ensureToolRuntimesReady);
+            }
             return service.testMcpServer(parsed, { interactive: true });
           },
           remote: (serverId) => {

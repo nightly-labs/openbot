@@ -10,6 +10,8 @@ import {
   clearMcpCommandCache,
   codexMcpServers,
   mcpLaunchEnvironment,
+  NO_MCP_TOOL_RUNTIMES,
+  needsManagedRuntime,
   pickWindowsExecutable,
   resolveMcpCommand,
   type UsableMcpServer,
@@ -215,6 +217,45 @@ describe("mcpLaunchEnvironment", () => {
       authorization: null,
     };
     expect(mcpLaunchEnvironment(server)).toMatchObject({ PATH: "/usr/bin:/bin" });
+  });
+});
+
+describe("needsManagedRuntime", () => {
+  it("ignores an http server", async () => {
+    await expect(needsManagedRuntime(config({}), NO_MCP_TOOL_RUNTIMES)).resolves.toBe(false);
+  });
+
+  it("ignores a command this machine already resolves", async () => {
+    // An absolute path is taken as written: no lookup runs, so no download is waited for.
+    const absolute = config({
+      transport: "stdio",
+      command: "/bin/echo",
+      args: ["ready"],
+      url: "",
+      headers: [],
+    });
+    await expect(needsManagedRuntime(absolute, NO_MCP_TOOL_RUNTIMES)).resolves.toBe(false);
+  });
+
+  it("waits for a command nothing names", async () => {
+    const missing = config({
+      transport: "stdio",
+      command: "openbot-no-such-command",
+      url: "",
+      headers: [],
+    });
+    await expect(needsManagedRuntime(missing, NO_MCP_TOOL_RUNTIMES)).resolves.toBe(true);
+  });
+
+  it("skips the wait once the managed store names the command", async () => {
+    const missing = config({
+      transport: "stdio",
+      command: "openbot-no-such-command",
+      url: "",
+      headers: [],
+    });
+    const tools = { binDirectories: [], commandAliases: { "openbot-no-such-command": "/managed/bin/tool" } };
+    await expect(needsManagedRuntime(missing, tools)).resolves.toBe(false);
   });
 });
 

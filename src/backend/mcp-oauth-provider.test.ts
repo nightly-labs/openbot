@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   McpOAuth,
   type McpOAuthAuthority,
@@ -44,7 +44,7 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
   response.end(JSON.stringify(body));
 }
 
-async function startFakeServer(quoteTokenOnError = false, hangToken = false): Promise<FakeServer> {
+async function startFakeServer(quoteTokenOnError = false, hangToken = false, delayTokenMs = 0): Promise<FakeServer> {
   const state: { registrations: number; tokenRequests: URLSearchParams[]; refreshToken: string } = {
     registrations: 0,
     tokenRequests: [],
@@ -86,6 +86,8 @@ async function startFakeServer(quoteTokenOnError = false, hangToken = false): Pr
         // An authorization server that takes the connection and never answers. The request is
         // recorded above, so a test can prove the exchange started without waiting for it.
         if (hangToken) return;
+        // A slow authorization server, so a test can remove the row mid-exchange.
+        if (delayTokenMs > 0) await new Promise((resolve) => setTimeout(resolve, delayTokenMs));
         if (form.get("grant_type") === "refresh_token") {
           // Rotating, like the specification recommends: the refresh token just spent is dead, so
           // a second exchange with it would be refused and the grant would be at risk.
@@ -228,8 +230,8 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-async function fakeServer(quoteTokenOnError = false, hangToken = false): Promise<FakeServer> {
-  const server = await startFakeServer(quoteTokenOnError, hangToken);
+async function fakeServer(quoteTokenOnError = false, hangToken = false, delayTokenMs = 0): Promise<FakeServer> {
+  const server = await startFakeServer(quoteTokenOnError, hangToken, delayTokenMs);
   servers.push(server);
   return server;
 }
@@ -408,6 +410,33 @@ describe("signing in to an http MCP server", () => {
       toolCount: 0,
       error: "The server answered 401.",
     });
+  });
+
+  it("does not restore credentials forgotten during a refresh", async () => {
+    const server = await fakeServer(false, false, 300);
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("A refresh must never open a browser."),
+    });
+
+    // The token endpoint answers slowly. The removal lands after the exchange started but before
+    // it finishes: without a guard the write it ends with would restore the account, and
+    // re-adding the URL would reuse it.
+    const pending = oauth.accessToken(server.url);
+    await vi.waitFor(() => {
+      expect(server.tokenRequests.filter((form) => form.get("grant_type") === "refresh_token")).toHaveLength(1);
+    });
+    await oauth.forget(server.url);
+
+    expect(await pending).toBe(ACCESS_TOKEN);
+    expect(storage.read(server.url)).toBeNull();
   });
 
   it("forgets a sign-in when the server is removed", async () => {

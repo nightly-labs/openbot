@@ -110,6 +110,12 @@ export class McpOAuth implements McpOAuthAuthority {
   readonly #waiting = new Map<string, (code: string) => void>();
   /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
   readonly #refreshing = new Map<string, Promise<void>>();
+  /**
+   * How many times a server's credentials were forgotten. A refresh or a sign-in already running
+   * when the count rises must not write back what was removed: its later writes are refused, so
+   * removal reads complete before credentials can return to disk.
+   */
+  readonly #generations = new Map<string, number>();
 
   constructor(options: McpOAuthOptions) {
     this.#options = options;
@@ -216,15 +222,33 @@ export class McpOAuth implements McpOAuthAuthority {
   /** Forgets one server's registration and tokens. Used when the row that named it is removed. */
   forget(url: string): Promise<void> {
     const resource = normalizeResource(url);
-    return resource ? this.#options.storage.clear(resource) : Promise.resolve();
+    if (!resource) return Promise.resolve();
+    // Counted before the removal: a refresh or a sign-in already running carries the previous
+    // count, so the write it finishes with is refused below rather than restoring the account.
+    // Re-adding the same URL starts a new sign-in at the new count, which its writes carry.
+    this.#generations.set(resource, (this.#generations.get(resource) ?? 0) + 1);
+    return this.#options.storage.clear(resource);
   }
 
   /** A `state` makes the provider interactive; `null` keeps it silent. */
   #provider(resource: string, state: string | null): OAuthClientProvider {
+    const generation = this.#generations.get(resource) ?? 0;
+    const storage = this.#options.storage;
+    // The store as this run saw it: reads answer from disk, but a write lands only while no
+    // `forget` has removed the server since this provider was built.
+    const guarded: McpOAuthStorage = {
+      read: (candidate) => storage.read(candidate),
+      write: async (candidate, record) => {
+        if ((this.#generations.get(resource) ?? 0) !== generation)
+          throw new Error("The MCP sign-in was forgotten while it was running.");
+        await storage.write(candidate, record);
+      },
+      clear: (candidate) => storage.clear(candidate),
+    };
     return new McpOAuthClientProvider({
       resource,
       state,
-      storage: this.#options.storage,
+      storage: guarded,
       redirectUrl: this.#options.redirectUrl,
       openExternal: this.#options.openExternal,
     });

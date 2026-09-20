@@ -349,6 +349,7 @@ function registerIpcHandlers({
       remoteServers,
       startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
       ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
+      toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
