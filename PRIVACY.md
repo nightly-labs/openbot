@@ -352,3 +352,8 @@ booleans through separate local status directories. It does not read or back up 
 workspaces, databases, provider directories, browser data, or conversations. It requests release
 metadata and application downloads from the fixed OpenBot GitHub repository; those requests
 expose the host's network address to GitHub. It sends no tenant status or tenant content to GitHub.
+
+The separate, optional administrator account-setup command creates new local Standard users and
+empty private homes. It saves generated login passwords in a root-only file under
+`/private/var/root` for the administrator to retrieve. It does not transmit those credentials or
+include them in logs. The administrator controls delivery and removal of this credential file.

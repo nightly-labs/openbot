@@ -943,6 +943,10 @@ See [plugin distribution and sharing](plugin-distribution.md) for the catalog sh
 
 ## macOS Host Manager
 
+`scripts/macos-tenant-setup.swift` is a separate administrator command for new Standard accounts.
+It uses OpenDirectory directly, creates only new empty homes, and stores generated credentials
+in a new root-only file before account creation. It is not installed or called by the daemon.
+
 The optional standalone root helper (`scripts/host-manager.ts`) uses the lifecycle in
 `src/main/host-manager.ts` and fixed macOS operations in `scripts/host-manager-macos.ts`.
 `src/main/host-update-coordinator.ts` is the unprivileged tenant client, not an update leader.

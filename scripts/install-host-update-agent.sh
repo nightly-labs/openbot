@@ -4,6 +4,7 @@
 # sudo scripts/install-host-update-agent.sh --managed /tmp/openbot-host-manager client-acme client-bravo
 set -eu
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export LC_ALL=C
 if [ "$(id -u)" -ne 0 ] || [ "${1:-}" != --managed ] || [ "$#" -lt 3 ]; then
   echo "usage: sudo $0 --managed <compiled-helper> <standard-user>..." >&2
   exit 1
@@ -37,9 +38,10 @@ for tenant in "$@"; do
   case "$tenant" in ''|-*|*[!a-zA-Z0-9_-]*) echo 'Invalid tenant account name.' >&2; exit 1;; esac
   tenant_uid=$(id -u "$tenant")
   [ "$tenant_uid" -ge 501 ] || exit 1
-  membership=$(dseditgroup -o checkmember -m "$tenant" admin)
-  if printf '%s\n' "$membership" | grep -q '^yes'; then
-    echo "Tenant $tenant must be a Standard user." >&2
+  membership_status=0
+  membership=$(dseditgroup -o checkmember -m "$tenant" admin) || membership_status=$?
+  if [ "$membership_status" -ne 67 ] || [ "$membership" != "no $tenant is NOT a member of admin" ]; then
+    echo "Could not verify that $tenant is a Standard user." >&2
     exit 1
   fi
   # Metadata only. Never open, scan, copy or modify any tenant content.

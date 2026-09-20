@@ -424,3 +424,5 @@ For one native Standard user per tenant, use the optional administrator-installe
 `bun build scripts/host-manager.ts --compile --outfile /tmp/openbot-host-manager`, then follow
 that guide's permissions and installation steps. Tenant users do not need sudo. The target-host
 acceptance checks are required before this configuration is used for paying clients.
+The guide also includes an administrator command to create new Standard accounts with generated
+passwords and private homes: [automatic account setup](docs/multi-tenant-hosting.md#create-tenant-accounts-automatically).

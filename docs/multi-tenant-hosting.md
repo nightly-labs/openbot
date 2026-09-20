@@ -86,6 +86,51 @@ The host download does not use or change a tenant's `autoDownload` preference.
 
 ## Installation
 
+### Create tenant accounts automatically
+
+For new accounts, compile the administrator setup tool from a trusted checkout as an
+unprivileged developer. This requires the Xcode Command Line Tools:
+
+```sh
+xcrun swiftc -parse-as-library scripts/macos-tenant-setup.swift -o /tmp/openbot-create-tenants
+sudo /tmp/openbot-create-tenants client-acme client-bravo
+```
+
+The command creates local Standard users with unique UIDs, independent generated passwords,
+and new empty `0700` homes under `/Users`. Use lowercase account names, starting with a letter,
+with at most 31 letters, digits, hyphens, or underscores. Existing accounts, group membership
+names, and home paths (including symlinks) cause setup to stop. It never resets an existing
+password, changes an existing home, or deletes an account to recover from failure.
+
+Passwords contain 192 random bits and are sent directly to Apple's OpenDirectory API in memory.
+They are not placed in command arguments, environment variables, stdout, or error messages.
+Before creating accounts, the tool saves a new root-owned `0600` credential file at
+`/private/var/root/openbot-tenant-credentials-<UUID>.json`. The terminal shows only this path and
+successful account names. Retrieve the passwords as the administrator, deliver each password
+to its tenant through your secure credential channel, and remove the file when no longer needed.
+Do not attach this file to diagnostics or commit it to the repository.
+
+A failed batch can leave some accounts or empty homes created. The credential file retains all
+planned passwords, including accounts that were not created. Inspect the partial setup as the
+administrator; the command stops at the first failure and will not overwrite it on retry.
+Do not run other account-creation tools at the same time. The tool serializes its own invocations,
+but macOS does not provide a transaction across independent administrator tools.
+
+This is a one-time setup tool, separate from the update daemon. It does not enroll accounts with
+the Host Manager, enable automatic login, grant administrator rights, or grant Secure Token or
+FileVault unlock rights. Log each account into a GUI session before enrollment. If the host uses
+FileVault, its administrator must unlock it after a restart. Verify account login, private home
+permissions, and lack of administrator membership on the target Mac before tenant use.
+
+The native tests use temporary files and a fake account service. They do not create users:
+
+```sh
+xcrun swiftc -parse-as-library -D TENANT_SETUP_TESTS scripts/macos-tenant-setup.swift scripts/macos-tenant-setup-tests.swift -o /tmp/openbot-tenant-setup-tests
+/tmp/openbot-tenant-setup-tests
+```
+
+### Install host management
+
 Use a trusted checkout. As an unprivileged developer, build the standalone helper:
 
 ```sh
