@@ -247,24 +247,38 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): AcpMcpServer
  * Codex reads `config.mcp_servers`, a record keyed by name, which `profile-generation.ts` already
  * writes to disable the user's own servers.
  *
- * **stdio only, and no working directory.** Neither the record's http shape nor a key for a working
- * directory could be confirmed against the pinned Codex app-server, and a guessed key name would
- * fail silently at the next turn. Both are left out of the Codex payload instead: a directory that
- * does not arrive would start the server in the wrong place, which a server told to open
- * `./data.db` answers by creating a second database. Every other capable provider still gets it.
+ * **stdio needs no working directory.** Neither a key for a working directory nor any other guess
+ * could be confirmed against the pinned Codex app-server, and a guessed key name would fail
+ * silently at the next turn. A server that names a directory is left out of the Codex payload
+ * instead: a directory that does not arrive would start the server in the wrong place, which a
+ * server told to open `./data.db` answers by creating a second database. Every other capable
+ * provider still gets it.
+ *
+ * **http travels as `url` with `http_headers`.** Both were confirmed against the pinned Codex
+ * app-server: an entry with an invalid credential is listed as failed with the server's own 401,
+ * which is the handshake reaching the server rather than the shape being dropped.
  */
-export type CodexMcpServer = { command: string; args: string[]; env: Record<string, string> };
+export type CodexMcpServer =
+  | { command: string; args: string[]; env: Record<string, string> }
+  | { url: string; http_headers: Record<string, string> };
 
 export function codexMcpServers(servers: readonly UsableMcpServer[]): Record<string, CodexMcpServer> {
   const record: Record<string, CodexMcpServer> = {};
   for (const server of servers) {
-    if (server.error !== undefined || server.config.transport !== "stdio") continue;
-    if (server.config.workingDirectory) continue;
-    record[server.config.name] = {
-      command: server.command,
-      args: [...server.config.args],
-      env: mcpLaunchEnvironment(server),
-    };
+    if (server.error !== undefined) continue;
+    if (server.config.transport === "stdio") {
+      if (server.config.workingDirectory) continue;
+      record[server.config.name] = {
+        command: server.command,
+        args: [...server.config.args],
+        env: mcpLaunchEnvironment(server),
+      };
+    } else {
+      record[server.config.name] = {
+        url: server.config.url,
+        http_headers: headerRecord(server.config),
+      };
+    }
   }
   return record;
 }

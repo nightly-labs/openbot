@@ -13,6 +13,55 @@ export const MCP_ELICITATION_DECISION_ID = "mcp-elicitation-decision";
 export const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 export const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 export const MCP_ELICITATION_DECLINE = "Don't allow";
+const COMPUTER_USE_SERVER = "computer-use";
+/** Field names a plugin uses for a credential. A match keeps the answer out of stored history. */
+const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
+
+export type ElicitationFieldValue = string | number | boolean | string[];
+
+export function secretElicitationField(id: string, property: DynamicRecord | undefined): boolean {
+  if (property?.writeOnly === true || getString(property, "format") === "password") return true;
+  return SECRET_FIELD_PATTERN.test(`${id} ${getString(property, "title") ?? ""}`);
+}
+
+export function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
+  if (Array.isArray(property.oneOf)) {
+    return property.oneOf.filter(isRecord).flatMap((option) => {
+      const value = getString(option, "const");
+      if (!value) return [];
+      return [{ label: getString(option, "title") ?? value, description: getString(option, "description") ?? "" }];
+    });
+  }
+  if (Array.isArray(property.enum)) {
+    return property.enum.filter(isString).map((value) => ({ label: value, description: "" }));
+  }
+  if (property.type === "boolean") {
+    return [
+      { label: "Yes", description: "" },
+      { label: "No", description: "" },
+    ];
+  }
+  return null;
+}
+
+export function elicitationValue(property: DynamicRecord | undefined, answers: string[]): ElicitationFieldValue {
+  if (!property) return answers[0] ?? "";
+  if (property.type === "array") return answers;
+  if (property.type === "boolean") return /^(yes|true|1)$/i.test(answers[0] ?? "");
+  if (Array.isArray(property.oneOf)) {
+    // The card submits the displayed label, which is the title when the schema names one: the
+    // response must carry the const the schema asked for instead.
+    const selected = property.oneOf
+      .filter(isRecord)
+      .find((option) => (getString(option, "title") ?? getString(option, "const")) === answers[0]);
+    if (selected) return getString(selected, "const") ?? answers[0] ?? "";
+  }
+  if (property.type === "number" || property.type === "integer") {
+    const parsed = Number(answers[0]);
+    return Number.isFinite(parsed) ? parsed : (answers[0] ?? "");
+  }
+  return answers[0] ?? "";
+}
 
 export function commandText(params: unknown): string | null {
   if (!isRecord(params)) return null;
@@ -39,56 +88,68 @@ export function promptQuestions(params: unknown): AgentPromptQuestion[] {
     }));
 }
 
-export function mcpElicitationQuestion(params: unknown): AgentPromptQuestion | null {
-  const serverName = getString(params, "serverName");
-  const mode = getString(params, "mode") ?? "form";
+/** A schema that asks for nothing is a consent hand-off: the plugin wants a yes or no. */
+function elicitationConsentQuestion(params: unknown, serverName: string | null): AgentPromptQuestion | null {
   const message = getString(params, "message")?.trim();
-  const requestedSchema = getRecord(params, "requestedSchema");
-  const properties = getRecord(requestedSchema, "properties");
-  if (
-    serverName !== "computer-use" ||
-    (mode !== "form" && mode !== "openai/form") ||
-    !message ||
-    !requestedSchema ||
-    !properties ||
-    Object.keys(properties).length > 0
-  ) {
-    return null;
-  }
-
+  if (!message) return null;
+  const subject = serverName === COMPUTER_USE_SERVER ? "Computer Use" : (serverName ?? "this plugin");
   const persistence = getArray(getRecord(params, "_meta"), "persist").filter(isString);
-  const options = [
-    {
-      label: MCP_ELICITATION_ALLOW_ONCE,
-      description: "Allow this Computer Use request.",
-    },
-    ...(persistence.includes("always")
-      ? [
-          {
-            label: MCP_ELICITATION_ALLOW_ALWAYS,
-            description: "Remember this access for future Computer Use requests.",
-          },
-        ]
-      : []),
-    {
-      label: MCP_ELICITATION_DECLINE,
-      description: "Keep access blocked.",
-    },
-  ];
-  const question: AgentPromptQuestion = {
+  return {
     id: MCP_ELICITATION_DECISION_ID,
-    header: "Computer Use",
+    header: subject.slice(0, INPUT_LIMITS.promptHeader),
     question: message.slice(0, INPUT_LIMITS.promptQuestion),
     isSecret: false,
-    options,
+    options: [
+      { label: MCP_ELICITATION_ALLOW_ONCE, description: `Allow this ${subject} request.` },
+      ...(persistence.includes("always")
+        ? [{ label: MCP_ELICITATION_ALLOW_ALWAYS, description: `Remember this access for future ${subject} requests.` }]
+        : []),
+      { label: MCP_ELICITATION_DECLINE, description: "Keep access blocked." },
+    ],
   };
-  return validPromptQuestions([question]) ? question : null;
+}
+
+/** One question per requested field, so a plugin can collect an API key or any other value. */
+export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+  const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
+  const message = getString(params, "message")?.trim();
+  return Object.entries(properties).flatMap(([id, property]) => {
+    if (!isRecord(property)) return [];
+    const question = getString(property, "description") ?? message ?? `${subject} needs more information.`;
+    return [
+      {
+        id,
+        header: (getString(property, "title") ?? id).slice(0, INPUT_LIMITS.promptHeader),
+        question: question.slice(0, INPUT_LIMITS.promptQuestion),
+        isSecret: secretElicitationField(id, property),
+        options: elicitationOptions(property),
+      },
+    ];
+  });
+}
+
+export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] | null {
+  const serverName = getString(params, "serverName");
+  const mode = getString(params, "mode") ?? "form";
+  const requestedSchema = getRecord(params, "requestedSchema");
+  const properties = getRecord(requestedSchema, "properties");
+  if ((mode !== "form" && mode !== "openai/form") || !requestedSchema || !properties) return null;
+
+  const questions =
+    Object.keys(properties).length === 0
+      ? [elicitationConsentQuestion(params, serverName)].filter((question) => question !== null)
+      : elicitationFieldQuestions(params, serverName ?? "This plugin");
+  return validPromptQuestions(questions) ? questions : null;
 }
 
 export function mcpElicitationResult(
   params: unknown,
   answers: Record<string, string[]>,
 ): { action: "accept" | "cancel" | "decline"; content: DynamicRecord | null; _meta: DynamicRecord | null } {
+  const properties = getRecord(getRecord(params, "requestedSchema"), "properties");
+  if (properties && Object.keys(properties).length > 0) {
+    return elicitationFieldResult(params, properties, answers);
+  }
   const selected = answers[MCP_ELICITATION_DECISION_ID]?.[0];
   if (selected === MCP_ELICITATION_ALLOW_ONCE) {
     return { action: "accept", content: {}, _meta: null };
@@ -100,6 +161,24 @@ export function mcpElicitationResult(
     return { action: "decline", content: null, _meta: null };
   }
   return { action: "cancel", content: null, _meta: null };
+}
+
+/** A skipped required field declines the request: a partial form is not an answer. */
+function elicitationFieldResult(
+  params: unknown,
+  properties: DynamicRecord,
+  answers: Record<string, string[]>,
+): { action: "accept" | "decline"; content: DynamicRecord | null; _meta: DynamicRecord | null } {
+  const content: Record<string, ElicitationFieldValue> = {};
+  for (const [id, values] of Object.entries(answers)) {
+    if (values.length === 0) continue;
+    content[id] = elicitationValue(getRecord(properties, id) ?? undefined, values);
+  }
+  const required = getArray(getRecord(params, "requestedSchema"), "required").filter(isString);
+  if (required.some((id) => !(id in content)) || Object.keys(content).length === 0) {
+    return { action: "decline", content: null, _meta: null };
+  }
+  return { action: "accept", content, _meta: null };
 }
 
 export function validPromptQuestions(questions: AgentPromptQuestion[]): boolean {

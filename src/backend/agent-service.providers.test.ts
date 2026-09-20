@@ -375,6 +375,38 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // A manifest written by an older adapter holds the same stored set as today, so the fingerprint
+  // has to carry the adapter: without it the stale session resumes forever with the servers it
+  // was given. A manifest that matches nothing - deleted or predating the version - forces the
+  // same replacement, with the public thread and its history intact.
+  it("replaces a Codex session whose tool manifest predates the adapter", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+    });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!firstSession) throw new Error("The Codex session did not start.");
+    await writeFile(
+      join(root, "user-data", "provider-toolsets", createHash("sha256").update(firstSession).digest("hex")),
+      "stale-manifest",
+    );
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+    expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
+  });
+
   // Save, remove and toggle all go through the same refresh, so one of them proves the mechanism.
   // Without it a loaded session keeps the tools it was given until the app restarts: the reason the
   // test above had to stop and start the service to see its new server.
