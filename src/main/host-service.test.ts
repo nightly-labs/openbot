@@ -240,6 +240,8 @@ describe("HostService account binding", () => {
         expiresAt: Date.now() + 60_000,
         usedAt: null,
         revokedAt: null,
+        permanent: false,
+        useCount: 0,
       },
     ]);
 
@@ -398,6 +400,8 @@ describe("HostService account binding", () => {
       inviteId: "invite-1",
       token: "invite-token-that-is-long-enough-for-a-link",
       expiresAt: Date.now() + 60_000,
+      permanent: false,
+      useCount: 0,
     });
     await settled;
 

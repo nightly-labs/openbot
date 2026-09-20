@@ -82,6 +82,9 @@ function decodeTeamInvite(value: unknown): TeamInviteSummary {
     expiresAt: requiredString(record, "expiresAt"),
     usedAt: nullableString(record, "usedAt"),
     email: nullableString(record, "email"),
+    // A host from before permanent links answers without these fields.
+    permanent: record.permanent === true,
+    useCount: typeof record.useCount === "number" ? record.useCount : 0,
   };
 }
 
@@ -95,7 +98,9 @@ export function decodeInviteSummary(value: unknown): InviteSummary {
   return { ...decodeTeamInvite(value), inviteUrl: requiredString(record, "inviteUrl") };
 }
 
-export function decodeInvitePreview(value: unknown): Pick<InvitePreview, "role" | "expiresAt" | "emailBound"> {
+export function decodeInvitePreview(
+  value: unknown,
+): Pick<InvitePreview, "role" | "expiresAt" | "emailBound" | "permanent"> {
   const record = decodeRecord(value, "invitation preview");
   const role = requiredString(record, "role");
   if (role !== "admin" && role !== "member") throw new Error("Invalid invitation preview response.");
@@ -103,5 +108,6 @@ export function decodeInvitePreview(value: unknown): Pick<InvitePreview, "role" 
     role,
     expiresAt: requiredString(record, "expiresAt"),
     emailBound: requiredBoolean(record, "emailBound"),
+    permanent: record.permanent === true,
   };
 }

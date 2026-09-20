@@ -123,6 +123,8 @@ export interface RemoteInviteRecord {
   expiresAt: number;
   usedAt: number | null;
   revokedAt: number | null;
+  permanent: boolean;
+  useCount: number;
 }
 
 export interface RemoteInvitePreview {
@@ -132,6 +134,7 @@ export interface RemoteInvitePreview {
   role: "admin" | "member";
   expiresAt: number;
   emailBound: boolean;
+  permanent: boolean;
   devicePublicKey: string | null;
 }
 
@@ -452,8 +455,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   createRemoteInvite(
     hostId: string,
-    input: { role: "admin" | "member"; email?: string },
-  ): Promise<{ inviteId: string; token: string; expiresAt: number }> {
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
+  ): Promise<{ inviteId: string; token: string; expiresAt: number; permanent: boolean; useCount: number }> {
     return this.#authorizedRequest(
       `/v2/remote/hosts/${encodeURIComponent(hostId)}/invites`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) },
@@ -1163,13 +1166,22 @@ function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
   });
 }
 
-function decodeCreatedRemoteInvite(value: unknown): { inviteId: string; token: string; expiresAt: number } {
+function decodeCreatedRemoteInvite(value: unknown): {
+  inviteId: string;
+  token: string;
+  expiresAt: number;
+  permanent: boolean;
+  useCount: number;
+} {
   const record = decodeRecord(value, "remote invitation");
   if (!isNumber(record.expiresAt)) throw new Error("Invalid remote invitation expiration.");
   return {
     inviteId: requiredString(record, "inviteId"),
     token: requiredString(record, "token"),
     expiresAt: record.expiresAt,
+    // A Worker from before permanent links answers without these fields.
+    permanent: record.permanent === true,
+    useCount: isNumber(record.useCount) ? record.useCount : 0,
   };
 }
 
@@ -1188,6 +1200,8 @@ function decodeRemoteInvite(value: unknown): RemoteInviteRecord {
     expiresAt: record.expiresAt,
     usedAt: record.usedAt,
     revokedAt: record.revokedAt,
+    permanent: record.permanent === true,
+    useCount: isNumber(record.useCount) ? record.useCount : 0,
   };
 }
 
@@ -1211,6 +1225,7 @@ function decodeRemoteInvitePreview(value: unknown): RemoteInvitePreview {
     role: record.role,
     expiresAt: record.expiresAt,
     emailBound: record.emailBound,
+    permanent: record.permanent === true,
     devicePublicKey: record.devicePublicKey,
   };
 }

@@ -194,6 +194,18 @@
   gap: var(--openbot-space-2);
 }
 
+/* The hidden tab panels stay mounted for the slide animation, so without this the
+   slot sizes to the widest panel and the active one inherits its width as dead space. */
+.server-settings-invite-composer .ui-sliding-tabs-content-slot {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.server-settings-invite-composer .ui-sliding-tabs-content:not([data-selected]) {
+  position: absolute;
+  inset: 0;
+}
+
 .server-settings-invite-mode-panel,
 .server-settings-invite-email-field,
 .server-settings-invite-email-field .ui-input {
@@ -203,6 +215,8 @@
 
 .server-settings-invite-email-field {
   position: relative;
+  width: 22rem;
+  max-width: 100%;
 }
 
 .server-settings-invite-email-field > .ui-label {
@@ -234,6 +248,18 @@
   height: var(--openbot-icon-sm);
   flex: 0 0 auto;
   stroke-width: var(--openbot-icon-stroke);
+}
+
+.server-settings-invite-new-link > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.server-settings-perma-hint {
+  display: block;
+  margin-top: var(--openbot-space-2);
 }
 
 .server-settings-role-select {
@@ -431,6 +457,10 @@
 
   .server-settings-invite-composer {
     grid-template-columns: minmax(0, 1fr) 118px;
+  }
+
+  .server-settings-invite-email-field {
+    max-width: none;
   }
 
   .server-settings-invite-composer > .ui-button,
