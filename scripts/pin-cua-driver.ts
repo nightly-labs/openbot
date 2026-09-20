@@ -1,7 +1,7 @@
-import { execFileSync } from "node:child_process";
 import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { extractCuaDriverArchive } from "./cua-driver-archive";
 import {
   CUA_DRIVER_LICENSE_FILE,
   CUA_DRIVER_TARGETS,
@@ -56,11 +56,7 @@ async function pinArtifact(fetchImpl: typeof fetch, target: CuaDriverTarget, ver
     const extracted = join(temporaryRoot, "extracted");
     await writeFile(archive, archiveBytes, { mode: 0o600 });
     await mkdir(extracted, { recursive: true });
-    if (descriptor.archive === "zip") {
-      execFileSync("unzip", ["-q", "-o", archive, "-d", extracted], { stdio: "inherit" });
-    } else {
-      execFileSync("tar", ["-xzf", archive, "-C", extracted, "--no-same-owner"], { stdio: "inherit" });
-    }
+    extractCuaDriverArchive(archive, extracted, descriptor.archive);
     const files: Record<string, string> = {};
     for (const file of descriptor.files) {
       const path = join(extracted, ...file.path.split("/"));

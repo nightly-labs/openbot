@@ -1,8 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
+import { extractCuaDriverArchive } from "./cua-driver-archive";
 import {
   CUA_DRIVER_LICENSE_FILE,
   CUA_DRIVER_TARGETS,
@@ -62,7 +62,7 @@ export async function installCuaDriver(
     const extracted = join(temporaryRoot, "extracted");
     await writeFile(archive, archiveBytes, { mode: 0o600 });
     await mkdir(extracted, { recursive: true });
-    extractArchive(archive, extracted, target);
+    extractCuaDriverArchive(archive, extracted, CUA_DRIVER_TARGETS[target].archive);
     await rm(staging, { recursive: true, force: true });
     await stageValidatedFiles(extracted, staging, target, lock);
     await writeFile(join(staging, CUA_DRIVER_LICENSE_FILE), licenseBytes, { mode: 0o644 });
@@ -123,14 +123,6 @@ async function stageValidatedFiles(
     await copyFile(source, destination);
     await chmod(destination, file.executable ? 0o755 : 0o644);
   }
-}
-
-function extractArchive(archive: string, destination: string, target: CuaDriverTarget): void {
-  if (CUA_DRIVER_TARGETS[target].archive === "zip") {
-    execFileSync("unzip", ["-q", "-o", archive, "-d", destination], { stdio: "inherit" });
-    return;
-  }
-  execFileSync("tar", ["-xzf", archive, "-C", destination, "--no-same-owner"], { stdio: "inherit" });
 }
 
 async function isCurrentInstallation(root: string, target: CuaDriverTarget, lock: CuaDriverLock): Promise<boolean> {
