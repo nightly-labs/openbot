@@ -40,6 +40,7 @@ import {
   SelectValue,
   SlidersHorizontal,
   Tabs,
+  Tooltip,
 } from "./ui";
 import { cx } from "./ui/utils";
 
@@ -59,26 +60,22 @@ interface ProviderModelPickerProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  /**
-   * Endpoints the user has named themselves. These are not a provider row: OpenCode serves them, so
-   * every one still reports `provider: "opencode"` over IPC and only the picker separates them out.
-   */
+  /** Endpoints the user named; served by OpenCode, separated out only by the picker. */
   customProviders?: readonly CustomProviderSummary[];
   onAddCustomProvider?: () => void;
   onChange: (model: AgentModelId, provider: AgentProviderId) => void;
 }
 
-/**
- * `PICKER_PROVIDERS` plus the one tab no contract knows about. A custom endpoint reaches OpenBot
- * through the OpenCode CLI, so widening `AgentProviderId` for it would cost a database migration and
- * a Team API decision to buy a rail icon - the split lives here instead, in the only place that
- * needs it.
- */
+/** Extra "custom" rail tab; widening the contract id would cost a migration. */
 type RailId = AgentProviderId | "custom";
 
 const CUSTOM_RAIL = "custom" as const;
 
 const PROVIDERS: readonly RailId[] = [...PICKER_PROVIDERS, CUSTOM_RAIL];
+
+/** Long enough that sweeping the rail does not flash a name per mark. */
+const RAIL_TOOLTIP_OPEN_DELAY = 150;
+
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
   const [search, setSearch] = createSignal("");
@@ -94,10 +91,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     props.provider === "opencode" && isCustomProviderModelId(props.value, customIds()) ? CUSTOM_RAIL : props.provider;
   const [railProvider, setRailProvider] = createSignal<RailId>(untrack(activeProvider));
 
-  /**
-   * The OpenCode tab and the Custom tab draw from the same wire provider, so each one subtracts the
-   * other: a custom endpoint's models appear once, under the endpoint the user named.
-   */
+  /** OpenCode and Custom tabs split one wire provider so each model appears once. */
   function railModelOptions(rail: RailId): AgentModelOption[] {
     if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
     if (rail === "opencode") {
@@ -230,38 +224,57 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 {(provider) => {
                   const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider);
                   return (
-                    <Tabs.Trigger
-                      ref={(element) => providerButtons.set(provider, element)}
-                      value={provider}
-                      class={[
-                        "provider-model-rail-button",
-                        {
-                          "provider-model-rail-button-selected": railProvider() === provider,
-                          "provider-model-rail-button-unavailable": status().state !== "available",
-                        },
-                      ]}
-                      aria-label={`${railName(provider)}: ${railSummary(provider, status())}`}
-                      title={`${railName(provider)} · ${railSummary(provider, status())}`}
-                      onClick={(event) => {
-                        const target = event.currentTarget;
-                        selectRailProvider(provider);
-                        queueMicrotask(() => target.focus({ preventScroll: true }));
-                      }}
-                      onKeyDown={(event) => {
-                        const delta =
-                          event.key === "ArrowDown" || event.key === "ArrowRight"
-                            ? 1
-                            : event.key === "ArrowUp" || event.key === "ArrowLeft"
-                              ? -1
-                              : 0;
-                        if (!delta) return;
-                        const current = PROVIDERS.indexOf(provider);
-                        const next = PROVIDERS[(current + delta + PROVIDERS.length) % PROVIDERS.length];
-                        if (next) providerButtons.get(next)?.focus();
-                      }}
+                    // The rail shows a mark alone, so hovering one names it. Focus needs no tooltip:
+                    // tabs activate on focus, and the panel heading beside them names the tab.
+                    // The name sits to the left, off the panel, and only flips right when the
+                    // window edge leaves no room there.
+                    <Tooltip.Root
+                      placement="left"
+                      gutter={8}
+                      openDelay={RAIL_TOOLTIP_OPEN_DELAY}
+                      closeDelay={0}
+                      skipDelayDuration={300}
                     >
-                      <ProviderMark provider={provider} large />
-                    </Tabs.Trigger>
+                      <Tooltip.Trigger as="div" class="provider-model-rail-tooltip-trigger">
+                        <Tabs.Trigger
+                          ref={(element) => providerButtons.set(provider, element)}
+                          value={provider}
+                          class={[
+                            "provider-model-rail-button",
+                            {
+                              "provider-model-rail-button-selected": railProvider() === provider,
+                              "provider-model-rail-button-unavailable": status().state !== "available",
+                            },
+                          ]}
+                          aria-label={`${railName(provider)}: ${railSummary(provider, status())}`}
+                          onClick={(event) => {
+                            const target = event.currentTarget;
+                            selectRailProvider(provider);
+                            queueMicrotask(() => target.focus({ preventScroll: true }));
+                          }}
+                          onKeyDown={(event) => {
+                            const delta =
+                              event.key === "ArrowDown" || event.key === "ArrowRight"
+                                ? 1
+                                : event.key === "ArrowUp" || event.key === "ArrowLeft"
+                                  ? -1
+                                  : 0;
+                            if (!delta) return;
+                            const current = PROVIDERS.indexOf(provider);
+                            const next = PROVIDERS[(current + delta + PROVIDERS.length) % PROVIDERS.length];
+                            if (next) providerButtons.get(next)?.focus();
+                          }}
+                        >
+                          <ProviderMark provider={provider} large />
+                        </Tabs.Trigger>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content class="provider-model-rail-tooltip">
+                          <strong>{railName(provider)}</strong>
+                          <small>{railSummary(provider, status())}</small>
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
                   );
                 }}
               </For>
@@ -277,8 +290,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     (model) => model.id === props.value || model.variants.some((variant) => variant.id === props.value),
                   ),
                 );
-                // Two tabs share the `opencode` wire id, so matching the provider does not say which
-                // one holds the selection - the tab whose own list contains it does.
+                // Both tabs share the `opencode` wire id; the tab whose list holds it owns it.
                 const ownsSelection = () =>
                   wireProvider(provider) === props.provider && (props.provider !== "opencode" || Boolean(selected()));
                 const effortOptions = createMemo(() => {
@@ -310,13 +322,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return value;
                 };
                 const runtimeAction = () => {
-                  if (available() || status().connectionState === "connecting") return undefined;
+                  // Downloading outranks connection states; Cancel stops this panel's download.
                   if (runtime()?.phase === "downloading") return "Cancel" as const;
+                  if (available() || status().connectionState === "connecting") return undefined;
                   if (runtime()?.phase === "ready") return "Connect" as const;
                   if (runtime()?.phase === "download-error") return "Retry" as const;
                   if (runtime()?.phase === "not-downloaded") return "Download" as const;
-                  // No runtime snapshot on this surface, but the provider still names its own way back:
-                  // a signed-out or failed provider offers Connect when a handler exists.
+                  // No runtime snapshot here; signed-out/failed providers offer Connect if handled.
                   if (status().state === "sign-in-required" || status().state === "error") {
                     return props.onConnectProvider ? ("Connect" as const) : undefined;
                   }

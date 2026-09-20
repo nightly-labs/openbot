@@ -1,21 +1,20 @@
 /**
- * The way in that leaves the app: the server's own page asks, and this side only learns that the
- * sign-in finished. The button says where the user is going, the way every other button that opens
- * a browser does.
+ * The way in that leaves the app: the server's own page asks, and this side only learns whether the
+ * connection that follows works. The button says where the user is going, the way every other button
+ * that opens a browser does.
+ *
+ * Nothing about the sign-in happens here, and nothing about it is faked here either. The connect
+ * attempt is what starts it: the listing installs as a bridge that holds an OAuth client, and that
+ * bridge opens the browser and keeps the token beside itself. So this dialog is the shell, the
+ * server's own words, and one button. The day the main process signs in for itself, the exchange
+ * goes in front of `onTest`, and the states on screen stay as they read.
  */
 
-import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { Show } from "solid-js";
 import { Button, ExternalLink } from "../../components/ui";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
 
-export interface McpSignInDialogProps extends McpConnectBaseProps {
-  /**
-   * Signs in on the server's own page and answers with the configuration that carries the grant.
-   * The exchange belongs to the main process; this side only learns that it finished.
-   */
-  onSignIn: (config: McpServerConfig) => Promise<McpServerConfig>;
-}
+export type McpSignInDialogProps = McpConnectBaseProps;
 
 export function McpSignInDialog(props: McpSignInDialogProps) {
   const { state, busy, attempt } = createConnectRun(props);
@@ -26,13 +25,13 @@ export function McpSignInDialog(props: McpSignInDialogProps) {
       state={state}
       busy={busy}
       description={`Sign in to your ${props.subject.name} account. OpenBot gets the tools that account can reach, and no password.`}
-      onSubmit={() => void attempt("signing-in", () => props.onSignIn(props.subject.config))}
+      onSubmit={() => void attempt(async () => props.subject.config)}
       action={
         <Button
           class="mcp-connect-primary"
           type="submit"
           loading={busy()}
-          loadingLabel={state.phase === "signing-in" ? "Waiting for the browser…" : "Connecting…"}
+          loadingLabel="Waiting for the browser…"
           disabled={busy()}
         >
           {state.phase === "failed" ? "Try again" : `Continue to ${props.subject.name}`}

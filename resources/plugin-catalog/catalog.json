@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "v1",
+  "plugins": [
+    {
+      "slug": "aave",
+      "version": "1.0.0",
+      "featured": true,
+      "detailSha256": "a48d147397385f04079d1fc94ecba212010e73196a84a74c01fe1e336fe8d188"
+    },
+    {
+      "slug": "canva",
+      "version": "1.0.0",
+      "featured": true,
+      "detailSha256": "1a048ae478be8b622d4a2e387ec3318ea7962884a6aadbb4b724d947fb7c1aca"
+    },
+    {
+      "slug": "github",
+      "version": "1.0.0",
+      "featured": true,
+      "detailSha256": "f33dc7018e8fcdbb9bc10051d051c06b2913d385f98e52ca01c039a337e419a0"
+    },
+    {
+      "slug": "linear",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "c976586933c1d8d1c9cd456ca947d98534995f07f0c9f221b4374f08887a67e9"
+    },
+    {
+      "slug": "notion",
+      "version": "1.0.0",
+      "featured": true,
+      "detailSha256": "ea54dabd967a4a586763aecc86915ace7bafc3a232ca8aa5d6942ceb27e2fabc"
+    },
+    {
+      "slug": "figma",
+      "version": "1.0.0",
+      "featured": true,
+      "detailSha256": "e78bbbea897d0ab840fd613089634bd36e2fb710dca6ad739c0f964c6baf88fe"
+    },
+    {
+      "slug": "sentry",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "412f984e42a88160c7b86a9b9d94e962f9f14b7e2d870807c7fc2b891dcc0a1d"
+    },
+    {
+      "slug": "context7",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "33225f2fdbeac0dfcdf94dcf080948805daf500e2cc0f722f7e0eabc653edb2a"
+    },
+    {
+      "slug": "stripe",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "8b53a691d487cbe70b46c8782903f6cfd77abf5d52dd01e0b666a41e6f593bbb"
+    },
+    {
+      "slug": "posthog",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "a4127ec0a7415dccbd2e57aa928e6ed3b6acc0913f1c02ea03bd10206333f173"
+    },
+    {
+      "slug": "airtable",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "e6a379f48703481c51f9457d670c278c33b106db5337d18658c190eeae127913"
+    },
+    {
+      "slug": "firecrawl",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "b287c44111eaf0d4e4fddfe90f766502485b6de917d9529af376b1d1cede7573"
+    },
+    {
+      "slug": "brave-search",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "91612bd0105499cf7b30377dc9f9295ac199fa482599e2d4e21abeaa8ea61d29"
+    },
+    {
+      "slug": "resend",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "06a649d220a6858a9856ff36661fe20c47219216235507778924b1c3e7c4b5ca"
+    }
+  ]
+}

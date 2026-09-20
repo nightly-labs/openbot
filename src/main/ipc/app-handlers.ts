@@ -36,7 +36,6 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "opencode-install": "https://opencode.ai/docs/",
   "opencode-auth": "https://opencode.ai/auth",
   "claude-install": "https://code.claude.com/docs",
-  "claude-sign-in": "https://code.claude.com/docs/en/authentication",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
   message: "https://x.com/norbertbodziony",
   "mac-screen-recording": COMPUTER_USE_PERMISSION_URLS["screen-recording"],

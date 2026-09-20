@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "v1",
+  "updatedAt": "2026-09-19T00:00:00.000Z",
+  "order": [
+    "aave",
+    "canva",
+    "github",
+    "linear",
+    "notion",
+    "figma",
+    "sentry",
+    "context7",
+    "stripe",
+    "posthog",
+    "airtable",
+    "firecrawl",
+    "brave-search",
+    "resend"
+  ],
+  "featured": ["aave", "canva", "github", "notion", "figma"]
+}

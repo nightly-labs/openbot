@@ -6,7 +6,7 @@ import type {
   MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import type { AgentActivityPresentation } from "./AgentActivity";
+import type { AgentActivityLabel } from "./AgentActivity";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendPluginPrompt,
@@ -33,7 +33,7 @@ function readBrowserPipBounds(): BrowserBounds | null {
 }
 
 interface ConversationResources {
-  agentActivityPresentations: Map<string, { activityId: string; presentation: AgentActivityPresentation }>;
+  agentActivityLabels: Map<string, { activityId: string; label: AgentActivityLabel }>;
   browserOpenRequests: Map<
     string,
     {
@@ -176,7 +176,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
   const [settingsPanelWidth, setSettingsPanelWidth] = createSignal(SETTINGS_PANEL_DEFAULT);
   const [browserPanelWidth, setBrowserPanelWidth] = createSignal(BROWSER_PANEL_DEFAULT);
   const resources: ConversationResources = {
-    agentActivityPresentations: new Map(),
+    agentActivityLabels: new Map(),
     browserOpenRequests: new Map(),
     importTargetAgents: new Map<string, { agentId: string; serverId: string }>(),
     seenMessageIds: new Set<string>(),

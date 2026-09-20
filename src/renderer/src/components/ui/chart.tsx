@@ -19,11 +19,7 @@ export function ChartContainer(props: {
   );
 }
 export const ChartTooltip = Tooltip;
-/**
- * `series` names each payload entry and supplies the mark that carries its identity, so a
- * multi-series card reads as a list rather than a column of bare numbers; `total` adds the
- * sum below it. Both are optional, and without them one series still renders as one value.
- */
+/** `series` names each payload entry; `total` adds the sum below. Both optional. */
 export function ChartTooltipContent(
   props: Partial<TooltipContentProps> & {
     formatValue: (value: number) => string;

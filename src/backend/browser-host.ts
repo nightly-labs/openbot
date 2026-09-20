@@ -91,6 +91,17 @@ const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
  */
 const OPERATION_UNWIND_GRACE_MS = 1_000;
 /**
+ * How long past its deadline an operation gets before the backstop timer answers for it.
+ *
+ * An operation carries the same deadline and reports what it managed to do with it: typing states
+ * how many characters reached the page, so a caller knows what not to send twice. A backstop that
+ * expires at the same millisecond as that check is a race, and the generic message wins it often
+ * enough that the caller loses the count. The backstop is there for an operation that does not
+ * unwind itself at all, so it starts after the operation's own last chance to answer, and the wait
+ * it adds is short beside the ten seconds an action gets by default.
+ */
+const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+/**
  * How long enumerating a tab's documents may take before it is unwound. It runs off a navigation
  * rather than a tool call, so no caller is waiting on it and nothing else supplies a deadline -- but
  * it is queued on the tab, so whatever the agent does next waits behind it.
@@ -856,7 +867,17 @@ export class BrowserHost {
         case "close_tab": {
           const { args } = call;
           const tabId = args.tabId;
-          if (this.#tabs.has(tabId)) this.#requireToolTab(params, tabId);
+          // Checked only for a tab that exists, so closing an id that is already gone stays a silent
+          // success and a repeated close is idempotent.
+          const tab = this.#tabs.get(tabId);
+          if (tab) {
+            this.#requireToolTab(params, tabId);
+            logger.info("Agent closed a browser tab.", {
+              tabId,
+              host: logUrlHost(tab.requestedUrl),
+              agentId: params.ownerAgentId ?? null,
+            });
+          }
           await this.close(tabId);
           return textResult({ closed: true });
         }
@@ -1365,7 +1386,7 @@ export class BrowserHost {
       onOperationStarted?.(operationCompletion);
       const boundedOperation = withTimeout(
         operationCompletion,
-        Math.max(0, deadline - Date.now()),
+        Math.max(0, deadline - Date.now()) + OPERATION_DEADLINE_BACKSTOP_MS,
         timeoutMessage,
       ).catch(async (error) => {
         if (!isTimeoutError(error)) throw error;
@@ -1614,6 +1635,12 @@ export class BrowserHost {
   #requireToolTab(params: DynamicToolCallParams, tabId: string): void {
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
     if (!tab || !this.#canUseToolTab(params, tab)) throw new Error(`Unknown browser tab: ${tabId}`);
+    // The user holds this tab. `AgentService` already refuses an agent's browser tools while its own
+    // takeover is outstanding, but that check is agent-wide and only covers callers that go through
+    // the agent service; this one is per tab and holds for every caller of a tabId-bearing tool.
+    // A distinct message matters: telling the model the tab vanished, while the user is part-way
+    // through a login on it, invites an `open` and a second tab onto the same flow.
+    if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
   }
 
   #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
@@ -1921,6 +1948,20 @@ function isAllowedMainUrl(value: string): boolean {
  */
 function isAllowedBrowserPermission(permission: string): boolean {
   return permission === "clipboard-sanitized-write";
+}
+
+/**
+ * The host of a tab's URL, for a log line. `diagnosticUrl` below keeps the path, which is right for a
+ * diagnostic the user reads back in the app but wrong for a log: a path carries tokens often enough
+ * (`/reset/<secret>`, `/invite/<secret>`) that writing one to disk breaks the redaction rule. The host
+ * is enough to tell which tab an agent closed.
+ */
+function logUrlHost(value: string): string | undefined {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return undefined;
+  }
 }
 
 function diagnosticUrl(value: string): string | undefined {

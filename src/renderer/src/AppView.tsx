@@ -43,7 +43,6 @@ export function AppAccessGate() {
     refreshingProviders,
     connectProvider,
     openProviderInstallGuide,
-    openProviderSignInGuide,
     refreshAgentProviders,
   } = useProviders();
   // Onboarding is ungated: it only ever runs against this computer, so there is no remote server to
@@ -94,7 +93,7 @@ export function AppAccessGate() {
                       }
                       onConnectProvider={connectProvider}
                       onInstallProvider={openProviderInstallGuide}
-                      onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : openProviderSignInGuide}
+                      onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : connectProvider}
                       onRefreshProviders={providerRuntimeDownloadsAvailable() ? undefined : refreshAgentProviders}
                       onSave={setup.saveSetup}
                       customProviders={customProviders()}

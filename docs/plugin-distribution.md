@@ -99,13 +99,20 @@ The detail gives the shape of the MCP server. It never gives a secret value.
       "server": {
         "transport": "http",
         "url": "https://mcp.linear.app/mcp",
-        "credentials": [
+        "auth": [
           {
-            "key": "Authorization",
-            "target": "header",
-            "label": "Linear API key",
-            "helpUrl": "https://linear.app/settings/api",
-            "valuePrefix": "Bearer "
+            "id": "api-key",
+            "kind": "key",
+            "label": "API key",
+            "docsUrl": "https://linear.app/settings/api",
+            "fields": [
+              {
+                "id": "token",
+                "label": "Linear API key",
+                "header": "Authorization",
+                "prefix": "Bearer "
+              }
+            ]
           }
         ]
       }
@@ -122,8 +129,10 @@ The detail gives the shape of the MCP server. It never gives a secret value.
 }
 ```
 
-`credentials` tells the user what to supply and where the value goes. The user types the value in
-the existing MCP server form. A secret is never in a public file, in a log, or in an export.
+`auth` lists the ways into the server, as the shipped `McpConnectFlow[]` in
+`packages/contracts/src/ipc-plugin-catalog.ts` declares them: a `"link"` flow signs in through the
+browser, a `"key"` flow names each field and where its value goes. The user types the value in the
+existing MCP server form. A secret is never in a public file, in a log, or in an export.
 
 The skills are pins into the skills marketplace. They are `marketplace_skills` identifiers and
 version identifiers. Thus the install reuses `installVersion` in
@@ -420,13 +429,17 @@ Ordered by cost.
 
 1. ~~Correct the fixture host to `openbot.run`, and build the share URL from the slug.~~ Done:
    `createPluginShareUrl` in `src/renderer/src/features/settings/marketplace-plugins.ts`.
-2. `marketplace/plugin-catalog/` and `scripts/build-plugin-catalog.ts`, with fixtures and `--check`.
+2. ~~`marketplace/plugin-catalog/` and `scripts/build-plugin-catalog.ts`, with fixtures and `--check`.~~ Done:
+   the source holds 14 listings (no-auth, header key, stdio env key, and OAuth
+   over the `mcp-remote` bridge), and the build writes the renderer literal,
+   the Worker module, and the offline snapshot, with `--check` for CI.
 3. The Worker routes: the JSON first, then the page and the sitemap entries.
 4. The contract types, the channels, the decoders, the preload and the mock.
 5. `src/main/plugin-catalog-service.ts`: the request, the cache and the snapshot.
 6. ~~Connect the Plugins tab to the real data. Keep the fixtures for Storybook.~~ Partly done: the
-   tab reads `src/renderer/src/features/settings/marketplace-plugin-catalog.ts`, a literal in the
-   renderer with one listing. Steps 2 to 5 replace that literal; nothing the tab renders changes.
+   tab reads the generated `src/renderer/src/features/settings/marketplace-plugin-catalog.ts`,
+   built from `marketplace/plugin-catalog/`. Steps 3 to 5 replace that generated
+   file with the served catalog; nothing the tab renders changes.
 7. Install and uninstall. Install is done: the page installs each pinned skill into the agent in the
    picker, then saves the listing's MCP server through `saveMcpServer` on the selected host. It
    reads the installed state back from `listMcpServers` and from the agent's installed skills, so a
@@ -435,5 +448,8 @@ Ordered by cost.
    `installVersion`. A failure unwinds the skills this attempt installed, and writes no MCP record.
    Uninstall is not built: the user removes the server in the MCP settings panel and the skill in
    the agent's skills panel.
-8. The deep-link router and the share link. Nothing serves `openbot.run/plugins/<slug>` yet, so the
-   page withholds `Copy link`: the button returns when the address answers.
+8. ~~The deep-link router and the share link.~~ Done. `src/main/deep-link-router.ts` decides which
+   kind an `openbot://` link is, `openbot://plugins/<slug>` opens that listing in the Plugins tab
+   and installs nothing, and `openbot.run/plugins/<slug>` now answers, so the detail page offers
+   `Copy link` again. The public pages read the same catalog the tab reads, from
+   `packages/contracts/src/plugin-catalog.ts`.

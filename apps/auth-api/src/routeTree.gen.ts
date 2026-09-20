@@ -27,7 +27,10 @@ import { Route as HealthReadyRouteImport } from './routes/health/ready'
 import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
 import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
+import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
+import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as V1MeRouteImport } from './routes/v1/me'
+import { Route as PluginsIconSlugRouteImport } from './routes/plugins/icon/$slug'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
@@ -175,9 +178,24 @@ const NewsRssDotxmlRoute = NewsRssDotxmlRouteImport.update({
   path: '/news/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PluginsIndexRoute = PluginsIndexRouteImport.update({
+  id: '/plugins/',
+  path: '/plugins/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PluginsSlugRoute = PluginsSlugRouteImport.update({
+  id: '/plugins/$slug',
+  path: '/plugins/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1MeRoute = V1MeRouteImport.update({
   id: '/v1/me',
   path: '/v1/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PluginsIconSlugRoute = PluginsIconSlugRouteImport.update({
+  id: '/plugins/icon/$slug',
+  path: '/plugins/icon/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1AuthLogoutRoute = V1AuthLogoutRouteImport.update({
@@ -494,9 +512,12 @@ export interface FileRoutesByFullPath {
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/plugins/$slug': typeof PluginsSlugRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
+  '/plugins/': typeof PluginsIndexRoute
+  '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -570,9 +591,12 @@ export interface FileRoutesByTo {
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/plugins/$slug': typeof PluginsSlugRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/guides': typeof GuidesIndexRoute
   '/news': typeof NewsIndexRoute
+  '/plugins': typeof PluginsIndexRoute
+  '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -647,9 +671,12 @@ export interface FileRoutesById {
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
+  '/plugins/$slug': typeof PluginsSlugRoute
   '/v1/me': typeof V1MeRouteWithChildren
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
+  '/plugins/': typeof PluginsIndexRoute
+  '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -725,9 +752,12 @@ export interface FileRouteTypes {
     | '/health/ready'
     | '/news/$slug'
     | '/news/rss.xml'
+    | '/plugins/$slug'
     | '/v1/me'
     | '/guides/'
     | '/news/'
+    | '/plugins/'
+    | '/plugins/icon/$slug'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -801,9 +831,12 @@ export interface FileRouteTypes {
     | '/health/ready'
     | '/news/$slug'
     | '/news/rss.xml'
+    | '/plugins/$slug'
     | '/v1/me'
     | '/guides'
     | '/news'
+    | '/plugins'
+    | '/plugins/icon/$slug'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -877,9 +910,12 @@ export interface FileRouteTypes {
     | '/health/ready'
     | '/news/$slug'
     | '/news/rss.xml'
+    | '/plugins/$slug'
     | '/v1/me'
     | '/guides/'
     | '/news/'
+    | '/plugins/'
+    | '/plugins/icon/$slug'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -954,9 +990,12 @@ export interface RootRouteChildren {
   HealthReadyRoute: typeof HealthReadyRoute
   NewsSlugRoute: typeof NewsSlugRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
+  PluginsSlugRoute: typeof PluginsSlugRoute
   V1MeRoute: typeof V1MeRouteWithChildren
   GuidesIndexRoute: typeof GuidesIndexRoute
   NewsIndexRoute: typeof NewsIndexRoute
+  PluginsIndexRoute: typeof PluginsIndexRoute
+  PluginsIconSlugRoute: typeof PluginsIconSlugRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1MobileAuthDevicesRoute: typeof V1MobileAuthDevicesRouteWithChildren
@@ -1130,11 +1169,32 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof NewsRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/plugins/': {
+      id: '/plugins/'
+      path: '/plugins'
+      fullPath: '/plugins/'
+      preLoaderRoute: typeof PluginsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plugins/$slug': {
+      id: '/plugins/$slug'
+      path: '/plugins/$slug'
+      fullPath: '/plugins/$slug'
+      preLoaderRoute: typeof PluginsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/me': {
       id: '/v1/me'
       path: '/v1/me'
       fullPath: '/v1/me'
       preLoaderRoute: typeof V1MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plugins/icon/$slug': {
+      id: '/plugins/icon/$slug'
+      path: '/plugins/icon/$slug'
+      fullPath: '/plugins/icon/$slug'
+      preLoaderRoute: typeof PluginsIconSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/auth/logout': {
@@ -1648,9 +1708,12 @@ const rootRouteChildren: RootRouteChildren = {
   HealthReadyRoute: HealthReadyRoute,
   NewsSlugRoute: NewsSlugRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
+  PluginsSlugRoute: PluginsSlugRoute,
   V1MeRoute: V1MeRouteWithChildren,
   GuidesIndexRoute: GuidesIndexRoute,
   NewsIndexRoute: NewsIndexRoute,
+  PluginsIndexRoute: PluginsIndexRoute,
+  PluginsIconSlugRoute: PluginsIconSlugRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1MobileAuthDevicesRoute: V1MobileAuthDevicesRouteWithChildren,

@@ -55,6 +55,18 @@ describe("settings general store", () => {
     expect(option.runtimeStatus?.version).toBe("1.18.27");
   });
 
+  // The user's own CLI keeps answering while OpenBot installs the managed one over it, so the
+  // agent reports the provider as available for the whole update. The row still has to report it.
+  it("reports the update a user's own CLI is downloading rather than reading it as ready", () => {
+    const option = opencodeOption(
+      statusWith({ id: "opencode", state: "available", version: "1.18.27", message: null, cliSource: "system" }),
+      { phase: "downloading", progress: 40, message: null, version: null },
+    );
+
+    expect(option.runtimeStatus?.phase).toBe("downloading");
+    expect(option.runtimeStatus?.progress).toBe(40);
+  });
+
   it("keeps offering the download while no CLI answers at all", () => {
     const option = opencodeOption(
       statusWith({ id: "opencode", state: "not-installed", version: null, message: null }),

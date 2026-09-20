@@ -6,12 +6,7 @@ import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner>;
 
-/**
- * How long a notification stays before the Toaster dismisses it.
- *
- * Exported so that a caller which has to run its own timer - one holding a single toast open across
- * a long operation, which sonner cannot re-arm - settles on the same count as everything else.
- */
+/** Toast lifetime; exported so manual timers settle on the same count. */
 export const TOAST_DURATION = 6_000;
 
 const [hasVisibleToasts, setHasVisibleToasts] = createSignal(false);

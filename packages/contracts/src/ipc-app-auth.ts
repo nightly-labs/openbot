@@ -182,7 +182,6 @@ export type ExternalDestination =
   | "opencode-auth"
   | "agent-setup"
   | "claude-install"
-  | "claude-sign-in"
   | "feedback"
   | "message"
   // Not a page: the macOS pane that grants OpenBot screen recording. It is here rather than behind

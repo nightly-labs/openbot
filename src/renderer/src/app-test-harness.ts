@@ -6,6 +6,7 @@ import type {
   AttachmentImportEvent,
   BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
+  BrowserTab,
   CentralAuthState,
   ConversationPage,
   DirectMessageRealtimeEvent,
@@ -99,6 +100,7 @@ export let emitPresence: ((snapshot: TeamPresenceSnapshot) => void) | undefined;
 export let emitDirectMessage: ((event: DirectMessageRealtimeEvent) => void) | undefined;
 export let emitDirectTyping: ((event: DirectTypingRealtimeEvent) => void) | undefined;
 export let emitInvite: ((inviteUrl: string) => void) | undefined;
+export let emitOpenPluginListing: ((slug: string) => void) | undefined;
 export let emitDynamicIslandAction: ((action: DynamicIslandAction) => void) | undefined;
 
 type BridgeListener<Event> = (event: Event) => void;
@@ -187,6 +189,9 @@ const directTypingBridge = createEventBridge<DirectTypingRealtimeEvent>((emit) =
 const inviteBridge = createEventBridge<string>((emit) => {
   emitInvite = emit;
 });
+const pluginListingBridge = createEventBridge<string>((emit) => {
+  emitOpenPluginListing = emit;
+});
 const dynamicIslandActionBridge = createEventBridge<DynamicIslandAction>((emit) => {
   emitDynamicIslandAction = emit;
 });
@@ -204,6 +209,7 @@ const eventBridges = {
   directMessage: directMessageBridge,
   directTyping: directTypingBridge,
   invite: inviteBridge,
+  pluginListing: pluginListingBridge,
   dynamicIslandAction: dynamicIslandActionBridge,
 } as const;
 
@@ -228,6 +234,7 @@ export function subscriberCounts(): BridgeSubscriberCounts {
     directMessage: directMessageBridge.count(),
     directTyping: directTypingBridge.count(),
     invite: inviteBridge.count(),
+    pluginListing: pluginListingBridge.count(),
     dynamicIslandAction: dynamicIslandActionBridge.count(),
   };
 }
@@ -914,6 +921,10 @@ export function installOpenbotStub(): void {
         onEvent: vi.fn(serversBridge.subscribe),
         onInvite: vi.fn(inviteBridge.subscribe),
       },
+      plugins: {
+        takePendingListing: vi.fn().mockResolvedValue(null),
+        onOpenListing: vi.fn(pluginListingBridge.subscribe),
+      },
       host: {
         getStatus: vi.fn().mockResolvedValue({
           phase: "unconfigured",
@@ -976,6 +987,45 @@ export function presenceMember(id: string, email: string, name: string): TeamPre
     online: true,
     typingAgentId: null,
   };
+}
+
+export function browserTab(id: string, title: string, overrides: Partial<BrowserTab> = {}): BrowserTab {
+  return {
+    id,
+    title,
+    url: "https://example.com",
+    loading: false,
+    ownerAgentId: "chief",
+    ownerThreadId: "thread-chief",
+    ...overrides,
+  };
+}
+
+export function agentReply(id: string, text: string, createdAt: string): ConversationPage["messages"][number] {
+  return { id, author: "assistant", text, createdAt, status: "completed" };
+}
+
+/**
+ * A conversation page whose last message is unread, which is what the read-state tests all start from.
+ *
+ * `firstUnreadMessageId` follows the last message rather than taking a value of its own, because a
+ * page carrying an unread count and an unrelated first-unread id is a state the host never sends,
+ * and a test that builds one asserts against a screen the user cannot reach.
+ */
+export function unreadConversationPage(
+  agentId: string,
+  messages: ConversationPage["messages"],
+  overrides: Partial<ConversationPage> = {},
+): ConversationPage {
+  return testConversationPage(agentId, messages, {
+    revision: 2,
+    readState: {
+      unreadCount: 1,
+      firstUnreadMessageId: messages.at(-1)?.id ?? null,
+      throughMessageId: null,
+    },
+    ...overrides,
+  });
 }
 
 export function attachment(id: string, name: string, kind: "image" | "pdf") {
