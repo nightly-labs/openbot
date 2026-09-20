@@ -58,6 +58,15 @@ export async function verifyNoWriteAcl(path: string): Promise<void> {
 }
 
 export async function verifyHostPath(path: string): Promise<void> {
+  if (resolve(path) === "/Applications") return verifySharedAppParent();
+  if (resolve(path) === STAGING) {
+    await verifySharedAppParent();
+    const info = await lstat(path);
+    if (!info.isDirectory() || info.uid !== 0 || (info.mode & 0o022) !== 0)
+      throw new Error("Unsafe application staging directory.");
+    await verifyNoWriteAcl(path);
+    return;
+  }
   await verifyHostDirectory(path);
   for (let part = resolve(path); ; part = dirname(part)) {
     await verifyNoWriteAcl(part);

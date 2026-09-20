@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { chmod, link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HostManager, type HostManagerOperations } from "../src/main/host-manager";
 import { hostStateSchema, readOwnedJson, writeProtocolJson } from "../src/main/host-update-files";
@@ -9,6 +10,55 @@ import { isNewerRelease, verifyBundleTree } from "./host-manager-macos";
 
 const directories: string[] = [];
 const uid = process.getuid?.() ?? 501;
+
+describe.skipIf(process.platform === "win32")("application staging permissions", () => {
+  it("stages under the administrator-writable Applications parent but rejects unsafe staging paths", async () => {
+    const stage = "/Applications/.openbot-host-stage";
+    const metadata = { uid: 0, mode: 0o40700, directory: true, acl: "" };
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("node:fs/promises")>()),
+      mkdir: vi.fn(async () => undefined),
+      chmod: vi.fn(async () => undefined),
+      lstat: async (path: string) =>
+        Object.assign(await lstat(process.cwd()), {
+          uid: path === stage ? metadata.uid : 0,
+          gid: path === "/Applications" ? 80 : 0,
+          mode: path === stage ? metadata.mode : path === "/Applications" ? 0o40775 : 0o40755,
+          isDirectory: () => path !== stage || metadata.directory,
+        }),
+    }));
+    vi.doMock("node:child_process", () => ({
+      execFile: Object.assign(vi.fn(), {
+        [promisify.custom]: async (_file: string, args: string[]) => ({
+          stdout: args.at(-1) === stage ? metadata.acl : "",
+          stderr: "",
+        }),
+      }),
+    }));
+    try {
+      const { ensureHostDirectory, verifyHostPath } = await import("./host-manager-macos");
+      await ensureHostDirectory(stage, 0o700);
+      await verifyHostPath(stage);
+      metadata.mode = 0o40777;
+      await expect(verifyHostPath(stage)).rejects.toThrow("Unsafe");
+      metadata.mode = 0o40700;
+      metadata.uid = 501;
+      await expect(verifyHostPath(stage)).rejects.toThrow("Unsafe");
+      metadata.uid = 0;
+      metadata.directory = false;
+      await expect(verifyHostPath(stage)).rejects.toThrow("Unsafe");
+      metadata.directory = true;
+      metadata.acl = " 0: user:client-acme allow add_file";
+      await expect(verifyHostPath(stage)).rejects.toThrow("ACL");
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.doUnmock("node:child_process");
+      vi.resetModules();
+    }
+  });
+});
+
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
