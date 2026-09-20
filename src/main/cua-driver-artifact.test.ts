@@ -1,8 +1,14 @@
 import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
 import { beforeEach, describe, expect, it } from "vitest";
-import { type CuaDriverArtifactInput, isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
+import {
+  type CuaDriverArtifactInput,
+  isSupportedCuaDriverTarget,
+  resolveCuaCursorTheme,
+  resolveCuaDriver,
+} from "./cua-driver-artifact";
 
 let root: string;
 
@@ -142,5 +148,38 @@ describe("resolveCuaDriver", () => {
     expect(isSupportedCuaDriverTarget("linux", "arm64")).toBe(true);
     expect(isSupportedCuaDriverTarget("linux", "ppc64")).toBe(false);
     expect(isSupportedCuaDriverTarget("freebsd", "x64")).toBe(false);
+  });
+});
+
+describe("resolveCuaCursorTheme", () => {
+  async function writeTheme(...segments: string[]): Promise<void> {
+    const path = join(root, ...segments, `${OPENBOT_CURSOR_THEME_ID}.cua-theme`);
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(path, "theme");
+  }
+
+  it("returns null when the build ships no cursor, because the driver then draws its own", async () => {
+    await expect(resolveCuaCursorTheme(input())).resolves.toBeNull();
+  });
+
+  it("finds the checkout theme a packaging run writes", async () => {
+    await writeTheme("source", "build", "cua-driver-theme");
+
+    await expect(resolveCuaCursorTheme(input())).resolves.toBe(join(root, "source", "build", "cua-driver-theme"));
+  });
+
+  it("finds the packaged theme, which is the one a user runs", async () => {
+    await writeTheme("resources", "cua-driver-theme");
+
+    await expect(resolveCuaCursorTheme(input({ isPackaged: true }))).resolves.toBe(
+      join(root, "resources", "cua-driver-theme"),
+    );
+  });
+
+  it("returns null when the directory holds no theme named after the id the daemon is given", async () => {
+    await mkdir(join(root, "source", "build", "cua-driver-theme"), { recursive: true });
+    await writeFile(join(root, "source", "build", "cua-driver-theme", "other.cua-theme"), "theme");
+
+    await expect(resolveCuaCursorTheme(input())).resolves.toBeNull();
   });
 });

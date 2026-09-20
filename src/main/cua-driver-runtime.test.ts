@@ -98,6 +98,30 @@ describe("CuaDriverRuntime", () => {
     expect(spawned[0].options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
   });
 
+  it("gives the daemon the OpenBot cursor, so a user sees which pointer an agent moves", async () => {
+    const { driver, spawned } = await runtime({
+      cursorTheme: {
+        directory: "/Applications/OpenBot.app/Contents/Resources/cua-driver-theme",
+        id: "run.openbot.cursor",
+      },
+    });
+    await driver.start();
+
+    expect(spawned[0].args).toContain("--cursor-theme");
+    expect(spawned[0].args.at(-1)).toBe("run.openbot.cursor");
+    expect(spawned[0].options.env.CUA_DRIVER_CURSOR_THEME_DIR).toBe(
+      "/Applications/OpenBot.app/Contents/Resources/cua-driver-theme",
+    );
+  });
+
+  it("names no cursor when the build ships none, so the driver keeps its own", async () => {
+    const { driver, spawned } = await runtime({ cursorTheme: null });
+    await driver.start();
+
+    expect(spawned[0].args).not.toContain("--cursor-theme");
+    expect(spawned[0].options.env.CUA_DRIVER_CURSOR_THEME_DIR).toBeUndefined();
+  });
+
   it("makes neither call the driver makes to its own vendor, because OpenBot ships the driver and pins it", async () => {
     // Set in the inherited environment, which the daemon spawn copies first. OpenBot ships the
     // driver, so the analytics and the release check stay off whatever a process it inherits from

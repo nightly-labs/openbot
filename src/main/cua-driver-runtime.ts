@@ -59,6 +59,7 @@ const PERMISSION_TIMEOUT_MS = 10_000;
  */
 const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
+const CURSOR_THEME_DIRECTORY_ENV = "CUA_DRIVER_CURSOR_THEME_DIR";
 const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
 
 /**
@@ -251,6 +252,13 @@ export interface CuaDriverRuntimeOptions {
   supported: boolean;
   /** Advisory only. The driver logs it; it is not a trust signal, so nothing may treat it as one. */
   hostBundleId: string;
+  /**
+   * The OpenBot cursor the driver draws while an agent acts, or `null` to leave the driver's own.
+   *
+   * The directory is where the theme file is, and the id names the theme inside it. Both reach the
+   * daemon, which owns the overlay: the `mcp` proxies are clients and configure nothing.
+   */
+  cursorTheme?: { directory: string; id: string } | null;
   platform: NodeJS.Platform;
   spawnProcess?: SpawnDriverProcess;
   onDiagnostic?: (message: string) => void;
@@ -487,13 +495,18 @@ export class CuaDriverRuntime {
       await this.#removeSocket();
     }
     this.#command = await this.#linkCommandAlias(executable);
-    const child = this.#spawn(executable, ["serve", "--socket", socketPath], {
+    // The theme is named only together with the directory it is in. A daemon that cannot find the
+    // id falls back to its own cursor without a word, so passing the flag on its own would claim a
+    // cursor OpenBot does not ship and say nothing when the claim is wrong.
+    const cursorTheme = this.#options.cursorTheme ?? null;
+    const child = this.#spawn(executable, ["serve", "--socket", socketPath, ...cursorThemeArguments(cursorTheme)], {
       cwd: dirname(executable),
       env: {
         ...process.env,
         [EMBEDDED_ENV]: "1",
         ...CUA_DRIVER_VENDOR_CALLS_OFF,
         [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
+        ...(cursorTheme ? { [CURSOR_THEME_DIRECTORY_ENV]: cursorTheme.directory } : {}),
         ...waylandEnvironment(this.#options.platform),
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -651,6 +664,11 @@ function describe(error: unknown): string {
  * A value the user set already is left alone, so the fallback stays reachable when a compositor
  * handles the native backend badly.
  */
+/** The `serve` flag that selects the OpenBot cursor, or nothing when the build ships no theme. */
+function cursorThemeArguments(theme: { directory: string; id: string } | null): readonly string[] {
+  return theme ? ["--cursor-theme", theme.id] : [];
+}
+
 function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
   if (platform !== "linux" || process.env[WAYLAND_ENV] !== undefined) return {};
   return process.env.XDG_SESSION_TYPE === "wayland" ? { [WAYLAND_ENV]: "1" } : {};

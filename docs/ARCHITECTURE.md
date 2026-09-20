@@ -202,6 +202,17 @@ re-signing under OpenBot's inherited entitlements would drop the Automation enti
 needs. `resolveCuaDriver` still finds a hand-installed driver after the packaged one, so a developer
 can point `OPENBOT_CUA_DRIVER_PATH` at another build.
 
+The driver draws an agent cursor over the desktop while it acts, and OpenBot gives it the OpenBot
+one: `serve` is started with `--cursor-theme run.openbot.cursor` and `CUA_DRIVER_CURSOR_THEME_DIR`
+pointed at OpenBot's own directory, which is where the compiled theme is shipped. Any
+`<id>.cua-theme` in that directory is available by its id, so nothing is installed and nothing is
+written at runtime. The daemon owns the overlay; the proxies are clients and configure none of it,
+so a per-agent cursor would depend on the model calling `set_agent_cursor_theme` itself, and one
+cursor that always means "an agent is acting" is what a user can trust. The art is JSON in
+`packages/brand/src/cursor-theme.ts`, and `scripts/build-cursor-theme.ts` compiles it at packaging
+time with `cua-cursor-theme`, which ships inside the pinned driver tree. A build without the
+artifact passes no flag, and the driver draws its own cursor.
+
 Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 `CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something
 a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot

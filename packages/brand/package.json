@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./bloub-avatar": "./src/bloub-avatar.ts",
+    "./cursor-theme": "./src/cursor-theme.ts",
     "./bloub-avatar-motion": "./src/bloub-avatar-motion.ts",
     "./logo.css": "./src/logo.css",
     "./tokens.css": "./src/tokens.css",

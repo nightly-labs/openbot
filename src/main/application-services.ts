@@ -29,6 +29,7 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
 import type {
   AgentStatus,
   AppVariant,
@@ -56,7 +57,7 @@ import { readAnalyticsPreference } from "./analytics-preference-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
-import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
+import { isSupportedCuaDriverTarget, resolveCuaCursorTheme, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
 import {
@@ -469,6 +470,11 @@ export async function createApplicationServices({
       localAppDataDirectory: process.env.LOCALAPPDATA,
       applicationsDirectory: "/Applications",
     });
+  const cuaCursorThemeDirectory = await resolveCuaCursorTheme({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    sourceRoot: resolve(__dirname, "../.."),
+  });
   const cuaDriver = new CuaDriverRuntime({
     executable: await resolveCuaDriverExecutable(),
     resolveExecutable: resolveCuaDriverExecutable,
@@ -488,6 +494,7 @@ export async function createApplicationServices({
     }),
     supported: isSupportedCuaDriverTarget(process.platform, process.arch),
     hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
+    cursorTheme: cuaCursorThemeDirectory ? { directory: cuaCursorThemeDirectory, id: OPENBOT_CURSOR_THEME_ID } : null,
     platform: process.platform,
     onDiagnostic: (message) => {
       void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);

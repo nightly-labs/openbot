@@ -76,6 +76,8 @@ mac:
       to: remote-desktop-runtime
     - from: build/cua-driver/darwin/arm64
       to: cua-driver/darwin/arm64
+    - from: build/cua-driver-theme
+      to: cua-driver-theme
   # The Computer Use driver arrives signed by Cua AI with the hardened runtime, a secure timestamp
   # and `com.apple.security.automation.apple-events`. Re-signing it with OpenBot's inherited
   # entitlements would drop that entitlement and break the driver's Automation route, so its own
@@ -110,6 +112,8 @@ win:
       to: remote-desktop-runtime
     - from: build/cua-driver/win32/x64
       to: cua-driver/win32/x64
+    - from: build/cua-driver-theme
+      to: cua-driver-theme
   target:
     - target: nsis
       arch:
@@ -123,6 +127,8 @@ linux:
       to: linux/openbot.apparmor
     - from: build/cua-driver/linux/x64
       to: cua-driver/linux/x64
+    - from: build/cua-driver-theme
+      to: cua-driver-theme
   # Electron takes its Linux app id from `desktopName` in package.json, and the window manager
   # matches a running window to the launcher through `StartupWMClass`. Syncing the two from one
   # value is what makes the taskbar icon group with the window it belongs to.
