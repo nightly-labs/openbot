@@ -598,6 +598,13 @@ export async function createApplicationServices({
     channels: service.channels,
     // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
     mcpServers: service,
+    // The host's Team API routes share the IPC handlers' runtime preparation: a first server
+    // saved, enabled, or tested remotely must start and await the managed download like a local one.
+    mcpToolRuntimePreparation: {
+      startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
+      ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
+      toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+    },
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),

@@ -41,6 +41,31 @@ export interface McpRemoteServers {
   request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
 }
 
+/**
+ * The managed tool runtimes as the MCP writers reach them. The IPC handlers and the host's Team
+ * API routes share this shape: the routes call `AgentService` directly and would otherwise bypass
+ * every preparation below, leaving a host with no Node unable to save or test its first server.
+ */
+export interface McpToolRuntimePreparation {
+  startToolRuntimes: () => void;
+  ensureToolRuntimesReady: () => Promise<void>;
+  toolRuntimes: () => McpToolRuntimes;
+}
+
+/**
+ * What a connection test waits for: nothing for http and installed commands, the bounded
+ * download for a command nothing names. Shared by the local Test button and the host route that
+ * answers a remote Test.
+ */
+export async function prepareToolRuntimeForTest(
+  config: McpServerConfig,
+  preparation: McpToolRuntimePreparation,
+): Promise<void> {
+  if (await needsManagedRuntime(config, preparation.toolRuntimes())) {
+    await awaitToolRuntimes(preparation.ensureToolRuntimesReady);
+  }
+}
+
 interface McpServerIpcDependencies {
   service: McpServerService;
   remoteServers: McpRemoteServers;
@@ -146,11 +171,11 @@ export function mcpServerIpcHandlers({
           // remote branch below carries no such flag; the route it reaches spends the host's stored
           // credentials instead, and still opens nothing.
           local: async () => {
-            // Only a command nothing on this machine names waits for the download: an installed
-            // interpreter or the user's own `npx` probes at once, and even the wait is bounded.
-            if (await needsManagedRuntime(parsed.config, toolRuntimes())) {
-              await awaitToolRuntimes(ensureToolRuntimesReady);
-            }
+            await prepareToolRuntimeForTest(parsed.config, {
+              startToolRuntimes,
+              ensureToolRuntimesReady,
+              toolRuntimes,
+            });
             return service.testMcpServer(parsed, { interactive: true });
           },
           remote: (serverId) => {

@@ -6,6 +6,7 @@ import {
   parseSetMcpServerEnabled,
   parseTestMcpServer,
 } from "../ipc/mcp-inputs";
+import { type McpToolRuntimePreparation, prepareToolRuntimeForTest } from "../ipc/mcp-server-handlers";
 import type { TeamApiMcpServers } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -25,6 +26,7 @@ import { readJson, requireAdmin } from "./request-helpers";
 export async function routeMcpServers(
   context: TeamApiRequestContext,
   mcpServers: TeamApiMcpServers | undefined,
+  toolRuntimes?: McpToolRuntimePreparation,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   const list = method === "GET" && url.pathname === MCP_ROUTES.list;
@@ -40,10 +42,21 @@ export async function routeMcpServers(
   // `readJson` has already run the body through the MCP wire codec, so every field below is decoded
   // and bounded before the IPC parsers see it.
   const body = mcpRequest(url.pathname, await readJson(request));
-  if (save) return json(200, mcpServers.saveMcpServer(parseSaveMcpServer(body)));
+  if (save) {
+    // The local save starts the runtime download; the host route shares it, or a first server
+    // added remotely never gets the runtime its test and its spawn need.
+    toolRuntimes?.startToolRuntimes();
+    return json(200, mcpServers.saveMcpServer(parseSaveMcpServer(body)));
+  }
   if (remove) return json(200, mcpServers.removeMcpServer(parseRemoveMcpServer(body)));
-  // The administrator tests the host's servers, so the host's stored sign-ins are spent - but no
-  // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back.
-  if (test) return json(200, await mcpServers.testMcpServer(parseTestMcpServer(body), { storedCredentials: true }));
-  return json(200, mcpServers.setMcpServerEnabled(parseSetMcpServerEnabled(body)));
+  if (test) {
+    const parsed = parseTestMcpServer(body);
+    if (toolRuntimes) await prepareToolRuntimeForTest(parsed.config, toolRuntimes);
+    // The administrator tests the host's servers, so the host's stored sign-ins are spent - but no
+    // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back.
+    return json(200, await mcpServers.testMcpServer(parsed, { storedCredentials: true }));
+  }
+  const toggled = parseSetMcpServerEnabled(body);
+  if (toggled.enabled) toolRuntimes?.startToolRuntimes();
+  return json(200, mcpServers.setMcpServerEnabled(toggled));
 }
