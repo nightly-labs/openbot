@@ -1,4 +1,5 @@
 import { ChildProcess, execFileSync } from "node:child_process";
+import * as dgram from "node:dgram";
 import { readFileSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import {
@@ -13,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import type { RemoteDesktopDisplay } from "@openbot/contracts/ipc";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import {
@@ -432,6 +433,48 @@ describe("sunshine port family helpers", () => {
       }
     } finally {
       releaseWebRtcPortRange(first);
+    }
+  });
+
+  it("closes failed UDP probes before trying another WebRTC range", async () => {
+    const first = await allocateWebRtcPortRange();
+    releaseWebRtcPortRange(first);
+    const occupied = dgram.createSocket("udp4");
+    const sockets: dgram.Socket[] = [];
+    const failed = new Set<dgram.Socket>();
+    const closed = new Set<dgram.Socket>();
+    vi.resetModules();
+    vi.doMock("node:dgram", () => ({
+      createSocket: (type: dgram.SocketType) => {
+        const socket = dgram.createSocket(type);
+        sockets.push(socket);
+        socket.once("error", () => failed.add(socket));
+        socket.once("close", () => closed.add(socket));
+        return socket;
+      },
+    }));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        occupied.once("error", reject);
+        occupied.bind(first.min, "127.0.0.1", resolve);
+      });
+      const allocator = await import("./sunshine-moonlight-runtime");
+      const next = await allocator.allocateWebRtcPortRange();
+      try {
+        expect(next.min).not.toBe(first.min);
+        expect(failed.size).toBeGreaterThan(0);
+        expect([...failed].every((socket) => closed.has(socket))).toBe(true);
+      } finally {
+        allocator.releaseWebRtcPortRange(next);
+      }
+    } finally {
+      await Promise.all(
+        [...sockets, occupied]
+          .filter((socket) => !closed.has(socket))
+          .map((socket) => new Promise<void>((resolve) => socket.close(() => resolve()))),
+      );
+      vi.doUnmock("node:dgram");
+      vi.resetModules();
     }
   });
 

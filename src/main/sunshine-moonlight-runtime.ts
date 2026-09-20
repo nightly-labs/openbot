@@ -181,9 +181,12 @@ function listenTcp(port: number): Promise<ReturnType<typeof createTcpServer>> {
 function bindUdp(port: number): Promise<ReturnType<typeof createSocket>> {
   return new Promise((resolve, reject) => {
     const socket = createSocket("udp4");
-    socket.once("error", reject);
+    const onError = (error: Error): void => {
+      socket.close(() => reject(error));
+    };
+    socket.once("error", onError);
     socket.bind(port, "127.0.0.1", () => {
-      socket.removeListener("error", reject);
+      socket.removeListener("error", onError);
       resolve(socket);
     });
   });
