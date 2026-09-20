@@ -379,11 +379,18 @@ async function readLoginShellPath(): Promise<string | null> {
  * The login shell that found the command holds the `PATH` that makes it run: an `npx` or `uvx`
  * installed by nvm, Homebrew or mise starts with `#!/usr/bin/env node`, so it needs that same `PATH`
  * to find its own runtime. An app the user started from Finder or a launcher inherits none of it,
- * which is a server that tests green from a terminal and fails everywhere else. The configuration's
- * own pairs are applied last, so a `PATH` the user wrote there still wins.
+ * which is a server that tests green from a terminal and fails everywhere else.
+ *
+ * The resolved `server.path` wins over the configured pairs: it is what the command was looked up
+ * in - the configured `PATH` with the managed directories appended - so launching with anything
+ * else would disagree with the lookup. The user's own directories still come first, because they
+ * were first in the resolved list.
  */
 export function mcpLaunchEnvironment(server: UsableMcpServer): Record<string, string> {
-  return { ...(server.path ? { PATH: server.path } : {}), ...mcpEnvironment(server.config) };
+  const environment = mcpEnvironment(server.config);
+  // Truthiness, not a null check: an empty list is no list, and the configured value stands.
+  if (server.path) environment.PATH = server.path;
+  return environment;
 }
 
 /**

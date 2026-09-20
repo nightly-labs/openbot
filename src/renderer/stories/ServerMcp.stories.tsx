@@ -143,8 +143,8 @@ export const McpList: Story = {
     // Local SQLite is the only fixture that names a working directory, and only Claude can carry
     // one. The row says so without a test having been run, because it reads the stored
     // configuration rather than a connection.
-    await expectVisible(await body.findByText(/only Claude/u));
-    await expect(body.getAllByText(/only Claude/u)).toHaveLength(1);
+    await expectVisible(await body.findByText(/Claude only/u));
+    await expect(body.getAllByText(/Claude only/u)).toHaveLength(1);
   },
 };
 

@@ -59,10 +59,19 @@ export interface McpOAuthOptions {
   redirectUrl: string;
   /** How long a sign-in may stay open before the wait is abandoned. */
   signInTimeoutMs?: number;
+  /** How long a token exchange may hold a thread start or a test before the stored token answers. */
+  refreshTimeoutMs?: number;
 }
 
 /** Long enough to find the right account and read a consent page, short enough to end by itself. */
 export const MCP_SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * How long a token exchange may hold a thread start or a test. The probe and the hand-off both
+ * resolve every token before they connect, so an authorization server that accepts a connection
+ * but never finishes its response would otherwise stall either past its own deadline.
+ */
+export const MCP_TOKEN_TIMEOUT_MS = 10_000;
 
 /**
  * An access token is refreshed this long before it is due to expire, so a thread that starts at the
@@ -132,10 +141,15 @@ export class McpOAuth implements McpOAuthAuthority {
    * the specification recommends - the second exchange spends one that has already been spent: it
    * is refused, and a server that reads reuse as theft revokes the whole grant and costs the user
    * the sign-in. A caller that arrives while an exchange is running waits for that one instead.
+   *
+   * The wait is bounded: an authorization server that accepts the connection but never finishes
+   * its response must not stall a thread start or a test past its own deadline. A caller whose
+   * wait ends reads the stored token instead, and the exchange it stopped waiting for keeps
+   * running - a token it eventually stores is what the next start reads.
    */
   #refresh(resource: string): Promise<void> {
     const running = this.#refreshing.get(resource);
-    if (running) return running;
+    if (running) return this.#awaitRefresh(running);
     // A refresh the authorization server refused, or one it never got, is not reported here: the
     // stored token is the best answer left, and the server is the right place for the refusal.
     const exchange = auth(this.#provider(resource, null), { serverUrl: resource })
@@ -145,7 +159,11 @@ export class McpOAuth implements McpOAuthAuthority {
       )
       .finally(() => this.#refreshing.delete(resource));
     this.#refreshing.set(resource, exchange);
-    return exchange;
+    return this.#awaitRefresh(exchange);
+  }
+
+  async #awaitRefresh(exchange: Promise<void>): Promise<void> {
+    await stopWaiting(exchange, this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS);
   }
 
   /** A sign-in the user asked for, or `null` when the URL is not one this can sign in to. */
@@ -167,7 +185,14 @@ export class McpOAuth implements McpOAuthAuthority {
       complete: async () => {
         try {
           const code = await withSignInDeadline(grant, this.#options.signInTimeoutMs ?? MCP_SIGN_IN_TIMEOUT_MS);
-          await auth(provider, { serverUrl: resource, authorizationCode: code });
+          // The grant waited on the person; the trade waits on the server, and on nothing else.
+          // Without this a hung token endpoint holds the test past its own deadline after the user
+          // has done everything right.
+          await withTimeout(
+            auth(provider, { serverUrl: resource, authorizationCode: code }),
+            this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
+            "The sign-in response did not arrive in time.",
+          );
         } finally {
           abandon();
         }
@@ -360,8 +385,41 @@ function expiringSoon(record: McpOAuthRecord): boolean {
 }
 
 function withSignInDeadline(grant: Promise<string>, timeoutMs: number): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("The sign-in was not finished in the browser.")), timeoutMs);
-    grant.then(resolve, reject).finally(() => clearTimeout(timer));
+  return withTimeout(grant, timeoutMs, "The sign-in was not finished in the browser.");
+}
+
+function withTimeout<T>(work: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * Stops waiting, never fails. The caller falls back to what is stored; the exchange itself keeps
+ * running, so a token it eventually stores is what the next caller reads.
+ */
+function stopWaiting(work: Promise<unknown>, timeoutMs: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(() => resolve(), timeoutMs);
+    work.then(
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+    );
   });
 }

@@ -44,13 +44,17 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
   response.end(JSON.stringify(body));
 }
 
-async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
+async function startFakeServer(quoteTokenOnError = false, hangToken = false): Promise<FakeServer> {
   const state: { registrations: number; tokenRequests: URLSearchParams[]; refreshToken: string } = {
     registrations: 0,
     tokenRequests: [],
     refreshToken: REFRESH_TOKEN,
   };
   let base = "";
+  // Sockets a hanging endpoint still holds. `server.close` waits for them, so a `/token` that
+  // never answers would hold the test's own teardown past its deadline; destroying them first
+  // keeps the hang inside the test.
+  const sockets = new Set<import("node:net").Socket>();
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", base).pathname;
@@ -79,6 +83,9 @@ async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
       if (path === "/token") {
         const form = new URLSearchParams(await readBody(request));
         state.tokenRequests.push(form);
+        // An authorization server that takes the connection and never answers. The request is
+        // recorded above, so a test can prove the exchange started without waiting for it.
+        if (hangToken) return;
         if (form.get("grant_type") === "refresh_token") {
           // Rotating, like the specification recommends: the refresh token just spent is dead, so
           // a second exchange with it would be refused and the grant would be at risk.
@@ -158,6 +165,10 @@ async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
     })();
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+  });
   const address = server.address();
   if (address === null || typeof address === "string") throw new Error("The fake server has no port.");
   base = `http://127.0.0.1:${address.port}`;
@@ -172,7 +183,11 @@ async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
     get tokenRequests() {
       return state.tokenRequests;
     },
-    close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        for (const socket of sockets) socket.destroy();
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
   };
 }
 
@@ -213,8 +228,8 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-async function fakeServer(quoteTokenOnError = false): Promise<FakeServer> {
-  const server = await startFakeServer(quoteTokenOnError);
+async function fakeServer(quoteTokenOnError = false, hangToken = false): Promise<FakeServer> {
+  const server = await startFakeServer(quoteTokenOnError, hangToken);
   servers.push(server);
   return server;
 }
@@ -299,6 +314,47 @@ describe("signing in to an http MCP server", () => {
     });
     expect(server.tokenRequests.filter((form) => form.get("grant_type") === "refresh_token")).toHaveLength(1);
     expect(server.registrations).toBe(0);
+  });
+
+  it("answers with the stored token when the refresh hangs", async () => {
+    const server = await fakeServer(false, true);
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("A refresh must never open a browser."),
+      refreshTimeoutMs: 200,
+    });
+
+    // The authorization server takes the connection and never answers. The thread start must not
+    // hang with it: the wait ends and the token on file answers instead.
+    expect(await oauth.accessToken(server.url)).toBe(ACCESS_TOKEN);
+    expect(server.tokenRequests).toHaveLength(1);
+  });
+
+  it("gives up the token trade when the authorization server hangs", async () => {
+    const server = await fakeServer(false, true);
+    const storage = memoryStorage();
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+      refreshTimeoutMs: 200,
+    });
+
+    // The user did everything right and the browser came back; the token endpoint then hung.
+    // The test reports that instead of holding past its own deadline.
+    const result = await testMcpServer(config(server.url), 10_000, undefined, oauth);
+    expect(result.toolCount).toBe(0);
+    expect(result.error).toContain("The sign-in response did not arrive in time.");
   });
 
   it("keeps the token it just minted out of the failure it reports", async () => {

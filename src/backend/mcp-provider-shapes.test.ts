@@ -9,6 +9,7 @@ import {
   claudeMcpServers,
   clearMcpCommandCache,
   codexMcpServers,
+  mcpLaunchEnvironment,
   pickWindowsExecutable,
   resolveMcpCommand,
   type UsableMcpServer,
@@ -174,6 +175,46 @@ describe("claudeMcpServers and acpMcpServers", () => {
     const expected = [{ name: "broken", reason: "command_not_found", detail: "Command not found: npx" }];
     expect(claudeMcpServers([failed]).dropped).toEqual(expected);
     expect(acpMcpServers([failed]).dropped).toEqual(expected);
+  });
+});
+
+describe("mcpLaunchEnvironment", () => {
+  it("launches with the PATH the command was looked up in", () => {
+    // The lookup appends the managed directories to the configured PATH. The launch used to
+    // spread the configured pairs last and lose them, so a server reaching the managed runtime
+    // through its command could not find that runtime from its own `PATH`.
+    const server: UsableMcpServer = {
+      config: config({
+        transport: "stdio",
+        command: "bun",
+        args: ["server.js"],
+        url: "",
+        headers: [],
+        env: [{ key: "PATH", value: "/usr/bin:/bin" }],
+      }),
+      command: "/managed/bin/bun",
+      workingDirectory: "",
+      path: "/usr/bin:/bin:/managed/bin",
+      authorization: null,
+    };
+    expect(mcpLaunchEnvironment(server)).toMatchObject({ PATH: "/usr/bin:/bin:/managed/bin" });
+  });
+
+  it("keeps a configured PATH when the lookup answered nothing", () => {
+    const server: UsableMcpServer = {
+      config: config({
+        transport: "stdio",
+        command: "server",
+        url: "",
+        headers: [],
+        env: [{ key: "PATH", value: "/usr/bin:/bin" }],
+      }),
+      command: "",
+      workingDirectory: "",
+      path: null,
+      authorization: null,
+    };
+    expect(mcpLaunchEnvironment(server)).toMatchObject({ PATH: "/usr/bin:/bin" });
   });
 });
 
