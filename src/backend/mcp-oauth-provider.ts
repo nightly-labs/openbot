@@ -34,6 +34,18 @@ export const mcpOAuthRecordSchema = z.object({
   tokens: OAuthTokensSchema.optional(),
   /** When `tokens` arrived. `expires_in` is a duration, and a duration alone names no moment. */
   obtainedAt: z.number().optional(),
+  /**
+   * Where the authorization server was found: its URL, and the metadata URL that named it. A
+   * later exchange reuses both instead of rediscovering at the default locations, which misses
+   * metadata that lives only at the advertised URL. Small on purpose: the SDK re-fetches the
+   * metadata documents themselves from these addresses.
+   */
+  discovery: z
+    .object({
+      authorizationServerUrl: z.string(),
+      resourceMetadataUrl: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type McpOAuthRecord = z.infer<typeof mcpOAuthRecordSchema>;
@@ -109,13 +121,7 @@ export class McpOAuth implements McpOAuthAuthority {
    */
   readonly #waiting = new Map<string, (code: string) => void>();
   /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
-  readonly #refreshing = new Map<string, Promise<void>>();
-  /**
-   * The SDK discovery state per server: the authorization server a sign-in found, so a later
-   * refresh or sign-in reuses it instead of rediscovering. Kept in memory beside the records,
-   * which is as far as it has to travel - every exchange of one run shares it.
-   */
-  readonly #discovery = new Map<string, OAuthDiscoveryState>();
+  readonly #refreshing = new Map<string, { exchange: Promise<void>; cancel: () => void }>();
   /**
    * How many times a server's credentials were forgotten. A refresh or a sign-in already running
    * when the count rises must not write back what was removed: its later writes are refused, so
@@ -158,19 +164,37 @@ export class McpOAuth implements McpOAuthAuthority {
    * its response must not stall a thread start or a test past its own deadline. A caller whose
    * wait ends reads the stored token instead, and the exchange it stopped waiting for keeps
    * running - a token it eventually stores is what the next start reads.
+   *
+   * The exchange itself is bounded too: a request that stays open without completing is aborted
+   * and its entry cleared, so the next caller starts a fresh exchange instead of joining the
+   * same stall again. Without this every later thread would wait out the same dead request and
+   * receive the expired token, even when the server answers new requests.
    */
   #refresh(resource: string): Promise<void> {
     const running = this.#refreshing.get(resource);
-    if (running) return this.#awaitRefresh(running);
+    if (running) return this.#awaitRefresh(running.exchange);
+    const timeoutMs = this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS;
+    const controller = new AbortController();
     // A refresh the authorization server refused, or one it never got, is not reported here: the
     // stored token is the best answer left, and the server is the right place for the refusal.
-    const exchange = auth(this.#provider(resource, null), { serverUrl: resource })
+    const exchange = auth(this.#provider(resource, null), {
+      serverUrl: resource,
+      fetchFn: (url, init) => fetch(url, { ...init, signal: controller.signal }),
+    })
       .then(
         () => undefined,
         () => undefined,
       )
-      .finally(() => this.#refreshing.delete(resource));
-    this.#refreshing.set(resource, exchange);
+      .finally(() => {
+        clearTimeout(deadline);
+        if (this.#refreshing.get(resource)?.exchange === exchange) this.#refreshing.delete(resource);
+      });
+    const entry = { exchange, cancel: () => controller.abort() };
+    this.#refreshing.set(resource, entry);
+    const deadline = setTimeout(() => {
+      entry.cancel();
+      if (this.#refreshing.get(resource) === entry) this.#refreshing.delete(resource);
+    }, timeoutMs);
     return this.#awaitRefresh(exchange);
   }
 
@@ -262,13 +286,6 @@ export class McpOAuth implements McpOAuthAuthority {
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
       openExternal: this.#options.openExternal,
-      saveDiscoveryState: (discovery) => {
-        this.#discovery.set(resource, discovery);
-      },
-      discoveryState: () => this.#discovery.get(resource),
-      clearDiscoveryState: () => {
-        this.#discovery.delete(resource);
-      },
       isAbandoned,
     });
   }
@@ -280,10 +297,6 @@ interface ClientProviderOptions {
   storage: McpOAuthStorage;
   redirectUrl: string;
   openExternal: (url: string) => Promise<void>;
-  /** Remembers the authorization server a sign-in found, so later exchanges reuse it. */
-  saveDiscoveryState: (discovery: OAuthDiscoveryState) => void;
-  discoveryState: () => OAuthDiscoveryState | undefined;
-  clearDiscoveryState: () => void;
   /** Whether the sign-in that built this provider has been abandoned since. */
   isAbandoned: () => boolean;
 }
@@ -368,16 +381,22 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * The authorization server the last exchange found, kept so the next one reuses it. Without
-   * this the SDK rediscovers at the default locations: metadata that lives only at the advertised
-   * URL is missed, and the exchange falls back to the MCP origin's token endpoint.
+   * The authorization server the last exchange found, kept with the encrypted credentials so a
+   * later exchange - in this run or after a restart - reuses it. Without this the SDK
+   * rediscovers at the default locations: metadata that lives only at the advertised URL is
+   * missed, and the exchange falls back to the MCP origin's token endpoint.
    */
-  saveDiscoveryState(discovery: OAuthDiscoveryState): void {
-    this.#options.saveDiscoveryState(discovery);
+  async saveDiscoveryState(discovery: OAuthDiscoveryState): Promise<void> {
+    await this.#save({
+      discovery: {
+        authorizationServerUrl: discovery.authorizationServerUrl,
+        resourceMetadataUrl: discovery.resourceMetadataUrl,
+      },
+    });
   }
 
   discoveryState(): OAuthDiscoveryState | undefined {
-    return this.#options.discoveryState();
+    return this.#record().discovery;
   }
 
   saveCodeVerifier(codeVerifier: string): void {
@@ -397,12 +416,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   async invalidateCredentials(scope: "all" | "client" | "tokens" | "verifier" | "discovery"): Promise<void> {
     if (scope === "verifier" || scope === "discovery") {
       if (scope === "verifier") this.#codeVerifier = null;
-      else this.#options.clearDiscoveryState();
+      else await this.#save({ discovery: undefined });
       return;
     }
     if (scope === "all") {
       this.#codeVerifier = null;
-      this.#options.clearDiscoveryState();
       await this.#options.storage.clear(this.#options.resource);
       return;
     }

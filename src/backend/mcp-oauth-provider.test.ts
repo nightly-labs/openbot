@@ -441,6 +441,75 @@ describe("signing in to an http MCP server", () => {
     });
   });
 
+  it("recovers the authorization server after a restart", async () => {
+    const server = await fakeServer({
+      advertisedPrmPath: "/custom-prm",
+      defaultAuthorizationServers: ["http://127.0.0.1:9/"],
+    });
+    const storage = memoryStorage();
+    const signIn = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        signIn.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+    // The sign-in discovers through the advertised metadata URL...
+    expect(await testMcpServer(config(server.url), 10_000, undefined, signIn)).toEqual({
+      toolCount: 1,
+      error: null,
+    });
+
+    // ...then OpenBot restarts: a new instance over the same store, and a stored access token the
+    // server rejects, aged out. Default discovery names a dead server; only the persisted state
+    // still names the one that issued the grant.
+    const record = storage.read(server.url);
+    if (!record?.tokens) throw new Error("The sign-in stored no tokens.");
+    storage.records.set(server.url, {
+      ...record,
+      tokens: { ...record.tokens, access_token: "rotated-away" },
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const restarted = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("A refresh must never open a browser."),
+    });
+    const silent: McpOAuthAuthority = {
+      accessToken: (url) => restarted.accessToken(url),
+      signIn: () => null,
+      forget: (url) => restarted.forget(url),
+    };
+    expect(await testMcpServer(config(server.url), 10_000, undefined, silent)).toEqual({
+      toolCount: 1,
+      error: null,
+    });
+  });
+
+  it("starts a fresh exchange when the running refresh stalls", async () => {
+    const server = await fakeServer({ delayTokenMs: 300 });
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("A refresh must never open a browser."),
+      refreshTimeoutMs: 100,
+    });
+
+    // The token endpoint answers slowly, past the wait. The first caller falls back to the stored
+    // token - but the second caller must not join the same stalled request and wait it out again.
+    // It starts a fresh exchange instead, which is the second token request below.
+    expect(await oauth.accessToken(server.url)).toBe(ACCESS_TOKEN);
+    expect(await oauth.accessToken(server.url)).toBe(ACCESS_TOKEN);
+    expect(server.tokenRequests.filter((form) => form.get("grant_type") === "refresh_token")).toHaveLength(2);
+  });
+
   it("never opens a browser for a sign-in the probe abandoned", async () => {
     const opened: string[] = [];
     const oauth = new McpOAuth({
