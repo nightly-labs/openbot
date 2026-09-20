@@ -44,7 +44,20 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
   response.end(JSON.stringify(body));
 }
 
-async function startFakeServer(quoteTokenOnError = false, hangToken = false, delayTokenMs = 0): Promise<FakeServer> {
+interface FakeServerOptions {
+  quoteTokenOnError?: boolean;
+  hangToken?: boolean;
+  delayTokenMs?: number;
+  /** Overrides the authorization endpoint the metadata advertises. */
+  authorizeUrl?: string;
+  /** The protected-resource metadata URL the 401 challenge advertises. */
+  advertisedPrmPath?: string;
+  /** Authorization servers the default protected-resource metadata names. */
+  defaultAuthorizationServers?: string[];
+}
+
+async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeServer> {
+  const { quoteTokenOnError = false, hangToken = false, delayTokenMs = 0 } = options;
   const state: { registrations: number; tokenRequests: URLSearchParams[]; refreshToken: string } = {
     registrations: 0,
     tokenRequests: [],
@@ -55,17 +68,24 @@ async function startFakeServer(quoteTokenOnError = false, hangToken = false, del
   // never answers would hold the test's own teardown past its deadline; destroying them first
   // keeps the hang inside the test.
   const sockets = new Set<import("node:net").Socket>();
+  const advertisedPrm = options.advertisedPrmPath ?? "/.well-known/oauth-protected-resource";
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", base).pathname;
       if (path === "/.well-known/oauth-protected-resource") {
+        // `base` is set once the server listens, before any request arrives.
+        const authorizationServers = options.defaultAuthorizationServers ?? [base];
+        sendJson(response, 200, { resource: `${base}/mcp`, authorization_servers: authorizationServers });
+        return;
+      }
+      if (path === advertisedPrm && advertisedPrm !== "/.well-known/oauth-protected-resource") {
         sendJson(response, 200, { resource: `${base}/mcp`, authorization_servers: [base] });
         return;
       }
       if (path === "/.well-known/oauth-authorization-server") {
         sendJson(response, 200, {
           issuer: base,
-          authorization_endpoint: `${base}/authorize`,
+          authorization_endpoint: options.authorizeUrl ?? `${base}/authorize`,
           token_endpoint: `${base}/token`,
           registration_endpoint: `${base}/register`,
           response_types_supported: ["code"],
@@ -125,7 +145,7 @@ async function startFakeServer(quoteTokenOnError = false, hangToken = false, del
         request.headers.authorization !== `Bearer ${REFRESHED_TOKEN}`
       ) {
         response.writeHead(401, {
-          "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+          "www-authenticate": `Bearer resource_metadata="${base}${advertisedPrm}"`,
         });
         response.end();
         return;
@@ -230,8 +250,8 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-async function fakeServer(quoteTokenOnError = false, hangToken = false, delayTokenMs = 0): Promise<FakeServer> {
-  const server = await startFakeServer(quoteTokenOnError, hangToken, delayTokenMs);
+async function fakeServer(options: FakeServerOptions = {}): Promise<FakeServer> {
+  const server = await startFakeServer(options);
   servers.push(server);
   return server;
 }
@@ -319,7 +339,7 @@ describe("signing in to an http MCP server", () => {
   });
 
   it("answers with the stored token when the refresh hangs", async () => {
-    const server = await fakeServer(false, true);
+    const server = await fakeServer({ hangToken: true });
     const storage = memoryStorage();
     storage.records.set(server.url, {
       client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
@@ -340,7 +360,7 @@ describe("signing in to an http MCP server", () => {
   });
 
   it("gives up the token trade when the authorization server hangs", async () => {
-    const server = await fakeServer(false, true);
+    const server = await fakeServer({ hangToken: true });
     const storage = memoryStorage();
     const oauth = new McpOAuth({
       storage,
@@ -359,8 +379,90 @@ describe("signing in to an http MCP server", () => {
     expect(result.error).toContain("The sign-in response did not arrive in time.");
   });
 
+  it("refuses to open a sign-in page that is not on the web", async () => {
+    const server = await fakeServer({ authorizeUrl: "file:///etc/hosts" });
+    const storage = memoryStorage();
+    const opened: string[] = [];
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        opened.push(url);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    // The discovered authorization endpoint names a file. Test must not invoke the program the
+    // operating system registers for it.
+    const result = await testMcpServer(config(server.url), 10_000, undefined, oauth);
+    expect(opened).toHaveLength(0);
+    expect(result.toolCount).toBe(0);
+    expect(result.error).toContain("The sign-in address is not a web page.");
+  });
+
+  it("reuses the authorization server the sign-in discovered", async () => {
+    const server = await fakeServer({
+      advertisedPrmPath: "/custom-prm",
+      defaultAuthorizationServers: ["http://127.0.0.1:9/"],
+    });
+    const storage = memoryStorage();
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+    // The sign-in discovers through the advertised metadata URL...
+    expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({
+      toolCount: 1,
+      error: null,
+    });
+
+    // ...then the stored access token is replaced with one the server rejects, and aged out, so
+    // the next probe must refresh through the same authorization server. Default discovery names
+    // a dead server; without the retained state the refresh fails and the tools stay missing.
+    const record = storage.read(server.url);
+    if (!record?.tokens) throw new Error("The sign-in stored no tokens.");
+    storage.records.set(server.url, {
+      ...record,
+      tokens: { ...record.tokens, access_token: "rotated-away" },
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const silent: McpOAuthAuthority = {
+      accessToken: (url) => oauth.accessToken(url),
+      signIn: () => null,
+      forget: (url) => oauth.forget(url),
+    };
+    expect(await testMcpServer(config(server.url), 10_000, undefined, silent)).toEqual({
+      toolCount: 1,
+      error: null,
+    });
+  });
+
+  it("never opens a browser for a sign-in the probe abandoned", async () => {
+    const opened: string[] = [];
+    const oauth = new McpOAuth({
+      storage: memoryStorage(),
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        opened.push(url);
+      },
+    });
+    const signIn = oauth.signIn("https://mcp.example.com/mcp");
+    if (!signIn) throw new Error("The example server cannot be signed in to.");
+    signIn.abandon();
+
+    // Discovery slow enough to outlast the probe finishes afterwards. The grant is gone with the
+    // callback, so opening the browser now would sign into nothing.
+    await signIn.provider.redirectToAuthorization(new URL("https://mcp.example.com/authorize"));
+    expect(opened).toHaveLength(0);
+    await expect(signIn.complete()).rejects.toThrow("The sign-in was abandoned.");
+  });
+
   it("keeps the token it just minted out of the failure it reports", async () => {
-    const server = await fakeServer(true);
+    const server = await fakeServer({ quoteTokenOnError: true });
     const storage = memoryStorage();
     const oauth = new McpOAuth({
       storage,
@@ -413,7 +515,7 @@ describe("signing in to an http MCP server", () => {
   });
 
   it("does not restore credentials forgotten during a refresh", async () => {
-    const server = await fakeServer(false, false, 300);
+    const server = await fakeServer({ delayTokenMs: 300 });
     const storage = memoryStorage();
     storage.records.set(server.url, {
       client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },

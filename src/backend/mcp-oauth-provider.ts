@@ -17,7 +17,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { auth, type OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth, type OAuthClientProvider, type OAuthDiscoveryState } from "@modelcontextprotocol/sdk/client/auth.js";
 import {
   type OAuthClientInformationFull,
   OAuthClientInformationFullSchema,
@@ -111,6 +111,12 @@ export class McpOAuth implements McpOAuthAuthority {
   /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
   readonly #refreshing = new Map<string, Promise<void>>();
   /**
+   * The SDK discovery state per server: the authorization server a sign-in found, so a later
+   * refresh or sign-in reuses it instead of rediscovering. Kept in memory beside the records,
+   * which is as far as it has to travel - every exchange of one run shares it.
+   */
+  readonly #discovery = new Map<string, OAuthDiscoveryState>();
+  /**
    * How many times a server's credentials were forgotten. A refresh or a sign-in already running
    * when the count rises must not write back what was removed: its later writes are refused, so
    * removal reads complete before credentials can return to disk.
@@ -182,13 +188,18 @@ export class McpOAuth implements McpOAuthAuthority {
       deliver = resolve;
     });
     this.#waiting.set(state, (code) => deliver(code));
-    const provider = this.#provider(resource, state);
+    // Set when the probe moves on: a discovery slow enough to outlast it must neither open a
+    // browser afterwards nor wait out a grant nobody will answer.
+    let abandoned = false;
+    const provider = this.#provider(resource, state, () => abandoned);
     const abandon = () => {
+      abandoned = true;
       this.#waiting.delete(state);
     };
     return {
       provider,
       complete: async () => {
+        if (abandoned) throw new Error("The sign-in was abandoned.");
         try {
           const code = await withSignInDeadline(grant, this.#options.signInTimeoutMs ?? MCP_SIGN_IN_TIMEOUT_MS);
           // The grant waited on the person; the trade waits on the server, and on nothing else.
@@ -231,7 +242,7 @@ export class McpOAuth implements McpOAuthAuthority {
   }
 
   /** A `state` makes the provider interactive; `null` keeps it silent. */
-  #provider(resource: string, state: string | null): OAuthClientProvider {
+  #provider(resource: string, state: string | null, isAbandoned: () => boolean = () => false): OAuthClientProvider {
     const generation = this.#generations.get(resource) ?? 0;
     const storage = this.#options.storage;
     // The store as this run saw it: reads answer from disk, but a write lands only while no
@@ -251,6 +262,14 @@ export class McpOAuth implements McpOAuthAuthority {
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
       openExternal: this.#options.openExternal,
+      saveDiscoveryState: (discovery) => {
+        this.#discovery.set(resource, discovery);
+      },
+      discoveryState: () => this.#discovery.get(resource),
+      clearDiscoveryState: () => {
+        this.#discovery.delete(resource);
+      },
+      isAbandoned,
     });
   }
 }
@@ -261,10 +280,16 @@ interface ClientProviderOptions {
   storage: McpOAuthStorage;
   redirectUrl: string;
   openExternal: (url: string) => Promise<void>;
+  /** Remembers the authorization server a sign-in found, so later exchanges reuse it. */
+  saveDiscoveryState: (discovery: OAuthDiscoveryState) => void;
+  discoveryState: () => OAuthDiscoveryState | undefined;
+  clearDiscoveryState: () => void;
+  /** Whether the sign-in that built this provider has been abandoned since. */
+  isAbandoned: () => boolean;
 }
 
 /**
- * The nine members the SDK asks for, and no protocol of its own.
+ * The members the SDK asks for, and no protocol of its own.
  *
  * The PKCE verifier is held in memory and not in the store. It is worth exactly one exchange, it is
  * only useful to the run that made it, and a run that ends before the browser comes back has lost
@@ -331,8 +356,28 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * reason RFC 8252 says a native app must not do it.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
+    // The probe moved on: a discovery slow enough to outlast it must not open a browser
+    // afterwards for a grant nobody waits for.
+    if (this.#options.isAbandoned()) return;
     if (!this.#options.state) throw new Error("This MCP sign-in cannot open a browser.");
+    // The address arrives in the server's own discovery document, and the SDK accepts more than
+    // web pages: an https server naming a file or an installed protocol handler must not reach
+    // the browser. Loopback http stays, for a sign-in server on the user's own machine.
+    if (!isAuthorizationUrlSafe(authorizationUrl)) throw new Error("The sign-in address is not a web page.");
     await this.#options.openExternal(authorizationUrl.toString());
+  }
+
+  /**
+   * The authorization server the last exchange found, kept so the next one reuses it. Without
+   * this the SDK rediscovers at the default locations: metadata that lives only at the advertised
+   * URL is missed, and the exchange falls back to the MCP origin's token endpoint.
+   */
+  saveDiscoveryState(discovery: OAuthDiscoveryState): void {
+    this.#options.saveDiscoveryState(discovery);
+  }
+
+  discoveryState(): OAuthDiscoveryState | undefined {
+    return this.#options.discoveryState();
   }
 
   saveCodeVerifier(codeVerifier: string): void {
@@ -352,10 +397,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   async invalidateCredentials(scope: "all" | "client" | "tokens" | "verifier" | "discovery"): Promise<void> {
     if (scope === "verifier" || scope === "discovery") {
       if (scope === "verifier") this.#codeVerifier = null;
+      else this.#options.clearDiscoveryState();
       return;
     }
     if (scope === "all") {
       this.#codeVerifier = null;
+      this.#options.clearDiscoveryState();
       await this.#options.storage.clear(this.#options.resource);
       return;
     }
@@ -397,6 +444,12 @@ export function normalizeResource(url: string): string | null {
 /** The names that never leave this machine. `::1` arrives from `URL` inside brackets. */
 function isLoopback(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
+/** Where a browser may be sent: a web page, or a sign-in server on the user's own machine. */
+function isAuthorizationUrlSafe(url: URL): boolean {
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && isLoopback(url.hostname);
 }
 
 /** Whether the stored access token is inside the margin, or already past its life. */
