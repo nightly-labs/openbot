@@ -94,6 +94,11 @@ export class TeamWebRtcFileTransfer {
     this.#notifyStateChange();
   }
 
+  /** Whether a transfer is moving right now, either direction. Completed files waiting for pickup do not count. */
+  hasActiveTransfers(): boolean {
+    return this.#incoming.size > 0 || this.#outgoing.size > 0;
+  }
+
   async send(peerId: string, input: { name: string; mimeType: string; bytes: Uint8Array }): Promise<string> {
     if (this.#stopped) throw new Error("The WebRTC file transport is stopped.");
     if (input.bytes.byteLength > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw new Error("The file is larger than 100 MB.");

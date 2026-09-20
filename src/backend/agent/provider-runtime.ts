@@ -498,6 +498,23 @@ export class ProviderRuntime implements ProviderPort {
     return this.#status.phase === "ready";
   }
 
+  /**
+   * Provider operations in flight right now: CLI logins and replacements, connection checks,
+   * provider starts, and the pending Codex login. Long-lived provider clients are deliberately
+   * not counted: they are stopped by the normal shutdown, and a client mid-turn always carries
+   * an active turn id, which the activity check sees. MCP servers a provider CLI spawned inside
+   * its own session stay invisible here; a live turn implies them.
+   */
+  activeProcessCount(): number {
+    return (
+      this.#cliLogins.size +
+      this.#providerStarts.size +
+      this.#providerConnectionCommands.size +
+      this.#replacingCli.size +
+      (this.#codexLogin === null ? 0 : 1)
+    );
+  }
+
   clientFor(provider: AgentProvider): AgentClient | null {
     return this.#clients.get(provider) ?? null;
   }

@@ -90,6 +90,29 @@ describe("the live browser view on a host", () => {
     }
     await gateway.stop();
   });
+
+  it("counts only views with a live socket", async () => {
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async () => async () => undefined,
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    expect(gateway.activeViewCount()).toBe(0);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    expect(gateway.activeViewCount()).toBe(0);
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(1));
+    socket.close();
+    await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
+    await gateway.stop();
+  });
 });
 
 async function serve(gateway: BrowserViewGateway): Promise<string> {

@@ -103,6 +103,29 @@ describe("TeamWebRtcFileTransfer", () => {
     await transfers.stop();
   });
 
+  it("reports a moving transfer and goes quiet after pickup", async () => {
+    const bridge = new FakeBridge();
+    const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
+    expect(transfers.hasActiveTransfers()).toBe(false);
+    transfers.setPeerAuthenticated("host-1", true);
+    const bytes = new TextEncoder().encode("hello-world");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const complete = transfers.receive("host-1", "transfer-1");
+    bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
+    await vi.waitFor(() => expect(transfers.hasActiveTransfers()).toBe(true));
+    bridge.emit("data", "host-1", "files", chunk("transfer-1", 0, bytes));
+    bridge.emit(
+      "data",
+      "host-1",
+      "files",
+      encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId: "transfer-1" }),
+    );
+    await expect(complete).resolves.toMatchObject({ transferId: "transfer-1" });
+    await transfers.consume("host-1", "transfer-1");
+    expect(transfers.hasActiveTransfers()).toBe(false);
+    await transfers.stop();
+  });
+
   it("disconnects an authenticated peer after an unidentifiable file frame", async () => {
     const bridge = new FakeBridge();
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());

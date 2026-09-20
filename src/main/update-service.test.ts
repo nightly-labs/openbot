@@ -15,6 +15,7 @@ import {
   supportsInstalledUpdates,
   UpdateService,
 } from "./update-service";
+import type { OpenBotSiblingInstance } from "./update-sibling-instances";
 
 const CHECK_TIMEOUT = 1_000;
 const CHECK_INTERVAL = 10_000;
@@ -60,6 +61,7 @@ function createService(
     beforeInstall?: () => Promise<void>;
     autoDownload?: boolean;
     checkIntervalMs?: number;
+    checkSiblingInstances?: () => Promise<readonly OpenBotSiblingInstance[]>;
   } = {},
 ) {
   return new UpdateService(updater, {
@@ -67,6 +69,7 @@ function createService(
     enabled: true,
     autoDownload: options.autoDownload ?? false,
     beforeInstall: options.beforeInstall ?? vi.fn(async () => undefined),
+    ...(options.checkSiblingInstances ? { checkSiblingInstances: options.checkSiblingInstances } : {}),
     platform: options.platform ?? "darwin",
     checkIntervalMs: options.checkIntervalMs ?? CHECK_INTERVAL,
     checkTimeoutMs: CHECK_TIMEOUT,
@@ -220,6 +223,72 @@ describe("UpdateService", () => {
     expect(beforeInstall).toHaveBeenCalledOnce();
     expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
     await expect(service.installUpdate()).rejects.toThrow("not ready");
+  });
+
+  it("refuses the install while another session runs from the same application", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    let siblings: readonly OpenBotSiblingInstance[] = [{ pid: 4242, uid: 502 }];
+    const checkSiblingInstances = vi.fn(async () => siblings);
+    const service = createService(updater, { platform: "darwin", beforeInstall, checkSiblingInstances });
+    service.start(false);
+
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    expect(service.getStatus().phase).toBe("ready");
+
+    await expect(service.installUpdate()).rejects.toThrow(/every other macOS user account/iu);
+    expect(checkSiblingInstances).toHaveBeenCalledOnce();
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    // Nothing was torn down, so the update stays ready and the install stays available.
+    expect(service.getStatus().phase).toBe("ready");
+
+    siblings = [];
+    await service.installUpdate();
+    expect(beforeInstall).toHaveBeenCalledOnce();
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+  });
+
+  it("installs without a sibling check when none is configured", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    const service = createService(updater, { platform: "darwin", beforeInstall });
+    service.start(false);
+
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    await service.installUpdate();
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+  });
+
+  it("refuses tenant installs in host-managed mode but allows the host install", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    const service = createService(updater, { platform: "darwin", beforeInstall });
+    service.start(false);
+
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    expect(service.getStatus().managedByHost).toBeUndefined();
+
+    service.setManagedByHost(true);
+    expect(service.getStatus().managedByHost).toBe(true);
+
+    await expect(service.installUpdate()).rejects.toThrow(/installed by the host/iu);
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    expect(service.getStatus().phase).toBe("ready");
+
+    await service.installHostUpdate();
+    expect(beforeInstall).toHaveBeenCalledOnce();
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
   });
 
   it("reports errors for the active update stage without raw provider details", async () => {

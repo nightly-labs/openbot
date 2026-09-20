@@ -849,6 +849,20 @@ export class ChannelService {
   }
 
   /**
+   * Whether any channel holds the host: an assignment still starting, running or queued, or a
+   * task queued or running. Paused, waiting and failed tasks do not hold anything; they resume
+   * from durable rows after a restart.
+   */
+  hasActiveWork(): boolean {
+    if (this.store.hasAssignmentInState(ACTIVE_ASSIGNMENT_STATES)) return true;
+    return this.store
+      .ids()
+      .some((channelId) =>
+        this.store.tasks(channelId).some((task) => task.state === "queued" || task.state === "running"),
+      );
+  }
+
+  /**
    * The channel work the queue of `agentId` is waiting behind, or null when no channel holds the
    * host.
    *

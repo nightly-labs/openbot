@@ -1,0 +1,537 @@
+import { execFileSync, type spawn as nodeSpawn } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import {
+  createServer as createHttpServer,
+  type Server as HttpServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
+import { createServer as createHttpsServer, type Server as HttpsServer } from "node:https";
+import { createServer as createTcpServer, type Server as TcpServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { RemoteDesktopDisplay } from "@openbot/contracts/ipc";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
+import {
+  allocateSunshineBasePort,
+  allocateWebRtcPortRange,
+  type MoonlightWebRtcPortRange,
+  releaseSunshineBasePort,
+  releaseWebRtcPortRange,
+  SUNSHINE_DEFAULT_BASE_PORT,
+  SunshineMoonlightRuntime,
+  sunshineHttpPortForBase,
+  sunshineHttpsPortForBase,
+  sunshinePortFamiliesOverlap,
+} from "./sunshine-moonlight-runtime";
+
+// Two OpenBot instances on one Mac share the host network namespace, so per-instance Sunshine
+// ports are the only thing keeping a second Remote Desktop from failing to bind. These tests
+// stand up two real runtimes against fake Sunshine/Moonlight loopback servers (only the process
+// spawn boundary is stubbed) and prove the ports stay apart end to end.
+
+const TEST_PATHS: RemoteDesktopRuntimePaths = {
+  sunshine: join("fake", "sunshine"),
+  moonlightWebServer: join("fake", "web-server"),
+  moonlightStreamer: join("fake", "streamer"),
+};
+
+const TEST_DISPLAYS: RemoteDesktopDisplay[] = [
+  { id: "test-display", label: "Test Display", width: 1920, height: 1080, primary: true },
+];
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve = (_value: T): void => undefined;
+  let reject = (_error: unknown): void => undefined;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readBody(request: IncomingMessage): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    request.on("error", reject);
+  });
+}
+
+class FakeChild extends EventEmitter {
+  exitCode: number | null = null;
+  killed = false;
+  stdout = new EventEmitter();
+  stderr = new EventEmitter();
+  readonly #onKill: () => void;
+
+  constructor(onKill: () => void = () => undefined) {
+    super();
+    this.#onKill = onKill;
+  }
+
+  kill(): boolean {
+    if (this.exitCode !== null) return false;
+    this.killed = true;
+    this.exitCode = 0;
+    this.#onKill();
+    queueMicrotask(() => this.emit("exit", 0));
+    return true;
+  }
+
+  complete(code: number): void {
+    this.exitCode = code;
+    queueMicrotask(() => this.emit("exit", code));
+  }
+}
+
+interface Harness {
+  stateDirectory: string;
+  hosts: Array<{ host_id: number; paired: "Paired" | "NotPaired" }>;
+  nextHostId: number;
+  observedSunshineHttpPorts: number[];
+  sunshineHits: Array<{ path: string; localPort: number }>;
+  pinBodies: string[];
+  pinSubmitted: Deferred<void>;
+  servers: Array<HttpServer | HttpsServer>;
+  serverErrors: unknown[];
+  spawn: typeof nodeSpawn;
+  closeAll(): Promise<void>;
+}
+
+function generateSunshineCert(certPath: string, keyPath: string): void {
+  try {
+    execFileSync(
+      "openssl",
+      [
+        "req",
+        "-x509",
+        "-newkey",
+        "ec",
+        "-pkeyopt",
+        "ec_paramgen_curve:prime256v1",
+        "-keyout",
+        keyPath,
+        "-out",
+        certPath,
+        "-days",
+        "2",
+        "-nodes",
+        "-subj",
+        "/CN=127.0.0.1",
+      ],
+      { stdio: "pipe" },
+    );
+  } catch (error) {
+    throw new Error(
+      `Fake Sunshine needs openssl to mint a test certificate: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+async function listenOn(server: TcpServer | HttpServer | HttpsServer, port: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", resolve);
+  });
+}
+
+async function closeServer(
+  server: { close: (callback: () => void) => unknown; listening: boolean } | null,
+): Promise<void> {
+  if (!server?.listening) return;
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+}
+
+function sunshineHandler(harness: Harness): (request: IncomingMessage, response: ServerResponse) => void {
+  return (request, response) => {
+    const url = new URL(request.url ?? "/", "https://127.0.0.1");
+    harness.sunshineHits.push({ path: url.pathname, localPort: request.socket.localPort ?? -1 });
+    const json = (value: unknown): void => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify(value));
+    };
+    if (request.method === "GET" && url.pathname === "/") {
+      response.writeHead(200);
+      response.end();
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/openbot/displays") {
+      json({ displays: [] });
+      return;
+    }
+    if (request.method === "POST" && url.pathname === "/api/pin") {
+      void readBody(request).then((body) => {
+        harness.pinBodies.push(body);
+        for (const host of harness.hosts) host.paired = "Paired";
+        harness.pinSubmitted.resolve();
+        response.writeHead(200);
+        response.end();
+      });
+      return;
+    }
+    response.writeHead(404);
+    response.end();
+  };
+}
+
+const moonlightHostCreateSchema = z.object({ address: z.string(), http_port: z.number().int() });
+const moonlightPairRequestSchema = z.object({ host_id: z.number().int() });
+const moonlightConfigFileSchema = z.object({
+  moonlight: z.object({ default_http_port: z.number().int() }),
+  webrtc: z.object({ port_range: z.object({ min: z.number().int(), max: z.number().int() }) }),
+  web_server: z.object({ bind_address: z.string() }),
+});
+
+function moonlightHandler(harness: Harness): (request: IncomingMessage, response: ServerResponse) => void {
+  return (request, response) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const jsonLine = (value: unknown): void => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(`${JSON.stringify(value)}\n`);
+    };
+    if (request.method === "GET" && url.pathname === "/api/authenticate") {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end('{"ok":true}');
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/hosts") {
+      jsonLine({ hosts: harness.hosts });
+      return;
+    }
+    if (request.method === "POST" && url.pathname === "/api/host") {
+      void readBody(request).then((body) => {
+        const parsed = moonlightHostCreateSchema.parse(JSON.parse(body));
+        harness.observedSunshineHttpPorts.push(parsed.http_port);
+        const host = { host_id: harness.nextHostId, paired: "NotPaired" as const };
+        harness.nextHostId += 1;
+        harness.hosts.push(host);
+        jsonLine({ host });
+      });
+      return;
+    }
+    if (request.method === "POST" && url.pathname === "/api/pair") {
+      void readBody(request).then(async (body) => {
+        const parsed = moonlightPairRequestSchema.parse(JSON.parse(body));
+        response.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        response.write(`${JSON.stringify({ Pin: "424242" })}\n`);
+        const submitted = await Promise.race([
+          harness.pinSubmitted.promise.then(() => true),
+          delay(15_000).then(() => false),
+        ]);
+        if (!submitted) {
+          response.write(`${JSON.stringify("PairError")}\n`);
+          response.end();
+          return;
+        }
+        response.write(`${JSON.stringify({ Paired: { host_id: parsed.host_id } })}\n`);
+        response.end();
+      });
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/apps") {
+      jsonLine({ apps: [{ app_id: 11, title: "Desktop" }] });
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/role") {
+      jsonLine({ role: { permissions: { allow_transport_webrtc: true, allow_transport_websockets: false } } });
+      return;
+    }
+    response.writeHead(404);
+    response.end();
+  };
+}
+
+function createHarness(stateDirectory: string): Harness {
+  const harness: Harness = {
+    stateDirectory,
+    hosts: [],
+    nextHostId: 1,
+    observedSunshineHttpPorts: [],
+    sunshineHits: [],
+    pinBodies: [],
+    pinSubmitted: createDeferred<void>(),
+    servers: [],
+    serverErrors: [],
+    spawn: createHarnessSpawn(),
+    closeAll: async () => {
+      await Promise.all(harness.servers.map((server) => closeServer(server)));
+    },
+  };
+  function createHarnessSpawn(): typeof nodeSpawn {
+    const spawn = (executable: string, args: string[]): FakeChild => {
+      if (args.includes("--creds")) {
+        const child = new FakeChild();
+        queueMicrotask(() => child.complete(0));
+        return child;
+      }
+      if (executable === TEST_PATHS.sunshine) {
+        const config = readFileSync(args[0] ?? "", "utf8");
+        const base = Number(/^\s*port\s*=\s*(\d+)\s*$/m.exec(config)?.[1]);
+        if (!Number.isInteger(base)) throw new Error("Fake Sunshine did not receive a base port in sunshine.conf.");
+        generateSunshineCert(join(stateDirectory, "sunshine-cert.pem"), join(stateDirectory, "sunshine-key.pem"));
+        let server: HttpsServer | null = null;
+        const child = new FakeChild(() => {
+          void closeServer(server);
+        });
+        void (async () => {
+          try {
+            server = createHttpsServer(
+              {
+                key: readFileSync(join(stateDirectory, "sunshine-key.pem")),
+                cert: readFileSync(join(stateDirectory, "sunshine-cert.pem")),
+              },
+              sunshineHandler(harness),
+            );
+            harness.servers.push(server);
+            await listenOn(server, base + 1);
+          } catch (error) {
+            harness.serverErrors.push(error);
+          }
+        })();
+        return child;
+      }
+      if (executable === TEST_PATHS.moonlightWebServer) {
+        const address = args[args.indexOf("--bind-address") + 1] ?? "";
+        const port = Number(address.split(":").pop());
+        if (!Number.isInteger(port)) throw new Error("Fake Moonlight did not receive a bind address.");
+        let server: HttpServer | null = null;
+        const child = new FakeChild(() => {
+          void closeServer(server);
+        });
+        void (async () => {
+          try {
+            server = createHttpServer(moonlightHandler(harness));
+            harness.servers.push(server);
+            await listenOn(server, port);
+          } catch (error) {
+            harness.serverErrors.push(error);
+          }
+        })();
+        return child;
+      }
+      throw new Error(`Unexpected spawn in test: ${executable} ${(args ?? []).join(" ")}`);
+    };
+    // biome-ignore lint/nursery/noUnsafeTypeAssertion: the test double implements the spawned Sunshine/Moonlight surface.
+    return spawn as unknown as typeof nodeSpawn;
+  }
+  return harness;
+}
+
+async function createStartedRuntime(): Promise<{
+  runtime: SunshineMoonlightRuntime;
+  harness: Harness;
+}> {
+  const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-sunshine-port-test-"));
+  const harness = createHarness(stateDirectory);
+  const runtime = new SunshineMoonlightRuntime({
+    paths: TEST_PATHS,
+    stateDirectory,
+    platform: "darwin",
+    credentials: { username: "openbot-test", password: "test-password" },
+    getDisplays: () => structuredClone(TEST_DISPLAYS),
+    getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
+    spawnProcess: harness.spawn,
+  });
+  await runtime.start();
+  if (harness.serverErrors.length > 0) throw harness.serverErrors[0];
+  return { runtime, harness };
+}
+
+async function disposeRuntime(runtime: SunshineMoonlightRuntime, harness: Harness): Promise<void> {
+  await runtime.stop().catch(() => undefined);
+  await harness.closeAll();
+  await rm(harness.stateDirectory, { recursive: true, force: true });
+}
+
+async function blockTcp(port: number): Promise<TcpServer> {
+  const server = createTcpServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", resolve);
+  });
+  return server;
+}
+
+describe("sunshine port family helpers", () => {
+  it("derives the HTTP/HTTPS pair from one base port", () => {
+    expect(sunshineHttpPortForBase(SUNSHINE_DEFAULT_BASE_PORT)).toBe(47_989);
+    expect(sunshineHttpsPortForBase(SUNSHINE_DEFAULT_BASE_PORT)).toBe(47_990);
+  });
+
+  it("treats adjacent base ports as overlapping families", () => {
+    expect(sunshinePortFamiliesOverlap(47_989, 47_989)).toBe(true);
+    expect(sunshinePortFamiliesOverlap(47_989, 47_990)).toBe(true);
+    expect(sunshinePortFamiliesOverlap(47_989, 48_021)).toBe(false);
+  });
+
+  it("hands out disjoint families from the allocator and releases them", async () => {
+    const first = await allocateSunshineBasePort();
+    try {
+      const second = await allocateSunshineBasePort();
+      try {
+        expect(sunshinePortFamiliesOverlap(first, second)).toBe(false);
+      } finally {
+        releaseSunshineBasePort(second);
+      }
+    } finally {
+      releaseSunshineBasePort(first);
+    }
+  });
+
+  it("hands out disjoint Moonlight WebRTC ranges", async () => {
+    const first: MoonlightWebRtcPortRange = await allocateWebRtcPortRange();
+    try {
+      const second: MoonlightWebRtcPortRange = await allocateWebRtcPortRange();
+      try {
+        expect(first.min).not.toBe(second.min);
+        expect(first.max - first.min).toBe(31);
+      } finally {
+        releaseWebRtcPortRange(second);
+      }
+    } finally {
+      releaseWebRtcPortRange(first);
+    }
+  });
+});
+
+describe("Sunshine port isolation", () => {
+  it("Test A: two runtimes receive disjoint Sunshine families and WebRTC ranges", async () => {
+    const first = await createStartedRuntime();
+    try {
+      const second = await createStartedRuntime();
+      try {
+        expect(first.runtime.sunshineBasePort).not.toBeNull();
+        expect(second.runtime.sunshineBasePort).not.toBeNull();
+        expect(first.runtime.sunshineBasePort).not.toBe(second.runtime.sunshineBasePort);
+        expect(
+          sunshinePortFamiliesOverlap(first.runtime.sunshineBasePort ?? 0, second.runtime.sunshineBasePort ?? 0),
+        ).toBe(false);
+        expect(first.runtime.webRtcPortRange).not.toEqual(second.runtime.webRtcPortRange);
+        expect(first.runtime.state?.baseUrl).not.toBe(second.runtime.state?.baseUrl);
+        expect(first.runtime.sunshineHttpPort).not.toBe(second.runtime.sunshineHttpPort);
+        expect(first.runtime.sunshineHttpsPort).not.toBe(second.runtime.sunshineHttpsPort);
+      } finally {
+        await disposeRuntime(second.runtime, second.harness);
+      }
+    } finally {
+      await disposeRuntime(first.runtime, first.harness);
+    }
+  });
+
+  it("Test B: generated configs carry the runtime ports", async () => {
+    const { runtime, harness } = await createStartedRuntime();
+    try {
+      const base = runtime.sunshineBasePort ?? 0;
+      const sunshineConf = await readFile(join(harness.stateDirectory, "sunshine.conf"), "utf8");
+      expect(sunshineConf).toContain(`port = ${base}`);
+      expect(sunshineConf).toContain("bind_address = 127.0.0.1");
+      const moonlightConfig = moonlightConfigFileSchema.parse(
+        JSON.parse(await readFile(join(harness.stateDirectory, "moonlight-config.json"), "utf8")),
+      );
+      expect(moonlightConfig.moonlight.default_http_port).toBe(runtime.sunshineHttpPort);
+      expect(moonlightConfig.webrtc.port_range).toEqual(runtime.webRtcPortRange);
+      expect(moonlightConfig.web_server.bind_address).toBe(`127.0.0.1:${runtime.moonlightPort}`);
+    } finally {
+      await disposeRuntime(runtime, harness);
+    }
+  });
+
+  it("Test C: Moonlight pairs against the runtime HTTP port, not the default", async () => {
+    const blockers = await Promise.all([blockTcp(47_989), blockTcp(47_990)]);
+    try {
+      const { runtime, harness } = await createStartedRuntime();
+      try {
+        expect(runtime.sunshineHttpPort).not.toBeNull();
+        expect(runtime.sunshineHttpPort).not.toBe(SUNSHINE_DEFAULT_BASE_PORT);
+        expect(harness.observedSunshineHttpPorts).toEqual([runtime.sunshineHttpPort]);
+      } finally {
+        await disposeRuntime(runtime, harness);
+      }
+    } finally {
+      await Promise.all(blockers.map((server) => closeServer(server)));
+    }
+  });
+
+  it("Test D: every Sunshine HTTPS request hits the runtime HTTPS port", async () => {
+    const blockers = await Promise.all([blockTcp(47_989), blockTcp(47_990)]);
+    try {
+      const { runtime, harness } = await createStartedRuntime();
+      try {
+        const httpsPort = runtime.sunshineHttpsPort;
+        expect(httpsPort).not.toBeNull();
+        expect(httpsPort).not.toBe(47_990);
+        expect(harness.pinBodies.length).toBeGreaterThan(0);
+        const paths = harness.sunshineHits.map((hit) => hit.path);
+        expect(paths).toContain("/api/openbot/displays");
+        expect(paths).toContain("/api/pin");
+        for (const hit of harness.sunshineHits) {
+          expect(hit.localPort).toBe(httpsPort);
+        }
+      } finally {
+        await disposeRuntime(runtime, harness);
+      }
+    } finally {
+      await Promise.all(blockers.map((server) => closeServer(server)));
+    }
+  });
+
+  it("Test E: stopping one runtime leaves the other working", async () => {
+    const first = await createStartedRuntime();
+    try {
+      const second = await createStartedRuntime();
+      try {
+        const secondBaseUrl = second.runtime.state?.baseUrl ?? "";
+        await first.runtime.stop();
+        expect(first.runtime.state).toBeNull();
+        expect(second.runtime.state).not.toBeNull();
+        const authenticate = await fetch(`${secondBaseUrl}/api/authenticate`, {
+          headers: { "X-OpenBot-Remote-User": "openbot-remote-slot-1" },
+        });
+        expect(authenticate.ok).toBe(true);
+        await expect(fetch(first.runtime.state?.baseUrl ?? "http://127.0.0.1:1/")).rejects.toThrow();
+        // Restarting the stopped runtime must not disturb the survivor either.
+        await first.runtime.start();
+        expect(first.runtime.state).not.toBeNull();
+        const stillThere = await fetch(`${secondBaseUrl}/api/authenticate`, {
+          headers: { "X-OpenBot-Remote-User": "openbot-remote-slot-1" },
+        });
+        expect(stillThere.ok).toBe(true);
+      } finally {
+        await disposeRuntime(second.runtime, second.harness);
+      }
+    } finally {
+      await disposeRuntime(first.runtime, first.harness);
+    }
+  });
+
+  it("Test F: no fixed 47989/47990 assumptions remain outside the default", async () => {
+    const source = await readFile(fileURLToPath(new URL("./sunshine-moonlight-runtime.ts", import.meta.url)), "utf8");
+    const stripped = source.replace(/\/\/.*$/gm, "");
+    expect(stripped).toContain("SUNSHINE_DEFAULT_BASE_PORT");
+    expect(stripped.match(/47_?989/g) ?? []).toHaveLength(1);
+    expect(stripped.match(/47_?990/g) ?? []).toHaveLength(0);
+    expect(stripped).not.toContain("SUNSHINE_HTTP_PORT");
+    expect(stripped).not.toContain("SUNSHINE_HTTPS_PORT");
+    expect(stripped).toContain("this.#requireSunshineHttpPort()");
+    expect(stripped).toContain("this.#requireSunshineHttpsPort()");
+  });
+});

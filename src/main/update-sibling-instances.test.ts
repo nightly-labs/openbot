@@ -1,0 +1,76 @@
+// @vitest-environment node
+
+import { describe, expect, it, vi } from "vitest";
+import { listSiblingOpenBotInstances, parseSiblingInstances } from "./update-sibling-instances";
+
+const EXECUTABLE = "/Applications/OpenBot.app/Contents/MacOS/OpenBot";
+
+const PS_OUTPUT = [
+  "  101   501 /Applications/OpenBot.app/Contents/MacOS/OpenBot",
+  "  202   502 /Applications/OpenBot.app/Contents/MacOS/OpenBot",
+  "  303   501 /Applications/OpenBot.app/Contents/Frameworks/OpenBot Helper.app/Contents/MacOS/OpenBot Helper",
+  "  404   501 /usr/sbin/systemstats",
+  "garbage line without numbers",
+  "",
+].join("\n");
+
+describe("parseSiblingInstances", () => {
+  it("finds another user's session and skips this process", () => {
+    expect(parseSiblingInstances(PS_OUTPUT, { executablePath: EXECUTABLE, currentPid: 101 })).toEqual([
+      { pid: 202, uid: 502 },
+    ]);
+  });
+
+  it("matches the executable with arguments appended", () => {
+    const output = `111 501 ${EXECUTABLE} --user-data-dir /tmp/x`;
+    expect(parseSiblingInstances(output, { executablePath: EXECUTABLE, currentPid: 999 })).toEqual([
+      { pid: 111, uid: 501 },
+    ]);
+  });
+
+  it("never mistakes an Electron helper for the main process", () => {
+    const output = `303 501 ${EXECUTABLE.replace("MacOS/OpenBot", "Frameworks/OpenBot Helper")}`;
+    expect(parseSiblingInstances(output, { executablePath: EXECUTABLE, currentPid: 999 })).toEqual([]);
+  });
+
+  it("ignores malformed lines and an empty executable path", () => {
+    expect(parseSiblingInstances("garbage\n\n", { executablePath: EXECUTABLE, currentPid: 1 })).toEqual([]);
+    expect(parseSiblingInstances(PS_OUTPUT, { executablePath: "   ", currentPid: 1 })).toEqual([]);
+  });
+});
+
+describe("listSiblingOpenBotInstances", () => {
+  it("scans with ps on macOS", async () => {
+    const listProcesses = vi.fn(async () => PS_OUTPUT);
+    const siblings = await listSiblingOpenBotInstances({
+      executablePath: EXECUTABLE,
+      currentPid: 101,
+      platform: "darwin",
+      listProcesses,
+    });
+    expect(listProcesses).toHaveBeenCalledOnce();
+    expect(siblings).toEqual([{ pid: 202, uid: 502 }]);
+  });
+
+  it("treats a failed scan as no evidence of siblings", async () => {
+    const siblings = await listSiblingOpenBotInstances({
+      executablePath: EXECUTABLE,
+      currentPid: 101,
+      platform: "darwin",
+      listProcesses: async () => "",
+    });
+    expect(siblings).toEqual([]);
+  });
+
+  it("does not scan where ps is unavailable", async () => {
+    const listProcesses = vi.fn(async () => PS_OUTPUT);
+    const siblings = await listSiblingOpenBotInstances({
+      executablePath: EXECUTABLE,
+      currentPid: 101,
+      platform: "win32",
+      listProcesses,
+    });
+    expect(listProcesses).not.toHaveBeenCalled();
+    expect(siblings).toEqual([]);
+  });
+});

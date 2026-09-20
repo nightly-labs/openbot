@@ -563,6 +563,14 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directTyping", forwardDirectTyping);
       updater.on("status", forwardUpdateStatus);
       updater.start();
+      // Host-managed updates: this instance quits itself when the coordinator's intent says
+      // stopping and its own readiness agrees. The stopped marker goes down before shutdown
+      // preparation, so the leader sees it even as this process tears itself down.
+      built.hostUpdateCoordinator.setStopHandler(async (version) => {
+        await built.hostUpdateCoordinator.markStopped(version);
+        await prepareForUpdateInstall();
+        app.quit();
+      });
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);

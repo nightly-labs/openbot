@@ -26,4 +26,19 @@ describe("AgentInitializationGate", () => {
 
     expect(initialize).toHaveBeenCalledTimes(2);
   });
+
+  it("reports pending only while initialization runs", async () => {
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const gate = new AgentInitializationGate(() => started);
+
+    expect(gate.pending).toBe(false);
+    const run = gate.start();
+    expect(gate.pending).toBe(true);
+    release();
+    await run;
+    expect(gate.pending).toBe(false);
+  });
 });

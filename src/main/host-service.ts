@@ -279,6 +279,21 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   /**
+   * Why the Team host half of this instance must not restart right now. A session still
+   * connecting never blocks: only a connected stream, a live browser view, or a moving file
+   * transfer holds the restart. Agent work is reported by AgentService, not here.
+   */
+  describeRestartBlockers(): string[] {
+    const reasons: string[] = [];
+    if (this.#remoteScreen.list().some((session) => session.phase === "connected")) {
+      reasons.push("remote-desktop");
+    }
+    if (this.#browserView.activeViewCount() > 0) reasons.push("browser-view");
+    if (this.#webrtcGateway?.hasActiveTransfers()) reasons.push("file-transfer");
+    return reasons;
+  }
+
+  /**
    * Binds the host to the signed-in account, or unbinds it on sign-out. The status is
    * rebuilt from the newly active identity rather than patched, so a second account can
    * never inherit the first one's server name, id or launch preference.

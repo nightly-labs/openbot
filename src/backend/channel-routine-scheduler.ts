@@ -104,6 +104,20 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     return this.#routines.list(this.#requireChannel(channelId));
   }
 
+  /**
+   * Whether any channel routine run is executing right now. Scheduled future runs do not count:
+   * they resume from durable rows after a restart. See RoutineScheduler.hasActiveRuns for why the
+   * executing case is still worth naming.
+   */
+  hasActiveRuns(): boolean {
+    for (const channelId of this.#channels.store.ids()) {
+      for (const routine of this.#routines.list(channelId)) {
+        if (this.#routines.activeRuns(channelId, routine.id).length > 0) return true;
+      }
+    }
+    return false;
+  }
+
   listRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
     return this.#routines.listRuns(this.#requireChannel(input.channelId), input.routineId, input.limit ?? 50);
   }

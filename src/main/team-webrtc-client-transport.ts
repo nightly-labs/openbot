@@ -343,6 +343,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     await this.#files.stop();
   }
 
+  /** Whether a transfer is moving right now, either direction. */
+  hasActiveTransfers(): boolean {
+    return this.#files.hasActiveTransfers();
+  }
+
   async #ensureConnected(hostId: string): Promise<void> {
     const principalId = this.#options.getPrincipalId();
     let current = this.#active.get(hostId);

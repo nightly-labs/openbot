@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { UpdateBusyPhase, UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
+import type { OpenBotSiblingInstance } from "./update-sibling-instances";
 
 /** Only the part of electron-updater's cancellation token this service depends on. */
 export type UpdateCancellationToken = {
@@ -78,6 +79,7 @@ interface UpdateServiceOptions {
   enabled: boolean;
   autoDownload: boolean;
   beforeInstall: () => Promise<void>;
+  checkSiblingInstances?: () => Promise<readonly OpenBotSiblingInstance[]>;
   platform?: NodeJS.Platform;
   logDirectory?: string;
   shipItDirectory?: string;
@@ -149,7 +151,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   readonly #options: Required<
     Pick<UpdateServiceOptions, "currentVersion" | "enabled" | "platform" | "initialCheckDelayMs" | "checkIntervalMs">
   > &
-    Pick<UpdateServiceOptions, "beforeInstall" | "logDirectory" | "shipItDirectory"> & {
+    Pick<UpdateServiceOptions, "beforeInstall" | "checkSiblingInstances" | "logDirectory" | "shipItDirectory"> & {
       phaseTimeoutsMs: Record<UpdateBusyPhase, number>;
     };
   #status: UpdateStatus;
@@ -162,6 +164,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #logWrite = Promise.resolve();
   #autoDownload: boolean;
   #downloadedVersion: string | null = null;
+  #managedByHost = false;
   #cancellationToken: UpdateCancellationToken | null = null;
   #checkGeneration = 0;
   #downloadGeneration = 0;
@@ -251,7 +254,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   }
 
   getStatus(): UpdateStatus {
-    return { ...this.#status };
+    const status = { ...this.#status };
+    if (this.#managedByHost) status.managedByHost = true;
+    return status;
   }
 
   getDiagnostics(): UpdateDiagnosticEvent[] {
@@ -265,6 +270,17 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   setAutoDownload(enabled: boolean): void {
     this.#autoDownload = enabled;
     if (enabled && this.#options.enabled && this.#status.phase === "available") void this.downloadUpdate();
+  }
+
+  /**
+   * Marks this instance host-managed: tenants report status but never install on their own.
+   * The flag only ever appears in the reported status; it changes no phase and interrupts
+   * nothing, so flipping it mid-download is safe.
+   */
+  setManagedByHost(managed: boolean): void {
+    if (this.#managedByHost === managed) return;
+    this.#managedByHost = managed;
+    this.#setStatus({});
   }
 
   /**
@@ -367,6 +383,35 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   async installUpdate(): Promise<void> {
     if (!this.#canInstall() || this.#installStarted) {
       throw new Error("An update is not ready to install.");
+    }
+    // Host-managed tenants never install on their own, even with no sibling in sight: the
+    // host owns the timing. Like the sibling refusal this throws before the latch, so the
+    // update stays ready.
+    if (this.#managedByHost) {
+      throw new Error(MANAGED_HOST_MESSAGE);
+    }
+    await this.#install();
+  }
+
+  /**
+   * The host coordinator's install: same one-shot path as the tenant action, but allowed on a
+   * managed instance. The sibling check still runs — a tenant that came back early must block
+   * the bundle replacement exactly like a tenant that never left.
+   */
+  async installHostUpdate(): Promise<void> {
+    if (!this.#canInstall() || this.#installStarted) {
+      throw new Error("An update is not ready to install.");
+    }
+    await this.#install();
+  }
+
+  async #install(): Promise<void> {
+    // Replacing the application bundle while another login session runs OpenBot from it breaks
+    // that session, so refuse before the one-shot install latch and before shutdown preparation.
+    // Nothing is torn down, the update stays ready, and the user retries once every session stopped.
+    const siblings = (await this.#options.checkSiblingInstances?.()) ?? [];
+    if (siblings.length > 0) {
+      throw new Error(SIBLING_SESSION_MESSAGE);
     }
     const generation = ++this.#installGeneration;
     this.#activeInstall = generation;
@@ -558,6 +603,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 }
 
 const INSTALL_FAILED_MESSAGE = "Could not install the update. Quit and reopen OpenBot, then try again.";
+const MANAGED_HOST_MESSAGE =
+  "Updates on this Mac are installed by the host. The update stays ready until the host's maintenance runs.";
+const SIBLING_SESSION_MESSAGE =
+  "Another OpenBot session is still running from this application. Stop OpenBot in every other macOS user account first, then install the update again.";
 const CHECK_STALLED_MESSAGE = "The update check stopped responding. Try again.";
 const CHECK_OFFLINE_MESSAGE = "Could not reach the update service. Check your internet connection, then try again.";
 const CHECK_SERVICE_MESSAGE = "The update service did not answer. OpenBot tries again on its own in a few minutes.";

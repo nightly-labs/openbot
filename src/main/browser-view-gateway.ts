@@ -85,6 +85,15 @@ export class BrowserViewGateway {
     return true;
   }
 
+  /** Views with a live socket. Created but never opened views do not hold anything. */
+  activeViewCount(): number {
+    let count = 0;
+    for (const session of this.#sessions.values()) {
+      if (session.socket) count += 1;
+    }
+    return count;
+  }
+
   async revokeTeamSession(teamSessionId: string): Promise<void> {
     for (const session of [...this.#sessions.values()]) {
       if (session.teamSessionId === teamSessionId) await this.#closeSession(session, "Team access ended.");

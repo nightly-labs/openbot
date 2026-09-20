@@ -68,7 +68,7 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
               size="sm"
               loading={props.store.presentation().busy}
               loadingLabel={props.store.presentation().actionLabel}
-              disabled={!props.store.presentation().supported}
+              disabled={!props.store.presentation().supported || props.store.presentation().managed}
               onClick={() => void props.store.runAction()}
             >
               {props.store.presentation().supported ? props.store.presentation().actionLabel : "Updates unavailable"}
