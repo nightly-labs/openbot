@@ -530,6 +530,47 @@ describe("signing in to an http MCP server", () => {
     await expect(signIn.complete()).rejects.toThrow("The sign-in was abandoned.");
   });
 
+  it("abandons a refresh whose token endpoint never answers", async () => {
+    const server = await fakeServer({ hangToken: true });
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("A refresh must never open a browser."),
+      refreshTimeoutMs: 200,
+    });
+
+    // The token endpoint takes the connection and never answers. Each caller falls back to the
+    // stored token - but the second caller must not join the same dead request and wait it out
+    // again. The aborted exchange is released, so it starts a fresh one instead, which is the
+    // second token request below.
+    expect(await oauth.accessToken(server.url)).toBe(ACCESS_TOKEN);
+    expect(await oauth.accessToken(server.url)).toBe(ACCESS_TOKEN);
+    expect(server.tokenRequests.filter((form) => form.get("grant_type") === "refresh_token")).toHaveLength(2);
+  });
+
+  it("refuses credential writes from an abandoned sign-in", async () => {
+    const storage = memoryStorage();
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("Nothing is signed in here."),
+    });
+    const signIn = oauth.signIn("https://mcp.example.com/mcp");
+    if (!signIn) throw new Error("The example server cannot be signed in to.");
+    signIn.abandon();
+
+    await expect(signIn.provider.saveTokens({ access_token: "late-token", token_type: "Bearer" })).rejects.toThrow(
+      "The MCP sign-in was abandoned.",
+    );
+    expect(storage.read("https://mcp.example.com/mcp")).toBeNull();
+  });
+
   it("keeps the token it just minted out of the failure it reports", async () => {
     const server = await fakeServer({ quoteTokenOnError: true });
     const storage = memoryStorage();

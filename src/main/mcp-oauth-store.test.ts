@@ -96,6 +96,48 @@ describe("McpOAuthStore", () => {
     expect(reopened.read(LINEAR)).toBeNull();
   });
 
+  it("keeps a record that names only where the authorization server was found", async () => {
+    const { path, store } = await createStore();
+    // The SDK saves discovery state before it registers: a first sign-in writes this and
+    // nothing else, and deleting it would send the code exchange back to default discovery.
+    await store.write(LINEAR, {
+      discovery: {
+        authorizationServerUrl: "https://auth.example.com",
+        resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
+      },
+    });
+
+    const reopened = new McpOAuthStore(path, cipher);
+    expect(await reopened.load()).toBeNull();
+    expect(reopened.read(LINEAR)).toEqual({
+      discovery: {
+        authorizationServerUrl: "https://auth.example.com",
+        resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
+      },
+    });
+
+    // The sign-in that follows merges into the discovery the SDK saved before registering,
+    // rather than replacing it: registration and tokens arrive as later writes to the same row.
+    await reopened.write(LINEAR, {
+      discovery: {
+        authorizationServerUrl: "https://auth.example.com",
+        resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth-protected-resource",
+      },
+      client: { client_id: "client-abc", redirect_uris: ["openbot://mcp-auth"] },
+    });
+    const reloaded = new McpOAuthStore(path, cipher);
+    await reloaded.load();
+    expect(reloaded.read(LINEAR)).toMatchObject({
+      discovery: { authorizationServerUrl: "https://auth.example.com" },
+      client: { client_id: "client-abc" },
+    });
+
+    await reloaded.write(LINEAR, {});
+    const emptied = new McpOAuthStore(path, cipher);
+    await emptied.load();
+    expect(emptied.read(LINEAR)).toBeNull();
+  });
+
   it("reports an envelope it cannot understand, and leaves it on disk", async () => {
     const { path } = await createStore();
     // Startup continues past this file: an unreadable sign-in must not stop the app, and it must

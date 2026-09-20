@@ -91,8 +91,12 @@ export class McpOAuthStore implements McpOAuthStorage {
       }
       const next = this.#editableRecords();
       // An empty record is the absence of one. `invalidateCredentials("all")` arrives as a clear, and
-      // dropping everything about a server arrives here as an object with nothing in it.
-      if (record.client === undefined && record.tokens === undefined) next.delete(resource);
+      // dropping everything about a server arrives here as an object with nothing in it. A record
+      // that names only where the authorization server was found is not empty: the SDK saves
+      // discovery state before it registers, and deleting it here would send the code exchange
+      // back to default discovery.
+      if (record.client === undefined && record.tokens === undefined && record.discovery === undefined)
+        next.delete(resource);
       else next.set(resource, record);
       await this.#commit(next);
     });

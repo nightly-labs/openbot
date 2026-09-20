@@ -224,17 +224,26 @@ export class McpOAuth implements McpOAuthAuthority {
       provider,
       complete: async () => {
         if (abandoned) throw new Error("The sign-in was abandoned.");
+        // Aborts with the wait: a token endpoint that never completes must not keep a request
+        // running after this attempt ends, or its late response would write credentials a later
+        // sign-in already replaced.
+        const controller = new AbortController();
         try {
           const code = await withSignInDeadline(grant, this.#options.signInTimeoutMs ?? MCP_SIGN_IN_TIMEOUT_MS);
           // The grant waited on the person; the trade waits on the server, and on nothing else.
           // Without this a hung token endpoint holds the test past its own deadline after the user
           // has done everything right.
           await withTimeout(
-            auth(provider, { serverUrl: resource, authorizationCode: code }),
+            auth(provider, {
+              serverUrl: resource,
+              authorizationCode: code,
+              fetchFn: (url, init) => fetch(url, { ...init, signal: controller.signal }),
+            }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
             "The sign-in response did not arrive in time.",
           );
         } finally {
+          controller.abort();
           abandon();
         }
       },
@@ -270,12 +279,14 @@ export class McpOAuth implements McpOAuthAuthority {
     const generation = this.#generations.get(resource) ?? 0;
     const storage = this.#options.storage;
     // The store as this run saw it: reads answer from disk, but a write lands only while no
-    // `forget` has removed the server since this provider was built.
+    // `forget` has removed the server - and no abandon has ended the run - since this provider
+    // was built.
     const guarded: McpOAuthStorage = {
       read: (candidate) => storage.read(candidate),
       write: async (candidate, record) => {
         if ((this.#generations.get(resource) ?? 0) !== generation)
           throw new Error("The MCP sign-in was forgotten while it was running.");
+        if (isAbandoned()) throw new Error("The MCP sign-in was abandoned.");
         await storage.write(candidate, record);
       },
       clear: (candidate) => storage.clear(candidate),
