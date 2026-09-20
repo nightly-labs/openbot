@@ -169,6 +169,9 @@ export class CuaDriverRuntime {
   readonly #options: CuaDriverRuntimeOptions;
   readonly #spawn: SpawnDriverProcess;
   readonly #listeners = new Set<(state: ComputerUseState) => void>();
+  readonly #mcpListeners = new Set<() => void>();
+  /** What the providers were last told to spawn, `""` for "nothing". */
+  #announcedMcpServer = "";
   #child: ChildProcess | null = null;
   #starting: Promise<void> | null = null;
   #state: ComputerUseState;
@@ -230,6 +233,20 @@ export class CuaDriverRuntime {
   }
 
   /**
+   * Told when the entry the providers are handed appears, changes or goes, and at no other time.
+   *
+   * Separate from the state, because the two ask for different work. A state change updates the
+   * capability, which costs nothing. An entry change replaces every agent's provider session,
+   * because the tool set is decided at each spawn. Granting a permission changes the state while
+   * the daemon keeps serving the same entry, so telling this listener then would end every
+   * conversation's session for a tool set that did not move.
+   */
+  onMcpServerChanged(listener: () => void): () => void {
+    this.#mcpListeners.add(listener);
+    return () => this.#mcpListeners.delete(listener);
+  }
+
+  /**
    * The daemon, started once however many callers ask at the same time.
    *
    * Starting is what makes macOS ask for the grants, so nothing starts it except the panel, an
@@ -242,6 +259,7 @@ export class CuaDriverRuntime {
     this.#starting = this.#start();
     try {
       await this.#starting;
+      this.#announceMcpServer();
     } finally {
       this.#starting = null;
     }
@@ -252,6 +270,7 @@ export class CuaDriverRuntime {
     this.#child = null;
     if (child) await stopRemoteProcess(child);
     await this.#removeSocket();
+    this.#announceMcpServer();
   }
 
   /** The panel's answer: starts the daemon if it is not running, then asks it what it may do. */
@@ -371,6 +390,7 @@ export class CuaDriverRuntime {
       if (this.#child !== child) return;
       this.#child = null;
       this.#options.onDiagnostic?.(`OpenBot: the Computer Use driver stopped with code ${code ?? "unknown"}.\n`);
+      this.#announceMcpServer();
       this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
@@ -397,6 +417,14 @@ export class CuaDriverRuntime {
     for (const stream of [child.stdout, child.stderr]) {
       stream?.on("data", (chunk: Buffer) => this.#options.onDiagnostic?.(chunk.toString("utf8")));
     }
+  }
+
+  #announceMcpServer(): void {
+    const config = this.mcpServerConfig();
+    const announced = config ? [config.command, ...config.args].join(" ") : "";
+    if (announced === this.#announcedMcpServer) return;
+    this.#announcedMcpServer = announced;
+    for (const listener of this.#mcpListeners) listener();
   }
 
   #initialState(): ComputerUseState {

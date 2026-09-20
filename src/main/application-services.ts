@@ -561,10 +561,10 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
   // The capability and the tool list both follow the daemon, and nothing else can tell them: no
   // provider probe reaches the driver, because the driver is this process's child.
-  cuaDriver.onStateChanged((state) => {
-    service.setComputerUseCapability(computerUseCapability(state));
-    service.notifyComputerUseChanged();
-  });
+  cuaDriver.onStateChanged((state) => service.setComputerUseCapability(computerUseCapability(state)));
+  // Only when the entry itself appears or goes: this replaces every agent's provider session, and a
+  // grant given while the daemon serves changes the state without changing the tool set.
+  cuaDriver.onMcpServerChanged(() => service.notifyComputerUseChanged());
   // A user who granted the permissions expects the tools after a restart without opening the panel,
   // and a remote request or a scheduled task opens no window at all. This starts the daemon once and
   // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees

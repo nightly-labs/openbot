@@ -198,6 +198,32 @@ describe("CuaDriverRuntime", () => {
     expect(seen).toEqual(["ready"]);
   });
 
+  // Replacing a provider session ends the idle conversations with it, so the tool set has to have
+  // moved. A grant given while the daemon serves leaves the entry exactly as it was.
+  it("reports the MCP entry only when it appears or goes, not when a grant changes", async () => {
+    let granted = false;
+    const { driver } = await runtime({
+      readPermissions: async () => [
+        { id: "screen-recording", granted },
+        { id: "accessibility", granted },
+      ],
+    });
+    let entries = 0;
+    driver.onMcpServerChanged(() => {
+      entries += 1;
+    });
+
+    await driver.state();
+    expect(entries).toBe(1);
+
+    granted = true;
+    await expect(driver.state()).resolves.toMatchObject({ status: "ready" });
+    expect(entries).toBe(1);
+
+    await driver.stop();
+    expect(entries).toBe(2);
+  });
+
   // A remote request and a scheduled task open no window, so waiting for the panel would leave a
   // user who granted the permissions without the tools after every restart.
   it("keeps the daemon at startup for a granted computer, and drops it for one that is not", async () => {
