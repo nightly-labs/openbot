@@ -20,9 +20,8 @@
       "iconUrl": "https://linear.app/favicon.ico",
       "server": {
         "name": "linear",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "mcp-remote@latest", "https://mcp.linear.app/sse"],
+        "transport": "http",
+        "url": "https://mcp.linear.app/mcp",
         "auth": [{ "id": "linear-oauth", "kind": "link", "label": "Sign in" }]
       }
     }

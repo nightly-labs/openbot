@@ -1,0 +1,281 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { afterEach, describe, expect, it } from "vitest";
+import { McpOAuth, type McpOAuthRecord, type McpOAuthStorage, normalizeResource } from "./mcp-oauth-provider";
+import { testMcpServer } from "./mcp-probe";
+
+/**
+ * A server that answers 401 until it is shown a token, and an authorization server beside it.
+ *
+ * Written on `node:http` rather than on the SDK's server helpers, so what is asserted is the wire a
+ * real bridge speaks: RFC 9728 discovery, RFC 7591 registration, a PKCE authorization code, and the
+ * bearer header on the request that finally works.
+ */
+const GRANT = "grant-abc";
+const ACCESS_TOKEN = "issued-access-token";
+
+interface FakeServer {
+  base: string;
+  url: string;
+  registrations: number;
+  tokenRequests: URLSearchParams[];
+  close: () => Promise<void>;
+}
+
+async function readBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  return new Promise<string>((resolve, reject) => {
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    request.on("error", reject);
+  });
+}
+
+function sendJson(response: ServerResponse, status: number, body: unknown): void {
+  response.writeHead(status, { "content-type": "application/json" });
+  response.end(JSON.stringify(body));
+}
+
+async function startFakeServer(): Promise<FakeServer> {
+  const state: { registrations: number; tokenRequests: URLSearchParams[] } = { registrations: 0, tokenRequests: [] };
+  let base = "";
+  const server: Server = createServer((request, response) => {
+    void (async () => {
+      const path = new URL(request.url ?? "/", base).pathname;
+      if (path === "/.well-known/oauth-protected-resource") {
+        sendJson(response, 200, { resource: `${base}/mcp`, authorization_servers: [base] });
+        return;
+      }
+      if (path === "/.well-known/oauth-authorization-server") {
+        sendJson(response, 200, {
+          issuer: base,
+          authorization_endpoint: `${base}/authorize`,
+          token_endpoint: `${base}/token`,
+          registration_endpoint: `${base}/register`,
+          response_types_supported: ["code"],
+          grant_types_supported: ["authorization_code", "refresh_token"],
+          code_challenge_methods_supported: ["S256"],
+        });
+        return;
+      }
+      if (path === "/register") {
+        await readBody(request);
+        state.registrations += 1;
+        sendJson(response, 201, { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] });
+        return;
+      }
+      if (path === "/token") {
+        const form = new URLSearchParams(await readBody(request));
+        state.tokenRequests.push(form);
+        if (form.get("code") !== GRANT || !form.get("code_verifier")) {
+          sendJson(response, 400, { error: "invalid_grant" });
+          return;
+        }
+        sendJson(response, 200, {
+          access_token: ACCESS_TOKEN,
+          token_type: "Bearer",
+          expires_in: 3600,
+          refresh_token: "issued-refresh-token",
+        });
+        return;
+      }
+      if (path !== "/mcp") {
+        response.writeHead(404).end();
+        return;
+      }
+      if (request.headers.authorization !== `Bearer ${ACCESS_TOKEN}`) {
+        response.writeHead(401, {
+          "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+        });
+        response.end();
+        return;
+      }
+      // The transport also opens a stream and deletes the session as it closes; neither carries a
+      // request, and answering them keeps the test's failures about the sign-in.
+      const body = await readBody(request);
+      if (!body) {
+        response.writeHead(request.method === "DELETE" ? 204 : 405).end();
+        return;
+      }
+      const message: { id?: number; method?: string } = JSON.parse(body);
+      if (message.id === undefined) {
+        response.writeHead(202).end();
+        return;
+      }
+      sendJson(response, 200, {
+        jsonrpc: "2.0",
+        id: message.id,
+        result:
+          message.method === "initialize"
+            ? {
+                protocolVersion: "2025-06-18",
+                capabilities: { tools: {} },
+                serverInfo: { name: "fake", version: "1" },
+              }
+            : { tools: [{ name: "one", inputSchema: { type: "object" } }] },
+      });
+    })();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new Error("The fake server has no port.");
+  base = `http://127.0.0.1:${address.port}`;
+  return {
+    get base() {
+      return base;
+    },
+    url: `${base}/mcp`,
+    get registrations() {
+      return state.registrations;
+    },
+    get tokenRequests() {
+      return state.tokenRequests;
+    },
+    close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
+  };
+}
+
+/** The store, without the file. `McpOAuthStore` covers the encryption and the envelope. */
+function memoryStorage(): McpOAuthStorage & { records: Map<string, McpOAuthRecord> } {
+  const records = new Map<string, McpOAuthRecord>();
+  return {
+    records,
+    read: (resource) => records.get(resource) ?? null,
+    write: async (resource, record) => {
+      records.set(resource, record);
+    },
+    clear: async (resource) => {
+      records.delete(resource);
+    },
+  };
+}
+
+function config(url: string): McpServerConfig {
+  return {
+    id: "mcp-1",
+    name: "Signed in",
+    transport: "http",
+    enabled: true,
+    command: "",
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url,
+    headers: [],
+  };
+}
+
+const servers: FakeServer[] = [];
+
+afterEach(async () => {
+  await Promise.all(servers.splice(0).map((server) => server.close()));
+});
+
+async function fakeServer(): Promise<FakeServer> {
+  const server = await startFakeServer();
+  servers.push(server);
+  return server;
+}
+
+describe("signing in to an http MCP server", () => {
+  it("registers, gets a grant from the browser, and connects with the token", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    const opened: string[] = [];
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      // The browser stands in for the user: it goes to the address it was given and comes back on
+      // the deep link, which is the only way a grant reaches this process.
+      openExternal: async (url) => {
+        opened.push(url);
+        const state = new URL(url).searchParams.get("state") ?? "";
+        expect(oauth.receiveAuthorizationCode(state, GRANT)).toBe(true);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({ toolCount: 1, error: null });
+
+    const authorize = new URL(opened[0] ?? "");
+    expect(authorize.origin + authorize.pathname).toBe(`${server.base}/authorize`);
+    expect(authorize.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(authorize.searchParams.get("redirect_uri")).toBe("openbot://mcp-auth");
+    expect(server.tokenRequests[0]?.get("code_verifier")).toBeTruthy();
+    expect(storage.read(server.url)?.tokens?.access_token).toBe(ACCESS_TOKEN);
+  });
+
+  it("spends the stored token the next time rather than signing in again", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    const opened: string[] = [];
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        opened.push(url);
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+    await testMcpServer(config(server.url), 10_000, undefined, oauth);
+
+    expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({ toolCount: 1, error: null });
+    // One browser trip and one registration for the whole account: a second window per test, or per
+    // thread start, is the failure this store exists to stop.
+    expect(opened).toHaveLength(1);
+    expect(server.registrations).toBe(1);
+    // And the hand-off path answers with the same token without going anywhere.
+    expect(await oauth.accessToken(server.url)).toBe(ACCESS_TOKEN);
+  });
+
+  it("says so plainly when a server answers 401 and nobody is signing in", async () => {
+    const server = await fakeServer();
+    // A thread start, not a test the user pressed: no browser opens and the tools are simply absent.
+    expect(await testMcpServer(config(server.url), 10_000)).toEqual({
+      toolCount: 0,
+      error: "The server answered 401.",
+    });
+  });
+
+  it("forgets a sign-in when the server is removed", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+    await testMcpServer(config(server.url), 10_000, undefined, oauth);
+
+    await oauth.forget(server.url);
+    expect(storage.records.size).toBe(0);
+    expect(await oauth.accessToken(server.url)).toBeNull();
+  });
+
+  it("ignores a grant for a sign-in this run never started", async () => {
+    const oauth = new McpOAuth({
+      storage: memoryStorage(),
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => undefined,
+    });
+    // Which is what makes a forged or replayed `openbot://mcp-auth` link do nothing at all.
+    expect(oauth.receiveAuthorizationCode("state-nobody-issued", GRANT)).toBe(false);
+  });
+
+  it("offers no sign-in for an address a grant must not be sent to", () => {
+    const oauth = new McpOAuth({
+      storage: memoryStorage(),
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => undefined,
+    });
+    expect(normalizeResource("http://mcp.example.com/mcp")).toBeNull();
+    expect(normalizeResource("https://mcp.example.com/mcp#tab")).toBe("https://mcp.example.com/mcp");
+    expect(oauth.signIn("http://mcp.example.com/mcp")).toBeNull();
+    expect(oauth.signIn("http://localhost:4000/mcp")).not.toBeNull();
+  });
+});

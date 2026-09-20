@@ -22,11 +22,19 @@ import { routeToServer } from "./route-to-server";
 interface McpServerIpcDependencies {
   service: AgentService;
   remoteServers: RemoteServerManager;
+  /**
+   * Fetches the tool runtimes an MCP server is started with, if this machine does not hold them
+   * yet. Onboarding asks for them first; this covers the user who was already past onboarding when
+   * OpenBot learned to download one. It answers at once and reports nothing, so a slow or failed
+   * download cannot turn saving a row into an error.
+   */
+  startToolRuntimes: () => void;
 }
 
 export function mcpServerIpcHandlers({
   service,
   remoteServers,
+  startToolRuntimes,
 }: McpServerIpcDependencies): Pick<IpcGroupHandlers, "mcpServers"> {
   /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
@@ -56,7 +64,10 @@ export function mcpServerIpcHandlers({
       save: payloadHandler(parseAgentRequest, (scoped) => {
         const parsed = parseSaveMcpServer(scoped.payload);
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
-          local: () => service.saveMcpServer(parsed),
+          local: () => {
+            startToolRuntimes();
+            return service.saveMcpServer(parsed);
+          },
           remote: (serverId) => remoteList(serverId, MCP_ROUTES.save, parsed),
         });
       }),
@@ -70,7 +81,10 @@ export function mcpServerIpcHandlers({
       setEnabled: payloadHandler(parseAgentRequest, (scoped) => {
         const parsed = parseSetMcpServerEnabled(scoped.payload);
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
-          local: () => service.setMcpServerEnabled(parsed),
+          local: () => {
+            if (parsed.enabled) startToolRuntimes();
+            return service.setMcpServerEnabled(parsed);
+          },
           remote: (serverId) => remoteList(serverId, MCP_ROUTES.toggle, parsed),
         });
       }),
@@ -79,7 +93,9 @@ export function mcpServerIpcHandlers({
       test: payloadHandler(parseAgentRequest, (scoped) => {
         const parsed = parseTestMcpServer(scoped.payload);
         return routeToServer<McpTestResult>(scoped.serverId, {
-          local: () => service.testMcpServer(parsed),
+          // Interactive: the user pressed Test and is in front of the browser a sign-in opens. The
+          // remote branch below carries no such flag, and the route it reaches does not set one.
+          local: () => service.testMcpServer(parsed, { interactive: true }),
           remote: (serverId) => {
             requireRemoteSupport(serverId);
             return remoteServers.request(serverId, MCP_ROUTES.test, decodeMcpTestResult, {

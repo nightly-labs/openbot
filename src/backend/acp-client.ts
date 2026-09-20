@@ -24,7 +24,14 @@ import { elicitationOptions, elicitationValue, secretElicitationField } from "./
 import type { AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
-import { acpMcpServers, type McpServerSource, usableMcpServers } from "./mcp-provider-shapes";
+import {
+  acpMcpServers,
+  type McpAuthorizationSource,
+  type McpDropReporter,
+  type McpServerSource,
+  type McpToolRuntimeSource,
+  usableMcpServers,
+} from "./mcp-provider-shapes";
 import {
   type AccountRateLimitsReadResult,
   type AppServerNotification,
@@ -142,6 +149,10 @@ export interface AcpProviderOptions {
    * so a configuration can never displace the tools the agent depends on.
    */
   mcpServers?: McpServerSource;
+  /** What this provider could not be given. Reported once per spawn, by `AgentService`. */
+  reportMcpDrops?: McpDropReporter;
+  mcpToolRuntimes?: McpToolRuntimeSource;
+  mcpAuthorization?: McpAuthorizationSource;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   /**
    * Reads optional identity fields that ACP does not define. A provider extension failing must not
@@ -586,7 +597,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       let currentModelId: string | null;
       // OpenBot's bridge servers last: all providers key MCP servers by name, so a user
       // configuration that reached one of those names would take the agent's own tools away.
-      const mcpServers = [...acpMcpServers(await usableMcpServers(this.options.mcpServers?.() ?? [])), ...mcp.servers];
+      const handoff = acpMcpServers(
+        await usableMcpServers(
+          this.options.mcpServers?.() ?? [],
+          this.options.mcpToolRuntimes?.(),
+          this.options.mcpAuthorization,
+        ),
+      );
+      this.options.reportMcpDrops?.(this.provider, handoff.dropped);
+      const mcpServers = [...handoff.servers, ...mcp.servers];
       if (resume && requestedThreadId) {
         const response = await connection.loadSession({
           sessionId: requestedThreadId,

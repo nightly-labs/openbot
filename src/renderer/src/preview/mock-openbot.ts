@@ -350,6 +350,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         grok: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         opencode: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
+      // No `availableVersion`: a tool runtime is downloaded once and replaced by a release, so the
+      // preview never offers an update for one.
+      toolRuntimes: { bun: { phase: "not-downloaded", progress: null, message: null, version: null } },
     },
   );
   let failRuntimeDownload = options.providerRuntimeFailure ?? false;

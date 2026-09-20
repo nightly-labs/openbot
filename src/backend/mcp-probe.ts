@@ -1,3 +1,4 @@
+import { type OAuthClientProvider, UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -5,8 +6,18 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { mcpLaunchEnvironment, type UsableMcpServer, usableMcpServer } from "./mcp-provider-shapes";
-import { redactMcpSecrets } from "./mcp-redaction";
+import type { McpOAuthAuthority, McpSignIn } from "./mcp-oauth-provider";
+import {
+  clearMcpCommandCache,
+  type McpToolRuntimes,
+  mcpHandoffHeaders,
+  mcpLaunchEnvironment,
+  NO_MCP_TOOL_RUNTIMES,
+  type ResolvedMcpServer,
+  type UsableMcpServer,
+  usableMcpServer,
+} from "./mcp-provider-shapes";
+import { redactMcpSecrets, redactMcpValues } from "./mcp-redaction";
 
 export const MCP_PROBE_TIMEOUT_MS = 10_000;
 
@@ -26,11 +37,32 @@ export interface McpProbeResult {
 export async function testMcpServer(
   config: McpServerConfig,
   timeoutMs = MCP_PROBE_TIMEOUT_MS,
+  tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
+  oauth?: McpOAuthAuthority,
 ): Promise<McpProbeResult> {
+  // The user is asking about now, usually straight after installing the thing that was missing, so
+  // no command keeps an answer from earlier in this run. Only a test does this: a hand-off wants
+  // the answer the probe gave, or the panel and the agent would describe two different servers.
+  clearMcpCommandCache();
   // Nothing cancels a test from outside: it ends on its own within the deadline, and a child that
   // outlives its transport is killed below either way.
   const controller = new AbortController();
-  return probeMcpServer(await usableMcpServer(config), controller.signal, timeoutMs);
+  /*
+   * A sign-in is offered only here, and only for an http server. This is the one path a person is
+   * waiting on: at a thread start the same 401 has to stay silent, because a browser window nobody
+   * asked for arriving in the middle of an answer is worse than a tool that says it is not signed in.
+   */
+  const signIn = config.transport === "http" ? (oauth?.signIn(config.url) ?? null) : null;
+  try {
+    return await probeMcpServer(
+      await usableMcpServer(config, tools, oauth ? (subject) => oauth.accessToken(subject.url) : undefined),
+      controller.signal,
+      timeoutMs,
+      signIn,
+    );
+  } finally {
+    signIn?.abandon();
+  }
 }
 
 /**
@@ -43,14 +75,54 @@ export async function probeMcpServer(
   server: UsableMcpServer,
   signal: AbortSignal,
   timeoutMs = MCP_PROBE_TIMEOUT_MS,
+  signIn: McpSignIn | null = null,
 ): Promise<McpProbeResult> {
   const { config } = server;
-  if (server.error) return { toolCount: 0, error: boundedError(server.error) };
+  // `!== undefined`, not truthiness: the resolved arm declares `error?: undefined`, and only the
+  // explicit comparison narrows this union to the arm `connectAndCount` below is given.
+  if (server.error !== undefined) return { toolCount: 0, error: boundedError(server.error) };
 
-  const client = new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} });
-  const transport = createTransport(server);
+  /*
+   * The token is minted for this connection and never written to the row, so `describeMcpError`,
+   * which reads the configuration, cannot know it. A transport reports a failure by quoting what it
+   * sent, and this is the one reader that would otherwise put a bearer token on the user's screen.
+   */
+  const failure = (error: unknown): McpProbeResult => ({
+    toolCount: 0,
+    error: boundedError(
+      redactMcpValues(describeMcpError(error, config, timeoutMs), server.authorization ? [server.authorization] : []),
+    ),
+  });
+
   try {
-    const count = await withDeadline(
+    return { toolCount: await connectAndCount(server, signal, timeoutMs, signIn?.provider), error: null };
+  } catch (error) {
+    if (!signIn || !(error instanceof UnauthorizedError)) return failure(error);
+    /*
+     * The browser is open on the server's own page. The deadline above measures the connection and
+     * not the person, so the wait for the grant is the sign-in's own and much longer; the second
+     * attempt is a fresh transport, because the first one has already been closed by its failure.
+     */
+    try {
+      await signIn.complete();
+      return { toolCount: await connectAndCount(server, signal, timeoutMs, signIn.provider), error: null };
+    } catch (retry) {
+      return failure(retry);
+    }
+  }
+}
+
+/** One connection, from the handshake to the tool count, closed again whatever it answered. */
+async function connectAndCount(
+  server: ResolvedMcpServer,
+  signal: AbortSignal,
+  timeoutMs: number,
+  authProvider: OAuthClientProvider | undefined,
+): Promise<number> {
+  const client = new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} });
+  const transport = createTransport(server, authProvider);
+  try {
+    return await withDeadline(
       (async () => {
         await client.connect(transport);
         return await countTools(client);
@@ -58,9 +130,6 @@ export async function probeMcpServer(
       signal,
       timeoutMs,
     );
-    return { toolCount: count, error: null };
-  } catch (error) {
-    return { toolCount: 0, error: boundedError(describeMcpError(error, config, timeoutMs)) };
   } finally {
     await closeQuietly(client, transport);
   }
@@ -99,11 +168,23 @@ function boundedError(text: string): string {
   return `${text.slice(0, INPUT_LIMITS.mcpErrorText - 1)}…`;
 }
 
-function createTransport(server: UsableMcpServer): Transport {
+function createTransport(server: ResolvedMcpServer, authProvider?: OAuthClientProvider): Transport {
   const { config } = server;
   if (config.transport === "http") {
+    /*
+     * The `authProvider` is what turns a 401 into a sign-in instead of a sentence. Without one the
+     * transport reports the refusal, which is what a server with a pasted key should do.
+     *
+     * With one, the stored token is left out of `requestInit`: a header written there wins over the
+     * one the provider adds, so a token the provider has just refreshed would lose to the value this
+     * probe read a moment before the refusal.
+     */
+    const headers = authProvider
+      ? Object.fromEntries(config.headers.map(({ key, value }) => [key, value]))
+      : mcpHandoffHeaders(server);
     return new StreamableHTTPClientTransport(new URL(config.url), {
-      requestInit: { headers: Object.fromEntries(config.headers.map(({ key, value }) => [key, value])) },
+      ...(authProvider ? { authProvider } : {}),
+      requestInit: { headers },
     });
   }
   return new StdioClientTransport({
@@ -173,6 +254,8 @@ class McpTimeout extends Error {
 /** The failure, in the words the panel shows. Secrets are removed before the text leaves here. */
 export function describeMcpError(error: unknown, config: McpServerConfig, timeoutMs: number): string {
   if (error instanceof McpTimeout) return `The server did not answer in ${Math.round(timeoutMs / 1000)} seconds.`;
+  // Only a sign-in reaches this: without an `authProvider` the transport reports the raw 401 below.
+  if (error instanceof UnauthorizedError) return "The server did not accept that sign-in.";
   const status = httpStatus(error);
   if (status !== null) return `The server answered ${status}.`;
   const message = error instanceof Error ? error.message : String(error);

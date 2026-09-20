@@ -128,6 +128,7 @@
     "install:claude-runtime": "bun scripts/install-claude-runtime.ts",
     "install:grok-runtime": "bun scripts/install-grok-runtime.ts",
     "pin:opencode-runtime": "bun scripts/pin-opencode-runtime.ts",
+    "pin:bun-runtime": "bun scripts/pin-bun-runtime.ts",
     "verify:remote-desktop-runtime": "bun scripts/verify-remote-desktop-runtime.ts",
     "preview": "bun scripts/preview.ts",
     "storybook": "bun scripts/dev-storybook.ts",

@@ -46,6 +46,13 @@
   margin-bottom: var(--openbot-space-2);
 }
 
+/* The managed runtime under a STDIO server, while it is downloading or after it failed. It sits
+   above the list because it describes every row there, not one of them. */
+.server-mcp-runtime-note {
+  display: block;
+  margin-bottom: var(--openbot-space-2);
+}
+
 /* A test result is one sentence under the Test section's own button, not a field. */
 .server-mcp-test-result {
   display: block;

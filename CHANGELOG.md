@@ -5,6 +5,31 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Start an MCP server on a computer that has no Node. OpenBot downloads Bun 1.4.2, a JavaScript
+  runtime it owns and checks, and starts a STDIO server with it. A computer with its own Node keeps
+  using that one: the managed runtime is the floor, not a replacement.
+- Say why an MCP server did not reach an agent. A command this computer does not have, and a
+  working directory the provider cannot carry, each raise one notice naming the server and the
+  reason, and the panel states the working-directory limit before the server is saved.
+
+### Changed
+
+- Give Claude and Codex agents only the MCP servers in Settings. A server declared in
+  `~/.claude/settings.json`, in a project `.mcp.json`, by a plugin, in agent frontmatter or in
+  `~/.codex/config.toml` no longer reaches an agent. Add it in OpenBot to keep it. A notice says
+  this once. OpenCode and Grok document no equivalent setting, so their agents can still start
+  servers from their own files, which the panel now states.
+- Replace a Codex thread that started before this release once, keeping its conversation and its
+  history, so the tools the agent has match the panel.
+- Sign in to Canva, Figma, Linear, Notion, Sentry and Stripe from OpenBot itself. The six listings
+  connect over HTTP, and OpenBot holds the OAuth client: it opens the browser, keeps the tokens in
+  the operating system's secret storage, and adds the header when it hands the server to a provider.
+  No third-party bridge program is downloaded or started, and the tokens are redacted on every log
+  and export path like every other secret. Sign in again once after upgrading; a bridge that already
+  holds a token keeps it in its own folder, which OpenBot does not read.
+
 ## [0.14.1] - 2026-09-19
 
 ### Changed

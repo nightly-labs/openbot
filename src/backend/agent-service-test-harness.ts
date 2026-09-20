@@ -52,6 +52,7 @@ const FAKE_RUNTIME_ENV_VARS = [
   "OPENBOT_FAKE_TURN_START_RESPONSE_DELAY",
   "OPENBOT_FAKE_WARNING",
   "OPENBOT_FAKE_CLAUDE_LOGIN_LOG",
+  "OPENBOT_FAKE_CODEX_CONFIG",
 ] as const;
 
 const PROVIDER_PATH_ENV_VARS = [
@@ -107,6 +108,12 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
   modelList: ((params: unknown) => unknown) | undefined;
   threadRead: ((params: unknown) => unknown) | undefined;
   accountRateLimits: unknown = { rateLimits: null, rateLimitsByLimitId: null };
+  /**
+   * What `config/read` answers, for the Codex sweep that turns off the servers of
+   * `~/.codex/config.toml`. Left unset it answers nothing, which is the failed read the sweep
+   * treats as "no entry of its own".
+   */
+  configRead: unknown;
 
   constructor(
     readonly provider: AgentProvider,
@@ -180,6 +187,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
     }
     if (method === "model/list" && this.modelList) result = this.modelList(params);
     if (method === "plugin/list") result = { marketplaces: [] };
+    if (method === "config/read") result = this.configRead;
     if (method === "thread/start") {
       this.#threadCounter += 1;
       result = { thread: { id: `${this.provider}-session-${this.#threadCounter}` } };
@@ -528,6 +536,10 @@ process.stdin.on("data", (chunk) => {
         { model: "gpt-5.3-codex-spark", displayName: "GPT-5.3-Codex-Spark" }
       ] } });
       if (message.method === "plugin/list") write({ id: message.id, result: { marketplaces: [{ plugins: [{ id: "computer-use@openai-bundled", name: "computer-use", installed: true, enabled: true }] }] } });
+      // The sweep that turns off the servers of the user's own Codex file reads this before every
+      // thread starts. An unanswered request holds that start open until the request times out,
+      // which is the failure this fake exists to make visible rather than hide.
+      if (message.method === "config/read") write({ id: message.id, result: JSON.parse(process.env.OPENBOT_FAKE_CODEX_CONFIG || '{"config":{}}') });
       if (message.method === "thread/start") {
         const threadId = "thread-" + (++threadCounter);
         write({ id: message.id, result: { thread: { id: threadId, turns: [] } } });

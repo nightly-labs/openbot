@@ -5,7 +5,13 @@ import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "./cli";
 import { GrokAgentClient } from "./grok-client";
-import type { McpServerSource } from "./mcp-provider-shapes";
+import type { McpOAuthAuthority } from "./mcp-oauth-provider";
+import type {
+  McpAuthorizationSource,
+  McpDropReporter,
+  McpServerSource,
+  McpToolRuntimeSource,
+} from "./mcp-provider-shapes";
 import {
   type CustomProviderSource,
   OPENCODE_PROFILE_CONFIG,
@@ -71,6 +77,28 @@ export interface ProviderClientContext {
    */
   readonly mcpServers: McpServerSource;
   /**
+   * What a provider could not be given, reported once per spawn. Optional, so the test call sites
+   * and `NO_PROVIDER_CREDENTIALS` stay valid: a driver with no reporter drops silently, exactly as
+   * every driver did before.
+   */
+  readonly reportMcpDrops?: McpDropReporter;
+  /**
+   * What OpenBot downloaded for the MCP servers, read at spawn like everything else here. Optional
+   * for the same reason as `reportMcpDrops`: a driver without one sees the machine as it is.
+   */
+  readonly mcpToolRuntimes?: McpToolRuntimeSource;
+  /**
+   * The bearer token for an http server this machine has signed in to, read at spawn. Optional for
+   * the same reason again: a driver without one hands over only the headers the user wrote.
+   */
+  readonly mcpAuthorization?: McpAuthorizationSource;
+  /**
+   * The sign-ins this machine holds for http MCP servers. Read by `AgentService` and by nothing
+   * else: a driver is given `mcpAuthorization` above, which is the one token it can spend. This is
+   * the whole authority - it signs in, refreshes and forgets - so it travels no further.
+   */
+  readonly mcpOAuth?: McpOAuthAuthority;
+  /**
    * Whether this model may still be used. A removed endpoint stays in the running process, with the
    * credentials it started with, until that process restarts, and the restart waits for the work in
    * flight. Read at the last moment before a prompt leaves, because everything above it awaits.
@@ -130,7 +158,16 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     },
     resolveCli: resolveClaudeCli,
     createClient: (cli, requestTimeoutMs, context) =>
-      new ClaudeAgentClient(cli, undefined, undefined, requestTimeoutMs, context.mcpServers),
+      new ClaudeAgentClient(
+        cli,
+        undefined,
+        undefined,
+        requestTimeoutMs,
+        context.mcpServers,
+        context.reportMcpDrops,
+        context.mcpToolRuntimes,
+        context.mcpAuthorization,
+      ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
@@ -146,7 +183,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     },
     resolveCli: resolveGrokCli,
     createClient: (cli, requestTimeoutMs, context) =>
-      new GrokAgentClient(cli, requestTimeoutMs, false, context.mcpServers),
+      new GrokAgentClient(
+        cli,
+        requestTimeoutMs,
+        false,
+        context.mcpServers,
+        context.reportMcpDrops,
+        context.mcpToolRuntimes,
+        context.mcpAuthorization,
+      ),
     createProfileClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs, true),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -170,6 +215,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: openCodeSignInMessage(context.customProviders().length),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {

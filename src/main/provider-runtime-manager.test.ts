@@ -17,7 +17,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { MANAGED_RUNTIME_PROVIDERS, type ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
+import { MANAGED_RUNTIME_PROVIDERS, MANAGED_TOOL_RUNTIMES, type ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
@@ -819,17 +819,17 @@ describe("ProviderRuntimeManager", () => {
     expect(providerEntries.some((entry) => entry.startsWith(".staging-"))).toBe(false);
   });
 
-  it("installs each provider under its own name and version", async () => {
+  it("installs each runtime under its own name and version", async () => {
     // The manager used to answer "which artifact does this provider get?" with `else grok`, so a
-    // provider it had never heard of got Grok's binary in its own directory. Every managed provider
+    // provider it had never heard of got Grok's binary in its own directory. Every managed runtime
     // is asked here, so a new one joins this case by joining the registry.
     const root = await temporaryRoot();
     const lock = parseAgentRuntimeLock(structuredClone(lockValue));
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", lock });
 
-    for (const provider of MANAGED_RUNTIME_PROVIDERS) {
-      expect(manager.executablePath(provider)).toBe(
-        join(root, provider, "darwin-arm64", lock[provider].version, "bin", provider),
+    for (const runtime of [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES]) {
+      expect(manager.executablePath(runtime)).toBe(
+        join(root, runtime, "darwin-arm64", lock[runtime].version, "bin", runtime),
       );
     }
   });
@@ -897,6 +897,43 @@ describe("ProviderRuntimeManager", () => {
     expect(entries.some((entry) => entry.startsWith(".staging-"))).toBe(false);
   });
 
+  /*
+   * Bun is downloaded for the MCP servers, not for an agent, and the two things a server needs from
+   * it are the binary and the second name `bunx`. Bun decides what to do from the name it was
+   * started under, so without that name a catalog entry written for `npx` would reach a runtime
+   * that reads `-y` as a script flag.
+   */
+  it("stages Bun with the bunx name beside it, and lends both to the MCP servers", async () => {
+    const root = await temporaryRoot();
+    const fixture = await bunFixture();
+    const manager = bunManager(root, fixture);
+    await manager.initialize();
+    expect(manager.mcpToolRuntimes()).toEqual({ binDirectories: [], commandAliases: {} });
+
+    await manager.downloadAndWait("bun");
+
+    const version = fixture.lock.bun.version;
+    expect(manager.getStatus().toolRuntimes.bun).toMatchObject({ phase: "ready", version });
+    const installed = join(root, "bun", "darwin-arm64", version);
+    expect(await readFile(join(installed, "bin", "bunx"), "utf8")).toBe(fixture.binaryText);
+    expect(await readFile(join(installed, "LICENSE.md"), "utf8")).toBe(fixture.licenseText);
+    expect(manager.mcpToolRuntimes()).toEqual({
+      binDirectories: [join(installed, "bin")],
+      commandAliases: { npx: join(installed, "bin", "bunx") },
+    });
+  });
+
+  it("does not offer Bun to the provider cards", async () => {
+    // `providers` is what every renderer reader iterates to draw a provider card. A tool runtime in
+    // it would become a provider everywhere, from the picker to the model list.
+    const root = await temporaryRoot();
+    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
+
+    const snapshot = await manager.initialize();
+
+    expect(Object.keys(snapshot.providers)).toEqual([...MANAGED_RUNTIME_PROVIDERS]);
+  });
+
   it.each([
     ["darwin", "arm64"],
     ["linux", "x64"],
@@ -909,6 +946,9 @@ describe("ProviderRuntimeManager", () => {
 
     for (const provider of MANAGED_RUNTIME_PROVIDERS) {
       expect(snapshot.providers[provider]).toMatchObject({ phase: "not-downloaded", message: null });
+    }
+    for (const tool of MANAGED_TOOL_RUNTIMES) {
+      expect(snapshot.toolRuntimes[tool]).toMatchObject({ phase: "not-downloaded", message: null });
     }
   });
 
@@ -955,6 +995,44 @@ async function opencodeFixture(options?: {
   artifact.installedBytes = archive.byteLength + 1_024;
   lock.opencode.licenseSha256 = digest(new TextEncoder().encode(licenseText));
   return { archive, binaryText, licenseText, lock };
+}
+
+/** A served `@oven/bun-darwin-aarch64` tarball with the lock rewritten to match it. */
+async function bunFixture(): Promise<OpencodeFixture> {
+  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+  const artifact = lock.bun.artifacts["darwin-arm64"];
+  const binaryText = `#!/bin/sh\necho ${lock.bun.version}\n`;
+  const licenseText = "MIT license\n";
+  const source = await temporaryRoot();
+  await mkdir(join(source, "package", "bin"), { recursive: true });
+  await writeFile(
+    join(source, "package", "package.json"),
+    JSON.stringify({ name: artifact.package, version: lock.bun.version }),
+  );
+  await writeFile(join(source, "package", "bin", artifact.executable), binaryText, { mode: 0o755 });
+  const archivePath = join(source, artifact.asset);
+  execFileSync("tar", ["-czf", archivePath, "-C", source, "package"]);
+  const archive = await readFile(archivePath);
+
+  artifact.assetSha256 = digest(archive);
+  artifact.binarySha256 = digest(new TextEncoder().encode(binaryText));
+  artifact.downloadBytes = archive.byteLength;
+  artifact.installedBytes = archive.byteLength + 1_024;
+  lock.bun.licenseSha256 = digest(new TextEncoder().encode(licenseText));
+  return { archive, binaryText, licenseText, lock };
+}
+
+function bunManager(root: string, fixture: OpencodeFixture): ProviderRuntimeManager {
+  return new ProviderRuntimeManager({
+    root,
+    platform: "darwin",
+    architecture: "arm64",
+    lock: fixture.lock,
+    fetchImpl: async (input) =>
+      String(input).endsWith("/LICENSE.md")
+        ? new Response(new TextEncoder().encode(fixture.licenseText))
+        : chunkedResponse(fixture.archive, 4_096),
+  });
 }
 
 function opencodeManager(root: string, fixture: OpencodeFixture): ProviderRuntimeManager {

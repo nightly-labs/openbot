@@ -179,14 +179,16 @@ describe("plugin catalog validation", () => {
     expect(() => validatePlugin("example", second, false, updatedAt)).toThrow("exactly one app");
   });
 
-  it("refuses a sign-in flow outside the bridge command", () => {
-    const wrongBridge = pluginWithServer({
+  /* OpenBot signs in for itself and adds the header when it hands the server over, which it can
+     only do for an http server. A stdio listing asking for a sign-in is asking for a bridge. */
+  it("refuses a sign-in flow on a server it cannot sign in to", () => {
+    const stdioSignIn = pluginWithServer({
       name: "example",
       transport: "stdio",
       command: "node",
       args: ["server.js"],
       auth: [{ id: "oauth", kind: "link", label: "Sign in" }],
     });
-    expect(() => validatePlugin("example", wrongBridge, false, updatedAt)).toThrow("sign-in bridge");
+    expect(() => validatePlugin("example", stdioSignIn, false, updatedAt)).toThrow("sign-in needs an http server");
   });
 });

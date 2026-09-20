@@ -150,10 +150,21 @@ let isQuitting = false;
 let shutdownStarted = false;
 let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
+/**
+ * The link kinds a renderer is ever told about.
+ *
+ * `mcp-auth` is not one of them. It carries an OAuth grant for an MCP server, which is a secret,
+ * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
+ * answered by the sign-in that started it, and there is no such sign-in before the app is running.
+ */
+type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" }>;
+
 // One link at a time, of whichever kind: a second replaces the first, because what a user opened
 // last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
 // tells a link that arrives now to be sent rather than held.
-let pendingDeepLink: DeepLink | null = findDeepLink(process.argv, developmentInviteLinkOptions);
+let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(
+  findDeepLink(process.argv, developmentInviteLinkOptions),
+);
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
@@ -333,7 +344,11 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
-    ...mcpServerIpcHandlers({ service, remoteServers }),
+    ...mcpServerIpcHandlers({
+      service,
+      remoteServers,
+      startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
+    }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView }),
@@ -427,6 +442,10 @@ function forwardCentralAuth(state: CentralAuthState): void {
  * cold start work: the window that the link itself opened asks for it once it is ready.
  */
 function acceptDeepLink(link: DeepLink): void {
+  if (link.kind === "mcp-auth") {
+    receiveMcpAuthorizationCode(link.state, link.code);
+    return;
+  }
   pendingDeepLink = link;
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
@@ -442,12 +461,29 @@ function acceptDeepLink(link: DeepLink): void {
  * The pending link, if it is the kind that asked. Either request marks the receiver ready, because
  * the renderer subscribes to both before it asks for either.
  */
-function takePendingDeepLink(kind: DeepLink["kind"]): string | null {
+function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
   deepLinkReceiverReady = true;
   const link = pendingDeepLink;
   if (link?.kind !== kind) return null;
   pendingDeepLink = null;
   return link.kind === "invite" ? link.url : link.slug;
+}
+
+/** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
+function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
+  return link && link.kind !== "mcp-auth" ? link : null;
+}
+
+/**
+ * Hands one MCP sign-in the grant it is waiting for, and shows the window that asked for it.
+ *
+ * The grant travels no further. A `state` this run did not start finds no sign-in and does nothing,
+ * which is what makes a forged or replayed link inert - so an unknown one raises no window either.
+ */
+function receiveMcpAuthorizationCode(state: string, code: string): void {
+  if (!services?.mcpOAuth.receiveAuthorizationCode(state, code)) return;
+  const window = windowHolder.current;
+  if (window && !window.isDestroyed()) showMainWindow(window);
 }
 
 app.on("open-url", (event, url) => {
