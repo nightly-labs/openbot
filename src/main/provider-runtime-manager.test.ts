@@ -923,6 +923,21 @@ describe("ProviderRuntimeManager", () => {
     });
   });
 
+  // The connection test waits on this before probing a stdio server: a machine that only needs
+  // the download must not answer `Command not found: npx` for it.
+  it("waits until the tool runtimes are ready", async () => {
+    const root = await temporaryRoot();
+    const fixture = await bunFixture();
+    const manager = bunManager(root, fixture);
+    await manager.initialize();
+    expect(manager.mcpToolRuntimes().binDirectories).toEqual([]);
+
+    await manager.ensureToolRuntimesReady();
+
+    expect(manager.getStatus().toolRuntimes.bun).toMatchObject({ phase: "ready" });
+    expect(manager.mcpToolRuntimes().binDirectories).toHaveLength(1);
+  });
+
   it("does not offer Bun to the provider cards", async () => {
     // `providers` is what every renderer reader iterates to draw a provider card. A tool runtime in
     // it would become a provider everywhere, from the picker to the model list.

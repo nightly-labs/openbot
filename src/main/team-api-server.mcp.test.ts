@@ -30,13 +30,16 @@ const config: McpServerConfig = {
 function createMcpServers(): NonNullable<TeamApiOptions["mcpServers"]> & {
   saved: McpServerConfig[];
   tested: McpServerConfig[];
+  testOptions: unknown[];
 } {
   const stored: McpServerConfig[] = [];
   const saved: McpServerConfig[] = [];
   const tested: McpServerConfig[] = [];
+  const testOptions: unknown[] = [];
   return {
     saved,
     tested,
+    testOptions,
     listMcpServers: () => stored,
     saveMcpServer: (input) => {
       saved.push(input.config);
@@ -48,8 +51,9 @@ function createMcpServers(): NonNullable<TeamApiOptions["mcpServers"]> & {
       for (const config of stored) if (config.id === input.mcpServerId) config.enabled = input.enabled;
       return stored;
     },
-    testMcpServer: async (input) => {
+    testMcpServer: async (input, options) => {
       tested.push(input.config);
+      testOptions.push(options);
       return { toolCount: 3, error: null };
     },
   };
@@ -104,6 +108,8 @@ describe("Team API MCP server access", () => {
     });
     expect(decodeMcpTestResult(await tested.json())).toEqual({ toolCount: 3, error: null });
     expect(mcpServers.tested).toEqual([draft]);
+    // The host spends its stored sign-ins for the administrator's test, and opens no browser.
+    expect(mcpServers.testOptions).toEqual([{ storedCredentials: true }]);
     expect(
       (
         await fetch(`${base}/v1/mcp-servers/test`, {

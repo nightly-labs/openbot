@@ -29,12 +29,20 @@ interface McpServerIpcDependencies {
    * download cannot turn saving a row into an error.
    */
   startToolRuntimes: () => void;
+  /**
+   * The same download, waited for. A first stdio plugin must pass its connection test before it
+   * can be saved, and without a runtime that test answers `Command not found` on a machine that
+   * only needs a download. A failed download is not a test failure: the test still runs and
+   * reports what the machine can actually start.
+   */
+  ensureToolRuntimesReady: () => Promise<void>;
 }
 
 export function mcpServerIpcHandlers({
   service,
   remoteServers,
   startToolRuntimes,
+  ensureToolRuntimesReady,
 }: McpServerIpcDependencies): Pick<IpcGroupHandlers, "mcpServers"> {
   /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
@@ -94,8 +102,14 @@ export function mcpServerIpcHandlers({
         const parsed = parseTestMcpServer(scoped.payload);
         return routeToServer<McpTestResult>(scoped.serverId, {
           // Interactive: the user pressed Test and is in front of the browser a sign-in opens. The
-          // remote branch below carries no such flag, and the route it reaches does not set one.
-          local: () => service.testMcpServer(parsed, { interactive: true }),
+          // remote branch below carries no such flag; the route it reaches spends the host's stored
+          // credentials instead, and still opens nothing.
+          local: async () => {
+            // Only a stdio test needs a runtime. An http test waits for no download, and a failed
+            // one is not a test failure: the probe still runs and reports what this machine starts.
+            if (parsed.config.transport === "stdio") await ensureToolRuntimesReady().catch(() => undefined);
+            return service.testMcpServer(parsed, { interactive: true });
+          },
           remote: (serverId) => {
             requireRemoteSupport(serverId);
             return remoteServers.request(serverId, MCP_ROUTES.test, decodeMcpTestResult, {

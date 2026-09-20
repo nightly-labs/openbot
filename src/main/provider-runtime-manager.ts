@@ -246,6 +246,18 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
+   * Starts whatever tool runtime this machine is missing and waits until each one is ready.
+   *
+   * The connection test is the one place that waits: a first credential-based stdio plugin must
+   * pass its test before it can be saved, and without a runtime the test answers `Command not
+   * found` for a machine that only needs a download. Throws when a download fails, so the caller
+   * decides whether the test still runs.
+   */
+  async ensureToolRuntimesReady(): Promise<void> {
+    for (const tool of MANAGED_TOOL_RUNTIMES) await this.downloadAndWait(tool);
+  }
+
+  /**
    * What the MCP servers may use from the store, in the shape the resolution step takes.
    *
    * Only a runtime that is `ready` is offered. A path into a directory that does not exist would

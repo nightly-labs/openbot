@@ -1,7 +1,13 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
-import { McpOAuth, type McpOAuthRecord, type McpOAuthStorage, normalizeResource } from "./mcp-oauth-provider";
+import {
+  McpOAuth,
+  type McpOAuthAuthority,
+  type McpOAuthRecord,
+  type McpOAuthStorage,
+  normalizeResource,
+} from "./mcp-oauth-provider";
 import { testMcpServer } from "./mcp-probe";
 
 /**
@@ -105,7 +111,10 @@ async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
         response.writeHead(404).end();
         return;
       }
-      if (request.headers.authorization !== `Bearer ${ACCESS_TOKEN}`) {
+      if (
+        request.headers.authorization !== `Bearer ${ACCESS_TOKEN}` &&
+        request.headers.authorization !== `Bearer ${REFRESHED_TOKEN}`
+      ) {
         response.writeHead(401, {
           "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
         });
@@ -260,6 +269,36 @@ describe("signing in to an http MCP server", () => {
 
     expect(both).toEqual([REFRESHED_TOKEN, REFRESHED_TOKEN]);
     expect(server.tokenRequests).toHaveLength(1);
+  });
+
+  it("spends a stored token for a silent test without opening a browser", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      // Long expired, so the probe must refresh before it connects. A remote administrator's test
+      // reaches the server through this same authority: stored tokens are spent, and `signIn`
+      // stays `null`, so no browser opens on a machine nobody is sitting at.
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("A silent test must never open a browser."),
+    });
+    const silent: McpOAuthAuthority = {
+      accessToken: (url) => oauth.accessToken(url),
+      signIn: () => null,
+      forget: (url) => oauth.forget(url),
+    };
+
+    expect(await testMcpServer(config(server.url), 10_000, undefined, silent)).toEqual({
+      toolCount: 1,
+      error: null,
+    });
+    expect(server.tokenRequests.filter((form) => form.get("grant_type") === "refresh_token")).toHaveLength(1);
+    expect(server.registrations).toBe(0);
   });
 
   it("keeps the token it just minted out of the failure it reports", async () => {

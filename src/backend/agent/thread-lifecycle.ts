@@ -17,7 +17,9 @@ import {
   type McpServerDrop,
   type McpServerSource,
   type McpToolRuntimeSource,
+  type McpToolRuntimes,
   mcpFingerprintValues,
+  NO_MCP_TOOL_RUNTIMES,
   usableMcpServers,
 } from "../mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "../openbot-tools";
@@ -34,9 +36,11 @@ import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-i
  * session started by an older adapter keeps the servers it was given even when the stored set
  * is unchanged. Folding this into the tool fingerprint refreshes those sessions once through
  * the replacement flow. Bump it when what Codex is sent changes; 2 is HTTP servers joining
- * the payload, and 3 is the sweep that turns off the servers `~/.codex/config.toml` declares.
+ * the payload, 3 is the sweep that turns off the servers `~/.codex/config.toml` declares, and 4 is
+ * the managed tool runtimes joining the fingerprint, so a session started before Bun finished
+ * downloading is replaced once its servers can actually start.
  */
-const CODEX_MCP_ADAPTER_VERSION = 3;
+const CODEX_MCP_ADAPTER_VERSION = 4;
 
 export interface ThreadLifecycleHooks {
   /** Keeps the `agent-service` logger (and its prefix) as the single writer. */
@@ -105,6 +109,15 @@ export class ThreadLifecycle {
     this.#mcpServers = options.mcpServers ?? (() => []);
     this.#mcpToolRuntimes = options.mcpToolRuntimes;
     this.#mcpAuthorization = options.mcpAuthorization;
+  }
+
+  /**
+   * The runtimes the MCP servers may use right now. Read at each use: a runtime that finished
+   * downloading after the app started has to count, and a session started before it did has to
+   * read as stale.
+   */
+  #toolRuntimes(): McpToolRuntimes {
+    return this.#mcpToolRuntimes?.() ?? NO_MCP_TOOL_RUNTIMES;
   }
 
   refreshAgentRuntime(agentId: string): void {
@@ -248,13 +261,16 @@ export class ThreadLifecycle {
     // that lands while the provider answers would be recorded as what this session was given, and
     // `hasCurrentTools` would then accept a session that never got it.
     const mcpServers = this.#mcpServers();
+    // The runtimes join that single reading for the same reason: a download that finishes while
+    // the provider answers must not be recorded as what resolved this session's servers.
+    const toolRuntimes = this.#toolRuntimes();
     // The same reading rule as above, and for the same reason: the manifest has to record the set
     // this session was started with, including the names swept out of the provider's own file.
     const disabled = await this.codexOwnServers(client);
     const response = await client.request(
       "thread/start",
       {
-        ...(await this.codexConfig(client, mcpServers, disabled)),
+        ...(await this.codexConfig(client, mcpServers, disabled, toolRuntimes)),
         model: agent.model,
         effort: agent.reasoningEffort,
         cwd: agent.workspacePath,
@@ -272,9 +288,13 @@ export class ThreadLifecycle {
     try {
       if (client.provider === "codex") {
         await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
-        await writeFile(this.toolManifestPath(externalThreadId), this.toolFingerprint(mcpServers, disabled), {
-          mode: 0o600,
-        });
+        await writeFile(
+          this.toolManifestPath(externalThreadId),
+          this.toolFingerprint(mcpServers, disabled, toolRuntimes),
+          {
+            mode: 0o600,
+          },
+        );
       }
       const handoff = this.buildProviderHandoff(agent.id, publicThreadId);
       if (handoff) {
@@ -333,11 +353,10 @@ export class ThreadLifecycle {
     client: AgentClient,
     configs: readonly McpServerConfig[],
     disabled: Record<string, CodexDisabledMcpServer>,
+    toolRuntimes: McpToolRuntimes,
   ): Promise<{ config?: { mcp_servers: Record<string, CodexMcpServer | CodexDisabledMcpServer> } }> {
     if (client.provider !== "codex") return {};
-    const { servers, dropped } = codexMcpServers(
-      await usableMcpServers(configs, this.#mcpToolRuntimes?.(), this.#mcpAuthorization),
-    );
+    const { servers, dropped } = codexMcpServers(await usableMcpServers(configs, toolRuntimes, this.#mcpAuthorization));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = { ...disabled, ...servers };
     return Object.keys(mcpServers).length > 0 ? { config: { mcp_servers: mcpServers } } : {};
@@ -368,6 +387,10 @@ export class ThreadLifecycle {
    * while the stored set is untouched, and a loaded session would keep the old tools with the
    * panel saying otherwise.
    *
+   * The managed tool runtimes are folded in too: a session started before Bun finished downloading
+   * drops its `npx` servers, while the configured set alone reads unchanged. Without the runtimes
+   * that session would resume forever without servers whose connection test passes by now.
+   *
    * The adapter version rides along for the same reason: a session started before HTTP servers
    * reached the Codex payload holds the same stored set as today, so without it the old session
    * would resume forever with the servers it was given. Bump it when what Codex is sent changes.
@@ -375,6 +398,7 @@ export class ThreadLifecycle {
   private toolFingerprint(
     configs: readonly McpServerConfig[],
     disabled: Record<string, CodexDisabledMcpServer>,
+    toolRuntimes: McpToolRuntimes,
   ): string {
     return createHash("sha256")
       .update(
@@ -382,6 +406,7 @@ export class ThreadLifecycle {
           [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
           mcpFingerprintValues(configs),
           Object.keys(disabled).sort(),
+          [toolRuntimes.binDirectories, toolRuntimes.commandAliases],
           CODEX_MCP_ADAPTER_VERSION,
         ]),
       )
@@ -391,7 +416,9 @@ export class ThreadLifecycle {
   private async hasCurrentTools(client: AgentClient, sessionId: string): Promise<boolean> {
     try {
       const stored = await readFile(this.toolManifestPath(sessionId), "utf8");
-      return stored === this.toolFingerprint(this.#mcpServers(), await this.codexOwnServers(client));
+      return (
+        stored === this.toolFingerprint(this.#mcpServers(), await this.codexOwnServers(client), this.#toolRuntimes())
+      );
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
       throw error;
@@ -414,7 +441,7 @@ export class ThreadLifecycle {
       sandbox: "danger-full-access",
       developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
-      ...(await this.codexConfig(client, this.#mcpServers(), await this.codexOwnServers(client))),
+      ...(await this.codexConfig(client, this.#mcpServers(), await this.codexOwnServers(client), this.#toolRuntimes())),
     };
   }
 

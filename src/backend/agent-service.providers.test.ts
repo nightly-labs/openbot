@@ -27,7 +27,7 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
-import { loginShellPath } from "./mcp-provider-shapes";
+import { loginShellPath, type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
 import { SidebarLayoutStore } from "./sidebar-layout-store";
 
@@ -509,6 +509,70 @@ describe.sequential("AgentService: providers", () => {
     expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
     expect(client.releasedThreads).toEqual([firstSession]);
     expect(client.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
+  });
+
+  // A session started before Bun finished downloading drops its `npx` servers, while the
+  // configured set alone reads unchanged. The tool fingerprint folds the runtimes in as well, so
+  // the next turn replaces the session once its servers can actually start - without it the old
+  // session would resume forever with the tools it was given.
+  it("replaces a Codex session started before the tool runtime was ready", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    let toolRuntimes: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+      credentials: {
+        apiKey: () => null,
+        customProviders: () => [],
+        mcpServers: () => [],
+        mcpToolRuntimes: () => toolRuntimes,
+      },
+    });
+    await service.initialize();
+    service.saveMcpServer({
+      config: {
+        id: "",
+        name: "Npx tool",
+        transport: "stdio",
+        enabled: true,
+        command: "npx",
+        args: ["-y", "some-tool"],
+        // An isolated `PATH` stands in for a machine with no Node: the command is looked up in
+        // this list, so `npx` is missing until the managed runtime joins it.
+        env: [{ key: "PATH", value: "/nonexistent-test-dir" }],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: "",
+        headers: [],
+      },
+    });
+
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!firstSession) throw new Error("The Codex session did not start.");
+    // No runtime yet, so the server is dropped from the session while the stored row stays.
+    const firstStart = client.requests.filter((request) => request.method === "thread/start").at(-1);
+    expect(paramsRecord(firstStart?.params)?.config ?? {}).not.toHaveProperty("mcp_servers");
+
+    // Bun finishes downloading between the turns. Nothing about the stored set changed.
+    toolRuntimes = { binDirectories: ["/tmp/fake-bun-bin"], commandAliases: { npx: "/tmp/fake-bun-bin/bunx" } };
+
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitFor(() =>
+      service?.listQueue("chief").deliveries.every((delivery) => ["completed", "failed"].includes(delivery.status)),
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstSession);
+    expect(client.releasedThreads).toEqual([firstSession]);
+    const starts = client.requests.filter((request) => request.method === "thread/start");
+    expect(starts).toHaveLength(2);
+    const config = paramsRecord(starts.at(-1)?.params)?.config;
+    expect(isDynamicRecord(config) ? config.mcp_servers : undefined).toMatchObject({
+      "Npx tool": expect.anything(),
+    });
   });
 
   // Save, remove and toggle all go through the same refresh, so one of them proves the mechanism.

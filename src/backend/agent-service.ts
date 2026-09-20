@@ -175,10 +175,14 @@ export interface ResolvedSharedFile {
  * Whether a person is in front of this test.
  *
  * Only an interactive test may open a browser for a sign-in. The same method answers the remote
- * Team API, where opening a window on the host machine would be a surprise nobody asked for.
+ * Team API, where opening a window on the host machine would be a surprise nobody asked for. A
+ * remote test still spends the host's stored sign-ins: the administrator tests the host's servers,
+ * not their own, and a stored token that works locally must work for them too.
  */
 export interface TestMcpServerOptions {
   interactive?: boolean;
+  /** Spend stored credentials without opening a browser. Implied by `interactive`. */
+  storedCredentials?: boolean;
 }
 
 export interface AgentServiceOptions {
@@ -972,7 +976,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (firstError) throw new Error(firstError);
     // A browser only opens when a person is waiting for it. The remote Team API route asks for the
     // same test and gets the silent answer, because nobody is at this machine to finish a sign-in.
-    const oauth = options.interactive ? (this.#mcpOAuth ?? undefined) : undefined;
+    // The stored sign-ins are still spent: without them the probe cannot read or refresh the host's
+    // token, and a remote administrator gets a false 401 for a server local agents use. `signIn`
+    // stays `null`, so a 401 the stored token cannot fix is reported rather than waited on.
+    const stored = this.#mcpOAuth;
+    const silent: McpOAuthAuthority | undefined =
+      !options.interactive && options.storedCredentials && stored
+        ? {
+            accessToken: (url) => stored.accessToken(url),
+            signIn: () => null,
+            forget: (url) => stored.forget(url),
+          }
+        : undefined;
+    const oauth = options.interactive ? (stored ?? undefined) : silent;
     return testMcpServer(config, undefined, this.#mcpToolRuntimes(), oauth);
   }
 
@@ -1435,6 +1451,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#stopping = false;
     await this.#store.initialize();
     await this.#mailbox.initialize();
+    // Rows installed from the old catalog's `mcp-remote` bridge definitions reach their servers
+    // natively from here on. Exact matches only; anything the user changed stays as it is.
+    this.#mcpServers.migrateCatalogBridgesToHttp();
     this.channels.restoreDeliveryLinks();
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();

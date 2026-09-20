@@ -42,6 +42,8 @@ export async function routeMcpServers(
   const body = mcpRequest(url.pathname, await readJson(request));
   if (save) return json(200, mcpServers.saveMcpServer(parseSaveMcpServer(body)));
   if (remove) return json(200, mcpServers.removeMcpServer(parseRemoveMcpServer(body)));
-  if (test) return json(200, await mcpServers.testMcpServer(parseTestMcpServer(body)));
+  // The administrator tests the host's servers, so the host's stored sign-ins are spent - but no
+  // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back.
+  if (test) return json(200, await mcpServers.testMcpServer(parseTestMcpServer(body), { storedCredentials: true }));
   return json(200, mcpServers.setMcpServerEnabled(parseSetMcpServerEnabled(body)));
 }
