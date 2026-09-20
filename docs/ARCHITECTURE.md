@@ -173,9 +173,14 @@ Codex, Claude, and ACP all read. Two properties keep it there: the name is not i
 stays empty, because ACP has no field for one and Codex accepts none, so an entry with one would
 vanish for two providers with no error. Codex staleness needs no separate signal, because
 `toolFingerprint` already folds the MCP entries and a changed fingerprint forces a replacement
-session. `onMcpServerChanged` is what refreshes the agent runtimes, and it reports only the entry
-appearing or going: a grant given while the daemon serves changes the state, not the tool set, and
-refreshing on it would end every idle conversation's session for nothing.
+session. `onMcpServerChanged` is what refreshes the agent runtimes, which deactivates every
+stored provider session: the next turn starts a new one, which keeps the public thread and loses
+what the provider held privately. So it reports two moments only — the entry appearing on a start a
+user asked for, and the daemon dying under OpenBot. It is quiet for a grant given while the daemon
+serves, which changes the state and not the tool set; for the startup warm-up, which settles the
+entry the stored sessions already had; and for the stop at teardown, which happens at order 55,
+before the agent service at 110, and would otherwise deactivate on every quit the sessions the next
+run is meant to resume.
 
 `capabilities.computerUse` is pushed by main from the daemon's own permission answer. It is no
 longer probed from Codex `plugin/list`, which is why the capability now reports the same state for

@@ -234,8 +234,9 @@ describe("CuaDriverRuntime", () => {
   });
 
   // Replacing a provider session ends the idle conversations with it, so the tool set has to have
-  // moved. A grant given while the daemon serves leaves the entry exactly as it was.
-  it("reports the MCP entry only when it appears or goes, not when a grant changes", async () => {
+  // moved. A grant given while the daemon serves leaves the entry exactly as it was, and a stop
+  // this process asked for is the teardown, where the stored sessions are left for the next run.
+  it("reports the MCP entry when it appears, not when a grant changes and not when it is stopped", async () => {
     let granted = false;
     const { driver } = await runtime({
       readPermissions: async () => [
@@ -256,7 +257,55 @@ describe("CuaDriverRuntime", () => {
     expect(entries).toBe(1);
 
     await driver.stop();
+    expect(entries).toBe(1);
+  });
+
+  // The daemon going on its own is the one loss the providers must hear: a live session keeps a
+  // command that no longer answers until its session is replaced.
+  it("reports the MCP entry going when the daemon dies under it", async () => {
+    const children: ChildProcess[] = [];
+    const { driver } = await runtime({
+      spawnProcess: (_command, _args, options) => {
+        const [standIn, ...standInArgs] = STAND_IN_DAEMON;
+        const child = spawn(standIn, standInArgs, { stdio: options.stdio });
+        children.push(child);
+        return child;
+      },
+    });
+    let entries = 0;
+    driver.onMcpServerChanged(() => {
+      entries += 1;
+    });
+    await driver.start();
+    expect(entries).toBe(1);
+
+    // The runtime's own `exit` listener was added first, so it has run by the time this one does.
+    const died = new Promise<void>((resolve) => children[0].once("exit", () => resolve()));
+    children[0].kill("SIGKILL");
+    await died;
+
     expect(entries).toBe(2);
+    expect(driver.mcpServerConfig()).toBeNull();
+  });
+
+  // The sessions read back from the database were written by a run that had this same entry, so
+  // announcing the warm-up would deactivate every one of them for a tool set that did not move.
+  it("keeps the startup warm-up quiet, and still reports a later start", async () => {
+    const { driver } = await runtime();
+    let entries = 0;
+    driver.onMcpServerChanged(() => {
+      entries += 1;
+    });
+
+    await driver.warmUp();
+    expect(driver.running()).toBe(true);
+    expect(entries).toBe(0);
+
+    await driver.stop();
+    await driver.start();
+    expect(entries).toBe(1);
+
+    await driver.stop();
   });
 
   // A remote request and a scheduled task open no window, so waiting for the panel would leave a

@@ -566,13 +566,15 @@ export async function createApplicationServices({
   // has until a grant moved.
   service.setComputerUseCapability(computerUseCapability(cuaDriver.lastState));
   cuaDriver.onStateChanged((state) => service.setComputerUseCapability(computerUseCapability(state)));
-  // Only when the entry itself appears or goes: this replaces every agent's provider session, and a
-  // grant given while the daemon serves changes the state without changing the tool set.
+  // Only when a live session would hold the wrong tool set: this deactivates every agent's stored
+  // provider session, so the driver stays quiet for a grant, for the warm-up below, and for the
+  // stop at teardown, where the sessions are being left for the next run.
   cuaDriver.onMcpServerChanged(() => service.notifyComputerUseChanged());
   // A user who granted the permissions expects the tools after a restart without opening the panel,
   // and a remote request or a scheduled task opens no window at all. This starts the daemon once and
   // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees
-  // nothing.
+  // nothing. It also tells no listener, because the sessions read back from the database were
+  // written by a run that had this same entry.
   void cuaDriver.warmUp();
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.

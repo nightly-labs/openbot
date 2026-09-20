@@ -172,6 +172,8 @@ export class CuaDriverRuntime {
   readonly #mcpListeners = new Set<() => void>();
   /** What the providers were last told to spawn, `""` for "nothing". */
   #announcedMcpServer = "";
+  /** True while the entry is allowed to move without the providers being told. See `warmUp`. */
+  #quiet = false;
   #child: ChildProcess | null = null;
   #starting: Promise<void> | null = null;
   #stopping: Promise<void> | null = null;
@@ -234,13 +236,19 @@ export class CuaDriverRuntime {
   }
 
   /**
-   * Told when the entry the providers are handed appears, changes or goes, and at no other time.
+   * Told when the entry the providers are handed appears or the daemon dies under OpenBot, and at
+   * no other time.
    *
    * Separate from the state, because the two ask for different work. A state change updates the
-   * capability, which costs nothing. An entry change replaces every agent's provider session,
-   * because the tool set is decided at each spawn. Granting a permission changes the state while
-   * the daemon keeps serving the same entry, so telling this listener then would end every
-   * conversation's session for a tool set that did not move.
+   * capability, which costs nothing. An entry change deactivates every agent's stored provider
+   * session, because the tool set is decided at each spawn, and a deactivated session is gone: the
+   * next turn starts a new one, which keeps the public thread and loses what the provider held
+   * privately. So this reports only the two moments that leave a live session holding a tool set
+   * that is not the one it would be given now.
+   *
+   * Three things it is quiet for. A grant changes the state while the daemon serves the same entry.
+   * The warm-up at startup settles the entry the stored sessions were already using. A stop this
+   * process asked for happens at teardown, where the sessions are being left for the next run.
    */
   onMcpServerChanged(listener: () => void): () => void {
     this.#mcpListeners.add(listener);
@@ -341,8 +349,13 @@ export class CuaDriverRuntime {
    */
   async warmUp(): Promise<void> {
     if (!this.#options.supported) return;
-    const state = await this.state();
-    if (state.status !== "ready") await this.stop().catch(() => undefined);
+    this.#quiet = true;
+    try {
+      const state = await this.state();
+      if (state.status !== "ready") await this.stop().catch(() => undefined);
+    } finally {
+      this.#quiet = false;
+    }
   }
 
   async #stop(): Promise<void> {
@@ -350,7 +363,9 @@ export class CuaDriverRuntime {
     this.#child = null;
     if (child) await stopRemoteProcess(child);
     await this.#removeSocket();
-    this.#announceMcpServer();
+    // No announcement: a stop this process asked for is the teardown, and telling the providers
+    // there would deactivate the very sessions the next run resumes.
+    this.#announcedMcpServer = "";
   }
 
   async #start(): Promise<void> {
@@ -441,6 +456,7 @@ export class CuaDriverRuntime {
     const announced = config ? [config.command, ...config.args].join(" ") : "";
     if (announced === this.#announcedMcpServer) return;
     this.#announcedMcpServer = announced;
+    if (this.#quiet) return;
     for (const listener of this.#mcpListeners) listener();
   }
 
