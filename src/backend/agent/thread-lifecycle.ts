@@ -24,6 +24,15 @@ import { agentNamesById, estimateTokens, renderHandoffMessage, summarizeOldMessa
 import { developerInstructions } from "./developer-instructions";
 import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-items";
 
+/**
+ * What the Codex adapter sends, versioned. Codex ignores MCP configuration on resume, so a
+ * session started by an older adapter keeps the servers it was given even when the stored set
+ * is unchanged. Folding this into the tool fingerprint refreshes those sessions once through
+ * the replacement flow. Bump it when what Codex is sent changes; 2 is HTTP servers joining
+ * the payload.
+ */
+const CODEX_MCP_ADAPTER_VERSION = 2;
+
 export interface ThreadLifecycleHooks {
   /** Keeps the `agent-service` logger (and its prefix) as the single writer. */
   logRecovery(agentId: string, provider: AgentProvider, outcome: "resumed" | "replaced"): void;
@@ -164,9 +173,12 @@ export class ThreadLifecycle {
         if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
       }
       // Codex ignores dynamicTools on thread/resume. A replacement provider session is
-      // required when tools change; the public thread and its history stay intact.
+      // required when tools change; the public thread and its history stay intact. The old
+      // session is closed in the client as well, or it keeps the MCP servers it started with
+      // every further change adding another unreachable set of processes.
       if (client.provider === "codex" && !(await this.hasCurrentTools(session.externalSessionId))) {
         const replacement = await this.startProviderThread(currentAgent, client, publicThreadId);
+        this.#releaseProviderSession(session.externalSessionId);
         this.retireProviderSession(currentAgent, session.externalSessionId);
         this.#hooks.logRecovery(currentAgent.id, client.provider, "replaced");
         return replacement;
@@ -309,10 +321,20 @@ export class ThreadLifecycle {
    * ignores a changed configuration on resume: an edited command, argument or credential has to
    * force a replacement session as surely as an added server. `mcpFingerprintValues` reduces the
    * secret values to a digest first, so the file this string is written to holds none of them.
+   *
+   * The adapter version rides along for the same reason: a session started before HTTP servers
+   * reached the Codex payload holds the same stored set as today, so without it the old session
+   * would resume forever with the servers it was given. Bump it when what Codex is sent changes.
    */
   private toolFingerprint(configs: readonly McpServerConfig[]): string {
     return createHash("sha256")
-      .update(JSON.stringify([[...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS], mcpFingerprintValues(configs)]))
+      .update(
+        JSON.stringify([
+          [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS],
+          mcpFingerprintValues(configs),
+          CODEX_MCP_ADAPTER_VERSION,
+        ]),
+      )
       .digest("hex");
   }
 

@@ -300,6 +300,55 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
 
     client.emit("request", {
       method: "mcpServer/elicitation/request",
+      id: "titled-option",
+      params: {
+        threadId,
+        turnId,
+        serverName: "posthog",
+        mode: "form",
+        _meta: null,
+        message: "Connect PostHog.",
+        requestedSchema: {
+          type: "object",
+          required: ["region"],
+          properties: {
+            region: {
+              type: "string",
+              title: "Region",
+              oneOf: [
+                { const: "us", title: "United States" },
+                { const: "eu", title: "European Union" },
+              ],
+            },
+          },
+        },
+      },
+    });
+    await waitFor(() => events.filter((event) => event.type === "prompt").length === 5);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "prompt",
+        requestId: "titled-option",
+        questions: [
+          expect.objectContaining({
+            id: "region",
+            options: [
+              expect.objectContaining({ label: "United States" }),
+              expect.objectContaining({ label: "European Union" }),
+            ],
+          }),
+        ],
+      }),
+    );
+    // The card submits the displayed label, but the schema asks for the const behind it.
+    await service.respondToPrompt({ requestId: "titled-option", answers: { region: ["European Union"] } });
+    expect(client.responses.at(-1)).toEqual({
+      id: "titled-option",
+      result: { action: "accept", content: { region: "eu" }, _meta: null },
+    });
+
+    client.emit("request", {
+      method: "mcpServer/elicitation/request",
       id: "unsupported-elicitation",
       params: {
         threadId,

@@ -48,6 +48,14 @@ export function elicitationValue(property: DynamicRecord | undefined, answers: s
   if (!property) return answers[0] ?? "";
   if (property.type === "array") return answers;
   if (property.type === "boolean") return /^(yes|true|1)$/i.test(answers[0] ?? "");
+  if (Array.isArray(property.oneOf)) {
+    // The card submits the displayed label, which is the title when the schema names one: the
+    // response must carry the const the schema asked for instead.
+    const selected = property.oneOf
+      .filter(isRecord)
+      .find((option) => (getString(option, "title") ?? getString(option, "const")) === answers[0]);
+    if (selected) return getString(selected, "const") ?? answers[0] ?? "";
+  }
   if (property.type === "number" || property.type === "integer") {
     const parsed = Number(answers[0]);
     return Number.isFinite(parsed) ? parsed : (answers[0] ?? "");
