@@ -152,6 +152,73 @@ describe("CuaDriverRuntime", () => {
     expect(spawned).toHaveLength(0);
   });
 
+  // `spawn` reports a removed or unreadable executable through an `error` event after it returns,
+  // and an unhandled one throws in the main process. Computer Use is optional; it may not end the app.
+  it("reports a failed spawn as a state, rather than throw out of the main process", async () => {
+    const { driver } = await runtime({
+      executable: "/opt/cua/bin/cua-driver-that-was-removed",
+      spawnProcess: (command, _args, options) => spawn(command, [], { stdio: options.stdio }),
+      // The socket never appears, because nothing ever started to serve it.
+      waitForSocket: () => new Promise(() => undefined),
+    });
+
+    await expect(driver.state()).resolves.toMatchObject({ status: "error" });
+    expect(driver.running()).toBe(false);
+    expect(driver.mcpServerConfig()).toBeNull();
+  });
+
+  // The panel tells a user with no driver to install it and check again. Reading the answer from
+  // startup would make a restart the only way to finish that installation.
+  it("looks for the driver again, so an installation made while OpenBot runs is found", async () => {
+    let installed: string | null = null;
+    const { driver, spawned } = await runtime({
+      executable: null,
+      resolveExecutable: async () => installed,
+    });
+
+    await expect(driver.state()).resolves.toMatchObject({ status: "driver-missing" });
+    expect(spawned).toHaveLength(0);
+
+    installed = "/opt/cua/bin/cua-driver";
+    await expect(driver.state()).resolves.toMatchObject({ status: "ready" });
+    expect(spawned).toHaveLength(1);
+  });
+
+  // Each notification replaces every agent's provider session, because the tool set changed.
+  // Reopening the panel asks the same question again, and the same answer must cost nothing.
+  it("tells the listeners once for an answer that did not change", async () => {
+    const { driver } = await runtime();
+    const seen: string[] = [];
+    driver.onStateChanged((state) => seen.push(state.status));
+
+    await driver.state();
+    await driver.state();
+    await driver.state();
+
+    expect(seen).toEqual(["ready"]);
+  });
+
+  // A remote request and a scheduled task open no window, so waiting for the panel would leave a
+  // user who granted the permissions without the tools after every restart.
+  it("keeps the daemon at startup for a granted computer, and drops it for one that is not", async () => {
+    const granted = await runtime();
+    await granted.driver.warmUp();
+    expect(granted.driver.running()).toBe(true);
+    expect(granted.driver.mcpServerConfig()).not.toBeNull();
+
+    const ungranted = await runtime({
+      readPermissions: async () => [
+        { id: "screen-recording", granted: false },
+        { id: "accessibility", granted: false },
+      ],
+    });
+    await ungranted.driver.warmUp();
+    expect(ungranted.driver.running()).toBe(false);
+    expect(ungranted.driver.mcpServerConfig()).toBeNull();
+
+    await granted.driver.stop();
+  });
+
   it("reports both grants as ready, and a missing one as setup still required", async () => {
     const granted = await runtime();
     await expect(granted.driver.state()).resolves.toMatchObject({ status: "ready" });

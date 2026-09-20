@@ -153,8 +153,13 @@ responsible process by walking up the launch chain, so a direct spawn puts OpenB
 and the user grants Screen Recording and Accessibility to OpenBot rather than to somebody else's
 helper. `CUA_DRIVER_EMBEDDED=1` tells the driver to stay on that path instead of relaunching itself
 as its own application. Anything that launches the daemon another way breaks the attribution, which
-is the reason the earlier Codex helper was replaced. The daemon starts lazily, on the first state
-read, so a user who never opens the panel is never asked for a grant.
+is the reason the earlier Codex helper was replaced.
+
+Startup calls `warmUp()`, which reads the state once and keeps the daemon only when both grants are
+there. A user who granted them keeps the tools after a restart, and a remote request or a scheduled
+task — neither of which opens a window — reaches them too. A user who granted nothing keeps no
+process, and no prompt is raised either way: only using the driver asks for a grant. Every other
+start is lazy, on a state read from the panel.
 
 The control socket lives in the private per-user runtime directory, mode `0o700`, not in `/tmp`:
 whoever reaches it can drive the whole desktop. It cannot live under `userData`, because

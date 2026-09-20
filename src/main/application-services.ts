@@ -494,23 +494,25 @@ export async function createApplicationServices({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
   });
-  // Resolved at startup, started only when something asks for Computer Use: starting the daemon is
-  // what makes macOS ask for the grants, and a user who never opens the panel must never be asked.
-  const cuaDriverExecutable = await resolveCuaDriver({
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-    sourceRoot: resolve(__dirname, "../.."),
-    platform: process.platform,
-    architecture: process.arch,
-    homeDirectory: homedir(),
-    pathVariable: process.env.PATH ?? null,
-    overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
-    installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
-    localAppDataDirectory: process.env.LOCALAPPDATA,
-    applicationsDirectory: "/Applications",
-  });
+  // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
+  // panel's "Check again" has to see it.
+  const resolveCuaDriverExecutable = (): Promise<string | null> =>
+    resolveCuaDriver({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      sourceRoot: resolve(__dirname, "../.."),
+      platform: process.platform,
+      architecture: process.arch,
+      homeDirectory: homedir(),
+      pathVariable: process.env.PATH ?? null,
+      overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
+      installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
+      localAppDataDirectory: process.env.LOCALAPPDATA,
+      applicationsDirectory: "/Applications",
+    });
   const cuaDriver = new CuaDriverRuntime({
-    executable: cuaDriverExecutable,
+    executable: await resolveCuaDriverExecutable(),
+    resolveExecutable: resolveCuaDriverExecutable,
     endpoint: cuaDriverEndpoint(process.platform, profileDigest(app.getPath("userData"))),
     supported: isSupportedCuaDriverTarget(process.platform, process.arch),
     hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
@@ -563,6 +565,11 @@ export async function createApplicationServices({
     service.setComputerUseCapability(computerUseCapability(state));
     service.notifyComputerUseChanged();
   });
+  // A user who granted the permissions expects the tools after a restart without opening the panel,
+  // and a remote request or a scheduled task opens no window at all. This starts the daemon once and
+  // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees
+  // nothing.
+  void cuaDriver.warmUp();
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   await sidebarLayout.reconcileAgents(service.sidebarChatIds());

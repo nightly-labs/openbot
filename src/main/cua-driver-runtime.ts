@@ -139,6 +139,14 @@ export type CuaDriverEndpoint =
 export interface CuaDriverRuntimeOptions {
   /** The resolved executable, or `null` when this computer has none. */
   executable: string | null;
+  /**
+   * Looks for the executable again, for a computer that had none when OpenBot started.
+   *
+   * The panel tells such a user to install the driver and then check again, and the check has to
+   * read the filesystem rather than the answer from startup: otherwise the only way to finish the
+   * installation is to restart OpenBot.
+   */
+  resolveExecutable?: () => Promise<string | null>;
   endpoint: CuaDriverEndpoint;
   /**
    * Whether the driver is published for this computer at all, which is not whether it is installed.
@@ -164,11 +172,14 @@ export class CuaDriverRuntime {
   #child: ChildProcess | null = null;
   #starting: Promise<void> | null = null;
   #state: ComputerUseState;
+  /** Mutable, because a user may install the driver while OpenBot runs. */
+  #executable: string | null;
 
   constructor(options: CuaDriverRuntimeOptions) {
     this.#options = options;
     this.#spawn = options.spawnProcess ?? nodeSpawn;
-    this.#state = initialState(options);
+    this.#executable = options.executable;
+    this.#state = initialState(options.platform, options.supported, options.executable);
   }
 
   get lastState(): ComputerUseState {
@@ -193,7 +204,7 @@ export class CuaDriverRuntime {
    * would drop this entry with no error if it carried one.
    */
   mcpServerConfig(): McpServerConfig | null {
-    const executable = this.#options.executable;
+    const executable = this.#executable;
     if (!executable || !this.running()) return null;
     return {
       id: COMPUTER_USE_MCP_SERVER_ID,
@@ -221,8 +232,9 @@ export class CuaDriverRuntime {
   /**
    * The daemon, started once however many callers ask at the same time.
    *
-   * Starting is what makes macOS ask for the grants, so nothing starts it before the user opens the
-   * Computer Use panel or an agent reaches for the tools.
+   * Starting is what makes macOS ask for the grants, so nothing starts it except the panel, an
+   * agent that reaches for the tools, and `warmUp`, which keeps it only for a user who granted
+   * them already.
    */
   async start(): Promise<void> {
     if (this.running()) return;
@@ -244,7 +256,11 @@ export class CuaDriverRuntime {
 
   /** The panel's answer: starts the daemon if it is not running, then asks it what it may do. */
   async state(): Promise<ComputerUseState> {
-    if (!this.#options.supported || !this.#options.executable) return this.#publish(initialState(this.#options));
+    if (!this.#options.supported) return this.#publish(this.#initialState());
+    // Read the filesystem again when there was nothing at startup, so that "Check again" finishes
+    // an installation the user has just made.
+    if (!this.#executable) this.#executable = (await this.#options.resolveExecutable?.()) ?? null;
+    if (!this.#executable) return this.#publish(this.#initialState());
 
     try {
       await this.start();
@@ -286,8 +302,24 @@ export class CuaDriverRuntime {
     }
   }
 
+  /**
+   * Starts the daemon at startup for a user who granted the permissions already, and stops it again
+   * for one who did not.
+   *
+   * The providers are handed the MCP entry at each spawn, and there is no entry while the daemon is
+   * stopped. Waiting for the panel would therefore leave a fully granted user without the tools
+   * after every restart, and would leave a remote request or a scheduled task — neither of which
+   * opens a window — without them at all. Asking the driver what it may do raises no prompt, so a
+   * user who never granted anything sees nothing and keeps no process.
+   */
+  async warmUp(): Promise<void> {
+    if (!this.#options.supported) return;
+    const state = await this.state();
+    if (state.status !== "ready") await this.stop().catch(() => undefined);
+  }
+
   async #start(): Promise<void> {
-    const executable = this.#options.executable;
+    const executable = this.#executable;
     if (!executable) throw new Error("This computer has no Computer Use driver.");
 
     const socketPath = this.socketPath();
@@ -322,6 +354,19 @@ export class CuaDriverRuntime {
     });
     this.#child = child;
     this.#pipeDiagnostics(child);
+    // `spawn` reports a missing or unreadable executable through this event, after it returns. An
+    // unhandled `error` event on a child process throws in the main process, and Computer Use is
+    // an optional function, so it is caught here and reported as a state instead.
+    const spawnFailure = new Promise<never>((_resolve, reject) => {
+      child.once("error", (error: Error) => {
+        if (this.#child === child) this.#child = null;
+        this.#options.onDiagnostic?.(`OpenBot: the Computer Use driver could not start. ${error.message}\n`);
+        reject(error);
+      });
+    });
+    // The race below drops the loser, and the child may still report an error after the daemon is
+    // up. This keeps that late rejection handled rather than an unhandled one.
+    spawnFailure.catch(() => undefined);
     child.once("exit", (code) => {
       if (this.#child !== child) return;
       this.#child = null;
@@ -334,7 +379,7 @@ export class CuaDriverRuntime {
     });
 
     try {
-      await (this.#options.waitForSocket ?? waitForSocket)(socketPath);
+      await Promise.race([(this.#options.waitForSocket ?? waitForSocket)(socketPath), spawnFailure]);
     } catch (error) {
       await this.stop();
       throw error;
@@ -354,31 +399,53 @@ export class CuaDriverRuntime {
     }
   }
 
+  #initialState(): ComputerUseState {
+    return initialState(this.#options.platform, this.#options.supported, this.#executable);
+  }
+
+  /**
+   * Tells the listeners, and only when the answer is not the one they hold already.
+   *
+   * A listener replaces every agent's provider session, because the tool set changed. Reopening the
+   * panel asks the driver the same question again, and repeating an unchanged answer would end each
+   * agent's session for nothing.
+   */
   #publish(state: ComputerUseState): ComputerUseState {
+    if (sameState(this.#state, state)) return this.#state;
     this.#state = state;
     for (const listener of this.#listeners) listener(state);
     return state;
   }
 }
 
-function initialState(
-  options: Pick<CuaDriverRuntimeOptions, "platform" | "executable" | "supported">,
-): ComputerUseState {
-  if (!options.supported) {
+function sameState(left: ComputerUseState, right: ComputerUseState): boolean {
+  return (
+    left.status === right.status &&
+    left.message === right.message &&
+    left.permissions.length === right.permissions.length &&
+    left.permissions.every((permission, index) => {
+      const other = right.permissions[index];
+      return other !== undefined && other.id === permission.id && other.granted === permission.granted;
+    })
+  );
+}
+
+function initialState(platform: NodeJS.Platform, supported: boolean, executable: string | null): ComputerUseState {
+  if (!supported) {
     return {
       status: "unsupported",
-      permissions: ungranted(options.platform),
+      permissions: ungranted(platform),
       message: "Computer Use is available on macOS, Windows and Linux.",
     };
   }
-  if (!options.executable) {
+  if (!executable) {
     return {
       status: "driver-missing",
-      permissions: ungranted(options.platform),
+      permissions: ungranted(platform),
       message: "Install the Computer Use driver, then check again.",
     };
   }
-  return { status: "permissions-required", permissions: ungranted(options.platform), message: null };
+  return { status: "permissions-required", permissions: ungranted(platform), message: null };
 }
 
 function requiredPermissions(platform: NodeJS.Platform): readonly MacPermissionId[] {

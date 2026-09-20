@@ -100,15 +100,36 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     }
   }
 
+  // A grant is given in System Settings, outside this window, and the driver reports only what it
+  // sees when it is asked. Coming back to OpenBot is the moment the answer may have changed, so the
+  // panel asks again rather than keeping a row that is granted already.
+  const recheckOnReturn = () => {
+    if (state()?.status === "permissions-required") void loadState();
+  };
+  window.addEventListener("focus", recheckOnReturn);
+
   onSettled(() => void loadState());
   onCleanup(() => {
     disposed = true;
+    window.removeEventListener("focus", recheckOnReturn);
   });
 
   const showPermissions = () => {
     const status = state()?.status;
     return (status === "permissions-required" || status === "ready") && permissions().length > 0;
   };
+
+  /** The manual way back, for a user whose desktop gave this window no focus event. */
+  const recheck = () => (
+    <Show when={state()?.status === "permissions-required"}>
+      <div class="computer-use-recheck">
+        <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
+          <RefreshCw aria-hidden="true" />
+          Check again
+        </Button>
+      </div>
+    </Show>
+  );
 
   const content = () => (
     <>
@@ -174,10 +195,16 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
       <Show when={showPermissions()}>
         <Show
           when={props.variant === "settings"}
-          fallback={<PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />}
+          fallback={
+            <>
+              <PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />
+              {recheck()}
+            </>
+          }
         >
           <SettingsSection title="System permissions" description="Permissions are managed by macOS.">
             <PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />
+            {recheck()}
           </SettingsSection>
         </Show>
       </Show>

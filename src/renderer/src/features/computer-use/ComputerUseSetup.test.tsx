@@ -58,6 +58,27 @@ describe("ComputerUseSetup", () => {
     expect(view.getAllByRole("button", { name: "Open settings" })).toHaveLength(1);
   });
 
+  // A grant is given in System Settings, outside this window. The driver reports only what it sees
+  // when it is asked, so a panel that never asks again keeps a row the user has already granted.
+  it("offers Check again, and asks the driver again when the window comes back", async () => {
+    mock = createMockOpenBot();
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce(state({}))
+      .mockResolvedValue(state({ status: "ready", permissions: [{ id: "screen-recording", granted: true }] }));
+    mock.api.getComputerUseState = read;
+    window.openbot = mock.api;
+    const view = render(() => <ComputerUseSetup platform="darwin" variant="compact" />);
+
+    await view.findByRole("button", { name: "Check again" });
+    fireEvent(window, new Event("focus"));
+
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    expect(await view.findByText("Granted")).toBeInTheDocument();
+    // Granted: nothing left to check, so the button goes with the rows it belonged to.
+    expect(view.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+  });
+
   it("names the install command when this computer has no driver", async () => {
     mock = createMockOpenBot();
     mock.api.getComputerUseState = vi.fn().mockResolvedValue(state({ status: "driver-missing" }));
