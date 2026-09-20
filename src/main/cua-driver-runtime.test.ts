@@ -1,5 +1,6 @@
-import { spawn } from "node:child_process";
-import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { type ChildProcess, spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -143,6 +144,40 @@ describe("CuaDriverRuntime", () => {
 
     expect(driver.running()).toBe(false);
     expect(driver.mcpServerConfig()).toBeNull();
+  });
+
+  // Both own the socket path. A start that overtook a stop would have its own socket removed by it,
+  // and the daemon would then serve an address no client can reach.
+  it("does not let a start overtake a stop and lose the socket it just made", async () => {
+    const children: ChildProcess[] = [];
+    const { driver, socketDirectory } = await runtime({
+      spawnProcess: (_command, _args, options) => {
+        // Deaf to `SIGTERM`, so the stop takes the grace period a real daemon can take to go. That
+        // is the window in which a start could overtake it. It says when the handler is installed,
+        // so the test signals it and never guesses.
+        const child = spawn(
+          process.execPath,
+          ["-e", "process.on('SIGTERM', () => {}); console.log('deaf'); setInterval(() => {}, 1_000);"],
+          { stdio: options.stdio },
+        );
+        children.push(child);
+        return child;
+      },
+      waitForSocket: async (path) => {
+        await writeFile(path, "");
+      },
+    });
+    await driver.start();
+    await new Promise<void>((resolve) => children[0].stdout?.once("data", () => resolve()));
+
+    // What the panel does while `warmUp` is putting an ungranted daemon away.
+    await Promise.all([driver.stop(), driver.state()]);
+
+    expect(children).toHaveLength(2);
+    expect(driver.running()).toBe(true);
+    // The replacement's socket is still there: the stop it waited for removed the first one only.
+    expect(existsSync(join(socketDirectory, "driver.sock"))).toBe(true);
+    await driver.stop();
   });
 
   it("reports the driver missing without spawning anything", async () => {

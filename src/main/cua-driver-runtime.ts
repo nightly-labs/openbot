@@ -174,6 +174,7 @@ export class CuaDriverRuntime {
   #announcedMcpServer = "";
   #child: ChildProcess | null = null;
   #starting: Promise<void> | null = null;
+  #stopping: Promise<void> | null = null;
   #state: ComputerUseState;
   /** Mutable, because a user may install the driver while OpenBot runs. */
   #executable: string | null;
@@ -254,6 +255,10 @@ export class CuaDriverRuntime {
    * them already.
    */
   async start(): Promise<void> {
+    // After a stop that is still running. Both own the socket path: a start that overtook a stop
+    // would have its own socket removed by it, and the daemon would then serve an address no client
+    // can reach, with nothing to say it had happened.
+    if (this.#stopping) await this.#stopping.catch(() => undefined);
     if (this.running()) return;
     if (this.#starting) return this.#starting;
     this.#starting = this.#start();
@@ -266,11 +271,14 @@ export class CuaDriverRuntime {
   }
 
   async stop(): Promise<void> {
-    const child = this.#child;
-    this.#child = null;
-    if (child) await stopRemoteProcess(child);
-    await this.#removeSocket();
-    this.#announceMcpServer();
+    if (this.#starting) await this.#starting.catch(() => undefined);
+    if (this.#stopping) return this.#stopping;
+    this.#stopping = this.#stop();
+    try {
+      await this.#stopping;
+    } finally {
+      this.#stopping = null;
+    }
   }
 
   /** The panel's answer: starts the daemon if it is not running, then asks it what it may do. */
@@ -337,6 +345,14 @@ export class CuaDriverRuntime {
     if (state.status !== "ready") await this.stop().catch(() => undefined);
   }
 
+  async #stop(): Promise<void> {
+    const child = this.#child;
+    this.#child = null;
+    if (child) await stopRemoteProcess(child);
+    await this.#removeSocket();
+    this.#announceMcpServer();
+  }
+
   async #start(): Promise<void> {
     const executable = this.#executable;
     if (!executable) throw new Error("This computer has no Computer Use driver.");
@@ -401,7 +417,8 @@ export class CuaDriverRuntime {
     try {
       await Promise.race([(this.#options.waitForSocket ?? waitForSocket)(socketPath), spawnFailure]);
     } catch (error) {
-      await this.stop();
+      // `#stop`, not `stop`: this runs inside the start that `stop()` waits for.
+      await this.#stop();
       throw error;
     }
   }
