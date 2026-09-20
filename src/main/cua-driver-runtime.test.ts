@@ -8,6 +8,7 @@ import {
   CuaDriverRuntime,
   type CuaDriverRuntimeOptions,
   readPermissionResult,
+  resolveCuaDriverEndpoint,
   type SpawnDriverOptions,
   type SpawnDriverProcess,
 } from "./cua-driver-runtime";
@@ -435,5 +436,84 @@ describe("CuaDriverRuntime", () => {
       { id: "screen-recording", granted: false },
       { id: "accessibility", granted: false },
     ]);
+  });
+
+  // The endpoint reaches each proxy as an argument, and the arguments are folded into the stored
+  // Codex tool fingerprint. A name that moves at each launch replaces every session on the next
+  // turn, which keeps the public thread and loses what the provider held privately.
+  describe("resolveCuaDriverEndpoint", () => {
+    it("keeps the Windows pipe name across restarts, and unguessable outside this profile", async () => {
+      const userDataPath = await mkdtemp(join(tmpdir(), "cua-profile-"));
+      directories.push(userDataPath);
+      const first = await resolveCuaDriverEndpoint({ platform: "win32", userDataPath, temporaryDirectory: tmpdir() });
+      const second = await resolveCuaDriverEndpoint({ platform: "win32", userDataPath, temporaryDirectory: tmpdir() });
+
+      expect(first).toEqual(second);
+      expect(first.kind).toBe("windows-pipe");
+      expect(first.kind === "windows-pipe" && first.name).toMatch(/^\\\\\.\\pipe\\openbot-cua-[0-9a-f-]{36}$/);
+
+      const other = await mkdtemp(join(tmpdir(), "cua-profile-"));
+      directories.push(other);
+      // A second profile on the same computer must not answer on the first one's pipe.
+      expect(
+        await resolveCuaDriverEndpoint({ platform: "win32", userDataPath: other, temporaryDirectory: tmpdir() }),
+      ).not.toEqual(first);
+    });
+
+    it("replaces a pipe name that is not one it wrote", async () => {
+      const userDataPath = await mkdtemp(join(tmpdir(), "cua-profile-"));
+      directories.push(userDataPath);
+      await mkdir(join(userDataPath, "cua-driver"), { recursive: true });
+      await writeFile(join(userDataPath, "cua-driver", "pipe-name"), "\\\\.\\pipe\\somebody-else");
+
+      const endpoint = await resolveCuaDriverEndpoint({
+        platform: "win32",
+        userDataPath,
+        temporaryDirectory: tmpdir(),
+      });
+      expect(endpoint.kind === "windows-pipe" && endpoint.name).toMatch(/openbot-cua-[0-9a-f-]{36}$/);
+    });
+
+    it("names the same socket directory for one profile, and a different one for another", async () => {
+      const temporaryDirectory = tmpdir();
+      const mine = await resolveCuaDriverEndpoint({
+        platform: "darwin",
+        userDataPath: "/Users/a/Library/OpenBot",
+        temporaryDirectory,
+      });
+      const again = await resolveCuaDriverEndpoint({
+        platform: "darwin",
+        userDataPath: "/Users/a/Library/OpenBot",
+        temporaryDirectory,
+      });
+      const other = await resolveCuaDriverEndpoint({
+        platform: "darwin",
+        userDataPath: "/Users/a/Library/OpenBot-dev",
+        temporaryDirectory,
+      });
+
+      expect(mine).toEqual(again);
+      expect(mine).not.toEqual(other);
+      expect(mine.kind === "unix-socket" && mine.directory.startsWith(temporaryDirectory)).toBe(true);
+    });
+
+    // `/tmp` is world-writable on Linux, so another local user can create our directory first.
+    it("prefers the login session's runtime directory on Linux", async () => {
+      const onLinux = await resolveCuaDriverEndpoint({
+        platform: "linux",
+        userDataPath: "/home/a/.config/OpenBot",
+        temporaryDirectory: "/tmp",
+        runtimeDirectory: "/run/user/1000",
+      });
+      const noSession = await resolveCuaDriverEndpoint({
+        platform: "linux",
+        userDataPath: "/home/a/.config/OpenBot",
+        temporaryDirectory: "/tmp",
+        runtimeDirectory: "  ",
+      });
+
+      expect(onLinux.kind === "unix-socket" && onLinux.directory.startsWith("/run/user/1000/")).toBe(true);
+      expect(noSession.kind === "unix-socket" && noSession.directory.startsWith("/tmp/")).toBe(true);
+    });
   });
 });

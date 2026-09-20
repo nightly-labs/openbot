@@ -2,9 +2,10 @@
 // providers spawn against it.
 
 import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
-import { lstat, mkdir, rm } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
@@ -20,6 +21,8 @@ import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
 import { stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
+/** Where the Windows pipe name is kept, below the profile directory. */
+const PIPE_NAME_FILE = ["cua-driver", "pipe-name"] as const;
 /**
  * The most a Unix socket path may hold, per platform.
  *
@@ -135,6 +138,66 @@ export type CuaDriverEndpoint =
       kind: "windows-pipe";
       name: string;
     };
+
+export interface CuaDriverEndpointInput {
+  platform: NodeJS.Platform;
+  /** This profile's directory. Windows keeps the pipe name below it; the rest name a socket after it. */
+  userDataPath: string;
+  temporaryDirectory: string;
+  /** `XDG_RUNTIME_DIR`, read on Linux alone. */
+  runtimeDirectory?: string | null;
+}
+
+/**
+ * Where the daemon listens, which is a different kind of thing on each desktop.
+ *
+ * The endpoint is a control channel to a process that can drive the whole desktop, so where it sits
+ * decides who may reach it. It also has to be the same across restarts: it is passed to each proxy
+ * as an argument, the arguments are folded into the stored Codex tool fingerprint, and a fingerprint
+ * that moves replaces every session, which loses what each provider held privately.
+ *
+ * On macOS the temporary directory is already private per user (`/var/folders/…`, mode `0700`). On
+ * Linux `os.tmpdir()` is usually the shared, world-writable `/tmp`, where another local user can
+ * create our directory before we do, so `XDG_RUNTIME_DIR` is used first: the login session owns it,
+ * it is mode `0700`, and it is removed at logout. The temporary directory stays as the fallback for
+ * a session that has none, and this runtime refuses a directory this user does not own either way.
+ * The digest of the profile path keeps two profiles on one computer apart and keeps the name the
+ * same, so a socket left by a crashed run is found and removed rather than accumulating.
+ *
+ * The user data directory cannot hold the socket: a socket path may hold about a hundred characters,
+ * and an isolated development profile spends 64 of them on a worktree hash alone.
+ *
+ * On Windows it is a named pipe, a name in a kernel namespace rather than a path, so it has no
+ * length limit and no directory to protect. The name is random, because Windows lets a second
+ * process add an instance to an existing pipe name, so a name another local process can guess could
+ * be taken before the driver starts. It is kept in the profile so that it is random once rather than
+ * once per launch: only a process that can already read this user's profile can read it back.
+ */
+export async function resolveCuaDriverEndpoint(input: CuaDriverEndpointInput): Promise<CuaDriverEndpoint> {
+  if (input.platform === "win32") return { kind: "windows-pipe", name: await windowsPipeName(input.userDataPath) };
+  const runtimeDirectory = input.runtimeDirectory?.trim();
+  const parent =
+    input.platform === "linux" && runtimeDirectory && isAbsolute(runtimeDirectory)
+      ? runtimeDirectory
+      : input.temporaryDirectory;
+  const digest = createHash("sha256").update(input.userDataPath).digest("hex").slice(0, 12);
+  return { kind: "unix-socket", directory: join(parent, `openbot-cua-${digest}`) };
+}
+
+/** Only this shape is read back, so a truncated or edited file is replaced rather than served. */
+const WINDOWS_PIPE_NAME = /^\\\\\.\\pipe\\openbot-cua-[0-9a-f-]{36}$/;
+
+async function windowsPipeName(userDataPath: string): Promise<string> {
+  const file = join(userDataPath, ...PIPE_NAME_FILE);
+  const stored = await readFile(file, "utf8")
+    .then((text) => text.trim())
+    .catch(() => "");
+  if (WINDOWS_PIPE_NAME.test(stored)) return stored;
+  const name = `\\\\.\\pipe\\openbot-cua-${randomUUID()}`;
+  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+  await writeFile(file, name, { mode: 0o600 });
+  return name;
+}
 
 export interface CuaDriverRuntimeOptions {
   /** The resolved executable, or `null` when this computer has none. */

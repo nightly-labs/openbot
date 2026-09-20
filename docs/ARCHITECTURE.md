@@ -164,7 +164,11 @@ start is lazy, on a state read from the panel.
 The control socket lives in the private per-user runtime directory, mode `0o700`, not in `/tmp`:
 whoever reaches it can drive the whole desktop. It cannot live under `userData`, because
 `sockaddr_un.sun_path` holds 104 bytes on macOS and an isolated development profile spends most of
-them on the worktree hash. Windows uses a named pipe, which has no such limit.
+them on the worktree hash. Windows uses a named pipe, which has no such limit; its name is random,
+because Windows lets a second process add an instance to a name it can guess, and it is kept in the
+profile so that it is random once rather than once per launch. The endpoint has to hold still: it
+reaches each proxy as an argument, and the arguments are folded into the stored Codex tool
+fingerprint, so a name that moves at each launch replaces every session after a restart.
 
 One MCP entry reaches every provider. `CuaDriverRuntime.mcpServerConfig()` returns a config only
 while the daemon runs, and `AgentService.enabledMcpServers()` appends it, which is the one function

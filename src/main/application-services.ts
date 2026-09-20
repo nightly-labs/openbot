@@ -25,11 +25,10 @@ import { localSkillTools } from "./local-skill-tools";
  * when - see `teardown-registry.ts` for why shutdown here is not the reverse of construction.
  */
 
-import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import type {
   AgentStatus,
   AppVariant,
@@ -58,7 +57,7 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
-import { type CuaDriverEndpoint, CuaDriverRuntime } from "./cua-driver-runtime";
+import { CuaDriverRuntime, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
 import {
   applyDevelopmentRemoteAccount,
@@ -141,46 +140,6 @@ const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
  */
 const PACKAGED_BUNDLE_IDENTIFIER = "app.openbot.desktop";
 const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
-
-/**
- * A short, stable name for this profile, so two profiles on one computer never share a socket.
- *
- * The digest is only a name. Nothing reads it back, and it guards nothing: the directory mode and
- * the per-user temporary directory are what keep the socket private.
- */
-function profileDigest(userDataPath: string): string {
-  return createHash("sha256").update(userDataPath).digest("hex").slice(0, 12);
-}
-
-/**
- * Where the driver listens, which each desktop names differently.
- *
- * The socket is a control channel to a process that can drive the whole desktop, so where it sits
- * decides who may reach it.
- *
- * On macOS the temporary directory is already private per user (`/var/folders/…`, mode `0700`). On
- * Linux `os.tmpdir()` is usually the shared, world-writable `/tmp`, where another local user can
- * create our directory before we do, so `XDG_RUNTIME_DIR` is used first: the login session owns it,
- * it is mode `0700`, and it is removed at logout. The temporary directory stays as the fallback for
- * a session that has none, and the runtime refuses a directory this user does not own either way.
- *
- * The user data directory cannot hold it: a socket path may hold about a hundred characters, and an
- * isolated development profile spends 64 of them on a worktree hash alone.
- *
- * On Windows it is a named pipe, which is a name in a kernel namespace rather than a path, so it has
- * no length limit and no directory to protect. It gets a random name instead of the profile digest:
- * Windows lets a second process add an instance to an existing pipe name, so a predictable name
- * could be taken by another local process before the driver starts, and a name it cannot guess
- * cannot be taken. Nothing persists the name; the daemon and its proxies are given it directly.
- */
-function cuaDriverEndpoint(platform: NodeJS.Platform, digest: string): CuaDriverEndpoint {
-  if (platform === "win32") return { kind: "windows-pipe", name: `\\\\.\\pipe\\openbot-cua-${randomUUID()}` };
-  const runtimeDirectory = process.env.XDG_RUNTIME_DIR?.trim();
-  const parent = platform === "linux" && runtimeDirectory && isAbsolute(runtimeDirectory) ? runtimeDirectory : tmpdir();
-  // The digest keeps two profiles on one computer apart, and keeps the name stable so a socket left
-  // by a crashed run is found and removed rather than accumulating.
-  return { kind: "unix-socket", directory: join(parent, `openbot-cua-${digest}`) };
-}
 
 const TEARDOWN_ORDER = {
   updater: 10,
@@ -513,7 +472,12 @@ export async function createApplicationServices({
   const cuaDriver = new CuaDriverRuntime({
     executable: await resolveCuaDriverExecutable(),
     resolveExecutable: resolveCuaDriverExecutable,
-    endpoint: cuaDriverEndpoint(process.platform, profileDigest(app.getPath("userData"))),
+    endpoint: await resolveCuaDriverEndpoint({
+      platform: process.platform,
+      userDataPath: app.getPath("userData"),
+      temporaryDirectory: tmpdir(),
+      runtimeDirectory: process.env.XDG_RUNTIME_DIR,
+    }),
     supported: isSupportedCuaDriverTarget(process.platform, process.arch),
     hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
     platform: process.platform,
@@ -575,7 +539,8 @@ export async function createApplicationServices({
   // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees
   // nothing. It also tells no listener, because the sessions read back from the database were
   // written by a run that had this same entry.
-  void cuaDriver.warmUp();
+  const computerUseWarmUp = cuaDriver.warmUp();
+  computerUseWarmUp.catch(() => undefined);
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   await sidebarLayout.reconcileAgents(service.sidebarChatIds());
@@ -866,7 +831,14 @@ export async function createApplicationServices({
     analyticsPreferenceFile,
     updatePreferenceFile,
     language,
-    agentInitialization: new AgentInitializationGate(() => service.initialize()),
+    agentInitialization: new AgentInitializationGate(async () => {
+      // The warm-up first: it decides whether the entry is there, and a session created while it
+      // still probes would hold a command the warm-up may stop a moment later, silently. It runs
+      // from the moment the runtime exists, so this waits only for what is left of it, and a
+      // failure here must not keep the agents down.
+      await computerUseWarmUp.catch(() => undefined);
+      await service.initialize();
+    }),
     sidebarLayout,
     host,
     remoteDesktop,
