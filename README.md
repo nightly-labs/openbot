@@ -416,3 +416,12 @@ See [NOTICE](NOTICE) for attribution and third-party notices.
 OpenBot is an independent source-available project and is not affiliated with, endorsed by, or
 sponsored by OpenAI. OpenAI, ChatGPT, and Codex are used only to describe compatibility with their
 respective products and services.
+
+### Shared macOS hosts
+
+For one native Standard user per tenant, install the normal OpenBot DMG and the optional
+`OpenBot-Host-<VERSION>-arm64.pkg` from the same release. The Host package provides
+`sudo openbot-host setup --create-user client-acme --create-user client-bravo` and
+`sudo openbot-host verify`. No Git checkout, Bun, or compilation is required on the host.
+Normal desktop users need only the DMG. See the [host deployment guide](docs/multi-tenant-hosting.md)
+for existing-user enrollment, password handling, package upgrades, and required target-host checks.

@@ -977,6 +977,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     await this.#webrtcTransport?.stop().catch(() => undefined);
   }
 
+  /** Whether a client-side file transfer is moving right now, either direction. */
+  hasActiveTransfers(): boolean {
+    return this.#webrtcTransport?.hasActiveTransfers() ?? false;
+  }
+
   async disconnectRemoteSessions(): Promise<void> {
     if (!this.#webrtcTransport) return;
     await Promise.all(

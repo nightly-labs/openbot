@@ -46,6 +46,7 @@ import {
   type ProviderClientContext,
   requireProviderDriver,
 } from "./../provider-drivers";
+import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -498,6 +499,23 @@ export class ProviderRuntime implements ProviderPort {
     return this.#status.phase === "ready";
   }
 
+  /**
+   * Provider operations in flight right now: CLI logins and replacements, connection checks,
+   * provider starts, and the pending Codex login. Long-lived provider clients are deliberately
+   * not counted: they are stopped by the normal shutdown, and a client mid-turn always carries
+   * an active turn id, which the activity check sees. MCP servers a provider CLI spawned inside
+   * its own session stay invisible here; a live turn implies them.
+   */
+  activeProcessCount(): number {
+    return (
+      this.#cliLogins.size +
+      this.#providerStarts.size +
+      this.#providerConnectionCommands.size +
+      this.#replacingCli.size +
+      (this.#codexLogin === null ? 0 : 1)
+    );
+  }
+
   clientFor(provider: AgentProvider): AgentClient | null {
     return this.#clients.get(provider) ?? null;
   }
@@ -600,6 +618,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#providerStarts.delete(provider);
       });
       this.#providerStarts.set(provider, start);
+      recordRestartActivity();
     }
     await start;
     if (this.#clients.has(provider)) return;
@@ -631,6 +650,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#providerStarts.delete(provider);
       });
       this.#providerStarts.set(provider, start);
+      recordRestartActivity();
     }
     await start;
     return this.status();
@@ -729,6 +749,7 @@ export class ProviderRuntime implements ProviderPort {
         );
       }
       this.#replacingCli.add(provider);
+      recordRestartActivity();
       try {
         await change();
       } catch (error) {
@@ -754,6 +775,7 @@ export class ProviderRuntime implements ProviderPort {
       const previousExecutable = this.#bundledExecutables[provider];
       this.#setProviderConnectionState(provider, "connecting");
       this.#replacingCli.add(provider);
+      recordRestartActivity();
       try {
         const executable = await install();
         this.#bundledExecutables[provider] = executable;
@@ -876,6 +898,7 @@ export class ProviderRuntime implements ProviderPort {
         result = await command();
       });
     this.#providerConnectionCommands.set(provider, current);
+    recordRestartActivity();
     try {
       await current;
       return result;
@@ -1197,6 +1220,7 @@ export class ProviderRuntime implements ProviderPort {
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
     this.#replacingCli.add(provider);
+    recordRestartActivity();
     try {
       cli = await this.#resolveProviderCli(provider);
       const candidate = await this.#createAuthenticatedProviderClient(provider, cli);
@@ -1227,6 +1251,7 @@ export class ProviderRuntime implements ProviderPort {
       });
       const pending: PendingCliLogin = { child, cli, task: null };
       this.#cliLogins.set(provider, pending);
+      recordRestartActivity();
       pending.task = waitForSuccessfulProcess(child, command.timeoutMs)
         .then(() => this.#completeCliLogin(provider, pending))
         .catch((error) => this.#failCliLogin(provider, pending, error));
@@ -1318,6 +1343,7 @@ export class ProviderRuntime implements ProviderPort {
       timer.unref?.();
       pending = { client, cli, loginId: login.loginId, timer, completing: false };
       this.#codexLogin = pending;
+      recordRestartActivity();
       client.once("exit", () => {
         if (this.#codexLogin?.client === client) {
           void this.#failCodexLogin(this.#codexLogin, "ChatGPT connection stopped. Try again.");

@@ -23,6 +23,7 @@ import type { AgentStore } from "../agent-store";
 import { sortConversationMessages } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
+import { recordRestartActivity } from "../restart-activity";
 import { collapseMissedOccurrences } from "../routine-schedule";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import { type ConversationRuntime, withDatabaseTransaction } from "./conversation-runtime";
@@ -123,6 +124,21 @@ export class RoutineScheduler implements RoutineDueSource {
   /** Unchecked read for callers that already hold the agent, such as the duplication signature. */
   listFor(agentId: string): Routine[] {
     return this.#routines.list(agentId);
+  }
+
+  /**
+   * Whether any routine run is executing right now. Scheduled future runs do not count: they
+   * resume from durable rows after a restart. An executing run also holds a turn or a delivery,
+   * which the wider activity check sees, so this covers the gap between the run firing and that
+   * work appearing.
+   */
+  hasActiveRuns(): boolean {
+    for (const agent of this.#hooks.listAgents()) {
+      for (const routine of this.#routines.list(agent.id)) {
+        if (this.#routines.activeRuns(agent.id, routine.id).length > 0) return true;
+      }
+    }
+    return false;
   }
 
   runForDelivery(deliveryId: string): RoutineRun | null {
@@ -455,6 +471,7 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   async #enqueueRun(run: RoutineRun): Promise<void> {
+    recordRestartActivity();
     const validateRecipient = this.#mailbox.prepareDelivery([run.agentId]);
     const agent = await this.#store.getOrCreate(run.agentId);
     try {

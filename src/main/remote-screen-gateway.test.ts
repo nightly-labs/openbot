@@ -434,6 +434,7 @@ class FakeRuntime implements RemoteScreenRuntime {
   async start() {
     return {
       baseUrl: this.baseUrl,
+      authHeader: "X-OpenBot-Remote-User",
       hostId: 12,
       hostIds: [12, 13, 14, 15],
       desktopAppId: 1,

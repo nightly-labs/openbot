@@ -2048,6 +2048,13 @@ describe("shared channel coordination", () => {
     expect(resourcesConflict(["host"], ["none"])).toBe(true);
     expect(resourcesConflict(["workspace:/work/a"], ["workspace:/work/b"])).toBe(false);
   });
+
+  it("reports no channel work on a fresh channel and work once a task queues", async () => {
+    expect(service.hasActiveWork()).toBe(false);
+    await send("Prepare the report");
+    expect(service.store.tasks("channel-1").some((task) => task.state === "queued")).toBe(true);
+    expect(service.hasActiveWork()).toBe(true);
+  });
 });
 
 function agent(agentId: string) {

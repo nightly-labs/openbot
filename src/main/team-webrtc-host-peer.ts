@@ -134,6 +134,11 @@ export class TeamWebRtcHostPeer {
     if (peerId) await this.#bridge.disconnectPeer(peerId).catch(() => undefined);
   }
 
+  /** Whether this device has a file transfer moving right now, either direction. */
+  hasActiveTransfers(): boolean {
+    return this.#files.hasActiveTransfers();
+  }
+
   dispose(): void {
     this.#bridge.off("connected", this.#onConnected);
     this.#bridge.off("data", this.#onData);

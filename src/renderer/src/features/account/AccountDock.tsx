@@ -347,7 +347,7 @@ export function AccountDock(props: AccountDockProps) {
               type="button"
               class="account-menu-row"
               onClick={() => void runUpdateAction()}
-              disabled={updatePresentation().busy}
+              disabled={updatePresentation().busy || updatePresentation().managed}
             >
               <CircleArrowDown
                 class={updatePresentation().busy ? "account-menu-icon account-menu-icon-spinning" : "account-menu-icon"}
