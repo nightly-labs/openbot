@@ -2,6 +2,7 @@ import type { McpServerConfig, TestMcpServerInput } from "@openbot/contracts/ipc
 import { render, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
+import { takeMcpConfigDoorNotice } from "./mcp-servers";
 import { ServerSettingsProvider, useServerSettings } from "./server-settings";
 import { ServersProvider } from "./servers-context";
 
@@ -158,5 +159,42 @@ describe("server settings MCP", () => {
     await store.saveMcpServer({ ...DRAFT, name: "Kept" });
 
     expect(store.serverSettingsMcp().map((config) => config.name)).toContain("Kept");
+  });
+});
+
+/*
+ * The notice for the release that takes servers away. It is owed to a user who declared an MCP
+ * server outside OpenBot and is about to lose it, and to nobody else - so the flag has to be kept
+ * whichever way the question is answered.
+ */
+describe("the MCP configuration notice", () => {
+  /** A storage this test owns, so the flag of one case cannot answer another. */
+  function fakeStorage() {
+    const values = new Map<string, string>();
+    return {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value);
+      },
+    };
+  }
+
+  it("names the files it takes servers from, once", () => {
+    const storage = fakeStorage();
+
+    const notice = takeMcpConfigDoorNotice(true, storage);
+
+    expect(notice?.description).toContain("~/.claude/settings.json");
+    expect(notice?.description).toContain("~/.codex/config.toml");
+    expect(takeMcpConfigDoorNotice(true, storage)).toBeNull();
+  });
+
+  it("stays silent for a user who is still in onboarding, and afterwards", () => {
+    const storage = fakeStorage();
+
+    expect(takeMcpConfigDoorNotice(false, storage)).toBeNull();
+    // Onboarding finishes in the same session. This user never had a server in another file, so
+    // the notice would describe a loss that cannot happen to them.
+    expect(takeMcpConfigDoorNotice(true, storage)).toBeNull();
   });
 });

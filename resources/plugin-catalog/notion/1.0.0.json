@@ -20,9 +20,8 @@
       "iconUrl": "https://www.notion.so/images/favicon.ico",
       "server": {
         "name": "notion",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "mcp-remote@latest", "https://mcp.notion.com/mcp"],
+        "transport": "http",
+        "url": "https://mcp.notion.com/mcp",
         "auth": [{ "id": "notion-oauth", "kind": "link", "label": "Sign in" }]
       }
     }

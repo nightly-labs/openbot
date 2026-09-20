@@ -34,6 +34,27 @@ import type { OpenBotDatabase } from "./openbot-database";
  */
 export class McpServerError extends Error {}
 
+/**
+ * The six sign-in listings as the shipped catalog described them before native OAuth: a stdio
+ * row running the third-party `mcp-remote` bridge. The current catalog
+ * (`marketplace/plugin-catalog/plugins/<slug>/plugin.json`, generated into
+ * `marketplace-plugin-catalog.ts`) reaches the same servers over native http instead.
+ *
+ * A row installed from one of these still names the server, so the marketplace reads it as
+ * installed and offers no way back in - while the bridge it runs no longer signs in. The migration
+ * below rewrites exactly these rows.
+ */
+const MCP_REMOTE_BRIDGES: ReadonlyArray<{ name: string; remoteUrl: string; url: string }> = [
+  { name: "canva", remoteUrl: "https://mcp.canva.com/mcp", url: "https://mcp.canva.com/mcp" },
+  { name: "linear", remoteUrl: "https://mcp.linear.app/sse", url: "https://mcp.linear.app/mcp" },
+  { name: "notion", remoteUrl: "https://mcp.notion.com/mcp", url: "https://mcp.notion.com/mcp" },
+  { name: "figma", remoteUrl: "https://mcp.figma.com/mcp", url: "https://mcp.figma.com/mcp" },
+  { name: "sentry", remoteUrl: "https://mcp.sentry.dev/mcp", url: "https://mcp.sentry.dev/mcp" },
+  { name: "stripe", remoteUrl: "https://mcp.stripe.com", url: "https://mcp.stripe.com" },
+];
+
+const MCP_REMOTE_ARGS = (remoteUrl: string): string[] => ["-y", "mcp-remote@latest", remoteUrl];
+
 export class McpServerStore {
   constructor(private readonly database: OpenBotDatabase) {}
 
@@ -128,6 +149,52 @@ export class McpServerStore {
     return { ...current, enabled };
   }
 
+  /**
+   * Converts rows installed from the old catalog's `mcp-remote` bridge definitions to the native
+   * http rows the current catalog installs, and answers how many rows changed.
+   *
+   * Only a row that still matches a shipped definition exactly - name, stdio transport, `npx`,
+   * and the bridge arguments - is converted. A renamed row cannot be told apart from one the user
+   * wrote by hand, and changed arguments are the user's own edits: both stay as they are. Every
+   * other column (id, enabled state, position, credentials, working directory) is kept, so the
+   * row the user sees is the row they had, reaching its server natively. The converted row holds
+   * no sign-in yet; the next Test on it signs in through the browser like any new installation.
+   *
+   * This is a data rewrite rather than a schema migration: no DDL changes, and running it again
+   * converts nothing, so it runs on every startup rather than behind a schema version.
+   */
+  migrateCatalogBridgesToHttp(now = new Date().toISOString()): number {
+    const db = this.database.connection;
+    let converted = 0;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const rows = databaseRows(
+        db.prepare("SELECT mcp_server_id, name, transport, command, args_json FROM projection_mcp_servers").all(),
+      );
+      for (const row of rows) {
+        const bridge = MCP_REMOTE_BRIDGES.find(
+          (candidate) =>
+            row.name === candidate.name &&
+            row.transport === "stdio" &&
+            row.command === "npx" &&
+            isStringList(row.args_json, MCP_REMOTE_ARGS(candidate.remoteUrl)),
+        );
+        if (!bridge) continue;
+        db.prepare(
+          `UPDATE projection_mcp_servers
+             SET transport = 'http', command = '', args_json = '[]', url = ?, updated_at = ?
+             WHERE mcp_server_id = ?`,
+        ).run(bridge.url, now, requiredStringColumn(row, "mcp_server_id"));
+        converted += 1;
+      }
+      db.exec("COMMIT");
+      return converted;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   private count(): number {
     return this.list().length;
   }
@@ -182,6 +249,22 @@ function parsePairs(row: DynamicRecord, key: string): McpKeyValue[] {
 function decodeStringList(value: unknown, key: string): string[] {
   if (!Array.isArray(value) || !value.every(isString)) throw new Error(`Invalid SQLite column ${key}.`);
   return value;
+}
+
+/** Whether a JSON column holds exactly the strings expected. A hand-edited value never matches. */
+function isStringList(value: unknown, expected: readonly string[]): boolean {
+  if (typeof value !== "string") return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return false;
+  }
+  return (
+    Array.isArray(parsed) &&
+    parsed.length === expected.length &&
+    parsed.every((item, index) => item === expected[index])
+  );
 }
 
 function decodePairList(value: unknown, key: string): McpKeyValue[] {

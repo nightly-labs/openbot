@@ -30,6 +30,22 @@ const opencodeArtifactSchema = z.object({
   executable: z.enum(["opencode", "opencode.exe"]),
   platformDirectory: z.enum(["linux", "mac", "win"]),
 });
+/**
+ * Bun ships one npm package per target and no `bunx` of its own, so the staged layout makes that
+ * name itself. `baseline` on x64: Bun's plain x64 builds need AVX2, and a machine older than that
+ * would answer a spawn with an illegal instruction and no message. The baseline build starts
+ * slightly slower, which is nothing against launching one MCP server.
+ */
+const bunArtifactSchema = z.object({
+  package: z.string().regex(/^@oven\/bun-(?:darwin-aarch64|linux-x64-baseline|windows-x64-baseline)$/u),
+  asset: z.string().regex(/^bun-(?:darwin-aarch64|linux-x64-baseline|windows-x64-baseline)-\d+\.\d+\.\d+\.tgz$/u),
+  assetSha256: sha256Schema,
+  binarySha256: sha256Schema,
+  downloadBytes: z.number().int().positive(),
+  installedBytes: z.number().int().positive(),
+  executable: z.enum(["bun", "bun.exe"]),
+});
+
 const grokArtifactSchema = z.object({
   asset: z.string().regex(/^grok-\d+\.\d+\.\d+-(?:linux-x86_64|macos-aarch64|windows-x86_64(?:\.exe)?)$/u),
   assetSha256: sha256Schema,
@@ -82,6 +98,26 @@ const agentRuntimeLockSchema = z.object({
       "darwin-arm64": opencodeArtifactSchema,
       "linux-x64": opencodeArtifactSchema,
       "win32-x64": opencodeArtifactSchema,
+    }),
+  }),
+  /**
+   * The JavaScript runtime OpenBot downloads for the MCP servers, not for a provider CLI.
+   *
+   * `tag` is the source tag the licence is read from; `version` is what `bun --version` prints and
+   * what the npm packages carry. Bun states both as the same number, and the schema keeps them
+   * separate anyway, because a lock that cannot say they disagree cannot notice when they do.
+   */
+  bun: z.object({
+    registry: z.literal("https://registry.npmjs.org"),
+    repository: z.literal("https://github.com/oven-sh/bun"),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/u),
+    tag: z.string().regex(/^bun-v\d+\.\d+\.\d+$/u),
+    license: z.literal("MIT"),
+    licenseSha256: sha256Schema,
+    artifacts: z.object({
+      "darwin-arm64": bunArtifactSchema,
+      "linux-x64": bunArtifactSchema,
+      "win32-x64": bunArtifactSchema,
     }),
   }),
   grok: z.object({

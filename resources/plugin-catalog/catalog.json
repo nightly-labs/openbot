@@ -12,7 +12,7 @@
       "slug": "canva",
       "version": "1.0.0",
       "featured": true,
-      "detailSha256": "1a048ae478be8b622d4a2e387ec3318ea7962884a6aadbb4b724d947fb7c1aca"
+      "detailSha256": "f3650d9ba3101c75fb8fea0685a3515d1c0d93c8a6798dc1046672b3c655c127"
     },
     {
       "slug": "github",
@@ -24,25 +24,25 @@
       "slug": "linear",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "c976586933c1d8d1c9cd456ca947d98534995f07f0c9f221b4374f08887a67e9"
+      "detailSha256": "6f99c0a2123c5e8d898d7c2d8c80b40f3390f9532c845959f3310a8af56bcd8b"
     },
     {
       "slug": "notion",
       "version": "1.0.0",
       "featured": true,
-      "detailSha256": "ea54dabd967a4a586763aecc86915ace7bafc3a232ca8aa5d6942ceb27e2fabc"
+      "detailSha256": "8b66d2a108340a79e398bedc19efc7dad2914b0addf17c76ee9fc50b72b09c1b"
     },
     {
       "slug": "figma",
       "version": "1.0.0",
       "featured": true,
-      "detailSha256": "e78bbbea897d0ab840fd613089634bd36e2fb710dca6ad739c0f964c6baf88fe"
+      "detailSha256": "954af383280b4bbe1fe380013b46ed04ed23388de118de3d09bd59cd72116e3d"
     },
     {
       "slug": "sentry",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "412f984e42a88160c7b86a9b9d94e962f9f14b7e2d870807c7fc2b891dcc0a1d"
+      "detailSha256": "4fc370192c4c20834039fbdce4c5deb76f1553690136488aed99df5d9acdd191"
     },
     {
       "slug": "context7",
@@ -54,7 +54,7 @@
       "slug": "stripe",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "8b53a691d487cbe70b46c8782903f6cfd77abf5d52dd01e0b666a41e6f593bbb"
+      "detailSha256": "e930034039d0630f4ac64deed7c08b282a601ff68821a81a95483b0a95fd16c2"
     },
     {
       "slug": "posthog",

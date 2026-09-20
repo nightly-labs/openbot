@@ -23,6 +23,8 @@ Rules for a new entry:
 - `http` servers take a `url`. `stdio` servers take a `command` and `args`.
   No `workingDirectory`: the provider drops such servers.
 - Names must pass `mcpConfigErrors` and must not be reserved (`openbot`).
-- OAuth-only vendors install as `npx mcp-remote@latest <url>` over stdio,
-  the same bridge the Canva listing uses, because the main process signs in
-  through the bridge rather than with an OAuth client of its own.
+- OAuth-only vendors install as a plain `http` server with a `link` flow, the
+  same shape the Canva listing uses. OpenBot signs in itself: the main process
+  holds the MCP OAuth client, keeps the tokens in encrypted storage, and adds
+  the `Authorization` header at hand-off. No bridge program is installed, and
+  no listing may name one.

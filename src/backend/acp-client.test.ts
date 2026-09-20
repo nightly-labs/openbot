@@ -248,6 +248,8 @@ function startOpencode(
     servesModel?: (modelId: string) => boolean;
     /** Read at every session, the same way the real source is. */
     mcpServers?: () => McpServerConfig[];
+    /** The bearer token a signed-in http server is given, minted at the hand-off and never stored. */
+    mcpAuthorization?: (config: McpServerConfig) => Promise<string | null>;
     /** How long one request may take, which is also the deadline model discovery works inside. */
     requestTimeoutMs?: number;
   } = {},
@@ -258,6 +260,7 @@ function startOpencode(
     apiKey,
     customProviders: options.customProviders ?? (() => []),
     mcpServers: options.mcpServers ?? (() => []),
+    mcpAuthorization: options.mcpAuthorization,
     servesModel: options.servesModel,
   };
   const timeoutMs = options.requestTimeoutMs ?? 10_000;
@@ -618,6 +621,46 @@ describe("OpenCode ACP MCP servers", () => {
     // directory, and a server told to open `./data.db` somewhere else creates a second database
     // rather than reading the one the user named.
     expect(params.mcpServers.map((server: { name: string }) => server.name)).toEqual(["Filesystem"]);
+  });
+});
+
+describe("OpenCode MCP sign-in", () => {
+  it("gives the session the token OpenBot minted for an http server", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const sessionLog = join(tmpdir(), `openbot-acp-signin-${Date.now()}.ndjson`);
+    vi.stubEnv("OPENBOT_FAKE_ACP_SESSION_LOG", sessionLog);
+    const config: McpServerConfig = {
+      id: "mcp-1",
+      name: "Signed in",
+      transport: "http",
+      enabled: true,
+      command: "",
+      args: [],
+      env: [],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "https://mcp.example.com/mcp",
+      headers: [],
+    };
+    const client = startOpencode(fake.cli, () => null, fake.envLog, {
+      mcpServers: () => [config],
+      mcpAuthorization: async () => "minted-access-token",
+    });
+    await client.request("initialize", {}, decodeRecordResponse);
+    await client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse);
+
+    // The row holds no credential: a native sign-in keeps the token in OpenBot's own store, so the
+    // only way OpenCode can reach the server is the header written here, at the hand-off.
+    const logged = (await readFile(sessionLog, "utf8")).split("\n").filter((line) => line.trim());
+    const params = JSON.parse(logged.at(-1) ?? "{}");
+    expect(params.mcpServers).toEqual([
+      {
+        type: "http",
+        name: "Signed in",
+        url: "https://mcp.example.com/mcp",
+        headers: [{ name: "Authorization", value: "Bearer minted-access-token" }],
+      },
+    ]);
   });
 });
 

@@ -7,8 +7,11 @@ import { dirname, join, resolve } from "node:path";
 import { finished } from "node:stream/promises";
 import { promisify } from "node:util";
 import {
+  isManagedToolRuntime,
   MANAGED_RUNTIME_PROVIDERS,
+  MANAGED_TOOL_RUNTIMES,
   type ManagedProviderId,
+  type ManagedRuntimeId,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -17,11 +20,23 @@ import { redactText } from "@openbot/logging";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import { type BundledProviderExecutables, configuredCliPath } from "../backend/cli";
+import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import { sha256File } from "./provider-runtime-archive";
-import { providerRuntimeDescriptor, type RuntimeSpec, type RuntimeTarget } from "./provider-runtime-descriptors";
+import {
+  bunxExecutableName,
+  providerRuntimeDescriptor,
+  type RuntimeSpec,
+  type RuntimeTarget,
+} from "./provider-runtime-descriptors";
 
 const execFileAsync = promisify(execFile);
 const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
+/**
+ * Everything the store holds. Downloading, staging, verifying, sweeping and freeing disk are the
+ * same work whether the pinned artifact is a provider CLI or the JavaScript runtime the MCP servers
+ * need, so those paths walk this list; only the parts that mean "a provider" walk `PROVIDERS`.
+ */
+const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
 const FREE_SPACE_HEADROOM = 100_000_000;
 const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 /**
@@ -65,7 +80,7 @@ type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Resp
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
 interface ProviderRuntimeManagerEvents {
   status: [snapshot: ProviderRuntimeSnapshot];
-  ready: [provider: ManagedProviderId];
+  ready: [runtime: ManagedRuntimeId];
 }
 
 export interface ProviderRuntimeManagerOptions {
@@ -85,7 +100,7 @@ export interface ProviderRuntimeManagerOptions {
   fetchImpl?: Fetch;
   lock?: AgentRuntimeLock;
   availableDiskBytes?: () => Promise<number>;
-  updateRuntime?: (provider: ManagedProviderId, install: () => Promise<string>) => Promise<void>;
+  updateRuntime?: (runtime: ManagedRuntimeId, install: () => Promise<string>) => Promise<void>;
 }
 
 /**
@@ -114,13 +129,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #fetch: Fetch;
   readonly #lock: AgentRuntimeLock;
   readonly #availableDiskBytes: () => Promise<number>;
-  readonly #statuses: Record<ManagedProviderId, ProviderRuntimeStatus>;
-  readonly #controllers = new Map<ManagedProviderId, AbortController>();
-  readonly #tasks = new Map<ManagedProviderId, Promise<void>>();
-  readonly #cancelled = new Set<ManagedProviderId>();
+  readonly #statuses: Record<ManagedRuntimeId, ProviderRuntimeStatus>;
+  readonly #controllers = new Map<ManagedRuntimeId, AbortController>();
+  readonly #tasks = new Map<ManagedRuntimeId, Promise<void>>();
+  readonly #cancelled = new Set<ManagedRuntimeId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the lock. */
   readonly #systemVersions = new Map<ManagedProviderId, string>();
-  readonly #updateRuntime: (provider: ManagedProviderId, install: () => Promise<string>) => Promise<void>;
+  readonly #updateRuntime: (runtime: ManagedRuntimeId, install: () => Promise<string>) => Promise<void>;
   #revision = 0;
   #stopping = false;
 
@@ -130,7 +145,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     this.#downloads = options.downloadRoot ?? join(options.root, ".downloads");
     this.#updateRuntime =
       options.updateRuntime ??
-      (async (_provider, install) => {
+      (async (_runtime, install) => {
         await install();
       });
     this.#target = runtimeTarget(options.platform ?? process.platform, options.architecture ?? process.arch);
@@ -148,26 +163,29 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       claude: emptyStatus(unsupportedMessage),
       grok: emptyStatus(unsupportedMessage),
       opencode: emptyStatus(unsupportedMessage),
+      bun: emptyStatus(unsupportedMessage),
     };
   }
 
   async initialize(): Promise<ProviderRuntimeSnapshot> {
     await mkdir(this.#root, { recursive: true });
     await this.#removeAbandonedStaging();
-    await Promise.all(PROVIDERS.map((provider) => this.#inspect(provider)));
+    await Promise.all(RUNTIMES.map((runtime) => this.#inspect(runtime)));
     const target = this.#target;
     if (target) {
       // Settled, not all: collecting an old version is housekeeping, and a version another instance
       // still runs refuses to be removed on Windows. Neither may stop the app from starting.
       await Promise.allSettled(
-        PROVIDERS.map((provider) => this.#removeOldVersions(runtimeSpec(provider, target, this.#lock))),
+        RUNTIMES.map((runtime) => this.#removeOldVersions(runtimeSpec(runtime, target, this.#lock))),
       );
     }
     return this.getStatus();
   }
 
   getStatus(): ProviderRuntimeSnapshot {
-    const providers = structuredClone(this.#statuses);
+    // Split rather than widened: `providers` means "a provider CLI" to every renderer that draws a
+    // card from it, and Bun must not become one.
+    const { bun, ...providers } = structuredClone(this.#statuses);
     if (this.#target) {
       for (const provider of PROVIDERS) {
         const version = runtimeSpec(provider, this.#target, this.#lock).version;
@@ -177,7 +195,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         providers[provider].availableVersion = offer && !configuredCliPath(provider) ? version : null;
       }
     }
-    return { revision: this.#revision, providers };
+    return { revision: this.#revision, providers, toolRuntimes: { bun } };
   }
 
   /**
@@ -203,68 +221,111 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return executables;
   }
 
-  executablePath(provider: ManagedProviderId): string | null {
+  executablePath(runtime: ManagedRuntimeId): string | null {
     if (!this.#target) return null;
-    const spec = runtimeSpec(provider, this.#target, this.#lock);
+    const spec = runtimeSpec(runtime, this.#target, this.#lock);
     return join(
-      this.#providerRoot(provider),
+      this.#runtimeRoot(runtime),
       spec.target,
-      this.#statuses[provider].version ?? spec.version,
+      this.#statuses[runtime].version ?? spec.version,
       "bin",
       spec.executableName,
     );
   }
 
-  async download(provider: ManagedProviderId): Promise<ProviderRuntimeSnapshot> {
+  /**
+   * Starts whatever tool runtime this machine is missing, and answers immediately.
+   *
+   * MCP is optional, so this is never something a user waits for or has to answer. A runtime that is
+   * already installed starts nothing, and every reason `download` refuses -- an unsupported
+   * platform, a download already running, the app closing -- is in the status a Settings reader can
+   * see, so there is nothing here that only this call site could report.
+   */
+  ensureToolRuntimes(): void {
+    for (const tool of MANAGED_TOOL_RUNTIMES) void this.download(tool).catch(() => undefined);
+  }
+
+  /**
+   * Starts whatever tool runtime this machine is missing and waits until each one is ready.
+   *
+   * The connection test is the one place that waits: a first credential-based stdio plugin must
+   * pass its test before it can be saved, and without a runtime the test answers `Command not
+   * found` for a machine that only needs a download. Throws when a download fails, so the caller
+   * decides whether the test still runs.
+   */
+  async ensureToolRuntimesReady(): Promise<void> {
+    for (const tool of MANAGED_TOOL_RUNTIMES) await this.downloadAndWait(tool);
+  }
+
+  /**
+   * What the MCP servers may use from the store, in the shape the resolution step takes.
+   *
+   * Only a runtime that is `ready` is offered. A path into a directory that does not exist would
+   * turn "Bun is still downloading" into "Command not found: npx", which is the wrong sentence and
+   * the wrong thing to do about it.
+   *
+   * The alias is how a catalog entry keeps working untouched. Bun decides what to do from the name
+   * it was started under, so the staged `bunx` takes `-y <package>` exactly as `npx` does, and
+   * nothing rewrites a stored command, the catalog, or the wire.
+   */
+  mcpToolRuntimes(): McpToolRuntimes {
+    const executable = this.#target && this.#statuses.bun.phase === "ready" ? this.executablePath("bun") : null;
+    if (!(executable && this.#target)) return NO_MCP_TOOL_RUNTIMES;
+    const bin = dirname(executable);
+    return { binDirectories: [bin], commandAliases: { npx: join(bin, bunxExecutableName(this.#target)) } };
+  }
+
+  async download(runtime: ManagedRuntimeId): Promise<ProviderRuntimeSnapshot> {
     if (!this.#target) throw new Error("Provider runtimes are not available on this platform.");
     if (this.#stopping) throw new Error("OpenBot is closing.");
-    if (configuredCliPath(provider))
+    // Only a provider CLI has a path override; nothing points `OPENBOT_BUN_PATH` at a tool runtime.
+    if (!isManagedToolRuntime(runtime) && configuredCliPath(runtime))
       throw new Error("Remove the explicit CLI path override before updating in OpenBot.");
-    if (this.#statuses[provider].phase === "ready" || this.#tasks.has(provider)) return this.getStatus();
+    if (this.#statuses[runtime].phase === "ready" || this.#tasks.has(runtime)) return this.getStatus();
 
-    const spec = runtimeSpec(provider, this.#target, this.#lock);
+    const spec = runtimeSpec(runtime, this.#target, this.#lock);
     const controller = new AbortController();
-    this.#controllers.set(provider, controller);
-    this.#cancelled.delete(provider);
-    this.#setStatus(provider, {
+    this.#controllers.set(runtime, controller);
+    this.#cancelled.delete(runtime);
+    this.#setStatus(runtime, {
       phase: "downloading",
       progress: 0,
       message: null,
-      version: this.#statuses[provider].version,
+      version: this.#statuses[runtime].version,
     });
     // The task is registered without an await between it and the guard above, so a second request
-    // for the same provider finds it and joins it instead of starting a download of its own.
+    // for the same runtime finds it and joins it instead of starting a download of its own.
     const task = this.#updateProviderRuntime(spec, controller.signal)
       .catch((error: unknown) => {
-        this.#controllers.delete(provider);
-        this.#tasks.delete(provider);
-        return this.#handleDownloadFailure(provider, error);
+        this.#controllers.delete(runtime);
+        this.#tasks.delete(runtime);
+        return this.#handleDownloadFailure(runtime, error);
       })
       .finally(() => {
-        this.#controllers.delete(provider);
-        this.#tasks.delete(provider);
-        this.#cancelled.delete(provider);
+        this.#controllers.delete(runtime);
+        this.#tasks.delete(runtime);
+        this.#cancelled.delete(runtime);
       });
-    this.#tasks.set(provider, task);
+    this.#tasks.set(runtime, task);
     return this.getStatus();
   }
 
-  async downloadAndWait(provider: ManagedProviderId): Promise<void> {
-    await this.download(provider);
-    await this.#tasks.get(provider);
-    const status = this.#statuses[provider];
-    if (status.phase !== "ready") throw new Error(status.message ?? "The provider update did not complete.");
+  async downloadAndWait(runtime: ManagedRuntimeId): Promise<void> {
+    await this.download(runtime);
+    await this.#tasks.get(runtime);
+    const status = this.#statuses[runtime];
+    if (status.phase !== "ready") throw new Error(status.message ?? "The runtime update did not complete.");
   }
 
-  async cancel(provider: ManagedProviderId): Promise<ProviderRuntimeSnapshot> {
-    if (this.#statuses[provider].phase !== "downloading") return this.getStatus();
-    const task = this.#tasks.get(provider);
-    this.#cancelled.add(provider);
-    this.#controllers.get(provider)?.abort();
+  async cancel(runtime: ManagedRuntimeId): Promise<ProviderRuntimeSnapshot> {
+    if (this.#statuses[runtime].phase !== "downloading") return this.getStatus();
+    const task = this.#tasks.get(runtime);
+    this.#cancelled.add(runtime);
+    this.#controllers.get(runtime)?.abort();
     await task;
-    if (this.#target) await this.#removePartial(runtimeSpec(provider, this.#target, this.#lock));
-    await this.#inspect(provider);
-    this.#setStatus(provider, this.#statuses[provider]);
+    if (this.#target) await this.#removePartial(runtimeSpec(runtime, this.#target, this.#lock));
+    await this.#inspect(runtime);
+    this.#setStatus(runtime, this.#statuses[runtime]);
     return this.getStatus();
   }
 
@@ -274,11 +335,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await Promise.allSettled(this.#tasks.values());
   }
 
-  async #inspect(provider: ManagedProviderId): Promise<ProviderRuntimeStatus> {
-    if (!this.#target) return this.#statuses[provider];
-    const spec = runtimeSpec(provider, this.#target, this.#lock);
-    this.#statuses[provider] = await this.#readStore(spec);
-    return this.#statuses[provider];
+  async #inspect(runtime: ManagedRuntimeId): Promise<ProviderRuntimeStatus> {
+    if (!this.#target) return this.#statuses[runtime];
+    const spec = runtimeSpec(runtime, this.#target, this.#lock);
+    this.#statuses[runtime] = await this.#readStore(spec);
+    return this.#statuses[runtime];
   }
 
   /**
@@ -313,7 +374,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     }
     if (this.#stopping) throw new Error("OpenBot is closing.");
     signal.throwIfAborted();
-    this.#setStatus(spec.provider, { phase: "downloading", progress: 0, message: null, version: installed.version });
+    this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
     await this.#activate(spec, signal);
   }
 
@@ -357,15 +418,15 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   async #activate(spec: RuntimeSpec, signal: AbortSignal | null): Promise<void> {
     let installed = false;
     try {
-      await this.#updateRuntime(spec.provider, async () => {
+      await this.#updateRuntime(spec.runtime, async () => {
         if (signal) {
           installed = await this.#runDownload(spec, signal);
           await this.#removePartial(spec);
         }
         return join(this.#installRoot(spec), "bin", spec.executableName);
       });
-      this.#setStatus(spec.provider, readyStatus(spec.version));
-      this.emit("ready", spec.provider);
+      this.#setStatus(spec.runtime, readyStatus(spec.version));
+      this.emit("ready", spec.runtime);
     } catch (error) {
       if (installed) await rm(this.#installRoot(spec), { recursive: true, force: true });
       throw error;
@@ -400,21 +461,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     );
     await streamResponse(response, partialPath, offset, signal, (received) => {
       const progress = Math.min(99, Math.floor((received / spec.downloadBytes) * 100));
-      if (progress !== this.#statuses[spec.provider].progress) {
-        this.#setStatus(spec.provider, {
+      if (progress !== this.#statuses[spec.runtime].progress) {
+        this.#setStatus(spec.runtime, {
           phase: "downloading",
           progress,
           message: null,
-          version: this.#statuses[spec.provider].version,
+          version: this.#statuses[spec.runtime].version,
         });
       }
     });
 
-    this.#setStatus(spec.provider, {
+    this.#setStatus(spec.runtime, {
       phase: "finishing",
       progress: null,
       message: null,
-      version: this.#statuses[spec.provider].version,
+      version: this.#statuses[spec.runtime].version,
     });
     const downloaded = await stat(partialPath);
     if (downloaded.size !== spec.downloadBytes) {
@@ -435,13 +496,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     // and the sweep can tell a live stage from an abandoned one by its age alone. The prefix is not
     // the one released builds sweep without looking at the age: see `STAGING_PREFIXES`.
     const staging = join(
-      this.#providerRoot(spec.provider),
+      this.#runtimeRoot(spec.runtime),
       `.staging-${spec.target}-${spec.version}-${process.pid}-${randomBytes(4).toString("hex")}`,
     );
     await mkdir(staging, { recursive: true });
     let committed = false;
     try {
-      await providerRuntimeDescriptor(spec.provider).stage({
+      await providerRuntimeDescriptor(spec.runtime).stage({
         spec,
         downloadedPath,
         staging,
@@ -479,7 +540,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   async #discardRejected(spec: RuntimeSpec): Promise<void> {
     const installRoot = this.#installRoot(spec);
     const aside = join(
-      this.#providerRoot(spec.provider),
+      this.#runtimeRoot(spec.runtime),
       `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
     );
     if (!(await renameIfPresent(installRoot, aside))) return;
@@ -530,7 +591,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     destination: string,
     spec: RuntimeSpec,
   ): Promise<"committed" | "adopted" | "moved"> {
-    const lock = join(this.#providerRoot(spec.provider), `.locking-${spec.target}-${spec.version}`);
+    const lock = join(this.#runtimeRoot(spec.runtime), `.locking-${spec.target}-${spec.version}`);
     const claim = await takeLock(lock);
     if (!claim) return "moved";
     try {
@@ -538,7 +599,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       // Beside the staging directories, not beside the version ones: that is where the sweep looks,
       // and `#removeOldVersions` reads everything in the target root as a version.
       const aside = join(
-        this.#providerRoot(spec.provider),
+        this.#runtimeRoot(spec.runtime),
         `.replaced-${spec.target}-${spec.version}-${randomBytes(4).toString("hex")}`,
       );
       // The claim is read once more against the one thing that can have displaced it: an instance
@@ -607,34 +668,34 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (available < required) throw new Error("There is not enough free disk space for this provider.");
   }
 
-  async #handleDownloadFailure(provider: ManagedProviderId, error: unknown): Promise<void> {
-    if (this.#cancelled.has(provider)) return;
+  async #handleDownloadFailure(runtime: ManagedRuntimeId, error: unknown): Promise<void> {
+    if (this.#cancelled.has(runtime)) return;
     if (this.#stopping && isAbortError(error)) return;
     const message = isAbortError(error)
       ? "Download stopped. Try again."
       : error instanceof Error
         ? redactText(error.message)
         : "Download failed. Try again.";
-    this.#setStatus(provider, {
+    this.#setStatus(runtime, {
       phase: "download-error",
       progress: null,
       message,
-      version: this.#statuses[provider].version,
+      version: this.#statuses[runtime].version,
     });
   }
 
-  #setStatus(provider: ManagedProviderId, status: ProviderRuntimeStatus): void {
-    this.#statuses[provider] = status;
+  #setStatus(runtime: ManagedRuntimeId, status: ProviderRuntimeStatus): void {
+    this.#statuses[runtime] = status;
     this.#revision += 1;
     this.emit("status", this.getStatus());
   }
 
-  #providerRoot(provider: ManagedProviderId): string {
-    return join(this.#root, provider);
+  #runtimeRoot(runtime: ManagedRuntimeId): string {
+    return join(this.#root, runtime);
   }
 
   #installRoot(spec: RuntimeSpec): string {
-    return join(this.#providerRoot(spec.provider), spec.target, spec.version);
+    return join(this.#runtimeRoot(spec.runtime), spec.target, spec.version);
   }
 
   #downloadRoot(): string {
@@ -642,7 +703,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   #partialPath(spec: RuntimeSpec): string {
-    return join(this.#downloadRoot(), `${spec.provider}-${spec.target}-${spec.version}.partial`);
+    return join(this.#downloadRoot(), `${spec.runtime}-${spec.target}-${spec.version}.partial`);
   }
 
   #partialMetadataPath(spec: RuntimeSpec): string {
@@ -664,8 +725,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    */
   async #removeAbandonedStaging(): Promise<void> {
     const stale = Date.now() - STALE_STAGING_MS;
-    for (const provider of PROVIDERS) {
-      const root = this.#providerRoot(provider);
+    for (const runtime of RUNTIMES) {
+      const root = this.#runtimeRoot(runtime);
       const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
       await Promise.all(
         entries
@@ -692,14 +753,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * nothing has opened for a month is collected.
    */
   async #removeOldVersions(spec: RuntimeSpec): Promise<void> {
-    const targetRoot = join(this.#providerRoot(spec.provider), spec.target);
+    const targetRoot = join(this.#runtimeRoot(spec.runtime), spec.target);
     const entries = await readdir(targetRoot, { withFileTypes: true }).catch(() => []);
     const versions = entries
       .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
       .map((entry) => entry.name);
     const keep = new Set([
       spec.version,
-      this.#statuses[spec.provider].version,
+      this.#statuses[spec.runtime].version,
       ...versions
         .filter((version) => version !== spec.version)
         .sort()
@@ -731,8 +792,8 @@ function runtimeTarget(platform: NodeJS.Platform, architecture: string): Runtime
   return null;
 }
 
-function runtimeSpec(provider: ManagedProviderId, target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec {
-  return providerRuntimeDescriptor(provider).spec(target, lock);
+function runtimeSpec(runtime: ManagedRuntimeId, target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec {
+  return providerRuntimeDescriptor(runtime).spec(target, lock);
 }
 
 /**
@@ -741,7 +802,7 @@ function runtimeSpec(provider: ManagedProviderId, target: RuntimeTarget, lock: A
  * catches a CLI that replaced itself after installation.
  */
 async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Promise<void> {
-  const descriptor = providerRuntimeDescriptor(spec.provider);
+  const descriptor = providerRuntimeDescriptor(spec.runtime);
   const executable = join(root, "bin", spec.executableName);
   await access(executable);
   await descriptor.verify(root, spec, lock);

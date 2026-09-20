@@ -7,6 +7,7 @@ import { useConversationController } from "./features/conversation/conversation-
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
@@ -204,6 +205,7 @@ function JoinServer(props: AccountProps) {
 function ServerSettings() {
   const platform = usePlatform();
   const { hostStatus, setServerMuted } = useServers();
+  const { toolRuntimeStatuses } = useProviders();
   const {
     serverSettingsTarget,
     serverSettingsOpen,
@@ -263,6 +265,9 @@ function ServerSettings() {
             onOpenScreenRecordingSettings={() => window.openbot.openExternal("mac-screen-recording")}
             onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
+            // Only for this computer: the runtime a remote host starts its own servers with is that
+            // host's, and this window downloads nothing for it.
+            mcpToolRuntimeNote={server().kind === "local" ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
             mcpLoadError={serverSettingsMcpError()}
             onMcpSectionShown={() => void refreshMcpServers()}
             onRetryMcpServers={() => void refreshMcpServers()}

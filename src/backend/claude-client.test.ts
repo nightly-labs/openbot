@@ -1113,6 +1113,49 @@ it("hands the enabled MCP servers to the spawn and keeps the bridge names", asyn
     expect(servers.Filesystem).toMatchObject({ type: "stdio", command: "/bin/echo", args: ["ready"] });
     expect(servers.Disabled).toBeUndefined();
     expect(isDynamicRecord(servers.openbot) ? servers.openbot.instance : null).toBeTruthy();
+    /*
+     * The record above is the whole set. Without the flag, Claude adds the servers of project
+     * `.mcp.json`, user settings, plugins and agent frontmatter to it - including one that takes
+     * the bridge name `openbot` - and the panel stops describing what the agent has. The setting
+     * sources stay, because the flag takes away MCP and leaves permissions and hooks.
+     */
+    expect(started?.strictMcpConfig).toBe(true);
+    expect(started?.settingSources).toEqual(["user", "project", "local"]);
+  } finally {
+    await client.stop();
+  }
+});
+
+// Before this, a command this machine does not have produced nothing at all: the adapter skipped
+// the server, so the provider never tried to start it and never wrote a word to stderr.
+it("reports an MCP server whose command this machine does not have", async () => {
+  const query = new TestQuery(new TestQueue<TestStreamMessage>());
+  const spawned: DynamicRecord[] = [];
+  const reportMcpDrops = vi.fn();
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    (params) => {
+      if (isDynamicRecord(params.options)) spawned.push(params.options);
+      return query;
+    },
+    undefined,
+    undefined,
+    () => [
+      mcpConfig({ id: "mcp-1", name: "Filesystem", command: "/bin/echo", args: ["ready"] }),
+      mcpConfig({ id: "mcp-2", name: "Missing", command: "openbot-not-a-real-command" }),
+    ],
+    reportMcpDrops,
+  );
+  client.start();
+  try {
+    await client.request("thread/start", { cwd: process.cwd() }, decodeThreadResponse);
+    expect(reportMcpDrops).toHaveBeenCalledWith("claude", [
+      { name: "Missing", reason: "command_not_found", detail: "Command not found: openbot-not-a-real-command" },
+    ]);
+    const servers = isDynamicRecord(spawned.at(-1)?.mcpServers) ? spawned.at(-1)?.mcpServers : {};
+    expect(isDynamicRecord(servers) ? servers.Missing : null).toBeUndefined();
+    // The one that resolves still goes: a bad server must not take a good one with it.
+    expect(isDynamicRecord(servers) ? servers.Filesystem : null).toMatchObject({ command: "/bin/echo" });
   } finally {
     await client.stop();
   }

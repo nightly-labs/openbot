@@ -431,7 +431,7 @@ Ordered by cost.
    `createPluginShareUrl` in `src/renderer/src/features/settings/marketplace-plugins.ts`.
 2. ~~`marketplace/plugin-catalog/` and `scripts/build-plugin-catalog.ts`, with fixtures and `--check`.~~ Done:
    the source holds 14 listings (no-auth, header key, stdio env key, and OAuth
-   over the `mcp-remote` bridge), and the build writes the renderer literal,
+   over HTTP, which the main process signs in to itself), and the build writes the renderer literal,
    the Worker module, and the offline snapshot, with `--check` for CI.
 3. The Worker routes: the JSON first, then the page and the sitemap entries.
 4. The contract types, the channels, the decoders, the preload and the mock.

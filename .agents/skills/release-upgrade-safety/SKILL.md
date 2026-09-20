@@ -135,6 +135,32 @@ to be long is not empty. An empty result means "nothing is wrong" and "I asked t
 equally well, and the second is the more common of the two. This is not hypothetical: it is how
 `check:ui` lost two checks (`AGENTS.md`, Tests) and why the repo deleted `no-runtime-typeof`.
 
+## Step 2b — the pinned runtimes
+
+Not a gate: nothing here can strand a user's data, and a stale pin is not a stop. It belongs to
+this audit because this is the one moment per release when somebody looks at the whole range, and a
+pinned runtime only reaches users through a release.
+
+`native-runtime.lock.json` pins the provider CLIs and Bun, the runtime a STDIO MCP server is
+started with. Bun and OpenCode have pin scripts; the rest are pinned by hand:
+
+```bash
+bun run pin:bun-runtime       # prints the block; says "already pins Bun <version>" when it matches
+bun run pin:opencode-runtime
+```
+
+Ask two questions and report the answers with the table:
+
+- **Has the pinned version a published security fix?** If so, moving the pin is part of this
+  release, not the next one. A user cannot update Bun themselves: OpenBot downloaded it, OpenBot
+  owns it.
+- **Did the range move a pin?** Then read the diff as a dependency change. A moved `assetSha256`
+  with an unmoved `version` is a stop and needs a human: the registry does not rewrite a published
+  artifact.
+
+Moving a pin needs the version assertion on a matching host, which `pin:bun-runtime` performs only
+for the target it runs on. [docs/RELEASING.md](../../../docs/RELEASING.md) holds the procedure.
+
 ## Step 3 — report and hand off
 
 Report a table:

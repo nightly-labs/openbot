@@ -122,6 +122,33 @@ Run it on a version bump only. A bump also needs the Windows checks in
 published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
 before release.
 
+## Pin the Bun tool runtime
+
+`native-runtime.lock.json` also pins Bun, which is not a provider CLI: it is the runtime a STDIO MCP
+server is started with on a computer that has no Node, and the staged layout puts a second name
+`bunx` beside it so that `npx -y <package>` has something to answer it. The pin has its own script
+for the same reason OpenCode does - the version, three platform packages, and the MIT license have
+to agree:
+
+```bash
+bun run pin:bun-runtime         # the newest published release
+bun run pin:bun-runtime 1.4.2   # one exact version
+```
+
+It works like the OpenCode script: it downloads all three platform tarballs, checks
+`package/package.json` against the registry metadata, hashes the extracted binary and
+`LICENSE.md`, runs `--version` on the target that matches the host, and prints the block for review
+instead of rewriting the lock. Paste it over the `bun` entry and re-run it with that exact version
+to get `already pins Bun <version>`.
+
+The x64 entries are the `baseline` builds. Bun's plain x64 build needs AVX2 and answers a spawn on
+an older machine with an illegal instruction and no message, which would reach the user as an MCP
+server that never starts.
+
+Move this pin at release preparation, with the release-upgrade-safety audit, and not on a schedule:
+a pinned runtime is OpenBot's supply chain, and a Bun security release only reaches users through an
+OpenBot release. One reviewed commit per release.
+
 ## Publish a version
 
 Start from a clean, up-to-date `main` branch. For the first release, `package.json` and

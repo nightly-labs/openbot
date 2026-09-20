@@ -20,9 +20,8 @@
       "iconUrl": "https://sentry.io/favicon.ico",
       "server": {
         "name": "sentry",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "mcp-remote@latest", "https://mcp.sentry.dev/mcp"],
+        "transport": "http",
+        "url": "https://mcp.sentry.dev/mcp",
         "auth": [{ "id": "sentry-oauth", "kind": "link", "label": "Sign in" }]
       }
     }

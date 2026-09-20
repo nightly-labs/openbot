@@ -294,7 +294,10 @@ export function AgentEventBridge() {
         const now = Date.now();
         if ((lastErrorToastAt.get(toastKey) ?? 0) + ERROR_TOAST_DEDUPE_MS < now) {
           lastErrorToastAt.set(toastKey, now);
-          toast.error("Provider error", { description: toastKey });
+          // An MCP server left out at hand-off is not the provider failing, and calling it a
+          // provider error sends the user to the wrong settings page.
+          const title = event.code === "mcp_server_not_started" ? "MCP server not started" : "Provider error";
+          toast.error(title, { description: toastKey });
         }
       }
     }
