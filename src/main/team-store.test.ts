@@ -144,6 +144,60 @@ describe("TeamStore", () => {
     );
   });
 
+  it("reuses a permanent link for many joins without expiring", async () => {
+    const { store } = await createStore();
+    await store.configure("Studio Mac", "owner", "correct horse battery");
+    const invite = await store.createInvite("member", undefined, { permanent: true });
+    expect(invite.permanent).toBe(true);
+    expect(invite.useCount).toBe(0);
+
+    await store.acceptInvite(invite.token, "alice", "a secure team password");
+    await store.acceptInvite(invite.token, "bob", "another secure password");
+    expect(store.previewInvite(invite.token)).toMatchObject({ role: "member", permanent: true });
+
+    const [listed] = store.listInvites();
+    expect(listed).toMatchObject({ id: invite.id, permanent: true, useCount: 2, usedAt: null });
+  });
+
+  it("reuses a permanent link across verified accounts", async () => {
+    const { store } = await createStore();
+    await store.configureWithAccount("Studio Mac", {
+      id: "owner-account",
+      email: "owner@example.com",
+      name: "Owner",
+      avatarUrl: null,
+    });
+    const invite = await store.createInvite("member", undefined, { permanent: true });
+    for (const [id, email] of [
+      ["alice-account", "alice@example.com"],
+      ["bob-account", "bob@example.com"],
+    ] as const) {
+      await expect(
+        store.acceptInviteWithAccount(invite.token, { id, email, name: null, avatarUrl: null }),
+      ).resolves.toBeDefined();
+    }
+    expect(store.listInvites()[0]).toMatchObject({ permanent: true, useCount: 2, usedAt: null });
+  });
+
+  it("rejects an email address on a permanent link", async () => {
+    const { store } = await createStore();
+    await store.configure("Studio Mac", "owner", "correct horse battery");
+    await expect(store.createInvite("member", "alice@example.com", { permanent: true })).rejects.toThrow("email");
+  });
+
+  it("caps permanent links separately from single-use invitations", async () => {
+    const { store } = await createStore();
+    await store.configure("Studio Mac", "owner", "correct horse battery");
+    for (let index = 0; index < INPUT_LIMITS.maxPermanentInvites; index += 1) {
+      await store.createInvite("member", undefined, { permanent: true });
+    }
+    await expect(store.createInvite("member", undefined, { permanent: true })).rejects.toThrow("permanent");
+    // Permanent links do not consume the single-use budget.
+    await expect(store.createInvite("member")).resolves.toBeDefined();
+    await store.revokeInvite(store.listInvites().find((invite) => invite.permanent)?.id ?? "");
+    await expect(store.createInvite("member", undefined, { permanent: true })).resolves.toBeDefined();
+  });
+
   it("previews an invitation without consuming it", async () => {
     const { store } = await createStore();
     await store.configure("Studio Mac", "owner", "correct horse battery");
@@ -153,6 +207,7 @@ describe("TeamStore", () => {
       role: "admin",
       expiresAt: invite.expiresAt,
       emailBound: true,
+      permanent: false,
     });
     await expect(
       store.acceptInviteWithAccount(invite.token, {

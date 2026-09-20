@@ -13,6 +13,7 @@ import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { permanentInviteExpiresAt } from "@openbot/contracts/invite-links";
 import type {
   AvatarImageInput,
   CentralAuthUser,
@@ -43,6 +44,9 @@ interface StoredInvite {
   expiresAt: string;
   usedAt: string | null;
   email?: string | null;
+  // Optional so files written before permanent links still read. Absent means single-use.
+  permanent?: boolean;
+  useCount?: number;
 }
 
 interface StoredSession {
@@ -107,12 +111,15 @@ export interface CreatedInvite {
   token: string;
   expiresAt: string;
   email: string | null;
+  permanent: boolean;
+  useCount: number;
 }
 
 export interface TeamInvitePreview {
   role: Exclude<TeamRole, "owner">;
   expiresAt: string;
   emailBound: boolean;
+  permanent: boolean;
 }
 
 export interface AuthenticatedMember {
@@ -738,6 +745,8 @@ export class TeamStore {
       expiresAt: invite.expiresAt,
       usedAt: invite.usedAt,
       email: invite.email ?? null,
+      permanent: invite.permanent ?? false,
+      useCount: invite.useCount ?? 0,
     }));
   }
 
@@ -768,28 +777,47 @@ export class TeamStore {
     return [...persisted, ...remote];
   }
 
-  async createInvite(role: Exclude<TeamRole, "owner">, emailInput?: string): Promise<CreatedInvite> {
+  async createInvite(
+    role: Exclude<TeamRole, "owner">,
+    emailInput?: string,
+    options?: { permanent?: boolean },
+  ): Promise<CreatedInvite> {
     if (role !== "admin" && role !== "member") throw new TeamStoreError("Invalid invite role.");
+    const permanent = options?.permanent ?? false;
+    const email = emailInput?.trim() ? normalizeEmail(emailInput) : null;
+    // A permanent link is a shareable URL, never an addressed message: binding it to an
+    // email would promise a restriction the token cannot enforce.
+    if (permanent && email) throw new TeamStoreError("A permanent invitation link cannot have an email address.");
     const state = this.#requireState();
-    const activeInvites = state.invites.filter(
-      (invite) => invite.usedAt === null && Date.parse(invite.expiresAt) > Date.now(),
-    ).length;
-    if (activeInvites >= INPUT_LIMITS.activeInvites) {
-      throw new TeamStoreError(`A host can have up to ${INPUT_LIMITS.activeInvites} active invitations.`);
+    if (permanent) {
+      const permanentInvites = state.invites.filter((invite) => invite.permanent === true).length;
+      if (permanentInvites >= INPUT_LIMITS.maxPermanentInvites) {
+        throw new TeamStoreError(
+          `A host can have up to ${INPUT_LIMITS.maxPermanentInvites} permanent invitation links.`,
+        );
+      }
+    } else {
+      const activeInvites = state.invites.filter(
+        (invite) => invite.permanent !== true && invite.usedAt === null && Date.parse(invite.expiresAt) > Date.now(),
+      ).length;
+      if (activeInvites >= INPUT_LIMITS.activeInvites) {
+        throw new TeamStoreError(`A host can have up to ${INPUT_LIMITS.activeInvites} active invitations.`);
+      }
     }
     const token = randomBytes(32).toString("base64url");
-    const email = emailInput?.trim() ? normalizeEmail(emailInput) : null;
     const invite: StoredInvite = {
       id: randomUUID(),
       tokenHash: hashToken(token),
       role,
-      expiresAt: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+      expiresAt: permanent ? permanentInviteExpiresAt() : new Date(Date.now() + INVITE_TTL_MS).toISOString(),
       usedAt: null,
       email,
+      permanent,
+      useCount: 0,
     };
     state.invites.push(invite);
     await this.#persist();
-    return { id: invite.id, role, token, expiresAt: invite.expiresAt, email };
+    return { id: invite.id, role, token, expiresAt: invite.expiresAt, email, permanent, useCount: 0 };
   }
 
   previewInvite(token: string): TeamInvitePreview {
@@ -799,6 +827,7 @@ export class TeamStore {
       role: invite.role,
       expiresAt: invite.expiresAt,
       emailBound: Boolean(invite.email),
+      permanent: invite.permanent ?? false,
     };
   }
 
@@ -818,7 +847,7 @@ export class TeamStore {
       existingMember.username = email;
       existingMember.name = normalizeName(user.name);
       existingMember.avatarUrl = normalizeAvatarUrl(user.avatarUrl);
-      invite.usedAt = new Date().toISOString();
+      this.#consumeInvite(invite);
       const result = this.#createSession(existingMember);
       await this.#persist();
       return result;
@@ -837,7 +866,7 @@ export class TeamStore {
       disabled: false,
       createdAt: new Date().toISOString(),
     };
-    invite.usedAt = new Date().toISOString();
+    this.#consumeInvite(invite);
     state.members.push(member);
     const result = this.#createSession(member);
     await this.#persist();
@@ -888,7 +917,7 @@ export class TeamStore {
       createdAt: new Date().toISOString(),
       ...credentials,
     };
-    invite.usedAt = new Date().toISOString();
+    this.#consumeInvite(invite);
     state.members.push(member);
     const result = this.#createSession(member);
     await this.#persist();
@@ -1056,10 +1085,24 @@ export class TeamStore {
   #findUsableInvite(token: string): StoredInvite | undefined {
     return this.#requireState().invites.find(
       (candidate) =>
-        candidate.usedAt === null &&
+        // A permanent link stays usable after joins; only expiry (never, by construction)
+        // or revocation (deletion) retires it.
+        (candidate.permanent === true || candidate.usedAt === null) &&
         Date.parse(candidate.expiresAt) > Date.now() &&
         safeTextEqual(candidate.tokenHash, hashToken(token)),
     );
+  }
+
+  /**
+   * Records one join against an invitation. Single-use links burn; permanent links
+   * count the join and stay usable.
+   */
+  #consumeInvite(invite: StoredInvite): void {
+    if (invite.permanent === true) {
+      invite.useCount = (invite.useCount ?? 0) + 1;
+      return;
+    }
+    invite.usedAt = new Date().toISOString();
   }
 
   #requireState(): StoredTeam {

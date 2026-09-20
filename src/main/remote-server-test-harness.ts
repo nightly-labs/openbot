@@ -130,7 +130,13 @@ export function fakeWebRtcTransport(hosts: readonly RemoteHostSummary[] = []): T
       signalUrl: "wss://signal.example.test/v1/signal",
     }),
     endSession: async () => undefined,
-    createInvite: async () => ({ inviteId: "invite", token: "token", expiresAt: Date.now() + 60_000 }),
+    createInvite: async () => ({
+      inviteId: "invite",
+      token: "token",
+      expiresAt: Date.now() + 60_000,
+      permanent: false,
+      useCount: 0,
+    }),
     listInvites: async () => [],
     previewInvite: async () => ({
       inviteId: "invite",
@@ -139,6 +145,7 @@ export function fakeWebRtcTransport(hosts: readonly RemoteHostSummary[] = []): T
       role: "member",
       expiresAt: Date.now() + 60_000,
       emailBound: false,
+      permanent: false,
       devicePublicKey: null,
     }),
     acceptInvite: async () => ({ hostId: "host-1", membershipId: "member-1", role: "member" }),

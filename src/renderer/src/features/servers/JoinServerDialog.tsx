@@ -1,5 +1,6 @@
 import { AppLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { isNeverExpiringInvite } from "@openbot/contracts/invite-links";
 import type { InvitePreview, JoinServerInput } from "@openbot/contracts/ipc";
 import { createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
 import {
@@ -368,7 +369,11 @@ export function InvitePreviewCard(props: InvitePreviewCardProps) {
         </div>
         <div>
           <dt>Expires</dt>
-          <dd>{formatInviteDate(props.preview.expiresAt)}</dd>
+          <dd>
+            {props.preview.permanent || isNeverExpiringInvite(props.preview.expiresAt)
+              ? "Never"
+              : formatInviteDate(props.preview.expiresAt)}
+          </dd>
         </div>
         <div>
           <dt>Account</dt>

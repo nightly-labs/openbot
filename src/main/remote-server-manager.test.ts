@@ -87,7 +87,13 @@ describe("remote server links", () => {
         signalUrl: "wss://signal.openbot.run/v1/signal",
       }),
       endSession: async () => undefined,
-      createInvite: async () => ({ inviteId: "invite-1", token: "t".repeat(43), expiresAt: Date.now() + 60_000 }),
+      createInvite: async () => ({
+        inviteId: "invite-1",
+        token: "t".repeat(43),
+        expiresAt: Date.now() + 60_000,
+        permanent: false,
+        useCount: 0,
+      }),
       listInvites: async () => [],
       previewInvite: async () => ({
         inviteId: "invite-1",
@@ -96,6 +102,7 @@ describe("remote server links", () => {
         role: "member" as const,
         expiresAt: Date.now() + 60_000,
         emailBound: false,
+        permanent: false,
         devicePublicKey: "trusted-host-public-key",
       }),
       acceptInvite,
@@ -167,7 +174,13 @@ describe("remote server links", () => {
         signalUrl: "wss://signal.openbot.run/v1/signal",
       }),
       endSession: async () => undefined,
-      createInvite: async () => ({ inviteId: "invite-1", token: "token", expiresAt: Date.now() + 60_000 }),
+      createInvite: async () => ({
+        inviteId: "invite-1",
+        token: "token",
+        expiresAt: Date.now() + 60_000,
+        permanent: false,
+        useCount: 0,
+      }),
       listInvites: async () => [],
       previewInvite: async () => ({
         inviteId: "invite-1",
@@ -176,6 +189,7 @@ describe("remote server links", () => {
         role: "member",
         expiresAt: Date.now() + 60_000,
         emailBound: false,
+        permanent: false,
         devicePublicKey: "trusted-host-public-key",
       }),
       acceptInvite: async () => ({ hostId, membershipId: "membership-1", role: "member" }),
@@ -283,7 +297,13 @@ describe("remote server links", () => {
       startSession: async (hostId) => ({ sessionId: "session-1", hostId, expiresAt: Date.now() + 60_000 }),
       issueTicket: async () => ({ ticket: "ticket", expiresAt: Date.now() + 60_000, signalUrl: "wss://signal" }),
       endSession: async () => undefined,
-      createInvite: async () => ({ inviteId: "invite-1", token: "t".repeat(43), expiresAt: Date.now() + 60_000 }),
+      createInvite: async () => ({
+        inviteId: "invite-1",
+        token: "t".repeat(43),
+        expiresAt: Date.now() + 60_000,
+        permanent: false,
+        useCount: 0,
+      }),
       listInvites: async () => [],
       previewInvite: async () => {
         throw new Error("Unexpected invite preview.");
@@ -445,7 +465,13 @@ describe("remote server links", () => {
         signalUrl: "wss://signal.openbot.run/v1/signal",
       }),
       endSession: async () => undefined,
-      createInvite: async () => ({ inviteId: "invite-1", token: "token", expiresAt: Date.now() + 60_000 }),
+      createInvite: async () => ({
+        inviteId: "invite-1",
+        token: "token",
+        expiresAt: Date.now() + 60_000,
+        permanent: false,
+        useCount: 0,
+      }),
       listInvites: async () => [],
       previewInvite: async () => {
         throw new Error("Unexpected invite preview.");

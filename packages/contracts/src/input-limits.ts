@@ -72,6 +72,9 @@ export const INPUT_LIMITS = {
   mcpErrorText: 2_000,
   teamMembers: 100,
   activeInvites: 100,
+  // Permanent links accept unlimited joins until revoked, so a leaked link is open
+  // enrollment. The cap stays small; single-use invitations keep the larger budget.
+  maxPermanentInvites: 5,
   sessionsPerMember: 10,
 } as const;
 
