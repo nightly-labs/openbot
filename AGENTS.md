@@ -48,11 +48,10 @@ requested change broke, and rerun them without asking at each step.
    `typecheck:*` includes mobile, Signal, and `remote/scripts`. Each TypeScript project has a
    separate incremental cache in this worktree. The first run creates it; later runs reuse it.
    Run these checks locally even when cache state or machine load makes them slower.
-3. Run one desktop test file with `bun run test:desktop -- <path>`. Ask for a specific command
-   before a wider test, build, or packaged-app check. Approval covers only that command.
-4. Leave `bun run check`, `bun run check:desktop`, `bun run test`, and `bun run build-storybook`
-   to CI unless authorized. These suites take minutes and desktop tests can fail under load.
-5. Do not run `bun run format`: it rewrites the whole repository. Use
+3. Run one desktop test file with `bun run test:desktop -- <path>`. Leave `bun run check`,
+   `bun run check:desktop`, `bun run test`, and `bun run build-storybook` to CI. These suites take
+   minutes and desktop tests can fail under load.
+4. Do not run `bun run format`: it rewrites the whole repository. Use
    `biome check --write <paths>` for changed files, or the pre-commit `bun run check:staged` hook.
    Keep `--max-diagnostics=none` for full Biome reports.
 
