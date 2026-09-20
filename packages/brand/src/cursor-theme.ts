@@ -76,22 +76,6 @@ const ARROW_CENTRE = { x: 21.5 * ARROW_SCALE, y: 25 * ARROW_SCALE } as const;
 const ARROW_OUTLINE_WIDTH = 4.4;
 
 /**
- * The four chips beside the tip, as the middle of each one.
- *
- * They are the driver's own mark for a computer the agent holds, and they sit off the tip so that
- * they never cover what is under it.
- */
-const CHIPS = [
-  [-21, -1],
-  [-10, -1],
-  [-21, 10],
-  [-10, 10],
-] as const;
-const CHIP_SIZE = 7 * ARROW_SCALE;
-const CHIP_CORNER = 2.4 * ARROW_SCALE;
-const CHIP_OUTLINE_WIDTH = 2;
-
-/**
  * The glow behind the arrow: the same shape, larger, in weaker copies of the accent.
  *
  * The profile refuses a gradient and a blur, so the soft edge is three stacked copies. Each one is
@@ -145,15 +129,6 @@ interface CursorPath {
   };
 }
 
-/** A rounded square, which is what a chip is. */
-interface CursorRectangle {
-  readonly ty: "rc";
-  readonly d: 1;
-  readonly s: { readonly a: 0; readonly k: readonly [number, number] };
-  readonly p: { readonly a: 0; readonly k: readonly [number, number] };
-  readonly r: { readonly a: 0; readonly k: number };
-}
-
 /** A circle. The profile refuses a group, so every shape sits directly on a layer. */
 interface CursorEllipse {
   readonly ty: "el";
@@ -178,7 +153,7 @@ interface CursorFill {
   readonly r: 1;
 }
 
-type CursorShape = CursorPath | CursorRectangle | CursorEllipse | CursorStroke | CursorFill;
+type CursorShape = CursorPath | CursorEllipse | CursorStroke | CursorFill;
 
 /** A layer's own transform, the only place the profile allows a keyframe. */
 interface CursorTransform {
@@ -253,8 +228,9 @@ export interface CursorThemeSource {
  * `scripts/build-cursor-theme.ts` writes these into an archive and hands it to
  * `cua-cursor-theme build`, which validates and compiles them. The drawing follows the driver's own
  * cursor, because that shape is what a user already reads as "something else is driving this
- * computer": a rounded dart on a soft glow of the same shape, under a white outline, with four
- * chips beside its tip. Only the colour is OpenBot's. The driver's own cursor cannot simply be
+ * computer": a rounded dart on a soft glow of the same shape, under a white outline. The driver
+ * draws chips beside its own tip; OpenBot leaves them out, because they say nothing the dart does
+ * not and they take room beside the point the cursor acts on. Only the colour is OpenBot's. The driver's own cursor cannot simply be
  * recoloured - it is built into the binary and a theme owns the twelve action drawings only - so
  * the treatment is drawn again here.
  *
@@ -328,29 +304,9 @@ function pulseAnimation(): CursorAnimation {
  */
 function cursorLayers(frames: number, firstIndex = 1): readonly CursorLayer[] {
   return [
-    chipLayer(firstIndex, frames),
-    arrowLayer(firstIndex + 1, frames),
-    ...GLOW.map((step, offset) => glowLayer(firstIndex + 2 + offset, frames, step)),
+    arrowLayer(firstIndex, frames),
+    ...GLOW.map((step, offset) => glowLayer(firstIndex + 1 + offset, frames, step)),
   ];
-}
-
-/** The chips, drawn in one layer because they share their treatment and never move apart. */
-function chipLayer(index: number, frames: number): CursorLayer {
-  return shapeLayer("chips", index, frames, [
-    ...CHIPS.map((chip) => chipShape(chip)),
-    stroke(OUTLINE, CHIP_OUTLINE_WIDTH),
-    fill(ACCENT, 100),
-  ]);
-}
-
-function chipShape([x, y]: readonly number[]): CursorRectangle {
-  return {
-    ty: "rc",
-    d: 1,
-    s: { a: 0, k: [CHIP_SIZE, CHIP_SIZE] },
-    p: { a: 0, k: [x * ARROW_SCALE, y * ARROW_SCALE] },
-    r: { a: 0, k: CHIP_CORNER },
-  };
 }
 
 /** The arrow itself: accent, under a white outline that carries it over any wallpaper. */
