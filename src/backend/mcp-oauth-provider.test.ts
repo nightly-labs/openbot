@@ -13,6 +13,8 @@ import { testMcpServer } from "./mcp-probe";
  */
 const GRANT = "grant-abc";
 const ACCESS_TOKEN = "issued-access-token";
+const REFRESH_TOKEN = "issued-refresh-token";
+const REFRESHED_TOKEN = "refreshed-access-token";
 
 interface FakeServer {
   base: string;
@@ -37,7 +39,11 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
 }
 
 async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
-  const state: { registrations: number; tokenRequests: URLSearchParams[] } = { registrations: 0, tokenRequests: [] };
+  const state: { registrations: number; tokenRequests: URLSearchParams[]; refreshToken: string } = {
+    registrations: 0,
+    tokenRequests: [],
+    refreshToken: REFRESH_TOKEN,
+  };
   let base = "";
   const server: Server = createServer((request, response) => {
     void (async () => {
@@ -67,6 +73,22 @@ async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
       if (path === "/token") {
         const form = new URLSearchParams(await readBody(request));
         state.tokenRequests.push(form);
+        if (form.get("grant_type") === "refresh_token") {
+          // Rotating, like the specification recommends: the refresh token just spent is dead, so
+          // a second exchange with it would be refused and the grant would be at risk.
+          if (form.get("refresh_token") !== state.refreshToken) {
+            sendJson(response, 400, { error: "invalid_grant" });
+            return;
+          }
+          state.refreshToken = `${state.refreshToken}-next`;
+          sendJson(response, 200, {
+            access_token: REFRESHED_TOKEN,
+            token_type: "Bearer",
+            expires_in: 3600,
+            refresh_token: state.refreshToken,
+          });
+          return;
+        }
         if (form.get("code") !== GRANT || !form.get("code_verifier")) {
           sendJson(response, 400, { error: "invalid_grant" });
           return;
@@ -75,7 +97,7 @@ async function startFakeServer(quoteTokenOnError = false): Promise<FakeServer> {
           access_token: ACCESS_TOKEN,
           token_type: "Bearer",
           expires_in: 3600,
-          refresh_token: "issued-refresh-token",
+          refresh_token: REFRESH_TOKEN,
         });
         return;
       }
@@ -214,6 +236,30 @@ describe("signing in to an http MCP server", () => {
     expect(authorize.searchParams.get("redirect_uri")).toBe("openbot://mcp-auth");
     expect(server.tokenRequests[0]?.get("code_verifier")).toBeTruthy();
     expect(storage.read(server.url)?.tokens?.access_token).toBe(ACCESS_TOKEN);
+  });
+
+  it("refreshes an expiring token once when two hand-offs ask together", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      // Long expired: this is the token a thread would otherwise hand a provider on its way out.
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: "openbot://mcp-auth",
+      openExternal: async () => expect.unreachable("A refresh must never open a browser."),
+    });
+
+    // Two rows naming the same server, resolved side by side, which is what one hand-off does. A
+    // second exchange would spend a refresh token the first one has already rotated away, and a
+    // server that reads that as theft revokes the grant.
+    const both = await Promise.all([oauth.accessToken(server.url), oauth.accessToken(server.url)]);
+
+    expect(both).toEqual([REFRESHED_TOKEN, REFRESHED_TOKEN]);
+    expect(server.tokenRequests).toHaveLength(1);
   });
 
   it("keeps the token it just minted out of the failure it reports", async () => {

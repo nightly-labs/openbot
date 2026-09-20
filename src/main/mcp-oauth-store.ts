@@ -73,6 +73,7 @@ export class McpOAuthStore implements McpOAuthStorage {
 
   write(resource: string, record: McpOAuthRecord): Promise<void> {
     return this.#enqueue(async () => {
+      await this.#reloadIfUnreadable();
       const next = this.#editableRecords();
       // An empty record is the absence of one. `invalidateCredentials("all")` arrives as a clear, and
       // dropping everything about a server arrives here as an object with nothing in it.
@@ -85,11 +86,33 @@ export class McpOAuthStore implements McpOAuthStorage {
   clear(resource: string): Promise<void> {
     return this.#enqueue(async () => {
       if (!this.#loaded) throw new Error("The MCP sign-in store is not loaded.");
-      if (!this.#loadError && !this.#records.has(resource)) return;
+      await this.#reloadIfUnreadable();
+      // An envelope this build cannot read holds nothing this can remove, and the file stays where
+      // it is: removing one server row is not the user asking to lose the sign-ins of the other
+      // five. A commit here would start from an empty map, and an empty map is `rm`. `write` is the
+      // one change that may replace an unreadable file, because it carries a sign-in that worked.
+      if (this.#loadError || !this.#records.has(resource)) return;
       const next = this.#editableRecords();
       next.delete(resource);
       await this.#commit(next);
     });
+  }
+
+  /**
+   * One more attempt to read a file that could not be read at startup.
+   *
+   * `safeStorage` can refuse once - a keychain still locked, an app started before the session was
+   * ready - while the envelope itself is perfectly good. Reading it again at the moment something
+   * wants to change it is what keeps that one refusal from costing the user every sign-in.
+   */
+  async #reloadIfUnreadable(): Promise<void> {
+    if (!this.#loadError) return;
+    try {
+      this.#records = await this.#read();
+      this.#loadError = null;
+    } catch {
+      // Still unreadable, and the two callers above decide what that means for their own change.
+    }
   }
 
   /**

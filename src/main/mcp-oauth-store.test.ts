@@ -111,6 +111,53 @@ describe("McpOAuthStore", () => {
     }
   });
 
+  it("keeps an unreadable envelope when a server row is removed", async () => {
+    const { path, store } = await createStore();
+    await store.write(LINEAR, record("linear-access"));
+    await store.write(NOTION, record("notion-access"));
+    const source = await readFile(path, "utf8");
+    // A keychain that refuses once. The envelope is still good, and removing one server row must
+    // not be what deletes every sign-in on the machine.
+    const refusing = new McpOAuthStore(path, {
+      ...cipher,
+      decrypt: () => {
+        throw new Error("System secret storage is unavailable.");
+      },
+    });
+    expect(await refusing.load()).toBeInstanceOf(Error);
+
+    await refusing.clear(LINEAR);
+    expect(await readFile(path, "utf8")).toBe(source);
+
+    // And once the keychain answers again, both sign-ins are still there.
+    const reopened = new McpOAuthStore(path, cipher);
+    expect(await reopened.load()).toBeNull();
+    expect(reopened.read(LINEAR)).toEqual(record("linear-access"));
+    expect(reopened.read(NOTION)).toEqual(record("notion-access"));
+  });
+
+  it("reads the file again when the keychain has started answering", async () => {
+    const { path, store } = await createStore();
+    await store.write(LINEAR, record("linear-access"));
+    let refuse = true;
+    const recovering = new McpOAuthStore(path, {
+      ...cipher,
+      decrypt: (value) => {
+        if (refuse) throw new Error("System secret storage is unavailable.");
+        return cipher.decrypt(value);
+      },
+    });
+    expect(await recovering.load()).toBeInstanceOf(Error);
+    refuse = false;
+
+    // The sign-in that follows is merged into what the file already held, rather than replacing it.
+    await recovering.write(NOTION, record("notion-access"));
+    const reopened = new McpOAuthStore(path, cipher);
+    await reopened.load();
+    expect(reopened.read(LINEAR)).toEqual(record("linear-access"));
+    expect(reopened.read(NOTION)).toEqual(record("notion-access"));
+  });
+
   it("replaces an unreadable envelope with the sign-in the user just finished", async () => {
     const { path } = await createStore();
     await writeFile(path, "not json", "utf8");

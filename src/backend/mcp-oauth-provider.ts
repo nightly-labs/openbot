@@ -99,6 +99,8 @@ export class McpOAuth implements McpOAuthAuthority {
    * `openbot://mcp-auth` link do nothing.
    */
   readonly #waiting = new Map<string, (code: string) => void>();
+  /** The refresh already running for a server, so two hand-offs share one exchange. See `#refresh`. */
+  readonly #refreshing = new Map<string, Promise<void>>();
 
   constructor(options: McpOAuthOptions) {
     this.#options = options;
@@ -118,13 +120,32 @@ export class McpOAuth implements McpOAuthAuthority {
     const stored = this.#options.storage.read(resource);
     if (!stored?.tokens) return null;
     if (!expiringSoon(stored)) return stored.tokens.access_token;
-    try {
-      await auth(this.#provider(resource, null), { serverUrl: resource });
-    } catch {
-      // A refresh the authorization server refused, or one it never got. The stored token is the
-      // best answer left, and the server is the right place for the refusal to be reported.
-    }
+    await this.#refresh(resource);
     return this.#options.storage.read(resource)?.tokens?.access_token ?? stored.tokens.access_token;
+  }
+
+  /**
+   * One exchange per server at a time, whoever asks.
+   *
+   * A hand-off resolves every server at once and two threads can start together, so the same
+   * expiring token is read twice. Where the authorization server rotates refresh tokens - which
+   * the specification recommends - the second exchange spends one that has already been spent: it
+   * is refused, and a server that reads reuse as theft revokes the whole grant and costs the user
+   * the sign-in. A caller that arrives while an exchange is running waits for that one instead.
+   */
+  #refresh(resource: string): Promise<void> {
+    const running = this.#refreshing.get(resource);
+    if (running) return running;
+    // A refresh the authorization server refused, or one it never got, is not reported here: the
+    // stored token is the best answer left, and the server is the right place for the refusal.
+    const exchange = auth(this.#provider(resource, null), { serverUrl: resource })
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+      .finally(() => this.#refreshing.delete(resource));
+    this.#refreshing.set(resource, exchange);
+    return exchange;
   }
 
   /** A sign-in the user asked for, or `null` when the URL is not one this can sign in to. */
