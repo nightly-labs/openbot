@@ -126,8 +126,16 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .describe(
           "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",
         ),
-      submission: z.enum(["auto", "enter", "click"]),
-      submitTarget: browserTargetSchema.optional(),
+      submission: z
+        .enum(["click", "enter", "on_input"])
+        .describe(
+          "Use click with submitTarget when the page has a Continue, Verify, Next, or Sign in button, even if disabled before entry. OpenBot fills the fields then clicks that button. Use enter only for a form submitted by Enter. on_input ONLY fills fields; use it only when the site explicitly submits on the final digit without a button. It does not find or click a button.",
+        ),
+      submitTarget: browserTargetSchema
+        .optional()
+        .describe(
+          "Required with click: the active step’s Continue, Verify, Next, or Sign in button from the same fresh snapshot. A currently disabled button can become enabled after entry.",
+        ),
     },
   }),
   browserTool({

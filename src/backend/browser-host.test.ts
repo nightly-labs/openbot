@@ -695,7 +695,7 @@ describe("secure browser handoff", () => {
         method,
         ...(digits === undefined ? {} : { digits }),
         targets: [{ kind: "css", selector: "input" }],
-        submission: "auto",
+        submission: "on_input",
       },
     });
     const contents = webContents.getAllWebContents().findLast((item) => item.getURL() === tab.url);
@@ -786,7 +786,7 @@ it("does not resume an existing stream after a secure handoff", async () => {
     ownerAgentId: "agent",
     turnId: "turn",
     callId: "secret",
-    arguments: { tabId: tab.id, method: "otp", targets: [{ kind: "css", selector: "input" }], submission: "auto" },
+    arguments: { tabId: tab.id, method: "otp", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
   });
   expect(invalidated).toHaveBeenCalledOnce();
   viewFrames[0]?.(frame);

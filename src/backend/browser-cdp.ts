@@ -129,7 +129,7 @@ export class BrowserCdpEngine {
   async prepareSecret(
     targets: BrowserTarget[],
     origin: string,
-    submission: "auto" | "enter" | "click",
+    submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
   ): Promise<(secret: string) => Promise<void>> {
     const generation = this.#navigationGeneration;
@@ -189,7 +189,7 @@ export class BrowserCdpEngine {
               [nodes.inputs.length === 1 ? secret : secret[index], origin],
             );
           }
-          if (submission === "auto" || generation !== this.#navigationGeneration) return;
+          if (submission === "on_input" || generation !== this.#navigationGeneration) return;
           if (submission === "click" && nodes.button) {
             await this.#callOnNode(
               send,

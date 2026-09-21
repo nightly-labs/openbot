@@ -79,7 +79,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           tabId: staleTab.id,
           method: "otp",
           targets: [{ kind: "css", selector: "#code" }],
-          submission: "auto",
+          submission: "on_input",
         },
       });
       const contents = webContents.getAllWebContents().find((item) => item.getURL() === staleTab.url);
