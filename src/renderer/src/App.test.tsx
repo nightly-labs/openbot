@@ -1081,39 +1081,42 @@ describe("OpenBot connected desktop shell", () => {
    * this login is over. What says it is the row reporting it is no longer connecting. The end of it
    * is a notification rather than a last screen, so the dialog is gone by the time it arrives.
    */
-  it("keeps a code sign-in waiting on a provider that is already signed in", async () => {
-    function CodeLoginProbe() {
-      const { codeLogin } = useProviders();
-      const { agentStatus } = useAgents();
-      const phase = () => {
-        if (codeLogin.provider() === null) return "closed";
-        const state = codeLogin.state();
-        return state.phase === "waiting" ? `waiting ${state.userCode}` : state.phase;
-      };
-      const row = () => agentStatus().providers?.find((provider) => provider.id === "codex");
-      return (
-        <>
-          <button type="button" onClick={() => codeLogin.start("codex")}>
-            Log in with code
-          </button>
-          <output aria-label="Code sign-in">{phase()}</output>
-          <output aria-label="ChatGPT row">{`${row()?.state} ${row()?.connectionState ?? "idle"} ${row()?.email}`}</output>
-          <Toaster />
-        </>
-      );
-    }
-    function codexStatus(codex: Partial<NonNullable<AgentStatus["providers"]>[number]>): AgentStatus {
-      return {
-        phase: "ready",
-        cliVersion: "0.155.0",
-        auth: { kind: "chatgpt", email: "first@example.com" },
-        providers: [{ id: "codex", state: "available", version: "0.155.0", message: null, ...codex }],
-        capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
-        message: null,
-        fullAccess: true,
-      };
-    }
+  function CodeLoginProbe() {
+    const { codeLogin } = useProviders();
+    const { agentStatus } = useAgents();
+    const phase = () => {
+      if (codeLogin.provider() === null) return "closed";
+      const state = codeLogin.state();
+      return state.phase === "waiting" ? `waiting ${state.userCode}` : state.phase;
+    };
+    const row = () => agentStatus().providers?.find((provider) => provider.id === "codex");
+    return (
+      <>
+        <button type="button" onClick={() => codeLogin.start("codex")}>
+          Log in with code
+        </button>
+        <button type="button" onClick={() => codeLogin.cancel()}>
+          Cancel code login
+        </button>
+        <output aria-label="Code sign-in">{phase()}</output>
+        <output aria-label="ChatGPT row">{`${row()?.state} ${row()?.connectionState ?? "idle"} ${row()?.email}`}</output>
+        <Toaster />
+      </>
+    );
+  }
+  function codexStatus(codex: Partial<NonNullable<AgentStatus["providers"]>[number]>): AgentStatus {
+    return {
+      phase: "ready",
+      cliVersion: "0.155.0",
+      auth: { kind: "chatgpt", email: "first@example.com" },
+      providers: [{ id: "codex", state: "available", version: "0.155.0", message: null, ...codex }],
+      capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
+      message: null,
+      fullAccess: true,
+    };
+  }
 
+  it.each([false, true])("keeps account-switch results correct when failure is %s", async (failed) => {
     render(() => (
       <AppProviders>
         <CodeLoginProbe />
@@ -1140,9 +1143,60 @@ describe("OpenBot connected desktop shell", () => {
 
     // The second account arrives, and only now is the sign-in over: the dialog closes, and what
     // says which account was signed in to is a notification.
-    emitAgentEvent?.({ type: "status", status: codexStatus({ email: "second@example.com" }) });
+    emitAgentEvent?.({
+      type: "status",
+      status: codexStatus(
+        failed
+          ? { email: "first@example.com", message: "OpenBot could not connect ChatGPT. Try again." }
+          : { email: "second@example.com" },
+      ),
+    });
     await waitFor(() => expect(screen.getByLabelText("Code sign-in")).toHaveTextContent("closed"));
-    expect(await screen.findByText("ChatGPT connected")).toBeVisible();
-    expect(screen.getByText("Signed in as second@example.com.")).toBeVisible();
+    if (failed) {
+      expect(await screen.findByText("Could not connect ChatGPT")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+      expect(screen.queryByText("ChatGPT connected")).not.toBeInTheDocument();
+    } else {
+      expect(await screen.findByText("ChatGPT connected")).toBeVisible();
+      expect(screen.getByText("Signed in as second@example.com.")).toBeVisible();
+    }
+  });
+  it.each([false, true])("ignores a cancelled attempt when its reply fails: %s", async (failed) => {
+    const oldReply = Promise.withResolvers<Awaited<ReturnType<typeof window.openbot.startProviderCodeLogin>>>();
+    const cancellation = Promise.withResolvers<AgentStatus>();
+    vi.mocked(window.openbot.startProviderCodeLogin).mockImplementationOnce(() => oldReply.promise);
+    vi.mocked(window.openbot.cancelProviderCodeLogin).mockImplementationOnce(() => cancellation.promise);
+    render(() => (
+      <AppProviders>
+        <CodeLoginProbe />
+      </AppProviders>
+    ));
+    await fireEvent.click(screen.getByRole("button", { name: "Log in with code" }));
+    await waitFor(() => expect(window.openbot.startProviderCodeLogin).toHaveBeenCalledTimes(1));
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel code login" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Log in with code" }));
+    if (failed) oldReply.reject(new Error("Old login failed"));
+    else
+      oldReply.resolve({
+        kind: "code",
+        userCode: "OLD-CODE",
+        verificationUrl: "https://auth.openai.com/codex/device",
+        expiresAt: Date.now() + 600_000,
+      });
+    await oldReply.promise.catch(() => undefined);
+    expect(screen.getByLabelText("Code sign-in")).toHaveTextContent("starting");
+    expect(window.openbot.startProviderCodeLogin).toHaveBeenCalledTimes(1);
+    emitAgentEvent?.({ type: "status", status: codexStatus({ email: "first@example.com" }) });
+    cancellation.resolve(codexStatus({ email: "first@example.com" }));
+    await waitFor(() => expect(window.openbot.startProviderCodeLogin).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByLabelText("Code sign-in")).toHaveTextContent("waiting KTQ4-B62MX"));
+    expect(screen.queryByText("Could not connect ChatGPT")).not.toBeInTheDocument();
+    emitAgentEvent?.({
+      type: "status",
+      status: codexStatus({ connectionState: "connecting", email: "first@example.com" }),
+    });
+    await waitFor(() => expect(screen.getByLabelText("ChatGPT row")).toHaveTextContent("connecting"));
+    emitAgentEvent?.({ type: "status", status: codexStatus({ email: "second@example.com" }) });
+    expect(await screen.findByText("Signed in as second@example.com.")).toBeVisible();
   });
 });

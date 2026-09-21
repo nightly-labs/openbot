@@ -42,6 +42,8 @@ const Providers = createSimpleContext({
     let codeLoginExpiry: number | undefined;
     /** Whether the provider has been seen working on the open code sign-in. */
     let codeLoginStarted = false;
+    let codeLoginGeneration = 0;
+    let codeLoginCancellation: Promise<void> = Promise.resolve();
 
     /**
      * The status is the completion signal for every connect started here: main
@@ -128,16 +130,20 @@ const Providers = createSimpleContext({
      * out; nothing it is later traded for reaches the renderer.
      */
     async function startProviderCodeLogin(provider: AgentProviderId): Promise<void> {
+      const generation = ++codeLoginGeneration;
       clearCodeLoginExpiry();
       codeLoginStarted = false;
       setCodeLoginProvider(provider);
       setCodeLoginState({ phase: "starting" });
       const analytics = beginProviderConnection(provider);
       try {
+        // Cancellation emits a terminal status. Finish it before the next attempt can wait.
+        await codeLoginCancellation;
+        if (generation !== codeLoginGeneration) return;
         const started = await window.openbot.startProviderCodeLogin(provider);
         // A dialog the user closed while the provider was answering: the login was cancelled with
         // it, so there is nobody left to show a code to.
-        if (codeLoginProvider() !== provider) return;
+        if (generation !== codeLoginGeneration) return;
         if (started.kind === "connected") {
           const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
           endProviderCodeLogin(provider, { kind: "connected", accountLabel: row?.email ?? null });
@@ -155,13 +161,14 @@ const Providers = createSimpleContext({
         // countdown: when it reaches zero the screen has to say so without waiting for a round trip.
         codeLoginExpiry = window.setTimeout(
           () => {
+            if (generation !== codeLoginGeneration) return;
             codeLoginExpiry = undefined;
             if (codeLoginState().phase === "waiting") endProviderCodeLogin(provider, { kind: "expired" });
           },
           Math.max(0, started.expiresAt - Date.now()),
         );
       } catch (error) {
-        if (codeLoginProvider() !== provider) return;
+        if (generation !== codeLoginGeneration) return;
         endFailedProviderConnection(provider, analytics);
         endProviderCodeLogin(provider, {
           kind: "failed",
@@ -176,13 +183,17 @@ const Providers = createSimpleContext({
     /** Abandons the code sign-in and closes the dialog. The code stops working before this returns. */
     function cancelProviderCodeLogin(): void {
       const provider = codeLoginProvider();
+      const generation = ++codeLoginGeneration;
+      codeLoginStarted = false;
       clearCodeLoginExpiry();
       setCodeLoginProvider(null);
       if (!provider) return;
       pendingProviderConnections.delete(provider);
-      void window.openbot
+      codeLoginCancellation = window.openbot
         .cancelProviderCodeLogin(provider)
-        .then((status) => flush(() => applyAgentStatus(status)))
+        .then((status) => {
+          if (generation === codeLoginGeneration) flush(() => applyAgentStatus(status));
+        })
         // The provider has already stopped waiting for the code in every case that fails here: a
         // login that was never started, or one that ended on its own while the dialog was open.
         .catch(() => undefined);
@@ -203,6 +214,7 @@ const Providers = createSimpleContext({
         | { kind: "expired" }
         | { kind: "failed"; message: string },
     ): void {
+      codeLoginGeneration++;
       clearCodeLoginExpiry();
       codeLoginStarted = false;
       flush(() => setCodeLoginProvider(null));
@@ -261,7 +273,7 @@ const Providers = createSimpleContext({
         }
         if (!codeLoginStarted) return;
         codeLoginStarted = false;
-        if (row.state === "available") {
+        if (row.state === "available" && !row.message) {
           endProviderCodeLogin(row.id, { kind: "connected", accountLabel: row.email ?? null });
         } else {
           endProviderCodeLogin(row.id, {
@@ -297,6 +309,7 @@ const Providers = createSimpleContext({
 
     onSettled(() => {
       return () => {
+        codeLoginGeneration++;
         pendingProviderConnections.clear();
         clearCodeLoginExpiry();
       };
