@@ -11,6 +11,7 @@ import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-r
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
+import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
@@ -34,6 +35,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const { theme } = useUniwind();
   const menu = useRef<MenuComponentRef>(null);
+  const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = pinnedChannelIds.includes(channel.id);
   const canPin = canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id);
   const disconnected = !servers.some((server) => server.id === serverId && server.state === "online");
@@ -142,6 +144,7 @@ export const ChannelListRow = memo(function ChannelListRow({
           <Link.MenuAction icon="info.circle" onPress={info}>
             Info
           </Link.MenuAction>
+          {sectionMenu.menu}
           <Link.MenuAction icon="doc.on.doc" onPress={copyId}>
             Copy ID
           </Link.MenuAction>
@@ -155,12 +158,14 @@ export const ChannelListRow = memo(function ChannelListRow({
       colorScheme={theme}
       shouldOpenOnLongPress
       actions={[
+        ...sectionMenu.androidActions,
         { id: "pin", title: isPinned ? "Unpin" : "Pin", attributes: { disabled: !canPin } },
         { id: "hide", title: "Hide" },
         { id: "info", title: "Info" },
         { id: "copy", title: "Copy ID" },
       ]}
       onPressAction={({ nativeEvent }) => {
+        sectionMenu.onAction(nativeEvent.event);
         if (nativeEvent.event === "pin") togglePin();
         if (nativeEvent.event === "hide") hide();
         if (nativeEvent.event === "info") info();

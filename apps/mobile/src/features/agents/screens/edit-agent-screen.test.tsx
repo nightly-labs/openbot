@@ -10,13 +10,15 @@ import {
   emptyAnalyticsTotals,
   parseChannelCommand,
   type Routine,
+  type SidebarLayoutAction,
+  type SidebarLayoutSnapshot,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
-import { act, type PropsWithChildren, useState } from "react";
+import { act, isValidElement, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ChatTarget } from "@/features/chat/model/chat-target";
@@ -27,9 +29,12 @@ import { ChannelActionsScreen } from "../../channels/screens/channel-actions-scr
 import { ChannelFormScreen } from "../../channels/screens/channel-form-screen";
 import { ChatHeader } from "../../chat/components/chat-header";
 import { saveAgentRecord } from "../../workspace/model/save-agent-record";
+import { mobileSidebarItems } from "../../workspace/model/sidebar-layout";
 import type { MobileAgent, MobileServer } from "../../workspace/model/workspace-types";
 import { useAgentContextMenu } from "../components/agent-context-menu";
 import { AgentPhoto } from "../components/agent-photo";
+import { SidebarSectionHeader } from "../components/sidebar-section-header";
+import { useChatSectionMenu } from "../components/use-chat-section-menu";
 import { AddAgentScreen } from "./add-agent-screen";
 import { EditAgentScreen } from "./edit-agent-screen";
 import { HiddenChatsScreen } from "./hidden-chats-screen";
@@ -138,7 +143,10 @@ function createChannelStore() {
 }
 const hiddenChannelIds: string[] = [];
 const hiddenAgents: MobileAgent[] = [];
+const sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }> = {};
 const workspace = {
+  sidebarByServer,
+  mutateSidebarLayout: vi.fn(async (_serverId: string, _action: SidebarLayoutAction) => {}),
   channelStore: createChannelStore(),
   agents: [original],
   servers: [host],
@@ -218,9 +226,21 @@ vi.mock("expo-router", () => ({
   Link: Object.assign(({ children }: PropsWithChildren) => <>{children}</>, {
     Trigger: ({ children }: PropsWithChildren) => children,
     AppleZoomTarget: ({ children }: PropsWithChildren) => children,
-    Menu: ({ children }: PropsWithChildren) => <div>{children}</div>,
-    MenuAction: ({ children, onPress }: PropsWithChildren<{ onPress: () => void }>) => (
-      <button type="button" onClick={onPress}>
+    Menu: ({ children, title }: PropsWithChildren<{ title?: string }>) => {
+      const [open, setOpen] = useState(!title);
+      return (
+        <div>
+          {title ? (
+            <button type="button" onClick={() => setOpen(!open)}>
+              {title}
+            </button>
+          ) : null}
+          {open ? children : null}
+        </div>
+      );
+    },
+    MenuAction: ({ children, onPress, disabled }: PropsWithChildren<{ onPress: () => void; disabled?: boolean }>) => (
+      <button type="button" disabled={disabled} onClick={onPress}>
         {children}
       </button>
     ),
@@ -252,7 +272,7 @@ vi.mock("react-native", () => ({
     onPress: () => void;
     accessibilityLabel: string;
     accessibilityRole?: "button" | "checkbox";
-    accessibilityState?: { checked?: boolean };
+    accessibilityState?: { checked?: boolean; expanded?: boolean };
     disabled?: boolean;
   }>) =>
     accessibilityRole === "checkbox" ? (
@@ -264,7 +284,13 @@ vi.mock("react-native", () => ({
         onChange={onPress}
       />
     ) : (
-      <button type="button" disabled={disabled} aria-label={accessibilityLabel} onClick={onPress}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={accessibilityLabel}
+        aria-expanded={accessibilityState?.expanded}
+        onClick={onPress}
+      >
         {children}
       </button>
     ),
@@ -284,7 +310,7 @@ vi.mock("heroui-native", () => {
     isDisabled?: boolean;
     accessibilityLabel?: string;
     accessibilityRole?: "radio";
-    accessibilityState?: { checked?: boolean };
+    accessibilityState?: { checked?: boolean; expanded?: boolean };
   }>) =>
     accessibilityRole === "radio" ? (
       <input
@@ -448,7 +474,13 @@ vi.mock("@expo/ui", () => {
 });
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
 vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {}, notification: async () => {} } }));
-vi.mock("lucide-react-native", () => ({ ArrowLeft: () => null, Eye: () => null, TriangleAlert: () => null }));
+vi.mock("lucide-react-native", () => ({
+  ChevronRight: () => null,
+  Ellipsis: () => null,
+  ArrowLeft: () => null,
+  Eye: () => null,
+  TriangleAlert: () => null,
+}));
 
 const container = document.createElement("div");
 document.body.append(container);
@@ -472,6 +504,8 @@ async function edit(name: string, value: string) {
   await act(() => fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } }));
 }
 beforeEach(() => {
+  delete sidebarByServer[host.id];
+  workspace.mutateSidebarLayout.mockReset().mockResolvedValue();
   mocks.choosePhoto
     .mockReset()
     .mockResolvedValue({ canceled: false, assets: [{ uri: "file:///photo.png", mimeType: "image/png" }] });
@@ -1304,7 +1338,9 @@ vi.mock("@expo/ui/community/menu", () => ({
     actions,
     onPressAction,
     shouldOpenOnLongPress,
+    children,
   }: {
+    children?: React.ReactNode;
     actions: { id: string; title: string; attributes?: { disabled?: boolean } }[];
     onPressAction: (event: { nativeEvent: { event: string } }) => void;
     shouldOpenOnLongPress?: boolean;
@@ -1319,7 +1355,9 @@ vi.mock("@expo/ui/community/menu", () => ({
             if (!shouldOpenOnLongPress) setOpen(true);
           }}
         >
-          Reassign
+          {isValidElement<{ accessibilityLabel?: string }>(children)
+            ? (children.props.accessibilityLabel ?? "Reassign")
+            : "Reassign"}
         </button>
         {open
           ? actions.map((action) => (
@@ -1442,6 +1480,8 @@ it("retries only history after a task action was accepted", async () => {
 vi.mock("expo-linking", () => ({ openURL: vi.fn() }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
 vi.mock("react-native-reanimated", () => ({
+  default: { View: ({ children }: PropsWithChildren) => <div>{children}</div> },
+  cubicBezier: () => "ease-out",
   useReducedMotion: () => true,
   Easing: { bezier: () => (value: number) => value },
   ReduceMotion: { System: "system" },
@@ -1560,4 +1600,79 @@ it("keeps a title after a failed save and permits clearing it", async () => {
   await edit("Title", "");
   await click("Save changes");
   expect(workspace.updateAgent).toHaveBeenLastCalledWith({ agentId: original.id, title: "" }, host.id);
+});
+
+function installSections() {
+  const layout: SidebarLayoutSnapshot = {
+    revision: 1,
+    sections: [{ id: "work", name: "Work" }],
+    order: ["people", "work", "unassigned"],
+    agentAssignments: { [original.id]: "work" },
+    agentOrder: [original.id],
+  };
+  sidebarByServer[host.id] = { layout, error: null };
+  return layout;
+}
+
+it("collapses and expands from the section name while options keep the section visible", async () => {
+  const layout = installSections();
+  function Section() {
+    const [collapsed, setCollapsed] = useState(false);
+    const items = mobileSidebarItems(layout, [original], [], new Set(collapsed ? ["work"] : []));
+    return (
+      <>
+        <SidebarSectionHeader
+          id="work"
+          name="Work"
+          empty={false}
+          visibleSectionIds={["work", "unassigned"]}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(!collapsed)}
+        />
+        {items.some((item) => item.kind === "agent") ? <button type="button">Open agent</button> : null}
+      </>
+    );
+  }
+  await act(() => root.render(<Section />));
+  await click("Work section options");
+  expect(screen.getByRole("button", { name: "Collapse Work" }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: "Open agent" })).toBeTruthy();
+  expect(workspace.mutateSidebarLayout).not.toHaveBeenCalled();
+  await click("Collapse Work");
+  expect(screen.queryByRole("button", { name: "Open agent" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Expand Work" }).getAttribute("aria-expanded")).toBe("false");
+  await click("Expand Work");
+  expect(screen.getByRole("button", { name: "Open agent" })).toBeTruthy();
+});
+
+it("moves a chat from the native submenu without opening a sheet", async () => {
+  installSections();
+  function Menu() {
+    return useChatSectionMenu(host.id, original.id).menu;
+  }
+  await act(() => root.render(<Menu />));
+  expect(screen.queryByRole("button", { name: "Agents" })).toBeNull();
+  await click("Move to section");
+  expect(screen.getByRole("button", { name: "Work" }).hasAttribute("disabled")).toBe(true);
+  await click("Agents");
+  expect(workspace.mutateSidebarLayout).toHaveBeenLastCalledWith(host.id, {
+    type: "assign",
+    agentId: original.id,
+    sectionId: null,
+  });
+  expect(mocks.push).not.toHaveBeenCalled();
+});
+
+it("keeps a failed submenu move available for retry", async () => {
+  installSections();
+  workspace.mutateSidebarLayout.mockRejectedValueOnce(new Error("Move failed"));
+  function Menu() {
+    return useChatSectionMenu(host.id, original.id).menu;
+  }
+  await act(() => root.render(<Menu />));
+  await click("Move to section");
+  await click("Agents");
+  expect(mocks.alert).toHaveBeenCalledWith("Could not move chat", "Move failed");
+  await click("Agents");
+  expect(workspace.mutateSidebarLayout).toHaveBeenCalledTimes(2);
 });

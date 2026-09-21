@@ -39,6 +39,10 @@ export function useChatMotion(
   );
   const reducedMotion = useReducedMotion();
   const keyboardHeight = useSharedValue(0);
+  // 0 while the keyboard is down, 1 while it is fully up, and every value
+  // between during an interactive dismissal. The composer reads this to size
+  // itself, so a swipe drives the shape change frame by frame.
+  const keyboardProgress = useSharedValue(0);
   // Track actual frames and completion, not the iOS provider's start-only target.
   // A render while the reply streams must not restore a dismissed keyboard's lift.
   useKeyboardHandler(
@@ -46,23 +50,29 @@ export function useChatMotion(
       onMove: (event) => {
         "worklet";
         keyboardHeight.set(event.height);
+        keyboardProgress.set(event.progress);
       },
       onInteractive: (event) => {
         "worklet";
         keyboardHeight.set(event.height);
+        keyboardProgress.set(event.progress);
       },
       onEnd: (event) => {
         "worklet";
         keyboardHeight.set(event.height);
+        keyboardProgress.set(event.progress);
       },
     },
-    [keyboardHeight],
+    [keyboardHeight, keyboardProgress],
   );
   useEffect(() => {
     // A native picker or interrupted dismissal can omit the controller's final frame.
-    const subscription = Keyboard.addListener("keyboardDidHide", () => keyboardHeight.set(0));
+    const subscription = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardHeight.set(0);
+      keyboardProgress.set(0);
+    });
     return () => subscription.remove();
-  }, [keyboardHeight]);
+  }, [keyboardHeight, keyboardProgress]);
   const composerStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, keyboardHeight.get() - keyboardOffset) }],
   }));
@@ -347,6 +357,8 @@ export function useChatMotion(
     responseVisible,
     composerHeight,
     composerStyle,
+    keyboardHeight,
+    keyboardProgress,
     blankSpace,
     historyStyle,
     firstMessageStyle,

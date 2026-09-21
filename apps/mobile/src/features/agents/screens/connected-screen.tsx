@@ -1,12 +1,22 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
-import type { ChannelSummary } from "@openbot/contracts/ipc";
+import type { SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import { router, Stack } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Bot, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
-import { useMemo } from "react";
-import { FlatList, Pressable, View } from "react-native";
-import Animated, { Easing, FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
+import { useLayoutEffect, useMemo, useState } from "react";
+import { Pressable, View } from "react-native";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
+  LinearTransition,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import {
   type AgentListRevealState,
   AgentListRowReveal,
@@ -15,18 +25,19 @@ import {
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
+import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
 import { ChannelListRow } from "@/features/channels/components/channel-list";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
-import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { mobileSidebarItems } from "@/features/workspace/model/sidebar-layout";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
-const ROW_ENTER = FadeIn.duration(180).easing(EASE_IN_OUT).reduceMotion(ReduceMotion.System);
-const ROW_EXIT = FadeOut.duration(120).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
+const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
+const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 // Agent search is not available in the current mobile release, so keep its entry points hidden until it is ready.
 const IS_AGENT_SEARCH_ENABLED = false;
 
@@ -35,21 +46,89 @@ function TransitioningChatRow({
   children,
   index,
   reveal,
+  collapsed,
 }: {
   chatId: string;
   children: React.ReactNode;
   index: number;
   reveal: AgentListRevealState;
+  collapsed: boolean;
 }) {
   const { transition } = useAgentPinTransition();
   const isTarget = transition?.chatId === chatId && transition.target === "row";
-  const isSource = transition?.chatId === chatId && transition.source === "row";
+
+  const [initiallyExpanded] = useState(!collapsed);
+  const [contentMounted, setContentMounted] = useState(!collapsed);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  const height = useSharedValue(0);
+  useLayoutEffect(() => {
+    if (!collapsed) setContentMounted(true);
+    if (measuredHeight === null) return;
+    let active = true;
+    const releaseContent = () => {
+      if (active) setContentMounted(false);
+    };
+    height.set(
+      withTiming(
+        collapsed ? 0 : measuredHeight,
+        {
+          duration: 240,
+          easing: EASE_OUT,
+          reduceMotion: ReduceMotion.System,
+        },
+        (finished) => {
+          if (finished && collapsed) scheduleOnRN(releaseContent);
+        },
+      ),
+    );
+    return () => {
+      active = false;
+      cancelAnimation(height);
+    };
+  }, [collapsed, height, measuredHeight]);
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: measuredHeight === null && initiallyExpanded ? undefined : height.get(),
+    overflow: "hidden",
+  }));
+  // Derive the fade from the same height, so a reversed toggle cannot leave
+  // opacity and the accordion at different points in their transitions.
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity:
+      measuredHeight !== null && measuredHeight > 0
+        ? Math.min(1, Math.max(0, height.get() / measuredHeight))
+        : initiallyExpanded
+          ? 1
+          : 0,
+  }));
 
   return (
-    <Animated.View entering={isTarget ? ROW_ENTER : undefined} exiting={isSource ? ROW_EXIT : undefined}>
-      <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
-        {children}
-      </AgentListRowReveal>
+    <Animated.View
+      style={bodyStyle}
+      pointerEvents={collapsed ? "none" : "auto"}
+      accessibilityElementsHidden={collapsed}
+      importantForAccessibility={collapsed ? "no-hide-descendants" : "auto"}
+    >
+      {contentMounted ? (
+        <Animated.View
+          style={[
+            measuredHeight === null && initiallyExpanded
+              ? undefined
+              : { position: "absolute", top: 0, left: 0, right: 0 },
+            contentStyle,
+          ]}
+          onLayout={({ nativeEvent }) => {
+            const nextHeight = nativeEvent.layout.height;
+            if (measuredHeight === null && initiallyExpanded) height.set(nextHeight);
+            setMeasuredHeight(nextHeight);
+          }}
+        >
+          <Animated.View collapsable={false} entering={isTarget ? ROW_ENTER : undefined}>
+            <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
+              {children}
+            </AgentListRowReveal>
+          </Animated.View>
+        </Animated.View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -80,6 +159,8 @@ export function ConnectedScreen() {
   const { isLoaderPresent } = useAppLoadingOverlay();
   const { openDrawer } = useAppDrawer();
   const {
+    sidebarByServer,
+    refreshServer,
     agents,
     activeAgents,
     activeServer,
@@ -92,6 +173,8 @@ export function ConnectedScreen() {
     serverDirectoryState,
     servers,
   } = useMobileWorkspace();
+  const [collapsedByServer, setCollapsedByServer] = useState<Record<string, ReadonlySet<string>>>({});
+  const collapsedSectionIds = collapsedByServer[activeServer.id];
   const channels = useChannels(activeServer.id);
   const channelAgents = useMemo(
     () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
@@ -121,52 +204,109 @@ export function ConnectedScreen() {
     (channel) => !channel.archived && !hiddenChannelIds.includes(channel.id) && pinnedChannelIds.includes(channel.id),
   );
   const hasPins = pinnedAgents.length + pinnedChannels.length > 0;
-  const unpinnedAgents = activeAgents.filter((agent) => !pinnedAgentIds.includes(agent.id));
-  const items: ({ kind: "agent"; agent: MobileAgent } | { kind: "channel"; channel: ChannelSummary })[] = [
-    ...channels.channels
-      .filter(
-        (channel) =>
-          !hiddenChannelIds.includes(channel.id) && !channel.archived && !pinnedChannelIds.includes(channel.id),
-      )
-      .map((channel) => ({ kind: "channel" as const, channel })),
-    ...unpinnedAgents.map((agent) => ({ kind: "agent" as const, agent })),
-  ];
+  const unpinnedAgents = useMemo(
+    () => activeAgents.filter((agent) => !pinnedAgentIds.includes(agent.id)),
+    [activeAgents, pinnedAgentIds],
+  );
+  const sidebar = sidebarByServer[activeServer.id];
+  const items = useMemo(
+    () =>
+      mobileSidebarItems(
+        sidebar?.layout ?? null,
+        unpinnedAgents,
+        channels.channels.filter(
+          (channel) =>
+            !hiddenChannelIds.includes(channel.id) && !channel.archived && !pinnedChannelIds.includes(channel.id),
+        ),
+      ),
+    [sidebar?.layout, unpinnedAgents, channels.channels, hiddenChannelIds, pinnedChannelIds],
+  );
+  const visibleSectionIds = items.filter((item) => item.kind === "section").map((item) => item.id);
   const listReveal = useAgentListReveal(listReady, items.length + (hasPins ? 1 : 0));
+  // Collapse keeps stable list cells and changes their heights on the UI thread.
+  // Enable cell reflow again when a host layout update moves agents or sections.
+  const [collapseLayout, setCollapseLayout] = useState<SidebarLayoutSnapshot | null>(null);
+  const collapsedChatIds = useMemo(() => {
+    const ids = new Set<string>();
+    let sectionCollapsed = false;
+    for (const item of items) {
+      if (item.kind === "section") sectionCollapsed = collapsedSectionIds?.has(item.id) ?? false;
+      else if (sectionCollapsed) ids.add(item.id);
+    }
+    return ids;
+  }, [items, collapsedSectionIds]);
   const optionsActions = useMemo<MenuAction[]>(
     () => [
       { id: "add-agent", title: "Add agent" },
+      ...(sidebar?.layout ? [{ id: "add-section", title: "New section" }] : []),
       ...(channels.supported ? [{ id: "add-channel", title: "New channel" }] : []),
       ...(hasHiddenChats ? [{ id: "hidden-chats", title: "Hidden chats" }] : []),
     ],
-    [hasHiddenChats, channels.supported],
+    [hasHiddenChats, channels.supported, sidebar?.layout],
   );
 
   return (
     <View className="flex-1 bg-background">
       {listReady ? (
-        <FlatList
+        <Animated.FlatList
+          key={activeServer.id}
+          itemLayoutAnimation={listReveal.finished && sidebar?.layout !== collapseLayout ? LIST_REFLOW : undefined}
+          skipEnteringExitingAnimations
+          removeClippedSubviews={false}
           className="flex-1 bg-background"
           alwaysBounceVertical={false}
           contentContainerClassName={items.length > 0 ? "pb-safe-offset-8 pt-3" : "grow pb-safe-offset-8 pt-3"}
           // Keep the native header inset even when short content cannot scroll or bounce.
           contentInsetAdjustmentBehavior="always"
           data={items}
-          keyExtractor={(item) => (item.kind === "agent" ? `agent:${item.agent.id}` : `channel:${item.channel.id}`)}
-          renderItem={({ item, index }) => (
-            <TransitioningChatRow
-              chatId={item.kind === "agent" ? item.agent.id : item.channel.id}
-              index={index + (hasPins ? 1 : 0)}
-              reveal={listReveal}
-            >
-              {item.kind === "channel" ? (
-                <ChannelListRow channel={item.channel} serverId={activeServer.id} agents={channelAgents} />
-              ) : (
-                <AgentListRow agent={item.agent} leftInset={15} rightInset={24} />
-              )}
-            </TransitioningChatRow>
-          )}
+          keyExtractor={(item) => `${item.kind}:${item.id}`}
+          renderItem={({ item, index }) =>
+            item.kind === "section" ? (
+              <SidebarSectionHeader
+                key={`${activeServer.id}:${item.id}`}
+                id={item.id}
+                name={item.name}
+                empty={item.empty}
+                visibleSectionIds={visibleSectionIds}
+                collapsed={collapsedSectionIds?.has(item.id) ?? false}
+                onToggle={() => {
+                  setCollapseLayout(sidebar?.layout ?? null);
+                  setCollapsedByServer((current) => {
+                    const next = new Set(current[activeServer.id]);
+                    if (next.has(item.id)) next.delete(item.id);
+                    else next.add(item.id);
+                    return { ...current, [activeServer.id]: next };
+                  });
+                }}
+              />
+            ) : (
+              <TransitioningChatRow
+                chatId={item.kind === "agent" ? item.agent.id : item.channel.id}
+                index={index + (hasPins ? 1 : 0)}
+                reveal={listReveal}
+                collapsed={collapsedChatIds.has(item.id)}
+              >
+                {item.kind === "channel" ? (
+                  <ChannelListRow channel={item.channel} serverId={activeServer.id} agents={channelAgents} />
+                ) : (
+                  <AgentListRow agent={item.agent} leftInset={15} rightInset={24} />
+                )}
+              </TransitioningChatRow>
+            )
+          }
           ListHeaderComponent={
             <AgentListRowReveal index={0} reveal={listReveal}>
+              {sidebar?.error ? (
+                <View className="gap-2 px-4">
+                  <Typography.Paragraph className="text-danger-text">{sidebar.error}</Typography.Paragraph>
+                  <Button
+                    variant="secondary"
+                    onPress={() => void refreshServer(activeServer.id).catch(() => undefined)}
+                  >
+                    <Button.Label>Retry sections</Button.Label>
+                  </Button>
+                </View>
+              ) : null}
               <PinnedAgentsGrid agents={pinnedAgents}>
                 {pinnedChannels.length
                   ? pinnedChannels.map((channel) => (
@@ -271,6 +411,8 @@ export function ConnectedScreen() {
                   <MenuView
                     actions={optionsActions}
                     onPressAction={(event) => {
+                      if (event.nativeEvent.event === "add-section")
+                        router.push({ pathname: "/section-form", params: { serverId: activeServer.id } });
                       if (event.nativeEvent.event === "add-agent") router.push("/add-agent");
                       if (event.nativeEvent.event === "add-channel")
                         router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } });
@@ -311,6 +453,14 @@ export function ConnectedScreen() {
               <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => router.push("/add-agent")}>
                 Add agent
               </Stack.Toolbar.MenuAction>
+              {sidebar?.layout ? (
+                <Stack.Toolbar.MenuAction
+                  icon="folder.badge.plus"
+                  onPress={() => router.push({ pathname: "/section-form", params: { serverId: activeServer.id } })}
+                >
+                  New section
+                </Stack.Toolbar.MenuAction>
+              ) : null}
               {channels.supported ? (
                 <Stack.Toolbar.MenuAction
                   icon="number"
