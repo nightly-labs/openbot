@@ -36,24 +36,19 @@ adding a module or moving ownership between workspaces.
 
 ## Checks
 
-`bun run lint`, `bun run typecheck`, `bun run check:ui` and a single test file are the default
-checks. They read the worktree, touch no user profile and no network. Run them, fix what the
-requested change broke, and rerun them without asking at each step.
+Do not run broad checks locally. They overload the user's computer. This explicit user preference
+replaces the previous full lint and typecheck defaults. Leave repository-wide lint, aggregate
+`bun run typecheck`, full UI checks, builds, and full test suites to CI. Do not request these checks
+as a routine completion or PR step.
 
-1. In a fresh worktree, run `bun install --frozen-lockfile` first. Alternatively, run
-   `bun scripts/prepare-dev-environment.ts` to also check Bun, migrate local D1, and create the
-   untracked `apps/auth-api/.env.dev`. Only `.env.production` needs the encrypted setup.
-2. Before completion, run the narrowest relevant test, then `bun run lint` and `bun run typecheck`.
-   Also run `bun run check:ui` for changes in `src/renderer`. Keep the full lint and typecheck scope;
-   `typecheck:*` includes mobile, Signal, and `remote/scripts`. Each TypeScript project has a
-   separate incremental cache in this worktree. The first run creates it; later runs reuse it.
-   Run these checks locally even when cache state or machine load makes them slower.
-3. Run one desktop test file with `bun run test:desktop -- <path>`. Leave `bun run check`,
-   `bun run check:desktop`, `bun run test`, and `bun run build-storybook` to CI. These suites take
-   minutes and desktop tests can fail under load.
+1. In a fresh worktree, run `bun install --frozen-lockfile` first.
+2. Run only the narrowest relevant test file and lint the changed files. Run checks one at a time, with one test worker where supported.
+   Use `bun run test:desktop -- <path>` for one desktop or mobile test file.
+3. Do not run whole-workspace TypeScript checks, `typecheck:*`, or parallel checks. Do not
+   replace an aggregate command with its constituent checks. Leave broad type validation to CI
+   and state what remains unverified.
 4. Do not run `bun run format`: it rewrites the whole repository. Use
-   `biome check --write <paths>` for changed files, or the pre-commit `bun run check:staged` hook.
-   Keep `--max-diagnostics=none` for full Biome reports.
+   `biome check --write --max-diagnostics=none <paths>` for changed files.
 
 [Check design notes](docs/development-checks.md#check-coverage) explain CI coverage, command aliases,
 and the separate Node and Bun type environments. Read them when changing checks or dependencies.
@@ -156,7 +151,7 @@ They describe the enforced syntax, fixture behavior, and reasons for removed rul
 - Open a PR only when asked.
 - For UI changes, show before and after. State the model and harness in the PR body.
   Do not commit screenshots or other PR review image assets to the repository.
-- Get approval for a specific wider check and run it before opening the PR.
+- Do not run wider checks locally before a PR. Report focused checks and leave broad checks to CI.
 - A PR needs a named reason and is not auto-approvable if it adds `biome-ignore`, `@ts-expect-error`,
   or `@ts-ignore`; disables rules through `biome.json` overrides or removes a GritQL plugin; widens
   a boundary to `any` or `unknown`; or uses an assertion to bypass a checker. Fix the domain issue,

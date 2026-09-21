@@ -24,6 +24,7 @@ import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-r
 import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 
@@ -105,6 +106,7 @@ export function AgentListRow({
   const { unreadAgentIds, pinnedAgentIds, pinnedChannelIds } = useMobileWorkspace();
   const { startAgentNavigationAnimated, toggleAgentPinAnimated, transition } = useAgentPinTransition();
   const editMenu = useRef<MenuComponentRef>(null);
+  const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const agentContextMenu = useAgentContextMenu(agent);
   const isUnread = unreadAgentIds.includes(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
@@ -209,8 +211,9 @@ export function AgentListRow({
           ref={editMenu}
           colorScheme={theme === "dark" ? "dark" : "light"}
           shouldOpenOnLongPress
-          actions={[{ id: "edit", title: "Info" }]}
+          actions={[...sectionMenu.androidActions, { id: "edit", title: "Info" }]}
           onPressAction={({ nativeEvent }) => {
+            sectionMenu.onAction(nativeEvent.event);
             if (nativeEvent.event === "edit")
               router.push({
                 pathname: "/agent-info/[agentId]",
