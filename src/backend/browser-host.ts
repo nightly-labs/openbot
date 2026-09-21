@@ -139,6 +139,7 @@ interface InternalTab {
   diagnostics: BrowserDiagnostics;
   recording: boolean;
   captureGeneration: number;
+  viewInvalidations: Set<() => void>;
   // Pending consent permits human takeover; submission blocks captures until document replacement.
   secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean };
 }
@@ -410,20 +411,27 @@ export class BrowserHost {
 
   async loadUrl(tabId: string, url: string): Promise<void> {
     const normalizedUrl = normalizeBrowserUrl(url);
-    await this.#enqueue(tabId, async (tab) => {
-      await navigateAndWait(tab.view.webContents, () =>
-        tab.view.webContents.loadURL(normalizedUrl, browserLoadOptions()),
-      );
-      this.#focusTab(tab);
-    });
+    await this.#enqueue(
+      tabId,
+      async (tab) => {
+        await navigateAndWait(tab.view.webContents, () =>
+          tab.view.webContents.loadURL(normalizedUrl, browserLoadOptions()),
+        );
+        this.#focusTab(tab);
+      },
+      true,
+    );
   }
 
   async reload(tabId: string): Promise<void> {
-    await this.#enqueue(tabId, async (tab) =>
-      navigateAndWait(tab.view.webContents, () => {
-        tab.view.webContents.reload();
-        return true;
-      }),
+    await this.#enqueue(
+      tabId,
+      async (tab) =>
+        navigateAndWait(tab.view.webContents, () => {
+          tab.view.webContents.reload();
+          return true;
+        }),
+      true,
     );
   }
 
@@ -495,7 +503,7 @@ export class BrowserHost {
       throw new Error("Invalid authentication targets.");
     const protection = { origin: url.origin, submitted: false, replaced: false, running: false };
     tab.secret = protection;
-    tab.captureGeneration += 1;
+    this.#invalidateViews(tab);
     this.#syncAttachedView();
     try {
       const enter = await this.#enqueue(
@@ -528,7 +536,7 @@ export class BrowserHost {
           if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
             throw new Error("Enter the requested number of digits.");
           protection.submitted = true;
-          tab.captureGeneration += 1;
+          this.#invalidateViews(tab);
           protection.running = true;
           this.#syncAttachedView();
           try {
@@ -739,16 +747,46 @@ export class BrowserHost {
    * after whatever the agent is doing has finished, which is exactly the picture the still-image
    * route already gave; the point of the view is that the page moves while the agent works.
    */
-  async startView(tabId: string, onFrame: (frame: BrowserScreencastFrame) => void): Promise<() => Promise<void>> {
+  #invalidateViews(tab: InternalTab): void {
+    tab.captureGeneration += 1;
+    for (const invalidate of [...tab.viewInvalidations]) invalidate();
+  }
+
+  async startView(
+    tabId: string,
+    onFrame: (frame: BrowserScreencastFrame) => void,
+    onInvalidated?: () => void,
+  ): Promise<() => Promise<void>> {
     const tab = this.#requireTab(tabId);
     if (tab.secret?.submitted) throw new Error("Browser view is protected during authentication.");
     const generation = tab.captureGeneration;
-    return tab.engine.startScreencast(
-      { quality: VIEW_FRAME_QUALITY, maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT },
-      (frame) => {
-        if (!tab.secret?.submitted && tab.captureGeneration === generation) onFrame(frame);
-      },
-    );
+    let invalidated = false;
+    const invalidate = () => {
+      invalidated = true;
+      tab.viewInvalidations.delete(invalidate);
+      onInvalidated?.();
+    };
+    tab.viewInvalidations.add(invalidate);
+    try {
+      const stop = await tab.engine.startScreencast(
+        { quality: VIEW_FRAME_QUALITY, maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT },
+        (frame) => {
+          if (!tab.secret?.submitted && tab.captureGeneration === generation) onFrame(frame);
+        },
+      );
+      let stopped = false;
+      const stopOnce = async () => {
+        tab.viewInvalidations.delete(invalidate);
+        if (stopped) return;
+        stopped = true;
+        await stop();
+      };
+      if (invalidated) await stopOnce();
+      return stopOnce;
+    } catch (error) {
+      tab.viewInvalidations.delete(invalidate);
+      throw error;
+    }
   }
 
   /**
@@ -1112,6 +1150,7 @@ export class BrowserHost {
       diagnostics,
       recording: false,
       captureGeneration: 0,
+      viewInvalidations: new Set(),
     };
   }
 

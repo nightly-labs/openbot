@@ -18,8 +18,8 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <label>Password<input id="password" type="password"></label>
       <label>Code<input id="code" inputmode="numeric"></label>
       <div>${Array.from({ length: 6 }, (_, index) => `<input aria-label="Digit ${index + 1}" id="digit-${index}" maxlength="1">`).join("")}</div>
-      <button id="submit" onclick="location.href='/complete'">Sign in</button>
-      <script>document.addEventListener('input', event => { console.error(event.target.value); document.title = event.target.value; });</script>`;
+      <button id="submit" disabled onclick="location.href='/complete'">Sign in</button>
+      <script>document.addEventListener('input', event => { document.querySelector('#submit').disabled = false; console.error(event.target.value); document.title = event.target.value; });</script>`;
     return new Response(`<!doctype html><body>${html}</body>`, { headers: { "Content-Type": "text/html" } });
   });
   await browser.close(seed.id);

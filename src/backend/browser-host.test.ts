@@ -756,6 +756,8 @@ describe("secure browser handoff", () => {
     prepared.cancel();
     host.endTakeover(tab.id);
     await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
+    await host.reload(tab.id);
+    await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
     contents.emit("did-navigate", {}, "https://example.com/account");
     await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
   });
@@ -772,7 +774,8 @@ describe("secure browser handoff", () => {
 it("does not resume an existing stream after a secure handoff", async () => {
   const tab = await host.open("https://example.com/stream", "thread", "agent");
   const receive = vi.fn();
-  await host.startView(tab.id, receive);
+  const invalidated = vi.fn();
+  await host.startView(tab.id, receive, invalidated);
   const frame = { sequence: 1, width: 1, height: 1, image: new Uint8Array([1]) };
   viewFrames[0]?.(frame);
   expect(receive).toHaveBeenCalledTimes(1);
@@ -785,6 +788,7 @@ it("does not resume an existing stream after a secure handoff", async () => {
     callId: "secret",
     arguments: { tabId: tab.id, method: "otp", targets: [{ kind: "css", selector: "input" }], submission: "auto" },
   });
+  expect(invalidated).toHaveBeenCalledOnce();
   viewFrames[0]?.(frame);
   prepared.cancel();
   viewFrames[0]?.(frame);

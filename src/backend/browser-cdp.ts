@@ -169,8 +169,8 @@ export class BrowserCdpEngine {
             const valid = await this.#callOnNode(
               send,
               node.backendNodeId,
-              `function(origin) { return this.isConnected && this.ownerDocument === document && location.origin === origin && !this.disabled && !this.readOnly; }`,
-              [origin],
+              `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (!this.disabled && !this.readOnly)); }`,
+              [origin, nodes.inputs.includes(node)],
             );
             if (valid !== true) throw new Error("Authentication target changed.");
           }
@@ -194,8 +194,8 @@ export class BrowserCdpEngine {
             await this.#callOnNode(
               send,
               nodes.button.backendNodeId,
-              `function(origin) { if (!this.isConnected || location.origin !== origin) throw new Error('Authentication target changed.'); this.click(); }`,
-              [origin],
+              `function(origin, expected) { if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.getAttribute('aria-disabled') === 'true' || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) throw new Error('Authentication target changed.'); this.click(); }`,
+              [origin, nodes.fingerprints.at(-1)],
             );
           } else if (submission === "enter") {
             const last = nodes.inputs.at(-1);
