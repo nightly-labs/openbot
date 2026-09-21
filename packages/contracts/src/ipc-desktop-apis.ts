@@ -355,6 +355,26 @@ export interface ProviderApiKeyState {
   status: ProviderApiKeyStatus;
 }
 
+/**
+ * What a started code sign-in gives the renderer: a code to show, or nothing left to do.
+ *
+ * `connected` is the provider that turned out to be signed in already, which the user reaches by
+ * asking for a code on a computer where the account arrived some other way. The token traded for
+ * the code never crosses this boundary; how the sign-in ends arrives as a provider status, the same
+ * way the browser sign-in's does.
+ */
+export type ProviderCodeLoginStart =
+  | {
+      kind: "code";
+      /** The one-time code the user types on the other device. Safe to show and to read out. */
+      userCode: string;
+      /** The page to type it on. Always https. */
+      verificationUrl: string;
+      /** Epoch milliseconds. When OpenBot gives up on this code, which is what the dialog counts down to. */
+      expiresAt: number;
+    }
+  | { kind: "connected" };
+
 export interface ProviderRuntimesDesktopApi {
   getStatus: () => Promise<ProviderRuntimeSnapshot>;
   download: (provider: AgentProviderId) => Promise<ProviderRuntimeSnapshot>;
@@ -540,6 +560,14 @@ export interface OpenBotDesktopApi {
   setProviderApiKey: (input: SetProviderApiKeyInput) => Promise<AgentStatus>;
   clearProviderApiKey: (provider: AgentProviderId) => Promise<AgentStatus>;
   getProviderApiKeyState: (provider: AgentProviderId) => Promise<ProviderApiKeyState>;
+  /**
+   * Starts a sign-in the user finishes on another device, for a provider whose descriptor says
+   * `codeSignIn`. Cancel it with `cancelProviderCodeLogin`; leaving it running holds one provider
+   * process open until the code expires.
+   */
+  startProviderCodeLogin: (provider: AgentProviderId) => Promise<ProviderCodeLoginStart>;
+  /** Abandons a code sign-in: the provider is told, the code is dead, and the provider goes idle. */
+  cancelProviderCodeLogin: (provider: AgentProviderId) => Promise<AgentStatus>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;

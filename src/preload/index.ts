@@ -80,6 +80,7 @@ import {
   type MarketplaceSkillPage,
   type OpenBotDesktopApi,
   type ProviderApiKeyState,
+  type ProviderCodeLoginStart,
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type ScopedAgentEvent,
@@ -345,6 +346,32 @@ function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {
     throw new Error("Invalid provider key state response.");
   }
   return { provider: value.provider, status: value.status };
+}
+
+/**
+ * A started code sign-in, checked field by field before the renderer shows it.
+ *
+ * The verification URL ends up in a link the user is invited to open, so it is held to https here
+ * as well as in the backend: this is the last point before it reaches the screen.
+ */
+function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginStart {
+  if (!isDynamicRecord(value)) throw new Error("Invalid code login response.");
+  if (value.kind === "connected") return { kind: "connected" };
+  if (
+    value.kind !== "code" ||
+    !isString(value.userCode) ||
+    !isString(value.verificationUrl) ||
+    !isNumber(value.expiresAt)
+  ) {
+    throw new Error("Invalid code login response.");
+  }
+  if (new URL(value.verificationUrl).protocol !== "https:") throw new Error("Invalid code login response.");
+  return {
+    kind: "code",
+    userCode: value.userCode,
+    verificationUrl: value.verificationUrl,
+    expiresAt: value.expiresAt,
+  };
 }
 
 function decodeAgentStatusFromMain(value: unknown): AgentStatus {
@@ -842,6 +869,10 @@ const openbotApi: OpenBotDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.clearProviderApiKey, provider).then(decodeAgentStatusFromMain),
   getProviderApiKeyState: (provider) =>
     ipcRenderer.invoke(IPC_CHANNELS.getProviderApiKeyState, provider).then(decodeProviderApiKeyState),
+  startProviderCodeLogin: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startProviderCodeLogin, provider).then(decodeProviderCodeLoginStart),
+  cancelProviderCodeLogin: (provider) =>
+    ipcRenderer.invoke(IPC_CHANNELS.cancelProviderCodeLogin, provider).then(decodeAgentStatusFromMain),
   providerRuntimes: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesGetStatus).then(decodeProviderRuntimeSnapshot),
     download: (provider) =>

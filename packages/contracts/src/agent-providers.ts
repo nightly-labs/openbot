@@ -49,6 +49,14 @@ export interface AgentProviderDescriptor {
   readonly authKind: AgentAuthState["kind"];
   /** Left-to-right order in the model picker and top-to-bottom in the onboarding list. */
   readonly pickerOrder: number;
+  /**
+   * Whether this provider can be signed in with a code typed on another device.
+   *
+   * Declared here rather than beside the backend's sign-in driver because the picker decides
+   * whether to offer the second sign-in before it has asked main anything, and a capability the
+   * renderer guesses at is a button that fails when it is pressed.
+   */
+  readonly codeSignIn: boolean;
 }
 
 /**
@@ -67,6 +75,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     legacyModelPrefix: null,
     authKind: "chatgpt",
     pickerOrder: 1,
+    codeSignIn: true,
   },
   claude: {
     id: "claude",
@@ -79,6 +88,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     legacyModelPrefix: "claude-",
     authKind: "claude",
     pickerOrder: 0,
+    codeSignIn: false,
   },
   grok: {
     id: "grok",
@@ -91,6 +101,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     legacyModelPrefix: "grok-",
     authKind: "grok",
     pickerOrder: 2,
+    codeSignIn: false,
   },
   opencode: {
     id: "opencode",
@@ -105,6 +116,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     legacyModelPrefix: null,
     authKind: "opencode",
     pickerOrder: 3,
+    codeSignIn: false,
   },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 

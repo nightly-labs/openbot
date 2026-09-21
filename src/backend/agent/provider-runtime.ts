@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AgentSummary,
   CustomProviderRestart,
+  ProviderCodeLoginStart,
 } from "@openbot/contracts/ipc";
 import {
   agentProviderDescriptor,
@@ -31,6 +32,7 @@ import { openCodeSignInMessage } from "./../opencode-config";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
+  decodeAccountDeviceCodeLoginStartResult,
   decodeAccountLoginStartResult,
   decodeAccountRateLimitsReadResult,
   decodeAccountReadResult,
@@ -687,6 +689,35 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
+   * Starts a sign-in the user finishes on another device, for a provider that offers one.
+   *
+   * Runs in the same queue as Connect, and cancels a sign-in already waiting: two live codes for
+   * one provider would leave the user reading the dead one. An account already on this computer is
+   * not a reason to refuse: asking for a code while signed in is how the user reaches a different
+   * account, and the one in use keeps working until the new sign-in finishes.
+   */
+  async startProviderCodeLogin(provider: AgentProvider): Promise<ProviderCodeLoginStart> {
+    if (!agentProviderDescriptor(provider).codeSignIn) {
+      throw new Error(`${providerLabel(provider)} cannot be signed in with a code.`);
+    }
+    const start = this.#providerStarts.get(provider);
+    if (start) await start;
+    return this.#runProviderConnectionCommand(provider, async () => {
+      await this.#cancelCodexLogin(null);
+      return this.#startCodexDeviceLogin();
+    });
+  }
+
+  /** Abandons a code sign-in. The provider is told, so the code cannot be used after this returns. */
+  async cancelProviderCodeLogin(provider: AgentProvider): Promise<AgentStatus> {
+    if (!agentProviderDescriptor(provider).codeSignIn) return this.status();
+    return this.#runProviderConnectionCommand(provider, async () => {
+      await this.#cancelCodexLogin(null);
+      return this.status();
+    });
+  }
+
+  /**
    * The custom-endpoint wording, when there is a custom endpoint to talk about.
    *
    * OpenCode answers "not signed in" for a refused key or an unreachable base URL exactly as it does
@@ -886,22 +917,20 @@ export class ProviderRuntime implements ProviderPort {
     this.#setStatus({ phase: "stopped", message: null });
   }
 
-  async #runProviderConnectionCommand(
-    provider: AgentProvider,
-    command: () => Promise<AgentStatus>,
-  ): Promise<AgentStatus> {
+  async #runProviderConnectionCommand<T>(provider: AgentProvider, command: () => Promise<T>): Promise<T> {
     const previous = this.#providerConnectionCommands.get(provider) ?? Promise.resolve();
-    let result = this.status();
-    const current = previous
-      .catch(() => undefined)
-      .then(async () => {
-        result = await command();
-      });
+    const run = previous.catch(() => undefined).then(() => command());
+    // What the queue holds is the turn, not its answer: a later command only waits for this one to
+    // be over, and swallowing the failure here is what keeps a refused sign-in from surfacing a
+    // second time as an unhandled rejection nobody is left awaiting.
+    const current = run.then(
+      () => undefined,
+      () => undefined,
+    );
     this.#providerConnectionCommands.set(provider, current);
     recordRestartActivity();
     try {
-      await current;
-      return result;
+      return await run;
     } finally {
       if (this.#providerConnectionCommands.get(provider) === current) {
         this.#providerConnectionCommands.delete(provider);
@@ -1296,7 +1325,15 @@ export class ProviderRuntime implements ProviderPort {
     else this.#clearProviderConnectionState(provider);
   }
 
-  async #startCodexLogin(openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
+  /**
+   * Brings a Codex client up to the point where a sign-in can start, and hands it to `run`.
+   *
+   * Returns null when the client turned out to be signed in already: the account was activated and
+   * there is no login to start. Both sign-in shapes share this because everything before the
+   * `account/login/start` call - the CLI, the handshake, the account already on this computer - and
+   * everything the failure path has to undo is the same for a browser hand-off and for a code.
+   */
+  async #withCodexLoginClient<T>(run: (client: AgentClient, cli: CodexCliInfo) => Promise<T>): Promise<T | null> {
     let client: AgentClient | null = null;
     let cli: CodexCliInfo | null = null;
     this.#setProviderConnectionState("codex", "connecting");
@@ -1322,40 +1359,11 @@ export class ProviderRuntime implements ProviderPort {
         const existingAccount = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
         if (existingAccount.account?.type === "chatgpt") {
           await this.#activateProviderClient("codex", client, cli, existingAccount.account);
-          return this.status();
+          return null;
         }
       }
 
-      const login = await client.request(
-        "account/login/start",
-        {
-          type: "chatgpt",
-          appBrand: "chatgpt",
-          codexStreamlinedLogin: true,
-          useHostedLoginSuccessPage: true,
-        },
-        decodeAccountLoginStartResult,
-      );
-      let pending: PendingCodexLogin;
-      const timer = setTimeout(() => {
-        void this.#cancelCodexLogin("ChatGPT connection timed out. Try again.", pending);
-      }, CODEX_LOGIN_TIMEOUT_MS);
-      timer.unref?.();
-      pending = { client, cli, loginId: login.loginId, timer, completing: false };
-      this.#codexLogin = pending;
-      recordRestartActivity();
-      client.once("exit", () => {
-        if (this.#codexLogin?.client === client) {
-          void this.#failCodexLogin(this.#codexLogin, "ChatGPT connection stopped. Try again.");
-        }
-      });
-      try {
-        await openExternal(login.authUrl);
-      } catch {
-        await this.#cancelCodexLogin("OpenBot could not open the ChatGPT connection page.");
-        throw new Error("OpenBot could not open the ChatGPT connection page.");
-      }
-      return this.status();
+      return await run(client, cli);
     } catch (error) {
       if (client && this.#codexLogin?.client !== client && this.#clients.get("codex") !== client) {
         await client.stop().catch(() => undefined);
@@ -1366,6 +1374,77 @@ export class ProviderRuntime implements ProviderPort {
       }
       throw error;
     }
+  }
+
+  /**
+   * Holds a started login open until the provider reports it finished, or until it times out.
+   *
+   * The deadline is OpenBot's, not the provider's. The code flow counts down to the same moment on
+   * screen, so the number the user reads is the one this timer acts on.
+   */
+  #trackCodexLogin(client: AgentClient, cli: CodexCliInfo, loginId: string): PendingCodexLogin {
+    let pending: PendingCodexLogin;
+    const timer = setTimeout(() => {
+      void this.#cancelCodexLogin("ChatGPT connection timed out. Try again.", pending);
+    }, CODEX_LOGIN_TIMEOUT_MS);
+    timer.unref?.();
+    pending = { client, cli, loginId, timer, completing: false };
+    this.#codexLogin = pending;
+    recordRestartActivity();
+    client.once("exit", () => {
+      if (this.#codexLogin?.client === client) {
+        void this.#failCodexLogin(this.#codexLogin, "ChatGPT connection stopped. Try again.");
+      }
+    });
+    return pending;
+  }
+
+  async #startCodexLogin(openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
+    await this.#withCodexLoginClient(async (client, cli) => {
+      const login = await client.request(
+        "account/login/start",
+        {
+          type: "chatgpt",
+          appBrand: "chatgpt",
+          codexStreamlinedLogin: true,
+          useHostedLoginSuccessPage: true,
+        },
+        decodeAccountLoginStartResult,
+      );
+      this.#trackCodexLogin(client, cli, login.loginId);
+      try {
+        await openExternal(login.authUrl);
+      } catch {
+        await this.#cancelCodexLogin("OpenBot could not open the ChatGPT connection page.");
+        throw new Error("OpenBot could not open the ChatGPT connection page.");
+      }
+    });
+    return this.status();
+  }
+
+  /**
+   * Starts the sign-in the user finishes on another device, and reports the code to show.
+   *
+   * Only the code and the page it is typed on cross back: the token the provider issues for that
+   * code stays with the Codex client this method leaves running, exactly as it does for the browser
+   * sign-in. How this one ends reaches the renderer the same way too, through the provider's status.
+   */
+  async #startCodexDeviceLogin(): Promise<ProviderCodeLoginStart> {
+    const started = await this.#withCodexLoginClient(async (client, cli) => {
+      const login = await client.request(
+        "account/login/start",
+        { type: "chatgptDeviceCode" },
+        decodeAccountDeviceCodeLoginStartResult,
+      );
+      this.#trackCodexLogin(client, cli, login.loginId);
+      return {
+        kind: "code" as const,
+        userCode: login.userCode,
+        verificationUrl: login.verificationUrl,
+        expiresAt: Date.now() + CODEX_LOGIN_TIMEOUT_MS,
+      };
+    });
+    return started ?? { kind: "connected" };
   }
 
   async #completeCodexLogin(completion: AccountLoginCompletedResult, source: AgentClient): Promise<void> {

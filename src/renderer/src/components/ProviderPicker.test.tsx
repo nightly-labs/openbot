@@ -114,6 +114,45 @@ describe("ProviderPicker", () => {
     expect(downloading.view.getByRole("button", { name: "Cancel OpenCode" })).toBeTruthy();
   });
 
+  it("offers the code sign-in on a connected row, and not while the runtime is still downloading", () => {
+    const onSignInWithCodeProvider = vi.fn();
+    const codex: ProviderPickerOption = { id: "codex", name: "ChatGPT", state: "available", message: null };
+    const menu = (option: ProviderPickerOption) =>
+      render(() => (
+        <ProviderPicker
+          value="codex"
+          options={[option]}
+          ariaLabel="AI providers"
+          allowUnavailableSelection
+          onChange={vi.fn()}
+          onSignInProvider={vi.fn()}
+          onSignInWithCodeProvider={onSignInWithCodeProvider}
+        />
+      )).queryByRole("button", { name: "More ways to log in to ChatGPT" });
+
+    // Signed in is not a reason to hide it: this is the way to a second account.
+    expect(menu(codex)).toBeTruthy();
+    expect(menu({ ...codex, state: "sign-in-required" })).toBeTruthy();
+    // Nothing to ask for a code with until the CLI is on the computer.
+    expect(
+      menu({ ...codex, runtimeStatus: runtime({ phase: "downloading", progress: 40, version: null }) }),
+    ).toBeNull();
+    // Claude has no code sign-in, so its row has no menu to hold one.
+    expect(
+      render(() => (
+        <ProviderPicker
+          value="claude"
+          options={[{ ...claude, state: "available" }]}
+          ariaLabel="AI providers"
+          allowUnavailableSelection
+          onChange={vi.fn()}
+          onSignInProvider={vi.fn()}
+          onSignInWithCodeProvider={onSignInWithCodeProvider}
+        />
+      )).queryByRole("button", { name: "More ways to log in to Claude" }),
+    ).toBeNull();
+  });
+
   it("badges the tier and connection state without doubling them", () => {
     // A saved key leaves the runtime "Connected" to speak for the row: no second chip.
     expect(renderPicker([{ ...openCode, keyStatus: "saved" }]).view.queryByText("Free")).toBeNull();

@@ -159,6 +159,7 @@ export const en = {
   "provider.action.update": "Update",
   "provider.action.install": "Install",
   "provider.action.signIn": "Sign in",
+  "provider.action.signInWithCode": "Log in with code",
   "provider.action.add": "Add",
   "provider.aria.download": "Download {name}",
   "provider.aria.cancel": "Cancel {name}",
@@ -169,6 +170,8 @@ export const en = {
   "provider.aria.update": "Update {name} to {version}",
   "provider.aria.install": "Install {name}",
   "provider.aria.signIn": "Sign in to {name}",
+  "provider.aria.moreSignIn": "More ways to log in to {name}",
+  "provider.aria.signInWithCode": "Log in to {name} with a code on another device",
 } as const satisfies MessageCatalog;
 
 export type AppMessages = typeof en;
