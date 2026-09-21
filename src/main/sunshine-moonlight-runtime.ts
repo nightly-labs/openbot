@@ -286,6 +286,7 @@ export class SunshineMoonlightRuntime {
   #moonlight: ChildProcess | null = null;
   #iceServer: Server | null = null;
   #iceToken = "";
+  readonly #pairingName = `OpenBot Remote Desktop ${randomBytes(16).toString("hex")}`;
   #state: SunshineMoonlightRuntimeState | null = null;
   #screenCaptureDenied = false;
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
@@ -557,7 +558,7 @@ export class SunshineMoonlightRuntime {
         default_role_id: null,
         session_cookie_expiration: { secs: 3600, nanos: 0 },
       },
-      moonlight: { default_http_port: this.#requireSunshineHttpPort(), pair_device_name: "OpenBot Remote Desktop" },
+      moonlight: { default_http_port: this.#requireSunshineHttpPort(), pair_device_name: this.#pairingName },
       streamer_path: this.#options.paths.moonlightStreamer,
       log: { level_filter: "Info", file_path: join(this.#options.stateDirectory, "moonlight.log"), dev_venator: false },
       default_settings: null,
@@ -757,6 +758,31 @@ export class SunshineMoonlightRuntime {
     });
   }
 
+  async #waitForPairingRequest(): Promise<string> {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const pending = await sunshineJson(
+        this.#requireSunshineHttpsPort(),
+        "/api/pin",
+        this.#options.credentials,
+        join(this.#options.stateDirectory, "sunshine-cert.pem"),
+        z.object({
+          pairings: z.array(
+            z.object({ id: z.string().regex(/^[a-fA-F0-9]{32}$/), name: z.string(), address: z.string() }),
+          ),
+        }),
+      );
+      const matches = pending.pairings.filter(
+        (pairing) =>
+          pairing.name === this.#pairingName && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(pairing.address),
+      );
+      if (matches.length > 1) throw new Error("Sunshine returned ambiguous local pairing requests.");
+      if (matches.length === 1) return matches[0].id;
+      await shortDelay();
+    }
+    throw new Error("Sunshine did not receive the expected local pairing request.");
+  }
+
   async #pairMoonlight(baseUrl: string, hostId: number, user: string): Promise<void> {
     const body = JSON.stringify({ host_id: hostId });
     const response = await requestStream(
@@ -784,15 +810,13 @@ export class SunshineMoonlightRuntime {
         const message = moonlightPairMessageSchema.parse(JSON.parse(line));
         if (message.kind === "pin") {
           this.#options.onDiagnostic?.("moonlight", "OpenBot: received local pairing PIN.\n");
-          // Moonlight publishes the PIN before its first pairing request reaches Sunshine.
-          // A short delay prevents Sunshine from accepting the PIN before a pairing request exists.
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          const pairingId = await this.#waitForPairingRequest();
           await sunshineRequest(
             this.#requireSunshineHttpsPort(),
             "/api/pin",
             this.#options.credentials,
             join(this.#options.stateDirectory, "sunshine-cert.pem"),
-            JSON.stringify({ pin: message.pin, name: "OpenBot Remote Desktop" }),
+            JSON.stringify({ pairing_id: pairingId, pin: message.pin, name: "OpenBot Remote Desktop" }),
           );
           this.#options.onDiagnostic?.("moonlight", "OpenBot: submitted local pairing PIN.\n");
           pinSubmitted = true;

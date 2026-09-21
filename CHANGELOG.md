@@ -32,6 +32,9 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- Backport Sunshine security fixes for malformed input packets, pairing approval, and
+  exact client certificate checks.
+
 - Keep provider downloads available while provider checks run.
 - Support Canva and other MCP sign-ins that require a local redirect address.
 - Allow plugin removal from its marketplace page.
