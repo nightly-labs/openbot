@@ -148,6 +148,11 @@ export function ChatComposer({
         .slice(0, 8)
     : [];
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
+  // What the bar has to stay open for. Attachments drop out of it the moment a
+  // send starts: they are waiting for their upload then, and the bar already
+  // stops showing them. Text does not drop out, because a draft typed during a
+  // send is a real one waiting to be queued.
+  const composing = Boolean(draft.trim()) || (attachments.items.length > 0 && !sending);
   const inputRef = useRef<TextInput>(null);
   const isFocused = useIsFocused();
   const focusedReplyVersion = useRef(0);
@@ -218,7 +223,7 @@ export function ChatComposer({
     // it, which is why it is safe to run on every open.
     if (menuOpen && openedWith?.focused) inputRef.current?.focus();
   }, [menuOpen, openedWith]);
-  const anchored = hasDraft || Boolean(openedWith?.expanded);
+  const anchored = composing || Boolean(openedWith?.expanded);
   const held = useSharedValue(anchored ? 1 : 0);
   useEffect(() => {
     held.set(
