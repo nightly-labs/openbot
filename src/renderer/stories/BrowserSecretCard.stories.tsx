@@ -1,4 +1,5 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import { userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { BrowserSecretCard } from "../src/features/conversation/BrowserSecretCard";
 
@@ -51,4 +52,16 @@ export const Narrow: Story = {
       <BrowserSecretCard {...args} />
     </div>
   ),
+};
+
+export const PartiallyFilled: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByLabelText("6-digit code"), "123");
+  },
+};
+
+export const TwelveDigitsNarrow: Story = {
+  args: { request: { ...request, secret: { method: "otp", origin: "https://accounts.example.com", digits: 12 } } },
+  render: Narrow.render,
 };

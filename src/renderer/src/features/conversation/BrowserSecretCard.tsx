@@ -1,6 +1,7 @@
 import type { BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { Button, Input } from "../../components/ui";
+import { OtpInput } from "../../components/ui/otp-input";
 
 export function BrowserSecretCard(props: {
   request: BrowserTakeoverRequest;
@@ -68,36 +69,48 @@ export function BrowserSecretCard(props: {
             : "Use the code sent by email or text message."}{" "}
         This value is not added to chat.
       </p>
-      <label>
-        <span>{password() ? "Password" : `${digits()}-digit code`}</span>
-        <div class="browser-secret-input" data-code={!password() || undefined}>
+      <Show
+        when={password()}
+        fallback={
+          <div class="browser-secret-code">
+            <span class="browser-secret-label">{digits()}-digit code</span>
+            <OtpInput
+              value={value()}
+              length={digits()}
+              numeric
+              masked
+              label={`${digits()}-digit code`}
+              status={pending() ? "verifying" : error() ? "error" : "idle"}
+              errorMessage={error()}
+              onChange={(next) => {
+                setValue(next);
+                setError("");
+              }}
+            />
+          </div>
+        }
+      >
+        <label class="browser-secret-password">
+          <span class="browser-secret-label">Password</span>
           <Input
-            aria-label={password() ? "Password" : `${digits()}-digit code`}
+            aria-label="Password"
             type="password"
-            inputmode={password() ? "text" : "numeric"}
-            autocomplete={password() ? "off" : "one-time-code"}
-            maxlength={password() ? 4096 : digits()}
+            autocomplete="off"
+            maxlength={4096}
             value={value()}
             disabled={pending()}
-            onInput={(event) =>
-              setValue(
-                password()
-                  ? event.currentTarget.value
-                  : event.currentTarget.value.replace(/[^0-9]/gu, "").slice(0, digits()),
-              )
-            }
+            invalid={Boolean(error())}
+            onInput={(event) => {
+              setValue(event.currentTarget.value);
+              setError("");
+            }}
           />
-          <Show when={!password()}>
-            <div class="browser-secret-digits" aria-hidden="true">
-              <For each={Array.from({ length: digits() })}>
-                {(_, index) => <span>{value().length > index() ? "•" : "–"}</span>}
-              </For>
-            </div>
-          </Show>
-        </div>
-      </label>
-      <Show when={error()}>
-        <p role="alert">{error()}</p>
+        </label>
+        <Show when={error()}>
+          <p class="browser-secret-error" role="alert">
+            {error()}
+          </p>
+        </Show>
       </Show>
       <footer class="browser-takeover-actions">
         <Button type="submit" disabled={pending() || !valid()}>

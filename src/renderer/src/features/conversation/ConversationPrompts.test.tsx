@@ -118,6 +118,9 @@ describe("secure authentication card", () => {
     ));
     const input = screen.getByLabelText("6-digit code");
     await fireEvent.input(input, { target: { value: "12 34 56" } });
+    expect(responses).toEqual([]);
+    expect(input).toHaveValue("");
+    expect(screen.getByRole("form", { name: "Secure authentication" })).not.toHaveTextContent("123456");
     await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await vi.waitFor(() =>
       expect(responses).toEqual([{ requestId: "auth", agentId: "agent", decision: "submit", secret: "123456" }]),
