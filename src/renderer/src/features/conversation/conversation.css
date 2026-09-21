@@ -8800,3 +8800,60 @@ body:has(.browser-panel-expanded) .app-frame {
   min-width: 0;
   flex: 1;
 }
+
+.browser-secret-card {
+  display: grid;
+  gap: 12px;
+}
+
+.browser-secret-card .browser-takeover-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.browser-secret-card strong {
+  overflow-wrap: anywhere;
+}
+
+.browser-secret-input {
+  position: relative;
+}
+
+.browser-secret-input[data-code] {
+  max-width: 420px;
+}
+
+.browser-secret-digits {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-block: 8px;
+  pointer-events: none;
+}
+
+.browser-secret-digits > span {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-width: 0;
+  max-width: 36px;
+  height: 36px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.browser-secret-input[data-code] input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.browser-secret-input[data-code]:focus-within {
+  outline: 2px solid var(--openbot-accent);
+  outline-offset: 2px;
+  border-radius: var(--openbot-radius-md);
+}

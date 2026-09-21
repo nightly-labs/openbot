@@ -36,6 +36,7 @@ import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
 import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
+import { BrowserSecretCard } from "./browser-secret-card";
 import { ChatCameraPanel } from "./chat-camera-panel";
 import { ChatQueueButton } from "./chat-queue-button";
 import type { ChatQueueController } from "./use-chat-queue";
@@ -109,6 +110,7 @@ export function ChatView({
   needsAction = false,
   notice,
 }: ChatViewProps) {
+  const { browserRequests, respondToBrowserSecret, respondToBrowserTakeover } = useMobileWorkspace();
   const isFocused = useIsFocused();
   const foregroundVisit = useAppForeground();
   const [conversationAnalytics] = useState(() => new MobileConversationAnalytics(mobileAnalytics));
@@ -476,6 +478,24 @@ export function ChatView({
                 </View>
               ) : null}
               <ConnectionStatus server={server} />
+              {serverOnline && appActive && isFocused && !readOnly
+                ? (browserRequests[target.serverId] ?? [])
+                    .filter((request) =>
+                      target.kind === "agent"
+                        ? request.agentId === target.id
+                        : target.members.some((member) => member.id === request.agentId),
+                    )
+                    .map((request) => (
+                      <BrowserSecretCard
+                        key={`${target.serverId}:${request.requestId}`}
+                        request={request}
+                        respond={(input) => respondToBrowserSecret(target.serverId, input)}
+                        respondToTakeover={(decision) =>
+                          respondToBrowserTakeover(target.serverId, { requestId: request.requestId, decision })
+                        }
+                      />
+                    ))
+                : null}
               {sendError?.agentId === target.id ? (
                 <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
                   {sendError.message}

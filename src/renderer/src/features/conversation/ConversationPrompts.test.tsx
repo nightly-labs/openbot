@@ -1,6 +1,7 @@
-import type { AgentApproval } from "@openbot/contracts/ipc";
+import type { AgentApproval, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
+import { BrowserSecretCard } from "./BrowserSecretCard";
 import { ApprovalCard, BrowserTakeoverCard, ChoiceCard } from "./ConversationPrompts";
 
 describe("ChoiceCard", () => {
@@ -92,5 +93,67 @@ describe("BrowserTakeoverCard", () => {
     expect(send).toHaveBeenCalledTimes(1);
     response.resolve(false);
     await vi.waitFor(() => expect(button).toBeEnabled());
+  });
+});
+
+describe("secure authentication card", () => {
+  const request = {
+    requestId: "auth",
+    agentId: "agent",
+    threadId: "thread",
+    turnId: "turn",
+    tabId: "tab",
+    secret: { method: "otp" as const, origin: "https://example.com", digits: 6 },
+  };
+
+  it("sends the code only through the secure response and clears the input", async () => {
+    const responses: RespondToBrowserSecretInput[] = [];
+    render(() => (
+      <BrowserSecretCard
+        request={request}
+        onRespond={async (input) => {
+          responses.push({ ...input });
+        }}
+      />
+    ));
+    const input = screen.getByLabelText("6-digit code");
+    await fireEvent.input(input, { target: { value: "12 34 56" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await vi.waitFor(() =>
+      expect(responses).toEqual([{ requestId: "auth", agentId: "agent", decision: "submit", secret: "123456" }]),
+    );
+    expect(input).toHaveValue("");
+    expect(screen.getByRole("form", { name: "Secure authentication" })).not.toHaveTextContent("123456");
+  });
+
+  it("does not send the entered value when cancelled", async () => {
+    const responses: RespondToBrowserSecretInput[] = [];
+    render(() => (
+      <BrowserSecretCard
+        request={request}
+        onRespond={async (input) => {
+          responses.push({ ...input });
+        }}
+      />
+    ));
+    await fireEvent.input(screen.getByLabelText("6-digit code"), { target: { value: "123456" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(responses).toEqual([{ requestId: "auth", agentId: "agent", decision: "cancel" }]);
+    expect(screen.getByLabelText("6-digit code")).toHaveValue("");
+  });
+
+  it("clears a rejected password and never displays a raw transport error", async () => {
+    render(() => (
+      <BrowserSecretCard
+        request={{ ...request, secret: { ...request.secret, method: "password" } }}
+        onRespond={async () => {
+          throw new Error("private-password");
+        }}
+      />
+    ));
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "private-password" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("private-password");
+    expect(screen.getByLabelText("Password")).toHaveValue("");
   });
 });

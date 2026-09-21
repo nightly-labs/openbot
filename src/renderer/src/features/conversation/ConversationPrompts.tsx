@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { AgentApproval, BrowserPreview, BrowserTab, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import {
   Badge,
@@ -13,6 +13,8 @@ import {
   Skeleton,
   X,
 } from "../../components/ui";
+import { useServers } from "../servers/servers-context";
+import { BrowserSecretCard } from "./BrowserSecretCard";
 
 export function ChoiceCard(props: {
   title: string;
@@ -168,7 +170,8 @@ export function ApprovalCard(props: {
   );
 }
 
-export function BrowserTakeoverCard(props: {
+interface BrowserTakeoverCardProps {
+  request?: BrowserTakeoverRequest;
   agentName: string;
   tab: BrowserTab | undefined;
   preview: BrowserPreview | null;
@@ -177,7 +180,33 @@ export function BrowserTakeoverCard(props: {
   onOpen?: () => void;
   onComplete: () => Promise<boolean>;
   onCancel: () => Promise<boolean>;
-}) {
+}
+
+export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
+  return (
+    <Show
+      when={props.request?.secret && !props.request.secret.requiresReload && props.request}
+      fallback={<BrowserManualTakeoverCard {...props} />}
+    >
+      {(request) => <ConnectedBrowserSecretCard request={request()} />}
+    </Show>
+  );
+}
+
+function ConnectedBrowserSecretCard(props: { request: BrowserTakeoverRequest }) {
+  const { activeServer } = useServers();
+  const connected = () => !activeServer() || activeServer()?.id === "local" || activeServer()?.state === "online";
+  return (
+    <Show when={connected()} fallback={<p role="status">Reconnect to enter the authentication value.</p>}>
+      <BrowserSecretCard
+        request={props.request}
+        onRespond={(input) => window.openbot.agent.respondToBrowserSecret(input)}
+      />
+    </Show>
+  );
+}
+
+function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
   const pageDetails = createMemo(() => browserPageDetails(props.tab));
   const completed = () => props.decision === "complete";
@@ -227,6 +256,12 @@ export function BrowserTakeoverCard(props: {
           </Badge>
         </Show>
       </header>
+      <Show when={props.request?.secret?.requiresReload}>
+        <p>
+          Finish sign-in, then reload the browser page before choosing “I’m done”. Page inspection stays blocked until
+          the page reloads.
+        </p>
+      </Show>
       <div class="browser-takeover-copy">
         <p>
           {completed()

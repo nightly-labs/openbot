@@ -2,6 +2,7 @@ import { expandChatTagReferences } from "../chat-tag-references";
 import { type AgentEvent, isAgentEvent } from "../ipc-agent-events";
 import { isTeamRealtimeEvent, type TeamRealtimeEvent } from "../ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import {
   toCurrentAgentKeys,
   toCurrentAgentKeysObjectForPath,
@@ -32,7 +33,12 @@ export function decodeTeamProtocolV4BaseCurrentEvent(value: unknown): TeamProtoc
   const decoded = decodeTeamProtocolV4BaseEvent(value);
   if (decoded.kind !== "known") return decoded;
   const decodedValue: TeamProtocolV4BaseJsonValue = JSON.parse(JSON.stringify(decoded.event));
-  const current = toCurrentAgentKeys(decodedValue);
+  let current: unknown;
+  try {
+    current = restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value);
+  } catch {
+    return { kind: "invalid", type: decoded.event.type };
+  }
   return isAgentEvent(current) || isTeamRealtimeEvent(current)
     ? { kind: "known", event: current }
     : { kind: "invalid", type: decoded.event.type };
@@ -40,7 +46,7 @@ export function decodeTeamProtocolV4BaseCurrentEvent(value: unknown): TeamProtoc
 
 export function encodeTeamProtocolV4BaseCurrentEvent(
   event: AgentEvent | TeamRealtimeEvent,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; preserveBrowserSecrets?: boolean } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
@@ -48,7 +54,11 @@ export function encodeTeamProtocolV4BaseCurrentEvent(
   const wireValue = toWireAgentKeys(currentValue);
   const downconvertedValue = options.preserveSemanticTags ? wireValue : downconvertCurrentTags(wireValue);
   const decoded = decodeTeamProtocolV4BaseEvent(downconvertedValue);
-  return decoded.kind === "known" ? encodeTeamProtocolV4BaseEvent(decoded.event) : null;
+  if (decoded.kind !== "known") return null;
+  const encoded = encodeTeamProtocolV4BaseEvent(decoded.event);
+  if (!encoded || !options.preserveBrowserSecrets) return encoded;
+  const output = JSON.parse(encoded);
+  return JSON.stringify(restoreBrowserSecretMetadata(output, wireValue));
 }
 
 export function encodeTeamProtocolV4BaseCurrentHttpRequest(

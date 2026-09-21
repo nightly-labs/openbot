@@ -14,6 +14,7 @@ import type {
   BrowserJsonValue,
   BrowserNavigationDirection,
   BrowserPreview,
+  BrowserSecretRequest,
   BrowserSnapshot,
   BrowserTab,
   BrowserTarget,
@@ -137,6 +138,15 @@ interface InternalTab {
   engine: BrowserCdpEngine;
   diagnostics: BrowserDiagnostics;
   recording: boolean;
+  captureGeneration: number;
+  // Pending consent permits human takeover; submission blocks captures until document replacement.
+  secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean };
+}
+
+export interface PreparedBrowserSecret {
+  request: BrowserSecretRequest;
+  submit(secret: string): Promise<"submitted" | "takeover">;
+  cancel(): void;
 }
 
 /**
@@ -455,14 +465,115 @@ export class BrowserHost {
     if (!tab) throw new Error("Browser tab not found.");
     tab.engine.invalidateReferences();
     this.#takeoverTabIds.add(tabId);
+    this.#syncAttachedView();
     tab.diagnostics.clearDiagnostics();
     this.#emitChanged();
     try {
-      await this.#enqueue(tabId, () => this.#recorder.discard(tabId, "tab-closed"));
+      await this.#enqueue(tabId, () => this.#recorder.discard(tabId, "tab-closed"), true);
     } catch (error) {
       tab.diagnostics.clearDiagnostics();
       this.#takeoverTabIds.delete(tabId);
       throw error;
+    }
+  }
+
+  async prepareSecret(params: DynamicToolCallParams): Promise<PreparedBrowserSecret> {
+    const call = parseBrowserToolCall("submit_secret", params.arguments);
+    if (call.tool !== "submit_secret") throw new Error("Invalid secure authentication request.");
+    const args = call.args;
+    this.#requireToolTab(params, args.tabId);
+    const tab = this.#requireTab(args.tabId);
+    if (tab.secret) throw new Error("Authentication is already active.");
+    const url = new URL(currentTabUrl(tab));
+    if (url.protocol !== "https:") throw new Error("Secure authentication requires HTTPS.");
+    if (
+      (args.method === "password" && args.targets.length !== 1) ||
+      (args.targets.length !== 1 && args.targets.length !== args.digits) ||
+      (args.submission === "click") !== Boolean(args.submitTarget)
+    )
+      throw new Error("Invalid authentication targets.");
+    const protection = { origin: url.origin, submitted: false, replaced: false, running: false };
+    tab.secret = protection;
+    tab.captureGeneration += 1;
+    this.#syncAttachedView();
+    try {
+      const enter = await this.#enqueue(
+        args.tabId,
+        async (_tab, keepQueueBlocked) => {
+          await this.#recorder.discard(args.tabId, "requested");
+          tab.diagnostics.clearDiagnostics();
+          return this.#boundEngineOperation(
+            tab,
+            tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
+            10_000,
+            "Authentication target resolution timed out.",
+            keepQueueBlocked,
+          );
+        },
+        true,
+      );
+      return {
+        request: { method: args.method, origin: url.origin, digits: args.digits },
+        cancel: () => {
+          if (tab.secret === protection && !protection.submitted) {
+            tab.secret = undefined;
+            this.#syncAttachedView();
+            this.#emitChanged();
+          }
+        },
+        submit: async (secret) => {
+          if (tab.secret !== protection || protection.submitted) throw new Error("Authentication request expired.");
+          if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
+            throw new Error("Enter the requested number of digits.");
+          protection.submitted = true;
+          tab.captureGeneration += 1;
+          protection.running = true;
+          this.#syncAttachedView();
+          try {
+            await this.#enqueue(
+              args.tabId,
+              async (_tab, keepQueueBlocked) => {
+                await this.#boundEngineOperation(
+                  tab,
+                  enter(secret),
+                  10_000,
+                  "Authentication submission timed out.",
+                  keepQueueBlocked,
+                );
+                if (!protection.replaced) {
+                  await new Promise<void>((resolve) => {
+                    const contents = tab.view.webContents;
+                    const finish = () => {
+                      clearTimeout(timer);
+                      contents.off("did-navigate", finish);
+                      contents.off("destroyed", finish);
+                      resolve();
+                    };
+                    const timer = setTimeout(finish, 5_000);
+                    contents.once("did-navigate", finish);
+                    contents.once("destroyed", finish);
+                  });
+                }
+              },
+              true,
+            );
+          } finally {
+            protection.running = false;
+            tab.diagnostics.clearDiagnostics();
+            if (protection.replaced) {
+              tab.view.webContents.navigationHistory.clear();
+              tab.secret = undefined;
+              this.#syncAttachedView();
+            }
+            this.#emitChanged();
+          }
+          return protection.replaced ? "submitted" : "takeover";
+        },
+      };
+    } catch {
+      tab.secret = undefined;
+      this.#syncAttachedView();
+      throw new Error("Secure authentication is unavailable. Use browser takeover.");
     }
   }
 
@@ -473,6 +584,7 @@ export class BrowserHost {
       tab.diagnostics.clearDiagnostics();
     }
     this.#takeoverTabIds.delete(tabId);
+    this.#syncAttachedView();
     this.#emitChanged();
   }
 
@@ -627,9 +739,13 @@ export class BrowserHost {
    */
   async startView(tabId: string, onFrame: (frame: BrowserScreencastFrame) => void): Promise<() => Promise<void>> {
     const tab = this.#requireTab(tabId);
+    if (tab.secret?.submitted) throw new Error("Browser view is protected during authentication.");
+    const generation = tab.captureGeneration;
     return tab.engine.startScreencast(
       { quality: VIEW_FRAME_QUALITY, maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT },
-      onFrame,
+      (frame) => {
+        if (!tab.secret?.submitted && tab.captureGeneration === generation) onFrame(frame);
+      },
     );
   }
 
@@ -642,6 +758,7 @@ export class BrowserHost {
    */
   async dispatchViewInput(tabId: string, input: BrowserViewportInput): Promise<void> {
     const tab = this.#requireTab(tabId);
+    if (tab.secret?.submitted) throw new Error("Browser input is protected during authentication.");
     if (input.type !== "pointer" || input.action !== "move") tab.engine.invalidateReferences();
     await tab.engine.dispatchViewportInput(input);
   }
@@ -881,6 +998,7 @@ export class BrowserHost {
           await this.close(tabId);
           return textResult({ closed: true });
         }
+        case "submit_secret":
         case "request_takeover":
           // Published in BROWSER_TOOL_DEFINITIONS like every other tool, but answered by the agent
           // service, which intercepts the namespace before the call reaches a host. Reaching here
@@ -991,6 +1109,7 @@ export class BrowserHost {
       engine: new BrowserCdpEngine(view.webContents),
       diagnostics,
       recording: false,
+      captureGeneration: 0,
     };
   }
 
@@ -1022,7 +1141,7 @@ export class BrowserHost {
     });
     this.#session.webRequest.onCompleted((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.view.webContents.id === details.webContentsId);
-      if (!tab) return;
+      if (!tab || tab.secret) return;
       tab.diagnostics.add({
         kind: "network",
         level: details.statusCode >= 400 ? "error" : "info",
@@ -1035,7 +1154,7 @@ export class BrowserHost {
     });
     this.#session.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.view.webContents.id === details.webContentsId);
-      if (!tab) return;
+      if (!tab || tab.secret) return;
       tab.diagnostics.add({
         kind: "network",
         level: "error",
@@ -1049,7 +1168,11 @@ export class BrowserHost {
       callback(isAllowedBrowserPermission(permission)),
     );
     this.#session.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
-    this.#session.on("will-download", (_event, item) => {
+    this.#session.on("will-download", (event, item, contents) => {
+      if ([...this.#tabs.values()].some((tab) => tab.secret && tab.view.webContents === contents)) {
+        event.preventDefault();
+        return;
+      }
       const safeName = basename(item.getFilename()).replace(/[^a-zA-Z0-9._ -]/g, "_");
       const downloadPath = uniqueDownloadPath(
         this.#downloadsRoot,
@@ -1166,7 +1289,7 @@ export class BrowserHost {
       void this.#syncViewBackground(tab);
     });
     contents.on("console-message", (...eventArgs) => {
-      if (this.#takeoverTabIds.has(tab.id)) return;
+      if (this.#takeoverTabIds.has(tab.id) || tab.secret) return;
       const details = readConsoleMessage(eventArgs);
       if (!details) return;
       tab.diagnostics.add({
@@ -1178,7 +1301,7 @@ export class BrowserHost {
       if (details.level === "error") this.#emitChanged();
     });
     contents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
-      if (!isMainFrame || code === -3) return;
+      if (!isMainFrame || code === -3 || tab.secret) return;
       tab.diagnostics.add({
         kind: "load",
         level: "error",
@@ -1189,6 +1312,15 @@ export class BrowserHost {
     });
     contents.on("page-title-updated", changed);
     contents.on("did-navigate", (_event, url) => {
+      if (tab.secret?.submitted) {
+        tab.secret.replaced = true;
+        if (!tab.secret.running) {
+          contents.navigationHistory.clear();
+          tab.secret = undefined;
+          this.#syncAttachedView();
+          tab.diagnostics.clearDiagnostics();
+        }
+      }
       if (this.#tabs.get(tab.id) !== tab) return;
       if (isPersistableBrowserUrl(url)) tab.requestedUrl = persistentBrowserUrl(url);
       tab.revision += 1;
@@ -1210,6 +1342,7 @@ export class BrowserHost {
       if (!isAllowedMainUrl(event.url)) event.preventDefault();
     });
     contents.setWindowOpenHandler(({ url }) => {
+      if (tab.secret) return { action: "deny" };
       // Auth popups (for example Continue with Google) start from a user click.
       // Open the new tab in front with keyboard focus so the user can log in at once.
       if (isAllowedMainUrl(url)) void this.open(url, tab.ownerThreadId, tab.ownerAgentId, true);
@@ -1353,6 +1486,7 @@ export class BrowserHost {
   ): Promise<BrowserSnapshot> {
     const tab = this.#requireTab(tabId);
     const started = tab.queue.then(() => {
+      if (tab.secret) throw new Error("Browser inspection is protected during authentication. Use takeover.");
       const focusedContents = webContents.getFocusedWebContents();
       const previouslyFocused =
         focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.view.webContents === focusedContents)
@@ -1474,6 +1608,7 @@ export class BrowserHost {
   ): Promise<BrowserJsonValue> {
     const tab = this.#requireTab(tabId);
     const started = tab.queue.then(() => {
+      if (tab.secret) throw new Error("Browser inspection is protected during authentication. Use takeover.");
       const deadline = Date.now() + timeoutMs;
       const timeoutMessage = "Browser evaluate timed out.";
       let unwound: Promise<void> | undefined;
@@ -1548,7 +1683,14 @@ export class BrowserHost {
   #syncAttachedView(): void {
     const tab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : null;
     const targetWindow = this.#target === "picture-in-picture" ? this.#pictureInPictureWindow : this.#window;
-    if (!this.#visible || !this.#bounds || !tab || !targetWindow || targetWindow.isDestroyed()) {
+    if (
+      !this.#visible ||
+      !this.#bounds ||
+      !tab ||
+      (tab.secret?.submitted && !this.#takeoverTabIds.has(tab.id)) ||
+      !targetWindow ||
+      targetWindow.isDestroyed()
+    ) {
       this.#attachedView?.setVisible(false);
       return;
     }
@@ -1640,6 +1782,8 @@ export class BrowserHost {
     // the agent service; this one is per tab and holds for every caller of a tabId-bearing tool.
     // A distinct message matters: telling the model the tab vanished, while the user is part-way
     // through a login on it, invites an `open` and a second tab onto the same flow.
+    if (this.#tabs.get(tabId)?.secret)
+      throw new Error("Browser inspection is protected during authentication. Use takeover.");
     if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
   }
 
@@ -1653,9 +1797,12 @@ export class BrowserHost {
   #enqueue<T>(
     tabId: string,
     operation: (tab: InternalTab, keepQueueBlocked: KeepQueueBlocked) => Promise<T>,
+    allowProtected = false,
   ): Promise<T> {
     const tab = this.#requireTab(tabId);
     const started = tab.queue.then(() => {
+      if (tab.secret?.submitted && !allowProtected)
+        throw new Error("Browser inspection is protected during authentication. Use takeover.");
       const drains: Promise<unknown>[] = [];
       const result = operation(tab, (promise) => drains.push(promise));
       const drained = result
@@ -1739,7 +1886,7 @@ export class BrowserHost {
       activeTabId: this.#activeTabId,
       tabs: [...this.#tabs.values()].map((tab) => ({
         id: tab.id,
-        url: persistentBrowserUrl(currentTabUrl(tab)),
+        url: tab.secret?.origin ?? persistentBrowserUrl(currentTabUrl(tab)),
         ownerThreadId: tab.ownerThreadId,
         ownerAgentId: tab.ownerAgentId,
         environment: tab.environment,
@@ -2001,8 +2148,8 @@ function toPublicTab(tab: InternalTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    title: tab.view.webContents.getTitle() || "New tab",
-    url: currentTabUrl(tab),
+    title: tab.secret ? "Secure authentication" : tab.view.webContents.getTitle() || "New tab",
+    url: tab.secret?.origin ?? currentTabUrl(tab),
     loading: tab.view.webContents.isLoading(),
     ownerThreadId: tab.ownerThreadId,
     ownerAgentId: tab.ownerAgentId,

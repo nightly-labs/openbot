@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier, isNullableBoundedString, isRequestId } from "./ipc-bounded-values";
+import { type BrowserSecretRequest, isBrowserSecretRequest } from "./ipc-browser-secret";
 import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
 export type AgentApprovalKind = "command" | "file-change" | "permissions";
@@ -70,6 +71,7 @@ export interface BrowserTakeoverRequest {
   threadId: string;
   turnId: string;
   tabId: string;
+  secret?: BrowserSecretRequest;
 }
 
 export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeoverRequest {
@@ -79,7 +81,8 @@ export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeov
     isIdentifier(value.agentId) &&
     isIdentifier(value.threadId) &&
     isIdentifier(value.turnId) &&
-    isIdentifier(value.tabId)
+    isIdentifier(value.tabId) &&
+    (value.secret === undefined || isBrowserSecretRequest(value.secret))
   );
 }
 

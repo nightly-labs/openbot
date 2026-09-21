@@ -530,6 +530,7 @@ export function ConversationTimeline() {
           <Show when={props.browserTakeover}>
             <Loading>
               <BrowserTakeoverCard
+                request={props.browserTakeover}
                 agentName={props.agent?.name ?? "the agent"}
                 tab={browserTakeoverTab()}
                 preview={browserTakeoverPreview().preview}

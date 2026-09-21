@@ -99,9 +99,22 @@ export const BROWSER_TOOL_DEFINITIONS = [
     shape: { tabId, image },
   }),
   browserTool({
+    name: "submit_secret",
+    description:
+      "Request a secure password or code input in chat. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover for OAuth selection, CAPTCHA, passkeys, and payments.",
+    shape: {
+      tabId,
+      method: z.enum(["password", "otp", "authenticator"]),
+      targets: z.array(browserTargetSchema).min(1).max(12),
+      digits: z.number().int().min(4).max(12).default(6),
+      submission: z.enum(["auto", "enter", "click"]),
+      submitTarget: browserTargetSchema.optional(),
+    },
+  }),
+  browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for an authorization step you cannot complete yourself, such as a hardware passkey, a prompt on another device, or a secret you cannot find.",
+      "Ask the user to take over a tab for OAuth account selection, CAPTCHA, passkeys, payment confirmation, or when secure password/code handoff is unavailable.",
     shape: { tabId },
   }),
   browserTool({

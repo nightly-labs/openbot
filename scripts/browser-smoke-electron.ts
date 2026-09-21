@@ -6,6 +6,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbo
 import { app, BrowserWindow, type WebContents, webContents } from "electron";
 import { BrowserHost } from "../src/backend/browser-host";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
+import { runSecretHandoffScenario } from "./browser-secret-smoke";
 
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
@@ -302,7 +303,15 @@ async function main(): Promise<void> {
   const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);
   if (
     scenario !== undefined &&
-    !["background", "controls", "tool-boundary", "evaluation", "wait-deadlines", "live-view"].includes(scenario)
+    ![
+      "background",
+      "controls",
+      "tool-boundary",
+      "evaluation",
+      "wait-deadlines",
+      "live-view",
+      "secret-handoff",
+    ].includes(scenario)
   ) {
     throw new Error(
       `Unknown browser smoke scenario: ${scenario}. Use background, controls, tool-boundary, evaluation, wait-deadlines, or live-view.`,
@@ -362,6 +371,8 @@ async function main(): Promise<void> {
       try {
         if (scenario === "background") {
           // The scenario runs before the browser panel is first shown.
+        } else if (scenario === "secret-handoff") {
+          await runSecretHandoffScenario(browser, origin);
         } else if (scenario === "tool-boundary") {
           await runToolBoundaryScenario(browser, origin);
         } else {
@@ -1630,6 +1641,7 @@ async function main(): Promise<void> {
     });
     if (!toolResult.success) throw new Error("Dynamic browser tool failed.");
     await runToolBoundaryScenario(browser, origin);
+    await runSecretHandoffScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
     }
