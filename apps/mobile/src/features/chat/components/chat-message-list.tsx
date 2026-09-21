@@ -2,16 +2,35 @@ import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
 import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
-import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, type CellRendererProps, FlatList, Pressable, View, type ViewStyle } from "react-native";
+import {
+  createContext,
+  forwardRef,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  AccessibilityInfo,
+  type CellRendererProps,
+  FlatList,
+  Pressable,
+  type StyleProp,
+  View,
+  type ViewStyle,
+} from "react-native";
 import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
-  FadeIn,
   FadeInDown,
   ReduceMotion,
   useAnimatedStyle,
   useReducedMotion,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import {
@@ -32,10 +51,12 @@ import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
+import { isStreamingReply } from "../model/reply-reveal";
 import { ChatAttachmentView } from "./chat-attachment";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
+import { useReplyHaptics } from "./use-reply-haptics";
 
 type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }>;
 const TailLayoutContext = createContext<{ id: string | null; motion: ChatMotion } | null>(null);
@@ -80,7 +101,42 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] })
   .reduceMotion(ReduceMotion.System);
-const AGENT_MESSAGE_ENTRANCE = FadeIn.duration(240).reduceMotion(ReduceMotion.System);
+const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
+
+function ChatBubble({
+  children,
+  agent,
+  className,
+  style,
+}: PropsWithChildren<{ agent: boolean; className: string; style: StyleProp<ViewStyle> }>) {
+  const size = useSharedValue({ width: 0, height: 0 });
+  const background = useAnimatedStyle(() => ({
+    width: withTiming(size.get().width, REPLY_SIZE),
+    height: withTiming(size.get().height, REPLY_SIZE),
+  }));
+  return (
+    <Animated.View
+      className={className}
+      style={style}
+      onLayout={
+        agent
+          ? ({ nativeEvent }) => size.set({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })
+          : undefined
+      }
+    >
+      {/* Only the childless background resizes. The list measures the actual
+          content once, without a layout animation moving its native anchor. */}
+      {agent ? (
+        <Animated.View
+          pointerEvents="none"
+          className="absolute left-0 top-0 rounded-[30px] bg-control/60"
+          style={[{ borderCurve: "circular" }, background]}
+        />
+      ) : null}
+      {children}
+    </Animated.View>
+  );
+}
 
 /**
  * Matches the desktop marker. An absent mark means a request: that is what a host older than the
@@ -192,7 +248,13 @@ export function ChatMessageList({
   ]).map(String);
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && online && appActive;
-  const arrivals = useMessageArrivals(target.id, messages, animateMessages && historyState === "ready");
+  const replyHaptics = useReplyHaptics(animateMessages && historyState === "ready" && motion.responseVisible);
+  const conversationKey = JSON.stringify([target.serverId, target.kind, target.id]);
+  const replySession = useMemo(
+    () => ({ key: conversationKey, progress: new Map<string, number>() }),
+    [conversationKey],
+  );
+  const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
   const userBubbleColor = getBloubAvatarColor(
     target.kind === "agent" ? target.avatarSeed : target.id,
     target.kind === "agent" ? target.avatarHue : null,
@@ -232,8 +294,8 @@ export function ChatMessageList({
   const listRef = useRef<FlatList<VisibleMessage>>(null);
   const tailLayout = useMemo(() => ({ id: tailId, motion }), [tailId, motion]);
   const seekLatest = useCallback(() => {
-    if (!motion.historyVisible && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
-  }, [motion.historyVisible, visibleMessages.length]);
+    if (motion.needsInitialPosition() && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
+  }, [motion.needsInitialPosition, visibleMessages.length]);
   useEffect(() => {
     if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
   }, [tailId, motion.needsSendPosition, motion.atLatest]);
@@ -306,7 +368,7 @@ export function ChatMessageList({
             arrivals.has(message.id) && !isFirstUser
               ? message.author === "user"
                 ? USER_MESSAGE_ENTRANCE
-                : AGENT_MESSAGE_ENTRANCE
+                : undefined
               : undefined
           }
           className={
@@ -342,14 +404,15 @@ export function ChatMessageList({
             />
           ))}
           {message.body.trim() ? (
-            <Animated.View
+            <ChatBubble
+              agent={message.author === "agent"}
               className={
                 message.author === "user"
                   ? `self-end rounded-[30px] px-4 py-3 ${target.kind === "channel" ? "bg-control/60" : ""} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
-                  : "max-w-full self-start rounded-[30px] bg-control/60 px-4 py-3"
+                  : "max-w-full self-start rounded-[30px] px-4 py-3"
               }
               style={[
-                { borderCurve: "circular" },
+                { borderCurve: "circular", overflow: "hidden" },
                 message.author === "user" && target.kind === "agent" ? userBubbleStyle : undefined,
               ]}
             >
@@ -358,10 +421,28 @@ export function ChatMessageList({
                 body={message.body}
                 selectable={message.author === "user"}
                 color={message.author === "user" && target.kind === "agent" ? userForeground : foreground}
-                streaming={message.author === "agent" && message.streaming}
+                playback={
+                  message.author === "agent" &&
+                  (message.streaming || message.status === "completed") &&
+                  !message.superseded &&
+                  (!message.speaker || message.speaker.kind === "agent")
+                    ? {
+                        id: message.id,
+                        complete: message.status === "completed",
+                        progress: replySession.progress,
+                        enabled:
+                          animateMessages &&
+                          arrivals.has(message.id) &&
+                          motion.responseVisible &&
+                          !reducedMotion &&
+                          !screenReaderEnabled,
+                        ...replyHaptics,
+                      }
+                    : undefined
+                }
                 animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
               />
-            </Animated.View>
+            </ChatBubble>
           ) : null}
         </Animated.View>
       );
@@ -408,19 +489,16 @@ export function ChatMessageList({
   };
   const renderActivity = (activity?: MobileAgentActivity) => {
     const latestThinking = messages.findLast(
-      (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
+      (message) => message.kind === "thinking" && message.turnId === (activity?.turnId ?? activeTurnId),
     );
-    const thinkingDetail =
-      latestThinking?.kind === "thinking" &&
-      !messages.some(
-        (message) =>
-          message.kind === "message" &&
-          message.author === "agent" &&
-          message.streaming &&
-          (!activity?.agentId || message.speaker?.id === activity.agentId),
-      )
-        ? latestThinking.steps.at(-1)?.text
-        : null;
+    const replying = messages.some(
+      (message) =>
+        isStreamingReply(message) &&
+        message.kind === "message" &&
+        message.body.trim() &&
+        (!activity?.agentId || !message.speaker || message.speaker.id === activity.agentId),
+    );
+    const thinkingDetail = !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1)?.text : null;
     const activityLabel =
       sending && !activity
         ? "Sending…"
@@ -440,7 +518,7 @@ export function ChatMessageList({
       : target.kind === "agent"
         ? target
         : undefined;
-    return activity || sending ? (
+    return activity || sending || messages.some(isStreamingReply) ? (
       <View
         className="flex-row items-center gap-2 px-1 py-2"
         accessible
@@ -530,7 +608,7 @@ export function ChatMessageList({
               {...props}
               motion={motion}
               automaticallyAdjustKeyboardInsets={false}
-              keyboardLiftBehavior="whenAtEnd"
+              keyboardLiftBehavior={motion.keyboardLiftBehavior}
               offset={keyboardOffset}
               applyWorkaroundForContentInsetHitTestBug
               blankSpace={motion.blankSpace}
@@ -554,6 +632,8 @@ export function ChatMessageList({
           }}
           onScroll={motion.onScroll}
           onScrollBeginDrag={motion.onScrollBeginDrag}
+          onScrollEndDrag={motion.onScrollEndDrag}
+          onMomentumScrollEnd={motion.onScrollEndDrag}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
