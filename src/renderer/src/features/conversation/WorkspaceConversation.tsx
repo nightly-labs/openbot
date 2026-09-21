@@ -239,7 +239,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       onActivateBrowserTab={activateBrowserTab}
       onCloseBrowserTab={closeBrowserTab}
       onOpenRemoteDesktop={openRemoteDesktopWorkspace}
-      onOpenAgentSetup={() => window.openbot.openExternal("agent-setup")}
       onStop={stopActiveTurn}
     />
   );

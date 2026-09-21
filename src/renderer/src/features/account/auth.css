@@ -1218,15 +1218,13 @@ body,
 }
 
 .remote-desktop-overlay > button,
-.agent-setup-card button,
 .remote-desktop-overlay > button:hover {
   border-color: var(--openbot-border-strong);
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
 }
 
-.remote-desktop-overlay > button:hover,
-.agent-setup-card button:hover {
+.remote-desktop-overlay > button:hover {
   background: var(--openbot-bg-control-active);
 }
 

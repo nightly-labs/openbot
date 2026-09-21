@@ -470,7 +470,7 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("heading", { name: "New agent" })).toBeInTheDocument();
   });
 
-  it("guides signed-out users before enabling chat", async () => {
+  it("blocks chat for signed-out users", async () => {
     vi.mocked(window.openbot.agent.getStatus).mockResolvedValueOnce({
       phase: "blocked",
       cliVersion: "0.144.1",
@@ -481,10 +481,9 @@ describe("OpenBot connected desktop shell", () => {
     });
     render(() => <App />);
 
-    expect(await screen.findByText("Agent CLI setup required")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Message Chief")).toHaveAttribute("contenteditable", "false"));
     expect(screen.queryByRole("listbox", { name: /helping with most/i })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Message Chief")).toHaveAttribute("contenteditable", "false");
-    fireEvent.click(screen.getByRole("button", { name: "Setup guide" }));
-    await waitFor(() => expect(window.openbot.openExternal).toHaveBeenCalledWith("agent-setup"));
+    expect(screen.queryByText("Agent CLI setup required")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Setup guide" })).not.toBeInTheDocument();
   });
 });
