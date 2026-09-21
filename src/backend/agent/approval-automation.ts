@@ -7,7 +7,7 @@ import type { AgentApproval } from "@openbot/contracts/ipc";
  * widen its filesystem or network reach before it can do the ordinary work the grant was given for,
  * so holding that class back left one card for each agent that the user could not turn off.
  *
- * Hosted-site publishing and replacement require Turbo. Deletion uses the ordinary grant.
+ * Hosted-site publishing, replacement and deletion require Turbo for automatic approval.
  * Validated mutations still run through the hosted-site coordinator.
  * Browser takeover is a separate flow with its own gate and is never asked about here.
  */

@@ -30,14 +30,9 @@ afterEach(async () => {
 });
 
 describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () => {
-  it.each([
-    { action: "publish", startWithTurbo: false },
-    { action: "replace", startWithTurbo: false },
-    { action: "delete", startWithTurbo: false },
-    { action: "delete", startWithTurbo: true },
-  ] as const)(
-    "applies site $action approval rules with initial Turbo $startWithTurbo",
-    async ({ action, startWithTurbo }) => {
+  it.each(["publish", "replace", "delete"] as const)(
+    "requires Turbo to auto-approve site %s and asks again after Turbo is disabled",
+    async (action) => {
       const { store, mailbox } = stores(root);
       const client = new FakeAgentClient("codex", "", false);
       const site = {
@@ -59,8 +54,8 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
         replace: vi.fn(async () => site),
         delete: vi.fn(async () => undefined),
       };
-      let granted = !startWithTurbo;
-      let turbo = startWithTurbo;
+      let granted = true;
+      let turbo = false;
       service = createTestService({
         store,
         mailbox,
@@ -93,22 +88,20 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
           description: site.description,
         },
       };
-      if (action !== "delete") {
-        client.emit("request", {
-          method: "item/tool/call",
-          id: "declined-site",
-          params: { ...params, callId: "declined-site" },
-        });
-        await waitFor(() =>
-          events.some((event) => event.type === "approval" && event.approval.requestId === "declined-site"),
-        );
-        expect(hostedSites[action]).not.toHaveBeenCalled();
-        await service.respondToApproval({ requestId: "declined-site", decision: "decline" });
-        expect(hostedSites[action]).not.toHaveBeenCalled();
-        // Turbo overrides even a disabled per-agent preference.
-        turbo = true;
-        granted = false;
-      }
+      client.emit("request", {
+        method: "item/tool/call",
+        id: "declined-site",
+        params: { ...params, callId: "declined-site" },
+      });
+      await waitFor(() =>
+        events.some((event) => event.type === "approval" && event.approval.requestId === "declined-site"),
+      );
+      expect(hostedSites[action]).not.toHaveBeenCalled();
+      await service.respondToApproval({ requestId: "declined-site", decision: "decline" });
+      expect(hostedSites[action]).not.toHaveBeenCalled();
+      // Turbo overrides even a disabled per-agent preference.
+      turbo = true;
+      granted = false;
       events.length = 0;
       client.emit("request", {
         method: "item/tool/call",
@@ -129,7 +122,7 @@ describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () 
       ]);
 
       turbo = false;
-      granted = action !== "delete";
+      granted = true;
       client.emit("request", {
         method: "item/tool/call",
         id: "manual-site",
