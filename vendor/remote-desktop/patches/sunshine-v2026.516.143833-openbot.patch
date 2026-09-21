@@ -392,10 +392,10 @@ index 00000000..3821983e
 +}
 diff --git a/src/platform/macos/openbot_setup.mm b/src/platform/macos/openbot_setup.mm
 new file mode 100644
-index 00000000..ba08c80e
+index 00000000..e42489af
 --- /dev/null
 +++ b/src/platform/macos/openbot_setup.mm
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,177 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#import <CoreGraphics/CoreGraphics.h>
@@ -514,6 +514,7 @@ index 00000000..ba08c80e
 +      clicked = typed = false;
 +      panel = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 480, 290) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
 +      panel.releasedWhenClosed = NO;
++      panel.movable = NO;
 +      panel.title = @"OpenBot remote desktop test";
 +      panel.level = NSFloatingWindowLevel;
 +      panel.contentView = [[OpenBotTestView alloc] initWithFrame:NSMakeRect(0, 0, 480, 290)];
@@ -615,10 +616,10 @@ index 195a666c..f0b09b8a 100644
    SimpleWeb::CaseInsensitiveMultimap headers;
 diff --git a/tests/unit/test_openbot_setup.mm b/tests/unit/test_openbot_setup.mm
 new file mode 100644
-index 00000000..005cae48
+index 00000000..7972aebd
 --- /dev/null
 +++ b/tests/unit/test_openbot_setup.mm
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,55 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#include <stdexcept>
@@ -632,6 +633,7 @@ index 00000000..005cae48
 +    [NSApp finishLaunching];
 +    platf::openbot_test_action("start");
 +    require(platf::openbot_test_status()["active"] == true);
++    require(!panel.movable);
 +    auto view = (OpenBotTestView *)panel.contentView;
 +    CGEventRef native = CGEventCreateKeyboardEvent(nullptr, 18, true);
 +    NSEvent *event = [NSEvent eventWithCGEvent:native];
