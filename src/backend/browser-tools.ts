@@ -101,12 +101,30 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "submit_secret",
     description:
-      "Request a secure password or code input in chat. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover for OAuth selection, CAPTCHA, passkeys, and payments.",
+      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, OAuth selection, CAPTCHA, passkeys, or payments.",
     shape: {
       tabId,
-      method: z.enum(["password", "otp", "authenticator"]),
-      targets: z.array(browserTargetSchema).min(1).max(12),
-      digits: z.number().int().min(4).max(12).default(6),
+      method: z
+        .enum(["password", "otp", "authenticator"])
+        .describe(
+          "Selects the card: password for an account password; otp for a numeric email/SMS code; authenticator for a numeric authenticator-app code. Generic 2FA labels or masked inputs do not establish the method.",
+        ),
+      targets: z
+        .array(browserTargetSchema)
+        .min(1)
+        .max(12)
+        .describe(
+          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
+        ),
+      digits: z
+        .number()
+        .int()
+        .min(4)
+        .max(12)
+        .default(6)
+        .describe(
+          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Do not infer six digits from the default. Ignored for password cards.",
+        ),
       submission: z.enum(["auto", "enter", "click"]),
       submitTarget: browserTargetSchema.optional(),
     },
