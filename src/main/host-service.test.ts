@@ -13,8 +13,6 @@ import { DEVELOPMENT_REMOTE_CLIENT_USERNAME, HostService } from "./host-service"
 import { createAgents, createBrowser, createMailbox, unimplemented } from "./team-api-server-test-harness";
 import { TeamStore } from "./team-store";
 
-vi.mock("electron", () => ({ shell: { openExternal: vi.fn(async () => undefined), showItemInFolder: vi.fn() } }));
-
 const roots: string[] = [];
 
 type HostOptions = ConstructorParameters<typeof HostService>[0];
@@ -27,7 +25,7 @@ async function createHostService(
   remote: Partial<
     Pick<
       HostOptions,
-      | "openRemoteDesktopPermissionSetup"
+      | "openRemoteDesktopSetup"
       | "listRemoteInvites"
       | "registerRemoteHost"
       | "updateRemoteHostLogo"
@@ -132,11 +130,11 @@ type RemoteInvite = Awaited<ReturnType<NonNullable<HostOptions["createRemoteInvi
 // The gateway holds the refusal, and this status is the only way it reaches the host owner's screen.
 // A member who is refused cannot grant anything: they are on the other computer.
 describe.runIf(process.platform === "darwin")("HostService permission setup", () => {
-  it.each(["accessibility", "screen-recording"] as const)("opens the Sunshine helper for %s", async (action) => {
-    const openRemoteDesktopPermissionSetup = vi.fn(async () => undefined);
-    const { service } = await createHostService({ openRemoteDesktopPermissionSetup }, () => false);
+  it.each(["accessibility", "screen-recording", "reveal"] as const)("opens Sunshine setup for %s", async (action) => {
+    const openRemoteDesktopSetup = vi.fn(async () => undefined);
+    const { service } = await createHostService({ openRemoteDesktopSetup }, () => false);
     await service.openRemoteDesktopSetup(action);
-    expect(openRemoteDesktopPermissionSetup).toHaveBeenCalledWith(action, "/runtime/Sunshine.app");
+    expect(openRemoteDesktopSetup).toHaveBeenCalledWith(action, "/runtime/Sunshine.app");
   });
 });
 

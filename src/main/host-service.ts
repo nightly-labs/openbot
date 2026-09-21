@@ -38,7 +38,6 @@ import type {
 } from "@openbot/contracts/ipc";
 import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { shell } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
@@ -94,10 +93,7 @@ interface HostServiceOptions {
     inviteUrl: string;
     role: "admin" | "member";
   }) => Promise<void>;
-  openRemoteDesktopPermissionSetup?: (
-    permission: "screen-recording" | "accessibility",
-    appPath: string,
-  ) => Promise<void>;
+  openRemoteDesktopSetup?: (action: RemoteDesktopSetupAction, appPath: string) => Promise<void>;
   remoteDesktopRuntimePaths?: RemoteDesktopRuntimePaths | null;
   remoteDesktopStateDirectory?: string;
   /** Only a test supplies this. The gateway builds the real Sunshine and Moonlight runtime itself. */
@@ -304,12 +300,8 @@ export class HostService extends EventEmitter<HostEvents> {
     const executable = this.#options.remoteDesktopRuntimePaths?.sunshine;
     if (!executable) throw new Error("The remote desktop runtime is not installed.");
     const appPath = dirname(dirname(dirname(executable)));
-    if (action === "reveal") {
-      shell.showItemInFolder(appPath);
-      return;
-    }
-    if (!this.#options.openRemoteDesktopPermissionSetup) throw new Error("Permission setup is not available.");
-    await this.#options.openRemoteDesktopPermissionSetup(action, appPath);
+    if (!this.#options.openRemoteDesktopSetup) throw new Error("Permission setup is not available.");
+    await this.#options.openRemoteDesktopSetup(action, appPath);
   }
 
   async recheckScreenRecording(): Promise<HostStatus> {

@@ -688,8 +688,9 @@ export async function createApplicationServices({
     platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
     unattended: false,
     remoteDesktopRuntimePaths: remoteDesktopRuntime,
-    openRemoteDesktopPermissionSetup: async (permission, appPath) => {
-      await computerUseMacSetup.openHelper(permission, appPath, "Sunshine");
+    openRemoteDesktopSetup: async (action, appPath) => {
+      if (action === "reveal") shell.showItemInFolder(appPath);
+      else await computerUseMacSetup.openHelper(action, appPath, "Sunshine");
     },
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => {
