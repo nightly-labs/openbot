@@ -498,8 +498,8 @@ jobs:
             --ephemeral \
             --ignore-user-config \
             --sandbox read-only \
-            --model gpt-6-astra \
-            --config 'model_reasoning_effort="low"' \
+            --model chatgpt-web/extra-high \
+            --config 'model_reasoning_effort="xhigh"' \
             --color never \
             --output-last-message "$last_message_file" \
             - < "$prompt_file" 2>&1 | tee "$live_file"
