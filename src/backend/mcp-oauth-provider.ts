@@ -68,7 +68,12 @@ export interface McpOAuthOptions {
   storage: McpOAuthStorage;
   /** Opens the authorization page in the user's own browser, never in a window of this app. */
   openExternal: (url: string) => Promise<void>;
-  /** Where the authorization server sends the grant back. One address serves every server. */
+  /**
+   * Where the authorization server sends the grant back. One address serves every server.
+   *
+   * A loopback http address while this app is listening on one, and the `openbot://mcp-auth` deep
+   * link when it could not bind a port. `describeUnusableRedirectUrl` refuses anything else.
+   */
   redirectUrl: string;
   /** How long a sign-in may stay open before the wait is abandoned. */
   signInTimeoutMs?: number;
@@ -139,6 +144,8 @@ export class McpOAuth implements McpOAuthAuthority {
   readonly #generations = new Map<string, number>();
 
   constructor(options: McpOAuthOptions) {
+    const refusal = describeUnusableRedirectUrl(options.redirectUrl);
+    if (refusal) throw new Error(refusal);
     this.#options = options;
   }
 
@@ -242,6 +249,9 @@ export class McpOAuth implements McpOAuthAuthority {
           // The grant is a credential until it is spent, and a token endpoint that refuses it
           // commonly quotes it back in `error_description`.
           provider.recordSecret(code);
+          // From here the registration on file is the one the grant was issued to, whatever
+          // address it names: registering again would trade the code against another client.
+          provider.beginCodeExchange();
           // The grant waited on the person; the trade waits on the server, and on nothing else.
           // Without this a hung token endpoint holds the test past its own deadline after the user
           // has done everything right.
@@ -354,6 +364,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * is too late: `invalidateCredentials` has often already dropped the value the attempt spent.
    */
   readonly #secrets = new Set<string>();
+  /** Whether the stored registration has already had its one pass with a stale redirect address. */
+  #redirectAddressChecked = false;
+  /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
+  #exchangingCode = false;
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
@@ -364,8 +378,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * What OpenBot registers itself as. `redirect_uris` holds the one address the deep-link router
-   * classifies, so an authorization server will not send a grant anywhere else.
+   * What OpenBot registers itself as. `redirect_uris` holds the one address this run receives on,
+   * so an authorization server will not send a grant anywhere else.
    *
    * No `scope` and no `token_endpoint_auth_method`: the SDK takes the scope the server's own
    * protected-resource metadata asks for, and picks an authentication method the server said it
@@ -387,10 +401,46 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return state;
   }
 
+  /**
+   * The registration this installation already has with that authorization server - unless it
+   * names an address the grant can no longer come back to, and the attempt in hand needs one.
+   *
+   * The redirect address is not fixed for all time. A build that sent `openbot://mcp-auth` and one
+   * that listens on a loopback port register different `redirect_uris`, and the port changes on
+   * each start - so a stored registration often names another address. An authorization request
+   * made against it earns an `Invalid redirect URI.` on the authorization page, where the user can
+   * do nothing about it. Answering `undefined` makes the SDK register again, which costs one
+   * request and is the whole repair.
+   *
+   * It is answered that way as late as it can be, because a refresh uses no redirect address at
+   * all. Registering in front of one would spend a refresh token against a `client_id` it was
+   * never issued to: the authorization server refuses it, and the user is sent to the browser for
+   * a sign-in a plain refresh would have avoided. So a record with a refresh token keeps its
+   * client for one pass; when that refresh is refused the SDK drops the tokens and asks again,
+   * and the pass that goes to the browser is the one that registers.
+   *
+   * Two attempts never reach here: a silent refresh, which has no browser to register for, and
+   * the exchange of a grant already in hand, which must spend it against the `client_id` it was
+   * issued to.
+   */
   clientInformation(): OAuthClientInformationFull | undefined {
-    const client = this.#record().client;
+    const record = this.#record();
+    const client = record.client;
     this.recordSecret(client?.client_secret);
-    return client;
+    if (!client) return undefined;
+    if (!this.#options.state || this.#exchangingCode) return client;
+    if (client.redirect_uris.includes(this.#options.redirectUrl)) return client;
+    const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
+    this.#redirectAddressChecked = true;
+    return refreshWorthTrying ? client : undefined;
+  }
+
+  /**
+   * The grant is in hand, so the registration on file is the one that has to spend it.
+   * `McpOAuth` calls this before the exchange; nothing else does.
+   */
+  beginCodeExchange(): void {
+    this.#exchangingCode = true;
   }
 
   async saveClientInformation(information: OAuthClientInformationFull): Promise<void> {
@@ -525,6 +575,36 @@ export function normalizeResource(url: string): string | null {
 /** The names that never leave this machine. `::1` arrives from `URL` inside brackets. */
 function isLoopback(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
+/**
+ * Why an address cannot receive a grant, or `null` when it can.
+ *
+ * Checked where the address is configured rather than where it is spent, because the failure it
+ * prevents is otherwise invisible from here: the authorization server refuses the address on its
+ * own page, in its own words, after the browser has already left. Canva answers `Invalid redirect
+ * URI.` there and OpenBot never learns of it.
+ *
+ * Two kinds are allowed, and they are the two RFC 8252 gives a native application: loopback http,
+ * which is what this app listens on, and a private-use scheme such as `openbot://mcp-auth`, which
+ * the operating system routes. An `https` address belongs to a web site, and a plain-text address
+ * anywhere but loopback would put the grant on the wire.
+ */
+export function describeUnusableRedirectUrl(redirectUrl: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(redirectUrl);
+  } catch {
+    return `"${redirectUrl}" is not a complete address, so no MCP sign-in can come back to it.`;
+  }
+  if (parsed.protocol === "http:") {
+    return isLoopback(parsed.hostname)
+      ? null
+      : `"${redirectUrl}" is not on this machine, so an MCP sign-in would send the grant in clear text.`;
+  }
+  if (parsed.protocol === "https:")
+    return `"${redirectUrl}" is a web address, which an MCP authorization server will not send a grant to.`;
+  return null;
 }
 
 /** Where a browser may be sent: a web page, or a sign-in server on the user's own machine. */
