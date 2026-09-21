@@ -486,6 +486,7 @@ export class BrowserHost {
     if (tab.secret) throw new Error("Authentication is already active.");
     const url = new URL(currentTabUrl(tab));
     if (url.protocol !== "https:") throw new Error("Secure authentication requires HTTPS.");
+    if (args.method !== "password" && args.digits === 0) throw new Error("Authentication codes require 4–12 digits.");
     if (
       (args.method === "password" && args.targets.length !== 1) ||
       (args.targets.length !== 1 && args.targets.length !== args.digits) ||
@@ -513,7 +514,8 @@ export class BrowserHost {
         true,
       );
       return {
-        request: { method: args.method, origin: url.origin, digits: args.digits },
+        // Password cards do not use digits; keep public metadata within its released bounds.
+        request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
         cancel: () => {
           if (tab.secret === protection && !protection.submitted) {
             tab.secret = undefined;

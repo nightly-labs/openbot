@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { isBrowserSecretRequest } from "@openbot/contracts/ipc";
 import { BrowserWindow, type WebContents, WebContentsView, webContents } from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
@@ -680,7 +681,7 @@ describe("agent tab cleanup", () => {
 });
 
 describe("secure browser handoff", () => {
-  async function prepare() {
+  async function prepare(method: "password" | "otp" | "authenticator" = "otp", digits?: number) {
     const tab = await host.open("https://example.com/secure", "thread", "agent");
     const prepared = await host.prepareSecret({
       namespace: "openbot_browser",
@@ -689,12 +690,31 @@ describe("secure browser handoff", () => {
       ownerAgentId: "agent",
       turnId: "turn",
       callId: "secret",
-      arguments: { tabId: tab.id, method: "otp", targets: [{ kind: "css", selector: "input" }], submission: "auto" },
+      arguments: {
+        tabId: tab.id,
+        method,
+        ...(digits === undefined ? {} : { digits }),
+        targets: [{ kind: "css", selector: "input" }],
+        submission: "auto",
+      },
     });
     const contents = webContents.getAllWebContents().findLast((item) => item.getURL() === tab.url);
     if (!contents) throw new Error("Missing browser tab.");
     return { tab, prepared, contents };
   }
+
+  it("prepares a password card when the provider supplies zero unused digits", async () => {
+    const { prepared } = await prepare("password", 0);
+    expect(prepared.request.method).toBe("password");
+    expect(isBrowserSecretRequest(prepared.request)).toBe(true);
+    expect(secretEntry).not.toHaveBeenCalled();
+    prepared.cancel();
+  });
+
+  it.each(["otp", "authenticator"] as const)("rejects zero digits for %s", async (method) => {
+    await expect(prepare(method, 0)).rejects.toThrow();
+    expect(secretEntry).not.toHaveBeenCalled();
+  });
 
   it("blocks every capture endpoint after entry, even if the request is cancelled", async () => {
     const { tab, prepared } = await prepare();
