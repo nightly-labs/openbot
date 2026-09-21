@@ -550,6 +550,15 @@ export class BrowserHost {
                   "Authentication submission timed out.",
                   keepQueueBlocked,
                 );
+              },
+              true,
+            ).catch(() => {
+              // Entry can fail after the site has consumed the value. Never retry the
+              // secret; recover access with a new document after the queue drains.
+            });
+            await this.#enqueue(
+              args.tabId,
+              async (_tab, keepQueueBlocked) => {
                 if (!protection.replaced) {
                   await new Promise<void>((resolve) => {
                     const contents = tab.view.webContents;
