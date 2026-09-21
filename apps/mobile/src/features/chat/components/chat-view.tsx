@@ -77,9 +77,6 @@ export interface ChatViewProps {
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
-// The composer at rest, at the default text size: 8 pt of top padding above
-// the 44 pt smaller bar. It has to be a constant, so it cannot follow the bar.
-const COMPOSER_RESTING_HEIGHT = 52;
 
 function leaveConversation(): void {
   if (router.canGoBack()) router.back();
@@ -141,12 +138,6 @@ export function ChatView({
   const [historyReceipt, setHistoryReceipt] = useState<ChatHistoryReceipt | null>(null);
   const [refreshingHistory, setRefreshingHistory] = useState(false);
   const [sendRetryVersion, setSendRetryVersion] = useState(0);
-  // KeyboardGestureArea turns this offset into an invisible inputAccessoryView
-  // on the focused input, so it is part of the keyboard. Feeding the composer's
-  // live height in resizes that view, UIKit reports a new keyboard frame, and
-  // the composer jumps with it for a frame. It has to stay constant, so measure
-  // nothing and use the composer's resting height.
-  const composerGestureOffset = COMPOSER_RESTING_HEIGHT + Math.max(insets.bottom, 10) - keyboardOffset;
   const sendingRef = useRef(false);
   const uploadCancelled = useRef(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -422,8 +413,13 @@ export function ChatView({
             style={{ flex: 1 }}
             textInputNativeID="chat-composer-input"
             interpolator="ios"
+            // No offset. KeyboardGestureArea turns one into an invisible
+            // inputAccessoryView on the focused input, which makes the strip
+            // over the composer part of the keyboard: iOS then refuses to put
+            // the attachment menu on the plus it belongs to and floats it above
+            // that strip instead. A swipe down still dismisses the keyboard
+            // from the message list, only not from the composer itself.
             enableSwipeToDismiss
-            offset={composerGestureOffset}
           >
             <ChatHeader
               target={target}
