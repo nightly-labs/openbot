@@ -351,6 +351,8 @@ it("instruments message commands without sending their contents or changing the 
     browserRequests: {},
     respondToBrowserTakeover: async () => undefined,
     respondToBrowserSecret: async () => undefined,
+    sidebarByServer: {},
+    mutateSidebarLayout: async () => {},
     loadQueue: async (agentId) => ({ agentId, deliveries: [] }),
     canEditQueue: () => false,
     changeQueue: async () => {},

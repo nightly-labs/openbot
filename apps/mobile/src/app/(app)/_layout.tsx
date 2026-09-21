@@ -131,6 +131,20 @@ function AuthenticatedStack() {
             sheetGrabberVisible: true,
           }}
         />
+        <Stack.Screen
+          name="section-form"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+            headerTransparent: isIOS,
+            headerBlurEffect: "none",
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+            title: "New section",
+          }}
+        />
         <Stack.Screen name="scan-invite" options={{ title: "Scan invitation", presentation: "fullScreenModal" }} />
         <Stack.Screen
           name="add-server"

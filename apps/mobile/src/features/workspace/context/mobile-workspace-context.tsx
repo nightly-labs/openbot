@@ -15,6 +15,8 @@ import {
   isQueueSnapshot,
   isReasoningEffort,
   isRoutine,
+  isSidebarLayoutSnapshot,
+  type SidebarLayoutSnapshot,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -147,6 +149,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
   const serversRef = useRef(servers);
   serversRef.current = servers;
+  const [sidebarByServer, setSidebarByServer] = useState<
+    Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
+  >({});
+  const applySidebarLayout = useCallback((serverId: string, layout: SidebarLayoutSnapshot) => {
+    if (removedServers.current.has(serverId)) return;
+    setSidebarByServer((current) => {
+      const previous = current[serverId]?.layout;
+      if (previous && previous.revision > layout.revision) return current;
+      return { ...current, [serverId]: { layout, error: null } };
+    });
+  }, []);
   const [agents, setAgents] = useState<MobileAgent[]>([]);
   // Keep former agent IDs too, so leaving also removes cached chats of deleted agents.
   const serverAgentIds = useRef(new Map<string, Set<string>>());
@@ -204,6 +217,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       for (const host of hosts) removedServers.current.delete(host.hostId);
       if (removed.length) {
+        setSidebarByServer((current) =>
+          Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))),
+        );
         setAgents((current) => current.filter((agent) => available.has(agent.serverId)));
         for (const id of removedAgentIds) conversationStore.remove(id);
         setUnreadAgentIds((current) => current.filter((id) => !removedAgentIds.has(id)));
@@ -347,6 +363,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
       void channelStore.refresh(serverId);
+      if (compatibility.capabilities.includes("sidebar-layout")) {
+        try {
+          const layout = await client.request("GET", TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayout);
+          if (!context.isCurrent()) return;
+          applySidebarLayout(serverId, layout);
+        } catch (error) {
+          if (!context.isCurrent()) return;
+          setSidebarByServer((current) => ({
+            ...current,
+            [serverId]: {
+              layout: current[serverId]?.layout ?? null,
+              error: errorMessage(error, "Could not load sections. Try again."),
+            },
+          }));
+        }
+      } else {
+        setSidebarByServer((current) => ({ ...current, [serverId]: { layout: null, error: null } }));
+      }
       context.stage = "agents";
       const summaries = await client.request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries);
       if (!context.isCurrent()) return;
@@ -380,7 +414,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       context.stage = "connection";
     },
-    [replaceServerAgents, preferenceStore, readRefresh, conversationStore, channelStore],
+    [replaceServerAgents, preferenceStore, readRefresh, conversationStore, channelStore, applySidebarLayout],
   );
 
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
@@ -483,6 +517,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           [serverId]: (current[serverId] ?? []).filter((item) => item.requestId !== event.requestId),
         }));
       }
+      if (event.type === "sidebar-layout-changed") {
+        applySidebarLayout(serverId, event.layout);
+        return;
+      }
       if (event.type === "queue-changed" || event.type === "queue-invalidated") {
         void applyMobileQueueEvent(queryClient, serverId, event);
       }
@@ -574,6 +612,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [
       channelStore,
+      applySidebarLayout,
       loadConversation,
       replaceServerAgents,
       conversationStore,
@@ -655,6 +694,20 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const value = useMemo<MobileWorkspaceContextValue>(() => {
     const activeServer = servers.find((server) => server.id === activeServerId) ?? EMPTY_SERVER;
     const workspace: MobileWorkspaceContextValue = {
+      sidebarByServer,
+      mutateSidebarLayout: async (serverId, action) => {
+        if (!serverCapabilities.current.get(serverId)?.includes("sidebar-layout")) {
+          throw new Error("This host does not support section changes.");
+        }
+        const layout = await request(
+          "POST",
+          TEAM_API_ROUTES.sidebarLayout.actions,
+          decodeSidebarLayout,
+          action,
+          serverId,
+        );
+        applySidebarLayout(serverId, layout);
+      },
       channelStore,
       servers,
       teamDirectory: directory,
@@ -705,6 +758,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           setActiveServerId(session.host?.hostId ?? null);
         }
         setServers((current) => current.filter((candidate) => candidate.id !== serverId));
+        setSidebarByServer((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== serverId)));
         setAgents((current) => current.filter((agent) => agent.serverId !== serverId));
         setActivityByServer((current) => {
           const next = { ...current };
@@ -1144,6 +1198,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     };
     return trackWorkspaceActions(workspace);
   }, [
+    sidebarByServer,
+    applySidebarLayout,
     channelStore,
     browserRequests,
     activeServerId,
@@ -1289,4 +1345,9 @@ function updateAgentPayload(input: UpdateAgentInput): TeamProtocolV2Json {
     ...(input.avatarSeed === undefined ? {} : { avatarSeed: input.avatarSeed }),
     ...(input.avatarHue === undefined ? {} : { avatarHue: input.avatarHue }),
   };
+}
+
+function decodeSidebarLayout(value: unknown): SidebarLayoutSnapshot {
+  if (!isSidebarLayoutSnapshot(value)) throw new Error("The server returned an invalid section layout.");
+  return value;
 }

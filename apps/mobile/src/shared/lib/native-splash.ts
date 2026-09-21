@@ -11,9 +11,9 @@ import type { SplashController } from "./use-splash-gate";
 // the splash at module scope - expo-router defers its own claim by a tick so an
 // app-level call wins - and release it from useSplashGate instead.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
-// Cross-fade into the backdrop, so the wallpaper appears behind a mark that does
-// not move. `setOptions` is a development-build API and warns in Expo Go.
-if (!isRunningInExpoGo()) SplashScreen.setOptions({ duration: 250, fade: true });
+// The JS backdrop owns the fade and respects system reduced motion. Avoid two
+// overlapping transitions. `setOptions` warns in Expo Go.
+if (!isRunningInExpoGo()) SplashScreen.setOptions({ fade: false });
 
 export const nativeSplash: SplashController = {
   hide: () => SplashScreen.hide(),

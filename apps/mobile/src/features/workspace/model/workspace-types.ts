@@ -16,6 +16,8 @@ import type {
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
+  SidebarLayoutAction,
+  SidebarLayoutSnapshot,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -74,6 +76,8 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<void>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
+  sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
+  mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   changeQueue: (
