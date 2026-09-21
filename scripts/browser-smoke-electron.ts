@@ -24,6 +24,47 @@ interface PersistenceSnapshot {
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === "/popup-parent") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<h1>Sign in</h1>
+      <button onclick="window.auth = window.open('/popup-login', 'auth')">Sign in with account</button>
+      <button onclick="window.auth = window.open('', 'auth'); auth.location.href='/popup-login'">Blank popup</button>
+      <button onclick="window.open('http://localhost:' + location.port + '/popup-login', 'cross-auth')">Cross-origin sign-in</button>
+      <a href="/popup-login" target="_blank">Independent tab</a>
+      <form action="/popup-post" method="POST" target="_blank"><input name="state" value="local-state"><button>Post sign-in</button></form>
+      <p id="result">Signed out</p><script>
+      document.cookie='popup_session=shared; Path=/';
+      addEventListener('message', event => {
+        if (event.origin === location.origin && event.data === 'signed-in') document.querySelector('#result').textContent = 'Signed in';
+      });
+      </script>`);
+    return;
+  }
+  if (url.pathname === "/popup-login") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<h1>Choose account</h1><button onclick="location.href='http://127.0.0.1:' + location.port + '/popup-callback'">Use test account</button>`,
+    );
+    return;
+  }
+  if (url.pathname === "/popup-callback") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<script>opener.postMessage('signed-in', location.origin); window.close();</script>`);
+    return;
+  }
+  if (url.pathname === "/popup-post") {
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
+    request.on("end", () => {
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(
+        `<h1>${request.method === "POST" && body === "state=local-state" ? "Post received" : "Post lost"}</h1>`,
+      );
+    });
+    return;
+  }
   if (url.pathname === "/cached") {
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
@@ -311,6 +352,7 @@ async function main(): Promise<void> {
       "wait-deadlines",
       "live-view",
       "secret-handoff",
+      "popups",
     ].includes(scenario)
   ) {
     throw new Error(
@@ -371,6 +413,8 @@ async function main(): Promise<void> {
       try {
         if (scenario === "background") {
           // The scenario runs before the browser panel is first shown.
+        } else if (scenario === "popups") {
+          await runPopupScenario(browser, origin);
         } else if (scenario === "secret-handoff") {
           await runSecretHandoffScenario(browser, origin);
         } else if (scenario === "tool-boundary") {
@@ -1641,6 +1685,7 @@ async function main(): Promise<void> {
     });
     if (!toolResult.success) throw new Error("Dynamic browser tool failed.");
     await runToolBoundaryScenario(browser, origin);
+    await runPopupScenario(browser, origin);
     await runSecretHandoffScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
@@ -2592,6 +2637,80 @@ async function waitForPersistenceSnapshot(browser: BrowserHost, tabId: string): 
 
 function argumentValue(prefix: string): string | null {
   return process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length) || null;
+}
+
+async function runPopupScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const { tab: parent, contents } = await openTabWithContents(
+    browser,
+    `${origin}/popup-parent`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const click = async (tabId: string, role: string, name: string) => {
+    const result = await callBrowserTool(browser, "click", {
+      tabId,
+      target: { kind: "role", role, name, exact: true },
+    });
+    if (!result.success) throw new Error(`Popup click failed: ${toolError(result)}`);
+  };
+  try {
+    for (const button of ["Sign in with account", "Blank popup", "Cross-origin sign-in"]) {
+      await click(parent.id, "button", button);
+      const popup = await waitForValue(() => browser.listTabs().find((tab) => tab.openerTabId === parent.id));
+      const listed = await callBrowserTool(browser, "list_tabs", {});
+      if (!JSON.stringify(toolTextPayload(listed)).includes(popup.id)) throw new Error("Agent cannot discover popup.");
+      const snapshot = await callBrowserTool(browser, "snapshot", { tabId: popup.id, image: "never" });
+      if (!snapshot.success || !JSON.stringify(toolTextPayload(snapshot)).includes("Use test account"))
+        throw new Error("Agent cannot read popup.");
+      const popupContents = webContents.getAllWebContents().find((item) => item.getURL().endsWith("/popup-login"));
+      if (!popupContents) throw new Error("Popup contents missing.");
+      const shared = await popupContents.executeJavaScript(
+        "(location.hostname === 'localhost' || document.cookie.includes('popup_session=shared')) && !!opener && typeof window.openbot === 'undefined' && typeof require === 'undefined'",
+      );
+      if (!shared) throw new Error("Popup lost session, opener, or isolation.");
+      // Named-window reuse must not register another view or lose the live relationship on reload.
+      if (button !== "Cross-origin sign-in")
+        await contents.executeJavaScript("window.open('/popup-login', 'auth'); void 0", true);
+      if (popupContents.session !== contents.session) throw new Error("Popup session changed.");
+      if (popupContents.getOwnerBrowserWindow() !== contents.getOwnerBrowserWindow())
+        throw new Error("Unmanaged popup window.");
+      await browser.setVisible({ visible: false });
+      await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+      if (browser.listTabs().filter((tab) => tab.openerTabId === parent.id).length !== 1)
+        throw new Error("Duplicate named popup.");
+      await browser.reload(parent.id);
+      if (!browser.listTabs().some((tab) => tab.id === popup.id)) throw new Error("Parent reload closed popup.");
+      await click(popup.id, "button", "Use test account");
+      await waitFor(async () => !browser.listTabs().some((tab) => tab.id === popup.id), "OAuth popup closure");
+      await waitFor(
+        async () => (await contents.executeJavaScript("document.querySelector('#result').textContent")) === "Signed in",
+        "OAuth callback",
+      );
+      if (browser.activeTabId !== parent.id) throw new Error("Popup did not return to opener.");
+    }
+    await click(parent.id, "link", "Independent tab");
+    const independent = await waitForValue(() =>
+      browser.listTabs().find((tab) => tab.id !== parent.id && tab.url === `${origin}/popup-login`),
+    );
+    await waitFor(
+      async () => browser.listTabs().some((tab) => tab.id === independent.id && !tab.loading),
+      "independent popup navigation",
+    );
+    if (independent.openerTabId) throw new Error("noopener link gained an opener.");
+    await browser.activate(parent.id);
+    await click(parent.id, "button", "Post sign-in");
+    const post = await waitForValue(() => browser.listTabs().find((tab) => tab.url === `${origin}/popup-post`));
+    const result = await callBrowserTool(browser, "snapshot", { tabId: post.id, image: "never" });
+    if (!JSON.stringify(toolTextPayload(result)).includes("Post received"))
+      throw new Error("Popup form POST was lost.");
+    await browser.close(parent.id);
+    if (!browser.listTabs().some((tab) => tab.id === independent.id))
+      throw new Error("Closing opener closed independent tab.");
+    await browser.close(independent.id);
+    await browser.close(post.id);
+  } finally {
+    await browser.close(parent.id);
+  }
 }
 
 async function openTabWithContents(

@@ -237,7 +237,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run typecheck` | Check all 11 projects in parallel with a separate incremental cache for each project in this worktree. |
 | `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
 | `bun run test:backend` | Run backend tests only. |
-| `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
+| `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
 | `bun run package` | Build an unpacked local ARM64 application. |

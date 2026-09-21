@@ -106,6 +106,15 @@ the `media-attachments` capability; released protocol adapters keep their existi
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
+hook. Native guests retain their opener, request body, and shared browser session. Local tab and
+agent tool results expose `openerTabId` while that relationship is live. Independent `noopener`
+tabs survive parent closure; dependent popups close with the parent. Closing a popup returns to its
+opener. Saved popup URLs omit OAuth callback credentials. Popup state is not restored as a live
+JavaScript relationship after an app restart.
+Agents use `list_tabs` after sign-in actions and inspect the new tab before continuing. Secure input
+and takeover still handle passwords, codes, CAPTCHA, and passkeys. Blocked requests produce a
+reason without including authentication URLs or request data.
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
@@ -991,4 +1000,4 @@ waits up to five seconds, then loads the current URL with GET to replace the doc
 a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
-OAuth selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.

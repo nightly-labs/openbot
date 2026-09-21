@@ -252,6 +252,7 @@ export class BrowserCdpEngine {
   }
   #retainDebugger = false;
   #ownsDebugger = false;
+  #closing = false;
   /**
    * How many leases are running. A lease detaches on the way out, and until this counter existed it
    * detached whenever it was the one that had attached -- which is wrong as soon as two overlap. An
@@ -267,6 +268,11 @@ export class BrowserCdpEngine {
 
   constructor(contents: WebContents) {
     this.#contents = contents;
+    contents.once("close", () => {
+      // Native teardown can start before isDestroyed() becomes true. Detaching a debugger
+      // during that interval can crash Electron; Chromium will dispose it with the page.
+      this.#closing = true;
+    });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
       this.#targets.clear();
@@ -1582,7 +1588,7 @@ export class BrowserCdpEngine {
   }
 
   async #lease<T>(operation: (send: SendCommand) => Promise<T>, attachFrames = true): Promise<T> {
-    if (this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
+    if (this.#closing || this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
     if (!this.#contents.debugger.isAttached()) {
       this.#contents.debugger.attach("1.3");
       this.#ownsDebugger = true;
@@ -1615,7 +1621,7 @@ export class BrowserCdpEngine {
     if (!this.#ownsDebugger) return;
     this.#ownsDebugger = false;
     this.#clearDebuggerSessions();
-    if (this.#contents.isDestroyed() || !this.#contents.debugger.isAttached()) return;
+    if (this.#closing || this.#contents.isDestroyed() || !this.#contents.debugger.isAttached()) return;
     this.#contents.debugger.detach();
   }
 

@@ -1772,8 +1772,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       reload: async () => undefined,
       close: async (tabId) => {
-        browserTabs = browserTabs.filter((tab) => tab.id !== tabId);
-        activeBrowserTabId = browserTabs[0]?.id ?? null;
+        const closedTab = browserTabs.find((tab) => tab.id === tabId);
+        const closedIds = new Set([tabId]);
+        for (const tab of browserTabs) {
+          if (tab.openerTabId && closedIds.has(tab.openerTabId)) closedIds.add(tab.id);
+        }
+        browserTabs = browserTabs.filter((tab) => !closedIds.has(tab.id));
+        if (activeBrowserTabId && closedIds.has(activeBrowserTabId)) {
+          activeBrowserTabId =
+            browserTabs.find((tab) => tab.id === closedTab?.openerTabId)?.id ?? browserTabs[0]?.id ?? null;
+        }
         emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
         emitAgentEvent({
           type: "browser-changed",

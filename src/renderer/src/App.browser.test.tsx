@@ -43,6 +43,29 @@ describe("OpenBot connected desktop shell", () => {
     vi.useRealTimers();
   });
 
+  it("shows a blocked popup reason and lets the user dismiss it", async () => {
+    const tab = {
+      ...browserTab("popup-parent", "Sign in"),
+      popupFailure: {
+        id: "blocked-1",
+        message: "The browser tab limit was reached. Close a tab, then retry from the page.",
+      },
+    };
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Sign in");
+    expect(await screen.findByRole("alert")).toHaveTextContent(tab.popupFailure.message);
+    await fireEvent.click(screen.getByRole("button", { name: "Dismiss popup message" }));
+    await waitFor(() => expect(screen.queryByText(tab.popupFailure.message)).not.toBeInTheDocument());
+    emitAgentEvent?.({
+      type: "browser-changed",
+      tabs: [{ ...tab, popupFailure: { ...tab.popupFailure, id: "blocked-2" } }],
+      activeTabId: tab.id,
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(tab.popupFailure.message);
+  });
+
   it("keeps notifications above the browser and restores the same tab after dismissal", async () => {
     const tab = browserTab("notification-tab", "Notification test");
     render(() => <App />);
