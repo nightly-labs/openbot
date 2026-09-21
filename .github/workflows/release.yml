@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - "v*.*.*"
+  # Exercises the Host signing keychain on its own, so a credential or keychain problem is found
+  # without pushing a tag. This path builds nothing and publishes nothing.
+  workflow_dispatch:
 
 permissions: {}
 
@@ -14,6 +17,9 @@ concurrency:
 jobs:
   validate:
     name: Validate release tag
+    # Gating the one job every build and the publish depend on keeps a manual run off the release
+    # path entirely, rather than relying on each of them to opt out.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -76,6 +82,34 @@ jobs:
           tr -d '\r' < "$verification_dir/association.headers" | grep -Eiq '^content-type: application/json'
           jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]}]' \
             "$verification_dir/association.json" >/dev/null
+
+  host-signing:
+    name: Check Host signing keychain
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the Host signing keychain and sign a throwaway binary
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.CSC_INSTALLER_KEY_PASSWORD }}
+          CSC_INSTALLER_LINK: ${{ secrets.CSC_INSTALLER_LINK }}
+        run: |
+          set -euo pipefail
+          source scripts/host-signing-keychain.sh
+          echo "Application identity: $HOST_APPLICATION_IDENTITY"
+          echo "Installer identity: $HOST_INSTALLER_IDENTITY"
 
   macos:
     name: Build signed macOS ARM64 release
@@ -255,32 +289,14 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          umask 077
-          test "$APPLE_TEAM_ID" = ZTRDTUL87R
-          signing_dir="$(mktemp -d "$RUNNER_TEMP/openbot-host-signing.XXXXXX")"
-          export HOST_SIGNING_KEYCHAIN="$signing_dir/host.keychain-db"
-          trap 'security delete-keychain "$HOST_SIGNING_KEYCHAIN" >/dev/null 2>&1 || true; rm -rf "$signing_dir"' EXIT
-          keychain_password="$(openssl rand -hex 32)"
-          echo "::add-mask::$keychain_password"
-          security create-keychain -p "$keychain_password" "$HOST_SIGNING_KEYCHAIN"
-          security unlock-keychain -p "$keychain_password" "$HOST_SIGNING_KEYCHAIN"
-          security set-keychain-settings -lut 3600 "$HOST_SIGNING_KEYCHAIN"
-          printf '%s' "$CSC_LINK" | base64 -D > "$signing_dir/application.p12"
-          printf '%s' "$CSC_INSTALLER_LINK" | base64 -D > "$signing_dir/installer.p12"
-          security import "$signing_dir/application.p12" -k "$HOST_SIGNING_KEYCHAIN" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign >/dev/null
-          security import "$signing_dir/installer.p12" -k "$HOST_SIGNING_KEYCHAIN" -P "$CSC_INSTALLER_KEY_PASSWORD" -T /usr/bin/productsign -T /usr/bin/pkgbuild >/dev/null
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$HOST_SIGNING_KEYCHAIN" >/dev/null
-          export HOST_APPLICATION_IDENTITY="$(security find-identity -v -p codesigning "$HOST_SIGNING_KEYCHAIN" | sed -n 's/.*"\(Developer ID Application:.*(ZTRDTUL87R)\)".*/\1/p')"
-          export HOST_INSTALLER_IDENTITY="$(security find-identity -v -p basic "$HOST_SIGNING_KEYCHAIN" | sed -n 's/.*"\(Developer ID Installer:.*(ZTRDTUL87R)\)".*/\1/p')"
-          test -n "$HOST_APPLICATION_IDENTITY" || { echo 'Developer ID Application identity missing.' >&2; exit 1; }
-          test -n "$HOST_INSTALLER_IDENTITY" || { echo 'Developer ID Installer identity missing.' >&2; exit 1; }
+          source scripts/host-signing-keychain.sh
           bun scripts/build-host-installer.ts
           host_pkg="dist/OpenBot-Host-$RELEASE_VERSION-arm64.pkg"
           xcrun notarytool store-credentials openbot-host-release --keychain "$HOST_SIGNING_KEYCHAIN" \
             --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID"
           xcrun notarytool submit "$host_pkg" --keychain "$HOST_SIGNING_KEYCHAIN" \
-            --keychain-profile openbot-host-release --wait --timeout 20m --output-format json > "$signing_dir/notarization.json"
-          jq -e '.status == "Accepted"' "$signing_dir/notarization.json" >/dev/null
+            --keychain-profile openbot-host-release --wait --timeout 20m --output-format json > "$host_signing_dir/notarization.json"
+          jq -e '.status == "Accepted"' "$host_signing_dir/notarization.json" >/dev/null
           xcrun stapler staple "$host_pkg"
           bun scripts/verify-host-installer.ts "$host_pkg" "$RELEASE_VERSION"
           # Host infrastructure is never an Electron auto-update target.
