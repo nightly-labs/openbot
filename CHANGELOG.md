@@ -5,23 +5,42 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-21
+
 ### Added
 
-- Give every agent Computer Use, on every desktop. OpenBot ships and runs the `cua-driver` binary
-  itself, and hands the same tools to Codex, Claude, and Grok, so GUI control no longer belongs to
-  one provider. macOS, Windows, and Linux all show the panel; only macOS asks for a permission.
+- Use Computer Use with Codex, Claude, Grok, and OpenCode. OpenBot now includes the
+  Computer Use driver on macOS, Windows, and Linux.
+- Set up remote desktop access from Server Settings. Check Sunshine permissions,
+  display availability, and the macOS user session; open a helper to grant access.
+- Test remote desktop video, mouse, and keyboard with a temporary test panel, including
+  a local test on the same Mac. Older runtimes support a video-only test.
+- Enter passwords and authentication codes through secure browser prompts in chat.
+  Secret values stay out of agent messages and browser captures during submission.
 
 ### Changed
 
-- Ask for the Screen Recording and Accessibility permissions for OpenBot itself. OpenBot starts the
-  driver as its own child process, so the grants go to OpenBot rather than to a helper application
-  signed by somebody else, and there is no longer an application to drag into System Settings. A
-  grant given to the old Codex helper does not carry over.
+- **On macOS, grant Screen Recording and Accessibility to OpenBot for Computer Use.
+  Grants for the old Codex helper do not carry over. Remote desktop uses separate
+  Sunshine grants in the macOS account that runs it.**
+- Enable ordinary auto-approval by default for new agents. Existing saved agent choices
+  are preserved. Automatic website publishing, replacement, and deletion require Turbo.
+- Keep previous approval settings in their original file during upgrade.
+- Rename a saved MCP server named `computer_use` to an available `computer_use_saved`
+  name. Its configuration and credentials are preserved.
+- Explain when updates are managed by the host in Settings.
+
+### Fixed
+
+- Keep provider downloads available while provider checks run.
+- Support Canva and other MCP sign-ins that require a local redirect address.
+- Allow plugin removal from its marketplace page.
+- Keep local remote desktop tests independent of account ICE settings, reject malformed
+  viewer URLs, and avoid repeated Sunshine restarts while granting permissions.
 
 ### Removed
 
-- Remove the separately installed Codex Computer Use plugin and its setup window. Nothing to install
-  by hand: the release carries the driver.
+- Remove the separate Codex Computer Use plugin setup and the Agent CLI setup card.
 
 ## [0.16.0] - 2026-09-21
 
