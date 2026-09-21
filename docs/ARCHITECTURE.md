@@ -212,16 +212,16 @@ drives the user's desktop; a release without the binary reports no driver. In a 
 `resolveCuaDriver` also reads an override, an install directory and `PATH`, so a developer can point
 `OPENBOT_CUA_DRIVER_PATH` at another build.
 
-The driver draws an agent cursor over the desktop while it acts, and OpenBot gives it the OpenBot
-one: `serve` is started with `--cursor-theme run.openbot.cursor` and `CUA_DRIVER_CURSOR_THEME_DIR`
-pointed at OpenBot's own directory, which is where the compiled theme is shipped. Any
-`<id>.cua-theme` in that directory is available by its id, so nothing is installed and nothing is
-written at runtime. The daemon owns the overlay; the proxies are clients and configure none of it,
-so a per-agent cursor would depend on the model calling `set_agent_cursor_theme` itself, and one
-cursor that always means "an agent is acting" is what a user can trust. The art is JSON in
-`packages/brand/src/cursor-theme.ts`, and `scripts/build-cursor-theme.ts` compiles it at packaging
-time with `cua-cursor-theme`, which ships inside the pinned driver tree. A build without the
-artifact passes no flag, and the driver draws its own cursor.
+OpenBot draws the agent cursor in its own per-display overlays for every display layout. The
+runtime starts `serve` with `--no-overlay`. The driver's overlay covers only the main display and
+cannot follow a display connected after startup. Keeping cursor ownership in OpenBot lets the
+highlight controller add, resize, and remove display overlays without restarting the daemon or
+changing provider sessions.
+
+The runtime still supports a driver cursor theme for callers that enable the driver's overlay.
+The theme art is JSON in `packages/brand/src/cursor-theme.ts`; `scripts/build-cursor-theme.ts`
+compiles it with the pinned driver's `cua-cursor-theme` at packaging time. OpenBot's application
+runtime disables that overlay and does not pass the theme flag or directory to the daemon.
 
 Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 `CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something

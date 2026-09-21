@@ -225,6 +225,33 @@ describe("ComputerUseHighlightController", () => {
     expect(place).toHaveBeenCalledWith(windows[1], expect.objectContaining({ x: 433, y: 311, cursor: null }));
   });
 
+  it("moves the agent cursor to a display connected while the controller runs", async () => {
+    const displays = [{ id: 1, bounds: { x: 0, y: 0, width: 1512, height: 982 } }];
+    let pointer = { x: 600, y: 500 };
+    const { controller, windows, place } = controllerWith(
+      [target(7, "Notes", { x: 100, y: 80, width: 900, height: 600 })],
+      displays,
+      () => pointer,
+    );
+    await controller.refresh();
+
+    displays.push({ id: 2, bounds: { x: -1512, y: 0, width: 1512, height: 982 } });
+    pointer = { x: -1000, y: 300 };
+    place.mockClear();
+    await controller.refresh();
+
+    expect(place).toHaveBeenCalledWith(windows[0], expect.objectContaining({ cursor: null }));
+    expect(place).toHaveBeenCalledWith(windows[1], expect.objectContaining({ cursor: { x: 512, y: 300 } }));
+
+    displays.pop();
+    pointer = { x: 600, y: 500 };
+    place.mockClear();
+    await controller.refresh();
+
+    expect(windows[1]?.destroy).toHaveBeenCalledOnce();
+    expect(place).toHaveBeenCalledWith(windows[0], expect.objectContaining({ cursor: { x: 600, y: 500 } }));
+  });
+
   it("drops the overlay of a display that is unplugged", async () => {
     const displays = [
       { id: 1, bounds: { x: 0, y: 0, width: 1512, height: 982 } },

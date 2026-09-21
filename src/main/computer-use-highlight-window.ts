@@ -77,7 +77,7 @@ export interface ComputerUseHighlightControllerOptions<W extends HighlightOverla
  * The overlay is OpenBot's own. A cursor says where one click lands and says nothing about which
  * window the next twenty actions belong to, so this marks the target window while the agent holds
  * the desktop and hides the moment it lets go. It also carries the agent cursor itself wherever the
- * driver draws none, which is every desktop of more than one display.
+ * driver draws none, which is every display layout in OpenBot.
  *
  * There is one overlay for each display, because macOS draws a window on one display only. Each
  * covers its own display and stays there, and only the rim inside it moves, so following a window

@@ -604,8 +604,9 @@ export async function createApplicationServices({
     supported: isSupportedCuaDriverTarget(process.platform, process.arch),
     hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
     cursorTheme: cuaCursorThemeDirectory ? { directory: cuaCursorThemeDirectory, id: OPENBOT_CURSOR_THEME_ID } : null,
-    // One screen is where the driver's cursor lands where the agent acts. See `drawsAgentCursor`.
-    drawsAgentCursor: () => screen.getAllDisplays().length === 1,
+    // Keep cursor ownership stable when displays are connected or removed. The OpenBot overlay
+    // follows display changes without restarting the daemon or its provider connections.
+    drawsAgentCursor: () => false,
     platform: process.platform,
     onDiagnostic: (message) => {
       void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);
