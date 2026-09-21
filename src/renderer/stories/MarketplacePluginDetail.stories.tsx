@@ -15,9 +15,11 @@ const storyAgents = STORY_AGENT_SUMMARIES.map((agent) => ({ id: agent.id, name: 
 function PluginDetailStory(props: {
   plugin?: PluginDetail;
   installed?: boolean;
+  removable?: boolean;
   busy?: boolean;
   readOnly?: boolean;
   onInstall?: () => void;
+  onUninstall?: () => void;
   onCopyLink?: () => void;
   onRunPrompt?: (prompt: { id: string; text: string }) => void;
   /** No agent chosen yet, so the story can show the install button waiting for a target. */
@@ -35,8 +37,10 @@ function PluginDetailStory(props: {
         targetAgentId={props.noAgents ? "" : target()}
         onTargetChange={setTarget}
         installed={props.installed}
+        removable={props.removable}
         busy={props.busy}
         onInstall={props.onInstall ?? fn()}
+        onUninstall={props.onUninstall ?? fn()}
         onCopyLink={props.onCopyLink ?? fn()}
         onRunPrompt={props.readOnly ? undefined : (props.onRunPrompt ?? fn())}
         onOpenUrl={fn()}
@@ -65,7 +69,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** The spies the interaction story asserts on. Held here so `play` and `render` see the same ones. */
-const defaultSpies = { install: fn(), copyLink: fn(), runPrompt: fn() };
+const defaultSpies = { install: fn(), copyLink: fn(), runPrompt: fn(), uninstall: fn() };
 
 export const Default: Story = {
   render: () => (
@@ -100,8 +104,28 @@ export const NoAgents: Story = {
   render: () => <PluginDetailStory noAgents />,
 };
 
+/** Already on this computer: the one control offers the way back out instead of the install. */
 export const Installed: Story = {
-  render: () => <PluginDetailStory installed />,
+  render: () => <PluginDetailStory installed onUninstall={defaultSpies.uninstall} />,
+  play: async ({ userEvent }) => {
+    defaultSpies.uninstall.mockClear();
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "Uninstall plugin" }));
+    await expect(defaultSpies.uninstall).toHaveBeenCalled();
+  },
+};
+
+/**
+ * Half of it is here: one app saved before a later one failed, or one removal that failed. The
+ * install can still finish the job, and what is already here can still go.
+ */
+export const PartlyInstalled: Story = {
+  render: () => <PluginDetailStory removable />,
+  play: async () => {
+    const body = within(document.body);
+    await expect(await body.findByRole("button", { name: "Install plugin" })).toBeVisible();
+    await expect(await body.findByRole("button", { name: "Uninstall plugin" })).toBeVisible();
+  },
 };
 
 export const Installing: Story = {

@@ -449,7 +449,15 @@ async function main(): Promise<void> {
     const currentSave = typed.elements.find((element) => element.name === "Save");
     if (!currentSave) throw new Error("Save control disappeared after typing.");
     await browser.act(tab.id, typed.revision, { type: "click", ref: currentSave.ref });
-    const result = await browser.snapshot(tab.id);
+    // A native click travels the input pipeline, not the snapshot channel, so the page can still be
+    // running the handler when the act call returns. Wait for the text the handler writes; a click
+    // that was not native never writes it, so the check keeps its meaning.
+    const clickDeadline = Date.now() + 5_000;
+    let result = await browser.snapshot(tab.id);
+    while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < clickDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      result = await browser.snapshot(tab.id);
+    }
     if (!result.text.includes("runs locally|input:true|click:true")) {
       throw new Error(`Browser input was not native: ${result.text}`);
     }

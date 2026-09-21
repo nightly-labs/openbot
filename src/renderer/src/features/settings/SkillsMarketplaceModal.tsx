@@ -69,8 +69,10 @@ import type {
   MarketplacePluginPrompt,
   MarketplacePluginDetail as PluginDetail,
 } from "./marketplace-plugins";
-import { createPluginShareUrl } from "./marketplace-plugins";
+import { createPluginShareUrl, isPluginAppConfig } from "./marketplace-plugins";
 import type { McpConnectFlow } from "./mcp-connect-auth";
+import type { PluginUninstallPlan } from "./PluginUninstallDialog";
+import { PluginUninstallDialog } from "./PluginUninstallDialog";
 
 /** Pending install connect; settle(null) on dismiss. */
 interface PendingConnect {
@@ -217,11 +219,15 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
 
   /** Open plugin page; the agent half holds its own detail. */
   const [openPlugin, setOpenPlugin] = createSignal<PluginDetail | null>(null);
+  /** The listing the user asked to uninstall, held while the confirmation is on screen. */
+  const [uninstalling, setUninstalling] = createSignal<PluginDetail | null>(null);
   function showPlugin(plugin: PluginDetail) {
     enterDetails(plugin.name, closePlugin);
     setOpenPlugin(plugin);
   }
   function closePlugin() {
+    // The confirmation asks about the page behind it, so leaving that page is the same as cancelling.
+    setUninstalling(null);
     setOpenPlugin(null);
     leaveDetails();
   }
@@ -256,16 +262,29 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     void window.openbot.openUrl(safe).catch(() => setError("Could not open the link."));
   }
 
-  /** Host MCP names; a plugin reads as installed iff all its apps and skills are present. */
-  const [hostMcpNames, setHostMcpNames] = createSignal<readonly string[]>([]);
+  /**
+   * The MCP servers the host holds, whole rather than by name: an uninstall removes a row by id, and
+   * a name alone cannot say which row an app's name belongs to.
+   */
+  const [hostMcpServers, setHostMcpServers] = createSignal<readonly McpServerConfig[]>([]);
+  /** The row this app installed as, or nothing: a name on its own is not enough to claim a row. */
+  const heldApp = (app: MarketplacePluginApp) => hostMcpServers().find((held) => isPluginAppConfig(held, app));
+  /** A plugin reads as installed iff all its apps and skills are present. */
   const pluginInstalled = (plugin: PluginDetail) =>
     (plugin.apps.length > 0 || plugin.skills.length > 0) &&
-    plugin.apps.every((app) => hostMcpNames().includes(app.server.name)) &&
+    plugin.apps.every((app) => Boolean(heldApp(app))) &&
     plugin.skills.every((skill) => installedById().has(skill.id));
+  /**
+   * Whether anything of this plugin is still here. A half-installed plugin - one app saved before a
+   * later one failed, or one removal that failed while the rest went - is not installed, but it is
+   * still removable, and the page must keep offering the way out of what is left.
+   */
+  const pluginRemovable = (plugin: PluginDetail) =>
+    plugin.apps.some((app) => Boolean(heldApp(app))) || plugin.skills.some((skill) => installedById().has(skill.id));
 
-  async function loadHostMcpNames(serverId: string) {
+  async function loadHostMcpServers(serverId: string) {
     const configs = await run(() => window.openbot.agent.listMcpServers(serverId));
-    if (configs) setHostMcpNames(configs.map((config) => config.name));
+    if (configs) setHostMcpServers(configs);
   }
 
   /** Pre-save connect check, settled by the dialog promise. */
@@ -334,9 +353,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
             await undoSkills(agentId, added);
             return false;
           }
-          setHostMcpNames(
-            (await window.openbot.agent.saveMcpServer({ config: connected }, serverId)).map((saved) => saved.name),
-          );
+          setHostMcpServers(await window.openbot.agent.saveMcpServer({ config: connected }, serverId));
         }
       } catch (error) {
         await undoSkills(agentId, added);
@@ -353,6 +370,72 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   /** Takes back only what this attempt installed. A skill the agent already had is the user's. */
   async function undoSkills(agentId: string, skillIds: readonly string[]) {
     for (const skillId of skillIds) await window.openbot.skills.uninstall({ agentId, skillId }).catch(() => undefined);
+  }
+
+  /**
+   * What an uninstall of this listing would really take, read from this computer rather than from
+   * the listing. A plugin can name two apps while the host holds one, and the skills belong to the
+   * agent the page is pointed at: the plan is what is there now, for that agent.
+   */
+  function uninstallPlan(plugin: PluginDetail): PluginUninstallPlan {
+    const held = installedById();
+    return {
+      pluginName: plugin.name,
+      appNames: plugin.apps.map((app) => heldApp(app)?.name).filter((name): name is string => Boolean(name)),
+      skillSlugs: plugin.skills.filter((skill) => held.has(skill.id)).map((skill) => skill.slug),
+      agentName: props.agents.find((agent) => agent.id === market.browse.targetAgentId)?.name ?? "this agent",
+    };
+  }
+
+  /**
+   * The install, undone. The apps go first and the skills after, the reverse of the order an install
+   * lands in: the server stops answering before the instructions that drive it are taken away, so
+   * there is never a moment where an agent holds a skill for a server it can still reach but no
+   * longer has a description of.
+   *
+   * Every step is attempted, even after one fails. Stopping at the first failure would leave the
+   * rest of the plugin behind with nothing on screen naming it, and the user would have to guess
+   * which half is still there; instead each failure is collected and reported by name, and what
+   * could be removed is removed. The lists are read again afterwards either way, so what the page
+   * says is installed is what the host and the agent really hold.
+   */
+  async function uninstallPlugin(plugin: PluginDetail) {
+    const serverId = props.pluginServerId;
+    if (!serverId) {
+      setError("Select a local server to uninstall a plugin.");
+      setUninstalling(null);
+      return;
+    }
+    const agentId = market.browse.targetAgentId;
+    setBusy(`plugin-uninstall:${plugin.id}`);
+    setError(null);
+    const failures: string[] = [];
+    for (const app of plugin.apps) {
+      const config = heldApp(app);
+      if (!config) continue;
+      try {
+        setHostMcpServers(await window.openbot.agent.removeMcpServer({ mcpServerId: config.id }, serverId));
+      } catch (cause) {
+        failures.push(`${app.name}: ${marketplaceErrorMessage(cause)}`);
+      }
+    }
+    if (agentId) {
+      for (const skill of plugin.skills) {
+        if (!installedById().has(skill.id)) continue;
+        try {
+          await window.openbot.skills.uninstall({ agentId, skillId: skill.id });
+        } catch (cause) {
+          failures.push(`${skill.slug}: ${marketplaceErrorMessage(cause)}`);
+        }
+      }
+    }
+    setUninstalling(null);
+    /* Read back before the failure is written: the reads clear the panel, and a message set first
+       would be taken off screen by the refresh that follows it. */
+    await loadHostMcpServers(serverId);
+    if (agentId && plugin.skills.length > 0) await loadInstalled(agentId);
+    if (failures.length > 0) setError(`Some of ${plugin.name} could not be removed. ${failures.join(" ")}`);
+    setBusy(null);
   }
 
   let installedRequest = 0;
@@ -381,6 +464,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
            Closing the page the install was started from is the same decision as closing the
            dialog: it stops. */
         connecting()?.settle(null);
+        setUninstalling(null);
         return;
       }
       setMarket((state) => {
@@ -395,8 +479,8 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   createEffect(
     () => (props.open && market.browse.kind === "plugins" ? props.pluginServerId : undefined),
     (serverId) => {
-      if (serverId) void loadHostMcpNames(serverId);
-      else setHostMcpNames([]);
+      if (serverId) void loadHostMcpServers(serverId);
+      else setHostMcpServers([]);
     },
   );
 
@@ -1102,8 +1186,14 @@ description: Turn merged work into clear, consistent release notes.
                                   })
                                 }
                                 installed={pluginInstalled(plugin)}
-                                busy={panel.busy === `plugin:${plugin.id}`}
+                                removable={pluginRemovable(plugin)}
+                                busy={
+                                  panel.busy === `plugin:${plugin.id}` || panel.busy === `plugin-uninstall:${plugin.id}`
+                                }
                                 onInstall={() => installPlugin(plugin)}
+                                onUninstall={() => {
+                                  setUninstalling(plugin);
+                                }}
                                 onRunPrompt={
                                   props.onRunPluginPrompt && market.browse.targetAgentId
                                     ? (prompt) => props.onRunPluginPrompt?.(market.browse.targetAgentId, prompt)
@@ -1140,6 +1230,20 @@ description: Turn merged work into clear, consistent release notes.
       {/* The connect step, beside the marketplace rather than inside its content: it is a dialog of
           its own over the same surface, not a part of the page it was started from. One dialog per
           way in, opened by an install and closed by it, each handing back what connected. */}
+      {/* The confirmation, beside the marketplace for the same reason the connect dialogs are: it is
+          one decision over the page it was started from, not a part of that page. */}
+      <Show when={uninstalling()} keyed>
+        {(plugin) => (
+          <PluginUninstallDialog
+            open={true}
+            plan={uninstallPlan(plugin)}
+            busy={panel.busy === `plugin-uninstall:${plugin.id}`}
+            onConfirm={() => void uninstallPlugin(plugin)}
+            onCancel={() => setUninstalling(null)}
+          />
+        )}
+      </Show>
+
       <Show when={connecting()} keyed>
         {(pending) => (
           <Switch>
