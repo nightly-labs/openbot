@@ -453,11 +453,13 @@ export function createComputerUsePermissionHelpWindow(): BrowserWindow {
 export function loadComputerUsePermissionHelpRenderer(
   window: BrowserWindow,
   permission: MacPermissionId,
+  sunshine = false,
 ): Promise<void> {
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
   const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
   url.searchParams.set("surface", "computer-use-permission-help");
   url.searchParams.set("permission", permission);
+  if (sunshine) url.searchParams.set("application", "sunshine");
   return window.loadURL(url.toString());
 }
 

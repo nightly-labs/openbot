@@ -1,7 +1,8 @@
-import type { ComputerUseState } from "@openbot/contracts/ipc";
+import { type ComputerUseState, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
+import { ComputerUsePermissionHelp } from "./ComputerUsePermissionHelp";
 import { ComputerUseSetup } from "./ComputerUseSetup";
 
 let mock: MockOpenBotControls | undefined;
@@ -11,6 +12,7 @@ afterEach(() => {
   mock?.dispose();
   mock = undefined;
   window.openbot = previousApi;
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -111,5 +113,31 @@ describe("ComputerUseSetup", () => {
     expect(await view.findByText("Computer Use is ready")).toBeInTheDocument();
     expect(view.queryByText("Screen Recording")).not.toBeInTheDocument();
     expect(view.queryByRole("button", { name: "Grant Screen Recording" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Sunshine permission help", () => {
+  it("reads Sunshine permissions and shows its bundle instead of the Computer Use application", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    mock.api.getComputerUsePermissionApp = async () => ({ name: "Sunshine", iconDataUrl: null });
+    const readSunshine = vi.spyOn(mock.api.remoteDesktop, "checkSetup");
+    const readComputerUse = vi.spyOn(mock.api, "getComputerUseState");
+    const view = render(() => <ComputerUsePermissionHelp permission="accessibility" sunshine />);
+    expect(
+      await view.findByRole("button", { name: "Drag Sunshine into System Settings, or press to show it in Finder" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(readSunshine).toHaveBeenCalledWith(LOCAL_SERVER_ID));
+    expect(readComputerUse).not.toHaveBeenCalled();
+    vi.useFakeTimers();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(readSunshine).toHaveBeenCalledOnce();
+    fireEvent(window, new Event("focus"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(readSunshine).toHaveBeenCalledTimes(2);
+    view.unmount();
+    fireEvent(window, new Event("focus"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(readSunshine).toHaveBeenCalledTimes(2);
   });
 });

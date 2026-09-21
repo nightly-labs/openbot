@@ -26,6 +26,7 @@ type FakeWindow = ReturnType<typeof fakeWindow>;
 function controller(
   loadWindow?: (window: FakeWindow, permission: MacPermissionId) => Promise<void>,
   bundlePath: () => string | null = () => "/Applications/OpenBot.app",
+  bundleIcon: (path: string) => Promise<string> = async () => "data:image/png;base64,icon",
 ) {
   const windows: FakeWindow[] = [];
   const revealed: string[] = [];
@@ -37,7 +38,7 @@ function controller(
     },
     loadWindow: loadWindow ?? (async () => undefined),
     bundlePath,
-    bundleIcon: async () => "data:image/png;base64,icon",
+    bundleIcon,
     revealPath: (path) => revealed.push(path),
   });
   return { controller: created, windows, revealed };
@@ -141,5 +142,38 @@ describe("ComputerUsePermissionHelpWindowController", () => {
     help.reveal();
 
     expect(revealed).toEqual(["/Applications/OpenBot.app"]);
+  });
+  it("uses Sunshine only in its helper and restores the Computer Use bundle when reopened", async () => {
+    const { controller: help, windows, revealed } = controller();
+    await help.show("accessibility", "/runtime/Sunshine.app");
+    const senderId = windows[0].webContents.id;
+    expect(await help.permissionApp(senderId)).toMatchObject({ name: "Sunshine" });
+    expect(await help.permissionApp(senderId + 1000)).toMatchObject({ name: "OpenBot" });
+    const startDrag = vi.fn();
+    await help.startDrag({ id: senderId, startDrag });
+    expect(startDrag).toHaveBeenCalledWith({ file: "/runtime/Sunshine.app", icon: "data:image/png;base64,icon" });
+    help.reveal(senderId);
+    expect(revealed).toEqual(["/runtime/Sunshine.app"]);
+    await help.show("screen-recording");
+    expect(await help.permissionApp(senderId)).toMatchObject({ name: "OpenBot" });
+    await help.show("accessibility", "/runtime/Sunshine.app");
+    help.close();
+    expect(await help.permissionApp(senderId)).toMatchObject({ name: "OpenBot" });
+  });
+
+  it("does not drag a stale bundle after the helper changes", async () => {
+    const releases: Array<(icon: string) => void> = [];
+    const { controller: help, windows } = controller(
+      undefined,
+      undefined,
+      () => new Promise((resolve) => releases.push(resolve)),
+    );
+    await help.show("accessibility", "/runtime/Sunshine.app");
+    const startDrag = vi.fn();
+    const pending = help.startDrag({ id: windows[0].webContents.id, startDrag });
+    await help.show("screen-recording");
+    releases[0]("icon");
+    await expect(pending).rejects.toThrow("changed before the drag started");
+    expect(startDrag).not.toHaveBeenCalled();
   });
 });

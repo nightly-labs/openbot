@@ -1,7 +1,10 @@
+import type { HostStatus } from "@openbot/contracts/ipc";
+import { createSignal, onSettled } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ServerSettingsModal } from "../src/features/servers/ServerSettingsModal";
+import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
 import { STORY_HOST_STATUS, STORY_INVITES, STORY_PRESENCE, STORY_SERVERS } from "../src/preview/fixtures";
+import { createMockOpenBot } from "./mock-openbot";
 
 const localServer = STORY_SERVERS.find((server) => server.kind === "local") ?? STORY_SERVERS[0];
 const remoteServer = STORY_SERVERS.find((server) => server.kind === "remote") ?? STORY_SERVERS[1];
@@ -20,6 +23,7 @@ const denseMembers = Array.from({ length: 4 }, (_, group) =>
 const meta = {
   title: "Settings/ServerSettingsModal",
   component: ServerSettingsModal,
+  render: (args) => <RemoteSetupStory settings={args} />,
   args: {
     open: true,
     onOpenChange: fn(),
@@ -138,6 +142,32 @@ export const FirstSetupInvalidNameSmallViewport: Story = {
   },
   play: FirstSetupInvalidName.play,
 };
+
+export const RemoteDesktopAfterPublication: Story = {
+  render: (args) => <PublicationSetupStory settings={args} />,
+  play: async () => {
+    const body = within(document.body);
+    await fireEvent.click(await body.findByRole("switch", { name: "Publish this server" }));
+    await expect(await body.findByRole("button", { name: "Set up" })).toBeVisible();
+  },
+};
+
+function PublicationSetupStory(props: { settings: ServerSettingsModalProps }) {
+  const [published, setPublished] = createSignal(false);
+  return (
+    <RemoteSetupStory
+      settings={{
+        ...props.settings,
+        get hostStatus(): HostStatus {
+          return { ...STORY_HOST_STATUS, configured: true, phase: published() ? "online" : "idle" };
+        },
+        onSetPublished: async (value) => {
+          setPublished(value);
+        },
+      }}
+    />
+  );
+}
 
 export const LocalOnline: Story = {
   args: {
@@ -303,21 +333,55 @@ export const RemoteDesktop: Story = {
   },
 };
 
-// What the host owner sees after a member was refused: the repair step is here, on the computer
-// that holds the grant.
 export const HostScreenRecordingBlocked: Story = {
-  args: {
-    hostStatus: { ...STORY_HOST_STATUS, remoteDesktopScreenRecordingDenied: true },
-  },
+  args: { hostStatus: { ...STORY_HOST_STATUS, remoteDesktopScreenRecordingDenied: true } },
   play: async () => {
     const body = within(document.body);
     await body.findByRole("dialog", { name: "General" });
-    body.getByRole("tab", { name: "Remote desktop" }).click();
-    await expect(body.getByText("OpenBot may not record this screen")).toBeVisible();
-    await expect(body.getByRole("button", { name: "Open System Settings" })).toBeVisible();
-    await expect(body.getByRole("button", { name: "Check again" })).toBeVisible();
+    await fireEvent.click(body.getByRole("tab", { name: "Remote desktop" }));
+    await fireEvent.click(body.getByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(body.getAllByText("Blocked")).toHaveLength(2));
+    await expect(body.getByRole("button", { name: "Grant Accessibility access" })).toBeVisible();
   },
 };
+
+export const HostPermissionsReady: Story = {
+  render: (args) => <RemoteSetupStory settings={args} permission="allowed" />,
+  play: async () => {
+    const body = within(document.body);
+    await body.findByRole("dialog", { name: "General" });
+    await fireEvent.click(body.getByRole("tab", { name: "Remote desktop" }));
+    await fireEvent.click(body.getByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(body.getAllByText("Allowed")).toHaveLength(2));
+  },
+};
+
+export const HostPermissionCheckFailed: Story = {
+  render: (args) => <RemoteSetupStory settings={args} permission="failed" />,
+  play: async () => {
+    const body = within(document.body);
+    await body.findByRole("dialog", { name: "General" });
+    await fireEvent.click(body.getByRole("tab", { name: "Remote desktop" }));
+    await fireEvent.click(body.getByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(body.getAllByText("Check failed")).toHaveLength(2));
+  },
+};
+
+function RemoteSetupStory(props: { settings: ServerSettingsModalProps; permission?: "allowed" | "failed" }) {
+  const previous = window.openbot;
+  const mock = createMockOpenBot({ hostStatus: props.settings.hostStatus ?? undefined });
+  const check = mock.api.remoteDesktop.checkSetup;
+  mock.api.remoteDesktop.checkSetup = async (serverId) => ({
+    ...(await check(serverId)),
+    ...(props.permission ? { screenRecording: props.permission, accessibility: props.permission } : {}),
+  });
+  window.openbot = mock.api;
+  onSettled(() => () => {
+    mock.dispose();
+    window.openbot = previous;
+  });
+  return <ServerSettingsModal {...props.settings} />;
+}
 
 export const SmallViewport: Story = {
   parameters: {

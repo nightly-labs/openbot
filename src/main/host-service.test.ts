@@ -25,6 +25,7 @@ async function createHostService(
   remote: Partial<
     Pick<
       HostOptions,
+      | "openRemoteDesktopSetup"
       | "listRemoteInvites"
       | "registerRemoteHost"
       | "updateRemoteHostLogo"
@@ -81,7 +82,7 @@ async function createHostService(
       ? {
           platform: "darwin" as const,
           remoteDesktopRuntimePaths: {
-            sunshine: "/sunshine",
+            sunshine: "/runtime/Sunshine.app/Contents/MacOS/Sunshine",
             moonlightWebServer: "/web",
             moonlightStreamer: "/stream",
           },
@@ -128,6 +129,15 @@ type RemoteInvite = Awaited<ReturnType<NonNullable<HostOptions["createRemoteInvi
 
 // The gateway holds the refusal, and this status is the only way it reaches the host owner's screen.
 // A member who is refused cannot grant anything: they are on the other computer.
+describe.runIf(process.platform === "darwin")("HostService permission setup", () => {
+  it.each(["accessibility", "screen-recording", "reveal"] as const)("opens Sunshine setup for %s", async (action) => {
+    const openRemoteDesktopSetup = vi.fn(async () => undefined);
+    const { service } = await createHostService({ openRemoteDesktopSetup }, () => false);
+    await service.openRemoteDesktopSetup(action);
+    expect(openRemoteDesktopSetup).toHaveBeenCalledWith(action, "/runtime/Sunshine.app");
+  });
+});
+
 describe("HostService screen recording", () => {
   it("reports the refusal the gateway holds, and says the status changed", async () => {
     let denied = true;

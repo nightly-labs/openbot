@@ -7,6 +7,8 @@ import type {
   LoginServerInput,
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
+  RemoteDesktopSetupAction,
+  RemoteDesktopTestInput,
   ReorderServersInput,
   SendDirectMessageInput,
   SetTeamTypingInput,
@@ -198,4 +200,20 @@ export function parseRemoteDesktopDisplay(input: unknown): { serverId: string; d
 export function parseSetServerMuted(value: unknown): { serverId: string; muted: boolean } {
   if (!isObject(value) || !isBoolean(value.muted)) throw new Error("Invalid server mute setting.");
   return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), muted: value.muted };
+}
+
+export function parseRemoteDesktopSetupAction(value: unknown): RemoteDesktopSetupAction {
+  if (value !== "screen-recording" && value !== "accessibility" && value !== "reveal")
+    throw new Error("Unknown remote desktop setup action.");
+  return value;
+}
+
+export function parseRemoteDesktopTest(value: unknown): RemoteDesktopTestInput {
+  if (!isObject(value) || (value.action !== "start" && value.action !== "status" && value.action !== "stop"))
+    throw new Error("Invalid remote desktop test action.");
+  return {
+    serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier),
+    sessionId: requireString(value.sessionId, "sessionId", INPUT_LIMITS.identifier),
+    action: value.action,
+  };
 }

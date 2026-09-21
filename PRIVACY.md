@@ -393,6 +393,14 @@ then removes the recovery file. A failed setup retains that root-only file for a
 The administrator controls secure password delivery. Host verification reads home metadata only
 and tests cross-user access using harmless temporary files outside tenant homes.
 
+### Remote desktop setup diagnostics
+
+When an authenticated server member checks remote desktop setup, the host sends its computer name,
+macOS account name, permission and service results, active session count, and check time to that member.
+A live test also sends a temporary four-digit code and mouse and keyboard test results. These results
+stay in memory and are not sent to analytics. Screen video uses the existing remote desktop connection.
+Permission approval remains in macOS System Settings on the host.
+
 ## Secure browser authentication
 
 Passwords, email/SMS codes, and authenticator codes entered in a secure chat card are sent to the

@@ -308,6 +308,31 @@ and filesystem work in both locations runs without OpenBot adding another permis
 Because these modes are intentionally unrestricted, they also permit host access outside those
 directories when the provider and operating system allow it.
 
+### macOS remote desktop permissions
+
+For each macOS account, log in to its GUI session and open **Server Settings → Remote desktop access**.
+Select **Check again** to read Sunshine's Screen Recording and Accessibility permissions, display availability,
+and GUI session status. The panel names the Mac and the account that runs Sunshine. Grant permissions in
+that account, including when the account was created with the tenant setup script.
+
+After you publish a server on a Mac, an optional **Set up remote desktop** prompt opens this panel. Select **Later** to keep using the published server without remote desktop setup.
+
+Use the permission buttons to open **System Settings → Privacy & Security** on the host. If Sunshine is
+missing from a list, select **Show Sunshine in Finder** and add the bundled `Sunshine.app` with the **+** button.
+macOS can attribute access to the application that starts Sunshine; enable the application named by the
+system prompt. Return to OpenBot to check again. If a restart is required, end remote sessions first.
+A check never restarts an active session.
+
+Select **Test on this Mac** for a local test. If native checks are unavailable, it tests video only and disables viewer input. After the checks pass, it can test mouse and keyboard too. Select **Test remote desktop** from another computer for a remote test.
+The test requires an otherwise unused remote desktop host. It opens a temporary host panel, keeps remote
+input inside that panel, and asks you to click a target and type a four-digit code. Confirm that the picture
+is visible, then select **Finish test**. Local input does not pass the mouse or keyboard test. The panel
+expires after two minutes. Older hosts or native runtimes require an update before these checks are available.
+
+The native runtime source change invalidates prior artifact pins. The **Remote desktop runtime** CI workflow
+builds and tests the new source, then publishes and pins verified artifacts through its existing release flow.
+Do not reuse old artifact hashes with the new source digest.
+
 ## Architecture
 
 ```text

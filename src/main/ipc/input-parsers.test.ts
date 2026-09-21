@@ -1,4 +1,5 @@
 import { parseDownloadAttachments } from "./agent-inputs";
+import { parseRemoteDesktopSetupAction, parseRemoteDesktopTest } from "./server-inputs";
 // @vitest-environment node
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -997,5 +998,23 @@ describe("ZIP download inputs", () => {
     { attachments: Array.from({ length: 1000 }, (_, index) => ({ id: String(index), name: "file" })) },
   ])("rejects an invalid archive request", (value) => {
     expect(() => parseDownloadAttachments(value)).toThrow();
+  });
+});
+
+describe("remote desktop setup input", () => {
+  it("accepts only named local setup actions", () => {
+    expect(parseRemoteDesktopSetupAction("accessibility")).toBe("accessibility");
+    expect(parseRemoteDesktopSetupAction("screen-recording")).toBe("screen-recording");
+    expect(parseRemoteDesktopSetupAction("reveal")).toBe("reveal");
+    expect(() => parseRemoteDesktopSetupAction("file:///private")).toThrow();
+  });
+  it("requires a server, a session, and a known test action", () => {
+    expect(parseRemoteDesktopTest({ serverId: "server-1", sessionId: "session-1", action: "start" })).toEqual({
+      serverId: "server-1",
+      sessionId: "session-1",
+      action: "start",
+    });
+    for (const input of [null, { action: "approve" }, { serverId: "server-1", action: "start" }])
+      expect(() => parseRemoteDesktopTest(input)).toThrow();
   });
 });

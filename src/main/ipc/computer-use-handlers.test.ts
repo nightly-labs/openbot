@@ -14,7 +14,7 @@ vi.mock("electron", () => ({
 
 const { computerUseIpcHandlers } = await import("./computer-use-handlers");
 
-const APP_FRAME = { senderFrame: { url: "openbot-app://app/index.html" } };
+const APP_FRAME = { sender: { id: 99 }, senderFrame: { url: "openbot-app://app/index.html" } };
 const HELP_WINDOW_FRAME = { ...APP_FRAME, sender: { id: 7 } };
 
 const READY: ComputerUseState = {
@@ -31,13 +31,14 @@ function bind(options: { show?: (permission: MacPermissionId) => Promise<void> }
     if (sender.id !== 7) throw new Error("The Computer Use drag must start in the help window.");
   });
   const reveal = vi.fn();
+  const permissionApp = vi.fn(async () => ({ name: "Electron", iconDataUrl: null }));
   const permissionHelp = {
     show: async (permission: MacPermissionId) => {
       shown.push(permission);
       await options.show?.(permission);
     },
     close,
-    permissionApp: async () => ({ name: "Electron", iconDataUrl: null }),
+    permissionApp,
     startDrag,
     reveal,
   };
@@ -50,7 +51,7 @@ function bind(options: { show?: (permission: MacPermissionId) => Promise<void> }
     permissionHelp,
   });
   for (const [name, register] of Object.entries(endpoints)) register(name);
-  return { opened, shown, close, startDrag, reveal };
+  return { opened, shown, close, startDrag, reveal, permissionApp };
 }
 
 describe("the Computer Use endpoints", () => {
@@ -99,12 +100,13 @@ describe("the Computer Use endpoints", () => {
   // The card the user drags carries the bundle macOS holds responsible, which in a development
   // build is Electron and not OpenBot.
   it("names the application the System Settings list will show", async () => {
-    bind();
+    const { permissionApp } = bind();
 
     await expect(bound.get("getPermissionApp")?.(APP_FRAME, undefined)).resolves.toEqual({
       name: "Electron",
       iconDataUrl: null,
     });
+    expect(permissionApp).toHaveBeenCalledWith(APP_FRAME.sender.id);
   });
 
   // A drag puts a file wherever the pointer is let go, so the sender is checked past the trusted
@@ -125,6 +127,6 @@ describe("the Computer Use endpoints", () => {
 
     await bound.get("revealPermissionApp")?.(APP_FRAME, undefined);
 
-    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(reveal).toHaveBeenCalledWith(APP_FRAME.sender.id);
   });
 });

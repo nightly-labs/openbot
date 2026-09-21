@@ -28,7 +28,7 @@ export interface PermissionAppDragSender {
 
 export interface ComputerUsePermissionHelpWindowOptions<W extends PermissionHelpWindow = BrowserWindow> {
   createWindow: () => W;
-  loadWindow: (window: W, permission: MacPermissionId) => Promise<void>;
+  loadWindow: (window: W, permission: MacPermissionId, sunshine: boolean) => Promise<void>;
   /** The bundle the user drags into the list, or `null` where there is none to drag. */
   bundlePath: () => string | null;
   bundleIcon: (path: string) => Promise<NativeImage | string>;
@@ -49,6 +49,7 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
   readonly #options: ComputerUsePermissionHelpWindowOptions<W>;
   #window: W | null = null;
   #generation = 0;
+  #sunshineAppPath: string | null = null;
 
   constructor(options: ComputerUsePermissionHelpWindowOptions<W>) {
     this.#options = options;
@@ -58,10 +59,11 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
     return this.#window !== null && !this.#window.isDestroyed();
   }
 
-  async show(permission: MacPermissionId): Promise<void> {
+  async show(permission: MacPermissionId, sunshineAppPath?: string): Promise<void> {
     const generation = ++this.#generation;
     const window = this.#ensureWindow();
-    await this.#options.loadWindow(window, permission);
+    this.#sunshineAppPath = sunshineAppPath ?? null;
+    await this.#options.loadWindow(window, permission, sunshineAppPath !== undefined);
     if (generation !== this.#generation || window.isDestroyed()) return;
     // `showInactive` would leave it behind System Settings, which is the one window it has to stand
     // in front of. It carries no input the user has to reach, so taking the front costs them nothing.
@@ -72,8 +74,8 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
    * What the window draws on the drag card: the name the System Settings list will show, and the
    * icon beside it. The icon is best-effort - a card with no picture still drags.
    */
-  async permissionApp(): Promise<ComputerUsePermissionApp | null> {
-    const path = this.#options.bundlePath();
+  async permissionApp(senderId?: number): Promise<ComputerUsePermissionApp | null> {
+    const path = this.#bundlePath(senderId);
     if (!path) return null;
     const icon = await this.#options.bundleIcon(path).catch(() => null);
     return {
@@ -91,17 +93,25 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
    */
   async startDrag(sender: PermissionAppDragSender): Promise<void> {
     if (sender.id !== this.#rendererId) throw new Error("The Computer Use drag must start in the help window.");
-    const path = this.#options.bundlePath();
+    const generation = this.#generation;
+    const path = this.#bundlePath(sender.id);
     if (!path) throw new Error("This build of OpenBot has no application to drag.");
     const icon = await this.#options.bundleIcon(path);
+    if (generation !== this.#generation || sender.id !== this.#rendererId) {
+      throw new Error("The permission help window changed before the drag started.");
+    }
     sender.startDrag({ file: path, icon });
   }
 
   /** The way past a drag the user cannot make, which is the `+` button in the pane. */
-  reveal(): void {
-    const path = this.#options.bundlePath();
+  reveal(senderId?: number): void {
+    const path = this.#bundlePath(senderId);
     if (!path) throw new Error("This build of OpenBot has no application to show.");
     this.#options.revealPath(path);
+  }
+
+  #bundlePath(senderId?: number): string | null {
+    return senderId === this.#rendererId && this.#sunshineAppPath ? this.#sunshineAppPath : this.#options.bundlePath();
   }
 
   get #rendererId(): number | null {
@@ -113,6 +123,7 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
     this.#generation += 1;
     const window = this.#window;
     this.#window = null;
+    this.#sunshineAppPath = null;
     if (window && !window.isDestroyed()) window.close();
   }
 

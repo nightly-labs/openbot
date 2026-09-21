@@ -12,6 +12,29 @@ index 73cfdae7..27f2bf1f 100644
  file(GLOB NVENC_SOURCES CONFIGURE_DEPENDS "src/nvenc/*.cpp" "src/nvenc/*.h")
  list(APPEND PLATFORM_TARGET_FILES ${NVENC_SOURCES})
  
+diff --git a/cmake/compile_definitions/macos.cmake b/cmake/compile_definitions/macos.cmake
+index 42a5dbe1..9ef25249 100644
+--- a/cmake/compile_definitions/macos.cmake
++++ b/cmake/compile_definitions/macos.cmake
+@@ -51,6 +51,7 @@ set(PLATFORM_TARGET_FILES
+         "${CMAKE_SOURCE_DIR}/src/platform/macos/input.cpp"
+         "${CMAKE_SOURCE_DIR}/src/platform/macos/microphone.mm"
+         "${CMAKE_SOURCE_DIR}/src/platform/macos/misc.mm"
++        "${CMAKE_SOURCE_DIR}/src/platform/macos/openbot_setup.mm"
+         "${CMAKE_SOURCE_DIR}/src/platform/macos/misc.h"
+         "${CMAKE_SOURCE_DIR}/src/platform/macos/nv12_zero_device.cpp"
+         "${CMAKE_SOURCE_DIR}/src/platform/macos/nv12_zero_device.h"
+@@ -65,3 +66,10 @@ if(SUNSHINE_ENABLE_TRAY)
+     list(APPEND PLATFORM_TARGET_FILES
+             "${CMAKE_SOURCE_DIR}/third-party/tray/src/tray_darwin.m")
+ endif()
++
++set_source_files_properties("${CMAKE_SOURCE_DIR}/src/platform/macos/openbot_setup.mm" PROPERTIES COMPILE_FLAGS "-fobjc-arc")
++
++add_executable(openbot-setup-test "${CMAKE_SOURCE_DIR}/tests/unit/test_openbot_setup.mm")
++target_compile_options(openbot-setup-test PRIVATE -fobjc-arc)
++target_compile_features(openbot-setup-test PRIVATE cxx_std_20)
++target_link_libraries(openbot-setup-test PRIVATE nlohmann_json::nlohmann_json ${APP_KIT_LIBRARY} ${APP_SERVICES_LIBRARY})
 diff --git a/package-lock.json b/package-lock.json
 index f8381b16..055d888b 100644
 --- a/package-lock.json
@@ -139,10 +162,18 @@ index f95d49f9..94758cb9 100644
    }
  }
 diff --git a/src/confighttp.cpp b/src/confighttp.cpp
-index 2f703dbc..d508faee 100644
+index 2f703dbc..80e99739 100644
 --- a/src/confighttp.cpp
 +++ b/src/confighttp.cpp
-@@ -1356,6 +1356,30 @@ namespace confighttp {
+@@ -1,3 +1,7 @@
++#include <cstdlib>
++#ifdef __APPLE__
++#include "platform/macos/openbot_setup.h"
++#endif
+ /**
+  * @file src/confighttp.cpp
+  * @brief Definitions for the Web UI Config HTTP server.
+@@ -1356,6 +1360,64 @@ namespace confighttp {
      }
    }
  
@@ -151,6 +182,40 @@ index 2f703dbc..d508faee 100644
 +   * @param response The HTTP response object.
 +   * @param request The HTTP request object.
 +   */
++  void getOpenBotSetup(const resp_https_t &response, const req_https_t &request) {
++    if (!authenticate(response, request)) return;
++#ifdef __APPLE__
++    send_response(response, platf::openbot_setup_status());
++#else
++    not_found(response, request, "macOS setup is unavailable.");
++#endif
++  }
++
++  void openBotTest(const resp_https_t &response, const req_https_t &request) {
++    if (!authenticate(response, request)) return;
++#ifdef __APPLE__
++    if (!std::getenv("OPENBOT_REMOTE_SETUP")) {
++      not_found(response, request, "Remote desktop testing is unavailable.");
++      return;
++    }
++    if (request->method == "POST") {
++      const auto body = nlohmann::json::parse(request->content.string(), nullptr, false);
++      if (!body.is_object() || !body.contains("action") || (body["action"] != "start" && body["action"] != "stop")) {
++        bad_request(response, request, "Invalid test action.");
++        return;
++      }
++      if (body.contains("displayId") && (!body["displayId"].is_string() || body["displayId"].get<std::string>().size() > 128)) {
++        bad_request(response, request, "Invalid test display.");
++        return;
++      }
++      platf::openbot_test_action(body["action"].get<std::string>(), body.value("displayId", ""));
++    }
++    send_response(response, platf::openbot_test_status());
++#else
++    not_found(response, request, "macOS setup is unavailable.");
++#endif
++  }
++
 +  void getOpenBotDisplays(const resp_https_t &response, const req_https_t &request) {
 +    if (!authenticate(response, request)) {
 +      return;
@@ -173,10 +238,13 @@ index 2f703dbc..d508faee 100644
    /**
     * @brief Reset the display device persistence.
     * @param response The HTTP response object.
-@@ -1780,6 +1804,7 @@ namespace confighttp {
+@@ -1780,6 +1842,10 @@ namespace confighttp {
      server.resource["^/api/password$"]["POST"] = savePassword;
      server.resource["^/api/pin$"]["POST"] = savePin;
      server.resource["^/api/logs$"]["GET"] = getLogs;
++    server.resource["^/api/openbot/setup$"]["GET"] = getOpenBotSetup;
++    server.resource["^/api/openbot/test$"]["GET"] = openBotTest;
++    server.resource["^/api/openbot/test$"]["POST"] = openBotTest;
 +    server.resource["^/api/openbot/displays$"]["GET"] = getOpenBotDisplays;
      server.resource["^/api/reset-display-device-persistence$"]["POST"] = resetDisplayDevicePersistence;
      server.resource["^/api/restart$"]["POST"] = restart;
@@ -193,6 +261,318 @@ index e8c4ea00..dc40bb92 100644
  
    // Browse helper functions (also exposed for unit testing)
    /**
+diff --git a/src/crypto.cpp b/src/crypto.cpp
+index c5e236e9..d6f8cd74 100644
+--- a/src/crypto.cpp
++++ b/src/crypto.cpp
+@@ -5,12 +5,14 @@
+ // lib includes
+ #include <openssl/pem.h>
+ #include <openssl/rsa.h>
++#include <openssl/x509v3.h>
+ 
+ // local includes
+ #include "crypto.h"
+ 
+ namespace crypto {
+   using asn1_string_t = util::safe_ptr<ASN1_STRING, ASN1_STRING_free>;
++  using x509_extension_t = util::safe_ptr<X509_EXTENSION, X509_EXTENSION_free>;
+ 
+   cert_chain_t::cert_chain_t():
+       _certs {},
+@@ -465,6 +467,19 @@ namespace crypto {
+     X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (const std::uint8_t *) cn.data(), (int) cn.size(), -1, 0);
+ 
+     X509_set_issuer_name(x509.get(), name);
++
++    X509V3_CTX extension_context {};
++    X509V3_set_ctx_nodb(&extension_context);
++    X509V3_set_ctx(&extension_context, x509.get(), x509.get(), nullptr, nullptr, 0);
++    x509_extension_t basic_constraints {
++      X509V3_EXT_conf_nid(nullptr, &extension_context, NID_basic_constraints, (char *) "critical,CA:TRUE")
++    };
++    X509_add_ext(x509.get(), basic_constraints.get(), -1);
++    x509_extension_t subject_alt_name {
++      X509V3_EXT_conf_nid(nullptr, &extension_context, NID_subject_alt_name, (char *) "IP:127.0.0.1,DNS:localhost")
++    };
++    X509_add_ext(x509.get(), subject_alt_name.get(), -1);
++
+     X509_sign(x509.get(), pkey.get(), EVP_sha256());
+ 
+     return {pem(x509), pem(pkey)};
+diff --git a/src/main.cpp b/src/main.cpp
+index 13df6784..26e77cec 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -1,3 +1,7 @@
++#include <cstdlib>
++#ifdef __APPLE__
++#include "platform/macos/openbot_setup.h"
++#endif
+ /**
+  * @file src/main.cpp
+  * @brief Definitions for the main entry point for Sunshine.
+@@ -100,6 +104,12 @@ constexpr bool tray_is_enabled = false;
+ #endif
+ 
+ void mainThreadLoop(const std::shared_ptr<safe::event_t<bool>> &shutdown_event) {
++  #ifdef __APPLE__
++  if (std::getenv("OPENBOT_REMOTE_SETUP")) {
++    platf::openbot_main_loop([&] { return shutdown_event->peek(); });
++    return;
++  }
++  #endif
+   bool run_loop = false;
+ 
+   // Conditions that would require the main thread event loop
+diff --git a/src/platform/macos/input.cpp b/src/platform/macos/input.cpp
+index de721819..db7bf802 100644
+--- a/src/platform/macos/input.cpp
++++ b/src/platform/macos/input.cpp
+@@ -15,6 +15,7 @@
+ #include <mach/mach.h>
+ 
+ // local includes
++#include "openbot_setup.h"
+ #include "src/display_device.h"
+ #include "src/input.h"
+ #include "src/logging.h"
+@@ -325,7 +326,7 @@ const KeyCodeMap kKeyCodesMap[] = {
+     }
+ 
+     CGEventSetFlags(event, macos_input->kb_flags);
+-    CGEventPost(kCGSessionEventTap, event);
++    if (!openbot_test_input(event)) CGEventPost(kCGSessionEventTap, event);
+     CFRelease(event);
+   }
+ 
+@@ -395,6 +396,7 @@ const KeyCodeMap kKeyCodesMap[] = {
+ 
+     // Inject modifier flags into mouse events so that shift+click and similar combinations work correctly.
+     CGEventSetFlags(event, macos_input->kb_flags);
++    if (openbot_test_input(event)) return;
+     CGEventPost(kCGHIDEventTap, event);
+     // For why this is here, see:
+     // https://stackoverflow.com/questions/15194409/simulated-mouseevent-not-working-properly-osx
+@@ -489,7 +491,7 @@ const KeyCodeMap kKeyCodesMap[] = {
+     int wheelY = high_res_distance / 120;
+     int wheelX = 0;
+     CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 2, wheelY, wheelX);
+-    CGEventPost(kCGHIDEventTap, upEvent);
++    if (!openbot_test_input(upEvent)) CGEventPost(kCGHIDEventTap, upEvent);
+     CFRelease(upEvent);
+   }
+ 
+@@ -497,7 +499,7 @@ const KeyCodeMap kKeyCodesMap[] = {
+     int wheelY = 0;
+     int wheelX = high_res_distance / 120;
+     CGEventRef upEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 2, wheelY, wheelX);
+-    CGEventPost(kCGHIDEventTap, upEvent);
++    if (!openbot_test_input(upEvent)) CGEventPost(kCGHIDEventTap, upEvent);
+     CFRelease(upEvent);
+   }
+ 
+diff --git a/src/platform/macos/openbot_setup.h b/src/platform/macos/openbot_setup.h
+new file mode 100644
+index 00000000..3821983e
+--- /dev/null
++++ b/src/platform/macos/openbot_setup.h
+@@ -0,0 +1,12 @@
++// OpenBot additions to Sunshine, distributed under GPL-3.0.
++#pragma once
++#include <functional>
++#include <ApplicationServices/ApplicationServices.h>
++#include <nlohmann/json.hpp>
++namespace platf {
++  nlohmann::json openbot_setup_status();
++  nlohmann::json openbot_test_status();
++  void openbot_test_action(const std::string &action, const std::string &display_id = "");
++  void openbot_main_loop(const std::function<bool()> &stopped);
++  bool openbot_test_input(CGEventRef event);
++}
+diff --git a/src/platform/macos/openbot_setup.mm b/src/platform/macos/openbot_setup.mm
+new file mode 100644
+index 00000000..e42489af
+--- /dev/null
++++ b/src/platform/macos/openbot_setup.mm
+@@ -0,0 +1,177 @@
++// OpenBot additions to Sunshine, distributed under GPL-3.0.
++#import <AppKit/AppKit.h>
++#import <CoreGraphics/CoreGraphics.h>
++#include <mutex>
++#include <unistd.h>
++#include "openbot_setup.h"
++#include "misc.h"
++
++namespace {
++  std::mutex input_mutex;
++  bool test_mode = false;
++  int64_t event_tag = 0;
++  CGRect test_bounds = CGRectZero;
++  bool clicked = false;
++  bool typed = false;
++  NSString *code = @"";
++  NSString *entered = @"";
++  NSWindow *panel = nil;
++  NSDate *expires = nil;
++  void on_main(void (^operation)()) {
++    if (NSThread.isMainThread) operation();
++    else dispatch_sync(dispatch_get_main_queue(), operation);
++  }
++}
++
++@interface OpenBotTestView : NSView
++@end
++@implementation OpenBotTestView
++- (BOOL)acceptsFirstResponder { return YES; }
++- (void)drawRect:(NSRect)dirtyRect {
++  [[NSColor windowBackgroundColor] setFill];
++  NSRectFill(self.bounds);
++  NSDictionary *attributes = @{NSFontAttributeName: [NSFont systemFontOfSize:20], NSForegroundColorAttributeName: [NSColor labelColor]};
++  [@"OpenBot remote desktop test" drawAtPoint:NSMakePoint(24, 240) withAttributes:attributes];
++  [@"Click the target through the remote connection." drawAtPoint:NSMakePoint(24, 198) withAttributes:attributes];
++  [[NSColor controlAccentColor] setFill];
++  NSRectFill(NSMakeRect(24, 110, 390, 60));
++  [(clicked ? @"Mouse received" : @"Click here") drawAtPoint:NSMakePoint(40, 128) withAttributes:attributes];
++  [[NSString stringWithFormat:@"Then type: %@", code] drawAtPoint:NSMakePoint(24, 70) withAttributes:attributes];
++  [(typed ? @"Keyboard received" : [NSString stringWithFormat:@"Input: %@", entered]) drawAtPoint:NSMakePoint(24, 30) withAttributes:attributes];
++}
++- (BOOL)remoteEvent:(NSEvent *)event {
++  CGEventRef native = event.CGEvent;
++  std::lock_guard<std::mutex> lock(input_mutex);
++  return test_mode && native && CGEventGetIntegerValueField(native, kCGEventSourceUserData) == event_tag &&
++    CGEventGetIntegerValueField(native, kCGEventSourceUnixProcessID) == getpid();
++}
++- (void)acceptMouse:(NSEvent *)event point:(NSPoint)point {
++  if ([self remoteEvent:event] && NSPointInRect(point, NSMakeRect(24, 110, 390, 60))) {
++    clicked = true;
++    [self.window makeFirstResponder:self];
++    self.needsDisplay = YES;
++  }
++}
++- (void)mouseDown:(NSEvent *)event {
++  [self acceptMouse:event point:[self convertPoint:event.locationInWindow fromView:nil]];
++}
++- (void)acceptKey:(NSEvent *)event characters:(NSString *)characters {
++  if (![self remoteEvent:event] || !clicked) return;
++  if (characters.length != 1 || [characters rangeOfCharacterFromSet:[[NSCharacterSet decimalDigitCharacterSet] invertedSet]].location != NSNotFound) return;
++  entered = [entered stringByAppendingString:characters];
++  if (entered.length > 4) entered = [entered substringFromIndex:entered.length - 4];
++  typed = [entered isEqualToString:code];
++  self.needsDisplay = YES;
++}
++- (void)keyDown:(NSEvent *)event {
++  [self acceptKey:event characters:event.charactersIgnoringModifiers];
++}
++@end
++
++namespace platf {
++  nlohmann::json openbot_setup_status() {
++    auto session = CGSessionCopyCurrentDictionary();
++    bool gui = false;
++    if (session) {
++      auto uid = (CFNumberRef) CFDictionaryGetValue(session, kCGSessionUserIDKey);
++      int session_uid = -1;
++      if (uid) CFNumberGetValue(uid, kCFNumberIntType, &session_uid);
++      gui = session_uid == getuid() && CFDictionaryGetValue(session, kCGSessionOnConsoleKey) == kCFBooleanTrue;
++      CFRelease(session);
++    }
++    uint32_t count = 0;
++    auto display_result = CGGetActiveDisplayList(0, nullptr, &count);
++    const bool capture = CGPreflightScreenCaptureAccess();
++    return {{"screenRecording", capture ? "allowed" : "blocked"},
++      {"accessibility", AXIsProcessTrusted() ? "allowed" : "blocked"},
++      {"guiSession", gui ? "allowed" : "blocked"},
++      {"displays", display_result == kCGErrorSuccess ? (count > 0 ? "allowed" : "unavailable") : "failed"},
++      {"restartRequired", capture && !is_screen_capture_allowed()},
++      {"username", std::string([NSUserName() UTF8String])},
++      {"hostName", std::string([NSProcessInfo.processInfo.hostName UTF8String])}};
++  }
++
++  nlohmann::json openbot_test_status() {
++    __block nlohmann::json result;
++    on_main(^{
++      result = {{"active", panel != nil && panel.visible}, {"mouse", clicked}, {"keyboard", typed}, {"code", std::string([code UTF8String])}};
++    });
++    return result;
++  }
++
++  void openbot_test_action(const std::string &action, const std::string &display_id) {
++    on_main(^{
++      if (action == "stop") {
++        [panel close];
++        panel = nil;
++        expires = nil;
++        std::lock_guard<std::mutex> lock(input_mutex);
++        test_mode = false;
++        event_tag = 0;
++        return;
++      }
++      if (panel) return;
++      code = [NSString stringWithFormat:@"%04u", arc4random_uniform(10000)];
++      entered = @"";
++      clicked = typed = false;
++      panel = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 480, 290) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
++      panel.releasedWhenClosed = NO;
++      panel.movable = NO;
++      panel.title = @"OpenBot remote desktop test";
++      panel.level = NSFloatingWindowLevel;
++      panel.contentView = [[OpenBotTestView alloc] initWithFrame:NSMakeRect(0, 0, 480, 290)];
++      NSScreen *target = NSScreen.screens.firstObject;
++      for (NSScreen *screen in NSScreen.screens) {
++        if (std::string([screen.deviceDescription[@"NSScreenNumber"] stringValue].UTF8String) == display_id) target = screen;
++      }
++      [panel setFrameOrigin:NSMakePoint(NSMidX(target.frame) - panel.frame.size.width / 2, NSMidY(target.frame) - panel.frame.size.height / 2)];
++      [panel makeKeyAndOrderFront:nil];
++      [panel makeFirstResponder:panel.contentView];
++      [NSApp activateIgnoringOtherApps:YES];
++      expires = [NSDate dateWithTimeIntervalSinceNow:120];
++      std::lock_guard<std::mutex> lock(input_mutex);
++      event_tag = ((int64_t)arc4random() << 20) | arc4random_uniform(1 << 20);
++      const auto frame = panel.frame;
++      const auto main_height = NSScreen.screens.firstObject.frame.size.height;
++      test_bounds = CGRectMake(frame.origin.x, main_height - NSMaxY(frame), frame.size.width, frame.size.height);
++      test_mode = true;
++    });
++  }
++
++  bool openbot_test_input(CGEventRef event) {
++    std::lock_guard<std::mutex> lock(input_mutex);
++    if (!test_mode) return false;
++    auto type = CGEventGetType(event);
++    if (type == kCGEventKeyDown || type == kCGEventKeyUp) {
++      auto key = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
++      // Only the ten digit keys; shortcuts cannot reach another application.
++      if (key != 18 && key != 19 && key != 20 && key != 21 && key != 23 && key != 22 && key != 26 && key != 28 && key != 25 && key != 29) return true;
++    } else if (type == kCGEventLeftMouseDown || type == kCGEventLeftMouseUp || type == kCGEventMouseMoved) {
++      if (!CGRectContainsPoint(test_bounds, CGEventGetLocation(event))) return true;
++    } else return true;
++    CGEventSetFlags(event, 0);
++    CGEventSetIntegerValueField(event, kCGEventSourceUserData, event_tag);
++    CGEventPostToPid(getpid(), event);
++    return true;
++  }
++
++  void openbot_main_loop(const std::function<bool()> &stopped) {
++    @autoreleasepool {
++      [NSApplication sharedApplication];
++      [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
++      [NSApp finishLaunching];
++      while (!stopped()) {
++        @autoreleasepool {
++          NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.1] inMode:NSDefaultRunLoopMode dequeue:YES];
++          if (event) [NSApp sendEvent:event];
++          [NSApp updateWindows];
++          if (expires && expires.timeIntervalSinceNow <= 0) {
++            [panel close];
++            expires = nil;
++          }
++        }
++      }
++      [panel close];
++    }
++  }
++}
 diff --git a/tests/unit/test_confighttp.cpp b/tests/unit/test_confighttp.cpp
 index 195a666c..f0b09b8a 100644
 --- a/tests/unit/test_confighttp.cpp
@@ -234,42 +614,64 @@ index 195a666c..f0b09b8a 100644
  // Test: confighttp::authenticate() rejects invalid password
  TEST_F(ConfigHttpTest, AuthenticateRejectsInvalidPassword) {
    SimpleWeb::CaseInsensitiveMultimap headers;
-diff --git a/src/crypto.cpp b/src/crypto.cpp
-index c5e236e9..d6f8cd74 100644
---- a/src/crypto.cpp
-+++ b/src/crypto.cpp
-@@ -5,12 +5,14 @@
- // lib includes
- #include <openssl/pem.h>
- #include <openssl/rsa.h>
-+#include <openssl/x509v3.h>
- 
- // local includes
- #include "crypto.h"
- 
- namespace crypto {
-   using asn1_string_t = util::safe_ptr<ASN1_STRING, ASN1_STRING_free>;
-+  using x509_extension_t = util::safe_ptr<X509_EXTENSION, X509_EXTENSION_free>;
- 
-   cert_chain_t::cert_chain_t():
-       _certs {},
-@@ -465,6 +467,19 @@ namespace crypto {
-     X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (const std::uint8_t *) cn.data(), (int) cn.size(), -1, 0);
- 
-     X509_set_issuer_name(x509.get(), name);
-+
-+    X509V3_CTX extension_context {};
-+    X509V3_set_ctx_nodb(&extension_context);
-+    X509V3_set_ctx(&extension_context, x509.get(), x509.get(), nullptr, nullptr, 0);
-+    x509_extension_t basic_constraints {
-+      X509V3_EXT_conf_nid(nullptr, &extension_context, NID_basic_constraints, (char *) "critical,CA:TRUE")
-+    };
-+    X509_add_ext(x509.get(), basic_constraints.get(), -1);
-+    x509_extension_t subject_alt_name {
-+      X509V3_EXT_conf_nid(nullptr, &extension_context, NID_subject_alt_name, (char *) "IP:127.0.0.1,DNS:localhost")
-+    };
-+    X509_add_ext(x509.get(), subject_alt_name.get(), -1);
-+
-     X509_sign(x509.get(), pkey.get(), EVP_sha256());
- 
-     return {pem(x509), pem(pkey)};
+diff --git a/tests/unit/test_openbot_setup.mm b/tests/unit/test_openbot_setup.mm
+new file mode 100644
+index 00000000..7972aebd
+--- /dev/null
++++ b/tests/unit/test_openbot_setup.mm
+@@ -0,0 +1,55 @@
++// OpenBot additions to Sunshine, distributed under GPL-3.0.
++#import <AppKit/AppKit.h>
++#include <stdexcept>
++#include "../../src/platform/macos/openbot_setup.mm"
++namespace platf { bool is_screen_capture_allowed() { return false; } }
++#define require(condition) do { if (!(condition)) throw std::runtime_error(#condition); } while (false)
++int main() {
++  @autoreleasepool {
++    [NSApplication sharedApplication];
++    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
++    [NSApp finishLaunching];
++    platf::openbot_test_action("start");
++    require(platf::openbot_test_status()["active"] == true);
++    require(!panel.movable);
++    auto view = (OpenBotTestView *)panel.contentView;
++    CGEventRef native = CGEventCreateKeyboardEvent(nullptr, 18, true);
++    NSEvent *event = [NSEvent eventWithCGEvent:native];
++    require(![view remoteEvent:event]);
++    [view keyDown:event];
++    require(platf::openbot_test_status()["keyboard"] == false);
++    CGEventSetIntegerValueField(native, kCGEventSourceUserData, event_tag);
++    event = [NSEvent eventWithCGEvent:native];
++    require([view remoteEvent:event]);
++    CGEventSetIntegerValueField(native, kCGEventSourceUnixProcessID, getpid() + 1);
++    event = [NSEvent eventWithCGEvent:native];
++    require(![view remoteEvent:event]);
++    CFRelease(native);
++    CGEventRef mouse = CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseDown, CGPointZero, kCGMouseButtonLeft);
++    NSEvent *click = [NSEvent eventWithCGEvent:mouse];
++    [view acceptMouse:click point:NSMakePoint(50, 130)];
++    require(!clicked);
++    CGEventSetIntegerValueField(mouse, kCGEventSourceUserData, event_tag);
++    click = [NSEvent eventWithCGEvent:mouse];
++    [view acceptMouse:click point:NSMakePoint(0, 0)];
++    require(!clicked);
++    [view acceptMouse:click point:NSMakePoint(50, 130)];
++    require(clicked);
++    CGEventRef key = CGEventCreateKeyboardEvent(nullptr, 18, true);
++    for (NSUInteger i = 0; i < code.length; i++) {
++      [view acceptKey:[NSEvent eventWithCGEvent:key] characters:[code substringWithRange:NSMakeRange(i, 1)]];
++    }
++    require(!typed);
++    CGEventSetIntegerValueField(key, kCGEventSourceUserData, event_tag);
++    for (NSUInteger i = 0; i < code.length; i++) {
++      [view acceptKey:[NSEvent eventWithCGEvent:key] characters:[code substringWithRange:NSMakeRange(i, 1)]];
++    }
++    require(typed);
++    CFRelease(mouse);
++    CFRelease(key);
++    platf::openbot_test_action("stop");
++    require(platf::openbot_test_status()["active"] == false);
++    require(!test_mode);
++    puts("Native test: local input rejected; marked Sunshine input recognized; panel cleanup passed.");
++  }
++}

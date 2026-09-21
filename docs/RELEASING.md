@@ -64,6 +64,11 @@ recipe or a pinned input changes. It publishes an immutable GitHub prerelease na
 SBOMs, build provenance, and `remote-desktop-runtime-manifest.json`. It is not an OpenBot application
 update and it must never contain `latest.yml`.
 
+PR pushes do not cancel an active runtime build. The next run reuses a successful native build
+from the same PR and platform when its native inputs and build tools are unchanged. It still runs
+verification and the macOS smoke test against the current checkout. A cache miss rebuilds the
+runtime. Pushes to `main` and manual dispatches do not use the PR build cache.
+
 After publication, the workflow opens a draft PR that adds the release tag and SHA-256 values to
 `native-runtime.lock.json`. That job runs only from `main`, because it pins against the lock it checks
 out: the input digest is derived from the recipe on disk, and a manifest built from a different recipe
@@ -80,6 +85,11 @@ gh workflow run remote-desktop-runtime.yml --ref <branch>
 gh release download remote-desktop-runtime-<input-digest> --pattern remote-desktop-runtime-manifest.json
 bun scripts/pin-remote-desktop-runtime.ts remote-desktop-runtime-manifest.json
 ```
+
+To repeat verification after a download or CI setup failure, without replacing the published
+artifacts, run `gh workflow run remote-desktop-runtime.yml --ref <branch> -f verify_only=true`.
+This mode requires an existing release for the current input digest and runs installation, runtime
+verification, the macOS smoke test, and application packaging. It does not build or publish.
 
 Commit the rewritten `native-runtime.lock.json` to the branch and merge it with the recipe, so `main`
 never sees the two apart. The pin does not change the input digest -- it covers `recipeVersion`, both

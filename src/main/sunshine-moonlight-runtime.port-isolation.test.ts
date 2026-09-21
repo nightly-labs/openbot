@@ -1,4 +1,4 @@
-import { ChildProcess, execFileSync } from "node:child_process";
+import { ChildProcess, execFileSync, type SpawnOptions } from "node:child_process";
 import * as dgram from "node:dgram";
 import { readFileSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -13,7 +13,7 @@ import { createServer as createTcpServer, type Server as TcpServer } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import type { RemoteDesktopDisplay } from "@openbot/contracts/ipc";
+import type { RemoteDesktopDisplay, RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
@@ -108,6 +108,8 @@ interface Harness {
   hosts: Array<{ host_id: number; paired: "Paired" | "NotPaired" }>;
   nextHostId: number;
   authHeader: string;
+  iceUrl: string;
+  iceToken: string;
   observedSunshineHttpPorts: number[];
   sunshineHits: Array<{ path: string; localPort: number }>;
   pinBodies: string[];
@@ -284,6 +286,8 @@ function createHarness(stateDirectory: string): Harness {
     hosts: [],
     nextHostId: 1,
     authHeader: "",
+    iceUrl: "",
+    iceToken: "",
     observedSunshineHttpPorts: [],
     sunshineHits: [],
     pinBodies: [],
@@ -296,7 +300,7 @@ function createHarness(stateDirectory: string): Harness {
     },
   };
   function createHarnessSpawn(): RemoteRuntimeSpawn {
-    const spawn = (executable: string, args: string[]): FakeChild => {
+    const spawn = (executable: string, args: string[], options: SpawnOptions): FakeChild => {
       if (args.some((arg) => arg.includes("test-password"))) throw new Error("Password exposed in child arguments.");
       if (executable === TEST_PATHS.sunshine) {
         const config = readFileSync(args[0] ?? "", "utf8");
@@ -325,6 +329,8 @@ function createHarness(stateDirectory: string): Harness {
         return child;
       }
       if (executable === TEST_PATHS.moonlightWebServer) {
+        harness.iceUrl = options.env?.OPENBOT_ICE_HELPER_URL ?? "";
+        harness.iceToken = options.env?.OPENBOT_ICE_HELPER_TOKEN ?? "";
         const configPath = args[args.indexOf("--config-path") + 1];
         harness.authHeader = moonlightConfigFileSchema.parse(
           JSON.parse(readFileSync(configPath, "utf8")),
@@ -354,7 +360,9 @@ function createHarness(stateDirectory: string): Harness {
   return harness;
 }
 
-async function createStartedRuntime(): Promise<{
+async function createStartedRuntime(
+  getIceServers: () => Promise<RemoteDesktopIceServer[]> = async () => [{ urls: "stun:127.0.0.1:3478" }],
+): Promise<{
   runtime: SunshineMoonlightRuntime;
   harness: Harness;
 }> {
@@ -366,7 +374,7 @@ async function createStartedRuntime(): Promise<{
     platform: "darwin",
     credentials: { username: "openbot-test", password: "test-password" },
     getDisplays: () => structuredClone(TEST_DISPLAYS),
-    getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
+    getIceServers,
     spawnProcess: harness.spawn,
   });
   await runtime.start();
@@ -390,6 +398,27 @@ async function blockTcp(port: number): Promise<TcpServer> {
 }
 
 describe("sunshine port family helpers", () => {
+  it.each(["throw", "reject"])("returns 503 for an ICE callback that can %s and recovers", async (failure) => {
+    let fail = true;
+    const { runtime, harness } = await createStartedRuntime(() => {
+      if (!fail) return Promise.resolve([]);
+      const error = new Error("Remote Signal has not supplied ICE servers yet.");
+      if (failure === "throw") throw error;
+      return Promise.reject(error);
+    });
+    try {
+      const headers = { Authorization: `Bearer ${harness.iceToken}` };
+      expect((await fetch(harness.iceUrl)).status).toBe(401);
+      expect((await fetch(harness.iceUrl, { headers })).status).toBe(503);
+      fail = false;
+      const response = await fetch(harness.iceUrl, { headers });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([]);
+    } finally {
+      await disposeRuntime(runtime, harness);
+    }
+  });
+
   it("writes the credential digest required by the pinned Sunshine build", () => {
     expect(sunshinePasswordHash("password", "salt")).toBe(
       "997B60F3DD238B10ECDEDC2805F9E3DCB42A5AFAC089909AC1EA18895CB8377A",

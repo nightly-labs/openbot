@@ -1049,6 +1049,24 @@ grace. This counter contains no user data and is never sent to the host. Health 
 readiness remain false until agent initialization succeeds.
 See [multi-tenant hosting](multi-tenant-hosting.md) for installation, permissions, and acceptance.
 
+### Remote desktop permission checks and live tests
+
+`RemoteScreenGateway` owns setup checks and live-test session ownership. The optional
+`remote-desktop-setup` Team API capability uses separate v4 adapter routes; released codecs remain unchanged.
+Diagnostics contain host/account names and permission results and travel only to an authenticated member.
+They do not include Sunshine credentials or screen content. The renderer opens macOS settings only through
+fixed local IPC actions.
+
+Sunshine checks its own macOS permissions and hosts the temporary native test panel. During a test, native
+input is restricted to that panel and tagged for the test. The panel requires both the test tag and the
+Sunshine process ID before recording a click or keyboard result. The gateway rejects additional sessions
+and display switches during a test and closes the panel when its owning stream disconnects. It does not
+interrupt another member's session to start a test.
+
+Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishing the host or requiring an account. The same single-use viewer grant and cookie checks protect it. The gateway owns the listener and closes it with the test session; its lease expires after three minutes. Local test IPC can address only sessions created for this purpose.
+
+A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
+
 ### Secure browser authentication
 
 `openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public

@@ -12,7 +12,12 @@ function state(granted: readonly MacPermissionId[]): ComputerUseState {
   };
 }
 
-function MockedHelp(props: { permission: MacPermissionId; granted?: readonly MacPermissionId[]; app?: string | null }) {
+function MockedHelp(props: {
+  permission: MacPermissionId;
+  granted?: readonly MacPermissionId[];
+  app?: string | null;
+  sunshine?: boolean;
+}) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
   mock.api.getComputerUseState = async () => state(props.granted ?? []);
@@ -25,7 +30,7 @@ function MockedHelp(props: { permission: MacPermissionId; granted?: readonly Mac
   });
   // The surface fills its own window, which is 340 by 322. Nothing wraps it here for the same
   // reason nothing wraps it there.
-  return <ComputerUsePermissionHelp permission={props.permission} />;
+  return <ComputerUsePermissionHelp permission={props.permission} sunshine={props.sunshine} />;
 }
 
 const meta = {
@@ -53,4 +58,8 @@ export const Granted: Story = {
 /** No bundle to drag, which is every build that does not run from an application. */
 export const WithoutApplication: Story = {
   render: () => <MockedHelp permission="screen-recording" app={null} />,
+};
+
+export const Sunshine: Story = {
+  render: () => <MockedHelp permission="accessibility" app="Sunshine" sunshine />,
 };

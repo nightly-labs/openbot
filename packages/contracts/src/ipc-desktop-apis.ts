@@ -147,6 +147,12 @@ import type {
   UpdateQueuedMessageInput,
 } from "./ipc-queue";
 import type {
+  RemoteDesktopSetupAction,
+  RemoteDesktopSetupStatus,
+  RemoteDesktopTestInput,
+  RemoteDesktopTestStatus,
+} from "./ipc-remote-desktop-setup";
+import type {
   CreateRoutineInput,
   DeleteRoutineInput,
   ListRoutineRunsInput,
@@ -474,6 +480,9 @@ export interface HostDesktopApi {
 }
 
 export interface RemoteDesktopDesktopApi {
+  checkSetup: (serverId: string) => Promise<RemoteDesktopSetupStatus>;
+  openSetup: (action: RemoteDesktopSetupAction) => Promise<void>;
+  test: (input: RemoteDesktopTestInput) => Promise<RemoteDesktopTestStatus>;
   list: () => Promise<RemoteDesktopSession[]>;
   connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopConnectResult>;
   selectDisplay: (input: RemoteDesktopSelectDisplayInput) => Promise<void>;

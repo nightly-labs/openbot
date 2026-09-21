@@ -16,6 +16,11 @@ render(() => {
   if (surface === "dynamic-island") return <DynamicIslandSurface />;
   if (surface === "computer-use-highlight") return <ComputerUseHighlightSurface />;
   if (surface === "computer-use-permission-help")
-    return <ComputerUsePermissionHelp permission={permissionFromQuery(window.location.search)} />;
+    return (
+      <ComputerUsePermissionHelp
+        permission={permissionFromQuery(window.location.search)}
+        sunshine={new URLSearchParams(window.location.search).get("application") === "sunshine"}
+      />
+    );
   return <App />;
 }, root);

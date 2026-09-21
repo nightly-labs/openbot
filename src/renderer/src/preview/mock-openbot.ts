@@ -2143,6 +2143,22 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     remoteDesktop: {
+      checkSetup: async () => ({
+        platform: "darwin",
+        hostName: "Mac mini",
+        username: "openbot",
+        checkedAt: new Date().toISOString(),
+        screenRecording: hostStatus.remoteDesktopScreenRecordingDenied ? "blocked" : "allowed",
+        accessibility: "blocked",
+        service: "allowed",
+        displays: "allowed",
+        guiSession: "allowed",
+        restartRequired: false,
+        activeSessions: remoteDesktopSessions.length,
+        message: null,
+      }),
+      openSetup: async () => undefined,
+      test: async (input) => ({ active: input.action !== "stop", mouse: false, keyboard: false, code: "1234" }),
       list: async () => clone(remoteDesktopSessions),
       connect: async (input) => {
         const session: RemoteDesktopSession = {

@@ -7,10 +7,22 @@ import https from "node:https";
 import { createServer as createTcpServer } from "node:net";
 import { dirname, join } from "node:path";
 import type { PeerCertificate } from "node:tls";
-import type { RemoteDesktopDisplay, RemoteDesktopIceServer } from "@openbot/contracts/ipc";
+import type {
+  RemoteDesktopDisplay,
+  RemoteDesktopIceServer,
+  RemoteDesktopSetupStatus,
+  RemoteDesktopTestStatus,
+} from "@openbot/contracts/ipc";
 import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { stopRemoteProcess } from "./remote-diagnostics";
+
+export class SunshineApiError extends Error {
+  constructor(readonly status: number) {
+    super(`Sunshine API failed with HTTP ${status}.`);
+    this.name = "SunshineApiError";
+  }
+}
 
 const MOONLIGHT_STREAMER_SLOTS = 4;
 // First candidate for Sunshine's base port. Sunshine derives its whole port family from this one
@@ -215,6 +227,22 @@ const moonlightPairMessageSchema = z.union([
   z.literal("PairError").transform(() => ({ kind: "error" as const })),
   z.literal("InternalServerError").transform(() => ({ kind: "error" as const })),
 ]);
+const sunshineSetupSchema = z.object({
+  hostName: z.string().max(255),
+  username: z.string().max(255),
+  screenRecording: z.enum(["allowed", "blocked"]),
+  accessibility: z.enum(["allowed", "blocked"]),
+  guiSession: z.enum(["allowed", "blocked"]),
+  displays: z.enum(["allowed", "unavailable", "failed"]),
+  restartRequired: z.boolean(),
+});
+const sunshineTestSchema = z.object({
+  active: z.boolean(),
+  mouse: z.boolean(),
+  keyboard: z.boolean(),
+  code: z.string().regex(/^(?:[0-9]{4})?$/u),
+});
+
 const sunshineDisplaysSchema = z.object({
   displays: z.array(z.object({ id: z.string().min(1), name: z.string().min(1) })),
 });
@@ -312,6 +340,35 @@ export class SunshineMoonlightRuntime {
     } finally {
       this.#starting = null;
     }
+  }
+
+  async checkSetup(): Promise<
+    Pick<
+      RemoteDesktopSetupStatus,
+      "hostName" | "username" | "screenRecording" | "accessibility" | "guiSession" | "displays" | "restartRequired"
+    >
+  > {
+    return sunshineJson(
+      this.#requireSunshineHttpsPort(),
+      "/api/openbot/setup",
+      this.#options.credentials,
+      join(this.#options.stateDirectory, "sunshine-cert.pem"),
+      sunshineSetupSchema,
+    );
+  }
+
+  async test(action: "start" | "status" | "stop"): Promise<RemoteDesktopTestStatus> {
+    const port = this.#requireSunshineHttpsPort();
+    const certificate = join(this.#options.stateDirectory, "sunshine-cert.pem");
+    if (action !== "status")
+      await sunshineRequest(
+        port,
+        "/api/openbot/test",
+        this.#options.credentials,
+        certificate,
+        JSON.stringify({ action, displayId: this.#selectedDisplayId ?? "" }),
+      );
+    return sunshineJson(port, "/api/openbot/test", this.#options.credentials, certificate, sunshineTestSchema);
   }
 
   async selectDisplay(displayId: string): Promise<void> {
@@ -571,6 +628,7 @@ export class SunshineMoonlightRuntime {
     this.#screenCaptureDenied = false;
     this.#sunshine = this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
       cwd: dirname(this.#options.paths.sunshine),
+      env: { ...process.env, OPENBOT_REMOTE_SETUP: "1" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -766,8 +824,8 @@ export class SunshineMoonlightRuntime {
         response.writeHead(401).end();
         return;
       }
-      void this.#options
-        .getIceServers()
+      void Promise.resolve()
+        .then(() => this.#options.getIceServers())
         .then((servers) => {
           response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
           response.end(JSON.stringify(servers.map((server) => ({ ...server, urls: arrayUrls(server.urls) }))));
@@ -833,6 +891,7 @@ async function moonlightHttpResponse(
   };
   const response = await new Promise<IncomingMessage>((resolve, reject) => {
     const request = httpRequest(`${baseUrl}${path}`, { method: init.method ?? "GET", headers }, resolve);
+    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
     request.once("error", reject);
     request.end(body);
   });
@@ -867,10 +926,11 @@ async function sunshineRequest(
         response.on("end", () =>
           response.statusCode && response.statusCode < 300
             ? resolve()
-            : reject(new Error(`Sunshine API failed with HTTP ${response.statusCode ?? 0}.`)),
+            : reject(new SunshineApiError(response.statusCode ?? 0)),
         );
       },
     );
+    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
     request.once("error", reject);
     request.end(body);
   });
@@ -900,7 +960,7 @@ async function sunshineJson<T>(
         response.once("error", reject);
         response.on("end", () => {
           if (!response.statusCode || response.statusCode >= 300) {
-            reject(new Error(`Sunshine API failed with HTTP ${response.statusCode ?? 0}.`));
+            reject(new SunshineApiError(response.statusCode ?? 0));
             return;
           }
           try {
@@ -911,6 +971,7 @@ async function sunshineJson<T>(
         });
       },
     );
+    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
     request.once("error", reject);
   });
 }
@@ -918,6 +979,7 @@ async function sunshineJson<T>(
 async function requestStream(url: string, headers: Record<string, string>, body: string): Promise<IncomingMessage> {
   return new Promise<IncomingMessage>((resolve, reject) => {
     const request = httpRequest(url, { method: "POST", headers }, resolve);
+    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
     request.once("error", reject);
     request.end(body);
   });

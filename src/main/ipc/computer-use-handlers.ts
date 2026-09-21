@@ -55,13 +55,13 @@ export function computerUseIpcHandlers({
       closePermissionHelp: handler(async () => {
         permissionHelp.close();
       }),
-      getPermissionApp: handler(() => permissionHelp.permissionApp()),
+      getPermissionApp: eventHandler((event) => permissionHelp.permissionApp(event.sender.id)),
       // The one sender-identity case in this group. A drag carries a file to wherever the pointer
       // is let go, so the window it starts in has to be the window the user is dragging from; the
       // trusted-URL gate cannot tell, because every window of the app shares one origin.
       startPermissionAppDrag: eventHandler((event) => permissionHelp.startDrag(event.sender)),
-      revealPermissionApp: handler(async () => {
-        permissionHelp.reveal();
+      revealPermissionApp: eventHandler(async (event) => {
+        permissionHelp.reveal(event.sender.id);
       }),
     },
   };

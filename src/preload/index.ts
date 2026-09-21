@@ -72,6 +72,8 @@ import {
   isFilePreviewKind,
   isQueuedMessageReceipt,
   isQueueSnapshot,
+  isRemoteDesktopSetupStatus,
+  isRemoteDesktopTestStatus,
   isRoutine,
   isRoutineRun,
   isRoutineSchedule,
@@ -89,6 +91,8 @@ import {
   type ProviderCodeLoginStart,
   type QueuedMessageReceipt,
   type QueueSnapshot,
+  type RemoteDesktopSetupStatus,
+  type RemoteDesktopTestStatus,
   type ScopedAgentEvent,
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
@@ -1325,6 +1329,10 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   remoteDesktop: {
+    checkSetup: (serverId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopCheckSetup, serverId).then(decodeRemoteDesktopSetupFromMain),
+    openSetup: (action) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopOpenSetup, action).then(decodeVoid),
+    test: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopTest, input).then(decodeRemoteDesktopTestFromMain),
     list: () => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopList),
     connect: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopConnect, input),
     selectDisplay: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopSelectDisplay, input),
@@ -1346,4 +1354,13 @@ function decodeAgentAnalyticsFromMain(value: unknown) {
 
 function decodeHostAnalyticsFromMain(value: unknown) {
   return decodeOptionalHostAnalytics(value);
+}
+
+function decodeRemoteDesktopSetupFromMain(value: unknown): RemoteDesktopSetupStatus {
+  if (!isRemoteDesktopSetupStatus(value)) throw new Error("Invalid remote desktop setup response.");
+  return { ...value };
+}
+function decodeRemoteDesktopTestFromMain(value: unknown): RemoteDesktopTestStatus {
+  if (!isRemoteDesktopTestStatus(value)) throw new Error("Invalid remote desktop test response.");
+  return { ...value };
 }
