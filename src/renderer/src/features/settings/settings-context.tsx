@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { toast } from "../../components/ui";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -111,7 +112,14 @@ const Settings = createSimpleContext({
             setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
             setAutoApproveAgentIds(preference.autoApproveAgentIds);
           })
-          .catch(() => setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode })));
+          .catch(() => {
+            setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode }));
+            toast.error(
+              previous.turboMode
+                ? "Could not turn off Turbo mode. It is still active. Try again."
+                : "Could not turn on Turbo mode. Try again.",
+            );
+          });
       }
       if (previous.autoDownloadUpdates !== value.autoDownloadUpdates) {
         autoDownloadUpdatesChanged = true;
