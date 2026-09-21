@@ -20,7 +20,6 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cubicBezier,
   Easing,
-  Extrapolation,
   interpolate,
   ReduceMotion,
   type SharedValue,
@@ -57,8 +56,19 @@ const ATTACHMENT_BLOCK_HEIGHT = 120;
 // just wrote. An ease-in-out spends its first half barely moving, which reads as
 // the card answering late, so hold the shape open with a strong ease-out instead.
 const SHAPE_DURATION = 120;
-// Room around the placeholder when the composer rests as a pill.
-const PILL_INSET = 20;
+// A control's own box, matching the `size-10` the two of them are drawn in,
+// and the room the toolbar holds around them.
+const CONTROL_SIZE = 40;
+const TOOLBAR_PADDING = 8;
+// At rest the composer is the same bar, smaller: it hugs its placeholder with
+// only this gap to each control, and gives up this much height. The height is
+// taken off the single line the field would otherwise be, so it follows the
+// text size instead of clipping the placeholder at a large one.
+const REST_TEXT_GAP = 10;
+const REST_HEIGHT_LOSS = 8;
+// The controls keep their layout box, so the touch target never shrinks with
+// the bar: only the drawing scales, and it then slides out to the bar's edge.
+const REST_CONTROL_SCALE = 0.8;
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView);
 const SHAPE_EASING = cubicBezier(0.23, 1, 0.32, 1);
@@ -166,12 +176,25 @@ export function ChatComposer({
   const reducedMotion = useReducedMotion();
   const shapeDuration = reducedMotion ? 0 : SHAPE_DURATION;
 
-  // At rest the composer is a pill that hugs its placeholder. It opens into the
+  // At rest the composer is a smaller bar: narrower, shorter, with the plus on
+  // the left, the placeholder centred and send on the right. It opens into the
   // full field as the keyboard rises, so an interactive dismissal closes it
   // frame by frame instead of snapping when the keyboard finally commits.
   const [placeholderWidth, setPlaceholderWidth] = useState(0);
   const cardWidth = windowWidth - BAR_INSET * 2;
-  const pillWidth = placeholderWidth > 0 ? Math.min(cardWidth, placeholderWidth + PILL_INSET * 2) : cardWidth;
+  const restHeight = Math.max(TOOLBAR_HEIGHT, lineHeight + FIELD_VERTICAL_PADDING) - REST_HEIGHT_LOSS;
+  // The toolbar keeps its height and the control rides down into the smaller
+  // bar, so the box fills that bar's height.
+  const restControlOffset = (TOOLBAR_HEIGHT - restHeight) / 2;
+  // A smaller control leaves its box wider than it draws. Slide it out by that
+  // slack plus the toolbar's own padding, so the gap it keeps from the bar's
+  // side is the same one it keeps from the bar's bottom.
+  const restControlShift = TOOLBAR_PADDING + (CONTROL_SIZE - restHeight) / 2;
+  const restControlDrawn = CONTROL_SIZE * REST_CONTROL_SCALE;
+  const restTextInset = (restHeight - restControlDrawn) / 2 + restControlDrawn + REST_TEXT_GAP;
+  // Sized from the placeholder, so the bar carries no empty space. Full width
+  // until the measurement lands: a bar that starts narrow would jump open.
+  const restWidth = placeholderWidth > 0 ? Math.min(cardWidth, placeholderWidth + restTextInset * 2) : cardWidth;
   // Content outlives the keyboard: a draft or an attachment has to stay
   // readable after a dismissal, so it holds the composer open on its own.
   const held = useSharedValue(hasDraft ? 1 : 0);
@@ -185,18 +208,32 @@ export function ChatComposer({
   }, [hasDraft, held, reducedMotion]);
   const expansion = useDerivedValue(() => Math.max(Math.min(1, keyboardProgress.get()), held.get()));
   const cardStyle = useAnimatedStyle(() => ({
-    width: interpolate(expansion.get(), [0, 1], [pillWidth, cardWidth]),
+    width: interpolate(expansion.get(), [0, 1], [restWidth, cardWidth]),
   }));
-  // The controls have no room in the pill, so they arrive with the width.
-  const controlStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(expansion.get(), [0.45, 1], [0, 1], Extrapolation.CLAMP),
-  }));
-  const plusStyle = useAnimatedStyle(() => {
-    const width = interpolate(expansion.get(), [0, 1], [pillWidth, cardWidth]);
+  // Both controls stay visible and pressable in the smaller bar, so the shape
+  // change owes them only a position and the size they are drawn at. Both are
+  // transforms: neither control re-lays-out on a single frame of the change.
+  const controlStyle = useAnimatedStyle(() => {
+    const progress = expansion.get();
     return {
-      opacity: interpolate(expansion.get(), [0.45, 1], [0, 1], Extrapolation.CLAMP),
-      // The card centres while it is narrow, so follow its left edge in.
-      transform: [{ translateX: (cardWidth - width) / 2 }],
+      transform: [
+        { translateX: interpolate(progress, [0, 1], [restControlShift, 0]) },
+        { translateY: interpolate(progress, [0, 1], [restControlOffset, 0]) },
+        { scale: interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]) },
+      ],
+    };
+  });
+  const plusStyle = useAnimatedStyle(() => {
+    const progress = expansion.get();
+    const width = interpolate(progress, [0, 1], [restWidth, cardWidth]);
+    return {
+      transform: [
+        // The card centres while it is narrow, so follow its left edge in, and
+        // out to it by the same slack the control on the far side takes.
+        { translateX: (cardWidth - width) / 2 - interpolate(progress, [0, 1], [restControlShift, 0]) },
+        { translateY: interpolate(progress, [0, 1], [restControlOffset, 0]) },
+        { scale: interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]) },
+      ],
     };
   });
   // The card shape drives the same slide, so it has to tween too. Reading
@@ -211,15 +248,56 @@ export function ChatComposer({
       }),
     );
   }, [stacked, stackedValue, reducedMotion]);
-  const fieldSlideStyle = useAnimatedStyle(() => {
-    const open = interpolate(stackedValue.get(), [0, 1], [ROW_CONTROL_INSET - FIELD_INSET, 0]);
-    return { transform: [{ translateX: interpolate(expansion.get(), [0, 1], [PILL_INSET - FIELD_INSET, open]) }] };
-  });
+  // The field's own height tweens on the UI thread, so the resting shape can
+  // interpolate against it. A React-side transition would jump whenever a line
+  // arrived in the middle of a keyboard dismissal.
+  const fieldHeightValue = useSharedValue(fieldHeight);
+  useEffect(() => {
+    fieldHeightValue.set(
+      withTiming(fieldHeight, {
+        duration: shapeDuration,
+        easing: SHAPE_EASING_FN,
+        reduceMotion: ReduceMotion.System,
+      }),
+    );
+  }, [fieldHeight, fieldHeightValue, shapeDuration]);
+  const fieldBoxStyle = useAnimatedStyle(() => ({
+    height: interpolate(expansion.get(), [0, 1], [restHeight, fieldHeightValue.get()]),
+    // The controls hold the bottom of the card. In a single row they overlay
+    // the field, so the text clears their width instead.
+    marginBottom: interpolate(stackedValue.get(), [0, 1], [0, TOOLBAR_HEIGHT]),
+  }));
+  // Centred at rest, and never further left than the plus: a placeholder wider
+  // than the smaller bar, or one not measured yet, keeps the open position and
+  // truncates instead of starting under a control.
+  const openTextOffset = ROW_CONTROL_INSET - FIELD_INSET;
+  const restTextOffset = placeholderWidth > 0 ? restTextInset - FIELD_INSET : openTextOffset;
+  const fieldSlideStyle = useAnimatedStyle(() => ({
+    height: fieldHeightValue.get(),
+    transform: [
+      {
+        translateX: interpolate(
+          expansion.get(),
+          [0, 1],
+          [restTextOffset, interpolate(stackedValue.get(), [0, 1], [openTextOffset, 0])],
+        ),
+      },
+    ],
+  }));
+  // The placeholder rides the same slide on its own node: it has to leave the
+  // centre in step with the text that replaces it.
+  const placeholderStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: interpolate(
+          expansion.get(),
+          [0, 1],
+          [restTextOffset, interpolate(stackedValue.get(), [0, 1], [openTextOffset, 0])],
+        ),
+      },
+    ],
+  }));
   const [focused, setFocused] = useState(false);
-  // React-side mirror of the resting shape. Focus and content change once per
-  // interaction, never per frame, so this drives hit testing without a render
-  // during the animation.
-  const resting = !focused && !hasDraft;
   const latestTextRef = useRef(draft);
   const [sendGate] = useState(createComposerSendGate);
 
@@ -472,27 +550,19 @@ export function ChatComposer({
               ) : null}
             </Animated.View>
             <View>
-              <Animated.View
-                style={{
-                  height: fieldHeight,
-                  // The controls hold the bottom of the card. In a single row they
-                  // overlay the field, so the text clears their width instead.
-                  marginBottom: stacked ? TOOLBAR_HEIGHT : 0,
-                  // The field keeps one layout width and slides. Animating the
-                  // inset would re-wrap the text on every frame, which reads as
-                  // the text shaking. A single row is only ever used while the
-                  // text fits the narrower measure, so the slid text still stops
-                  // short of the controls.
-                  paddingLeft: FIELD_INSET,
-                  paddingRight: FIELD_INSET,
-                  transitionProperty: ["height", "marginBottom"],
-                  transitionDuration: shapeDuration,
-                  transitionTimingFunction: SHAPE_EASING,
-                }}
-              >
-                {/* The slide lives here, not on the box above: a CSS transition
-                    and an animated style must not share one node. */}
-                <Animated.View style={[{ flex: 1 }, fieldSlideStyle]}>
+              <Animated.View style={[{ overflow: "hidden" }, fieldBoxStyle]}>
+                {/* The field keeps its own height while the box closes over it:
+                    re-laying the input out every frame would reflow its text.
+                    The box is only ever shorter than the field while the field
+                    is empty, so nothing readable is ever clipped.
+                    The field also keeps one layout width and slides. Animating
+                    the inset would re-wrap the text on every frame, which reads
+                    as the text shaking. A single row is only ever used while the
+                    text fits the narrower measure, so the slid text still stops
+                    short of the controls. */}
+                <Animated.View
+                  style={[{ position: "absolute", left: FIELD_INSET, right: FIELD_INSET, bottom: 0 }, fieldSlideStyle]}
+                >
                   <TextInput
                     ref={inputRef}
                     nativeID="chat-composer-input"
@@ -501,10 +571,8 @@ export function ChatComposer({
                     editable={!disabled}
                     showSoftInputOnFocus={!disabled}
                     className="min-w-0 font-sans text-foreground"
-                    placeholder={`Ask ${agentName}`}
                     autoCorrect
                     autoCapitalize="sentences"
-                    placeholderTextColor={muted}
                     multiline
                     scrollEnabled={wrap.lines > MAX_INPUT_LINES}
                     returnKeyType="default"
@@ -579,54 +647,87 @@ export function ChatComposer({
                     </NativeText>
                   </TextInput>
                 </Animated.View>
+                {displayText ? null : (
+                  <Animated.View
+                    accessible={false}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    pointerEvents="none"
+                    // Own placeholder, not TextInput's: only a separate node can
+                    // leave the centre of the resting bar for the field's inset.
+                    // It renders through the native text primitive, like the
+                    // measuring node, so its metrics match the field it covers.
+                    style={[
+                      {
+                        position: "absolute",
+                        left: FIELD_INSET,
+                        right: ROW_CONTROL_INSET,
+                        top: 0,
+                        bottom: 0,
+                        justifyContent: "center",
+                        alignItems: "flex-start",
+                      },
+                      placeholderStyle,
+                    ]}
+                  >
+                    <NativeText
+                      numberOfLines={1}
+                      className="font-sans"
+                      style={{ color: String(muted), fontSize: 16, lineHeight: 22 }}
+                    >
+                      {`Ask ${agentName}`}
+                    </NativeText>
+                  </Animated.View>
+                )}
               </Animated.View>
-              <Animated.View
+              <View
                 pointerEvents="box-none"
-                style={[
-                  {
-                    position: "absolute",
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: TOOLBAR_HEIGHT,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    paddingHorizontal: 8,
-                  },
-                  controlStyle,
-                ]}
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  // Constant: the smaller bar moves the control down instead of
+                  // resizing this row under it, so the row never re-lays-out.
+                  height: TOOLBAR_HEIGHT,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  paddingHorizontal: TOOLBAR_PADDING,
+                }}
               >
-                <Pressable
-                  accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !pressable, busy: busy || stopPending }}
-                  disabled={!pressable}
-                  className="size-10 items-center justify-center rounded-full"
-                  style={{
-                    // Nothing to send reads as a bare glyph on the card, not as a
-                    // filled control the user could press.
-                    backgroundColor: primed ? action : "transparent",
-                    // The card dims as a whole when the composer is disabled.
-                    // Dim only this control for a state the card does not show.
-                    opacity: disabled || pressable ? 1 : 0.45,
-                  }}
-                  onPress={stopMode ? onStop : requestSend}
-                >
-                  {busy || stopPending ? (
-                    <Spinner size="sm" color={String(actionForeground)} />
-                  ) : stopMode ? (
-                    <Square
-                      color={String(actionForeground)}
-                      fill={String(actionForeground)}
-                      size={14}
-                      strokeWidth={2}
-                    />
-                  ) : (
-                    <ArrowUp color={String(primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
-                  )}
-                </Pressable>
-              </Animated.View>
+                <Animated.View style={controlStyle}>
+                  <Pressable
+                    accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !pressable, busy: busy || stopPending }}
+                    disabled={!pressable}
+                    className="size-10 items-center justify-center rounded-full"
+                    style={{
+                      // Nothing to send reads as a bare glyph on the card, not as a
+                      // filled control the user could press.
+                      backgroundColor: primed ? action : "transparent",
+                      // The card dims as a whole when the composer is disabled.
+                      // Dim only this control for a state the card does not show.
+                      opacity: disabled || pressable ? 1 : 0.45,
+                    }}
+                    onPress={stopMode ? onStop : requestSend}
+                  >
+                    {busy || stopPending ? (
+                      <Spinner size="sm" color={String(actionForeground)} />
+                    ) : stopMode ? (
+                      <Square
+                        color={String(actionForeground)}
+                        fill={String(actionForeground)}
+                        size={14}
+                        strokeWidth={2}
+                      />
+                    ) : (
+                      <ArrowUp color={String(primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
+                    )}
+                  </Pressable>
+                </Animated.View>
+              </View>
             </View>
           </AnimatedGlassView>
         </GestureDetector>
@@ -642,16 +743,14 @@ export function ChatComposer({
           <View
             ref={attachmentButton}
             collapsable={false}
-            // Inert while the composer rests as a pill: the control is invisible
-            // there, and a tap on the pill has to reach the field instead.
-            pointerEvents={resting || disabled || sending || attachments.preparing ? "none" : "auto"}
+            pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
             // SwiftUI's Menu owns the tap and @expo/ui documents onOpenMenu as
             // never firing on iOS, so answer the press itself. pointerEvents
             // already blocks this while the button cannot act.
             onTouchStart={() => void haptics.selection()}
           >
             <MenuView
-              style={{ width: 40, height: 40 }}
+              style={{ width: CONTROL_SIZE, height: CONTROL_SIZE }}
               actions={[
                 { id: "camera", title: "Camera", image: "camera" },
                 { id: "photos", title: "Photos", image: "photo" },

@@ -77,8 +77,9 @@ export interface ChatViewProps {
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
-// The composer at rest: 8 pt of top padding above the 48 pt control row.
-const COMPOSER_RESTING_HEIGHT = 56;
+// The composer at rest, at the default text size: 8 pt of top padding above
+// the 44 pt smaller bar. It has to be a constant, so it cannot follow the bar.
+const COMPOSER_RESTING_HEIGHT = 52;
 
 function leaveConversation(): void {
   if (router.canGoBack()) router.back();
