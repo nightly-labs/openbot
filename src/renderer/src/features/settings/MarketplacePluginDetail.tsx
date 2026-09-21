@@ -99,6 +99,12 @@ export function MarketplacePluginDetail(props: {
   busy?: boolean;
   onInstall: () => void | Promise<void>;
   /**
+   * Takes the plugin back off this computer. Offered in the install button's own place rather than
+   * beside it: a listing is installed or it is not, and the one control says which and offers the
+   * other. What is about to be removed is named in the confirmation the caller opens, not here.
+   */
+  onUninstall: () => void | Promise<void>;
+  /**
    * Given only where the copied address leads somewhere. `openbot.run/plugins/<slug>` is not served
    * yet, so the app withholds the button rather than hand out a link that answers 404.
    */
@@ -141,13 +147,18 @@ export function MarketplacePluginDetail(props: {
               states which agent gets the plugin and sends it there in the same place. */}
           <div class="marketplace-install-control">
             <AgentSelect agents={props.agents} value={props.targetAgentId} onChange={props.onTargetChange} />
-            <Button
-              loading={props.busy}
-              disabled={!props.targetAgentId || props.installed}
-              onClick={() => void props.onInstall()}
+            <Show
+              when={props.installed}
+              fallback={
+                <Button loading={props.busy} disabled={!props.targetAgentId} onClick={() => void props.onInstall()}>
+                  Install plugin
+                </Button>
+              }
             >
-              {props.installed ? "Installed" : "Install plugin"}
-            </Button>
+              <Button variant="destructive" loading={props.busy} onClick={() => void props.onUninstall()}>
+                Uninstall plugin
+              </Button>
+            </Show>
           </div>
         </div>
       </div>
