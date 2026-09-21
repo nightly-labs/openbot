@@ -206,7 +206,14 @@ export function ChatComposer({
       }),
     );
   }, [hasDraft, held, reducedMotion]);
-  const expansion = useDerivedValue(() => Math.max(Math.min(1, keyboardProgress.get()), held.get()));
+  // The keyboard drives the shape frame by frame, so zeroing the other
+  // durations leaves this one path moving. Reduced motion answers it by
+  // dropping the resting shape altogether: the composer stays open, and the
+  // keyboard changes nothing about it. Two discrete states would still jump
+  // on every keyboard, which is the motion the setting asks us to remove.
+  const expansion = useDerivedValue(() =>
+    reducedMotion ? 1 : Math.max(Math.min(1, keyboardProgress.get()), held.get()),
+  );
   const cardStyle = useAnimatedStyle(() => ({
     width: interpolate(expansion.get(), [0, 1], [restWidth, cardWidth]),
   }));
