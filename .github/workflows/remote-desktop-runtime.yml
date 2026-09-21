@@ -38,7 +38,8 @@ permissions: {}
 
 concurrency:
   group: remote-desktop-runtime-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Let native builds finish so the next push can reuse their successful output.
+  cancel-in-progress: false
 
 jobs:
   prepare:
@@ -164,19 +165,30 @@ jobs:
         with:
           persist-credentials: false
 
+      # PR caches stay separate from release builds. No prefix fallback: changed
+      # native inputs or build tools must compile again. Verification and smoke
+      # tests still run against the current checkout on every cache hit.
+      - name: Restore successful PR runtime build
+        if: github.event_name == 'pull_request'
+        id: runtime-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/remote-desktop-runtime
+          key: remote-desktop-pr-${{ github.event.pull_request.number }}-${{ matrix.os }}-${{ matrix.target }}-${{ needs.prepare.outputs.input_digest }}-${{ hashFiles('.github/workflows/remote-desktop-runtime.yml', 'scripts/**', 'vendor/remote-desktop/**', 'bun.lock', 'package.json', 'packages/**/package.json') }}
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.0
 
       - name: Set up Windows Node.js
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
 
       - name: Export Windows tool paths
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           "OPENBOT_BUN_DIR=$(Split-Path (Get-Command bun).Source -Parent)" >> $env:GITHUB_ENV
@@ -185,11 +197,11 @@ jobs:
           "OPENBOT_PERL_DIR=$(Split-Path (Get-Command perl).Source -Parent)" >> $env:GITHUB_ENV
 
       - name: Install macOS build dependencies
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.runtime-cache.outputs.cache-hit != 'true'
         run: brew install cmake ninja node pkgconf icu4c@78 miniupnpc openssl@3 opus
 
       - name: Set up Windows build dependencies
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
         with:
           msystem: UCRT64
@@ -215,13 +227,13 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build runtime on macOS
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.runtime-cache.outputs.cache-hit != 'true'
         env:
           CMAKE_GENERATOR: Ninja
         run: bun run build:remote-desktop-runtime
 
       - name: Build runtime on Windows
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         env:
           CMAKE_GENERATOR: Ninja
