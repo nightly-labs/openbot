@@ -42,7 +42,6 @@ index-*.css
 .claude/settings.local.json
 /build/cloudflared/
 /build/cua-driver/
-/build/cua-driver-theme/
 /build/codex/
 /build/claude/
 /build/grok/

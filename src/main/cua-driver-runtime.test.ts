@@ -140,24 +140,30 @@ describe("CuaDriverRuntime", () => {
   });
 
   it("waits for socket readiness before a second state probe reads permissions", async () => {
-    const socket = Promise.withResolvers<void>();
-    const waiting = Promise.withResolvers<void>();
+    let releaseSocket = () => {};
+    const socket = new Promise<void>((resolve) => {
+      releaseSocket = resolve;
+    });
+    let reportWaiting = () => {};
+    const waiting = new Promise<void>((resolve) => {
+      reportWaiting = resolve;
+    });
     const readPermissions = vi.fn(async () => [{ id: "accessibility" as const, granted: true }]);
     const { driver, spawned } = await runtime({
       waitForSocket: () => {
-        waiting.resolve();
-        return socket.promise;
+        reportWaiting();
+        return socket;
       },
       readPermissions,
     });
     const first = driver.state();
-    await waiting.promise;
+    await waiting;
     const second = driver.state();
     // Drain the second caller's continuation while the socket is still unavailable.
     await Promise.resolve();
     await Promise.resolve();
     expect(readPermissions).not.toHaveBeenCalled();
-    socket.resolve();
+    releaseSocket();
     await Promise.all([first, second]);
 
     expect(spawned).toHaveLength(1);
