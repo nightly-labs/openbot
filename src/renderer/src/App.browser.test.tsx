@@ -1,6 +1,7 @@
 import type { AgentSummary, BrowserPreview, BrowserTab, ServerSummary } from "@openbot/contracts/ipc";
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -16,7 +17,6 @@ import {
   installOpenbotStub,
   testServer,
 } from "./app-test-harness";
-import { toast } from "./components/ui";
 import BrowserPreviewSidebar, { BrowserPreviewCard } from "./features/conversation/BrowserPreviewSidebar";
 import { TestIntersectionObserver } from "./setupTests";
 
@@ -313,6 +313,23 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByRole("img", { name: "Preview of New page" });
     expect(capture.mock.calls.map(([id]) => id)).toEqual(["new"]);
     expect(screen.getByRole("img", { name: "Preview of Existing page" })).toBeInTheDocument();
+  });
+
+  it("does not use the desktop preview capture when web disables capture", async () => {
+    const capture = vi.mocked(window.openbot.browser.capturePreview);
+    render(() => (
+      <BrowserPreviewCard
+        capturePreview={null}
+        tab={browserTab("remote", "Remote page")}
+        contextKey="remote:chief"
+        enabled
+        onOpen={() => undefined}
+      />
+    ));
+
+    await screen.findByRole("button", { name: "Open Remote page" });
+    flush();
+    expect(capture).not.toHaveBeenCalled();
   });
 
   it("refreshes preview images only while the card is visible and enabled", async () => {

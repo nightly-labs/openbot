@@ -7,15 +7,15 @@ import type {
   QueueSnapshot,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import type { AgentMessage as RendererAgentMessage } from "@openbot/ui/data";
+import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, onSettled, type ParentProps, Show } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { clipboardFiles } from "../../preload/clipboard-files";
-import type { AgentMessage as RendererAgentMessage } from "../src/data";
 import { AuthProvider } from "../src/features/account/account-context";
 import { Conversation, createConversationController } from "../src/features/conversation/Conversation";
-import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
 import { ConversationView } from "../src/features/conversation/ConversationView";
 import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
 import { composerDraftKey } from "../src/features/conversation/conversation-keys";

@@ -4,6 +4,7 @@
 // blank all five and turn email delivery off locally instead of dialling the real mail host.
 const LOCAL_RUNTIME_KEYS = [
   "AUTH_EXPOSE_DEVELOPMENT_CODE",
+  "WEB_CLIENT_ENABLED",
   "EMAIL_SMTP_HOST",
   "EMAIL_SMTP_PORT",
   "EMAIL_SMTP_USERNAME",
@@ -23,6 +24,7 @@ const LOCAL_RUNTIME_KEYS = [
 
 const BOOLEAN_RUNTIME_KEYS = new Set<(typeof LOCAL_RUNTIME_KEYS)[number]>([
   "AUTH_EXPOSE_DEVELOPMENT_CODE",
+  "WEB_CLIENT_ENABLED",
   "SITE_PUBLISH_ENABLED",
   "SITE_COOKIE_ISOLATION_READY",
 ]);

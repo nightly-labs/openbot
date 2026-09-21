@@ -1,4 +1,3 @@
-import { For, Show } from "solid-js";
 import {
   Badge,
   Button,
@@ -11,7 +10,8 @@ import {
   SettingsSection,
   Text,
   Trash2,
-} from "../../components/ui";
+} from "@openbot/ui";
+import { For, Show } from "solid-js";
 import type { SettingsHostedSitesStore } from "./stores/hosted-sites-store";
 
 interface SettingsHostedSitesTabProps {

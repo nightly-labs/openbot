@@ -1,8 +1,11 @@
+import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
+import {
+  attachmentReferenceBadge,
+  attachmentReferenceTone,
+} from "@openbot/ui/features/conversation/AttachmentReference";
+import { messageFileReferences } from "@openbot/ui/features/conversation/FileReference";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { AttachmentCards } from "./AttachmentCards";
-import { attachmentReferenceBadge, attachmentReferenceTone } from "./AttachmentReference";
-import { messageFileReferences } from "./FileReference";
 
 describe("attachmentReferenceBadge", () => {
   it.each([

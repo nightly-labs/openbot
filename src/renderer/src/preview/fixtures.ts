@@ -31,9 +31,9 @@ import type {
   TeamSessionSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "../data";
+import type { AgentProfile } from "@openbot/ui/data";
+import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import type { McpServerConfig } from "../features/servers/mcp-servers";
-import type { MarketplacePluginDetail } from "../features/settings/marketplace-plugins";
 
 export const STORY_NOW = "2026-08-19T10:00:00.000Z";
 

@@ -1,9 +1,9 @@
+import type { AgentProfile } from "@openbot/ui/data";
+import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { describe, expect, it } from "vitest";
-import type { AgentProfile } from "../../data";
 import { STORY_AGENTS } from "../../preview/fixtures";
-import { AgentActivityIndicator } from "./AgentActivity";
 
 // An avatar is decorative, so it has no accessible name of its own: the agent it
 // belongs to is announced by the indicator's own status text. Which of the two

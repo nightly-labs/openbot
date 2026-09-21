@@ -1,12 +1,12 @@
 import { type ApprovalAutomationPreference, agentAutoApprovalEnabled } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { toast } from "../../components/ui";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
-import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "./app-settings";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";

@@ -1,9 +1,9 @@
 import type { SharedTable } from "@openbot/contracts/ipc";
+import { Button, Dialog, IconButton, Trash2, X } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import type { AgentProfile } from "@openbot/ui/data";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
-import { createScrollFades } from "../../components/createScrollFades";
-import { Button, Dialog, IconButton, Trash2, X } from "../../components/ui";
-import type { AgentProfile } from "../../data";
-import { errorMessage } from "../../error-message";
 
 interface SharedTablesModalProps {
   /** Resolves an owner id to a name. The owner can be an agent the user deleted, hence the lookup. */

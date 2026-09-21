@@ -72,21 +72,23 @@ export class RemoteDirectoryError extends Error {
 
 export class RemoteTeamDirectoryClient {
   readonly #apiUrl: string;
-  readonly #token: string;
+  readonly #authentication: { kind: "bearer"; token: string } | { kind: "browser" };
   readonly #fetch: TeamClientFetch;
   readonly #hostKeys: RemoteHostKeyStore;
   readonly #pairedHost: MobileConnectHostBinding | undefined;
   #pinTail: Promise<void> = Promise.resolve();
 
-  constructor(input: {
-    apiUrl: string;
-    token: string;
-    fetch: TeamClientFetch;
-    hostKeys?: RemoteHostKeyStore;
-    pairedHost?: MobileConnectHostBinding;
-  }) {
+  constructor(
+    input: {
+      apiUrl: string;
+      fetch: TeamClientFetch;
+      hostKeys?: RemoteHostKeyStore;
+      pairedHost?: MobileConnectHostBinding;
+    } & ({ token: string; authentication?: never } | { token?: never; authentication: { kind: "browser" } }),
+  ) {
     this.#apiUrl = input.apiUrl;
-    this.#token = input.token;
+    if (!input.authentication && !input.token) throw new Error("Account authentication is required.");
+    this.#authentication = input.authentication ?? { kind: "bearer", token: input.token ?? "" };
     this.#fetch = input.fetch;
     this.#pairedHost = input.pairedHost;
     const keys = new Map<string, string>();
@@ -249,7 +251,14 @@ export class RemoteTeamDirectoryClient {
 
   async previewInvite(inviteUrl: string): Promise<RemoteInvitePreview> {
     const invite = parseInviteUrl(inviteUrl);
-    if (new URL(invite.apiUrl).origin !== new URL(this.#apiUrl).origin) {
+    const inviteOrigin = new URL(invite.apiUrl).origin;
+    const origin = new URL(this.#apiUrl).origin;
+    // These production origins serve the same account Worker. Requests still use this client's origin.
+    const publicWebsiteInvite =
+      this.#authentication.kind === "browser" &&
+      origin === "https://openbot.run" &&
+      inviteOrigin === "https://api.openbot.run";
+    if (inviteOrigin !== origin && !publicWebsiteInvite) {
       throw new Error("This invitation belongs to another OpenBot service.");
     }
     const value = await this.#request("/v2/remote/invites/preview", {
@@ -311,13 +320,21 @@ export class RemoteTeamDirectoryClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await this.#fetch(new URL(path, this.#apiUrl), {
+      const browser = this.#authentication.kind === "browser";
+      const response = await this.#fetch(new URL(browser ? `/api/browser${path}` : path, this.#apiUrl), {
+        ...(browser ? { credentials: "same-origin" as const } : {}),
         method: options.method ?? "GET",
         headers: {
-          ...(options.authenticated === false ? {} : { Authorization: `Bearer ${this.#token}` }),
-          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(this.#authentication.kind === "bearer" && options.authenticated !== false
+            ? { Authorization: `Bearer ${this.#authentication.token}` }
+            : {}),
+          ...(browser
+            ? { "X-OpenBot-Browser": "1", "Content-Type": "application/json" }
+            : options.body
+              ? { "Content-Type": "application/json" }
+              : {}),
         },
-        ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+        ...(options.body || (browser && options.method === "POST") ? { body: JSON.stringify(options.body ?? {}) } : {}),
         signal: controller.signal,
       });
       const value = await response.json().catch(() => null);

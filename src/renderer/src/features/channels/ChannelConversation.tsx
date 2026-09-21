@@ -6,6 +6,40 @@ import {
   type DraftAttachment,
   type FilePreview,
 } from "@openbot/contracts/ipc";
+import { ArrowUp, Button, Plus, X } from "@openbot/ui";
+import { QuestionPromptBubble } from "@openbot/ui/components/QuestionPromptBubble";
+import {
+  SettingsPanel,
+  SettingsPanelContent,
+  SettingsPanelHeader,
+  settingsPanelMaxWidth,
+} from "@openbot/ui/components/SettingsPanel";
+import type { AgentMessage } from "@openbot/ui/data";
+import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
+import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
+import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
+import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import {
+  calculateChatScrollMargin,
+  createChatVirtualizer,
+} from "@openbot/ui/features/conversation/createChatVirtualizer";
+import { ScrollToLatestButton, scrollToLatestMessage } from "@openbot/ui/features/conversation/MessageNavigation";
+import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import {
+  anchorNewMessages,
+  countableTimelineMessage,
+  type NewMessageTally,
+  tallyNewMessages,
+} from "@openbot/ui/features/conversation/new-message-tally";
+import {
+  scrollToUnreadBoundary,
+  UnreadMessagesBanner,
+  UnreadMessagesDivider,
+  unreadMessagesDividerIsVisible,
+} from "@openbot/ui/features/conversation/UnreadMessages";
 import {
   createEffect,
   createMemo,
@@ -18,16 +52,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
-import {
-  createSettingsPanelWidth,
-  SettingsPanel,
-  SettingsPanelContent,
-  SettingsPanelHeader,
-  settingsPanelMaxWidth,
-} from "../../components/SettingsPanel";
-import { ArrowUp, Button, Plus, X } from "../../components/ui";
-import type { AgentMessage } from "../../data";
+import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
@@ -36,33 +61,11 @@ import { useBrowserTabs } from "../browser/browser-context";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
-import { ChatActionMarker } from "../conversation/ChatActionMarker";
-import { ChatMessageRow } from "../conversation/ChatMessageRow";
-import { ComposerEditor, expandComposerMentions } from "../conversation/ComposerEditor";
-import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
-import { calculateChatScrollMargin, createChatVirtualizer } from "../conversation/createChatVirtualizer";
-import { ScrollToLatestButton, scrollToLatestMessage } from "../conversation/MessageNavigation";
-import { MessageActions } from "../conversation/MessageRendering";
 import { channelMemoriesPort } from "../conversation/memories-port";
-import {
-  anchorNewMessages,
-  countableTimelineMessage,
-  type NewMessageTally,
-  tallyNewMessages,
-} from "../conversation/new-message-tally";
 import { channelRoutinesPort } from "../conversation/routines-port";
-import {
-  scrollToUnreadBoundary,
-  UnreadMessagesBanner,
-  UnreadMessagesDivider,
-  unreadMessagesDividerIsVisible,
-} from "../conversation/UnreadMessages";
 import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
-import { ChannelActivityIndicator, type ChannelWorker } from "./ChannelActivityIndicator";
-import { ChannelAvatar } from "./ChannelAvatar";
 import { ChannelEditor } from "./ChannelEditor";
-import { ChannelStoppedTasks } from "./ChannelStoppedTasks";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 import { useChannels } from "./channels-context";
 
@@ -761,6 +764,12 @@ export function ChannelConversation() {
                               }),
                             )
                           }
+                          browserSecret={{
+                            loadPreview: window.openbot.browser.capturePreview,
+                            onRespond: async (input) => {
+                              await channels.perform(() => window.openbot.agent.respondToBrowserSecret(input));
+                            },
+                          }}
                         />
                       )}
                     </Show>
@@ -917,6 +926,7 @@ export function ChannelConversation() {
             </Show>
             <Show when={!page().channel.archived && channels.state.editing === "settings"}>
               <SettingsPanel
+                onResizeEnd={saveSettingsPanelWidth}
                 id="channel-side-panel"
                 label="Channel panel"
                 width={panelWidth()}

@@ -39,7 +39,8 @@
     "./team-protocol/v4-webrtc-adapter": "./src/team-protocol/v4-webrtc-adapter.ts",
     "./validation": "./src/validation.ts",
     "./team-protocol/channels-v1": "./src/team-protocol/channels-v1.ts",
-    "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts"
+    "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts",
+    "./team-protocol/remote-stream-v1": "./src/team-protocol/remote-stream-v1.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

@@ -1,5 +1,5 @@
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createSignal, flush, getOwner, isDisposed, onSettled } from "solid-js";
-import { errorMessage } from "../../error-message";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";

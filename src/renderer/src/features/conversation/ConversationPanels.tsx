@@ -1,6 +1,4 @@
-import { usePlatform } from "../../platform";
 import { serverSupportsCapability } from "../servers/server-capabilities";
-import { useSettings } from "../settings/settings-context";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -16,10 +14,8 @@ import { Portal } from "@solidjs/web";
 import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
 
 /** @internal Stable HMR boundary for conversation panels. */
-export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
+export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLButtonElement) => void }) {
   const controller = useConversationController();
-  const platform = usePlatform();
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
   const {
     agentReady,
     activateBrowserTab,
@@ -93,6 +89,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
           return (
             <Loading>
               <FilePreviewPanel
+                allowExternalOpen={!props.runtime}
                 preview={file().preview}
                 agents={props.agents}
                 defaultWidth={() =>
@@ -114,7 +111,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
                 sourceUrl={attached()?.previewUrl ?? null}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={attached() ? downloadSidebarFile : undefined}
-                onReveal={attached() ? revealSidebarFile : undefined}
+                onReveal={attached() && !props.runtime ? revealSidebarFile : undefined}
                 onClose={closeSidebarFilePreview}
               />
             </Loading>
@@ -139,13 +136,14 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             )
           }
           onWidthChange={setBrowserPanelWidth}
+          capturePreview={props.runtime ? null : undefined}
           onOpenTab={(tabId, trigger) => {
             browserPreviewTrigger = trigger;
             if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
             setActiveRightPanel("browser-expanded");
           }}
-          onCloseTab={(tabId) => void closeBrowserTab(tabId)}
-          onNewTab={() => void openBrowserAddress("https://www.google.com", true)}
+          onCloseTab={props.runtime ? undefined : (tabId) => void closeBrowserTab(tabId)}
+          onNewTab={props.runtime ? undefined : () => void openBrowserAddress("https://www.google.com", true)}
           onCollapse={hideBrowserPanel}
         />
       </Show>
@@ -155,7 +153,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
           <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
           <BrowserPanel
             open={browserExpandedOpen()}
-            macWindowControls={platform.appInfo()?.platform === "darwin"}
+            macWindowControls={props.platform === "darwin"}
             tabs={browserTabs()}
             activeTab={activeBrowserTab()}
             activeControl={activeBrowserControl()}
@@ -164,19 +162,23 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             controllerForTab={browserControllerForTab}
             onAddressChange={setBrowserAddress}
             onAddressEditingChange={setBrowserAddressEditing}
-            onOpenAddress={(address) => void openBrowserAddress(address, address !== undefined)}
-            onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
-            onReload={(tabId) => void reloadBrowserTab(tabId)}
+            onOpenAddress={
+              props.runtime ? undefined : (address) => void openBrowserAddress(address, address !== undefined)
+            }
+            onNavigate={props.runtime ? undefined : (tabId, direction) => void navigateBrowserTab(tabId, direction)}
+            onReload={props.runtime ? undefined : (tabId) => void reloadBrowserTab(tabId)}
             onActivateTab={activateBrowserTab}
             onCloseTab={(tabId) => void closeBrowserTab(tabId)}
+            canCloseTabs={!props.runtime}
             onSurface={setBrowserSurfaceElement}
             liveViewTabId={
               props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view")
                 ? (activeBrowserTab()?.id ?? null)
                 : null
             }
+            liveViewRuntime={props.browserRuntime}
             onBack={() => setActiveRightPanel("browser")}
-            onEnterPip={showBrowserPip}
+            onEnterPip={props.runtime ? () => undefined : showBrowserPip}
           />
         </Portal>
       </Show>
@@ -185,9 +187,10 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
         {(agent) => (
           <Loading>
             <AgentSettingsPanel
-              skillsMarketplaceOpen={skillsMarketplaceOpen()}
-              onAddFromMarketplace={props.server?.kind === "local" ? () => setSkillsMarketplaceOpen(true) : undefined}
-              skillsMode={props.server?.kind === "local" ? "mutable" : "readonly"}
+              remoteClient={Boolean(props.runtime)}
+              skillsMarketplaceOpen={props.skillsMarketplaceOpen}
+              onAddFromMarketplace={props.server?.kind === "local" ? props.onOpenMarketplace : undefined}
+              skillsMode={props.runtime ? "hidden" : props.server?.kind === "local" ? "mutable" : "readonly"}
               tablesVisible={props.server?.kind === "local"}
               agents={props.agents}
               onCreateSkill={

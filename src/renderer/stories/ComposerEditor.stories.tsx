@@ -1,10 +1,10 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { DraftAttachment, InstalledSkill } from "@openbot/contracts/ipc";
+import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { createSignal } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ComposerEditor } from "../src/features/conversation/ComposerEditor";
 import { STORY_AGENTS, STORY_MCP_SERVERS } from "./fixtures";
 
 const args: Parameters<typeof ComposerEditor>[0] = {

@@ -17,7 +17,10 @@ import type {
   TeamPresenceSnapshot,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import type { AgentMessage, AgentProfile } from "../../data";
+import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
+import type { JSX } from "@solidjs/web";
+import type { BrowserViewRuntime } from "../browser/BrowserLiveView";
+import type { ConversationRuntime } from "./conversation-runtime";
 
 /**
  * What a conversation is, as data. These live apart from `ConversationView.tsx`
@@ -34,6 +37,12 @@ export interface ConversationTarget {
 }
 
 export interface ConversationProps {
+  runtime?: ConversationRuntime;
+  notice?: JSX.Element;
+  onOpenUsage?: (trigger: HTMLButtonElement) => void;
+  onOpenMarketplace?: () => void;
+  platform?: import("@openbot/contracts/ipc").AppInfo["platform"];
+
   agentStatus: AgentStatus;
   /**
    * The plan windows for the active agent's provider and model, when the account dock has them.
@@ -95,6 +104,8 @@ export interface ConversationProps {
    */
   workspaceCovered?: boolean;
   browserControlState: BrowserControlState;
+  /** Optional browser stream adapter for a non-Electron client. */
+  browserRuntime?: BrowserViewRuntime;
   server: ServerSummary | undefined;
   presence: TeamPresenceSnapshot;
   currentUserEmail: string;

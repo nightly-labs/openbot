@@ -1,8 +1,8 @@
 import type { DynamicIslandAction } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, onSettled } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
-import { toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";

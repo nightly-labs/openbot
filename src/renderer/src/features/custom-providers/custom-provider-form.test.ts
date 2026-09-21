@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
 import {
   type CustomProviderDraft,
   customProviderValue,
   emptyCustomProviderDraft,
   hasCustomProviderError,
   validateCustomProvider,
-} from "./custom-provider-form";
+} from "@openbot/ui/features/custom-providers/custom-provider-form";
+import { describe, expect, it } from "vitest";
 
 function draft(overrides: Partial<CustomProviderDraft> = {}): CustomProviderDraft {
   return {

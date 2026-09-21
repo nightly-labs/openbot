@@ -1,9 +1,9 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId, AgentStatus, AppSetupState, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import { Toaster, toast } from "@openbot/ui";
 import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Toaster, toast } from "../src/components/ui";
 import { OnboardingFlow } from "../src/features/onboarding/OnboardingFlow";
 import { createFakeCodeLogin } from "./code-login-fixture";
 import { STORY_AGENT_STATUS } from "./fixtures";

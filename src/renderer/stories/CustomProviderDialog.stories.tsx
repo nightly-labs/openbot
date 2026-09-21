@@ -1,7 +1,7 @@
+import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
+import type { CustomProviderDraft } from "@openbot/ui/features/custom-providers/custom-provider-form";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { CustomProviderDialog } from "../src/features/custom-providers/CustomProviderDialog";
-import type { CustomProviderDraft } from "../src/features/custom-providers/custom-provider-form";
 
 const localEndpoint: CustomProviderDraft = {
   providerId: "studio-local",

@@ -12,7 +12,7 @@
  */
 
 import type { AgentProviderId } from "@openbot/contracts/ipc";
-import type { ProviderCodeLoginState } from "./ProviderCodeLoginDialog";
+import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 
 export interface ProviderCodeLoginApi {
   /** The provider whose dialog is open, or null while none is. */

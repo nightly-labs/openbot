@@ -39,6 +39,24 @@ const channelFixture = {
 };
 
 describe("browser remote peer recovery", () => {
+  it("delivers browser-view frames only while the host connection is authenticated", async () => {
+    const received = deferred();
+    const onHostStreamData = vi.fn(() => {
+      received.resolve();
+    });
+    const network = await setupNetwork({ onHostStreamData });
+    await expect(network.runtime.sendHostStreamData("frame")).rejects.toThrow("offline");
+    await network.connect();
+    const channel = network.connection().channel("openbot.remote-desktop.signal.v1");
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
+    for (const frame of encodeTeamWebRtcPayload(bytes, 64 * 1024)) channel.receive(frame);
+    await received.promise;
+    expect(onHostStreamData).toHaveBeenCalledWith(bytes);
+    await network.runtime.dispose();
+    for (const frame of encodeTeamWebRtcPayload(bytes, 64 * 1024)) channel.receive(frame);
+    expect(onHostStreamData).toHaveBeenCalledOnce();
+    await expect(network.runtime.sendHostStreamData("frame")).rejects.toThrow("offline");
+  });
   it.each<{ path: string; method: string; body: TeamProtocolV2Json; response: TeamProtocolV2Json }>([
     {
       path: CHANNEL_ROUTES.list,
@@ -798,6 +816,7 @@ function deferred() {
 
 async function setupNetwork(
   options: {
+    onHostStreamData?: (data: string | ArrayBuffer) => void;
     onTeamEvent?: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
     onAccountProfileChanged?: () => Promise<void>;
     endSession?: () => Promise<void>;
@@ -1000,6 +1019,7 @@ async function setupNetwork(
       },
       endSession: options.endSession ?? (async () => {}),
       onAccountProfileChanged: options.onAccountProfileChanged,
+      onHostStreamData: options.onHostStreamData,
       onTeamEvent: options.onTeamEvent ?? (async () => {}),
       onConnectionUpdate: async (update) => {
         updates.push(update);

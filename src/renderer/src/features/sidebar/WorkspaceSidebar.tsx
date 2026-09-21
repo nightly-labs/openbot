@@ -1,3 +1,4 @@
+import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { createMemo } from "solid-js";
 import { useLayout } from "../../layout";
 import { DirectConversation } from "../../lazy-views";
@@ -13,7 +14,6 @@ import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
-import { Sidebar } from "./Sidebar";
 import { computeSidebarAgentStates } from "./sidebar-agent-states";
 import { useSidebar } from "./sidebar-context";
 

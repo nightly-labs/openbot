@@ -29,6 +29,49 @@ const PREVIEW = {
 const ACCEPTED = { hostId: HOST_ID, membershipId: "membership-1", role: "member" };
 
 describe("RemoteTeamDirectoryClient", () => {
+  it("uses same-origin browser cookies and CSRF headers without a bearer token", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ hosts: [] }));
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: "https://openbot.run",
+      authentication: { kind: "browser" },
+      fetch,
+    });
+    await client.listHosts();
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("https://openbot.run/api/browser/v2/remote/hosts/"),
+      expect.objectContaining({
+        credentials: "same-origin",
+        headers: { "X-OpenBot-Browser": "1", "Content-Type": "application/json" },
+      }),
+    );
+    fetch.mockResolvedValue(Response.json({ ended: true }));
+    await client.endSession("session");
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("https://openbot.run/api/browser/v2/remote/sessions/session/end"),
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    );
+  });
+  it("accepts production account invitations on the public web origin without sending credentials to the API origin", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json(PREVIEW));
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: "https://openbot.run",
+      authentication: { kind: "browser" },
+      fetch,
+    });
+    await expect(client.previewInvite(INVITE)).resolves.toMatchObject({ hostId: HOST_ID });
+    expect(fetch).toHaveBeenCalledWith(
+      new URL("https://openbot.run/api/browser/v2/remote/invites/preview"),
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    const foreign = createInviteUrl({
+      apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/",
+      serverId: HOST_ID,
+      fingerprint: HOST_FINGERPRINT,
+      token: "t".repeat(32),
+    });
+    await expect(client.previewInvite(foreign)).rejects.toThrow("another OpenBot service");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
   it("removes a revoked paired desktop while keeping the other memberships available", async () => {
     const remote = {
       hostId: "other",

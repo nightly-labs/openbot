@@ -144,7 +144,12 @@
       }
     },
     {
-      "includes": ["src/renderer/src/**/*.ts", "src/renderer/src/**/*.tsx"],
+      "includes": [
+        "src/renderer/src/**/*.ts",
+        "src/renderer/src/**/*.tsx",
+        "packages/ui/src/**/*.ts",
+        "packages/ui/src/**/*.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -199,6 +204,26 @@
         "./tools/biome/anti-slop/rules/no-class-selector-queries.grit",
         "./tools/biome/anti-slop/rules/no-sleep-in-tests.grit"
       ]
+    },
+    {
+      "includes": ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/renderer/**", "**/main/**", "**/backend/**", "**/preload/**"],
+                    "message": "Shared UI receives data and actions through props; do not import application or platform implementations."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "javascript": {

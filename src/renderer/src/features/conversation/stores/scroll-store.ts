@@ -1,16 +1,23 @@
-import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { createScrollFades } from "../../../components/createScrollFades";
-import { errorMessage } from "../../../error-message";
-import type { ConversationProps, ConversationTarget } from "../conversation-types";
-import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "../createChatVirtualizer";
-import { scrollToLatestMessage } from "../MessageNavigation";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { errorMessage } from "@openbot/ui/error-message";
+import {
+  calculateChatScrollMargin,
+  chatHistoryBoundaryReached,
+  createChatVirtualizer,
+} from "@openbot/ui/features/conversation/createChatVirtualizer";
+import { scrollToLatestMessage } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
   anchorNewMessages,
   countableTimelineMessage,
   type NewMessageTally,
   tallyNewMessages,
-} from "../new-message-tally";
-import { scrollToUnreadBoundary, unreadMessagesDividerIsVisible } from "../UnreadMessages";
+} from "@openbot/ui/features/conversation/new-message-tally";
+import {
+  scrollToUnreadBoundary,
+  unreadMessagesDividerIsVisible,
+} from "@openbot/ui/features/conversation/UnreadMessages";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import type { ConversationProps, ConversationTarget } from "../conversation-types";
 
 export interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;

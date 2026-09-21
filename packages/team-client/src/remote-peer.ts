@@ -108,6 +108,7 @@ export interface RemoteTeamConnectionUpdate {
 }
 
 export interface RemoteTeamPeerActions {
+  onHostStreamData?: (data: string | ArrayBuffer) => void;
   onAccountProfileChanged?: () => Promise<void>;
   getBootstrap: (hostId: string, clientPublicKey: string) => Promise<RemoteTeamBootstrapPayload>;
   endSession: (sessionId: string) => Promise<void>;
@@ -188,6 +189,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
   const closingSessions = new Map<string, Promise<void>>();
 
   return {
+    async sendHostStreamData(data: string | ArrayBuffer) {
+      const state = peer;
+      if (!state || !isPeerOnline(state)) throw new Error("The host connection is offline.");
+      await sendPayload(state, "desktop", data);
+    },
+    cancelUpload: () => files.cancelUpload(),
     execute: (command: RemoteTeamCommand) => executeCommand(command, actions),
     dispose: () => {
       active = false;
@@ -602,6 +609,11 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     actions: ActionsRef,
   ): Promise<void> {
     if (state.closed || peer !== state) return;
+    if (kind === "desktop") {
+      if (!state.authenticated) throw new Error("The host sent stream data before authentication.");
+      actions.current.onHostStreamData?.(data);
+      return;
+    }
     if (kind === "files") {
       if (!state.authenticated) throw new Error("The host sent data before authentication.");
       if (!(await downloads.receive(data)) && isString(data)) files.receive(data);

@@ -11,6 +11,7 @@ export interface WorkerBindings {
   MARKETPLACE_UPLOAD_RATE_LIMITER: RateLimit;
   SITE_REPORT_RATE_LIMITER: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
+  WEB_CLIENT_ENABLED?: string;
   EMAIL_SMTP_HOST?: string;
   EMAIL_SMTP_PORT?: string;
   EMAIL_SMTP_USERNAME?: string;

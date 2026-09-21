@@ -1,6 +1,3 @@
-import { createSignal } from "solid-js";
-import { expect, fn, within } from "storybook/test";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
   AlertDialog,
   buttonVariants,
@@ -22,7 +19,10 @@ import {
   Tabs,
   Tooltip,
   Trash2,
-} from "../src/components/ui";
+} from "@openbot/ui";
+import { createSignal } from "solid-js";
+import { expect, fn, within } from "storybook/test";
+import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const meta = {
   title: "Foundations/Interactions",

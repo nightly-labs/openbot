@@ -1,7 +1,7 @@
+import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { createMemo, createSignal } from "solid-js";
 import { expect, fireEvent, fn, userEvent, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ServerRail } from "../src/features/servers/ServerRail";
 import { STORY_SERVERS } from "./fixtures";
 
 const args: Parameters<typeof ServerRail>[0] = {

@@ -1,6 +1,6 @@
+import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 
 /*
  * The one place a user's OpenCode Go key enters OpenBot.

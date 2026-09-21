@@ -2,13 +2,13 @@ import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
+import { Button, toast } from "@openbot/ui";
+import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
+import { errorMessage } from "@openbot/ui/error-message";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { ComputerIcon, RemoteDesktopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { createMemo, Show } from "solid-js";
-import { ProviderModelPicker } from "../../components/ProviderModelPicker";
-import { Button, toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import { useI18n } from "../../i18n-context";
-import { AgentAvatar } from "../agents/AgentAvatar";
-import { ComputerIcon, RemoteDesktopIcon } from "./ConversationIcons";
 
 /** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {

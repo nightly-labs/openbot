@@ -3,14 +3,14 @@ import type {
   ProviderRuntimeStatus,
   ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
+import { Toaster } from "@openbot/ui";
+import type { ProviderUpdate } from "@openbot/ui/features/provider-updates/provider-update";
+import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, it, vi } from "vitest";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
-import { Toaster } from "../../components/ui";
-import { DEFAULT_GENERAL_SETTINGS } from "../settings/app-settings";
 import { SettingsModal } from "../settings/SettingsModal";
 import { createProviderRuntimeStore } from "./provider-runtime-store";
-import type { ProviderUpdate } from "./provider-update";
 import { dismissProviderUpdateToast } from "./provider-update-toast";
 
 const offer: ProviderUpdate = {

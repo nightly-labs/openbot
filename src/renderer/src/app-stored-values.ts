@@ -1,5 +1,5 @@
+import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import { createStore } from "solid-js";
-import type { AgentMessage, AgentProfile } from "./data";
 
 /**
  * Agent profiles and messages are handed to the view as stores, so replacing one

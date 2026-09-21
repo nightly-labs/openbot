@@ -1,5 +1,5 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
-import { errorMessage } from "../../error-message";
+import { errorMessage } from "@openbot/ui/error-message";
 export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "transcribing";
 
 export function voiceButtonLabel(phase: VoicePhase) {

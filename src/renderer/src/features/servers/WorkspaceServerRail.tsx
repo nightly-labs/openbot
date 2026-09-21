@@ -1,9 +1,9 @@
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { onSettled, Show } from "solid-js";
-import { toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { useUsage } from "../usage/usage-context";
-import { ServerRail } from "./ServerRail";
 import { useServerSelection } from "./server-selection";
 import { useServerSettings } from "./server-settings";
 import { useServers } from "./servers-context";

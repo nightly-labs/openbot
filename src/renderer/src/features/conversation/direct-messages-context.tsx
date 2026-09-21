@@ -6,9 +6,9 @@ import type {
   DirectThreadSummary,
   DirectTypingRealtimeEvent,
 } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";

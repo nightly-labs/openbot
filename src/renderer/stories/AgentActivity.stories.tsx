@@ -1,6 +1,6 @@
+import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { createSignal, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AgentActivityIndicator } from "../src/features/conversation/AgentActivity";
 import { STORY_AGENTS } from "./fixtures";
 
 const indicatorMeta = {

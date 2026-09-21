@@ -1,7 +1,7 @@
+import type { AgentMessage } from "@openbot/ui/data";
+import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import type { AgentMessage } from "../src/data";
-import { MessageActions } from "../src/features/conversation/MessageRendering";
 
 const message: AgentMessage = {
   id: "message-actions-1",

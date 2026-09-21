@@ -7,11 +7,11 @@ import type {
   OpenBotDesktopApi,
   SkillSubmission,
 } from "@openbot/contracts/ipc";
+import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { type ComponentProps, createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "../../analytics";
-import type { MarketplacePluginDetail } from "./marketplace-plugins";
 import { SkillsMarketplaceModal } from "./SkillsMarketplaceModal";
 
 /** The install target is a listbox control, so a choice is a click on the trigger and on the option. */

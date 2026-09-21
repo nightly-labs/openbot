@@ -5,8 +5,6 @@ import type {
   BrowserControlSession,
   BrowserTab,
 } from "@openbot/contracts/ipc";
-import { Portal } from "@solidjs/web";
-import { createEffect, For, onSettled, Show } from "solid-js";
 import {
   Button,
   buttonVariants,
@@ -16,9 +14,8 @@ import {
   PictureInPicture2,
   Tabs,
   TriangleAlert,
-} from "../../components/ui";
-import type { AgentProfile } from "../../data";
-import BrowserLiveView from "../browser/BrowserLiveView";
+} from "@openbot/ui";
+import type { AgentProfile } from "@openbot/ui/data";
 import {
   BrowserBackIcon,
   BrowserControlIcon,
@@ -26,7 +23,10 @@ import {
   BrowserReloadIcon,
   CloseIcon,
   PlusIcon,
-} from "./ConversationIcons";
+} from "@openbot/ui/features/conversation/ConversationIcons";
+import { Portal } from "@solidjs/web";
+import { createEffect, For, onSettled, Show } from "solid-js";
+import BrowserLiveView, { type BrowserViewRuntime } from "../browser/BrowserLiveView";
 
 const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailAction, string> = {
   open: "Opening a page…",
@@ -66,14 +66,16 @@ interface BrowserPanelProps {
   controllerForTab: (tab: BrowserTab) => AgentProfile | undefined;
   onAddressChange: (value: string) => void;
   onAddressEditingChange: (editing: boolean) => void;
-  onOpenAddress: (address?: string) => void;
-  onNavigate: (tabId: string, direction: "back" | "forward") => void;
-  onReload: (tabId: string) => void;
+  onOpenAddress?: (address?: string) => void;
+  onNavigate?: (tabId: string, direction: "back" | "forward") => void;
+  onReload?: (tabId: string) => void;
   onActivateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onSurface: (element: HTMLDivElement | undefined) => void;
   /** The tab to draw here, for a host whose browser is not a view on this screen. Local: `null`. */
   liveViewTabId: string | null;
+  liveViewRuntime?: BrowserViewRuntime;
+  canCloseTabs?: boolean;
   onBack: () => void;
   onEnterPip: () => void;
   /**
@@ -117,7 +119,9 @@ export default function BrowserPanel(props: BrowserPanelProps) {
 
   const surface = () => (
     <div class="browser-surface" ref={(element) => (surfaceElement = element)}>
-      <Show when={props.liveViewTabId}>{(tabId) => <BrowserLiveView tabId={tabId()} active={props.open} />}</Show>
+      <Show when={props.liveViewTabId}>
+        {(tabId) => <BrowserLiveView runtime={props.liveViewRuntime} tabId={tabId()} active={props.open} />}
+      </Show>
       <Show when={props.tabs.length === 0}>
         <div class="browser-empty-state">
           <strong>Open a page</strong>
@@ -132,7 +136,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       class="browser-address-bar"
       onSubmit={(event) => {
         event.preventDefault();
-        props.onOpenAddress();
+        props.onOpenAddress?.();
       }}
     >
       <Input
@@ -186,20 +190,23 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                       as="button"
                       value={tab().id}
                       aria-label={control() ? `${title()}, controlled by ${controller()?.name ?? "agent"}` : title()}
-                      aria-description="Press Delete or Control/Command W to close"
+                      aria-description={
+                        props.canCloseTabs === false ? undefined : "Press Delete or Control/Command W to close"
+                      }
                       class={buttonVariants({ variant: "ghost", class: "browser-tab" })}
                       // Only user interaction activates a native tab. Collection registration can
                       // temporarily make the controlled selection absent and suggest the first tab.
                       onClick={() => props.onActivateTab(tab().id)}
                       onFocus={() => props.activeTab?.id !== tab().id && props.onActivateTab(tab().id)}
                       onPointerDown={(event) => {
+                        if (props.canCloseTabs === false) return;
                         if (event.button !== 1) return;
                         event.preventDefault();
                         event.stopPropagation();
                         props.onCloseTab(tab().id);
                       }}
                       onKeyDown={(event) => {
-                        if (event.key !== "Delete") return;
+                        if (props.canCloseTabs === false || event.key !== "Delete") return;
                         event.preventDefault();
                         props.onCloseTab(tab().id);
                       }}
@@ -215,41 +222,45 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                         )}
                       </Show>
                       <span class="browser-tab-title">{title()}</span>
-                      <span
-                        class="browser-tab-close"
-                        aria-hidden="true"
-                        title={`Close ${tab().title || "browser tab"}`}
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          if (event.button === 1) props.onCloseTab(tab().id);
-                        }}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          props.onCloseTab(tab().id);
-                        }}
-                      >
-                        <CloseIcon />
-                      </span>
+                      <Show when={props.canCloseTabs !== false}>
+                        <span
+                          class="browser-tab-close"
+                          aria-hidden="true"
+                          title={`Close ${tab().title || "browser tab"}`}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (event.button === 1) props.onCloseTab(tab().id);
+                          }}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            props.onCloseTab(tab().id);
+                          }}
+                        >
+                          <CloseIcon />
+                        </span>
+                      </Show>
                     </Tabs.Trigger>
                   </div>
                 );
               }}
             </For>
           </Tabs.List>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-new-tab"
-            aria-label="New browser tab"
-            onClick={() => {
-              props.onAddressChange("https://www.google.com");
-              props.onOpenAddress("https://www.google.com");
-            }}
-          >
-            <PlusIcon />
-          </Button>
+          <Show when={props.onOpenAddress}>
+            <Button
+              variant="ghost"
+              type="button"
+              class="browser-new-tab"
+              aria-label="New browser tab"
+              onClick={() => {
+                props.onAddressChange("https://www.google.com");
+                props.onOpenAddress?.("https://www.google.com");
+              }}
+            >
+              <PlusIcon />
+            </Button>
+          </Show>
         </div>
       </header>
       <Portal>
@@ -269,37 +280,41 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       </Portal>
       <Tabs.Content forceMount value={props.activeTab?.id ?? "__empty"} class="browser-tab-panel">
         <div class="browser-toolbar">
-          <Button
-            variant="ghost"
-            type="button"
-            aria-label="Go back"
-            class="browser-toolbar-button"
-            disabled={!props.activeTab}
-            onClick={() => props.activeTab && props.onNavigate(props.activeTab.id, "back")}
-          >
-            <BrowserBackIcon />
-          </Button>
-          <Button
-            variant="ghost"
-            type="button"
-            aria-label="Go forward"
-            class="browser-toolbar-button"
-            disabled={!props.activeTab}
-            onClick={() => props.activeTab && props.onNavigate(props.activeTab.id, "forward")}
-          >
-            <BrowserForwardIcon />
-          </Button>
-          <Button
-            variant="ghost"
-            type="button"
-            aria-label="Reload page"
-            class="browser-toolbar-button"
-            disabled={!props.activeTab}
-            onClick={() => props.activeTab && props.onReload(props.activeTab.id)}
-          >
-            <BrowserReloadIcon />
-          </Button>
-          {addressBar()}
+          <Show when={props.onNavigate}>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-label="Go back"
+              class="browser-toolbar-button"
+              disabled={!props.activeTab}
+              onClick={() => props.activeTab && props.onNavigate?.(props.activeTab.id, "back")}
+            >
+              <BrowserBackIcon />
+            </Button>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-label="Go forward"
+              class="browser-toolbar-button"
+              disabled={!props.activeTab}
+              onClick={() => props.activeTab && props.onNavigate?.(props.activeTab.id, "forward")}
+            >
+              <BrowserForwardIcon />
+            </Button>
+          </Show>
+          <Show when={props.onReload}>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-label="Reload page"
+              class="browser-toolbar-button"
+              disabled={!props.activeTab}
+              onClick={() => props.activeTab && props.onReload?.(props.activeTab.id)}
+            >
+              <BrowserReloadIcon />
+            </Button>
+          </Show>
+          <Show when={props.onOpenAddress}>{addressBar()}</Show>
           <Show when={props.activeTab?.recording}>
             <span class="browser-recording-status" role="status" aria-label="Browser recording active">
               <CircleDot /> REC
@@ -317,15 +332,17 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               </span>
             )}
           </Show>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label="Open browser Picture in Picture"
-            onClick={props.onEnterPip}
-          >
-            <PictureInPicture2 class="browser-toolbar-icon" />
-          </Button>
+          <Show when={props.canCloseTabs !== false}>
+            <Button
+              variant="ghost"
+              type="button"
+              class="browser-toolbar-button"
+              aria-label="Open browser Picture in Picture"
+              onClick={props.onEnterPip}
+            >
+              <PictureInPicture2 class="browser-toolbar-icon" />
+            </Button>
+          </Show>
         </div>
         {surface()}
       </Tabs.Content>

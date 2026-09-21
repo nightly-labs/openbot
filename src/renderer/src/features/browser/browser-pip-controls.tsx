@@ -1,5 +1,5 @@
+import { Button, PanelRight, X } from "@openbot/ui";
 import { render } from "@solidjs/web";
-import { Button, PanelRight, X } from "../../components/ui";
 import "../../styles.css";
 
 function BrowserPictureInPictureControls() {

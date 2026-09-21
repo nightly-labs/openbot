@@ -1,7 +1,8 @@
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { ProviderPicker, type ProviderPickerOption } from "./ProviderPicker";
+import { ProviderPicker } from "./ProviderPicker";
 
 /*
  * The two provider rows OpenBot treats differently.

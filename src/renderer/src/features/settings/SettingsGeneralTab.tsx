@@ -6,8 +6,6 @@ import type {
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createSignal, Show } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import {
   AlertDialog,
   Button,
@@ -25,12 +23,14 @@ import {
   SettingsSection,
   SwitchField,
   Text,
-} from "../../components/ui";
+} from "@openbot/ui";
+import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
+import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
+import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { createSignal, Show } from "solid-js";
+import { ProviderPicker } from "../../components/ProviderPicker";
 import { useI18n } from "../../i18n-context";
-import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
-import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
-import type { GeneralSettingsValue } from "./app-settings";
 import { LanguageSelect } from "./LanguageSelect";
 import type { SettingsGeneralStore } from "./stores/general-store";
 

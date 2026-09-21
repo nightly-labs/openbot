@@ -6,5 +6,11 @@
     "jsxImportSource": "@solidjs/web",
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "packages/contracts/src/**/*.ts"]
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "packages/contracts/src/**/*.ts",
+    "packages/ui/src/**/*.ts",
+    "packages/ui/src/**/*.tsx"
+  ]
 }

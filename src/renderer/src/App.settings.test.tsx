@@ -1,4 +1,5 @@
 import type { AccountUsage, AgentSummary, ApprovalAutomationPreference } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -14,8 +15,7 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
-import { toast } from "./components/ui";
-import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
+import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
 
 describe("OpenBot connected desktop shell", () => {
   it("opens the marketplace from skill settings and returns to skills", async () => {

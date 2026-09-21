@@ -1,6 +1,6 @@
+import { Heading, ServerGradientLogo, serverGradientLogoProfile, Text } from "@openbot/ui";
 import { For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Heading, ServerGradientLogo, serverGradientLogoProfile, Text } from "../src/components/ui";
 
 const GALLERY_SEEDS = [
   "cobalt-labs",

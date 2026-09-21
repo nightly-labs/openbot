@@ -1,6 +1,6 @@
+import { Heading, Switch, SwitchField } from "@openbot/ui";
 import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Heading, Switch, SwitchField } from "../src/components/ui";
 
 const meta = {
   title: "Foundations/Switch",

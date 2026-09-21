@@ -35,6 +35,7 @@ describe("ui foundation check", () => {
         // nothing about this branch of the pattern.
         "components/Icons.tsx: Kobalte/Lucide imports are allowed only in components/ui",
         "components/ui/complex.tsx: a Kobalte namespace must go through an adapter, not a direct alias",
+        "components/ui/features/Bad.tsx: use a components/ui control instead of a native element",
         // A sibling directory whose name starts with "ui". Skipping the design system is a
         // path-prefix comparison, so without a separator this line and the second composite
         // role below both disappear, and a components/ui-kit could hold anything.
@@ -140,4 +141,23 @@ describe("ui foundation check", () => {
       "renderer/components/ui/complex.tsx: a Kobalte namespace must go through an adapter, not a direct alias",
     );
   });
+});
+
+it("checks primitive adapters when the shared UI is outside the renderer", () => {
+  const report = checkUiFoundation(
+    cleanRenderer,
+    fixtureRenderer,
+    [cleanRenderer, fixtureRenderer],
+    resolve(fixtureRenderer, "components/ui"),
+  );
+  expect(report.failures).toContain(
+    "components/ui/complex.tsx: a Kobalte namespace must go through an adapter, not a direct alias",
+  );
+  const clean = checkUiFoundation(
+    cleanRenderer,
+    cleanRenderer,
+    [cleanRenderer],
+    resolve(cleanRenderer, "components/ui"),
+  );
+  expect(clean.failures).toEqual([]);
 });

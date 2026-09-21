@@ -12,19 +12,6 @@ import type {
   ProviderRuntimeStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createStore, For, onCleanup, onSettled, Show } from "solid-js";
-import { normalizeAvatarFile } from "../../avatar-image";
-import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "../../bloub-avatar";
-import { ProviderModelPicker, reasoningLabel } from "../../components/ProviderModelPicker";
-import {
-  createSettingsPanelWidth,
-  SettingsField,
-  SettingsLinkGroup,
-  SettingsLinkRow,
-  SettingsPanel,
-  SettingsPanelContent,
-  SettingsPanelHeader,
-} from "../../components/SettingsPanel";
 import {
   Button,
   Input,
@@ -36,10 +23,23 @@ import {
   SelectValue,
   Switch,
   Textarea,
-} from "../../components/ui";
-import type { AgentProfile } from "../../data";
-import { errorMessage } from "../../error-message";
-import { AgentAvatar } from "../agents/AgentAvatar";
+} from "@openbot/ui";
+import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
+import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "@openbot/ui/bloub-avatar";
+import { ProviderModelPicker, reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
+import {
+  SettingsField,
+  SettingsLinkGroup,
+  SettingsLinkRow,
+  SettingsPanel,
+  SettingsPanelContent,
+  SettingsPanelHeader,
+} from "@openbot/ui/components/SettingsPanel";
+import type { AgentProfile } from "@openbot/ui/data";
+import { errorMessage } from "@openbot/ui/error-message";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { createEffect, createMemo, createStore, For, onCleanup, onSettled, Show } from "solid-js";
+import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, userAssignedSkills } from "./AgentSkillsModal";
@@ -56,7 +56,8 @@ export interface AgentRuntimeSettings {
 export type AgentRuntimeSettingsPatch = AgentRuntimeSettings | Pick<AgentRuntimeSettings, "reasoningEffort">;
 
 interface AgentSettingsPanelProps {
-  onOpenUsage: (trigger: HTMLButtonElement) => void;
+  remoteClient?: boolean;
+  onOpenUsage?: (trigger: HTMLButtonElement) => void;
   agent: AgentProfile;
   runtimeSettings: AgentRuntimeSettings;
   agentStatus: AgentStatus;
@@ -259,7 +260,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.skills.reopenAfterMarketplace = false;
         }
       });
-      if (agentChanged) {
+      if (agentChanged && !props.remoteClient) {
         void window.openbot.agent
           .listTables()
           .catch(() => [])
@@ -604,6 +605,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
 
   return (
     <SettingsPanel
+      onResizeEnd={saveSettingsPanelWidth}
       id="settings-side-panel"
       label="Agent settings"
       width={panelWidth()}
@@ -833,49 +835,53 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               onBlur={saveDescription}
             />
           </SettingsField>
-          <SettingsLinkGroup>
-            <SettingsLinkRow label="Usage" onClick={props.onOpenUsage} />
-            <SettingsLinkRow
-              label="Memories"
-              value={`${draft.memories.count} saved`}
-              onClick={() =>
-                setDraft((state) => {
-                  state.memories.open = true;
-                })
-              }
-            />
-            <Show when={skillsMode() !== "hidden"}>
+          <Show when={!props.remoteClient}>
+            <SettingsLinkGroup>
+              <Show when={props.onOpenUsage}>
+                <SettingsLinkRow label="Usage" onClick={(trigger) => props.onOpenUsage?.(trigger)} />
+              </Show>
               <SettingsLinkRow
-                label="Skills"
-                value={`${draft.skills.count} assigned`}
+                label="Memories"
+                value={`${draft.memories.count} saved`}
                 onClick={() =>
                   setDraft((state) => {
-                    state.skills.open = true;
+                    state.memories.open = true;
                   })
                 }
               />
-            </Show>
-            <Show when={props.tablesVisible !== false}>
+              <Show when={skillsMode() !== "hidden"}>
+                <SettingsLinkRow
+                  label="Skills"
+                  value={`${draft.skills.count} assigned`}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.skills.open = true;
+                    })
+                  }
+                />
+              </Show>
+              <Show when={props.tablesVisible !== false}>
+                <SettingsLinkRow
+                  label="Tables"
+                  value={`${draft.tables.count} ${draft.tables.count === 1 ? "table" : "tables"}`}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.tables.open = true;
+                    })
+                  }
+                />
+              </Show>
               <SettingsLinkRow
-                label="Tables"
-                value={`${draft.tables.count} ${draft.tables.count === 1 ? "table" : "tables"}`}
+                label="Routines"
+                value={`${draft.routines.count} configured`}
                 onClick={() =>
                   setDraft((state) => {
-                    state.tables.open = true;
+                    state.routines.open = true;
                   })
                 }
               />
-            </Show>
-            <SettingsLinkRow
-              label="Routines"
-              value={`${draft.routines.count} configured`}
-              onClick={() =>
-                setDraft((state) => {
-                  state.routines.open = true;
-                })
-              }
-            />
-          </SettingsLinkGroup>
+            </SettingsLinkGroup>
+          </Show>
           <section class="agent-settings-model" aria-labelledby="agent-model-heading">
             <div class="agent-settings-section-heading">
               <strong id="agent-model-heading">Runtime</strong>

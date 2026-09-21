@@ -1,5 +1,4 @@
 import { type AgentSummary, analyticsRange, type HostAnalytics, type HostAnalyticsInput } from "@openbot/contracts/ipc";
-import { createEffect, createStore, onSettled, Show } from "solid-js";
 import {
   ArrowLeft,
   Button,
@@ -10,8 +9,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui";
-import { AgentUsageReport } from "./AgentUsageReport";
+} from "@openbot/ui";
+import { AgentUsageReport } from "@openbot/ui/features/usage/AgentUsageReport";
 import {
   type UsageAgentLabel,
   type UsageMetric,
@@ -19,7 +18,8 @@ import {
   usageMetrics,
   usagePeriodDays,
   usagePeriods,
-} from "./usage-format";
+} from "@openbot/ui/features/usage/usage-format";
+import { createEffect, createStore, onSettled, Show } from "solid-js";
 
 interface AgentUsagePanelProps {
   agentId?: string;

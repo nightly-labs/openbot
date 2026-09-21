@@ -1,4 +1,4 @@
-import type { BrowserLiveViewInput } from "@openbot/contracts/ipc";
+import type { BrowserDesktopApi, BrowserLiveViewInput } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
 
 /** CDP's modifier bitmap, which is what the host dispatches the event with. */
@@ -7,7 +7,13 @@ const CONTROL = 2;
 const META = 4;
 const SHIFT = 8;
 
+export type BrowserViewRuntime = Pick<
+  BrowserDesktopApi,
+  "startLiveView" | "stopLiveView" | "sendLiveViewInput" | "onLiveViewEvent"
+>;
+
 interface BrowserLiveViewProps {
+  runtime?: BrowserViewRuntime;
   tabId: string;
   /** False while the panel is closed: a view nobody is looking at still costs the host a screencast. */
   active: boolean;
@@ -22,6 +28,7 @@ interface BrowserLiveViewProps {
  * back on the same socket as a fraction of the frame the user was actually looking at.
  */
 export default function BrowserLiveView(props: BrowserLiveViewProps) {
+  const runtime = props.runtime ?? window.openbot.browser;
   const [state, setState] = createStore<{ live: boolean; message: string }>({
     live: false,
     message: "Connecting to the page on the host…",
@@ -42,7 +49,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     bitmap.close();
   };
 
-  const stopListening = window.openbot.browser.onLiveViewEvent((event) => {
+  const stopListening = runtime.onLiveViewEvent((event) => {
     if (event.tabId !== props.tabId) return;
     if (event.type === "stopped") {
       setState(() => ({ live: false, message: event.reason }));
@@ -65,24 +72,27 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     ({ tabId, active }) => {
       if (!active) return;
       setState(() => ({ live: false, message: "Connecting to the page on the host…" }));
-      void window.openbot.browser
+      void runtime
         .startLiveView(tabId)
         .catch((error: unknown) => setState(() => ({ live: false, message: errorMessage(error) })));
-      onCleanup(() => void window.openbot.browser.stopLiveView().catch(() => undefined));
+      onCleanup(() => void runtime.stopLiveView().catch(() => undefined));
     },
   );
 
   const send = (input: BrowserLiveViewInput) => {
-    void window.openbot.browser.sendLiveViewInput(input).catch(() => undefined);
+    void runtime.sendLiveViewInput(input).catch(() => undefined);
   };
 
   const point = (event: MouseEvent): { x: number; y: number } | null => {
-    const bounds = canvas()?.getBoundingClientRect();
-    if (!bounds || bounds.width === 0 || bounds.height === 0) return null;
-    return {
-      x: clampFraction((event.clientX - bounds.left) / bounds.width),
-      y: clampFraction((event.clientY - bounds.top) / bounds.height),
-    };
+    const element = canvas();
+    if (!element) return null;
+    return mapBrowserViewPoint(
+      element.getBoundingClientRect(),
+      element.width,
+      element.height,
+      event.clientX,
+      event.clientY,
+    );
   };
 
   const pointer = (event: MouseEvent, action: "move" | "down" | "up") => {
@@ -156,6 +166,28 @@ function modifiers(event: MouseEvent | KeyboardEvent): number {
 
 function clampFraction(value: number): number {
   return Math.min(Math.max(value, 0), 1);
+}
+
+/** Map a screen point to the image area of a contain-sized canvas. */
+export function mapBrowserViewPoint(
+  bounds: Pick<DOMRect, "left" | "top" | "width" | "height">,
+  frameWidth: number,
+  frameHeight: number,
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } | null {
+  if (bounds.width <= 0 || bounds.height <= 0 || frameWidth <= 0 || frameHeight <= 0) return null;
+  const scale = Math.min(bounds.width / frameWidth, bounds.height / frameHeight);
+  const imageWidth = frameWidth * scale;
+  const imageHeight = frameHeight * scale;
+  const imageLeft = bounds.left + (bounds.width - imageWidth) / 2;
+  const imageTop = bounds.top + (bounds.height - imageHeight) / 2;
+  if (clientX < imageLeft || clientX > imageLeft + imageWidth || clientY < imageTop || clientY > imageTop + imageHeight)
+    return null;
+  return {
+    x: clampFraction((clientX - imageLeft) / imageWidth),
+    y: clampFraction((clientY - imageTop) / imageHeight),
+  };
 }
 
 function errorMessage(error: unknown): string {

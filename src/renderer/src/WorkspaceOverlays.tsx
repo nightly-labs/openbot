@@ -1,5 +1,6 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
+import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createMemo, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
@@ -13,7 +14,6 @@ import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
-import type { ProviderKeyApi } from "./features/settings/OpenCodeKeyDialog";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import {

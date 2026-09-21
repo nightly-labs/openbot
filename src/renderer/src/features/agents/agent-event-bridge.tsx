@@ -1,10 +1,10 @@
 import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
 import { classifyUserError } from "@openbot/user-errors";
 import { flush, onSettled } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent } from "../../completion-sound";
-import { toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { queueAfterTurnCompleted } from "../../queue-reconciliation";
