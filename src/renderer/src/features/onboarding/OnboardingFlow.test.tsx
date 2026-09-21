@@ -88,9 +88,10 @@ describe("OnboardingFlow", () => {
     const openPermission = vi.spyOn(activeMock?.api ?? window.openbot, "openComputerUsePermissionPane");
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     expect(await view.findByRole("heading", { name: "OpenBot might control your computer" })).toBeInTheDocument();
-    await waitFor(() => expect(view.getAllByRole("button", { name: "Open settings" })).toHaveLength(2));
+    await waitFor(() => expect(view.getByRole("button", { name: "Grant Screen Recording" })).toBeInTheDocument());
+    expect(view.getByRole("button", { name: "Grant Accessibility" })).toBeInTheDocument();
 
-    await fireEvent.click(view.getAllByRole("button", { name: "Open settings" })[0]);
+    await fireEvent.click(view.getByRole("button", { name: "Grant Screen Recording" }));
     await waitFor(() => expect(openPermission).toHaveBeenCalledWith("screen-recording"));
 
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
