@@ -9,8 +9,8 @@ import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { readAnalyticsPreference, writeAnalyticsPreference } from "../analytics-preference-store";
 import type { ApprovalAutomation } from "../approval-automation-store";
-import { COMPUTER_USE_PERMISSION_URLS } from "../computer-use-mac-setup-window";
 import type { LanguageService } from "../language-service";
+import { MAC_PERMISSION_URLS } from "../mac-permission-urls";
 import { exportDiagnostics, exportOpenBotData } from "../maintenance-service";
 import { readSetupState, writeSetupState } from "../setup-store";
 import type { UpdateService } from "../update-service";
@@ -31,7 +31,7 @@ import { stringPayload } from "./validation";
  *
  * `mac-screen-recording` is the one entry that is not a web page. macOS opens a settings pane from a
  * URL, and the table is what keeps that address out of the renderer. It is the same pane the
- * computer use setup opens, so it is read from there rather than written twice.
+ * Computer Use panel opens, so it is read from `mac-permission-urls.ts` rather than written twice.
  */
 export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "agent-setup": "https://github.com/nightly-labs/openbot/blob/main/docs/TROUBLESHOOTING.md",
@@ -40,7 +40,7 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "claude-install": "https://code.claude.com/docs",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
   message: "https://x.com/norbertbodziony",
-  "mac-screen-recording": COMPUTER_USE_PERMISSION_URLS["screen-recording"],
+  "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";

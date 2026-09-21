@@ -4,7 +4,7 @@ import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
-import { app, BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
+import { app, BrowserWindow, dialog, powerMonitor, protocol, screen, shell } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
@@ -228,9 +228,29 @@ const windows = createMainWindowController({
   onRendererLoadStarted: () => {
     deepLinkReceiverReady = false;
   },
-  onMainWindowCreated: attachWindowsSessionEndHandlers,
+  onMainWindowCreated: (window) => {
+    attachWindowsSessionEndHandlers(window);
+    attachQuitOnMainWindowClose(window);
+  },
   reportError: (message, error) => logger.error(message, toLogValue(error)),
 });
+
+/**
+ * Outside macOS, closing the main window ends OpenBot.
+ *
+ * `window-all-closed` cannot carry that on its own any more. The Computer Use overlays are built
+ * once and then hidden between actions rather than closed, and a hidden window is still a window,
+ * so the event never arrives: the user would close the last window they can see and leave OpenBot
+ * and the driver running with no way back to them.
+ */
+function attachQuitOnMainWindowClose(window: BrowserWindow): void {
+  if (process.platform === "darwin") return;
+  window.on("closed", () => {
+    // `quit`, not a teardown of its own: `before-quit` below is what OpenBot shuts down through,
+    // and it already ignores a second request while the first one runs.
+    app.quit();
+  });
+}
 
 /**
  * Windows gives an application a few seconds between announcing a session end and killing it, so
@@ -298,7 +318,8 @@ function registerIpcHandlers({
   marketplaceAgents,
   voice,
   dynamicIsland,
-  computerUseMacSetup,
+  cuaDriver,
+  computerUsePermissionHelp,
   analytics,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -324,7 +345,11 @@ function registerIpcHandlers({
       setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
-    ...computerUseIpcHandlers({ computerUseMacSetup }),
+    ...computerUseIpcHandlers({
+      cuaDriver,
+      openExternal: (url) => shell.openExternal(url),
+      permissionHelp: computerUsePermissionHelp,
+    }),
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials }),
     ...voiceIpcHandlers({ voice }),
     ...accountIpcHandlers({ centralAuth, host }),

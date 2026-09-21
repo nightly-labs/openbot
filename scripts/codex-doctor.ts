@@ -1,6 +1,6 @@
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { resolveCodexCli } from "../src/backend/cli";
-import { decodeAccountReadResult, decodeRecordResponse, getArray, getString, isRecord } from "../src/backend/protocol";
+import { decodeAccountReadResult, decodeRecordResponse } from "../src/backend/protocol";
 
 const strict = process.argv.includes("--strict");
 let client: CodexAppServerClient | null = null;
@@ -20,8 +20,6 @@ try {
   client.notify("initialized");
 
   const account = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
-  const plugins = await client.request("plugin/list", { cwds: [] }, decodeRecordResponse);
-  const computerUse = findComputerUse(plugins);
   const auth = account.account
     ? {
         type: account.account.type,
@@ -38,7 +36,6 @@ try {
         cliVersion: cli.version,
         appServer: "ready",
         auth,
-        computerUse,
       },
       null,
       2,
@@ -54,22 +51,4 @@ try {
   process.exitCode = 1;
 } finally {
   if (client) await client.stop();
-}
-
-function findComputerUse(value: unknown): "installed" | "missing" {
-  for (const marketplace of getArray(value, "marketplaces")) {
-    for (const plugin of getArray(marketplace, "plugins")) {
-      if (!isRecord(plugin)) continue;
-      const id = getString(plugin, "id");
-      const name = getString(plugin, "name");
-      if (
-        (id === "computer-use@openai-bundled" || name === "computer-use") &&
-        plugin.installed === true &&
-        plugin.enabled === true
-      ) {
-        return "installed";
-      }
-    }
-  }
-  return "missing";
 }

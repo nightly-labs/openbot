@@ -291,7 +291,15 @@ const server = createServer((request, response) => {
     <button aria-label="Save" onclick="document.querySelector('output').textContent = document.querySelector('input').value + '|input:' + document.querySelector('input').dataset.trusted + '|click:' + event.isTrusted">Save</button>
     <a href="/child" target="_blank">Child</a>
     <a href="/download" download>Download</a>
-    <output>empty</output>`);
+    <output>empty</output>
+    <script>
+      window.smokePointerEvents = [];
+      for (const type of ['pointerdown', 'pointerup', 'click']) {
+        document.addEventListener(type, event => {
+          window.smokePointerEvents.push({ type, target: event.target.tagName, x: event.clientX, y: event.clientY, trusted: event.isTrusted });
+        }, true);
+      }
+    </script>`);
 });
 
 void main().catch((error) => {
@@ -449,9 +457,19 @@ async function main(): Promise<void> {
     const currentSave = typed.elements.find((element) => element.name === "Save");
     if (!currentSave) throw new Error("Save control disappeared after typing.");
     await browser.act(tab.id, typed.revision, { type: "click", ref: currentSave.ref });
-    const result = await browser.snapshot(tab.id);
+    // A native click travels the input pipeline, not the snapshot channel, so the page can still be
+    // running the handler when the act call returns. Wait for the text the handler writes; a click
+    // that was not native never writes it, so the check keeps its meaning.
+    const clickDeadline = Date.now() + 5_000;
+    let result = await browser.snapshot(tab.id);
+    while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < clickDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      result = await browser.snapshot(tab.id);
+    }
     if (!result.text.includes("runs locally|input:true|click:true")) {
-      throw new Error(`Browser input was not native: ${result.text}`);
+      const contents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
+      const pointerEvents = await contents?.executeJavaScript("JSON.stringify(window.smokePointerEvents)");
+      throw new Error(`Browser input was not native: ${result.text}; pointer events: ${pointerEvents}`);
     }
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 

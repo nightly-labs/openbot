@@ -4,7 +4,12 @@ import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import type { AgentEvent, McpServerConfig } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
+  type McpServerConfig,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
@@ -712,6 +717,55 @@ describe.sequential("AgentService: providers", () => {
     expect(paramsRecord(starts[1]?.params)?.config).toEqual({
       mcp_servers: { Filesystem: { command: "/bin/echo", args: ["ready"], env: await launchEnvironment() } },
     });
+  });
+
+  // One append in `enabledMcpServers` is what gives Codex, Claude and the ACP providers the same
+  // Computer Use tools, so the Codex thread configuration proving it stands for all three. It also
+  // proves the name is not a reserved one: `usableMcpServers` drops those on the way out.
+  it("hands the provider the Computer Use entry while the driver runs, and nothing when it stops", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "CODEX_DONE", true, true);
+    let driverRunning = true;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: () => client,
+      computerUseMcpServer: () =>
+        driverRunning
+          ? {
+              id: COMPUTER_USE_MCP_SERVER_ID,
+              name: COMPUTER_USE_MCP_SERVER_NAME,
+              transport: "stdio",
+              enabled: true,
+              command: "/opt/cua/bin/cua-driver",
+              args: ["mcp", "--socket", "/tmp/openbot-test.sock"],
+              env: [{ key: "CUA_DRIVER_EMBEDDED", value: "1" }],
+              envPassthrough: [],
+              workingDirectory: "",
+              url: "",
+              headers: [],
+            }
+          : null,
+    });
+    await service.initialize();
+
+    expect(service.enabledMcpServers().map((entry) => entry.name)).toEqual([COMPUTER_USE_MCP_SERVER_NAME]);
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const [start] = client.requests.filter((request) => request.method === "thread/start");
+    expect(paramsRecord(start?.params)?.config).toEqual({
+      mcp_servers: {
+        [COMPUTER_USE_MCP_SERVER_NAME]: {
+          command: "/opt/cua/bin/cua-driver",
+          args: ["mcp", "--socket", "/tmp/openbot-test.sock"],
+          env: await launchEnvironment({ CUA_DRIVER_EMBEDDED: "1" }),
+        },
+      },
+    });
+
+    driverRunning = false;
+    expect(service.enabledMcpServers()).toEqual([]);
   });
 
   /*
@@ -2227,7 +2281,9 @@ describe.sequential("AgentService: providers", () => {
         { id: "grok", state: "not-installed", version: null },
         { id: "opencode", state: "not-installed", version: null },
       ],
-      capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
+      // Unavailable because no Computer Use driver was given to this service. It no longer follows
+      // from Codex being connected.
+      capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
     });
     await expect(service.getUsage()).resolves.toMatchObject({
       limits: [
@@ -2266,7 +2322,7 @@ describe.sequential("AgentService: providers", () => {
         "You may list, read, create, edit, move, and delete files and run local commands in both directories.",
       );
       expect(params.developerInstructions).toContain("For every browser task");
-      expect(params.developerInstructions).toContain("Use the installed Computer Use plugin only");
+      expect(params.developerInstructions).toContain(`Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task`);
       expect(params.developerInstructions).toContain("openbot_browser.submit_secret");
       expect(params.developerInstructions).toContain("openbot.create_routine");
       expect(params.developerInstructions).toContain("Never use ChatGPT Sites");

@@ -1155,7 +1155,8 @@ describe("SkillsMarketplaceModal", () => {
         { config: expect.objectContaining({ id: "", name: app.server.name, transport: "http", url: appUrl }) },
         "local",
       );
-      expect(await screen.findByRole("button", { name: "Installed" })).toBeDisabled();
+      // The one control turns into the way back out, which is how the page says it is installed.
+      expect(await screen.findByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
     });
 
     /**
@@ -1378,8 +1379,176 @@ describe("SkillsMarketplaceModal", () => {
       });
       await openPluginPage();
 
-      expect(await screen.findByRole("button", { name: "Installed" })).toBeDisabled();
+      expect(await screen.findByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
       expect(window.openbot.agent.saveMcpServer).not.toHaveBeenCalled();
+    });
+
+    /** The host row an installed app leaves behind, as `listMcpServers` answers it. */
+    function hostApp(): McpServerConfig {
+      return {
+        id: "mcp-1",
+        name: app.server.name,
+        transport: "http" as const,
+        enabled: true,
+        command: "",
+        args: [],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: appUrl,
+        headers: [],
+      };
+    }
+
+    /** Opens the listing of an installed plugin and presses Uninstall, stopping at the confirmation. */
+    async function askToUninstall() {
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Uninstall plugin" }));
+      return screen.findByRole("alertdialog");
+    }
+
+    it("names the app and the skill it is about to remove before removing either", async () => {
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => [installedYield]) };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [hostApp()]),
+        removeMcpServer: vi.fn(async () => []),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+
+      expect(within(confirm).getByRole("heading", { name: "Uninstall Aave?" })).toBeInTheDocument();
+      expect(within(confirm).getByText(app.server.name)).toBeInTheDocument();
+      expect(within(confirm).getByText("yield-analysis")).toBeInTheDocument();
+      // The question is asked before anything goes: nothing is removed by opening it.
+      expect(window.openbot.agent.removeMcpServer).not.toHaveBeenCalled();
+      expect(window.openbot.skills.uninstall).not.toHaveBeenCalled();
+    });
+
+    it("removes the host's app row and the agent's skill when the uninstall is confirmed", async () => {
+      const order: string[] = [];
+      const removeMcpServer: OpenBotDesktopApi["agent"]["removeMcpServer"] = vi.fn(async () => {
+        order.push("app");
+        return [];
+      });
+      const uninstall = vi.fn(async () => {
+        order.push("skill");
+      });
+      let held: InstalledSkill[] = [installedYield];
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => held), uninstall };
+      let hostRows: McpServerConfig[] = [hostApp()];
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => hostRows),
+        removeMcpServer,
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+      hostRows = [];
+      held = [];
+      fireEvent.click(within(confirm).getByRole("button", { name: "Uninstall" }));
+
+      await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
+      expect(removeMcpServer).toHaveBeenCalledWith({ mcpServerId: "mcp-1" }, "local");
+      // The app stops answering before the instructions that drive it are taken away.
+      expect(order).toEqual(["app", "skill"]);
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+    });
+
+    it("removes nothing when the confirmation is cancelled", async () => {
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => [installedYield]) };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [hostApp()]),
+        removeMcpServer: vi.fn(async () => []),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+      fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(window.openbot.agent.removeMcpServer).not.toHaveBeenCalled();
+      expect(window.openbot.skills.uninstall).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
+    });
+
+    /**
+     * A cleanup that half works. The skill must still be taken even though the app row refused, and
+     * the failure must name what stayed rather than leave the user to find it.
+     */
+    it("reports what could not be removed and still removes the rest", async () => {
+      const uninstall = vi.fn(async () => undefined);
+      let held: InstalledSkill[] = [installedYield];
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => held), uninstall };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [hostApp()]),
+        removeMcpServer: vi.fn(async () => {
+          throw new Error("This MCP server no longer exists.");
+        }),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+      held = [];
+      fireEvent.click(within(confirm).getByRole("button", { name: "Uninstall" }));
+
+      await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("This MCP server no longer exists.");
+      // Half a plugin is not installed, but what stayed must still have a way out: the retry.
+      expect(screen.getByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
+    });
+
+    /**
+     * Names are unique on a host, so a server the user wrote by hand can own a catalog name while
+     * pointing somewhere else. That row is not the plugin's, and an uninstall must never offer to
+     * take it: the listing reads as not installed and there is nothing to confirm.
+     */
+    it("leaves a server that only shares the app's name alone", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [{ ...hostApp(), url: "https://mcp.example.test/mine" }]),
+        removeMcpServer: vi.fn(async () => []),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Uninstall plugin" })).toBeNull();
     });
 
     /**

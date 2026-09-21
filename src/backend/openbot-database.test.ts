@@ -128,6 +128,7 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
     ]);
     database.close();
   });
@@ -1107,6 +1108,7 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
     ]);
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     migrated.close();
@@ -1174,7 +1176,7 @@ describe("OpenBotDatabase", () => {
       ALTER TABLE projection_provider_sessions_v18 RENAME TO projection_provider_sessions;
       CREATE INDEX provider_sessions_thread
         ON projection_provider_sessions(thread_id, provider, state);
-      DELETE FROM schema_migrations WHERE version IN (19, 20);
+      DELETE FROM schema_migrations WHERE version IN (19, 20, 21);
       PRAGMA foreign_keys = ON;
     `);
     legacy.close();
@@ -1202,7 +1204,7 @@ describe("OpenBotDatabase", () => {
         .get(),
     ).toMatchObject({ sql: expect.stringContaining("'opencode'") });
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 20,
+      version: 21,
     });
     migrated.close();
   });
@@ -1220,7 +1222,7 @@ describe("OpenBotDatabase", () => {
     const legacy = new DatabaseSync(database.path);
     legacy.exec(`
       DROP TABLE projection_mcp_servers;
-      DELETE FROM schema_migrations WHERE version = 20;
+      DELETE FROM schema_migrations WHERE version IN (20, 21);
     `);
     legacy.close();
 
@@ -1245,8 +1247,53 @@ describe("OpenBotDatabase", () => {
       { name: "Filesystem" },
     ]);
     expect(reopened.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 20,
+      version: 21,
     });
+    reopened.close();
+  });
+
+  it("moves a saved server off the Computer Use name and keeps what the user configured", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-db-v20-"));
+    roots.push(root);
+    const database = new OpenBotDatabase(root);
+    await database.initialize();
+    database.close();
+
+    // A version 20 database, written when `computer_use` was still a name a user could take. The
+    // second row holds the first name the migration reaches for, so it has to reach further.
+    const legacy = new DatabaseSync(database.path);
+    legacy.exec(`
+      INSERT INTO projection_mcp_servers
+        (mcp_server_id, name, transport, enabled, command, args_json, env_json, env_passthrough_json,
+         working_directory, url, headers_json, position, created_at, updated_at)
+      VALUES
+        ('mcp-1', 'computer_use', 'stdio', 1, 'my-driver', '["--serve"]', '[]', '[]', '', '', '[]', 0,
+         '2026-09-14T10:00:00.000Z', '2026-09-14T10:00:00.000Z'),
+        ('mcp-2', 'computer_use_saved', 'stdio', 1, 'other', '[]', '[]', '[]', '', '', '[]', 1,
+         '2026-09-14T10:00:00.000Z', '2026-09-14T10:00:00.000Z');
+      DELETE FROM schema_migrations WHERE version = 21;
+    `);
+    legacy.close();
+
+    const migrated = new OpenBotDatabase(root);
+    await migrated.initialize();
+    expect(
+      migrated.connection
+        .prepare("SELECT name, command, args_json, enabled FROM projection_mcp_servers ORDER BY position")
+        .all(),
+    ).toEqual([
+      { name: "computer_use_saved_2", command: "my-driver", args_json: '["--serve"]', enabled: 1 },
+      { name: "computer_use_saved", command: "other", args_json: "[]", enabled: 1 },
+    ]);
+    migrated.close();
+
+    // Running again renames nothing: the name is free now, so a second start leaves the row alone.
+    const reopened = new OpenBotDatabase(root);
+    await reopened.initialize();
+    expect(reopened.connection.prepare("SELECT name FROM projection_mcp_servers ORDER BY position").all()).toEqual([
+      { name: "computer_use_saved_2" },
+      { name: "computer_use_saved" },
+    ]);
     reopened.close();
   });
 
@@ -1302,6 +1349,7 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
     ]);
     migrated.close();
   });
@@ -1380,6 +1428,7 @@ describe("OpenBotDatabase", () => {
       { version: 18 },
       { version: 19 },
       { version: 20 },
+      { version: 21 },
     ]);
     retried.close();
   });

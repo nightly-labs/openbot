@@ -30,7 +30,16 @@ await Promise.all([
   access(resolve(resourcesPath, "managed-skills")),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
+  // Computer Use is the one native runtime the Linux build does ship.
+  access(resolve(resourcesPath, "cua-driver/linux/x64/cua-driver")),
+  access(resolve(resourcesPath, "cua-driver/linux/x64/wayland-helper/winrects@cua/extension.js")),
+  access(resolve(resourcesPath, "cua-driver/linux/x64/LICENSE.md")),
 ]);
+await Promise.all(
+  ["darwin", "win32"].map((name) =>
+    assertAbsent(resolve(resourcesPath, "cua-driver", name), "Only this platform's driver ships"),
+  ),
+);
 
 // Voice and remote desktop are not built for Linux. These two assertions are the regression guard
 // for the platform split of `extraResources`: if either ever returns to the shared list, the Linux
