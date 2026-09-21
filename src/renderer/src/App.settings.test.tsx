@@ -47,6 +47,9 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(toggle).toBeChecked());
     await fireEvent.click(toggle);
     await waitFor(() => expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({ turbo: false }));
+    expect(toggle).toBeDisabled();
+    await fireEvent.click(toggle);
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledOnce();
     await fireEvent.keyDown(screen.getByRole("dialog", { name: "General" }), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument());
     write.reject(new Error("Write failed"));
@@ -54,7 +57,9 @@ describe("OpenBot connected desktop shell", () => {
       await screen.findByText("Could not turn off Turbo mode. It is still active. Try again."),
     ).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(await screen.findByRole("switch", { name: "Turbo mode" })).toBeChecked();
+    const restored = await screen.findByRole("switch", { name: "Turbo mode" });
+    expect(restored).toBeChecked();
+    expect(restored).toBeEnabled();
   });
 
   it("reports a failed model-picker revocation and keeps the grant available for retry", async () => {

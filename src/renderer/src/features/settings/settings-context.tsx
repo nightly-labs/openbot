@@ -49,6 +49,7 @@ const Settings = createSimpleContext({
     let analyticsVersionRecorded = false;
     let autoDownloadUpdatesChanged = false;
     let turboModeChanged = false;
+    const [turboModePending, setTurboModePending] = createSignal(false);
 
     createEffect(
       () => ({
@@ -87,7 +88,8 @@ const Settings = createSimpleContext({
 
     function updateGeneralSettings(value: GeneralSettingsValue): void {
       const previous = generalSettings();
-      setGeneralSettings(value);
+      const turboMode = turboModePending() ? previous.turboMode : value.turboMode;
+      setGeneralSettings({ ...value, turboMode });
       if (previous.productAnalytics !== value.productAnalytics) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics);
         setAnalyticsPreferenceLoaded(value.productAnalytics);
@@ -104,10 +106,11 @@ const Settings = createSimpleContext({
             setGeneralSettings((current) => ({ ...current, productAnalytics: previous.productAnalytics }));
           });
       }
-      if (previous.turboMode !== value.turboMode) {
+      if (previous.turboMode !== turboMode) {
         turboModeChanged = true;
+        setTurboModePending(true);
         void window.openbot
-          .setApprovalAutomation({ turbo: value.turboMode })
+          .setApprovalAutomation({ turbo: turboMode })
           .then((preference) => {
             setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
             setAutoApproveAgentIds(preference.autoApproveAgentIds);
@@ -119,7 +122,8 @@ const Settings = createSimpleContext({
                 ? "Could not turn off Turbo mode. It is still active. Try again."
                 : "Could not turn on Turbo mode. Try again.",
             );
-          });
+          })
+          .finally(() => setTurboModePending(false));
       }
       if (previous.autoDownloadUpdates !== value.autoDownloadUpdates) {
         autoDownloadUpdatesChanged = true;
@@ -255,6 +259,7 @@ const Settings = createSimpleContext({
     return {
       analyticsPreferenceLoaded,
       generalSettings,
+      turboModePending,
       updateGeneralSettings,
       autoApproveAgentIds,
       setAgentAutoApprove,

@@ -71,6 +71,7 @@ interface SettingsGeneralTabProps {
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
   /** The agents granted a standing approval. Without the pair the autonomy rows are read-only. */
   autoApprovedAgents?: readonly { id: string; name: string }[];
+  turboModePending?: boolean;
   onRevokeAutoApprove?: (agentId: string) => Promise<void>;
 }
 
@@ -224,6 +225,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         <ItemGroup class="settings-modal-card">
           <SwitchField
             checked={props.value.turboMode}
+            disabled={props.turboModePending}
             onChange={(checked) => {
               // Turning it on is the move that needs the warning. Turning it off restores asking and
               // is never something a user needs protecting from, so it is written straight away.

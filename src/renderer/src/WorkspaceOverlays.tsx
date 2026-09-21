@@ -302,6 +302,7 @@ function AppSettings(props: AccountProps) {
     updateGeneralSettings,
     appSettingsRestoreTarget,
     autoApproveAgentIds,
+    turboModePending,
     setAgentAutoApprove,
   } = useSettings();
   const [localAgents, setLocalAgents] = createSignal<AgentSummary[]>([]);
@@ -394,6 +395,7 @@ function AppSettings(props: AccountProps) {
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         autoApprovedAgents={autoApprovedAgents()}
+        turboModePending={turboModePending()}
         onRevokeAutoApprove={(agentId) => setAgentAutoApprove(agentId, false)}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />
