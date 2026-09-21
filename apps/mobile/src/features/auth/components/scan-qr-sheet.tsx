@@ -1,21 +1,23 @@
+import { BlurTargetView, BlurView } from "expo-blur";
 import { Typography } from "heroui-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BackHandler, Pressable, StyleSheet, View } from "react-native";
+import { AppState, BackHandler, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   cancelAnimation,
-  interpolate,
+  Easing,
   interpolateColor,
   ReduceMotion,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 
 import { QrScanner } from "@/features/auth/components/qr-scanner";
-import { ScanQrButton } from "@/features/auth/components/scan-qr-button";
+import { ScanQrButton } from "./scan-qr-button";
 import { ScannerCloseButton } from "./scanner-close-button";
 
 export interface ScannerOrigin {
@@ -25,10 +27,9 @@ export interface ScannerOrigin {
   height: number;
 }
 
-const MORPH = { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System };
+// Shared brand curve for a continuous shape change in both directions.
+const EASE_MORPH = Easing.bezier(0.77, 0, 0.175, 1);
 
-// A route sheet cannot morph from the measured button bounds. This in-content
-// surface uses the existing native camera and HeroUI controls, without navigation.
 export function ScanQrSheet({
   origin,
   viewport,
@@ -38,14 +39,18 @@ export function ScanQrSheet({
   origin: ScannerOrigin;
   viewport: { width: number; height: number };
   onClose: () => void;
-  onScan: (data: string) => Promise<void>;
+  onScan: (data: string, beforeConnect: () => Promise<void>) => Promise<void>;
 }) {
-  const [phase, setPhase] = useState<"opening" | "open" | "closing">("opening");
+  const [phase, setPhase] = useState<"opening" | "open" | "closing" | "closed">("opening");
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const closing = useRef(false);
   const startedOpening = useRef(false);
   const progress = useSharedValue(0);
+  const departure = useSharedValue(0);
+  const finishDeparture = useRef<(() => void) | null>(null);
+  const blurTarget = useRef<View>(null);
+  const reducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const brand = String(useCSSVariable("--openbot-logo-production") ?? "#cdadec");
   const surface = String(useCSSVariable("--openbot-bg-sheet"));
@@ -56,29 +61,82 @@ export function ScanQrSheet({
   const x = (viewport.width - width) / 2;
   const y = viewport.height - insets.bottom - 16 - height;
 
-  const finishOpen = useCallback(() => setPhase("open"), []);
+  const finishOpen = useCallback(() => {
+    if (!closing.current) setPhase("open");
+  }, []);
+  const finishClose = useCallback(() => {
+    setPhase("closed");
+    onClose();
+  }, [onClose]);
   const beginOpening = useCallback(() => {
     if (closing.current || startedOpening.current) return;
     startedOpening.current = true;
     progress.set(
-      withSpring(1, MORPH, (finished) => {
-        if (finished) scheduleOnRN(finishOpen);
-      }),
+      withTiming(
+        1,
+        { duration: reducedMotion ? 160 : 400, easing: EASE_MORPH, reduceMotion: ReduceMotion.Never },
+        (finished) => {
+          if (finished) scheduleOnRN(finishOpen);
+        },
+      ),
     );
-  }, [finishOpen, progress]);
-  useEffect(() => () => cancelAnimation(progress), [progress]);
+  }, [finishOpen, progress, reducedMotion]);
+  const releaseDeparture = useCallback(() => {
+    finishDeparture.current?.();
+    finishDeparture.current = null;
+  }, []);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") releaseDeparture();
+    });
+    return () => {
+      subscription.remove();
+      cancelAnimation(progress);
+      cancelAnimation(departure);
+      releaseDeparture();
+    };
+  }, [departure, progress, releaseDeparture]);
+
+  function beforeConnect(): Promise<void> {
+    if (AppState.currentState !== "active") return Promise.resolve();
+    return new Promise((resolve) => {
+      // A lost native callback must never prevent attachment of a redeemed session.
+      const deadline = setTimeout(releaseDeparture, 1000);
+      finishDeparture.current = () => {
+        clearTimeout(deadline);
+        resolve();
+      };
+      departure.set(
+        withTiming(
+          1,
+          {
+            duration: reducedMotion ? 160 : 280,
+            easing: Easing.bezier(0.23, 1, 0.32, 1),
+            reduceMotion: ReduceMotion.Never,
+          },
+          (finished) => {
+            if (finished) scheduleOnRN(releaseDeparture);
+          },
+        ),
+      );
+    });
+  }
 
   const close = useCallback(() => {
     if (busyRef.current || closing.current) return;
     closing.current = true;
-    // Remove the camera before collapsing its native surface.
+    // Block scans immediately, but retain the preview until the fade finishes.
     setPhase("closing");
     progress.set(
-      withSpring(0, MORPH, (finished) => {
-        if (finished) scheduleOnRN(onClose);
-      }),
+      withTiming(
+        0,
+        { duration: reducedMotion ? 160 : 400, easing: EASE_MORPH, reduceMotion: ReduceMotion.Never },
+        (finished) => {
+          if (finished) scheduleOnRN(finishClose);
+        },
+      ),
     );
-  }, [onClose, progress]);
+  }, [finishClose, progress, reducedMotion]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -95,88 +153,106 @@ export function ScanQrSheet({
     busyRef.current = true;
     setBusy(true);
     try {
-      await onScan(data);
+      await onScan(data, beforeConnect);
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
   }
 
+  // Animate only this absolute clip. Its children keep their final dimensions;
+  // the native camera never changes size or stretches with the button surface.
+  const departureStyle = useAnimatedStyle(() => ({
+    opacity: (reducedMotion ? progress.get() : 1) * (1 - departure.get()),
+    transform: [{ translateY: reducedMotion ? 0 : -24 * departure.get() }],
+  }));
+  const coverStyle = useAnimatedStyle(() => ({ opacity: departure.get() }));
   const panelStyle = useAnimatedStyle(() => {
-    const p = progress.get();
+    const p = reducedMotion ? 1 : progress.get();
     return {
-      left: interpolate(p, [0, 1], [origin.x, x]),
-      top: interpolate(p, [0, 1], [origin.y, y]),
-      width: interpolate(p, [0, 1], [origin.width, width]),
-      height: interpolate(p, [0, 1], [origin.height, height]),
-      borderRadius: interpolate(p, [0, 1], [radius, radius * 2]),
+      left: origin.x + (x - origin.x) * p,
+      top: origin.y + (y - origin.y) * p,
+      width: origin.width + (width - origin.width) * p,
+      height: origin.height + (height - origin.height) * p,
+      borderRadius: radius * (1 + p),
+      backgroundColor: interpolateColor(p, [0, 1], [brand, surface]),
+      opacity: reducedMotion ? progress.get() : 1,
     };
   });
-  // Keep the fixed-size preview centered inside the changing clip bounds.
-  // Anchoring it at top-left makes the content slide diagonally during the morph.
-  const scannerStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, Math.max(0, (progress.get() - 0.55) / 0.45)),
-    transform: [
-      { translateX: ((origin.width - width) * (1 - progress.get())) / 2 },
-      { translateY: ((origin.height - height) * (1 - progress.get())) / 2 },
-    ],
-  }));
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.get() * 0.45 }));
-  const sourceButtonStyle = useAnimatedStyle(() => ({
-    opacity: Math.max(0, 1 - progress.get() * 5),
+  const previewStyle = useAnimatedStyle(() => {
+    const p = progress.get();
+    return {
+      opacity: reducedMotion ? p : Math.min(1, Math.max(0, (p - 0.2) / 0.65)),
+      transform: [
+        { translateX: reducedMotion ? 0 : ((origin.width - width) * (1 - p)) / 2 },
+        { translateY: reducedMotion ? 0 : ((origin.height - height) * (1 - p)) / 2 },
+      ],
+    };
+  });
+  const buttonStyle = useAnimatedStyle(() => ({
+    opacity: reducedMotion ? 0 : Math.max(0, 1 - progress.get() / 0.3),
     transform: [
       { translateX: ((width - origin.width) * progress.get()) / 2 },
       { translateY: ((height - origin.height) * progress.get()) / 2 },
     ],
   }));
-  // Native button padding, type and material need to match at handoff. Fade the
-  // morph surface out before returning to the same button component below it.
-  const surfaceStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.get(), [0, 1], [brand, surface]),
-    opacity: Math.min(1, Math.max(0, progress.get() * 5)),
-  }));
+  const blurStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.get() }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.get() * 0.6 }));
 
   return (
     <View style={StyleSheet.absoluteFill} accessibilityViewIsModal onAccessibilityEscape={close}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: scrim }, backdropStyle]}>
         <Pressable style={StyleSheet.absoluteFill} accessible={false} onPress={close} />
       </Animated.View>
-      <Animated.View className="absolute overflow-hidden" style={panelStyle}>
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, surfaceStyle]} />
-        {phase !== "closing" ? (
+      <Animated.View pointerEvents="none" className="bg-background" style={[StyleSheet.absoluteFill, coverStyle]} />
+      <Animated.View className="absolute overflow-hidden" style={[panelStyle, departureStyle]}>
+        {phase !== "closed" ? (
           <Animated.View
             pointerEvents={phase === "open" ? "auto" : "none"}
             accessibilityElementsHidden={phase !== "open"}
             importantForAccessibility={phase === "open" ? "auto" : "no-hide-descendants"}
             className="absolute"
-            style={[{ width, height }, scannerStyle]}
+            style={[{ width, height }, previewStyle]}
           >
-            <QrScanner
-              embedded
-              onPreviewReady={beginOpening}
-              scanEnabled={phase === "open"}
-              onScan={scan}
-              renderOverlay={(camera) => (
-                <View
-                  pointerEvents="box-none"
-                  className="absolute inset-x-0 top-0 flex-row items-center justify-between gap-3 px-5 py-3"
-                >
-                  <Typography.Heading type="h4" className={camera ? "text-white" : undefined}>
-                    Scan QR code
-                  </Typography.Heading>
-                  <ScannerCloseButton disabled={busy} onPress={close} />
-                </View>
-              )}
-            />
+            <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
+              <QrScanner
+                embedded
+                onPreviewReady={beginOpening}
+                scanEnabled={phase === "open"}
+                onScan={scan}
+                renderOverlay={(camera) => (
+                  <View
+                    pointerEvents="box-none"
+                    className="absolute inset-x-0 top-0 flex-row items-center justify-between gap-3 px-5 py-3"
+                  >
+                    <Typography.Heading type="h4" className={camera ? "text-white" : undefined}>
+                      Scan QR code
+                    </Typography.Heading>
+                    <ScannerCloseButton disabled={busy} onPress={close} />
+                  </View>
+                )}
+              />
+            </BlurTargetView>
+            {!reducedMotion && phase !== "open" ? (
+              <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, blurStyle]}>
+                <BlurView
+                  blurTarget={blurTarget}
+                  blurMethod="dimezisBlurViewSdk31Plus"
+                  intensity={16}
+                  tint="systemUltraThinMaterial"
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
+            ) : null}
           </Animated.View>
         ) : null}
-        {phase !== "open" ? (
+        {phase !== "open" && !reducedMotion ? (
           <Animated.View
             pointerEvents="none"
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
             className="absolute"
-            style={[{ width: origin.width, height: origin.height }, sourceButtonStyle]}
+            style={[{ width: origin.width, height: origin.height }, buttonStyle]}
           >
             <ScanQrButton width={origin.width} onPress={close} />
           </Animated.View>

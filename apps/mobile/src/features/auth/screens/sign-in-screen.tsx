@@ -60,10 +60,9 @@ export function SignInScreen() {
   const measurementDeadline = useRef<ReturnType<typeof setTimeout> | null>(null);
   const root = useRef<View>(null);
   const button = useRef<View>(null);
-  const measuring = useRef(false);
-  const [preparingScanner, setPreparingScanner] = useState(false);
   const [origin, setOrigin] = useState<ScannerOrigin | null>(null);
-  const animationActive = isFocused && !preparingScanner && !origin && (motion?.complete ?? true);
+  const scannerOpen = origin !== null;
+  const animationActive = isFocused && !scannerOpen && (motion?.complete ?? true);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [mainHeight, setMainHeight] = useState(0);
   const [helpTriggerHeight, setHelpTriggerHeight] = useState(0);
@@ -72,8 +71,6 @@ export function SignInScreen() {
   const contentTop = insets.top + Math.max(32, (viewport.height - insets.top - insets.bottom - closedHeight) / 2);
   const closeScanner = useCallback(() => {
     setOrigin(null);
-    setPreparingScanner(false);
-    measuring.current = false;
   }, []);
 
   const reportHero = useCallback(() => {
@@ -99,22 +96,11 @@ export function SignInScreen() {
   }, [motion?.revealing, reportContentReady, reportHero, viewport.height]);
 
   function openScanner() {
-    if (measuring.current || origin || !root.current || !button.current) return;
     motion?.finish();
-    measuring.current = true;
-    setPreparingScanner(true);
-    root.current.measureInWindow((rootX, rootY) => {
-      if (!button.current) {
-        closeScanner();
-        return;
-      }
-      button.current.measureInWindow((x, y, width, height) => {
-        if (width <= 0 || height <= 0) {
-          closeScanner();
-          return;
-        }
+    root.current?.measureInWindow((rootX, rootY) => {
+      button.current?.measureInWindow((x, y, width, height) => {
+        if (width <= 0 || height <= 0) return;
         setOrigin({ x: x - rootX, y: y - rootY, width, height });
-        setPreparingScanner(false);
       });
     });
   }
@@ -129,10 +115,10 @@ export function SignInScreen() {
       <SplashWallpaper />
       <ScrollView
         onScrollBeginDrag={motion?.finish}
-        scrollEnabled={!origin}
-        pointerEvents={origin ? "none" : "auto"}
-        accessibilityElementsHidden={Boolean(origin)}
-        importantForAccessibility={origin ? "no-hide-descendants" : "auto"}
+        scrollEnabled={!scannerOpen}
+        pointerEvents={scannerOpen ? "none" : "auto"}
+        accessibilityElementsHidden={scannerOpen}
+        importantForAccessibility={scannerOpen ? "no-hide-descendants" : "auto"}
         className="flex-1"
         contentContainerClassName="items-center px-8"
         contentContainerStyle={{
@@ -171,7 +157,7 @@ export function SignInScreen() {
               </Typography.Paragraph>
             </Animated.View>
             <Animated.View style={actionsStyle}>
-              <View ref={button} collapsable={false} style={{ width: buttonWidth, opacity: origin ? 0 : 1 }}>
+              <View ref={button} collapsable={false} style={{ width: buttonWidth, opacity: scannerOpen ? 0 : 1 }}>
                 <ScanQrButton width={buttonWidth} onPress={openScanner} />
               </View>
             </Animated.View>
@@ -206,13 +192,16 @@ export function SignInScreen() {
           origin={origin}
           viewport={viewport}
           onClose={closeScanner}
-          onScan={async (data) =>
-            connect(
-              await mobileAnalytics.operation("mobile_pairing_action", { action: "redeem" }, () =>
-                redeemMobileConnectUrl(data),
-              ),
-            )
-          }
+          onScan={async (data, beforeConnect) => {
+            const session = await mobileAnalytics.operation("mobile_pairing_action", { action: "redeem" }, () =>
+              redeemMobileConnectUrl(data),
+            );
+            try {
+              await beforeConnect();
+            } finally {
+              connect(session);
+            }
+          }}
         />
       ) : null}
     </View>

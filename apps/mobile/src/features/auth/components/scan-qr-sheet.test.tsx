@@ -20,6 +20,7 @@ const native = vi.hoisted(() => {
   const camera: { ready?: () => void; fail?: () => void; scan?: (event: { data: string }) => void } = {};
   return {
     measurementAvailable: true,
+    reducedMotion: false,
     layout: new Set<(event: { nativeEvent: { layout: { width: number; height: number } } }) => void>(),
     finishMotion: () => {},
     motionStarted: vi.fn(),
@@ -95,8 +96,9 @@ vi.mock("react-native-reanimated", () => ({
   cancelAnimation: () => {},
   useSharedValue: (initial: number) => useRef({ get: () => initial, set: () => {} }).current,
   useAnimatedStyle: () => ({}),
-  withTiming: (target: number) => target,
-  withSpring: (_target: number, _config: { duration: number }, done: (finished: boolean) => void) => {
+  useReducedMotion: () => native.reducedMotion,
+  withTiming: (target: number, _config: { duration: number }, done?: (finished: boolean) => void) => {
+    if (!done) return target;
     native.motionStarted();
     native.finishMotion = () => done(true);
     return 0;
@@ -107,6 +109,10 @@ vi.mock("react-native-worklets", () => ({
 }));
 vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 44, bottom: 34 }) }));
 vi.mock("uniwind", () => ({ useCSSVariable: () => "12" }));
+vi.mock("expo-blur", () => ({
+  BlurTargetView: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  BlurView: () => null,
+}));
 vi.mock("expo-camera", () => ({
   useCameraPermissions: () => [native.permission, native.requestPermission, native.getPermission],
   CameraView: ({
@@ -198,6 +204,7 @@ document.body.append(container);
 let root = createRoot(container);
 beforeEach(() => {
   native.measurementAvailable = true;
+  native.reducedMotion = false;
   native.motionStarted.mockClear();
   native.cameraStarted.mockClear();
   native.permission = { granted: true, canAskAgain: true };
@@ -210,7 +217,9 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-async function renderSheet(onScan: (data: string) => Promise<void> = async () => {}) {
+async function renderSheet(
+  onScan: (data: string, beforeConnect: () => Promise<void>) => Promise<void> = async () => {},
+) {
   const onClose = vi.fn();
   await act(() =>
     root.render(
@@ -279,7 +288,7 @@ describe("scanner sheet lifecycle", () => {
     expect(screen.getByRole("button", { name: "Scan QR code" })).toBeTruthy();
   });
 
-  it("prepares the camera before opening and stops before closing", async () => {
+  it("prepares the camera before opening and blocks scans while fading out", async () => {
     const onScan = vi.fn(async () => {});
     const { onClose } = await renderSheet(onScan);
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
@@ -291,10 +300,79 @@ describe("scanner sheet lifecycle", () => {
     expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
     expect(native.camera.scan).toBeTypeOf("function");
     await act(() => fireEvent.click(screen.getByRole("button", { name: "Close scanner" })));
-    expect(screen.queryByRole("img", { name: "Camera preview" })).toBeNull();
+    expect(screen.getByRole("img", { name: "Camera preview" })).toBeTruthy();
+    await act(() => native.camera.scan?.({ data: "code-during-closing" }));
+    expect(onScan).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     await finishMotion();
+    expect(screen.queryByRole("img", { name: "Camera preview" })).toBeNull();
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, true])("keeps an interrupted opening closed (reduced motion: %s)", async (reducedMotion) => {
+    native.reducedMotion = reducedMotion;
+    const onScan = vi.fn(async () => {});
+    const { onClose } = await renderSheet(onScan);
+    await act(() => native.camera.ready?.());
+    const finishOpening = native.finishMotion;
+    await act(() => {
+      for (const back of native.back) back();
+    });
+    const finishClosing = native.finishMotion;
+    await act(() => finishOpening());
+    await act(() => native.camera.scan?.({ data: "code-after-cancel" }));
+    expect(onScan).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    await act(() => finishClosing());
+    expect(screen.queryByRole("img", { name: "Camera preview" })).toBeNull();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("attaches the session after the successful scanner exit", async () => {
+    const attach = vi.fn();
+    const { onClose } = await renderSheet(async (_data, beforeConnect) => {
+      await beforeConnect();
+      attach();
+    });
+    await finishMotion();
+    await act(() => native.camera.scan?.({ data: "paired-code" }));
+    expect(attach).not.toHaveBeenCalled();
+    await act(() => {
+      for (const back of native.back) back();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    await act(() => native.finishMotion());
+    expect(attach).toHaveBeenCalledOnce();
+  });
+
+  it("attaches a redeemed session if the native exit callback is lost", async () => {
+    vi.useFakeTimers();
+    const attach = vi.fn();
+    await renderSheet(async (_data, beforeConnect) => {
+      await beforeConnect();
+      attach();
+    });
+    await finishMotion();
+    await act(() => native.camera.scan?.({ data: "paired-code" }));
+    expect(attach).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTime(1000));
+    expect(attach).toHaveBeenCalledOnce();
+  });
+
+  it("does not strand a redeemed session when the app backgrounds during its exit", async () => {
+    const attach = vi.fn();
+    await renderSheet(async (_data, beforeConnect) => {
+      await beforeConnect();
+      attach();
+    });
+    await finishMotion();
+    await act(() => native.camera.scan?.({ data: "paired-code" }));
+    await act(() => {
+      for (const listener of native.appState) listener("background");
+    });
+    expect(attach).toHaveBeenCalledOnce();
+    await act(() => native.finishMotion());
+    expect(attach).toHaveBeenCalledOnce();
   });
 
   it("releases the camera in the background and resumes it on return", async () => {
@@ -334,7 +412,7 @@ describe("scanner sheet lifecycle", () => {
     await act(() => fireEvent.click(screen.getByRole("button", { name: "Scan again" })));
     expect(native.cameraStarted).toHaveBeenCalledTimes(1);
     await act(() => native.camera.scan?.({ data: "next-code" }));
-    expect(onScan).toHaveBeenLastCalledWith("next-code");
+    expect(onScan).toHaveBeenLastCalledWith("next-code", expect.any(Function));
     await act(() => fireEvent.click(screen.getByRole("button", { name: "Close scanner" })));
     await finishMotion();
     expect(onClose).toHaveBeenCalledOnce();
