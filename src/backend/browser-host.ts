@@ -564,6 +564,19 @@ export class BrowserHost {
                     contents.once("destroyed", finish);
                   });
                 }
+                if (!protection.replaced) {
+                  // Load with GET rather than replaying a possible form POST. Keep capture
+                  // blocked until navigation has replaced the document and this operation ends.
+                  await this.#boundEngineOperation(
+                    tab,
+                    navigateAndWait(tab.view.webContents, () =>
+                      tab.view.webContents.loadURL(currentTabUrl(tab), browserLoadOptions()),
+                    ),
+                    10_000,
+                    "Authentication page reload timed out.",
+                    keepQueueBlocked,
+                  );
+                }
               },
               true,
             );

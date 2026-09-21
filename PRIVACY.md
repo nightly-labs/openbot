@@ -385,7 +385,9 @@ values are held in memory for the operation; cancellation and submission clear t
 OpenBot blocks agent browser access while consent is pending. Before entering a submitted value, it
 blocks image capture and live browser streams, and stops
 and discards the active browser recording before entry. After entry, protection stays until the
-browser replaces the document. Same-page logins require manual takeover. Recording does not restart
+browser replaces the document. After a same-page submission, OpenBot automatically loads the current
+URL as a new document with a GET request. This can reset an unfinished login step. Failed submission
+or reload requires manual takeover. Recording does not restart
 automatically, and the tab's back/forward history is cleared after replacement to prevent restoring
 the sensitive document. The destination site receives the value and controls its own processing.
 This protection does not isolate credentials from the operating system or agents with unrestricted

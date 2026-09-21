@@ -986,6 +986,9 @@ The browser host owns the protection state and serializes entry behind existing 
 resolves fields before consent and checks the document and origin again before entry. The host
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
-or an uncertain submission. A new document releases it and clears navigation history; manual takeover
+or an uncertain submission. After a completed submit action without document replacement, the host
+waits up to five seconds, then loads the current URL with GET to replace the document without replaying
+a form POST. Failure retains protection and falls back to takeover. A new document releases it and
+clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 OAuth selection, CAPTCHA, passkeys, and payment confirmation use takeover.

@@ -717,7 +717,8 @@ describe("secure browser handoff", () => {
   });
 
   it("blocks every capture endpoint after entry, even if the request is cancelled", async () => {
-    const { tab, prepared } = await prepare();
+    const { tab, prepared, contents } = await prepare();
+    vi.spyOn(contents, "loadURL").mockResolvedValue(undefined);
     vi.useFakeTimers();
     const submitted = prepared.submit("123456");
     await vi.waitFor(() => expect(secretEntry).toHaveBeenCalled());
@@ -745,8 +746,25 @@ describe("secure browser handoff", () => {
     expect(secretEntry).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a same-document submission protected through cancellation and takeover completion", async () => {
+  it("automatically loads a new document after same-page submission without replaying the secret", async () => {
+    const { tab, prepared, contents } = await prepare("password", 0);
+    const load = vi.spyOn(contents, "loadURL");
+    vi.useFakeTimers();
+    const submitted = prepared.submit("fixture-password");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("fixture-password"));
+    contents.emit("did-navigate-in-page", {}, tab.url);
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(submitted).resolves.toBe("submitted");
+    expect(load).toHaveBeenCalledOnce();
+    expect(load.mock.calls[0]?.[0]).toBe(tab.url);
+    expect(secretEntry).toHaveBeenCalledOnce();
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+
+  it("keeps protection when automatic navigation does not replace the document", async () => {
     const { tab, prepared, contents } = await prepare();
+    vi.spyOn(contents, "loadURL").mockResolvedValue(undefined);
     vi.useFakeTimers();
     const submitted = prepared.submit("123456");
     await vi.waitFor(() => expect(secretEntry).toHaveBeenCalled());
