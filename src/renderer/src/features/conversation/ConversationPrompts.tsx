@@ -12,8 +12,10 @@ import {
   Monitor,
   RadioGroup,
   Skeleton,
+  toast,
   X,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 
 export function ChoiceCard(props: {
   title: string;
@@ -125,8 +127,13 @@ export function ApprovalCard(props: {
     if (!grant || submitting()) return;
     setConfirmingAlways(false);
     setSubmitting(true);
-    const completed = await grant();
-    if (!completed) setSubmitting(false);
+    try {
+      const completed = await grant();
+      if (!completed) setSubmitting(false);
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not save the standing approval. Try again."));
+      setSubmitting(false);
+    }
   };
 
   return (

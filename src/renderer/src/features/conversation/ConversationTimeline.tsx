@@ -516,11 +516,11 @@ export function ConversationTimeline() {
               </Loading>
             )}
           </Show>
-          <Show when={props.approval}>
+          <Show keyed when={props.approval}>
             {(approval) => (
               <Loading>
                 <ApprovalCard
-                  approval={approval()}
+                  approval={approval}
                   agentName={props.agent?.name}
                   onApprove={() => props.onRespondToApproval("accept")}
                   onReject={() => props.onRespondToApproval("decline")}

@@ -4,6 +4,7 @@ import { hasVisibleToasts } from "../../components/ui";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
+import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -31,6 +32,7 @@ import { useConversation } from "./conversation-context";
  * rather than captured once.
  */
 export function WorkspaceConversation(props: { account: () => CentralAuthUser }) {
+  const scopeIsCurrent = createScopeGuard();
   const platform = usePlatform();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
@@ -57,6 +59,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     turnProgress,
     answerPrompt,
     respondToApproval,
+    respondToApprovalRequest,
     respondToBrowserTakeover,
     cancelQueuedMessage,
     steerQueuedMessage,
@@ -126,7 +129,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     if (activeServer()?.kind !== "local") return undefined;
     return async () => {
       await setAgentAutoApprove(agent.id, true);
-      return respondToApproval("accept");
+      if (!scopeIsCurrent()) return false;
+      return respondToApprovalRequest(agent.id, approval.requestId, "accept");
     };
   });
 

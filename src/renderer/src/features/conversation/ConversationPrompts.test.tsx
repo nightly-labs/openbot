@@ -1,6 +1,7 @@
 import type { AgentApproval } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
+import { Toaster, toast } from "../../components/ui";
 import { ApprovalCard, BrowserTakeoverCard, ChoiceCard } from "./ConversationPrompts";
 
 describe("ChoiceCard", () => {
@@ -51,6 +52,33 @@ const approval: AgentApproval = {
 };
 
 describe("ApprovalCard", () => {
+  afterEach(() => toast.dismiss());
+
+  it("shows a failed grant write and restores the approval controls", async () => {
+    const response = Promise.withResolvers<boolean>();
+    const grant = vi.fn(() => response.promise);
+    const approve = vi.fn(async () => true);
+    render(() => (
+      <>
+        <Toaster />
+        <ApprovalCard approval={approval} onApprove={approve} onReject={async () => true} onAlwaysAllow={grant} />
+      </>
+    ));
+    await fireEvent.click(screen.getByRole("button", { name: "Always allow" }));
+    const confirmations = await screen.findAllByRole("button", { name: "Always allow" });
+    const confirm = confirmations.at(-1);
+    if (!confirm) throw new Error("The confirmation was not rendered.");
+    await fireEvent.click(confirm);
+    await vi.waitFor(() => expect(grant).toHaveBeenCalledOnce());
+    response.reject(new Error("Could not save the standing approval."));
+    expect(await screen.findByText("Could not save the standing approval.")).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Always allow" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Deny" })).toBeEnabled();
+    await fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+    expect(approve).toHaveBeenCalledOnce();
+  });
+
   it.each(["Allow", "Deny"])("sends %s once and permits retry when the response fails", async (action) => {
     const response = Promise.withResolvers<boolean>();
     const send = vi.fn(() => response.promise);

@@ -1,10 +1,11 @@
-import type { AccountUsage, AgentSummary } from "@openbot/contracts/ipc";
+import type { AccountUsage, AgentSummary, ApprovalAutomationPreference } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { desktopAnalytics } from "./analytics";
 import {
   AGENTS,
+  confirmOnboardingModel,
   emitAgentEvent,
   emitScopedAgentEvent,
   emitUpdateStatus,
@@ -32,6 +33,89 @@ describe("OpenBot connected desktop shell", () => {
   });
   beforeEach(() => {
     installOpenbotStub();
+  });
+
+  it("answers the original approval after switching agents during a grant write", async () => {
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValue(
+      AGENTS.map((agent) => ({ ...agent, threadId: `thread-${agent.id}` })),
+    );
+    const write = Promise.withResolvers<ApprovalAutomationPreference>();
+    vi.mocked(window.openbot.setApprovalAutomation).mockReturnValueOnce(write.promise);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await confirmOnboardingModel();
+    const requestApproval = (agentId: string) => {
+      emitAgentEvent?.({
+        type: "approval",
+        approval: {
+          requestId: `approval-${agentId}`,
+          agentId,
+          threadId: `thread-${agentId}`,
+          turnId: `turn-${agentId}`,
+          kind: "command",
+          command: "bun run lint",
+          cwd: null,
+          reason: null,
+          grantRoot: null,
+          permissions: null,
+        },
+      });
+    };
+    requestApproval("chief");
+    await fireEvent.click(await screen.findByRole("button", { name: "Always allow" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Always allow" }));
+    await waitFor(() =>
+      expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({ agentId: "chief", autoApprove: true }),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound, Outbound specialist/ }));
+    await screen.findByRole("heading", { name: "Sales Outbound" });
+    requestApproval("sales-outbound");
+    await screen.findByRole("button", { name: "Deny" });
+    write.resolve({ turbo: false, autoApproveAgentIds: ["chief"] });
+    await waitFor(() => expect(window.openbot.agent.respondToApproval).toHaveBeenCalledOnce());
+    expect(window.openbot.agent.respondToApproval).toHaveBeenCalledWith({
+      requestId: "approval-chief",
+      decision: "accept",
+    });
+    expect(screen.getByRole("button", { name: "Deny" })).toBeEnabled();
+  });
+
+  it("lists and revokes local grants while a remote server is selected", async () => {
+    const local = testServer("local", true);
+    const remote = testServer("remote-1", false);
+    vi.mocked(window.openbot.servers.list).mockResolvedValue([local, remote]);
+    vi.mocked(window.openbot.servers.select).mockResolvedValue([
+      { ...local, active: false },
+      { ...remote, active: true },
+    ]);
+    let granted = ["chief", "sales-outbound"];
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: false, autoApproveAgentIds: granted });
+    vi.mocked(window.openbot.setApprovalAutomation).mockImplementation(async ({ agentId }) => {
+      granted = granted.filter((id) => id !== agentId);
+      return { turbo: false, autoApproveAgentIds: granted };
+    });
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    vi.mocked(window.openbot.agent.listAgents).mockImplementation(async (serverId) =>
+      serverId === "local" ? AGENTS : [{ ...AGENTS[0], name: "Remote Chief" }],
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Studio Mac server" }));
+    await screen.findByRole("heading", { name: "Remote Chief" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    expect(await screen.findByRole("button", { name: "Revoke the standing approval for Chief" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Revoke the standing approval for Sales Outbound" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Revoke the standing approval for Remote Chief" }),
+    ).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Revoke all" }));
+    await waitFor(() => expect(window.openbot.setApprovalAutomation).toHaveBeenCalledTimes(2));
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({ agentId: "chief", autoApprove: false });
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({
+      agentId: "sales-outbound",
+      autoApprove: false,
+    });
+    expect(await screen.findByText("No agent has a standing approval")).toBeInTheDocument();
   });
 
   it("refreshes skill suggestions after settings closes", async () => {
