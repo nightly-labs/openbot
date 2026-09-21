@@ -1,3 +1,4 @@
+import type { HostStatus } from "@openbot/contracts/ipc";
 import { createSignal, onSettled } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -147,7 +148,7 @@ export const RemoteDesktopAfterPublication: Story = {
   play: async () => {
     const body = within(document.body);
     await fireEvent.click(await body.findByRole("switch", { name: "Publish this server" }));
-    await expect(await body.findByRole("button", { name: "Set up", exact: true })).toBeVisible();
+    await expect(await body.findByRole("button", { name: "Set up" })).toBeVisible();
   },
 };
 
@@ -157,7 +158,7 @@ function PublicationSetupStory(props: { settings: ServerSettingsModalProps }) {
     <RemoteSetupStory
       settings={{
         ...props.settings,
-        get hostStatus() {
+        get hostStatus(): HostStatus {
           return { ...STORY_HOST_STATUS, configured: true, phase: published() ? "online" : "idle" };
         },
         onSetPublished: async (value) => {

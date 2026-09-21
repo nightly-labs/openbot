@@ -167,7 +167,7 @@ describe("ServerSettingsModal", () => {
     ));
     expect(screen.queryByText("Set up remote desktop")).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole("switch", { name: "Publish this server" }));
-    const button = await screen.findByRole("button", { name: action, exact: true });
+    const button = await screen.findByRole("button", { name: action });
     expect(onSetPublished).toHaveBeenCalledWith(true);
     await fireEvent.click(button);
     expect(screen.queryByText("Set up remote desktop")).not.toBeInTheDocument();

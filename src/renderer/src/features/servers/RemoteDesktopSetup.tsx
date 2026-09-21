@@ -278,7 +278,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                 <Show when={state.result?.checkedAt}>
                   {" · Checked "}
                   <time
-                    dateTime={state.result?.checkedAt ?? undefined}
+                    datetime={state.result?.checkedAt ?? undefined}
                     title={new Date(state.result?.checkedAt ?? "").toLocaleString()}
                   >
                     {new Date(state.result?.checkedAt ?? "").toLocaleTimeString([], {

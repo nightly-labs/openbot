@@ -1,6 +1,6 @@
 import type { RemoteDesktopErrorCode, RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
-import { Portal } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, type JSX, onSettled, Show } from "solid-js";
+import { type JSX, Portal } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { z } from "zod";
 import {
   ArrowLeft,
@@ -231,7 +231,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                 class="remote-desktop-viewer"
                 title="Sunshine remote desktop"
                 inert={props.viewOnly}
-                tabIndex={props.viewOnly ? -1 : undefined}
+                tabindex={props.viewOnly ? -1 : undefined}
                 src={source()}
                 sandbox="allow-scripts allow-forms allow-same-origin allow-pointer-lock"
                 allow="fullscreen; keyboard-map"
