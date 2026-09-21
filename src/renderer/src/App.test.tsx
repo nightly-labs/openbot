@@ -348,7 +348,9 @@ describe("OpenBot connected desktop shell", () => {
       });
 
     render(() => <App />);
-    await screen.findByText("Connecting to agent CLIs…");
+    // The first read must land before the ready status, or the refresh it triggers has nothing
+    // stored to replace.
+    await waitFor(() => expect(window.openbot.agent.readConversation).toHaveBeenCalledTimes(1));
     emitAgentEvent?.({
       type: "status",
       status: {
