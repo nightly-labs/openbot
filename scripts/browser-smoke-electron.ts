@@ -449,6 +449,12 @@ async function main(): Promise<void> {
     const currentSave = typed.elements.find((element) => element.name === "Save");
     if (!currentSave) throw new Error("Save control disappeared after typing.");
     await browser.act(tab.id, typed.revision, { type: "click", ref: currentSave.ref });
+    // Native clicks use Electron's input pipeline, so the click handler can still be running when
+    // the action call returns. Wait for the handler output before checking the result.
+    await waitFor(
+      async () => (await browser.snapshot(tab.id)).text.includes("runs locally|input:true|click:true"),
+      "the native Save click",
+    );
     const result = await browser.snapshot(tab.id);
     if (!result.text.includes("runs locally|input:true|click:true")) {
       throw new Error(`Browser input was not native: ${result.text}`);
