@@ -6,7 +6,7 @@ export function SidebarFrame(props: ParentProps<{ compact?: boolean }>) {
     <aside
       id="agent-sidebar"
       aria-label="Agent navigation"
-      class={["sidebar panel-edge", { "sidebar-compact": props.compact }]}
+      class={["sidebar panel-edge", { "sidebar-compact": props.compact === true }]}
     >
       {props.children}
     </aside>

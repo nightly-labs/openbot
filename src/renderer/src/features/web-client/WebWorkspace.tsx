@@ -126,7 +126,7 @@ export function WebWorkspace(props: {
   const prompt = createMemo<Extract<AgentEvent, { type: "prompt" }> | undefined>(() => {
     if (workspace.state.status !== "online") return;
     const page = workspace.conversation()?.page;
-    if (!page) return;
+    if (!page?.threadId) return;
     const pending = workspace.state.prompts.find(
       (item) => item.agentId === page.agentId && item.threadId === page.threadId,
     );

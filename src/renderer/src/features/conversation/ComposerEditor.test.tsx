@@ -91,6 +91,7 @@ describe("ComposerEditor", () => {
       disable = () => setDisabled(true);
       return (
         <ComposerEditor
+          agentId="chief"
           agents={[]}
           value=""
           placeholder="Connect to your host to start"
@@ -101,7 +102,7 @@ describe("ComposerEditor", () => {
         />
       );
     });
-    const editor = screen.getByRole("textbox", { name: "Message", exact: true });
+    const editor = screen.getByRole("textbox", { name: "Message" });
     editor.focus();
     disable();
     await waitFor(() => expect(editor).toHaveAttribute("aria-disabled", "true"));

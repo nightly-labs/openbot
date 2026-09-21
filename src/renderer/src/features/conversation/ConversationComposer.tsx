@@ -376,10 +376,12 @@ export function ConversationComposer() {
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
             <div class="composer-primary-actions">
-              <Show when={attachmentBusy() && props.runtime?.cancelImportFiles}>
-                <Button variant="ghost" type="button" onClick={() => void props.runtime?.cancelImportFiles()}>
-                  Cancel upload
-                </Button>
+              <Show when={attachmentBusy() && props.runtime?.cancelImportFiles} keyed>
+                {(cancelImportFiles) => (
+                  <Button variant="ghost" type="button" onClick={() => void cancelImportFiles()}>
+                    Cancel upload
+                  </Button>
+                )}
               </Show>
               <Show when={voiceAvailable()}>
                 <Show when={voicePhase() === "preparing"}>

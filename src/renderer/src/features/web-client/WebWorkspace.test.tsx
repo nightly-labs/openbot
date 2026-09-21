@@ -354,7 +354,7 @@ describe("web workspace state", () => {
     };
     const directoryRefresh = Promise.withResolvers<(typeof host)[]>();
     const listHosts = vi.fn().mockResolvedValueOnce([host]).mockReturnValueOnce(directoryRefresh.promise);
-    const app = harness({ listHosts, onSessionCheck: vi.fn().mockResolvedValue(undefined) });
+    const app = harness({ listHosts });
     const workspace = await connected(app);
     workspace.setDraft("Private draft");
     app.events().connection({

@@ -384,9 +384,17 @@ export function createWebWorkspaceRuntime(
     },
     async conversation(id, before) {
       if (!capabilities.includes("conversation-pagination")) {
-        const snapshot = await request("GET", TEAM_API_ROUTES.agent.conversation(id));
+        const snapshot: unknown = await request("GET", TEAM_API_ROUTES.agent.conversation(id));
         if (!isConversationSnapshot(snapshot)) throw new Error("The host returned an invalid conversation.");
-        return { ...snapshot, references: {}, pageInfo: { hasOlder: false, olderCursor: null } };
+        return {
+          agentId: snapshot.agentId,
+          threadId: snapshot.threadId,
+          activeTurnId: snapshot.activeTurnId,
+          revision: snapshot.revision,
+          messages: snapshot.messages,
+          references: {},
+          pageInfo: { hasOlder: false, olderCursor: null },
+        };
       }
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));

@@ -26,6 +26,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Connected: Story = {
   play: async ({ canvas }) => {
-    await expect(await canvas.findByRole("textbox", { name: "Message Chief", exact: true })).toBeVisible();
+    await expect(await canvas.findByRole("textbox", { name: "Message Chief" })).toBeVisible();
   },
 };

@@ -62,7 +62,7 @@ describe("browser account UI", () => {
     const mock = setup();
     mock.fetch.mockResolvedValueOnce(Response.json({}, { status: 401 }));
     render(() => <WebApp createRuntime={createMockWebRuntime} />);
-    await fireEvent.input(await screen.findByRole("textbox", { name: "Email", exact: true }), {
+    await fireEvent.input(await screen.findByRole("textbox", { name: "Email" }), {
       target: { value: "test@example.test" },
     });
     mock.fetch.mockResolvedValueOnce(Response.json({ challengeId: "challenge", resendAt: Date.now() + 60000 }));
@@ -98,7 +98,7 @@ describe("browser account UI", () => {
     );
     mock.fetch.mockResolvedValue(Response.json({ error: { message: "Sign in is required." } }, { status: 401 }));
     mock.changed();
-    await screen.findByRole("textbox", { name: "Email", exact: true });
+    await screen.findByRole("textbox", { name: "Email" });
     expect(screen.queryByRole("button", { name: "Open account actions" })).not.toBeInTheDocument();
     app.unmount();
     expect(mock.close).toHaveBeenCalledOnce();
@@ -110,7 +110,7 @@ describe("browser account UI", () => {
     mock.fetch.mockResolvedValue(Response.json({ signedOut: true }));
     await fireEvent.click(screen.getByRole("button", { name: "Open account actions" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
-    await screen.findByRole("textbox", { name: "Email", exact: true });
+    await screen.findByRole("textbox", { name: "Email" });
     expect(mock.fetch).toHaveBeenLastCalledWith(
       "/api/browser/logout",
       expect.objectContaining({
@@ -127,6 +127,6 @@ describe("browser account UI", () => {
     );
     render(() => <WebApp createRuntime={createMockWebRuntime} />);
     await waitFor(() => expect(screen.getByText("Browser access is not available yet.")).toBeVisible());
-    expect(screen.queryByRole("textbox", { name: "Email", exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
   });
 });
