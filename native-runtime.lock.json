@@ -229,10 +229,26 @@
       "overrides": [],
       "submodules": {}
     },
-    "releaseArtifacts": {},
+    "releaseArtifacts": {
+      "darwin-arm64": {
+        "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
+        "sha256": "17fb97c6ecf50c100f0796cd48400fba713c0484202a59a3b1f2e19bc10ddb66"
+      },
+      "win32-x64": {
+        "asset": "remote-desktop-runtime-win32-x64.tar.gz",
+        "sha256": "a1e3fe43d9348d42c0f7d0060335dd8245c2a4bab845099bd31fe5b9dce63d67"
+      }
+    },
     "targets": {
       "darwin-arm64": ["Sunshine.app/Contents/MacOS/Sunshine", "web-server", "streamer"],
       "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"]
+    },
+    "artifactRelease": {
+      "repository": "nightly-labs/openbot",
+      "tag": "remote-desktop-runtime-4afafecce7c6ce5b79f9c98124574092e1bc75b8bd1c9282190ebe617367cbcf",
+      "inputDigest": "4afafecce7c6ce5b79f9c98124574092e1bc75b8bd1c9282190ebe617367cbcf",
+      "manifestAsset": "remote-desktop-runtime-manifest.json",
+      "manifestSha256": "6d9def274286d08e3a0992950c8d1830617caf7553f4e2e380ea91ec521a194e"
     }
   },
   "bun": {
