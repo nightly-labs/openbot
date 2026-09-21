@@ -498,7 +498,7 @@ jobs:
             --ephemeral \
             --sandbox danger-full-access \
             --model chatgpt-web/extra-high \
-            --config 'model_reasoning_effort="high"' \
+            --config 'model_reasoning_effort="xhigh"' \
             --color never \
             --output-last-message "$last_message_file" \
             - < "$prompt_file" 2>&1 | tee "$live_file"
