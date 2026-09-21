@@ -96,12 +96,19 @@ export function MarketplacePluginDetail(props: {
   targetAgentId: string;
   onTargetChange: (id: string) => void;
   installed?: boolean;
+  /**
+   * Whether any app or skill of this plugin is still on this computer. A half-installed plugin is
+   * not `installed`, so the install stays on offer, and this keeps the way out of what is there on
+   * offer beside it. Both are false for a listing that has never been installed.
+   */
+  removable?: boolean;
   busy?: boolean;
   onInstall: () => void | Promise<void>;
   /**
-   * Takes the plugin back off this computer. Offered in the install button's own place rather than
-   * beside it: a listing is installed or it is not, and the one control says which and offers the
-   * other. What is about to be removed is named in the confirmation the caller opens, not here.
+   * Takes the plugin back off this computer. Once a plugin is whole it takes the install button's
+   * own place, because a listing is then installed or it is not and one control says which. While
+   * only part of it is here both are offered: what is missing can still be installed, and what is
+   * here can still go. What is about to be removed is named in the confirmation the caller opens.
    */
   onUninstall: () => void | Promise<void>;
   /**
@@ -147,14 +154,12 @@ export function MarketplacePluginDetail(props: {
               states which agent gets the plugin and sends it there in the same place. */}
           <div class="marketplace-install-control">
             <AgentSelect agents={props.agents} value={props.targetAgentId} onChange={props.onTargetChange} />
-            <Show
-              when={props.installed}
-              fallback={
-                <Button loading={props.busy} disabled={!props.targetAgentId} onClick={() => void props.onInstall()}>
-                  Install plugin
-                </Button>
-              }
-            >
+            <Show when={!props.installed}>
+              <Button loading={props.busy} disabled={!props.targetAgentId} onClick={() => void props.onInstall()}>
+                Install plugin
+              </Button>
+            </Show>
+            <Show when={props.installed || props.removable}>
               <Button variant="destructive" loading={props.busy} onClick={() => void props.onUninstall()}>
                 Uninstall plugin
               </Button>

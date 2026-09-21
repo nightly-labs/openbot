@@ -1499,7 +1499,7 @@
   width: 100%;
   display: grid;
   gap: var(--openbot-space-2);
-  margin-top: var(--openbot-space-5);
+  margin-top: var(--openbot-space-4);
   text-align: start;
 }
 .plugin-uninstall-list {

@@ -254,11 +254,16 @@ find a probable install, but it then offers "Reinstall" and not a version.
 Uninstall removes the plugin's skills from the agent in the picker, and the plugin's apps from the
 host. Nothing is silent: the listing shows `Uninstall plugin` in the install button's place, and a
 confirmation names every app row and every skill slug that is about to go before any of them does.
+While only part of a plugin is here - one app saved before a later one failed, or one removal that
+failed - the page offers both: the install can finish the job, and what is here can still go.
 
 Built, in `SkillsMarketplaceModal.tsx`:
 
 - the plan is read from this computer, not from the listing. An app the host does not hold and a
   skill the agent does not hold are not named and not removed;
+- a row is the plugin's only when its name and its address - or its command and words - are the
+  listing's. Names are unique on a host, so a server the user wrote by hand can hold a catalog name
+  while pointing elsewhere; that row is neither counted as installed nor removed;
 - the apps go first and the skills after, the reverse of the install order. The server stops
   answering before the instructions that drive it are taken away;
 - every step is attempted even after one fails. What could be removed is removed, and the failures
@@ -418,7 +423,7 @@ mandatory.
 | `src/main/ipc/plugin-handlers.test.ts` | The sender check runs before the payload is read. A bad slug is refused. The pending link is given one time. |
 | `src/main/plugin-catalog-service.test.ts` | A 304 answer, a wrong hash, the offline fallback, the choice between the snapshot and the cache, and a part-completed install. |
 | `src/main/ipc-channel-coverage.test.ts` | Exists. It fails until the channels are in the contracts, the preload and the mock. |
-| `src/renderer/src/features/settings/SkillsMarketplaceModal.test.tsx` | A slug opens the Plugins tab and that listing, no install call is made, an unknown slug shows the `missing` state, and `Copy link` writes the canonical URL. For the uninstall: the confirmation names the app and the skill and removes neither, a confirmed uninstall removes the host row before the agent's skill, a cancel removes nothing, and a failed app removal still takes the skill and is reported. |
+| `src/renderer/src/features/settings/SkillsMarketplaceModal.test.tsx` | A slug opens the Plugins tab and that listing, no install call is made, an unknown slug shows the `missing` state, and `Copy link` writes the canonical URL. For the uninstall: the confirmation names the app and the skill and removes neither, a confirmed uninstall removes the host row before the agent's skill, a cancel removes nothing, and a failed app removal still takes the skill, is reported, and still offers the uninstall, and a server that only shares the app's name is neither read as installed nor removable. |
 | `apps/auth-api/test/` page and metadata tests | The page shows the listing and both buttons. The canonical URL and the sitemap are correct. An unknown slug gives a 404. |
 
 ## 7. Open questions

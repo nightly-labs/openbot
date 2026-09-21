@@ -1522,6 +1522,33 @@ describe("SkillsMarketplaceModal", () => {
 
       await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("This MCP server no longer exists.");
+      // Half a plugin is not installed, but what stayed must still have a way out: the retry.
+      expect(screen.getByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
+    });
+
+    /**
+     * Names are unique on a host, so a server the user wrote by hand can own a catalog name while
+     * pointing somewhere else. That row is not the plugin's, and an uninstall must never offer to
+     * take it: the listing reads as not installed and there is nothing to confirm.
+     */
+    it("leaves a server that only shares the app's name alone", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [{ ...hostApp(), url: "https://mcp.example.test/mine" }]),
+        removeMcpServer: vi.fn(async () => []),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Uninstall plugin" })).toBeNull();
     });
 
     /**

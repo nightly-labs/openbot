@@ -69,7 +69,7 @@ import type {
   MarketplacePluginPrompt,
   MarketplacePluginDetail as PluginDetail,
 } from "./marketplace-plugins";
-import { createPluginShareUrl } from "./marketplace-plugins";
+import { createPluginShareUrl, isPluginAppConfig } from "./marketplace-plugins";
 import type { McpConnectFlow } from "./mcp-connect-auth";
 import type { PluginUninstallPlan } from "./PluginUninstallDialog";
 import { PluginUninstallDialog } from "./PluginUninstallDialog";
@@ -267,12 +267,20 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
    * a name alone cannot say which row an app's name belongs to.
    */
   const [hostMcpServers, setHostMcpServers] = createSignal<readonly McpServerConfig[]>([]);
-  const hostMcpNames = () => hostMcpServers().map((config) => config.name);
+  /** The row this app installed as, or nothing: a name on its own is not enough to claim a row. */
+  const heldApp = (app: MarketplacePluginApp) => hostMcpServers().find((held) => isPluginAppConfig(held, app));
   /** A plugin reads as installed iff all its apps and skills are present. */
   const pluginInstalled = (plugin: PluginDetail) =>
     (plugin.apps.length > 0 || plugin.skills.length > 0) &&
-    plugin.apps.every((app) => hostMcpNames().includes(app.server.name)) &&
+    plugin.apps.every((app) => Boolean(heldApp(app))) &&
     plugin.skills.every((skill) => installedById().has(skill.id));
+  /**
+   * Whether anything of this plugin is still here. A half-installed plugin - one app saved before a
+   * later one failed, or one removal that failed while the rest went - is not installed, but it is
+   * still removable, and the page must keep offering the way out of what is left.
+   */
+  const pluginRemovable = (plugin: PluginDetail) =>
+    plugin.apps.some((app) => Boolean(heldApp(app))) || plugin.skills.some((skill) => installedById().has(skill.id));
 
   async function loadHostMcpServers(serverId: string) {
     const configs = await run(() => window.openbot.agent.listMcpServers(serverId));
@@ -373,9 +381,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     const held = installedById();
     return {
       pluginName: plugin.name,
-      appNames: plugin.apps
-        .map((app) => hostMcpServers().find((config) => config.name === app.server.name)?.name)
-        .filter((name): name is string => Boolean(name)),
+      appNames: plugin.apps.map((app) => heldApp(app)?.name).filter((name): name is string => Boolean(name)),
       skillSlugs: plugin.skills.filter((skill) => held.has(skill.id)).map((skill) => skill.slug),
       agentName: props.agents.find((agent) => agent.id === market.browse.targetAgentId)?.name ?? "this agent",
     };
@@ -405,7 +411,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setError(null);
     const failures: string[] = [];
     for (const app of plugin.apps) {
-      const config = hostMcpServers().find((held) => held.name === app.server.name);
+      const config = heldApp(app);
       if (!config) continue;
       try {
         setHostMcpServers(await window.openbot.agent.removeMcpServer({ mcpServerId: config.id }, serverId));
@@ -1180,6 +1186,7 @@ description: Turn merged work into clear, consistent release notes.
                                   })
                                 }
                                 installed={pluginInstalled(plugin)}
+                                removable={pluginRemovable(plugin)}
                                 busy={
                                   panel.busy === `plugin:${plugin.id}` || panel.busy === `plugin-uninstall:${plugin.id}`
                                 }

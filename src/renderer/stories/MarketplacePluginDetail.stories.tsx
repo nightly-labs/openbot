@@ -15,6 +15,7 @@ const storyAgents = STORY_AGENT_SUMMARIES.map((agent) => ({ id: agent.id, name: 
 function PluginDetailStory(props: {
   plugin?: PluginDetail;
   installed?: boolean;
+  removable?: boolean;
   busy?: boolean;
   readOnly?: boolean;
   onInstall?: () => void;
@@ -36,6 +37,7 @@ function PluginDetailStory(props: {
         targetAgentId={props.noAgents ? "" : target()}
         onTargetChange={setTarget}
         installed={props.installed}
+        removable={props.removable}
         busy={props.busy}
         onInstall={props.onInstall ?? fn()}
         onUninstall={props.onUninstall ?? fn()}
@@ -110,6 +112,19 @@ export const Installed: Story = {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Uninstall plugin" }));
     await expect(defaultSpies.uninstall).toHaveBeenCalled();
+  },
+};
+
+/**
+ * Half of it is here: one app saved before a later one failed, or one removal that failed. The
+ * install can still finish the job, and what is already here can still go.
+ */
+export const PartlyInstalled: Story = {
+  render: () => <PluginDetailStory removable />,
+  play: async () => {
+    const body = within(document.body);
+    await expect(await body.findByRole("button", { name: "Install plugin" })).toBeVisible();
+    await expect(await body.findByRole("button", { name: "Uninstall plugin" })).toBeVisible();
   },
 };
 
