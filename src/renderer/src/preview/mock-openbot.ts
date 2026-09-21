@@ -586,12 +586,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     getApprovalAutomation: async () => clone(approvalAutomation),
     setApprovalAutomation: async ({ turbo, agentId, autoApprove }) => {
-      const granted = new Set(approvalAutomation.autoApproveAgentIds);
-      if (agentId !== undefined && autoApprove !== undefined) {
-        if (autoApprove) granted.add(agentId);
-        else granted.delete(agentId);
-      }
-      approvalAutomation = { turbo: turbo ?? approvalAutomation.turbo, autoApproveAgentIds: [...granted] };
+      approvalAutomation = {
+        ...approvalAutomation,
+        turbo: turbo ?? approvalAutomation.turbo,
+        autoApproveOverrides:
+          agentId !== undefined && autoApprove !== undefined
+            ? { ...approvalAutomation.autoApproveOverrides, [agentId]: autoApprove }
+            : approvalAutomation.autoApproveOverrides,
+      };
       return clone(approvalAutomation);
     },
     getAppLanguagePreference: async () => clone(languagePreference),

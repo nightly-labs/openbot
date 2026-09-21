@@ -383,7 +383,7 @@ export class AttentionRegistry {
   ): Promise<void> {
     const prepared = await this.#hostedSites.prepareApproval(client, request, params, tool);
     if (!prepared) return;
-    if (shouldAutoApprove(this.#approvalAutomation, prepared.approval)) {
+    if (shouldAutoApprove(this.#approvalAutomation, prepared.approval) && this.#approvalAutomation.turboEnabled()) {
       await this.#hostedSites.resolveApproval(
         prepared.mutation,
         { client, id: request.id, agentId: prepared.approval.agentId },
