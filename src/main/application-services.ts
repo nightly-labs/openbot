@@ -136,7 +136,8 @@ import { VoiceTranscriptionService } from "./voice-transcription-service";
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
-const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
+const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
+const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
@@ -439,6 +440,7 @@ export async function createApplicationServices({
     initial: await readApprovalAutomation(
       approvalAutomationFile,
       store.list().map((agent) => agent.id),
+      join(app.getPath("userData"), LEGACY_APPROVAL_AUTOMATION_FILE),
     ),
     knownAgentIds: () => store.list().map((agent) => agent.id),
   });
