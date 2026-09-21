@@ -76,7 +76,7 @@ export function ConversationHeader() {
             onDownloadProvider={props.onDownloadProvider}
             onCancelProviderDownload={props.onCancelProviderDownload}
             onConnectProvider={props.onConnectProvider}
-            disabled={agentActivity() === "Working"}
+            modelChangesDisabled={agentActivity() === "Working"}
             disabledReason={
               agentActivity() === "Working"
                 ? "Wait for the current work to finish before changing models."

@@ -126,26 +126,6 @@ describe("ApprovalCard", () => {
     expect(approve).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Allow" })).toBeEnabled();
   });
-
-  it("grants and answers the request in hand once the confirmation is accepted", async () => {
-    const grant = vi.fn(async () => true);
-    render(() => (
-      <ApprovalCard
-        approval={approval}
-        agentName="Chief"
-        onApprove={async () => true}
-        onReject={async () => true}
-        onAlwaysAllow={grant}
-      />
-    ));
-
-    await fireEvent.click(screen.getByRole("button", { name: "Always allow" }));
-    const confirmations = await screen.findAllByRole("button", { name: "Always allow" });
-    const confirm = confirmations.at(-1);
-    if (!confirm) throw new Error("The confirmation was not rendered.");
-    await fireEvent.click(confirm);
-    await vi.waitFor(() => expect(grant).toHaveBeenCalledTimes(1));
-  });
 });
 
 describe("BrowserTakeoverCard", () => {

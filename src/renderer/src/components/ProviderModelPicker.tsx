@@ -57,6 +57,8 @@ interface ProviderModelPickerProps {
   reasoningEffort?: AgentReasoningEffort;
   onReasoningEffortChange?: (effort: AgentReasoningEffort) => void;
   disabled?: boolean;
+  /** Keep approval controls available while model and effort changes are locked. */
+  modelChangesDisabled?: boolean;
   disabledReason?: string;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -169,6 +171,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   }
 
   function selectModel(model: AgentModelId, rail: RailId): void {
+    if (props.disabled || props.modelChangesDisabled) return;
     if (providerAvailability(props.agentStatus, props.modelOptions, rail).state !== "available") return;
     if (
       !showsReasoningEffort() &&
@@ -199,7 +202,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
           aria-label={`${props.ariaLabel ?? "Agent model"}: ${triggerModelName()}`}
           disabled={props.disabled}
-          title={props.disabled ? props.disabledReason : `${railName(activeProvider())} · ${triggerModelName()}`}
+          title={
+            props.disabled || props.modelChangesDisabled
+              ? props.disabledReason
+              : `${railName(activeProvider())} · ${triggerModelName()}`
+          }
           onKeyDown={(event: KeyboardEvent) => {
             if (event.key !== "ArrowDown") return;
             event.preventDefault();
@@ -442,7 +449,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           )}
                           optionValue="id"
                           optionTextValue={(model) => displayModelName(model.name, model.id)}
-                          optionDisabled={() => !available()}
+                          optionDisabled={() => !available() || props.modelChangesDisabled === true}
                           value={[selected()?.id ?? props.value]}
                           selectionMode="single"
                           disallowEmptySelection
@@ -459,7 +466,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 aria-label={`${displayModelName(model.name, model.id)}${
                                   model.id === railDefaultModel(provider) ? ", default" : ""
                                 }`}
-                                disabled={!available()}
+                                disabled={!available() || props.modelChangesDisabled}
                                 onClick={() => {
                                   if (!isSelected() || props.provider !== provider) selectModel(model.id, provider);
                                 }}
@@ -492,7 +499,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           optionTextValue="name"
                           value={effortOptions().find((option) => option.id === effortValue())}
                           onChange={(option) => {
-                            if (!available() || !option || option.id === effortValue()) return;
+                            if (
+                              props.disabled ||
+                              props.modelChangesDisabled ||
+                              !available() ||
+                              !option ||
+                              option.id === effortValue()
+                            )
+                              return;
                             if (selected()?.variants.length) props.onChange(option.id, wireProvider(provider));
                             else {
                               const effort = selectedModel()?.supportedReasoningEfforts.find(
@@ -503,7 +517,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           }}
                           itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
                         >
-                          <SelectTrigger size="sm" aria-label="Agent reasoning effort" disabled={!available()}>
+                          <SelectTrigger
+                            size="sm"
+                            aria-label="Agent reasoning effort"
+                            disabled={!available() || props.modelChangesDisabled}
+                          >
                             <SelectValue<{ id: string; name: string }>>
                               {(state) => state.selectedOption()?.name ?? "Select effort"}
                             </SelectValue>

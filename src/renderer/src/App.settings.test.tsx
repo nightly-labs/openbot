@@ -795,11 +795,14 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByLabelText("Message Chief")).toHaveAttribute("contenteditable", "true");
   });
 
-  it("locks the header model picker during active work", async () => {
+  it("permits approval revocation during active work while locking model and effort changes", async () => {
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: false, autoApproveAgentIds: ["chief"] });
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     const trigger = screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" });
     await waitFor(() => expect(trigger).toBeEnabled());
+    await fireEvent.click(trigger);
+    await screen.findByRole("option", { name: "GPT-5.6 Sol" });
 
     emitAgentEvent?.({
       type: "turn-started",
@@ -807,7 +810,14 @@ describe("OpenBot connected desktop shell", () => {
       threadId: "thread-chief",
       turnId: "turn-1",
     });
-    await waitFor(() => expect(trigger).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeDisabled());
+    expect(trigger).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Agent reasoning effort/ })).toBeDisabled();
+    const approval = screen.getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(approval).toBeChecked();
+    await fireEvent.click(approval);
+    await waitFor(() => expect(approval).not.toBeChecked());
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({ agentId: "chief", autoApprove: false });
 
     emitAgentEvent?.({
       type: "turn-completed",
@@ -816,7 +826,8 @@ describe("OpenBot connected desktop shell", () => {
       turnId: "turn-1",
       status: "completed",
     });
-    await waitFor(() => expect(trigger).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: /Agent reasoning effort/ })).toBeEnabled();
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_started", expect.anything());
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_completed", expect.anything());
   });
