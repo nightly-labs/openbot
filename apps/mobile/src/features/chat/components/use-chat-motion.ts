@@ -357,6 +357,7 @@ export function useChatMotion(
     responseVisible,
     composerHeight,
     composerStyle,
+    keyboardHeight,
     keyboardProgress,
     blankSpace,
     historyStyle,

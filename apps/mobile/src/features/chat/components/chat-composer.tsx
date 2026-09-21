@@ -1,4 +1,3 @@
-import { MenuView } from "@expo/ui/community/menu";
 import { GlassView } from "expo-glass-effect";
 import { Image } from "expo-image";
 import { useIsFocused } from "expo-router";
@@ -20,6 +19,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cubicBezier,
   Easing,
+  Extrapolation,
   interpolate,
   ReduceMotion,
   type SharedValue,
@@ -95,6 +95,10 @@ interface ChatComposerProps {
   onStop?: () => void;
   /** 0 with the keyboard down, 1 with it up, and every value a swipe passes through. */
   keyboardProgress: SharedValue<number>;
+  /** The attachment card is open on the plus, which then has to hold still. */
+  menuOpen: boolean;
+  /** The card's open progress, so the plus can cross-fade against the card. */
+  menuProgress: SharedValue<number>;
   stopping?: boolean;
   attachments: ChatAttachments;
   sending: boolean;
@@ -122,6 +126,8 @@ export function ChatComposer({
   onSend,
   onStop,
   keyboardProgress,
+  menuOpen,
+  menuProgress,
   stopping = false,
   attachments,
   sending,
@@ -143,7 +149,6 @@ export function ChatComposer({
     : [];
   const hasDraft = Boolean(draft.trim()) || attachments.items.length > 0;
   const inputRef = useRef<TextInput>(null);
-  const attachmentButton = useRef<View>(null);
   const isFocused = useIsFocused();
   const focusedReplyVersion = useRef(0);
   useEffect(() => {
@@ -197,15 +202,32 @@ export function ChatComposer({
   const restWidth = placeholderWidth > 0 ? Math.min(cardWidth, placeholderWidth + restTextInset * 2) : cardWidth;
   // Content outlives the keyboard: a draft or an attachment has to stay
   // readable after a dismissal, so it holds the composer open on its own.
-  const held = useSharedValue(hasDraft ? 1 : 0);
+  // What the composer was when the card opened. The card is anchored to that
+  // shape, so the shape holds until the card is gone: choosing the camera puts
+  // the keyboard away, and the plus must not travel out from under a card that
+  // is already growing out of it. Recorded on the press, so opening the card
+  // never changes the shape on its own.
+  const [openedWith, setOpenedWith] = useState<{ expanded: boolean; focused: boolean } | null>(null);
+  useEffect(() => {
+    if (!menuOpen) setOpenedWith(null);
+  }, [menuOpen]);
+  useEffect(() => {
+    // Mounting the card resigns first responder somewhere in the native tree
+    // and the keyboard leaves with it. Opening the card is not a reason to
+    // close the keyboard, so take it back. This is a no-op when the input kept
+    // it, which is why it is safe to run on every open.
+    if (menuOpen && openedWith?.focused) inputRef.current?.focus();
+  }, [menuOpen, openedWith]);
+  const anchored = hasDraft || Boolean(openedWith?.expanded);
+  const held = useSharedValue(anchored ? 1 : 0);
   useEffect(() => {
     held.set(
-      withTiming(hasDraft ? 1 : 0, {
+      withTiming(anchored ? 1 : 0, {
         duration: reducedMotion ? 0 : SHAPE_DURATION,
         reduceMotion: ReduceMotion.System,
       }),
     );
-  }, [hasDraft, held, reducedMotion]);
+  }, [anchored, held, reducedMotion]);
   // The keyboard drives the shape frame by frame, so zeroing the other
   // durations leaves this one path moving. Reduced motion answers it by
   // dropping the resting shape altogether: the composer stays open, and the
@@ -346,6 +368,27 @@ export function ChatComposer({
   // its appearance from the draft alone: it would flip to an empty state
   // under the user's own press.
   const busy = sending || attachments.preparing;
+  const attachmentsBlocked = disabled || sending || attachments.preparing;
+  // The card covers this glyph and draws the same corner, so the two trade
+  // places on one progress: the glyph is gone by the time the card is drawn,
+  // and back on the frames the card fades out. Waiting for the card to
+  // unmount left the corner empty for the whole length of its collapse.
+  const plusGlyphStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(menuProgress.get(), [0, 0.2], [1, 0], Extrapolation.CLAMP) * (attachmentsBlocked ? 0.45 : 1),
+  }));
+  // Where the plus is drawn, in either shape, from the constants that draw it.
+  // Measuring it cannot work: `measureInWindow` reads the layout tree, and the
+  // plus and the composer around it both carry Reanimated transforms that
+  // never reach it. `focused` and `hasDraft` are the React mirror of the two
+  // things that open the composer, and both change once per interaction.
+  const restingPlus = !hasDraft && !focused;
+  const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
+  const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
+  const attachmentAnchor = {
+    left: BAR_INSET + TOOLBAR_PADDING + plusInset + (restingPlus ? (cardWidth - restWidth) / 2 - restControlShift : 0),
+    bottom: Math.max(bottomInset, 10) + 4 + plusInset - (restingPlus ? restControlOffset : 0),
+    size: plusDrawn,
+  };
   // A draft still sends while the agent works: the host queues it. So stop only
   // takes the control when there is nothing to send.
   const stopMode = Boolean(onStop) && !hasDraft && !busy;
@@ -747,54 +790,23 @@ export function ChatComposer({
           // have to carry the bar's own padding to land on the card.
           style={[{ position: "absolute", left: BAR_INSET + 8, bottom: Math.max(bottomInset, 10) + 4 }, plusStyle]}
         >
-          <View
-            ref={attachmentButton}
-            collapsable={false}
-            pointerEvents={disabled || sending || attachments.preparing ? "none" : "auto"}
-            // SwiftUI's Menu owns the tap and @expo/ui documents onOpenMenu as
-            // never firing on iOS, so answer the press itself. pointerEvents
-            // already blocks this while the button cannot act.
-            onTouchStart={() => void haptics.selection()}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add attachment"
+            accessibilityState={{ disabled: attachmentsBlocked }}
+            disabled={attachmentsBlocked}
+            hitSlop={4}
+            className="size-10 items-center justify-center rounded-full"
+            onPress={() => {
+              void haptics.selection();
+              setOpenedWith({ expanded: !restingPlus, focused });
+              attachments.openMenu(attachmentAnchor);
+            }}
           >
-            <MenuView
-              style={{ width: CONTROL_SIZE, height: CONTROL_SIZE }}
-              actions={[
-                { id: "camera", title: "Camera", image: "camera" },
-                { id: "photos", title: "Photos", image: "photo" },
-                {
-                  id: "files",
-                  title: "Files",
-                  image: "paperclip",
-                  attributes: { disabled: disabled || sending || attachments.preparing },
-                },
-              ]}
-              onPressAction={({ nativeEvent }) => {
-                if (disabled || sending || attachments.preparing) return;
-                if (nativeEvent.event === "files") void attachments.chooseFiles();
-                if (nativeEvent.event === "photos") void attachments.choosePhotos();
-                if (nativeEvent.event === "camera") {
-                  if (!attachmentButton.current) {
-                    void attachments.takePhoto();
-                    return;
-                  }
-                  attachmentButton.current.measureInWindow((x, y, width, height) => {
-                    void attachments.takePhoto(width > 0 && height > 0 ? { x, y, width, height } : undefined);
-                  });
-                }
-              }}
-            >
-              <View
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel="Add attachment"
-                accessibilityState={{ disabled: disabled || sending || attachments.preparing }}
-                className="size-10 items-center justify-center rounded-full"
-                style={{ opacity: disabled || sending || attachments.preparing ? 0.45 : 1 }}
-              >
-                <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
-              </View>
-            </MenuView>
-          </View>
+            <Animated.View style={plusGlyphStyle}>
+              <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
+            </Animated.View>
+          </Pressable>
         </Animated.View>
       </View>
     </View>

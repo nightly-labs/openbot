@@ -10,15 +10,20 @@ import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useRef, useState } from "react";
-import { Alert, Keyboard } from "react-native";
+import { Alert } from "react-native";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 
-export interface ChatCameraOrigin {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+/**
+ * Where the plus is drawn, from the screen's left and bottom edges. Measuring
+ * it is not an option: `measureInWindow` reads the layout tree, and both the
+ * plus and the composer around it carry Reanimated transforms that never reach
+ * it. The composer computes this from the same numbers it draws with.
+ */
+export interface ChatAttachmentAnchor {
+  left: number;
+  bottom: number;
+  size: number;
 }
 
 export interface ChatAttachment extends RemoteFileUpload {
@@ -37,8 +42,10 @@ export function useChatAttachments(
   initialItems: ChatAttachment[] = [],
   persist?: (items: ChatAttachment[]) => Promise<void>,
 ) {
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraOrigin, setCameraOrigin] = useState<ChatCameraOrigin>();
+  // The plus's rect while the attachment card is open, and null while it is
+  // not: one value, so the card can never be open without an anchor to grow
+  // out of and collapse back into.
+  const [menuAnchor, setMenuAnchor] = useState<ChatAttachmentAnchor | null>(null);
   const [items, setItems] = useState<ChatAttachment[]>(initialItems);
   const itemsRef = useRef<ChatAttachment[]>(initialItems);
   // Selection reads files one by one while persistence runs per file. A plain
@@ -104,13 +111,24 @@ export function useChatAttachments(
     if (!result.canceled) for (const asset of result.assets) await addFile(asset.uri, asset.name);
     else mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
   }
-  async function openCamera(origin?: ChatCameraOrigin) {
-    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
-    if (!(await ImagePicker.requestCameraPermissionsAsync()).granted)
-      throw new Error("Allow camera access in Settings to take a photo.");
-    Keyboard.dismiss();
-    setCameraOrigin(origin);
-    setCameraOpen(true);
+  // Answers whether the card may become the camera. It reports its own refusal
+  // rather than throwing: the card stays open on a refusal, so there is nothing
+  // for the caller's error path to unwind.
+  async function requestCamera(): Promise<boolean> {
+    try {
+      if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
+      if (!(await ImagePicker.requestCameraPermissionsAsync()).granted)
+        throw new Error("Allow camera access in Settings to take a photo.");
+    } catch (error) {
+      mobileAnalytics.track("attachment_action", {
+        action: "select",
+        result: "failed",
+        failure_code: "operation_failed",
+      });
+      Alert.alert("Could not add attachment", error instanceof Error ? error.message : "Try again.");
+      return false;
+    }
+    return true;
   }
   async function choosePhotos() {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
@@ -168,15 +186,15 @@ export function useChatAttachments(
   return {
     items,
     preparing,
-    cameraOpen,
-    cameraOrigin,
-    closeCamera: () => setCameraOpen(false),
-    addPhoto: async (uri: string) => {
-      await addFile(uri, "photo.jpg");
-      setCameraOpen(false);
-    },
+    menuAnchor,
+    menuOpen: menuAnchor !== null,
+    openMenu: (anchor: ChatAttachmentAnchor) => setMenuAnchor(anchor),
+    closeMenu: () => setMenuAnchor(null),
+    // Holds the photo only. The card closes itself once it is held, so it can
+    // collapse back into the control it opened from instead of disappearing.
+    addPhoto: (uri: string) => addFile(uri, "photo.jpg"),
     choosePhotos: () => report(choosePhotos),
-    takePhoto: (origin?: ChatCameraOrigin) => report(() => openCamera(origin)),
+    requestCamera,
     chooseFiles: () => report(chooseFiles),
     paste,
     remove: (id: string) => {

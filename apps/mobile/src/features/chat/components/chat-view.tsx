@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
-import Animated from "react-native-reanimated";
+import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
@@ -36,7 +36,7 @@ import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
 import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
-import { ChatCameraPanel } from "./chat-camera-panel";
+import { ChatAttachmentPanel } from "./chat-attachment-panel";
 import { ChatQueueButton } from "./chat-queue-button";
 import type { ChatQueueController } from "./use-chat-queue";
 
@@ -256,18 +256,30 @@ export function ChatView({
     else leaveConversation();
   }, [animateAvatarOnExit, target.id, target.kind, leaveAgentChatAnimated]);
 
+  // The attachment card must not rebuild this gesture. A new gesture object
+  // makes GestureDetector re-attach around the whole chat, the input inside it
+  // is recreated, and the keyboard goes with it. Read the card's state in the
+  // gesture instead, so opening the card leaves the detector untouched.
+  const menuOpenValue = useSharedValue(false);
+  // The card's own open progress, shared with the composer: the plus fades
+  // back in on the frames the card fades out, so the corner is never empty.
+  const menuProgress = useSharedValue(0);
+  useEffect(() => {
+    menuOpenValue.set(attachments.menuOpen);
+  }, [attachments.menuOpen, menuOpenValue]);
   const edgeBackGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!isIOS && !attachments.cameraOpen)
+        .enabled(!isIOS)
         .hitSlop({ left: 0, width: CHAT_BACK_EDGE_WIDTH })
         .activeOffsetX(12)
         .failOffsetX(-8)
         .failOffsetY([-16, 16])
         .onEnd((event) => {
+          if (menuOpenValue.get()) return;
           if (event.translationX >= 48 || event.velocityX >= 650) scheduleOnRN(handleLeaveConversation);
         }),
-    [handleLeaveConversation, attachments.cameraOpen],
+    [handleLeaveConversation, menuOpenValue],
   );
 
   async function retryAcceptedHistory() {
@@ -405,9 +417,13 @@ export function ChatView({
       <View className="flex-1" style={{ backgroundColor: background }}>
         <View
           className="flex-1"
-          accessibilityElementsHidden={attachments.cameraOpen}
-          importantForAccessibility={attachments.cameraOpen ? "no-hide-descendants" : "auto"}
-          pointerEvents={attachments.cameraOpen ? "none" : "auto"}
+          // Nothing here may switch on the card: this view is an ancestor of
+          // the focused input, and each of pointerEvents and
+          // accessibilityElementsHidden can take first responder with it, and
+          // the keyboard with that. The card's own backdrop absorbs the taps,
+          // and its accessibilityViewIsModal hides this from VoiceOver on iOS.
+          // Android has no such flag, so it keeps the one prop that is its own.
+          importantForAccessibility={attachments.menuOpen ? "no-hide-descendants" : "auto"}
         >
           <KeyboardGestureArea
             style={{ flex: 1 }}
@@ -560,17 +576,25 @@ export function ChatView({
                   onSend={sendMessage}
                   onStop={requestStop}
                   keyboardProgress={motion.keyboardProgress}
+                  menuOpen={attachments.menuOpen}
+                  menuProgress={menuProgress}
                   stopping={stopping}
                 />
               ) : null}
             </Animated.View>
           </KeyboardGestureArea>
         </View>
-        {attachments.cameraOpen && isFocused && appActive ? (
-          <ChatCameraPanel
-            origin={attachments.cameraOrigin}
-            onClose={attachments.closeCamera}
-            onPhoto={attachments.addPhoto}
+        {attachments.menuAnchor && isFocused && appActive ? (
+          <ChatAttachmentPanel
+            anchor={attachments.menuAnchor}
+            attachments={attachments}
+            fallbackBackground={fieldBackground}
+            foreground={foreground}
+            keyboardHeight={motion.keyboardHeight}
+            keyboardOffset={keyboardOffset}
+            liquidGlassAvailable={liquidGlassAvailable}
+            onClose={attachments.closeMenu}
+            progress={menuProgress}
           />
         ) : null}
       </View>
