@@ -416,8 +416,10 @@ export function installOpenbotStub(): void {
       getSetupState: vi.fn().mockResolvedValue({ completed: true, preferredProvider: "codex" }),
       getAnalyticsPreference: vi.fn().mockResolvedValue({ enabled: true }),
       setAnalyticsPreference: vi.fn(async ({ enabled }) => ({ enabled })),
-      getApprovalAutomation: vi.fn().mockResolvedValue({ turbo: false, autoApproveAgentIds: [] }),
-      setApprovalAutomation: vi.fn(async () => ({ turbo: false, autoApproveAgentIds: [] })),
+      getApprovalAutomation: vi
+        .fn()
+        .mockResolvedValue({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} }),
+      setApprovalAutomation: vi.fn(async () => ({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} })),
       getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
       setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
       onAppLanguagePreference: vi.fn(() => () => undefined),
@@ -762,6 +764,7 @@ export function installOpenbotStub(): void {
         interrupt: vi.fn().mockResolvedValue(undefined),
         respondToPrompt: vi.fn().mockResolvedValue(undefined),
         respondToApproval: vi.fn().mockResolvedValue(undefined),
+        respondToBrowserSecret: vi.fn().mockResolvedValue(undefined),
         respondToBrowserTakeover: vi.fn().mockResolvedValue(undefined),
         onEvent: vi.fn(agentEventBridge.subscribe),
         onScopedEvent: vi.fn(scopedAgentEventBridge.subscribe),

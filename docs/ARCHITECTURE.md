@@ -990,3 +990,23 @@ interrupt another member's session to start a test.
 Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishing the host or requiring an account. The same single-use viewer grant and cookie checks protect it. The gateway owns the listener and closes it with the test session; its lease expires after three minutes. Local test IPC can address only sessions created for this purpose.
 
 A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
+
+### Secure browser authentication
+
+`openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public
+secret-request metadata. The attention registry creates a fresh request ID and owns the pending
+response. The secret travels through a dedicated typed IPC endpoint or the optional
+`browser-secret-handoff` Team API capability, never a prompt answer or provider tool argument.
+Frozen protocol projections continue to show ordinary takeover to older clients. Current codecs
+carry validated metadata beside those projections. There is no database schema change.
+
+The browser host owns the protection state and serializes entry behind existing browser work. CDP
+resolves fields before consent and checks the document and origin again before entry. The host
+stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
+and invalidates existing live-view streams. Capture protection remains after same-document navigation
+or an uncertain submission. After a completed submit action without document replacement, the host
+waits up to five seconds, then loads the current URL with GET to replace the document without replaying
+a form POST. Failure retains protection and falls back to takeover. A new document releases it and
+clears navigation history; manual takeover
+completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
+OAuth selection, CAPTCHA, passkeys, and payment confirmation use takeover.

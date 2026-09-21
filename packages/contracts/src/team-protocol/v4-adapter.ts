@@ -7,6 +7,7 @@ import {
   parseSaveAgentProfile,
 } from "../ipc-agent-profile";
 import { isAgentProvider } from "../ipc-agent-status";
+import { BROWSER_SECRET_RESPONSE_PATH, parseBrowserSecretResponse } from "../ipc-browser-secret";
 import { decodeHostAnalytics } from "../ipc-host-analytics";
 import { isBoolean, isDynamicRecord, isString } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
@@ -132,6 +133,8 @@ export function encodeTeamProtocolV4CurrentHttpRequest(
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): string {
   if (isRemoteDesktopSetupRoute(method, path)) return JSON.stringify(decodeRemoteDesktopSetupRequest(path, value));
+  if (method === "POST" && path === BROWSER_SECRET_RESPONSE_PATH)
+    return JSON.stringify(parseBrowserSecretResponse(value));
   if (isBrowserLoadRoute(method, path)) return JSON.stringify(decodeBrowserLoadRequest(value));
   if (isBrowserViewSessionsRoute(method, path)) return JSON.stringify(decodeBrowserViewSessionRequest(value));
   if (isQueueEditRoute(method, path)) return JSON.stringify(decodeQueueEditRequest(value));
@@ -167,6 +170,7 @@ export function decodeTeamProtocolV4CurrentHttpRequest(
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): TeamProtocolV4BaseJsonObject {
   if (isRemoteDesktopSetupRoute(method, path)) return decodeRemoteDesktopSetupRequest(path, value);
+  if (method === "POST" && path === BROWSER_SECRET_RESPONSE_PATH) return { ...parseBrowserSecretResponse(value) };
   if (isBrowserLoadRoute(method, path)) return { ...decodeBrowserLoadRequest(value) };
   if (isBrowserViewSessionsRoute(method, path)) return { ...decodeBrowserViewSessionRequest(value) };
   if (isQueueEditRoute(method, path)) return { ...decodeQueueEditRequest(value) };
@@ -214,6 +218,7 @@ export function encodeTeamProtocolV4CurrentHttpResponse(
     return JSON.stringify(decodeAnalyticsV1Response(decodeAgentAnalytics(value)));
   if (isAgentProfileRoute(method, path) && status < 400) return JSON.stringify(encodeProfileResponse(path, value));
   if (isBrowserLoadRoute(method, path) && status < 400) return "{}";
+  if (path === BROWSER_SECRET_RESPONSE_PATH && status === 204) return "{}";
   if (isBrowserViewSessionRoute(method, path) && status < 400) return "{}";
   if (isBrowserViewSessionsRoute(method, path) && status < 400)
     return JSON.stringify(decodeBrowserViewSessionResponse(value));
@@ -265,6 +270,7 @@ export function decodeTeamProtocolV4CurrentHttpResponse(
     return JSON.parse(JSON.stringify(decodeAgentAnalytics(decodeAnalyticsV1Response(value))));
   if (isAgentProfileRoute(method, path) && status < 400) return decodeProfileResponse(path, value);
   if (isBrowserLoadRoute(method, path) && status < 400) return {};
+  if (path === BROWSER_SECRET_RESPONSE_PATH && status === 204) return {};
   if (isBrowserViewSessionRoute(method, path) && status < 400) return {};
   if (isBrowserViewSessionsRoute(method, path) && status < 400) return { ...decodeBrowserViewSessionResponse(value) };
   if (isBrowserDisplayRoute(method, path) && status < 400)

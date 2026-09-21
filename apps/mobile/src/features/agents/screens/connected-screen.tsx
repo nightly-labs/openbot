@@ -222,7 +222,7 @@ export function ConnectedScreen() {
     [sidebar?.layout, unpinnedAgents, channels.channels, hiddenChannelIds, pinnedChannelIds],
   );
   const visibleSectionIds = items.filter((item) => item.kind === "section").map((item) => item.id);
-  const listReveal = useAgentListReveal(listReady, items.length + (hasPins ? 1 : 0));
+  const listReveal = useAgentListReveal(listReady, activeServer.id);
   // Collapse keeps stable list cells and changes their heights on the UI thread.
   // Enable cell reflow again when a host layout update moves agents or sections.
   const [collapseLayout, setCollapseLayout] = useState<SidebarLayoutSnapshot | null>(null);
@@ -250,6 +250,7 @@ export function ConnectedScreen() {
       {listReady ? (
         <Animated.FlatList
           key={activeServer.id}
+          onLayout={listReveal.onLayout}
           itemLayoutAnimation={listReveal.finished && sidebar?.layout !== collapseLayout ? LIST_REFLOW : undefined}
           skipEnteringExitingAnimations
           removeClippedSubviews={false}
@@ -262,23 +263,25 @@ export function ConnectedScreen() {
           keyExtractor={(item) => `${item.kind}:${item.id}`}
           renderItem={({ item, index }) =>
             item.kind === "section" ? (
-              <SidebarSectionHeader
-                key={`${activeServer.id}:${item.id}`}
-                id={item.id}
-                name={item.name}
-                empty={item.empty}
-                visibleSectionIds={visibleSectionIds}
-                collapsed={collapsedSectionIds?.has(item.id) ?? false}
-                onToggle={() => {
-                  setCollapseLayout(sidebar?.layout ?? null);
-                  setCollapsedByServer((current) => {
-                    const next = new Set(current[activeServer.id]);
-                    if (next.has(item.id)) next.delete(item.id);
-                    else next.add(item.id);
-                    return { ...current, [activeServer.id]: next };
-                  });
-                }}
-              />
+              <AgentListRowReveal index={index + (hasPins ? 1 : 0)} reveal={listReveal}>
+                <SidebarSectionHeader
+                  key={`${activeServer.id}:${item.id}`}
+                  id={item.id}
+                  name={item.name}
+                  empty={item.empty}
+                  visibleSectionIds={visibleSectionIds}
+                  collapsed={collapsedSectionIds?.has(item.id) ?? false}
+                  onToggle={() => {
+                    setCollapseLayout(sidebar?.layout ?? null);
+                    setCollapsedByServer((current) => {
+                      const next = new Set(current[activeServer.id]);
+                      if (next.has(item.id)) next.delete(item.id);
+                      else next.add(item.id);
+                      return { ...current, [activeServer.id]: next };
+                    });
+                  }}
+                />
+              </AgentListRowReveal>
             ) : (
               <TransitioningChatRow
                 chatId={item.kind === "agent" ? item.agent.id : item.channel.id}

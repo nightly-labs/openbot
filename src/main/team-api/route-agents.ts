@@ -1,5 +1,7 @@
 import {
+  BROWSER_SECRET_RESPONSE_PATH,
   parseAgentAnalyticsInput,
+  parseBrowserSecretResponse,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
@@ -233,6 +235,12 @@ export async function routeAgents(
       requestId: promptRequestId(body.requestId),
       decision: approvalDecision(body.decision),
     });
+    return empty(204);
+  }
+  if (method === "POST" && url.pathname === BROWSER_SECRET_RESPONSE_PATH) {
+    if (!capabilities.has("browser-secret-handoff"))
+      throw new HttpError(400, "Secure authentication is not supported by this client.");
+    await agents.respondToBrowserSecret(parseBrowserSecretResponse(await readJson(request)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.browserTakeover) {

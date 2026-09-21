@@ -1,3 +1,4 @@
+import { BROWSER_SECRET_CAPABILITY } from "../ipc-browser-secret";
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
@@ -25,6 +26,7 @@ export {
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
+  BROWSER_SECRET_CAPABILITY,
   ...TEAM_PROTOCOL_V4_CAPABILITIES,
   "remote-desktop-setup",
   TEAM_QUEUE_EDIT_CAPABILITY,

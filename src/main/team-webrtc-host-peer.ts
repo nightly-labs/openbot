@@ -543,6 +543,7 @@ export class TeamWebRtcHostPeer {
                 event,
                 {
                   preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
+                  preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
                 },
               ),
         );

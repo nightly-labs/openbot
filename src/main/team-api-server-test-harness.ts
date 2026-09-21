@@ -131,6 +131,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     interrupt: unimplemented,
     respondToPrompt: unimplemented,
     respondToApproval: unimplemented,
+    respondToBrowserSecret: unimplemented,
     respondToBrowserTakeover: unimplemented,
     ...overrides,
   };

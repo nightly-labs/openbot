@@ -200,6 +200,7 @@ export const IPC_ENDPOINTS = {
     interrupt: request(IPC_CHANNELS.agentInterrupt),
     respondToPrompt: request(IPC_CHANNELS.agentRespondToPrompt),
     respondToApproval: request(IPC_CHANNELS.agentRespondToApproval),
+    respondToBrowserSecret: request(IPC_CHANNELS.agentRespondToBrowserSecret),
     respondToBrowserTakeover: request(IPC_CHANNELS.agentRespondToBrowserTakeover),
     event: event(IPC_CHANNELS.agentEvent),
   },

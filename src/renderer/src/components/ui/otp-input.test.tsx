@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
-import { OtpInput, type OtpInputStatus } from "./OtpInput";
+import { OtpInput, type OtpInputStatus } from "./otp-input";
 
 function renderOtp(options: { value?: string; status?: OtpInputStatus } = {}) {
   const onChange = vi.fn();

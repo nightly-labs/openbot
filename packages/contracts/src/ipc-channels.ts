@@ -164,6 +164,7 @@ export const IPC_CHANNELS = {
   agentInterrupt: "agent:interrupt",
   agentRespondToPrompt: "agent:respond-to-prompt",
   agentRespondToApproval: "agent:respond-to-approval",
+  agentRespondToBrowserSecret: "agent:respond-to-browser-secret",
   agentRespondToBrowserTakeover: "agent:respond-to-browser-takeover",
   agentEvent: "agent:event",
   browserOpen: "browser:open",

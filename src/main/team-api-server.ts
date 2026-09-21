@@ -641,7 +641,11 @@ export class TeamApiServer {
     capabilities: ReadonlySet<string>,
     options: { preserveSemanticTags?: boolean } = {},
   ): string | null {
-    if (capabilities.has("opencode")) return encodeTeamProtocolV4BaseCurrentEvent(event, options);
+    if (capabilities.has("opencode"))
+      return encodeTeamProtocolV4BaseCurrentEvent(event, {
+        ...options,
+        preserveBrowserSecrets: capabilities.has("browser-secret-handoff"),
+      });
     const visible = legacyProviderView(event, hiddenProviderAgentIds(this.#options.agents.listAgents()));
     return isAgentEvent(visible) || isTeamRealtimeEvent(visible)
       ? encodeTeamProtocolV1CurrentEvent(visible, options)

@@ -740,6 +740,7 @@ export function ChannelConversation() {
                     <Show when={takeover()}>
                       {(request) => (
                         <BrowserTakeoverCard
+                          request={request()}
                           agentName={name(member.agentId)}
                           tab={browserTabs().find((tab) => tab.id === request().tabId)}
                           preview={null}

@@ -69,6 +69,41 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
+  it("closes invalidated views and rejects reuse of their session", async () => {
+    let invalidate: (() => void) | undefined;
+    const stop = vi.fn(async () => undefined);
+    const dispatch = vi.fn(async () => undefined);
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, _onFrame, onInvalidated) => {
+          invalidate = onInvalidated;
+          return stop;
+        },
+        dispatchViewInput: dispatch,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(invalidate).toBeDefined());
+    const closed = new Promise((resolve) => socket.once("close", resolve));
+    invalidate?.();
+    await closed;
+    expect(gateway.activeViewCount()).toBe(0);
+    expect(stop).toHaveBeenCalledOnce();
+    expect(dispatch).not.toHaveBeenCalled();
+    const retry = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const failure = await new Promise<string>((resolve) => retry.once("error", (error) => resolve(error.message)));
+    expect(failure).toContain("401");
+    await gateway.stop();
+  });
+
   it("refuses a socket that names neither the session nor its member", async () => {
     const gateway = new BrowserViewGateway({
       browser: {
