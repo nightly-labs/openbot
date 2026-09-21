@@ -44,6 +44,7 @@ import type {
   ListRoutineRunsInput,
   McpServerConfig,
   McpTestResult,
+  ProviderCodeLoginStart,
   QueuedMessageReceipt,
   QueueSnapshot,
   RemoveMcpServerInput,
@@ -1558,6 +1559,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   connectProvider(provider: AgentProvider, openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
     return this.#providers.connectProvider(provider, openExternal);
+  }
+
+  startProviderCodeLogin(provider: AgentProvider): Promise<ProviderCodeLoginStart> {
+    return this.#providers.startProviderCodeLogin(provider);
+  }
+
+  cancelProviderCodeLogin(provider: AgentProvider): Promise<AgentStatus> {
+    return this.#providers.cancelProviderCodeLogin(provider);
   }
 
   changeProviderCredential(provider: AgentProvider, change: () => Promise<void>): Promise<AgentStatus> {

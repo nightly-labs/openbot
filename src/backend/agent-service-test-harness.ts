@@ -157,7 +157,17 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
       };
     }
     if (method === "account/login/start") {
-      result = { type: "chatgpt", loginId: "login-1", authUrl: "https://auth.openai.test/connect" };
+      // The two shapes the real app server answers with: a URL this computer opens, or a code the
+      // user types elsewhere. Which one comes back is decided by what the caller asked for.
+      result =
+        isDynamicRecord(params) && params.type === "chatgptDeviceCode"
+          ? {
+              type: "chatgptDeviceCode",
+              loginId: "login-1",
+              verificationUrl: "https://auth.openai.test/device",
+              userCode: "TEST-CODE",
+            }
+          : { type: "chatgpt", loginId: "login-1", authUrl: "https://auth.openai.test/connect" };
     }
     if (method === "account/login/cancel") result = { status: "cancelled" };
     if (method === "account/rateLimits/read") {

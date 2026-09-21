@@ -644,6 +644,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
+    // A code that never completes: the preview has no provider to finish the sign-in, so this shows
+    // the waiting screen and leaves it there.
+    startProviderCodeLogin: async () => ({
+      kind: "code",
+      userCode: "KTQ4-B62MX",
+      verificationUrl: "https://auth.openai.com/codex/device",
+      expiresAt: Date.now() + 10 * 60_000,
+    }),
+    cancelProviderCodeLogin: async () => clone(agentStatus),
     setProviderApiKey: async ({ provider, key }) => {
       if (!key.trim()) throw new Error("A provider key is required.");
       providerApiKeys.add(provider);

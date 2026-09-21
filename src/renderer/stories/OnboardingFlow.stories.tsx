@@ -5,6 +5,7 @@ import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { Toaster, toast } from "../src/components/ui";
 import { OnboardingFlow } from "../src/features/onboarding/OnboardingFlow";
+import { createFakeCodeLogin } from "./code-login-fixture";
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -359,6 +360,26 @@ export const NoProvidersConnected: Story = {
     await expect(storyArgs.onConnectProvider).toHaveBeenCalledWith("grok");
     await expect(storyArgs.onRefreshProviders).toHaveBeenCalledOnce();
     await expect(canvas.getByRole("button", { name: "Next" })).toBeDisabled();
+  },
+};
+
+/**
+ * The second way in, on the step where it matters most: first run on a computer whose browser
+ * cannot finish the hand-off. The ChatGPT row keeps it in its actions menu, beside the Connect the
+ * step leads with, and the code opens over the step rather than replacing it.
+ */
+export const SignInWithCode: Story = {
+  args: {
+    agentStatus: noProvidersConnectedAgentStatus,
+    onConnectProvider: fn(),
+    onRefreshProviders: fn(),
+    codeLogin: createFakeCodeLogin({ finishAfterMs: 0 }),
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "More ways to log in to ChatGPT" }));
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("menuitem", { name: "Log in with code" }));
+    await expect(await body.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
   },
 };
 
