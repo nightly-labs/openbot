@@ -179,15 +179,17 @@ export class BrowserCdpEngine {
             await this.#callOnNode(
               send,
               node.backendNodeId,
-              `function(value, origin) {
+              `function(origin) {
                 if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly) throw new Error('Authentication target changed.');
-                const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                setter.call(this, value);
-                this.dispatchEvent(new Event('input', { bubbles: true }));
-                this.dispatchEvent(new Event('change', { bubbles: true }));
+                this.focus();
+                this.select();
               }`,
-              [nodes.inputs.length === 1 ? secret : secret[index], origin],
+              [origin],
             );
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            // Native entry emits trusted input events across shadow roots, as regular browser typing
+            // does. Synthetic value setters can leave component forms unaware of the filled field.
+            await send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
           }
           if (submission === "on_input" || generation !== this.#navigationGeneration) return;
           if (submission === "click" && nodes.button) {

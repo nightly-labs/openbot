@@ -19,7 +19,9 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <label>Code<input id="code" inputmode="numeric"></label>
       <div>${Array.from({ length: 6 }, (_, index) => `<input aria-label="Digit ${index + 1}" id="digit-${index}" maxlength="1">`).join("")}</div>
       <button id="submit" disabled onclick="${url.pathname === "/same-page" ? "history.replaceState({}, '', '/complete')" : "location.href='/complete'"}">Sign in</button>
-      <script>document.addEventListener('input', event => { document.querySelector('#submit').disabled = false; console.error(event.target.value); document.title = event.target.value; });</script>`;
+      <script>
+      ${url.pathname === "/component" ? `const host = document.createElement('div'); document.body.append(host); const root = host.attachShadow({mode: 'open'}); root.append(...document.querySelectorAll('input'));` : ""}
+      document.addEventListener('input', event => { if (${url.pathname === "/component"} && !event.isTrusted) return; document.querySelector('#submit').disabled = false; console.error(event.target.value); document.title = event.target.value; });</script>`;
     return new Response(`<!doctype html><body>${html}</body>`, { headers: { "Content-Type": "text/html" } });
   });
   await browser.close(seed.id);
@@ -29,6 +31,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       ["otp", "login"],
       ["authenticator", "login"],
       ["password", "same-page"],
+      ["password", "component"],
     ] as const) {
       const tab = await browser.open(`https://authentication.openbot.test/${path}`, "secret-thread", "secret-agent");
       const params: DynamicToolCallParams = {
