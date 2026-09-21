@@ -582,6 +582,9 @@ describe("Sunshine port isolation", () => {
     try {
       const second = await createStartedRuntime();
       try {
+        expect(first.harness.pairingName).toMatch(/^[A-Za-z0-9-]+$/);
+        expect(second.harness.pairingName).toMatch(/^[A-Za-z0-9-]+$/);
+        expect(first.harness.pairingName).not.toBe(second.harness.pairingName);
         expect(first.runtime.sunshineBasePort).not.toBeNull();
         expect(second.runtime.sunshineBasePort).not.toBeNull();
         expect(first.runtime.sunshineBasePort).not.toBe(second.runtime.sunshineBasePort);

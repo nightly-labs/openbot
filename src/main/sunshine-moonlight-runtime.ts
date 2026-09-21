@@ -286,7 +286,7 @@ export class SunshineMoonlightRuntime {
   #moonlight: ChildProcess | null = null;
   #iceServer: Server | null = null;
   #iceToken = "";
-  readonly #pairingName = `OpenBot Remote Desktop ${randomBytes(16).toString("hex")}`;
+  readonly #pairingName = `openbot-remote-${randomBytes(16).toString("hex")}`;
   #state: SunshineMoonlightRuntimeState | null = null;
   #screenCaptureDenied = false;
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
