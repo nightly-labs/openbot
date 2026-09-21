@@ -23,8 +23,31 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     props.updateStatus.availableVersion
       ? `OpenBot v${props.updateStatus.availableVersion}`
       : "The latest OpenBot update";
+  /**
+   * Host phases arrive mapped onto the shared update phases, so the managed wording says what the
+   * host is doing rather than asking a tenant to restart an application the host replaces.
+   */
+  const hostMessage = () => {
+    switch (props.updateStatus.phase) {
+      case "idle":
+      case "up-to-date":
+        return "Up to date. OpenBot Host Manager keeps this Mac current.";
+      case "ready":
+        return `${targetUpdate()} is downloaded. Waiting for the other users of this Mac to be idle.`;
+      case "installing":
+        return `Installing ${targetUpdate()}…`;
+      case "error":
+        return errorMessage(props.updateStatus.message, "The host update failed. Contact the host administrator.");
+      default:
+        return null;
+    }
+  };
   const message = () => {
     if (error()) return error();
+    if (presentation().managed) {
+      const managedMessage = hostMessage();
+      if (managedMessage) return managedMessage;
+    }
     switch (props.updateStatus.phase) {
       case "idle":
         return "Check for updates to find the latest Stable release.";

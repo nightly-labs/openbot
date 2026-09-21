@@ -44,6 +44,18 @@ const readyUpdateStatus: UpdateStatus = {
   phase: "ready",
   progress: 100,
 };
+/** A managed Mac: Host Manager owns the shared application, so the tenant only watches. */
+const hostManagedUpdateStatus: UpdateStatus = {
+  ...storyUpdateStatus,
+  phase: "up-to-date",
+  managedByHost: true,
+};
+const hostManagedDownloadStatus: UpdateStatus = {
+  ...hostManagedUpdateStatus,
+  phase: "downloading",
+  availableVersion: "0.3.0",
+  progress: 42,
+};
 const providerAgentStatus: AgentStatus = {
   phase: "blocked",
   cliVersion: null,
@@ -529,6 +541,24 @@ export const ReadyToInstall: Story = {
   play: async ({ userEvent }) => {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("tab", { name: "Updates" }));
+  },
+};
+
+export const HostManagedUpdates: Story = {
+  render: () => <SettingsModalStory initialOpen initialUpdateStatus={hostManagedUpdateStatus} />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Updates" }));
+    await expect(await body.findByText("Managed by Host")).toBeVisible();
+  },
+};
+
+export const HostManagedUpdateInProgress: Story = {
+  render: () => <SettingsModalStory initialOpen initialUpdateStatus={hostManagedDownloadStatus} />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Updates" }));
+    await expect(await body.findByText("Downloading OpenBot v0.3.0 · 42%")).toBeVisible();
   },
 };
 
