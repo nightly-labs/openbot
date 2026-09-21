@@ -1,4 +1,6 @@
 import { isDynamicRecord, isString } from "../runtime-values";
+import { isBrowserDisplayRoute } from "./browser-navigation-v1";
+import { isBrowserViewSessionRoute } from "./browser-view-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2EventFrame } from "./v2";
 import {
   decodeTeamProtocolV3WebRtcHttpRequest,
@@ -20,6 +22,9 @@ export function encodeTeamProtocolV4WebRtcHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ) {
+  // A GET reaches the v3 frame, whose frozen no-body route list cannot learn a route added after it.
+  // The display route carries no request body at all, so its frame is the empty object.
+  if (isBrowserDisplayRoute(method, path) || isBrowserViewSessionRoute(method, path)) return {};
   if (method === "GET" || method === "DELETE" || isRoutineTestRequest(method, path) || isRemoteViewerRoute(path))
     return encodeTeamProtocolV3WebRtcHttpRequest(method, path, value, options);
   return decodeTeamProtocolV2Json(
@@ -32,6 +37,7 @@ export function decodeTeamProtocolV4WebRtcHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ) {
+  if (isBrowserDisplayRoute(method, path) || isBrowserViewSessionRoute(method, path)) return {};
   if (method === "GET" || method === "DELETE" || isRoutineTestRequest(method, path) || isRemoteViewerRoute(path))
     return decodeTeamProtocolV3WebRtcHttpRequest(method, path, value, options);
   return decodeTeamProtocolV2Json(decodeTeamProtocolV4CurrentHttpRequest(method, path, value ?? {}, options));

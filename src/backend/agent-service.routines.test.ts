@@ -881,6 +881,34 @@ describe.sequential("AgentService: routines", () => {
     expect(getString(inputRecords(noticeStart?.params)[0], "text")).toContain("The sender does not want an answer.");
   });
 
+  it("drops a placeholder answer to a teammate request instead of showing and relaying it", async () => {
+    process.env.OPENBOT_FAKE_AUTO_COMPLETE = "∅";
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await store.initialize();
+    await mailbox.initialize();
+    await store.getOrCreate("chief");
+    await store.getOrCreate("sales-outbound");
+
+    await mailbox.enqueue({
+      sender: { kind: "agent", agentId: "chief" },
+      recipientAgentIds: ["sales-outbound"],
+      text: "Check the weather.",
+    });
+
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    // The turn relays its result and sets the preview before it reports completion, so this wait
+    // is the point after which an absent relay is a decision rather than a race.
+    await waitFor(() => events.some((event) => event.type === "turn-completed" && event.agentId === "sales-outbound"));
+
+    const snapshot = await service.readConversation("sales-outbound");
+    expect(snapshot.messages.filter((message) => message.author === "assistant")).toEqual([]);
+    expect(service.listQueue("chief").deliveries).toEqual([]);
+    expect(service.listAgents().find((agent) => agent.id === "sales-outbound")?.preview).not.toBe("∅");
+  });
+
   it("reads the canonical SQLite conversation during an active stream", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });

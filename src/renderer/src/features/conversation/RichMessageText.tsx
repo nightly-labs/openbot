@@ -2,7 +2,7 @@ import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag
 import type { AttachmentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
-import { Button, Puzzle } from "../../components/ui";
+import { Blocks, Button, Puzzle } from "../../components/ui";
 import { ReferenceChip } from "../../components/ui/reference-chip";
 import { usesTouchLayout } from "../../components/ui/utils";
 import type { AgentProfile, MessageCitation } from "../../data";
@@ -129,6 +129,9 @@ export function RichMessageText(props: RichMessageTextProps) {
           }
           if (part.skill) {
             return <ReferenceChip kind="skill" name={part.skill.name} icon={<Puzzle />} />;
+          }
+          if (part.mcpName) {
+            return <ReferenceChip kind="mcp" name={part.mcpName} icon={<Blocks />} />;
           }
           if (part.unavailableKind) {
             return (
@@ -285,6 +288,11 @@ interface RichMessagePart {
   text: string;
   agent?: AgentProfile;
   skill?: InstalledSkill;
+  /**
+   * An MCP server tag carries the name it was written with, and nothing looks it up. A message is a
+   * record of what the user asked, and a server removed since does not make that record wrong.
+   */
+  mcpName?: string;
   unavailableKind?: ChatTagKind;
   citation?: MessageCitation;
   attachment?: AttachmentSummary;
@@ -301,7 +309,7 @@ function richMessageParts(
 ): RichMessagePart[] {
   const parts: RichMessagePart[] = [];
   for (const taggedReference of semanticTagParts(body, agents, skills)) {
-    if (taggedReference.agent || taggedReference.skill || taggedReference.unavailableKind) {
+    if (taggedReference.agent || taggedReference.skill || taggedReference.mcpName || taggedReference.unavailableKind) {
       parts.push(taggedReference);
       continue;
     }
@@ -337,6 +345,8 @@ function semanticTagParts(body: string, agents: AgentProfile[], skills: Installe
     if (reference.kind === "agent") {
       const agent = agents.find((candidate) => candidate.id === reference.id);
       parts.push(agent ? { text: agent.name, agent } : { text: reference.name, unavailableKind: "agent" });
+    } else if (reference.kind === "mcp") {
+      parts.push({ text: reference.name, mcpName: reference.name });
     } else {
       const skill = skills.find(
         (candidate) => candidate.skillId === reference.id && candidate.state !== "needs-repair",

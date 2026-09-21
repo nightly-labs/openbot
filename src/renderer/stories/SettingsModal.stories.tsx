@@ -122,7 +122,11 @@ function SettingsModalStory(props: {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
     providerRuntimeSnapshot: props.providerUpdate
-      ? { revision: 0, providers: providerUpdateRuntimeStatuses }
+      ? {
+          revision: 0,
+          providers: providerUpdateRuntimeStatuses,
+          toolRuntimes: { bun: { phase: "ready", progress: 100, message: null, version: "1.4.2" } },
+        }
       : undefined,
     providerRuntimeFailure: props.providerUpdateFailure,
   });

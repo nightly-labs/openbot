@@ -1,12 +1,12 @@
 import { attachmentReferenceIds, serializeAttachmentReference } from "@openbot/contracts/attachment-references";
-import { chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { type ChatTagKind, chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { DraftAttachment, InstalledSkill } from "@openbot/contracts/ipc";
+import type { DraftAttachment, InstalledSkill, McpServerConfig } from "@openbot/contracts/ipc";
 import { Dynamic, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { createStaticAvatarSvg } from "../../bloub-avatar";
 import { createScrollFades } from "../../components/createScrollFades";
-import { Badge, Bot, File, Folder, Listbox, Puzzle, ShieldCheck, Store } from "../../components/ui";
+import { Badge, Blocks, Bot, File, Folder, Listbox, Plug, Puzzle, ShieldCheck, Store } from "../../components/ui";
 import { referenceChipClasses } from "../../components/ui/reference-chip";
 import { usesTouchLayout } from "../../components/ui/utils";
 import type { AgentProfile } from "../../data";
@@ -19,6 +19,8 @@ interface ComposerEditorProps {
   agentId: string | undefined;
   agents: AgentProfile[];
   skills?: InstalledSkill[];
+  /** The host's MCP servers, offered by the same `$` the skills answer. */
+  mcpServers?: McpServerConfig[];
   attachments?: DraftAttachment[];
   value: string;
   placeholder: string;
@@ -62,27 +64,38 @@ export function expandComposerMentions(value: string): string {
 type PickerOption =
   | { type: "agent"; agent: AgentProfile }
   | { type: "skill"; skill: InstalledSkill }
+  | { type: "mcp"; server: McpServerConfig }
   | { type: "attachment"; attachment: DraftAttachment };
 
 function pickerOptionKey(option: PickerOption): string {
   if (option.type === "agent") return `agent:${option.agent.id}`;
-  return option.type === "skill" ? `skill:${option.skill.skillId}` : `attachment:${option.attachment.id}`;
+  if (option.type === "skill") return `skill:${option.skill.skillId}`;
+  return option.type === "mcp" ? `mcp:${option.server.id}` : `attachment:${option.attachment.id}`;
 }
 
 function pickerOptionText(option: PickerOption): string {
   if (option.type === "agent") return `${option.agent.name} Agent`;
-  return option.type === "skill" ? `${option.skill.name} Skill` : `${option.attachment.name} File`;
+  if (option.type === "skill") return `${option.skill.name} Skill`;
+  return option.type === "mcp" ? `${option.server.name} MCP server` : `${option.attachment.name} File`;
 }
 
 function pickerOptionName(option: PickerOption): string {
   if (option.type === "agent") return option.agent.name;
-  return option.type === "skill" ? option.skill.name : option.attachment.name;
+  if (option.type === "skill") return option.skill.name;
+  return option.type === "mcp" ? option.server.name : option.attachment.name;
 }
 
 function pickerOptionDescription(option: PickerOption): string | undefined {
   if (option.type === "attachment") return formatFileSize(option.attachment.size);
   if (option.type === "skill") return skillDescription(option.skill);
+  if (option.type === "mcp") return mcpServerDescription(option.server);
   return option.agent.description.trim() || option.agent.title.trim() || undefined;
+}
+
+/** Where the server answers: the address for an http server, the command for a stdio one. */
+function mcpServerDescription(server: McpServerConfig): string | undefined {
+  const source = server.transport === "stdio" ? [server.command, ...server.args].join(" ") : server.url;
+  return source.trim() || undefined;
 }
 
 /** Hangs the picker off the composer's top edge, inside the wrap the queue panel also sits in. */
@@ -100,6 +113,7 @@ function measurePickerFrame(editor: HTMLElement): PickerFrame {
 function pickerOptionBadge(option: PickerOption): { label: string; icon: typeof Puzzle } {
   if (option.type === "agent") return { label: "Agent", icon: Bot };
   if (option.type === "attachment") return { label: "File", icon: File };
+  if (option.type === "mcp") return { label: "MCP", icon: Plug };
   switch (option.skill.origin ?? "marketplace") {
     case "local":
       return { label: "Custom", icon: Folder };
@@ -152,9 +166,20 @@ export function ComposerEditor(props: ComposerEditorProps) {
         (!query || `${skill.name} ${skill.slug} ${skill.description ?? ""}`.toLocaleLowerCase().includes(query)),
     );
   });
+  const matchingMcpServers = createMemo(() => {
+    const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
+    return (props.mcpServers ?? []).filter(
+      (server) => server.enabled && (!query || server.name.toLocaleLowerCase().includes(query)),
+    );
+  });
   const matchingOptions = createMemo<PickerOption[]>(() => {
     const trigger = mention()?.trigger;
-    if (trigger === "$") return matchingSkills().map((skill) => ({ type: "skill" as const, skill }));
+    /* Skills first: a skill is what the user writes with, and a server is what one of them reaches. */
+    if (trigger === "$")
+      return [
+        ...matchingSkills().map((skill) => ({ type: "skill" as const, skill })),
+        ...matchingMcpServers().map((server) => ({ type: "mcp" as const, server })),
+      ];
     if (trigger !== "@") return [];
     return [
       ...matchingAgents().map((agent) => ({ type: "agent" as const, agent })),
@@ -187,6 +212,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   let lastAgentId: string | undefined;
   let lastAttachmentKey = "";
   let lastSkillKey = "";
+  let lastMcpKey = "";
   let lastEmittedValue = "";
   let lastFocusRequest = 0;
   let isComposing = false;
@@ -221,31 +247,36 @@ export function ComposerEditor(props: ComposerEditorProps) {
       value: props.value,
       agents: props.agents,
       skills: props.skills ?? [],
+      mcpServers: props.mcpServers ?? [],
       attachments: props.attachments ?? [],
       focusRequest: props.focusRequest ?? 0,
     }),
-    ({ agentId, value, agents, skills, attachments, focusRequest }) => {
+    ({ agentId, value, agents, skills, mcpServers, attachments, focusRequest }) => {
       if (!editor) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
       const skillKey = skills
         .map((skill) => `${skill.skillId}:${skill.name}:${skill.state}:${skill.description ?? ""}`)
         .join("|");
+      const mcpKey = mcpServers.map((server) => `${server.id}:${server.name}:${server.enabled}`).join("|");
       const contentChanged =
         agentId !== lastAgentId || value !== lastEmittedValue || attachmentKey !== lastAttachmentKey;
       const skillsChanged = skillKey !== lastSkillKey;
+      const mcpChanged = mcpKey !== lastMcpKey;
       const focusRequested = focusRequest > lastFocusRequest;
       if (contentChanged) {
         lastAgentId = agentId;
         lastAttachmentKey = attachmentKey;
         lastEmittedValue = value;
         setAttachmentTooltip(null);
-        renderEditorValue(editor, value, agents, skills, attachments, attachmentTokenActions);
+        renderEditorValue(editor, value, agents, skills, mcpServers, attachments, attachmentTokenActions);
         syncTrailingLineSentinel(editor, value);
         setMention(null);
-      } else if (skillsChanged) {
-        syncSkillTokens(editor, skills);
+      } else {
+        if (skillsChanged) syncSkillTokens(editor, skills);
+        if (mcpChanged) syncMcpTokens(editor, mcpServers);
       }
       lastSkillKey = skillKey;
+      lastMcpKey = mcpKey;
       if (focusRequested) {
         lastFocusRequest = focusRequest;
         editor.focus();
@@ -265,6 +296,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         value,
         props.agents,
         props.skills ?? [],
+        props.mcpServers ?? [],
         props.attachments ?? [],
         attachmentTokenActions,
       );
@@ -329,7 +361,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
         ? createMentionToken(option.agent)
         : option.type === "skill"
           ? createSkillToken(option.skill)
-          : createAttachmentToken(option.attachment, attachmentTokenActions);
+          : option.type === "mcp"
+            ? createMcpToken(option.server)
+            : createAttachmentToken(option.attachment, attachmentTokenActions);
     const trailingSpace = document.createTextNode(" ");
     range.insertNode(trailingSpace);
     range.insertNode(token);
@@ -522,6 +556,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       nextValue,
       props.agents,
       props.skills ?? [],
+      props.mcpServers ?? [],
       props.attachments ?? [],
       attachmentTokenActions,
     );
@@ -600,7 +635,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               ref={pickerFades.bind}
               class={["mention-picker-list", pickerFades.classes()]}
               onScroll={pickerFades.measure}
-              aria-label={mention()?.trigger === "$" ? "Insert skill" : "Insert mention"}
+              aria-label={mention()?.trigger === "$" ? "Insert skill or MCP server" : "Insert mention"}
               options={matchingOptions()}
               optionValue={pickerOptionKey}
               optionTextValue={pickerOptionText}
@@ -645,6 +680,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     ) : option.type === "skill" ? (
                       <span class="mention-picker-skill-icon" aria-hidden="true">
                         <Puzzle />
+                      </span>
+                    ) : option.type === "mcp" ? (
+                      <span class="mention-picker-skill-icon" aria-hidden="true">
+                        <Blocks />
                       </span>
                     ) : (
                       <AttachmentReferenceVisual name={option.attachment.name} />
@@ -801,15 +840,45 @@ function updateSkillToken(token: HTMLSpanElement, skill: InstalledSkill): void {
   token.replaceChildren(iconWrap, name);
 }
 
+function createMcpToken(server: McpServerConfig): HTMLSpanElement {
+  const token = document.createElement("span");
+  updateMcpToken(token, server);
+  return token;
+}
+
+function updateMcpToken(token: HTMLSpanElement, server: McpServerConfig): void {
+  token.className = `composer-mention-token ${referenceChipClasses.root}`;
+  token.dataset.kind = "mcp";
+  token.title = server.name;
+  token.contentEditable = "false";
+  token.dataset.mcpId = server.id;
+  token.dataset.mcpName = server.name;
+  token.setAttribute("aria-label", `MCP server ${server.name}`);
+  const iconWrap = document.createElement("span");
+  iconWrap.className = referenceChipClasses.icon;
+  iconWrap.setAttribute("aria-hidden", "true");
+  const icon = Blocks({ class: "skill-chip-glyph" });
+  if (!(icon instanceof Node)) throw new Error("Blocks icon did not render to a DOM node");
+  iconWrap.append(icon);
+  const name = document.createElement("span");
+  name.className = referenceChipClasses.name;
+  name.textContent = server.name;
+  token.replaceChildren(iconWrap, name);
+}
+
 function skillDescription(skill: InstalledSkill): string | undefined {
   const description = skill.description?.trim();
   return description || undefined;
 }
 
-function createUnavailableTagToken(kind: "agent" | "skill", id: string, name: string): HTMLSpanElement {
+function createUnavailableTagToken(kind: ChatTagKind, id: string, name: string): HTMLSpanElement {
   const token = document.createElement("span");
   if (kind === "skill") {
     updateUnavailableSkillToken(token, id, name);
+    return token;
+  }
+  if (kind === "mcp") {
+    updateUnavailableMcpToken(token, id, name);
     return token;
   }
   token.className = "composer-mention-token composer-tag-unavailable";
@@ -828,6 +897,28 @@ function updateUnavailableSkillToken(token: HTMLSpanElement, id: string, name: s
   token.dataset.skillName = name;
   token.setAttribute("aria-label", `Unavailable skill ${name}`);
   token.textContent = name;
+}
+
+function updateUnavailableMcpToken(token: HTMLSpanElement, id: string, name: string): void {
+  token.className = "composer-mention-token composer-tag-unavailable";
+  token.contentEditable = "false";
+  token.dataset.mcpId = id;
+  token.dataset.mcpName = name;
+  token.setAttribute("aria-label", `Unavailable MCP server ${name}`);
+  token.textContent = name;
+}
+
+/* A server the host no longer holds, or one the user turned off, is drawn as a name the agent
+   cannot reach - the same outline a removed skill takes. */
+function syncMcpTokens(editor: HTMLDivElement, servers: McpServerConfig[]): void {
+  const available = new Map(servers.filter((server) => server.enabled).map((server) => [server.id, server]));
+  for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-mcp-id]")) {
+    const id = token.dataset.mcpId;
+    if (!id) continue;
+    const server = available.get(id);
+    if (server) updateMcpToken(token, server);
+    else updateUnavailableMcpToken(token, id, token.dataset.mcpName ?? "MCP server");
+  }
 }
 
 function syncSkillTokens(editor: HTMLDivElement, skills: InstalledSkill[]): void {
@@ -850,6 +941,7 @@ function renderEditorValue(
   value: string,
   agents: AgentProfile[],
   skills: InstalledSkill[],
+  mcpServers: McpServerConfig[],
   attachments: DraftAttachment[],
   attachmentTokenActions: AttachmentTokenActions,
 ) {
@@ -879,6 +971,13 @@ function renderEditorValue(
       cursor = index + match[0].length;
       continue;
     }
+    if (target.startsWith("mcp:")) {
+      const id = target.slice("mcp:".length);
+      const server = mcpServers.find((candidate) => candidate.id === id && candidate.enabled);
+      editor.append(server ? createMcpToken(server) : createUnavailableTagToken("mcp", id, name));
+      cursor = index + match[0].length;
+      continue;
+    }
     const id = target.startsWith("agent:") ? target.slice("agent:".length) : target;
     const agent = agents.find((candidate) => candidate.id === id);
     editor.append(agent ? createMentionToken(agent) : createUnavailableTagToken("agent", id, name));
@@ -897,7 +996,7 @@ function scheduleStaticMentionAvatar(avatar: HTMLElement, agent: AgentProfile): 
 function serializeEditor(editor: HTMLDivElement): string {
   if (
     editor.textContent === "" &&
-    !editor.querySelector("[data-mention-id], [data-skill-id], [data-attachment-reference-id]")
+    !editor.querySelector("[data-mention-id], [data-skill-id], [data-mcp-id], [data-attachment-reference-id]")
   )
     return "";
   return Array.from(editor.childNodes).map(serializeNode).join("");
@@ -918,6 +1017,9 @@ function serializeNode(node: Node): string {
   const skillId = node.dataset.skillId;
   const skillName = node.dataset.skillName;
   if (skillId && skillName) return serializeChatTagReference("skill", skillName, skillId);
+  const mcpId = node.dataset.mcpId;
+  const mcpName = node.dataset.mcpName;
+  if (mcpId && mcpName) return serializeChatTagReference("mcp", mcpName, mcpId);
   if (node.tagName === "BR") return "\n";
   const content = Array.from(node.childNodes).map(serializeNode).join("");
   return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
@@ -1035,7 +1137,7 @@ function mentionTokenAtCaretBoundary(
 
 function closestMentionToken(node: Node, editor: HTMLDivElement): HTMLElement | null {
   const element = node instanceof HTMLElement ? node : node.parentElement;
-  const token = element?.closest<HTMLElement>("[data-mention-id], [data-skill-id]") ?? null;
+  const token = element?.closest<HTMLElement>("[data-mention-id], [data-skill-id], [data-mcp-id]") ?? null;
   return token && editor.contains(token) ? token : null;
 }
 

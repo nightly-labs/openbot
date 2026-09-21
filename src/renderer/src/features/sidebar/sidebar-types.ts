@@ -6,6 +6,7 @@ import type {
   SidebarLayoutSnapshot,
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
+import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 
@@ -35,6 +36,8 @@ export interface SidebarProps {
   directThreads: DirectThreadSummary[];
   activeDirectMemberId: string | null;
   agentStates: Record<string, SidebarAgentState>;
+  /** The face each agent wears, from `computeAgentAvatarMoods`. A missing entry rests. */
+  agentMoods: Record<string, AvatarMood>;
   layout: SidebarLayoutSnapshot;
   layoutMutable?: boolean;
   collapsedSectionIds: string[];

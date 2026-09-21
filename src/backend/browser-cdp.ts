@@ -12,6 +12,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { NativeImage, WebContents } from "electron";
+import { createFramePacer } from "./browser-screencast-pacing";
 
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
@@ -88,6 +89,34 @@ export interface SnapshotContext {
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];
 }
+
+export interface BrowserScreencastOptions {
+  quality: number;
+  maxWidth: number;
+  maxHeight: number;
+}
+
+export interface BrowserScreencastFrame {
+  sequence: number;
+  width: number;
+  height: number;
+  image: Uint8Array;
+}
+
+/** Pointer and key input in the page's own CSS pixels. */
+export type BrowserViewportInput =
+  | {
+      type: "pointer";
+      action: "move" | "down" | "up" | "wheel";
+      x: number;
+      y: number;
+      button: "left" | "middle" | "right";
+      clickCount: number;
+      deltaX: number;
+      deltaY: number;
+      modifiers: number;
+    }
+  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number };
 
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
@@ -819,6 +848,121 @@ export class BrowserCdpEngine {
         if (fill) await send("Emulation.clearDeviceMetricsOverride");
       }
     });
+  }
+
+  /**
+   * A live view of the page for as long as the returned stop function is not called.
+   *
+   * The lease is held open for the whole stream rather than taken per frame, so the debugger stays
+   * attached and the agent's own operations keep running beside it -- overlapping leases are what
+   * the lease counter is for. Every frame is acknowledged, which is how the page learns to send the
+   * next one: without the acknowledgement the screencast stops after the first frame. Frames are
+   * acknowledged as fast as they arrive and forwarded no faster than `createFramePacer` allows, so a
+   * page that animates cannot raise what the link and the client have to carry.
+   */
+  async startScreencast(
+    options: BrowserScreencastOptions,
+    onFrame: (frame: BrowserScreencastFrame) => void,
+  ): Promise<() => Promise<void>> {
+    let stop = (): void => undefined;
+    const stopped = new Promise<void>((resolve) => {
+      stop = () => resolve();
+    });
+    let started = (): void => undefined;
+    let failed = (_error: unknown): void => undefined;
+    const ready = new Promise<void>((resolve, reject) => {
+      started = resolve;
+      failed = reject;
+    });
+    let sequence = 0;
+    // The number counts the frames the client is given, not the ones the page drew.
+    const pacer = createFramePacer<Omit<BrowserScreencastFrame, "sequence">>((frame) => {
+      sequence += 1;
+      onFrame({ ...frame, sequence });
+    });
+    const listener = (_event: unknown, method: string, params?: DynamicRecord | unknown, sessionId?: string): void => {
+      if (method !== "Page.screencastFrame" || !isDynamicRecord(params)) return;
+      const metadata = recordValue(params.metadata);
+      const data = stringValue(params.data);
+      const frameSessionId = numberValue(params.sessionId);
+      // The page is told it may send the next frame whether or not this one could be read, so a
+      // frame the client cannot use never ends the stream.
+      // The root session is reported as an empty string, which `sendCommand` refuses: sending it
+      // would fail every acknowledgement, and the page stops after the few frames it may hold
+      // unacknowledged.
+      void this.#contents.debugger
+        .sendCommand("Page.screencastFrameAck", { sessionId: frameSessionId }, sessionId || undefined)
+        .catch(() => undefined);
+      if (!data) return;
+      pacer.offer({
+        image: Buffer.from(data, "base64"),
+        // The device size is the CSS viewport the fractional input coordinates are measured against.
+        width: Math.max(1, Math.round(numberValue(metadata?.deviceWidth))),
+        height: Math.max(1, Math.round(numberValue(metadata?.deviceHeight))),
+      });
+    };
+    const running = this.#lease(async (send) => {
+      this.#contents.debugger.on("message", listener);
+      try {
+        await send("Page.startScreencast", {
+          format: "jpeg",
+          quality: options.quality,
+          maxWidth: options.maxWidth,
+          maxHeight: options.maxHeight,
+          everyNthFrame: 1,
+        });
+        started();
+        await stopped;
+      } finally {
+        this.#contents.debugger.off("message", listener);
+        pacer.stop();
+        await send("Page.stopScreencast").catch(() => undefined);
+      }
+    }, false);
+    void running.catch((error: unknown) => failed(error));
+    await ready;
+    return async () => {
+      stop();
+      await running.catch(() => undefined);
+    };
+  }
+
+  /**
+   * Input from a person watching the live view. The coordinates are already in this page's CSS
+   * pixels: the fraction of a frame the remote client sends is turned into them by the caller, which
+   * is the only place that knows which frame the person was looking at.
+   */
+  async dispatchViewportInput(input: BrowserViewportInput): Promise<void> {
+    await this.#lease(async (send) => {
+      if (input.type === "key") {
+        await send("Input.dispatchKeyEvent", {
+          type: input.action === "char" ? "char" : input.action === "down" ? "rawKeyDown" : "keyUp",
+          modifiers: input.modifiers,
+          ...(input.action === "char" ? { text: input.text } : { key: input.key, code: input.code }),
+        });
+        return;
+      }
+      if (input.action === "wheel") {
+        await send("Input.dispatchMouseEvent", {
+          type: "mouseWheel",
+          x: input.x,
+          y: input.y,
+          deltaX: input.deltaX,
+          deltaY: input.deltaY,
+          modifiers: input.modifiers,
+        });
+        return;
+      }
+      await send("Input.dispatchMouseEvent", {
+        type: input.action === "move" ? "mouseMoved" : input.action === "down" ? "mousePressed" : "mouseReleased",
+        x: input.x,
+        y: input.y,
+        button: input.action === "move" ? "none" : input.button,
+        buttons: input.action === "down" ? buttonMask(input.button) : 0,
+        clickCount: input.action === "move" ? 0 : input.clickCount,
+        modifiers: input.modifiers,
+      });
+    }, false);
   }
 
   async navigate(url: string): Promise<void> {
@@ -2578,6 +2722,11 @@ function axValue(value: unknown): string {
   const record = recordValue(value);
   const raw = record?.value;
   return isString(raw) || isNumber(raw) || isBoolean(raw) ? String(raw) : "";
+}
+
+function buttonMask(button: "left" | "middle" | "right"): 1 | 2 | 4 {
+  if (button === "left") return 1;
+  return button === "right" ? 2 : 4;
 }
 
 function recordValue(value: unknown): CdpResult | undefined {

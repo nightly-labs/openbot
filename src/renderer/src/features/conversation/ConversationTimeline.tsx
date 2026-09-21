@@ -492,7 +492,7 @@ export function ConversationTimeline() {
                 <AgentActivityIndicator
                   agent={activity().agent}
                   detail={activity().detail}
-                  presentation={activity().presentation}
+                  label={activity().label}
                   phase={activity().phase}
                 />
               )}

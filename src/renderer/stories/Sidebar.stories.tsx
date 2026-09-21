@@ -2,6 +2,7 @@ import type { ChannelSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from 
 import { createSignal, untrack } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import type { AvatarMood } from "../src/bloub-avatar";
 import { Sidebar } from "../src/features/sidebar/Sidebar";
 import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "../src/features/sidebar/sidebar-pins";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
@@ -12,6 +13,12 @@ const agentStates: Record<string, SidebarAgentState> = {
   chief: { kind: "working" },
   research: { kind: "unread", count: 3 },
   sales: { kind: "responded" },
+};
+
+const agentMoods: Record<string, AvatarMood> = {
+  chief: "working",
+  research: "waiting",
+  sales: "responded",
 };
 
 const sidebarAgents = STORY_AGENTS.map((agent) => {
@@ -119,6 +126,7 @@ const args: Parameters<typeof Sidebar>[0] = {
   directThreads: STORY_DIRECT_THREADS,
   activeDirectMemberId: null,
   agentStates,
+  agentMoods,
   layout: defaultSidebarLayout(),
   collapsedSectionIds: [],
   onMutateLayout: fn(async () => undefined),
@@ -397,6 +405,7 @@ export const AgentTiles: Story = {
     people: [],
     directThreads: [],
     agentStates: {},
+    agentMoods: {},
     pinnedItems: [],
   },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
@@ -427,6 +436,7 @@ export const AgentLongLabels: Story = {
     people: [],
     directThreads: [],
     agentStates: {},
+    agentMoods: {},
     pinnedItems: [],
   },
   decorators: [
@@ -469,6 +479,7 @@ export const AgentContextMenu: Story = {
     people: [],
     directThreads: [],
     agentStates: {},
+    agentMoods: {},
     layout: sectionedLayout,
     pinnedItems: [],
   },
@@ -791,6 +802,7 @@ export const Empty: Story = {
     people: [],
     directThreads: [],
     agentStates: {},
+    agentMoods: {},
     pinnedItems: [],
   },
 };

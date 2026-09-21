@@ -1,4 +1,4 @@
-import type { ManagedProviderId } from "./agent-providers";
+import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
 import type { AgentModelId } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
 import type { AvatarImageInput } from "./ipc-agents";
@@ -64,6 +64,11 @@ export interface UpdateStatus {
   checkedAt: string | null;
   message: string | null;
   errorCode: UpdateFailureCode | null;
+  /**
+   * True on a Mac whose host manages updates for every tenant. The tenant UI hides its own
+   * install, download and check actions but keeps showing the status; absent means unmanaged.
+   */
+  managedByHost?: boolean;
 }
 
 export type UpdateFailureCode = "check_failed" | "download_failed" | "install_failed";
@@ -91,6 +96,14 @@ export interface ProviderRuntimeSnapshot {
    * provider that is in the tuple has a real status.
    */
   providers: Record<ManagedProviderId, ProviderRuntimeStatus>;
+  /**
+   * The tool runtimes, in a field of their own rather than mixed in above.
+   *
+   * These are downloaded for the MCP servers, not for an agent: nothing signs in to one, nothing
+   * picks a model on one, and the provider cards must not grow an entry for one. Required, so a
+   * reader that needs the status of a managed tool cannot silently read `undefined` instead.
+   */
+  toolRuntimes: Record<ManagedToolRuntimeId, ProviderRuntimeStatus>;
 }
 
 export interface ExportResult {
@@ -182,7 +195,6 @@ export type ExternalDestination =
   | "opencode-auth"
   | "agent-setup"
   | "claude-install"
-  | "claude-sign-in"
   | "feedback"
   | "message"
   // Not a page: the macOS pane that grants OpenBot screen recording. It is here rather than behind

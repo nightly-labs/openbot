@@ -213,14 +213,150 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
 
     client.emit("request", {
       method: "mcpServer/elicitation/request",
+      id: "plugin-api-key",
+      params: {
+        threadId,
+        turnId,
+        serverName: "posthog",
+        mode: "form",
+        _meta: null,
+        message: "Connect PostHog.",
+        requestedSchema: {
+          type: "object",
+          required: ["apiKey"],
+          properties: {
+            apiKey: {
+              type: "string",
+              title: "Personal API key",
+              description: "Paste the PostHog personal API key.",
+            },
+            region: { type: "string", title: "Region", enum: ["us", "eu"], description: "Which region?" },
+          },
+        },
+      },
+    });
+    await waitFor(() => events.filter((event) => event.type === "prompt").length === 3);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "prompt",
+        requestId: "plugin-api-key",
+        questions: [
+          expect.objectContaining({
+            id: "apiKey",
+            header: "Personal API key",
+            question: "Paste the PostHog personal API key.",
+            isSecret: true,
+            options: null,
+          }),
+          expect.objectContaining({
+            id: "region",
+            isSecret: false,
+            options: [expect.objectContaining({ label: "us" }), expect.objectContaining({ label: "eu" })],
+          }),
+        ],
+      }),
+    );
+
+    await service.respondToPrompt({
+      requestId: "plugin-api-key",
+      answers: { apiKey: ["phx_test-key"], region: ["eu"] },
+    });
+    expect(client.responses.at(-1)).toEqual({
+      id: "plugin-api-key",
+      result: { action: "accept", content: { apiKey: "phx_test-key", region: "eu" }, _meta: null },
+    });
+    const keyMessage = (await service.readConversation("chief")).messages.find(
+      (message) => message.questionPrompt?.requestId === "plugin-api-key",
+    );
+    expect(keyMessage?.text).not.toContain("phx_test-key");
+    expect(keyMessage?.questionPrompt?.resolution).toMatchObject({
+      status: "answered",
+      responses: { apiKey: { status: "answered" }, region: { status: "answered", answers: ["eu"] } },
+    });
+
+    client.emit("request", {
+      method: "mcpServer/elicitation/request",
+      id: "skipped-required-field",
+      params: {
+        threadId,
+        turnId,
+        serverName: "posthog",
+        mode: "form",
+        _meta: null,
+        message: "Connect PostHog.",
+        requestedSchema: {
+          type: "object",
+          required: ["apiKey"],
+          properties: { apiKey: { type: "string", title: "Personal API key" } },
+        },
+      },
+    });
+    await waitFor(() => events.filter((event) => event.type === "prompt").length === 4);
+    await service.respondToPrompt({ requestId: "skipped-required-field", answers: { apiKey: [] } });
+    expect(client.responses.at(-1)).toEqual({
+      id: "skipped-required-field",
+      result: { action: "decline", content: null, _meta: null },
+    });
+
+    client.emit("request", {
+      method: "mcpServer/elicitation/request",
+      id: "titled-option",
+      params: {
+        threadId,
+        turnId,
+        serverName: "posthog",
+        mode: "form",
+        _meta: null,
+        message: "Connect PostHog.",
+        requestedSchema: {
+          type: "object",
+          required: ["region"],
+          properties: {
+            region: {
+              type: "string",
+              title: "Region",
+              oneOf: [
+                { const: "us", title: "United States" },
+                { const: "eu", title: "European Union" },
+              ],
+            },
+          },
+        },
+      },
+    });
+    await waitFor(() => events.filter((event) => event.type === "prompt").length === 5);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "prompt",
+        requestId: "titled-option",
+        questions: [
+          expect.objectContaining({
+            id: "region",
+            options: [
+              expect.objectContaining({ label: "United States" }),
+              expect.objectContaining({ label: "European Union" }),
+            ],
+          }),
+        ],
+      }),
+    );
+    // The card submits the displayed label, but the schema asks for the const behind it.
+    await service.respondToPrompt({ requestId: "titled-option", answers: { region: ["European Union"] } });
+    expect(client.responses.at(-1)).toEqual({
+      id: "titled-option",
+      result: { action: "accept", content: { region: "eu" }, _meta: null },
+    });
+
+    client.emit("request", {
+      method: "mcpServer/elicitation/request",
       id: "unsupported-elicitation",
       params: {
         threadId,
         turnId,
         serverName: "other-plugin",
-        mode: "form",
+        mode: "url",
         _meta: null,
-        message: "Enter a value.",
+        message: "Open this page to continue.",
         requestedSchema: { type: "object", properties: {} },
       },
     });

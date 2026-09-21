@@ -4,7 +4,9 @@ import type {
   AgentStatus,
   AgentSummary,
   AttachmentImportEvent,
+  BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
+  BrowserTab,
   CentralAuthState,
   ConversationPage,
   DirectMessageRealtimeEvent,
@@ -90,6 +92,7 @@ export let emitAgentEvent: ((event: AgentEvent) => void) | undefined;
 export let emitScopedAgentEvent: ((event: ScopedAgentEvent) => void) | undefined;
 export let emitAttachmentImport: ((event: AttachmentImportEvent) => void) | undefined;
 export let emitBrowserPictureInPicture: ((event: BrowserPictureInPictureEvent) => void) | undefined;
+export let emitBrowserLiveView: ((event: BrowserLiveViewEvent) => void) | undefined;
 export let emitUpdateStatus: ((status: UpdateStatus) => void) | undefined;
 export let emitAuth: ((state: CentralAuthState) => void) | undefined;
 export let emitServers: ((servers: ServerSummary[]) => void) | undefined;
@@ -97,6 +100,7 @@ export let emitPresence: ((snapshot: TeamPresenceSnapshot) => void) | undefined;
 export let emitDirectMessage: ((event: DirectMessageRealtimeEvent) => void) | undefined;
 export let emitDirectTyping: ((event: DirectTypingRealtimeEvent) => void) | undefined;
 export let emitInvite: ((inviteUrl: string) => void) | undefined;
+export let emitOpenPluginListing: ((slug: string) => void) | undefined;
 export let emitDynamicIslandAction: ((action: DynamicIslandAction) => void) | undefined;
 
 type BridgeListener<Event> = (event: Event) => void;
@@ -161,6 +165,9 @@ const attachmentImportBridge = createEventBridge<AttachmentImportEvent>((emit) =
 const browserPictureInPictureBridge = createEventBridge<BrowserPictureInPictureEvent>((emit) => {
   emitBrowserPictureInPicture = emit;
 });
+const browserLiveViewBridge = createEventBridge<BrowserLiveViewEvent>((emit) => {
+  emitBrowserLiveView = emit;
+});
 const updateStatusBridge = createEventBridge<UpdateStatus>((emit) => {
   emitUpdateStatus = emit;
 });
@@ -182,6 +189,9 @@ const directTypingBridge = createEventBridge<DirectTypingRealtimeEvent>((emit) =
 const inviteBridge = createEventBridge<string>((emit) => {
   emitInvite = emit;
 });
+const pluginListingBridge = createEventBridge<string>((emit) => {
+  emitOpenPluginListing = emit;
+});
 const dynamicIslandActionBridge = createEventBridge<DynamicIslandAction>((emit) => {
   emitDynamicIslandAction = emit;
 });
@@ -191,6 +201,7 @@ const eventBridges = {
   scopedAgentEvent: scopedAgentEventBridge,
   attachmentImport: attachmentImportBridge,
   browserPictureInPicture: browserPictureInPictureBridge,
+  browserLiveView: browserLiveViewBridge,
   updateStatus: updateStatusBridge,
   auth: authBridge,
   servers: serversBridge,
@@ -198,6 +209,7 @@ const eventBridges = {
   directMessage: directMessageBridge,
   directTyping: directTypingBridge,
   invite: inviteBridge,
+  pluginListing: pluginListingBridge,
   dynamicIslandAction: dynamicIslandActionBridge,
 } as const;
 
@@ -214,6 +226,7 @@ export function subscriberCounts(): BridgeSubscriberCounts {
     scopedAgentEvent: scopedAgentEventBridge.count(),
     attachmentImport: attachmentImportBridge.count(),
     browserPictureInPicture: browserPictureInPictureBridge.count(),
+    browserLiveView: browserLiveViewBridge.count(),
     updateStatus: updateStatusBridge.count(),
     auth: authBridge.count(),
     servers: serversBridge.count(),
@@ -221,6 +234,7 @@ export function subscriberCounts(): BridgeSubscriberCounts {
     directMessage: directMessageBridge.count(),
     directTyping: directTypingBridge.count(),
     invite: inviteBridge.count(),
+    pluginListing: pluginListingBridge.count(),
     dynamicIslandAction: dynamicIslandActionBridge.count(),
   };
 }
@@ -594,6 +608,7 @@ export function installOpenbotStub(): void {
         ]),
         listAgents: vi.fn().mockResolvedValue(AGENTS),
         listInstalledSkills: vi.fn().mockResolvedValue([]),
+        listMcpServers: vi.fn().mockResolvedValue([]),
         listMemories: vi.fn().mockResolvedValue([]),
         listRoutines: vi.fn().mockResolvedValue([]),
         listRoutineRuns: vi.fn().mockResolvedValue([]),
@@ -755,6 +770,10 @@ export function installOpenbotStub(): void {
           height: 600,
         }),
         setVisible: vi.fn().mockResolvedValue(undefined),
+        startLiveView: vi.fn().mockResolvedValue(undefined),
+        stopLiveView: vi.fn().mockResolvedValue(undefined),
+        sendLiveViewInput: vi.fn().mockResolvedValue(undefined),
+        onLiveViewEvent: vi.fn(browserLiveViewBridge.subscribe),
         onDisplayState: vi.fn().mockReturnValue(() => undefined),
         openPictureInPicture: vi
           .fn()
@@ -840,6 +859,7 @@ export function installOpenbotStub(): void {
           role: "member",
           expiresAt: "2026-08-21T10:00:00.000Z",
           emailBound: false,
+          permanent: false,
         }),
         takePendingInvite: vi.fn().mockResolvedValue(null),
         login: vi.fn().mockResolvedValue(undefined),
@@ -862,6 +882,8 @@ export function installOpenbotStub(): void {
           expiresAt: "2026-08-21T10:00:00.000Z",
           role: "member",
           email: null,
+          permanent: false,
+          useCount: 0,
         }),
         setTyping: vi.fn().mockResolvedValue(undefined),
         onPresence: vi.fn(presenceBridge.subscribe),
@@ -901,6 +923,10 @@ export function installOpenbotStub(): void {
         onDirectTyping: vi.fn(directTypingBridge.subscribe),
         onEvent: vi.fn(serversBridge.subscribe),
         onInvite: vi.fn(inviteBridge.subscribe),
+      },
+      plugins: {
+        takePendingListing: vi.fn().mockResolvedValue(null),
+        onOpenListing: vi.fn(pluginListingBridge.subscribe),
       },
       host: {
         getStatus: vi.fn().mockResolvedValue({
@@ -964,6 +990,45 @@ export function presenceMember(id: string, email: string, name: string): TeamPre
     online: true,
     typingAgentId: null,
   };
+}
+
+export function browserTab(id: string, title: string, overrides: Partial<BrowserTab> = {}): BrowserTab {
+  return {
+    id,
+    title,
+    url: "https://example.com",
+    loading: false,
+    ownerAgentId: "chief",
+    ownerThreadId: "thread-chief",
+    ...overrides,
+  };
+}
+
+export function agentReply(id: string, text: string, createdAt: string): ConversationPage["messages"][number] {
+  return { id, author: "assistant", text, createdAt, status: "completed" };
+}
+
+/**
+ * A conversation page whose last message is unread, which is what the read-state tests all start from.
+ *
+ * `firstUnreadMessageId` follows the last message rather than taking a value of its own, because a
+ * page carrying an unread count and an unrelated first-unread id is a state the host never sends,
+ * and a test that builds one asserts against a screen the user cannot reach.
+ */
+export function unreadConversationPage(
+  agentId: string,
+  messages: ConversationPage["messages"],
+  overrides: Partial<ConversationPage> = {},
+): ConversationPage {
+  return testConversationPage(agentId, messages, {
+    revision: 2,
+    readState: {
+      unreadCount: 1,
+      firstUnreadMessageId: messages.at(-1)?.id ?? null,
+      throughMessageId: null,
+    },
+    ...overrides,
+  });
 }
 
 export function attachment(id: string, name: string, kind: "image" | "pdf") {

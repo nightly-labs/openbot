@@ -15,6 +15,8 @@ export function serverSupportsCapability(
       capability === "channel-delete-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||
+      capability === "browser-navigation" ||
+      capability === "browser-view" ||
       capability === "mcp-servers-v1") &&
     server?.kind === "remote"
   ) {

@@ -11,6 +11,7 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "../lib/content-collection";
+import { PLUGINS_UPDATED_AT, pluginIndexUrl, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
 import { OPENBOT_SITE_TITLE, OPENBOT_SITE_URL } from "../lib/site-metadata";
 
 /**
@@ -47,6 +48,14 @@ export function contentSitemapXml(): string {
         priority: "0.7",
       })),
     ]),
+    /* The plugin pages hold no secret, unlike /join, so they are indexed like any article. Each
+       entry's date is the catalog's own, which is what changes when a listing ships. */
+    { loc: pluginIndexUrl(), lastmod: PLUGINS_UPDATED_AT, priority: "0.8" },
+    ...SITE_PLUGINS.map((plugin) => ({
+      loc: pluginUrl(plugin.slug),
+      lastmod: PLUGINS_UPDATED_AT,
+      priority: "0.7",
+    })),
   ];
 
   const urls = entries

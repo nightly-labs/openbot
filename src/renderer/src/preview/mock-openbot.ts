@@ -15,6 +15,7 @@ import type {
   AppSetupState,
   AttachmentImportEvent,
   BrowserControlState,
+  BrowserLiveViewEvent,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
   BrowserPreview,
@@ -155,14 +156,7 @@ export interface MockOpenBotOptions {
   customProviders?: CustomProviderSummary[];
 }
 
-/**
- * What the OpenCode CLI would report for one endpoint, read from the endpoint itself. Preview
- * composes these into `listModels()` instead of putting them in `STORY_MODELS`, which several
- * stories read directly as their whole catalogue.
- *
- * OpenCode names a custom model `<provider name>/<model name>` and ids it
- * `<provider id>/<model id>`.
- */
+/** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): AgentModelOption[] {
   return provider.models.map((model) => ({
     provider: "opencode",
@@ -203,11 +197,7 @@ export interface MockOpenBotControls {
   dispose: () => void;
 }
 
-/**
- * The preview build has no main process to read a file, so it answers with the same fixtures that
- * the file preview stories use. A path with no fixture keeps the unsupported shape, which is what
- * the panel shows for a kind it cannot render.
- */
+/** Preview file fixtures; a path with no fixture keeps the unsupported shape. */
 function mockFilePreview(path: string, fallbackName: string): FilePreview {
   return (
     filePreviewForPath(path) ?? {
@@ -360,6 +350,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         grok: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         opencode: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
+      // No `availableVersion`: a tool runtime is downloaded once and replaced by a release, so the
+      // preview never offers an update for one.
+      toolRuntimes: { bun: { phase: "not-downloaded", progress: null, message: null, version: null } },
     },
   );
   let failRuntimeDownload = options.providerRuntimeFailure ?? false;
@@ -372,6 +365,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   };
   const agentListeners = new Set<Listener<AgentEvent>>();
   const browserDisplayListeners = new Set<Listener<{ tabs: BrowserTab[]; activeTabId: string | null }>>();
+  const browserLiveViewListeners = new Set<Listener<BrowserLiveViewEvent>>();
   const browserPictureInPictureListeners = new Set<Listener<BrowserPictureInPictureEvent>>();
   const authListeners = new Set<Listener<CentralAuthState>>();
   const presenceListeners = new Set<Listener<TeamPresenceSnapshot>>();
@@ -1769,6 +1763,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(preview);
       },
       setVisible: async () => undefined,
+      // The preview has no host, so it answers the one thing that is true: there is nothing live to
+      // show. The panel draws its own message for that rather than an empty rectangle.
+      startLiveView: async (tabId) => {
+        emit(browserLiveViewListeners, { type: "stopped", tabId, reason: "The preview has no host to watch." });
+      },
+      stopLiveView: async () => undefined,
+      sendLiveViewInput: async () => undefined,
+      onLiveViewEvent: (listener) => {
+        browserLiveViewListeners.add(listener);
+        return () => browserLiveViewListeners.delete(listener);
+      },
       onDisplayState: (listener) => {
         browserDisplayListeners.add(listener);
         return () => browserDisplayListeners.delete(listener);
@@ -1871,6 +1876,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: "member",
         expiresAt: "2026-09-19T10:00:00.000Z",
         emailBound: false,
+        permanent: false,
       }),
       takePendingInvite: async () => null,
       login: async (input) => {
@@ -1915,6 +1921,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: input.role,
         usedAt: null,
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       setTyping: async (_input: SetTeamTypingInput) => undefined,
       onPresence: (listener, serverId) => {
@@ -2010,6 +2018,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => inviteListeners.delete(listener);
       },
     },
+    plugins: {
+      // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
     host: {
       getStatus: async () => clone(hostStatus),
       configure: async (input: ConfigureHostInput) => {
@@ -2073,6 +2089,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         usedAt: null,
         inviteUrl: "https://openbot.run/join?invite=mock-invite",
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       onEvent: (listener) => {
         hostListeners.add(listener);

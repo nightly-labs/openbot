@@ -35,10 +35,12 @@ function runtimeHarness() {
       grok: { ...offer.runtime, availableVersion: null },
       opencode: { ...offer.runtime, availableVersion: null },
     },
+    toolRuntimes: { bun: { ...offer.runtime } },
   };
   let listener: ((snapshot: ProviderRuntimeSnapshot) => void) | undefined;
   function emit(patch: Partial<ProviderRuntimeStatus>) {
     snapshot = {
+      ...snapshot,
       revision: snapshot.revision + 1,
       providers: { ...snapshot.providers, claude: { ...snapshot.providers.claude, ...patch } },
     };

@@ -150,6 +150,25 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 }
 
 /**
+ * The tools OpenBot downloads for the MCP servers rather than for an agent: a JavaScript runtime,
+ * so that `npx some-server` starts on a machine that has never had Node.
+ *
+ * A separate id space, not a fifth managed provider. `ManagedProviderId` is what makes
+ * `ProviderRuntimeSnapshot.providers` a total record of provider CLIs, and every renderer reader
+ * iterates it to draw a provider card; a tool runtime in that tuple would become a provider
+ * everywhere, from the picker to the model list.
+ */
+export const MANAGED_TOOL_RUNTIMES = ["bun"] as const;
+export type ManagedToolRuntimeId = (typeof MANAGED_TOOL_RUNTIMES)[number];
+
+/** Everything the runtime manager downloads, pins and verifies, whoever ends up running it. */
+export type ManagedRuntimeId = ManagedProviderId | ManagedToolRuntimeId;
+
+export function isManagedToolRuntime(id: string): id is ManagedToolRuntimeId {
+  return isOneOf(MANAGED_TOOL_RUNTIMES, id);
+}
+
+/**
  * Whether an OpenCode model's display name marks it as one the free tier covers.
  *
  * OpenCode states the price in the name and nowhere else: `model/list` carries no price field, and

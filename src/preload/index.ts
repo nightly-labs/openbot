@@ -102,6 +102,7 @@ import {
   requiredNumber,
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
+import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { clipboardFiles } from "./clipboard-files";
@@ -1058,6 +1059,14 @@ const openbotApi: OpenBotDesktopApi = {
     capturePreview: (tabId) =>
       ipcRenderer.invoke(IPC_CHANNELS.browserCapturePreview, tabId).then(decodeBrowserPreviewFromMain),
     setVisible: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSetVisible, input),
+    startLiveView: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserStartLiveView, tabId),
+    stopLiveView: () => ipcRenderer.invoke(IPC_CHANNELS.browserStopLiveView),
+    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input),
+    onLiveViewEvent: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) => listener(event);
+      ipcRenderer.on(IPC_CHANNELS.browserLiveViewEvent, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.browserLiveViewEvent, handler);
+    },
     onDisplayState: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
       ipcRenderer.on(IPC_CHANNELS.browserDisplayStateEvent, handler);
@@ -1160,6 +1169,21 @@ const openbotApi: OpenBotDesktopApi = {
       const handler = (_event: Electron.IpcRendererEvent, inviteUrl: string) => listener(inviteUrl);
       ipcRenderer.on(IPC_CHANNELS.serversInvite, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversInvite, handler);
+    },
+  },
+  plugins: {
+    // The slug is checked again on arrival rather than trusted because it came from main. It began
+    // life in a URL a web page chose, and this is the last point before the renderer looks it up.
+    takePendingListing: async () => {
+      const slug = await ipcRenderer.invoke(IPC_CHANNELS.pluginsTakePendingListing);
+      return typeof slug === "string" && isPluginSlug(slug) ? slug : null;
+    },
+    onOpenListing: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, slug: unknown) => {
+        if (typeof slug === "string" && isPluginSlug(slug)) listener(slug);
+      };
+      ipcRenderer.on(IPC_CHANNELS.pluginsOpenListing, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.pluginsOpenListing, handler);
     },
   },
   host: {

@@ -7,10 +7,12 @@ import { useConversationController } from "./features/conversation/conversation-
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
+import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 import type { ProviderKeyApi } from "./features/settings/OpenCodeKeyDialog";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
@@ -104,13 +106,24 @@ function PermissionsReview(props: AccountProps) {
  * machine, so the picker is empty for a remote server.
  */
 function SkillsMarketplace() {
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
+  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
   const controller = useConversationController();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
   const local = createMemo(() => activeServer()?.kind === "local");
+  /* What both example controls need: a local agent whose composer is free to take another line. */
+  const composerFree = createMemo(
+    () =>
+      local() &&
+      agentStatus().phase === "ready" &&
+      !controller.submitting() &&
+      !controller.selectionSending() &&
+      controller.voicePhase() === "idle" &&
+      !controller.editingDeliveryId() &&
+      !(agentSetupOpen() && creatingAgent()),
+  );
 
   return (
     <Show when={skillsMarketplaceOpen()}>
@@ -119,15 +132,14 @@ function SkillsMarketplace() {
           open={true}
           agents={local() ? agentList() : []}
           activeAgentId={local() ? (activeAgent()?.id ?? "") : ""}
-          onOpenChange={setSkillsMarketplaceOpen}
+          onOpenChange={(open) => {
+            /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
+               hand lands on the catalog rather than on the listing a link once named. */
+            if (!open) setPendingPluginSlug(null);
+            setSkillsMarketplaceOpen(open);
+          }}
           onTrySkill={
-            local() &&
-            agentStatus().phase === "ready" &&
-            !controller.submitting() &&
-            !controller.selectionSending() &&
-            controller.voicePhase() === "idle" &&
-            !controller.editingDeliveryId() &&
-            !(agentSetupOpen() && creatingAgent())
+            composerFree()
               ? (agentId, skill) => {
                   const server = activeServer();
                   if (server?.kind !== "local" || !agentList().some((agent) => agent.id === agentId)) return;
@@ -138,6 +150,24 @@ function SkillsMarketplace() {
               : undefined
           }
           onAgentInstalled={openInstalledMarketplaceAgent}
+          plugins={MARKETPLACE_PLUGINS}
+          initialPluginSlug={pendingPluginSlug() ?? undefined}
+          onInitialPluginSlugConsumed={() => setPendingPluginSlug(null)}
+          /* A plugin's app is an MCP server, which the host holds. Only a local server takes one
+             here, as the agents list does, so a remote server browses the listings and installs
+             nothing. */
+          pluginServerId={local() ? activeServer()?.id : undefined}
+          onRunPluginPrompt={
+            composerFree()
+              ? (agentId, prompt) => {
+                  const server = activeServer();
+                  if (server?.kind !== "local" || !agentList().some((agent) => agent.id === agentId)) return;
+                  selectAgent(agentId);
+                  controller.appendPluginPrompt({ serverId: server.id, agentId }, prompt.text);
+                  setSkillsMarketplaceOpen(false);
+                }
+              : undefined
+          }
         />
       </Loading>
     </Show>
@@ -175,6 +205,7 @@ function JoinServer(props: AccountProps) {
 function ServerSettings() {
   const platform = usePlatform();
   const { hostStatus, setServerMuted } = useServers();
+  const { toolRuntimeStatuses } = useProviders();
   const {
     serverSettingsTarget,
     serverSettingsOpen,
@@ -234,6 +265,9 @@ function ServerSettings() {
             onOpenScreenRecordingSettings={() => window.openbot.openExternal("mac-screen-recording")}
             onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
+            // Only for this computer: the runtime a remote host starts its own servers with is that
+            // host's, and this window downloads nothing for it.
+            mcpToolRuntimeNote={server().kind === "local" ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
             mcpLoadError={serverSettingsMcpError()}
             onMcpSectionShown={() => void refreshMcpServers()}
             onRetryMcpServers={() => void refreshMcpServers()}

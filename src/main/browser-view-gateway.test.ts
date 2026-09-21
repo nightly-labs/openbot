@@ -1,0 +1,140 @@
+import { restartActivityGeneration } from "../backend/restart-activity";
+// @vitest-environment node
+
+import { createServer, type IncomingMessage } from "node:http";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import type { Duplex } from "node:stream";
+import { decodeBrowserViewFrame, encodeBrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type * as Ws from "ws";
+import { z } from "zod";
+import type { BrowserViewportInput } from "../backend/browser-cdp";
+import { BrowserViewGateway } from "./browser-view-gateway";
+
+const requireModule = createRequire(import.meta.url);
+const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
+const TEAM_SESSION = "team-session-1";
+const closers: Array<() => Promise<void>> = [];
+
+afterEach(async () => {
+  for (const close of closers.splice(0)) await close();
+});
+
+describe("the live browser view on a host", () => {
+  it("sends the tab's frames and dispatches a click at the point on the frame", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+    expect(decodeBrowserViewFrame(frames[0])).toMatchObject({ sequence: 1, width: 1200, height: 800 });
+
+    socket.send(
+      encodeBrowserViewInput({
+        type: "pointer",
+        action: "down",
+        x: 0.5,
+        y: 0.25,
+        button: "left",
+        clickCount: 1,
+        deltaX: 0,
+        deltaY: 0,
+        modifiers: 0,
+      }),
+    );
+    // The member's pointer is a fraction of the frame they watched; the host's page is in pixels.
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("refuses a socket that names neither the session nor its member", async () => {
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async () => async () => undefined,
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: (token) => (token === "other-member-token" ? { id: "member-2" } : null),
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    for (const options of [
+      { headers: { "X-OpenBot-WebRTC-Session": "another-team-session" } },
+      { protocols: ["openbot-token.other-member-token"] },
+      {},
+    ]) {
+      const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, options.protocols ?? [], options);
+      const failure = await new Promise<string>((resolve) => socket.once("error", (error) => resolve(error.message)));
+      expect(failure).toContain("401");
+    }
+    await gateway.stop();
+  });
+
+  it("counts only views with a live socket", async () => {
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async () => async () => undefined,
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    expect(gateway.activeViewCount()).toBe(0);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    expect(gateway.activeViewCount()).toBe(0);
+
+    const before = restartActivityGeneration();
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(1));
+    socket.close();
+    await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
+    expect(restartActivityGeneration()).toBeGreaterThan(before);
+    await gateway.stop();
+  });
+});
+
+async function serve(gateway: BrowserViewGateway): Promise<string> {
+  const server = createServer();
+  server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    if (!gateway.handlesUpgrade(url)) return socket.destroy();
+    gateway.handleUpgrade(request, socket, head, url);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = z.object({ port: z.number().int() }).parse(server.address());
+  closers.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  return `ws://127.0.0.1:${address.port}`;
+}
+
+function collect(socket: Ws.WebSocket): Uint8Array[] {
+  const frames: Uint8Array[] = [];
+  socket.on("message", (data, binary) => {
+    if (binary && !Array.isArray(data) && !(data instanceof ArrayBuffer)) frames.push(new Uint8Array(data));
+  });
+  return frames;
+}

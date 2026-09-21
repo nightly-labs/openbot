@@ -22,14 +22,34 @@ export function appendSkillExample(
   draft: ComposerDraft,
   skill: Pick<MarketplaceSkillDetail, "id" | "name" | "examplePrompt">,
 ): ComposerDraft {
-  const example = `${serializeChatTagReference("skill", skill.name, skill.id)} ${skill.examplePrompt?.trim() || "Help me use this skill."}`;
-  return { ...draft, text: draft.text ? `${draft.text}\n${example}` : example };
+  return appendDraftLine(
+    draft,
+    `${serializeChatTagReference("skill", skill.name, skill.id)} ${skill.examplePrompt?.trim() || "Help me use this skill."}`,
+  );
 }
 
 export function appendSkillCreationRequest(draft: ComposerDraft): ComposerDraft {
-  const request =
-    "Help me create a new local skill. Use the skill-creation guide. Ask me what workflow it should support before you create it.";
-  return { ...draft, text: draft.text ? `${draft.text}\n${request}` : request };
+  return appendDraftLine(
+    draft,
+    "Help me create a new local skill. Use the skill-creation guide. Ask me what workflow it should support before you create it.",
+  );
+}
+
+/**
+ * A plugin's example question, written as the user would have typed it.
+ *
+ * It carries no reference marker, unlike a skill example: a marker names something the agent must
+ * be pointed at, and a plugin's tools are already offered to every agent on this computer. So the
+ * example is the question alone.
+ */
+export function appendPluginPrompt(draft: ComposerDraft, prompt: string): ComposerDraft {
+  const text = prompt.trim();
+  return text ? appendDraftLine(draft, text) : draft;
+}
+
+/** One more line in the draft, so an added example never overwrites what the user already typed. */
+function appendDraftLine(draft: ComposerDraft, line: string): ComposerDraft {
+  return { ...draft, text: draft.text ? `${draft.text}\n${line}` : line };
 }
 
 export const QUEUE_EDIT_STORAGE_KEY = "openbot:queue-edit";

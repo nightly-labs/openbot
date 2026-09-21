@@ -25,6 +25,8 @@ import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   app,
   BrowserWindow,
+  clipboard,
+  Menu,
   type NativeImage,
   type Session,
   session,
@@ -32,11 +34,18 @@ import {
   WebContentsView,
   webContents,
 } from "electron";
-import { BrowserCdpEngine, type BrowserUploadAssignment, type SnapshotReadResult } from "./browser-cdp";
+import {
+  BrowserCdpEngine,
+  type BrowserScreencastFrame,
+  type BrowserUploadAssignment,
+  type BrowserViewportInput,
+  type SnapshotReadResult,
+} from "./browser-cdp";
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import { applySiteIdentity } from "./browser-identity";
 import { BrowserRecorder } from "./browser-recorder";
 import {
+  browserContextMenuItems,
   EDITABLE_FOCUS_SCRIPT,
   isCloseBrowserTabShortcut,
   isCollapseBrowserShortcut,
@@ -82,11 +91,30 @@ const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
  */
 const OPERATION_UNWIND_GRACE_MS = 1_000;
 /**
+ * How long past its deadline an operation gets before the backstop timer answers for it.
+ *
+ * An operation carries the same deadline and reports what it managed to do with it: typing states
+ * how many characters reached the page, so a caller knows what not to send twice. A backstop that
+ * expires at the same millisecond as that check is a race, and the generic message wins it often
+ * enough that the caller loses the count. The backstop is there for an operation that does not
+ * unwind itself at all, so it starts after the operation's own last chance to answer, and the wait
+ * it adds is short beside the ten seconds an action gets by default.
+ */
+const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+/**
  * How long enumerating a tab's documents may take before it is unwound. It runs off a navigation
  * rather than a tool call, so no caller is waiting on it and nothing else supplies a deadline -- but
  * it is queued on the tab, so whatever the agent does next waits behind it.
  */
 const DOCUMENT_ENUMERATION_TIMEOUT_MS = 10_000;
+/**
+ * The live view's frames. The quality is what a page of text survives on a slow link, and the size
+ * is the client's panel rather than the host's monitor: a frame larger than the panel that draws it
+ * is bytes nobody sees.
+ */
+const VIEW_FRAME_QUALITY = 60;
+const VIEW_FRAME_MAX_WIDTH = 1_280;
+const VIEW_FRAME_MAX_HEIGHT = 800;
 
 interface BrowserConsoleMessageDetails {
   level: "info" | "warning" | "error" | "debug";
@@ -590,6 +618,34 @@ export class BrowserHost {
     });
   }
 
+  /**
+   * A live view of a tab, for a member who is not at this computer.
+   *
+   * The frames do not go through the tab's operation queue. A queued frame is a frame that arrives
+   * after whatever the agent is doing has finished, which is exactly the picture the still-image
+   * route already gave; the point of the view is that the page moves while the agent works.
+   */
+  async startView(tabId: string, onFrame: (frame: BrowserScreencastFrame) => void): Promise<() => Promise<void>> {
+    const tab = this.#requireTab(tabId);
+    return tab.engine.startScreencast(
+      { quality: VIEW_FRAME_QUALITY, maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT },
+      onFrame,
+    );
+  }
+
+  /**
+   * Input from the person watching that view. It is not queued either, for the same reason a local
+   * click on the visible tab is not: a pointer that answers when the agent's turn ends is not a
+   * pointer. Anything that can change the page clears the references the agent's last snapshot
+   * handed out, the way taking the tab over does, so the agent takes a fresh one rather than acting
+   * on an element the person moved.
+   */
+  async dispatchViewInput(tabId: string, input: BrowserViewportInput): Promise<void> {
+    const tab = this.#requireTab(tabId);
+    if (input.type !== "pointer" || input.action !== "move") tab.engine.invalidateReferences();
+    await tab.engine.dispatchViewportInput(input);
+  }
+
   async handleDynamicTool(
     params: DynamicToolCallParams,
     hooks: BrowserDynamicToolHooks = {},
@@ -811,7 +867,17 @@ export class BrowserHost {
         case "close_tab": {
           const { args } = call;
           const tabId = args.tabId;
-          if (this.#tabs.has(tabId)) this.#requireToolTab(params, tabId);
+          // Checked only for a tab that exists, so closing an id that is already gone stays a silent
+          // success and a repeated close is idempotent.
+          const tab = this.#tabs.get(tabId);
+          if (tab) {
+            this.#requireToolTab(params, tabId);
+            logger.info("Agent closed a browser tab.", {
+              tabId,
+              host: logUrlHost(tab.requestedUrl),
+              agentId: params.ownerAgentId ?? null,
+            });
+          }
           await this.close(tabId);
           return textResult({ closed: true });
         }
@@ -979,8 +1045,10 @@ export class BrowserHost {
       });
       this.#emitChanged();
     });
-    this.#session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-    this.#session.setPermissionCheckHandler(() => false);
+    this.#session.setPermissionRequestHandler((_webContents, permission, callback) =>
+      callback(isAllowedBrowserPermission(permission)),
+    );
+    this.#session.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
     this.#session.on("will-download", (_event, item) => {
       const safeName = basename(item.getFilename()).replace(/[^a-zA-Z0-9._ -]/g, "_");
       const downloadPath = uniqueDownloadPath(
@@ -1055,6 +1123,37 @@ export class BrowserHost {
       if (!isCloseBrowserTabShortcut(input)) return;
       event.preventDefault();
       setImmediate(() => void this.close(tab.id).catch(() => undefined));
+    });
+    contents.on("context-menu", (event, params) => {
+      const items = browserContextMenuItems({
+        selectionText: params.selectionText,
+        isEditable: params.isEditable,
+        linkURL: params.linkURL,
+        srcURL: params.srcURL,
+        mediaType: params.mediaType,
+      });
+      if (items.length === 0) return;
+      event.preventDefault();
+      const window = this.#mountedViews.get(tab.view);
+      if (!window || window.isDestroyed()) return;
+      // The edit entries name the page explicitly rather than taking an Electron role: a role acts
+      // on whichever contents hold focus when the item is picked, and the right-click that opened
+      // the menu may have landed on a page the user had not focused.
+      const onPage = (act: (target: WebContents) => void) => () => {
+        if (!contents.isDestroyed()) act(contents);
+      };
+      Menu.buildFromTemplate(
+        items.map((item) => {
+          if (item === "separator") return { type: "separator" } as const;
+          if (item === "copy-link") return { label: "Copy Link", click: () => clipboard.writeText(params.linkURL) };
+          if (item === "copy-image-address")
+            return { label: "Copy Image Address", click: () => clipboard.writeText(params.srcURL) };
+          if (item === "cut") return { label: "Cut", click: onPage((target) => target.cut()) };
+          if (item === "copy") return { label: "Copy", click: onPage((target) => target.copy()) };
+          if (item === "paste") return { label: "Paste", click: onPage((target) => target.paste()) };
+          return { label: "Select All", click: onPage((target) => target.selectAll()) };
+        }),
+      ).popup({ window });
     });
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
@@ -1287,7 +1386,7 @@ export class BrowserHost {
       onOperationStarted?.(operationCompletion);
       const boundedOperation = withTimeout(
         operationCompletion,
-        Math.max(0, deadline - Date.now()),
+        Math.max(0, deadline - Date.now()) + OPERATION_DEADLINE_BACKSTOP_MS,
         timeoutMessage,
       ).catch(async (error) => {
         if (!isTimeoutError(error)) throw error;
@@ -1536,6 +1635,12 @@ export class BrowserHost {
   #requireToolTab(params: DynamicToolCallParams, tabId: string): void {
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
     if (!tab || !this.#canUseToolTab(params, tab)) throw new Error(`Unknown browser tab: ${tabId}`);
+    // The user holds this tab. `AgentService` already refuses an agent's browser tools while its own
+    // takeover is outstanding, but that check is agent-wide and only covers callers that go through
+    // the agent service; this one is per tab and holds for every caller of a tabId-bearing tool.
+    // A distinct message matters: telling the model the tab vanished, while the user is part-way
+    // through a login on it, invites an `open` and a second tab onto the same flow.
+    if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
   }
 
   #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
@@ -1832,6 +1937,31 @@ function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
 
 function isAllowedMainUrl(value: string): boolean {
   return value === "about:blank" || isPersistableBrowserUrl(value);
+}
+
+/**
+ * The embedded browser grants exactly one page permission: writing plain, sanitized content to the
+ * clipboard. Chromium only asks for it behind a user gesture, which is what a page's own "copy
+ * link" button is, and refusing it left such a button silently doing nothing. Reading the clipboard
+ * stays refused -- a page must never see what the user copied elsewhere -- and so does everything
+ * else, so camera, microphone, location and notifications are unchanged.
+ */
+function isAllowedBrowserPermission(permission: string): boolean {
+  return permission === "clipboard-sanitized-write";
+}
+
+/**
+ * The host of a tab's URL, for a log line. `diagnosticUrl` below keeps the path, which is right for a
+ * diagnostic the user reads back in the app but wrong for a log: a path carries tokens often enough
+ * (`/reset/<secret>`, `/invite/<secret>`) that writing one to disk breaks the redaction rule. The host
+ * is enough to tell which tab an agent closed.
+ */
+function logUrlHost(value: string): string | undefined {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return undefined;
+  }
 }
 
 function diagnosticUrl(value: string): string | undefined {

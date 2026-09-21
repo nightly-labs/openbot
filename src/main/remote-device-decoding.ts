@@ -3,6 +3,7 @@
 
 import {
   type BrowserControlState,
+  type BrowserDisplayState,
   type BrowserPreview,
   type BrowserTab,
   REMOTE_DESKTOP_ERROR_CODES,
@@ -28,6 +29,13 @@ export function decodeBrowserTabs(value: unknown): BrowserTab[] {
 export function decodeBrowserTab(value: unknown): BrowserTab {
   if (!isBrowserTabValue(value)) throw new Error("Invalid remote browser tab.");
   return value;
+}
+
+export function decodeBrowserDisplayState(value: unknown): BrowserDisplayState {
+  if (!isDynamicRecord(value) || (value.activeTabId !== null && !isString(value.activeTabId))) {
+    throw new Error("Invalid remote browser display state.");
+  }
+  return { tabs: decodeBrowserTabs(value.tabs), activeTabId: value.activeTabId };
 }
 
 export function decodeBrowserPreviewFromHost(value: unknown): BrowserPreview {

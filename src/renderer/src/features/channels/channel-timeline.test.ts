@@ -2,6 +2,7 @@ import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import type { AgentProfile } from "../../data";
+import { mergeChannelPage } from "./channel-page-merge";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 
 const now = new Date(2026, 8, 9, 14, 0);
@@ -370,5 +371,55 @@ describe("isOwnChannelAuthor", () => {
     expect(isOwnChannelAuthor("local-user:user-1", host)).toBe(true);
     expect(isOwnChannelAuthor("member-2", host)).toBe(false);
     expect(isOwnChannelAuthor("local-user:user-2", host)).toBe(false);
+  });
+});
+
+function pageMessage(sequence: number): ChannelMessage {
+  return {
+    id: `m${sequence}`,
+    channelId: "channel-1",
+    sequence,
+    author: { kind: "member", id: "person", name: "You" },
+    taskId: null,
+    superseded: false,
+    message: {
+      id: `m${sequence}`,
+      author: "user",
+      text: `Message ${sequence}`,
+      createdAt: "2026-09-09T12:00:00.000Z",
+      status: "completed",
+      replyToMessageId: null,
+    },
+  };
+}
+
+describe("mergeChannelPage", () => {
+  it("keeps the loaded transcript when the fetched window continues it", () => {
+    const merged = mergeChannelPage([pageMessage(1), pageMessage(2)], [pageMessage(3), pageMessage(4)]);
+    expect(merged.messages.map((item) => item.sequence)).toEqual([1, 2, 3, 4]);
+    expect(merged.takeFetchedCursor).toBe(false);
+  });
+
+  it("keeps the loaded transcript when the fetched window overlaps it", () => {
+    const merged = mergeChannelPage(
+      [pageMessage(1), pageMessage(2), pageMessage(3)],
+      [pageMessage(2), pageMessage(3), pageMessage(4)],
+    );
+    expect(merged.messages.map((item) => item.sequence)).toEqual([1, 2, 3, 4]);
+    expect(merged.takeFetchedCursor).toBe(false);
+  });
+
+  it("drops the loaded transcript when messages arrived between the two blocks", () => {
+    // Sequences 3 to 9 are outside the fetched window and outside the loaded block. Keeping the
+    // loaded block would leave them unreachable, because its cursor starts below sequence 1.
+    const merged = mergeChannelPage([pageMessage(1), pageMessage(2)], [pageMessage(10), pageMessage(11)]);
+    expect(merged.messages.map((item) => item.sequence)).toEqual([10, 11]);
+    expect(merged.takeFetchedCursor).toBe(true);
+  });
+
+  it("takes the fetched window and its cursor when nothing is loaded below it", () => {
+    const merged = mergeChannelPage([], [pageMessage(1), pageMessage(2)]);
+    expect(merged.messages.map((item) => item.sequence)).toEqual([1, 2]);
+    expect(merged.takeFetchedCursor).toBe(true);
   });
 });

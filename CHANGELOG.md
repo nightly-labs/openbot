@@ -5,6 +5,136 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-20
+
+### Added
+
+- Start an MCP server on a computer that has no Node. OpenBot downloads Bun 1.4.2, a JavaScript
+  runtime it owns and checks, and starts a STDIO server with it. A computer with its own Node keeps
+  using that one: the managed runtime is the floor, not a replacement.
+- Say why an MCP server did not reach an agent. A command this computer does not have, and a
+  working directory the provider cannot carry, each raise one notice naming the server and the
+  reason, and the panel states the working-directory limit before the server is saved.
+- Answer a question an MCP server asks, on every provider. A server that needs a field gets one
+  question for each field it requests, with the typed value it asked for, a secret hidden as it is
+  entered, and a decline that names the field the server cannot do without.
+- Invite people with a permanent link, in the new **Perma link** tab of server settings. The link
+  is reusable and never expires, so it suits a channel or a document rather than one person. A host
+  keeps at most five, each one is revoked from the same tab, and a permanent link cannot be bound
+  to an email address. Single-use invitations are unchanged. A server that speaks an older Team API
+  does not offer the tab, because that protocol carries no permanent link.
+- Update OpenBot for every account on a shared Mac from one place, with the new Host package.
+  An administrator installs it, and the Mac then downloads a release once, waits until every
+  signed-in account is idle, installs it one time, and starts OpenBot again for each account. A
+  managed account shows the host's progress and never installs on its own. The package is signed
+  and notarized on its own, and it installs managed-host infrastructure only: the DMG is still the
+  application. The installer also creates Standard accounts for tenants.
+
+### Changed
+
+- **A server declared outside OpenBot no longer reaches a Claude or Codex agent. Add it in
+  Settings, MCP to keep it.** This covers `~/.claude/settings.json`, a project `.mcp.json`, a
+  plugin, agent frontmatter and `~/.codex/config.toml`. Nothing is deleted: the declaration stays
+  in its own file and OpenBot does not read it. A notice says this once. OpenCode and Grok document
+  no equivalent setting, so their agents can still start servers from their own files, which the
+  panel now states.
+- **Sign in again once after upgrading to reach Canva, Figma, Linear, Notion, Sentry or Stripe.**
+  The six listings now connect over HTTP and OpenBot holds the OAuth client itself: it opens the
+  browser, keeps the tokens in the operating system's secret storage, and adds the header when it
+  hands the server to a provider. No third-party bridge program is downloaded or started. A bridge
+  that already holds a token keeps it in its own folder, which OpenBot does not read, so the sign-in
+  does not carry over. Removing the server forgets its sign-in, and the tokens are redacted on every
+  log and export path like every other secret.
+- Replace a Codex thread that started before this release once, keeping its conversation and its
+  history, so the tools the agent has match the panel.
+- Re-read a provider's remaining usage while the figure is on screen, so a window that counts down
+  no longer reads minutes out of date. The dock, the account menu and the usage popover refresh a
+  reading that is five minutes old. Nothing is read while no view shows the figure, and a hidden
+  window reads again when it comes back.
+- Run two Remote Desktop sessions at the same time on a shared Mac. Each signed-in account gets its
+  own port range, so one session no longer takes the ports the other needs.
+
+## [0.14.1] - 2026-09-19
+
+### Changed
+
+- Sign in to Claude from the composer notice, which opens the OAuth window instead of the
+  authentication documentation. OpenCode, whose key is pasted in settings, no longer raises a
+  notice with a button that starts nothing.
+- Name the provider under each mark in the header model picker rail, with its state below the name.
+
+### Fixed
+
+- Ship the 0.14.0 work, which no build carried: that release stopped while it was being packaged,
+  on a test that allowed one second for the interface to answer on a machine that was building and
+  signing the application at the same time. Everything listed under 0.14.0, the fourteen-plugin
+  Marketplace catalog included, arrives here.
+
+## [0.14.0] - 2026-09-19
+
+### Added
+
+- Show a host's browser tab live to a remote member, with pointer and key input back to the page.
+- Connect an MCP server before it is installed: the install dialog tests the configuration, and
+  only a configuration that answers is saved.
+- Open a Marketplace plugin from an `openbot://plugins/<slug>` link on its own detail page.
+- Publish plugin pages on openbot.run from the shipped catalog: fourteen listings, each with its
+  own mark.
+- Give each agent one silhouette and a face that matches the work, in the sidebar and the activity
+  indicator.
+- List Marketplace plugins in the landing header on openbot.run.
+
+### Changed
+
+- Define when an agent's browser tabs close: no tab closes when a turn ends, the agent uses
+  close_tab when a task no longer needs the tab, and deleting an agent closes its tabs.
+- Show the download percent while a provider connects, with Cancel during the download and Retry
+  on failure.
+- Grow the plugin catalog to fourteen simple-auth listings: GitHub, Linear, Notion, Figma, Sentry,
+  Context7, Stripe, PostHog, Airtable, Firecrawl, Brave Search, Resend.
+- Name the shared tables "Tables" in agent settings.
+
+### Fixed
+
+- Let the embedded browser copy: pages can write to the clipboard on user gesture, and right-click
+  offers copy link, copy image address, cut, copy, paste, and select all with full link targets.
+- Align the Usage header icon with the provider logos.
+
+## [0.13.0] - 2026-09-18
+
+### Added
+
+- Install an app and its skills together from the new Marketplace **Plugins** tab. Each plugin adds
+  its MCP server record and the pinned skill versions its instructions need.
+- Let agents keep records in one shared database at `~/OpenBot/Shared/Data/agent-data.db`. An agent
+  creates, reads and writes its own tables, and the **Shared tables** view lists every table with its
+  owner and lets you delete any of them.
+- Let an agent tell a teammate something without asking for an answer. The message names that no
+  reply is due, so the teammate does not open a turn for it.
+- Let the agent complete provider authorization steps itself instead of stopping for the user.
+- Show the remaining usage for every connected provider, and show the Grok account email.
+
+### Changed
+
+- Handle an exhausted provider usage limit: the agent reports the limit and the time it resets
+  instead of failing the turn.
+- Open a browser takeover page from its preview card. A takeover request no longer expands the
+  browser over the conversation on its own.
+- Open an attached file in the right panel instead of a modal.
+- Group the agent chat message times, and correct the position of a message timestamp.
+- Use a custom agent avatar in the activity indicator.
+- Remove the **View source** toggle from a Markdown preview.
+
+### Fixed
+
+- Drop the placeholder answer that an agent sent for a teammate request.
+- Load an OpenCode ACP session before reading it at startup.
+- Remove the duplicated agent message previews.
+- Save an edited agent instruction again.
+- Keep a required input prompt visible.
+- Type into the focused page when the browser cannot target an element.
+- Keep the agent recipient menu text readable.
+
 ## [0.12.0] - 2026-09-17
 
 ### Added

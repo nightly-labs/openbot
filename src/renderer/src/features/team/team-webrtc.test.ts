@@ -1,7 +1,9 @@
+import { isString } from "@openbot/contracts/runtime-values";
 import type { SignalServerMessage } from "@openbot/contracts/signal-protocol/messages";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
-import { afterEach, expect, it, type Mock, vi } from "vitest";
+import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { BridgeCommand } from "./team-webrtc";
+import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
 
 // The previously untested boundary is the hidden renderer's actual MessagePort
 // routing: each authenticated Signal connection must own a separate RTC peer.
@@ -251,3 +253,39 @@ it("stops a peer that Signal sends a frame it cannot read", async () => {
   expect(posted("peer-disconnected")).toHaveLength(1);
   expect(signal.close).toHaveBeenCalled();
 });
+
+describe("Team WebRTC payload framing", () => {
+  it("fragments and restores text within the negotiated SCTP limit", () => {
+    const frames = encodeTeamWebRtcPayload("remote payload ".repeat(100), 128, 7);
+    const decoder = new TeamWebRtcPayloadDecoder();
+    let decoded: string | ArrayBuffer | undefined;
+    for (const frame of frames) {
+      expect(isString(frame) ? frame.length : frame.byteLength).toBeLessThanOrEqual(128);
+      decoded = decoder.push(frame);
+    }
+    expect(decoded).toBe("remote payload ".repeat(100));
+  });
+
+  it("frames binary payloads without changing their bytes", () => {
+    const input = new Uint8Array(400);
+    for (let index = 0; index < input.byteLength; index += 1) input[index] = index % 251;
+    const decoder = new TeamWebRtcPayloadDecoder();
+    let decoded: string | ArrayBuffer | undefined;
+    for (const frame of encodeTeamWebRtcPayload(input.buffer, 96, 8)) decoded = decoder.push(frame);
+    if (!(decoded instanceof ArrayBuffer)) throw new Error("Expected a binary WebRTC payload.");
+    expect(new Uint8Array(decoded)).toEqual(input);
+  });
+
+  it("rejects non-contiguous fragments", () => {
+    const frames = encodeTeamWebRtcPayload("x".repeat(300), 96, 9);
+    const decoder = new TeamWebRtcPayloadDecoder();
+    expect(decoder.push(requiredBinaryFrame(frames, 0))).toBeUndefined();
+    expect(() => decoder.push(requiredBinaryFrame(frames, 2))).toThrow("contiguous");
+  });
+});
+
+function requiredBinaryFrame(frames: Array<string | ArrayBuffer>, index: number): ArrayBuffer {
+  const frame = frames[index];
+  if (!(frame instanceof ArrayBuffer)) throw new Error("Expected a binary WebRTC frame.");
+  return frame;
+}

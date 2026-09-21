@@ -114,25 +114,18 @@ describe("ProviderPicker", () => {
     expect(downloading.view.getByRole("button", { name: "Cancel OpenCode" })).toBeTruthy();
   });
 
-  it("badges the OpenCode row with the free tier, and only while keyless", () => {
+  it("badges the tier and connection state without doubling them", () => {
     // A saved key leaves the runtime "Connected" to speak for the row: no second chip.
-    const saved = renderPicker([{ ...openCode, keyStatus: "saved" }]);
-    expect(saved.view.queryByText("Free")).toBeNull();
+    expect(renderPicker([{ ...openCode, keyStatus: "saved" }]).view.queryByText("Free")).toBeNull();
 
-    const missing = renderPicker([{ ...openCode, keyStatus: "missing" }]);
-    expect(missing.view.getByText("Free")).toBeTruthy();
-
-    // An unreadable key runs keyless, so it reads as free as well.
-    const unreadable = renderPicker([{ ...openCode, keyStatus: "unreadable" }]);
-    expect(unreadable.view.getByText("Free")).toBeTruthy();
+    // Keyless rows read as free, including when the key is unreadable.
+    expect(renderPicker([{ ...openCode, keyStatus: "missing" }]).view.getByText("Free")).toBeTruthy();
+    expect(renderPicker([{ ...openCode, keyStatus: "unreadable" }]).view.getByText("Free")).toBeTruthy();
 
     // Unknown until the first read: no badge rather than a wrong one, and never on another row.
-    const unknown = renderPicker([openCode, { ...claude, keyStatus: "saved" }]);
-    expect(unknown.view.queryByText("Free")).toBeNull();
-  });
+    expect(renderPicker([openCode, { ...claude, keyStatus: "saved" }]).view.queryByText("Free")).toBeNull();
 
-  it("prints Connected once on a signed-in OpenCode row, and keeps busy states reporting", () => {
-    // Steady and signed in: the runtime badge alone, no key chip beside it.
+    // Steady and signed in: the runtime badge alone, printed once.
     const steady = renderPicker([{ ...openCode, state: "available", runtimeStatus: runtime({}), keyStatus: "saved" }]);
     expect(steady.view.getAllByText("Connected")).toHaveLength(1);
 
@@ -143,15 +136,18 @@ describe("ProviderPicker", () => {
     expect(keyless.view.getByText("Free")).toBeTruthy();
     expect(keyless.view.getByText("Connected")).toBeTruthy();
 
-    // Busy states still report, with no tier chip beside them once signed in.
+    // Busy states still report, with no tier chip beside them once signed in. Main holds the
+    // provider "connecting" for the whole install, so the row reports the download, not the word.
     const downloading = renderPicker([
       {
         ...openCode,
+        connectionState: "connecting",
         runtimeStatus: runtime({ phase: "downloading", progress: 40, version: null }),
         keyStatus: "saved",
       },
     ]);
     expect(downloading.view.getByText("40%")).toBeTruthy();
     expect(downloading.view.queryByText("Free")).toBeNull();
+    expect(downloading.view.queryByText("Connecting")).toBeNull();
   });
 });

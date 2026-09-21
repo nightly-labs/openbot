@@ -12,6 +12,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
+import { recordRestartActivity } from "./restart-activity";
 import { collapseMissedOccurrences } from "./routine-schedule";
 import type { RoutineDueSource } from "./routine-timer";
 
@@ -102,6 +103,20 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
 
   list(channelId: string): ChannelRoutine[] {
     return this.#routines.list(this.#requireChannel(channelId));
+  }
+
+  /**
+   * Whether any channel routine run is executing right now. Scheduled future runs do not count:
+   * they resume from durable rows after a restart. See RoutineScheduler.hasActiveRuns for why the
+   * executing case is still worth naming.
+   */
+  hasActiveRuns(): boolean {
+    for (const channelId of this.#channels.store.ids()) {
+      for (const routine of this.#routines.list(channelId)) {
+        if (this.#routines.activeRuns(channelId, routine.id).length > 0) return true;
+      }
+    }
+    return false;
   }
 
   listRuns(input: ListChannelRoutineRunsInput): ChannelRoutineRun[] {
@@ -243,6 +258,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
   }
 
   async #issue(run: ChannelRoutineRun): Promise<ChannelRoutineRun> {
+    recordRestartActivity();
     if (!run.requestMessageId) throw new Error("The routine run has no request message.");
     try {
       await this.#channels.command(

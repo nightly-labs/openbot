@@ -205,3 +205,30 @@ export interface BrowserVisibilityInput {
   bounds?: BrowserBounds;
   target?: BrowserViewTarget;
 }
+
+/**
+ * A pointer or key event the user made over a live view of a remote tab.
+ *
+ * Coordinates are a fraction of the frame the user was looking at, not pixels. The renderer draws a
+ * frame at whatever size its panel is and the host's viewport is a third size again, so pixels would
+ * mean one side has to know the other's scale. This mirrors the Team protocol's own input shape
+ * rather than importing it: the wire may version, and the renderer's API must not move when it does.
+ */
+export type BrowserLiveViewInput =
+  | {
+      type: "pointer";
+      action: "move" | "down" | "up" | "wheel";
+      x: number;
+      y: number;
+      button: "left" | "middle" | "right";
+      clickCount?: number;
+      deltaX?: number;
+      deltaY?: number;
+      modifiers?: number;
+    }
+  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text?: string; modifiers?: number };
+
+/** What a live view sends the renderer. The image is the host's own JPEG, not a data URL. */
+export type BrowserLiveViewEvent =
+  | { type: "frame"; tabId: string; sequence: number; width: number; height: number; image: Uint8Array }
+  | { type: "stopped"; tabId: string; reason: string };

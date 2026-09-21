@@ -124,6 +124,51 @@ describe("McpServerStore", () => {
     store.remove(first.id);
     expect(store.list().map((config) => config.id)).toEqual([second.id]);
   });
+
+  // Rows installed from the old catalog ran the `mcp-remote` bridge. The marketplace reads a row
+  // as installed by name, so these users could never reach the native sign-in through the listing.
+  // The migration converts exactly those rows; anything the user changed stays as it is.
+  it("converts catalog bridge rows to native http and leaves edited rows alone", async () => {
+    const { store } = await setup();
+    const linear = store.save(
+      stdioConfig({
+        name: "linear",
+        command: "npx",
+        args: ["-y", "mcp-remote@latest", "https://mcp.linear.app/sse"],
+      }),
+    );
+    const edited = store.save(
+      stdioConfig({
+        name: "notion",
+        command: "npx",
+        args: ["-y", "mcp-remote@latest", "--debug", "https://mcp.notion.com/mcp"],
+      }),
+    );
+    const renamed = store.save(
+      stdioConfig({
+        name: "My Linear",
+        command: "npx",
+        args: ["-y", "mcp-remote@latest", "https://mcp.linear.app/sse"],
+      }),
+    );
+    store.setEnabled(linear.id, false);
+
+    expect(store.migrateCatalogBridgesToHttp()).toBe(1);
+    expect(store.migrateCatalogBridgesToHttp()).toBe(0);
+
+    const [kept] = store.list().filter((config) => config.id === linear.id);
+    expect(kept).toMatchObject({
+      id: linear.id,
+      name: "linear",
+      transport: "http",
+      enabled: false,
+      command: "",
+      args: [],
+      url: "https://mcp.linear.app/mcp",
+    });
+    expect(store.list().find((config) => config.id === edited.id)?.transport).toBe("stdio");
+    expect(store.list().find((config) => config.id === renamed.id)?.transport).toBe("stdio");
+  });
 });
 
 function stdioConfig(overrides: Partial<McpServerConfig> = {}): McpServerConfig {

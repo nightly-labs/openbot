@@ -68,6 +68,16 @@ describe("presentUpdateStatus", () => {
     expect(presentUpdateStatus(status({ phase: "unsupported" })).supported).toBe(false);
   });
 
+  it("names host management instead of an action on a managed host", () => {
+    for (const phase of ["available", "ready"] as const) {
+      const presentation = presentUpdateStatus(status({ phase, managedByHost: true }));
+      expect(presentation.managed).toBe(true);
+      expect(presentation.actionLabel).toBe("Managed by host");
+      expect(presentation.available).toBe(true);
+    }
+    expect(presentUpdateStatus(status({ phase: "ready" })).managed).toBe(false);
+  });
+
   it("shows download progress and otherwise the relevant version", () => {
     expect(presentUpdateStatus(status({ phase: "downloading", progress: 42.4 })).detail).toBe("42%");
     expect(presentUpdateStatus(status({ phase: "available", availableVersion: "0.4.3" })).detail).toBe("v0.4.3");

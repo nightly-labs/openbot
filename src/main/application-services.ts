@@ -37,7 +37,7 @@ import type {
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
@@ -45,6 +45,7 @@ import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { MailboxStore } from "../backend/mailbox-store";
+import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { TeamChatStore } from "../backend/team-chat-store";
 import { AgentInitializationGate } from "./agent-initialization";
@@ -52,10 +53,12 @@ import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { HostAnalytics } from "./analytics";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
+import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
 import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
 import { CustomProviderStore } from "./custom-provider-store";
+import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
 import {
   applyDevelopmentRemoteAccount,
   type DevelopmentRemoteRole,
@@ -64,6 +67,7 @@ import {
 import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
+import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -75,6 +79,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
+import { McpOAuthStore } from "./mcp-oauth-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
@@ -95,6 +100,7 @@ import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { readUpdatePreference } from "./update-preference-store";
+import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
   createDisabledUpdateAdapter,
   isValidSemver,
@@ -102,6 +108,7 @@ import {
   type UpdateAdapter,
   UpdateService,
 } from "./update-service";
+import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 
@@ -122,6 +129,8 @@ const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
+/** The MCP sign-ins. Separate from the keys above: a key is typed by the user, a token is not. */
+const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
@@ -129,9 +138,11 @@ const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
  */
 const TEARDOWN_ORDER = {
   updater: 10,
+  hostUpdateCoordinator: 12,
   dynamicIsland: 20,
   browser: 30,
   browserPictureInPicture: 40,
+  browserView: 45,
   providerRuntimes: 50,
   remoteServers: 60,
   voice: 70,
@@ -167,10 +178,16 @@ export interface ApplicationServices {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
+  /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
+  mcpOAuth: McpOAuth;
   mailbox: MailboxStore;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
+  browserView: BrowserViewClient;
   updater: UpdateService;
+  /** Point-in-time restart safety for host-managed updates. Nothing holds the instance when empty. */
+  describeRestartReadiness: () => RestartReadiness;
+  hostUpdateCoordinator: HostUpdateCoordinator;
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
@@ -396,8 +413,14 @@ export async function createApplicationServices({
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
     }),
     downloadRoot: join(app.getPath("userData"), "provider-runtimes", ".downloads"),
-    updateRuntime: async (provider, install) => {
-      await service.updateProviderCli(provider, install);
+    updateRuntime: async (runtime, install) => {
+      // A tool runtime has no client to swap: the MCP servers are started per thread and read the
+      // managed path at the next spawn, so installing it is the whole of the update.
+      if (isManagedToolRuntime(runtime)) {
+        await install();
+        return;
+      }
+      await service.updateProviderCli(runtime, install);
     },
   });
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
@@ -436,6 +459,29 @@ export async function createApplicationServices({
   if (credentialLoadError) {
     logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
   }
+  /*
+   * The MCP sign-ins, in their own file with the same cipher. `mcp-remote` used to keep these where
+   * OpenBot could not redact them; here they are covered by the same rule as every other secret.
+   *
+   * Unreadable is not fatal, for the same reason as the keys above: every signed-in server asks for
+   * a sign-in again, and nothing else on this machine stops working.
+   */
+  const mcpOAuthStore = new McpOAuthStore(join(app.getPath("userData"), MCP_OAUTH_FILE), {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value) => safeStorage.decryptString(value),
+  });
+  const mcpOAuthLoadError = await mcpOAuthStore.load();
+  if (mcpOAuthLoadError) {
+    logger.warn(`OpenBot could not read the MCP sign-in file (${mcpOAuthLoadError.name}). It was left unchanged.`);
+  }
+  const mcpOAuth = new McpOAuth({
+    storage: mcpOAuthStore,
+    openExternal: (url) => shell.openExternal(url),
+    redirectUrl: MCP_OAUTH_REDIRECT_URL,
+  });
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
@@ -466,11 +512,27 @@ export async function createApplicationServices({
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
       // into the object being constructed; nothing calls it before the constructor returns.
       mcpServers: () => service.enabledMcpServers(),
+      // The floor under those servers: the `bin` of every managed tool runtime, appended after the
+      // user's own `PATH`, so a machine with no Node can still start `npx some-server` and a machine
+      // that has one keeps the build it installed.
+      mcpToolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+      // The bearer token for an http server, minted here and spent by the provider process. The
+      // service asks for one at each hand-off; only a test the user pressed may open a browser.
+      mcpOAuth,
     },
     localSkillTools: () => localSkillTools(skills),
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  /*
+   * Where the decision put the download: onboarding, which is the screen this start is about to
+   * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for
+   * one here too, but only when this machine already has an MCP server to start.
+   *
+   * Nothing waits for it and nothing reports it. MCP is optional, so a failed download must not
+   * reach onboarding; a server that cannot start is reported at hand-off like any other.
+   */
+  if (!setupState.completed || service.enabledMcpServers().length > 0) providerRuntimes.ensureToolRuntimes();
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   await sidebarLayout.reconcileAgents(service.sidebarChatIds());
@@ -492,6 +554,13 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
+  // A tool runtime that becomes ready changes what the MCP servers resolve to, for every
+  // provider: sessions that dropped their stdio servers before it finished downloading are
+  // marked for refresh, and the deferred mechanism spends the mark before each agent's next
+  // turn. Provider CLI updates change no MCP resolution, so only tool runtimes refresh.
+  providerRuntimes.on("ready", (runtime) => {
+    if (isManagedToolRuntime(runtime)) service.refreshAllAgentRuntimes();
+  });
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),
@@ -536,6 +605,13 @@ export async function createApplicationServices({
     channels: service.channels,
     // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
     mcpServers: service,
+    // The host's Team API routes share the IPC handlers' runtime preparation: a first server
+    // saved, enabled, or tested remotely must start and await the managed download like a local one.
+    mcpToolRuntimePreparation: {
+      startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
+      ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
+      toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+    },
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),
@@ -686,6 +762,16 @@ export async function createApplicationServices({
   }
   configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
   configureServerLogoProtocols({ teamStore, remoteServers });
+  // After the servers: the view it opens belongs to one of them, and it has to stop before they do.
+  const browserView = new BrowserViewClient({
+    servers: remoteServers,
+    onEvent: (event) => {
+      const window = windows.getMainWindow();
+      if (!window || window.isDestroyed()) return;
+      sendToRenderer(window, IPC_CHANNELS.browserLiveViewEvent, event);
+    },
+  });
+  teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => browserView.stop());
   const remoteDesktop = new RemoteDesktopManager(remoteServers);
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => remoteDesktop.stop());
   const voice = new VoiceTranscriptionService({
@@ -730,6 +816,18 @@ export async function createApplicationServices({
     enabled: updaterEnabled,
     autoDownload: updatePreference.autoDownload,
     beforeInstall: prepareForUpdateInstall,
+    // Packaged runs share one application bundle across macOS users. Installing while another
+    // login session runs OpenBot from that bundle would replace it underneath that session, so
+    // the service refuses the install until every sibling session stopped. Unpackaged runs never
+    // enable updates, so there is nothing to guard there.
+    checkSiblingInstances: app.isPackaged
+      ? () =>
+          listSiblingOpenBotInstances({
+            executablePath: app.getPath("exe"),
+            currentPid: process.pid,
+            platform: process.platform,
+          })
+      : undefined,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
     // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
@@ -737,20 +835,57 @@ export async function createApplicationServices({
       process.platform === "darwin" ? join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt") : undefined,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => updater.stop());
+  const agentInitialization = new AgentInitializationGate(() => service.initialize());
+  const describeRestartReadiness = (): RestartReadiness =>
+    checkRestartReadiness({
+      agentWork: service.hasActiveWork(),
+      hostBlockers: host.describeRestartBlockers(),
+      activeBrowserControls: browser.getControlState().sessions.length,
+      activeFileTransfers: remoteServers.hasActiveTransfers(),
+      updaterBusy: !updater.getStatus().managedByHost && isUpdateBusyPhase(updater.getStatus().phase),
+      initializationPending: !agentInitialization.succeeded,
+    });
+  const hostUpdateCoordinator = new HostUpdateCoordinator({
+    uid: typeof process.getuid === "function" ? process.getuid() : 0,
+    pid: process.pid,
+    currentVersion,
+    describeReadiness: describeRestartReadiness,
+    setManagedByHost: (managed) => updater.setManagedByHost(managed),
+    setHostState: (state) => updater.setHostState(state),
+    onDiagnostic: (message) => logger.warn(message),
+    checkHealth: async () => {
+      if (!agentInitialization.succeeded) return { ok: false, checks: ["initialization-not-ready"] };
+      try {
+        service.listAgents();
+      } catch {
+        return { ok: false, checks: ["agent-list-failed"] };
+      }
+      return { ok: true, checks: ["initialization-succeeded", "agent-list"] };
+    },
+  });
+  await hostUpdateCoordinator.tick();
+  hostUpdateCoordinator.start();
+  teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
+    hostUpdateCoordinator.stop(),
+  );
 
   return {
     service,
     providerRuntimes,
     providerCredentials,
+    mcpOAuth,
     mailbox,
     browser,
     browserPictureInPicture,
+    browserView,
     updater,
     setupFile,
     analyticsPreferenceFile,
     updatePreferenceFile,
     language,
-    agentInitialization: new AgentInitializationGate(() => service.initialize()),
+    agentInitialization,
+    hostUpdateCoordinator,
+    describeRestartReadiness,
     sidebarLayout,
     host,
     remoteDesktop,

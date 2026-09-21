@@ -1,4 +1,4 @@
-import { type AgentEvent, isAgentEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import { type AgentEvent, type BrowserTab, isAgentEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -6,6 +6,7 @@ import {
   createFakeClaude,
   createTestService,
   FakeAgentClient,
+  fakeBrowser,
   firstInputText,
   nextRoutinesChanged,
   notification,
@@ -16,6 +17,15 @@ import {
   waitFor,
 } from "./agent-service-test-harness";
 import { getString } from "./protocol";
+
+const browserTab = (id: string, ownerAgentId: string | null, ownerThreadId: string | null): BrowserTab => ({
+  id,
+  title: id,
+  url: `https://example.com/${id}`,
+  loading: false,
+  ownerThreadId,
+  ownerAgentId,
+});
 
 let root: string;
 let logPath: string;
@@ -711,5 +721,49 @@ describe.sequential("AgentService: restart", () => {
     await service.initialize();
 
     expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toHaveLength(1);
+  });
+  it("closes a deleted agent's browser tabs and leaves another agent's tabs open", async () => {
+    const { store, mailbox } = stores(root);
+    const tabs: BrowserTab[] = [];
+    const closed: string[] = [];
+    const browser = fakeBrowser(tabs);
+    browser.close = async (tabId: string) => {
+      closed.push(tabId);
+    };
+    service = createTestService({ store, mailbox, browser });
+    await service.initialize();
+    const deleted = await store.getOrCreate("tab-owner");
+    const kept = await store.getOrCreate("tab-keeper");
+    // A fresh agent holds no thread until its first turn, and the legacy owner rule matches on the
+    // thread id, so give both agents one.
+    const deletedThreadId = store.ensureThreadIdNow(deleted.id);
+    const keptThreadId = store.ensureThreadIdNow(kept.id);
+    tabs.push(
+      browserTab("tab-owned", deleted.id, deletedThreadId),
+      // A tab from a build that stored only the thread id. The renderer still groups it under this
+      // agent, so deleting the agent has to take it too.
+      browserTab("tab-legacy", null, deletedThreadId),
+      browserTab("tab-other", kept.id, keptThreadId),
+    );
+
+    await service.deleteAgent(deleted.id);
+
+    expect(closed).toEqual(["tab-owned", "tab-legacy"]);
+  });
+
+  it("still deletes the agent when closing one of its browser tabs fails", async () => {
+    const { store, mailbox } = stores(root);
+    const tabs: BrowserTab[] = [];
+    const browser = fakeBrowser(tabs);
+    browser.close = async () => {
+      throw new Error("could not close");
+    };
+    service = createTestService({ store, mailbox, browser });
+    await service.initialize();
+    const agent = await store.getOrCreate("tab-close-failure");
+    tabs.push(browserTab("tab-stuck", agent.id, store.ensureThreadIdNow(agent.id)));
+
+    await expect(service.deleteAgent(agent.id)).resolves.toBeUndefined();
+    expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(false);
   });
 });

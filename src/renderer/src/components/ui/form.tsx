@@ -17,11 +17,7 @@ export interface FieldContextValue {
   required?: boolean;
 }
 
-/**
- * Exported so a surface that draws its own field frame can still hand its control an id. `Input`,
- * `Textarea` and `NativeSelect` read it, which is what lets a label point at a control it wraps
- * rather than one it names.
- */
+/** Lets a custom field frame hand its control an id for label association. */
 export const FieldContext = createContext<FieldContextValue | null>(null);
 
 interface TextControlOptions extends ControlOptions {

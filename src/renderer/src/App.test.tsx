@@ -237,16 +237,9 @@ describe("OpenBot connected desktop shell", () => {
     });
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
       {
-        id: "remote-1",
-        name: "Studio Mac",
-        logoUrl: null,
-        notificationsMuted: false,
-        kind: "remote",
-        state: "online",
-        apiUrl: "https://studio.example.com",
+        ...testServer("remote-1", true),
         remoteDesktopAvailable: true,
         role: "owner",
-        active: true,
         compatibility: {
           localAppVersion: "1.0.0",
           hostAppVersion: "1.0.0",
@@ -1001,11 +994,27 @@ describe("OpenBot connected desktop shell", () => {
     };
   }
 
-  it("offers a provider sign-in above the composer before the user sends", async () => {
+  /**
+   * An agent on `provider`, with that provider reporting a signed-out CLI. Every composer sign-in
+   * case starts here and differs only in what it expects the notice to offer.
+   */
+  async function renderSignedOutProvider(provider: "codex" | "claude" | "opencode", model: string): Promise<void> {
+    if (provider !== "codex") {
+      vi.mocked(window.openbot.agent.listAgents).mockResolvedValueOnce([{ ...AGENTS[0], provider, model }]);
+    }
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({
+      type: "status",
+      status: {
+        ...signedOutCodexStatus(),
+        providers: [{ id: provider, state: "sign-in-required" as const, version: "1.0.0", message: null }],
+      },
+    });
+  }
 
-    emitAgentEvent?.({ type: "status", status: signedOutCodexStatus() });
+  it("offers a provider sign-in above the composer before the user sends", async () => {
+    await renderSignedOutProvider("codex", "gpt-5");
 
     const signIn = await screen.findByRole("button", { name: "Sign in to ChatGPT" });
     expect(screen.getByText("Sign in to ChatGPT to send messages.")).toBeVisible();
@@ -1014,6 +1023,27 @@ describe("OpenBot connected desktop shell", () => {
 
     await fireEvent.click(signIn);
     await waitFor(() => expect(window.openbot.connectProvider).toHaveBeenCalledWith("codex"));
+  });
+
+  it("starts the Claude login from the composer notice rather than opening a page", async () => {
+    await renderSignedOutProvider("claude", "claude-sonnet-5");
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Sign in to Claude" }));
+
+    // Claude signs in through its own CLI login, so the button connects the provider. It used to
+    // open the authentication docs, which left the user to finish the sign-in themselves.
+    await waitFor(() => expect(window.openbot.connectProvider).toHaveBeenCalledWith("claude"));
+    expect(window.openbot.openExternal).not.toHaveBeenCalled();
+  });
+
+  it("offers no composer sign-in for OpenCode, whose key is pasted in settings", async () => {
+    await renderSignedOutProvider("opencode", "opencode/big-pickle");
+
+    // The notice would carry a button that starts nothing: OpenCode has no login to open, only a
+    // key to paste in settings. The composer still takes the draft.
+    expect(await screen.findByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in to OpenCode" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Sign in required")).not.toBeInTheDocument();
   });
 
   it("states a spent plan window above the composer, and drops it when the window ends", async () => {

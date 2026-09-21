@@ -11,6 +11,18 @@ import { decodeHostAnalytics } from "../ipc-host-analytics";
 import { isBoolean, isDynamicRecord, isString } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
 import {
+  decodeBrowserDisplayResponse,
+  decodeBrowserLoadRequest,
+  isBrowserDisplayRoute,
+  isBrowserLoadRoute,
+} from "./browser-navigation-v1";
+import {
+  decodeBrowserViewSessionRequest,
+  decodeBrowserViewSessionResponse,
+  isBrowserViewSessionRoute,
+  isBrowserViewSessionsRoute,
+} from "./browser-view-v1";
+import {
   isAgentAnalyticsRoute,
   isAgentCreateRoute,
   isAgentProfileRoute,
@@ -114,6 +126,8 @@ export function encodeTeamProtocolV4CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): string {
+  if (isBrowserLoadRoute(method, path)) return JSON.stringify(decodeBrowserLoadRequest(value));
+  if (isBrowserViewSessionsRoute(method, path)) return JSON.stringify(decodeBrowserViewSessionRequest(value));
   if (isQueueEditRoute(method, path)) return JSON.stringify(decodeQueueEditRequest(value));
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path))
     return JSON.stringify(decodeScopedUsageRequest(value));
@@ -146,6 +160,8 @@ export function decodeTeamProtocolV4CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): TeamProtocolV4BaseJsonObject {
+  if (isBrowserLoadRoute(method, path)) return { ...decodeBrowserLoadRequest(value) };
+  if (isBrowserViewSessionsRoute(method, path)) return { ...decodeBrowserViewSessionRequest(value) };
   if (isQueueEditRoute(method, path)) return { ...decodeQueueEditRequest(value) };
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) return decodeScopedUsageRequest(value);
   if (isAgentProfileRoute(method, path))
@@ -188,6 +204,14 @@ export function encodeTeamProtocolV4CurrentHttpResponse(
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.stringify(decodeAnalyticsV1Response(decodeAgentAnalytics(value)));
   if (isAgentProfileRoute(method, path) && status < 400) return JSON.stringify(encodeProfileResponse(path, value));
+  if (isBrowserLoadRoute(method, path) && status < 400) return "{}";
+  if (isBrowserViewSessionRoute(method, path) && status < 400) return "{}";
+  if (isBrowserViewSessionsRoute(method, path) && status < 400)
+    return JSON.stringify(decodeBrowserViewSessionResponse(value));
+  // The tabs keep the released projection, and that projection names `ownerBotId`, so the swap the
+  // base adapter does by path has to happen here too.
+  if (isBrowserDisplayRoute(method, path) && status < 400)
+    return JSON.stringify(decodeBrowserDisplayResponse(toWireAgentKeys(JSON.parse(JSON.stringify(value ?? null)))));
   if (isQueueEditRoute(method, path) && status === 204) return "{}";
   if (isQueueEditRoute(method, path))
     return encodeQueueSnapshot(
@@ -230,6 +254,11 @@ export function decodeTeamProtocolV4CurrentHttpResponse(
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.parse(JSON.stringify(decodeAgentAnalytics(decodeAnalyticsV1Response(value))));
   if (isAgentProfileRoute(method, path) && status < 400) return decodeProfileResponse(path, value);
+  if (isBrowserLoadRoute(method, path) && status < 400) return {};
+  if (isBrowserViewSessionRoute(method, path) && status < 400) return {};
+  if (isBrowserViewSessionsRoute(method, path) && status < 400) return { ...decodeBrowserViewSessionResponse(value) };
+  if (isBrowserDisplayRoute(method, path) && status < 400)
+    return toCurrentAgentKeys(structuredClone(decodeBrowserDisplayResponse(value)));
   if (isQueueEditRoute(method, path) && status === 204) return {};
   if (isQueueEditRoute(method, path))
     return withQueueEditing(

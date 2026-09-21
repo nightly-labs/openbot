@@ -1,6 +1,23 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@solidjs/testing-library";
+import { cleanup, configure } from "@solidjs/testing-library";
 import { afterEach } from "vitest";
+
+/**
+ * How long a `findBy*` or `waitFor` polls before failing with the query that never matched.
+ *
+ * Testing Library's own default is 1000 ms, which says how long a browser takes to paint, not how
+ * long a loaded runner takes to get back to a test. The release job builds and signs on the machine
+ * that runs these tests, and a renderer test that finishes in 4 s locally lost that one-second race
+ * there and stopped the release of v0.14.0. What a test waits for is unchanged - it waits for the
+ * element, never for elapsed time; only the point at which waiting is called hopeless moves, to the
+ * deadline `src/backend/test-deadlines.ts` already gives a backend wait. It is written here rather
+ * than imported, because the renderer reaches nothing in `src/backend`, and the vitest per-test
+ * budget there stays twice this, so a slow test still fails with the query rather than with
+ * vitest's generic "test timed out".
+ */
+const DOM_WAIT_TIMEOUT_MS = 10_000;
+
+configure({ asyncUtilTimeout: DOM_WAIT_TIMEOUT_MS });
 
 export class TestResizeObserver implements ResizeObserver {
   /**

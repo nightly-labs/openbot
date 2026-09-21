@@ -52,6 +52,8 @@ import type {
   BrowserBounds,
   BrowserControlState,
   BrowserDisplayState,
+  BrowserLiveViewEvent,
+  BrowserLiveViewInput,
   BrowserNavigateInput,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
@@ -306,6 +308,11 @@ export interface BrowserDesktopApi {
   getControlState: () => Promise<BrowserControlState>;
   capturePreview: (tabId: string) => Promise<BrowserPreview>;
   setVisible: (input: BrowserVisibilityInput) => Promise<void>;
+  /** Starts a live view of a tab on the active remote server. A local tab is already on screen. */
+  startLiveView: (tabId: string) => Promise<void>;
+  stopLiveView: () => Promise<void>;
+  sendLiveViewInput: (input: BrowserLiveViewInput) => Promise<void>;
+  onLiveViewEvent: (listener: (event: BrowserLiveViewEvent) => void) => () => void;
   onDisplayState: (listener: (state: BrowserDisplayState) => void) => () => void;
   openPictureInPicture: (bounds?: BrowserBounds) => Promise<BrowserBounds>;
   closePictureInPicture: () => Promise<void>;
@@ -399,6 +406,15 @@ export interface ServersDesktopApi {
   onDirectTyping: (listener: (event: DirectTypingRealtimeEvent) => void) => () => void;
   onEvent: (listener: (servers: ServerSummary[]) => void) => () => void;
   onInvite: (listener: (inviteUrl: string) => void) => () => void;
+}
+
+/**
+ * The plugin deep link. Both carry a slug, never a listing: the catalog is already in the renderer,
+ * and a link that carried the listing itself would let the address bar describe what gets installed.
+ */
+export interface PluginsDesktopApi {
+  takePendingListing: () => Promise<string | null>;
+  onOpenListing: (listener: (slug: string) => void) => () => void;
 }
 
 export interface HostDesktopApi {
@@ -528,6 +544,7 @@ export interface OpenBotDesktopApi {
   update: UpdateDesktopApi;
   maintenance: MaintenanceDesktopApi;
   servers: ServersDesktopApi;
+  plugins: PluginsDesktopApi;
   host: HostDesktopApi;
   remoteDesktop: RemoteDesktopDesktopApi;
 }

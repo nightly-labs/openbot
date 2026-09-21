@@ -41,7 +41,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     downloadProviderRuntime,
     cancelProviderRuntimeDownload,
     connectProvider,
-    openProviderSignInGuide,
   } = useProviders();
   // Not gated on the server: the picker needs these IDs to label a model it is already showing, and
   // a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
@@ -126,7 +125,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
-      onSignInProvider={activeServer()?.kind === "local" ? openProviderSignInGuide : undefined}
+      onSignInProvider={activeServer()?.kind === "local" ? connectProvider : undefined}
       agent={activeAgent()}
       agents={agentList()}
       availableRoutineIds={activeRoutineIds()}
@@ -165,6 +164,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       activeTurnId={activeAgent() ? activeTurns()[activeAgent()?.id ?? ""] : null}
       activityDetail={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.detail : undefined}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}
+      mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
       globalOverlayOpen={
         globalSearchOpen() ||
         joinServerOpen() ||

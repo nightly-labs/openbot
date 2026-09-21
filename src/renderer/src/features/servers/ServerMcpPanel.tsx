@@ -36,16 +36,14 @@ import {
   mcpConfigDraft,
   mcpConfigErrors,
   mcpConfigIsValid,
+  mcpProviderLimitNote,
   mcpStatusLabel,
   mcpStatusVariant,
   mcpTestMessage,
   normalizeMcpConfig,
 } from "./mcp-servers";
 
-/**
- * The state of the form's save bar. The dialog reads it inside its own footer, so every read tracks
- * the panel's store and the bar stays current without the panel reporting the form again.
- */
+/** Save-bar state, read live by the dialog footer. */
 export interface McpPanelSaveBar {
   message: string;
   /** True when `message` reports a failed save rather than the state of the draft. */
@@ -55,7 +53,7 @@ export interface McpPanelSaveBar {
   saveDisabled: boolean;
 }
 
-/** What the form view is, so the dialog header can name it and the dialog footer can hold its save bar. */
+/** Form view descriptor for the dialog header/footer. */
 export interface McpPanelDetail {
   title: string;
   back: () => void;
@@ -72,27 +70,26 @@ export interface ServerMcpPanelProps {
   menuMount?: HTMLElement;
   /** Reports the form view, so the header shows a breadcrumb instead of the panel holding a back row. */
   onDetailChange?: (detail: McpPanelDetail | null) => void;
-  /**
-   * Why the list is empty, when the read failed rather than found nothing. The panel must not
-   * answer a failed read with "No MCP servers yet.": that sentence says the server holds none.
-   */
+  /** Empty-list reason when the read failed; a failed read must not say "No MCP servers yet." */
   loadError?: string | null;
-  /** Reads the list again. Without it the error has no way out except closing the dialog. */
+  /**
+   * One sentence about the managed runtime a STDIO server is started with, or nothing.
+   *
+   * Not a health claim about any server, and not stored: it is what the download on this computer
+   * is doing right now, and the panel only repeats it. The caller leaves it out for a remote
+   * server, whose host holds its own runtime.
+   */
+  toolRuntimeNote?: string | null;
+  /** Re-read the list; without it the error has no way out except closing the dialog. */
   onRetryLoad?: () => void;
   onSave: (config: McpServerConfig) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onSetEnabled: (id: string, enabled: boolean) => Promise<void>;
-  /**
-   * Connects once with the configuration given and answers what it found. The configuration is
-   * passed whole, not by id, so the form can test a draft that was never saved.
-   */
+  /** Test an unsaved draft config. */
   onTest: (config: McpServerConfig) => Promise<McpTestResult>;
 }
 
-/**
- * One record rather than a signal each: opening the form writes `view`, `editingId`, `draft` and
- * `touched` together, and going back rewrites the same four, so they are one concern.
- */
+/** One record for form view/edit/draft/touched, which change together. */
 interface McpPanelState {
   view: "list" | "form";
   /** `null` in the form view means the user is connecting a new server. */
@@ -107,22 +104,13 @@ interface McpPanelState {
   busy: string | null;
   error: string;
   /**
-   * What each row's test found, keyed by MCP server id. A row with no entry was never tested.
-   *
-   * Each answer carries the configuration it was measured for, because a saved edit and a test race
-   * each other both ways: a row edited after a passing test would otherwise keep reporting the
-   * endpoint it no longer holds, and a test sent before the edit answers after it.
+   * Row test answers keyed by server id. Each carries the config it was measured for: edits and
+   * tests race both ways, so a stale pass must not describe the edited endpoint.
    */
   tests: Record<string, { test: McpTestState; config: McpServerConfig }>;
   /** The form's own test, which answers for the draft on screen and not for any stored row. */
   formTest: McpTestState | null;
-  /**
-   * The configuration that test was run with.
-   *
-   * A test is a question about one set of settings, and the user can edit a field while it is
-   * answered. Kept beside the answer so the panel can tell whether the answer still describes what
-   * the form shows, rather than reporting a working connection for settings nobody tried.
-   */
+  /** The config the form test ran with; a test only describes the settings it measured. */
   formTestConfig: McpServerConfig | null;
 }
 
@@ -148,22 +136,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   let draftTestRun = 0;
 
   const errors = createMemo(() => mcpConfigErrors(state.draft));
-  /**
-   * The form's test result while it still describes the form.
-   *
-   * An edit to any field answers the question again, so a result measured before it says nothing
-   * about what is on screen now. Compared rather than cleared on each keystroke: typing a value
-   * back as it was leaves the answer that was measured for it true.
-   */
+  /** Form test result while it still describes the form; typing a value back restores it. */
   const formTest = createMemo(() =>
     state.formTestConfig && !mcpConfigChanged(state.draft, state.formTestConfig) ? state.formTest : null,
   );
-  /**
-   * A row's test result while it still describes what that row holds, on the same rule as `formTest`.
-   *
-   * The switch is left out of the comparison: it decides which agents are given the server, not what
-   * the connection is, and a test answers even for a server that is turned off.
-   */
+  /** Row test result while it still describes the row; the enabled switch is not compared. */
   const rowTest = (config: McpServerConfig): McpTestState | undefined => {
     const entry = state.tests[config.id];
     if (!entry || mcpConfigChanged({ ...config, enabled: entry.config.enabled }, entry.config)) return undefined;
@@ -198,10 +175,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     }
   }
 
-  /**
-   * A test takes no `busy` latch: it is a question about one server, it can take as long as the
-   * deadline allows, and a slow server must not stop the user from saving or removing another.
-   */
+  /** Tests run without the busy latch so a slow server never blocks saving another. */
   async function runTest(config: McpServerConfig): Promise<McpTestState> {
     try {
       const result = await props.onTest(config);
@@ -247,7 +221,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.view = "form";
       current.editingId = config?.id ?? null;
       current.draft = draft;
-      // A copy, not the same object: the form edits `draft` in place, and the baseline has to hold still.
+      // Copy, not alias: the form edits `draft` in place while the baseline holds still.
       current.baseline = mcpConfigDraft(draft);
       current.touched = false;
       current.error = "";
@@ -255,7 +229,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       current.formTestConfig = null;
     });
     draftTestRun += 1;
-    // Read from the argument, not the store: a store write is not visible to a read in the same tick.
+    // Store writes are not visible to reads in the same tick: read from the argument.
     props.onDetailChange?.({
       title: config ? EDIT_TITLE : CONNECT_TITLE,
       back: backToList,
@@ -323,7 +297,14 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       <SettingsSection
         class="server-mcp-section"
         title="MCP servers"
-        description="Model Context Protocol servers give this server’s agents extra tools."
+        /*
+         * The second sentence is the panel telling the truth about its own reach. Claude is
+         * started with `strictMcpConfig` and Codex is started with the names in its own file
+         * turned off, so for those two this list is the whole set. OpenCode and Grok document
+         * no such flag, and guessing a key name would fail silently at the next turn, so the
+         * limit is stated rather than hidden.
+         */
+        description="Model Context Protocol servers give this server’s agents extra tools. Claude and Codex agents get only the servers in this list; OpenCode and Grok agents can also start servers from their own configuration files."
         actions={
           <Show when={props.servers.length > 0}>
             <Button type="button" size="sm" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
@@ -337,6 +318,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           <Text class="server-mcp-error" variant="caption" tone="danger" role="alert">
             {state.error}
           </Text>
+        </Show>
+        <Show when={props.toolRuntimeNote}>
+          {(note) => (
+            <Text class="server-mcp-runtime-note" variant="caption" tone="muted">
+              {note()}
+            </Text>
+          )}
         </Show>
         <Show
           when={props.servers.length > 0}
@@ -390,6 +378,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       </div>
                       <Show when={test()?.status === "failed" && test()}>
                         {(failed) => <ItemDescription>{mcpTestMessage(failed())}</ItemDescription>}
+                      </Show>
+                      {/* Only when no failure is shown: a test the user just ran answers about this
+                          server now, and the standing limit must not push it out of the slot. */}
+                      <Show when={test()?.status !== "failed" && mcpProviderLimitNote(config())}>
+                        {(note) => <ItemDescription>{note()}</ItemDescription>}
                       </Show>
                     </ItemContent>
                     <ItemActions>
@@ -635,12 +628,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               </McpRowList>
 
               {/* The limit is named here, before the save, because it cannot be fixed afterwards:
-                  the ACP protocol carries no working directory and the Codex configuration shape
-                  for one is unconfirmed, so only Claude and the test can honour this field. The
-                  other providers skip such a server rather than start it somewhere else. */}
+                  the ACP schema carries no working directory, and no key for one survived testing
+                  against the pinned Codex app-server, so only Claude and the test honour this
+                  field. The other providers skip such a server rather than start it somewhere
+                  else, and say so: the row keeps the note, and the hand-off reports the skip. */}
               <Field
                 label="Working directory"
-                description="Claude agents and the connection test start the server here. Leave it empty to give this server to every provider: the other providers cannot set a directory, so they skip a server that names one."
+                description="Claude agents and the connection test start the server here. Leave it empty to give this server to every provider: no other provider can set a directory, so it skips a server that names one."
               >
                 <Input
                   size="md"
@@ -661,7 +655,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             <SettingsSection
               class="server-mcp-section"
               title="Endpoint"
-              description="Codex agents cannot use an HTTP MCP server. Every other provider can."
+              description="Every provider can use an HTTP MCP server."
             >
               <Field label="Server URL" error={visible("url")}>
                 <Input

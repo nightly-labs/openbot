@@ -28,6 +28,7 @@
 @import "./features/servers/server-settings-modal.css";
 @import "./features/servers/server-mcp.css";
 @import "./features/settings/skills-marketplace.css";
+@import "./features/settings/mcp-connect-dialog.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "./features/custom-providers/custom-providers.css";
 @import "./styles/reference-chip.css";

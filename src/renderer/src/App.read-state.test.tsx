@@ -12,6 +12,7 @@ import { App } from "./App";
 import { AppAccessGate } from "./AppView";
 import { AppProviders } from "./app-providers";
 import {
+  agentReply,
   emitAgentEvent,
   emitDirectMessage,
   emitDynamicIslandAction,
@@ -21,6 +22,7 @@ import {
   presenceMember,
   testConversationPage,
   testServer,
+  unreadConversationPage,
 } from "./app-test-harness";
 import { useChannels } from "./features/channels/channels-context";
 import { useConversation } from "./features/conversation/conversation-context";
@@ -341,13 +343,7 @@ describe("OpenBot connected desktop shell", () => {
         });
       }
       return testConversationPage("chief", [
-        {
-          id: "earlier-answer",
-          author: "assistant",
-          text: "Earlier answer is reachable",
-          createdAt: "2026-08-30T02:00:00.000Z",
-          status: "completed",
-        },
+        agentReply("earlier-answer", "Earlier answer is reachable", "2026-08-30T02:00:00.000Z"),
       ]);
     });
     render(() => <App />);
@@ -382,15 +378,7 @@ describe("OpenBot connected desktop shell", () => {
     await pendingOlder;
     flush();
     readOlder.mockResolvedValue(
-      testConversationPage("chief", [
-        {
-          id: "earlier-reply",
-          author: "assistant",
-          text: "Earlier reply",
-          createdAt: "2026-08-30T02:00:00.000Z",
-          status: "completed",
-        },
-      ]),
+      testConversationPage("chief", [agentReply("earlier-reply", "Earlier reply", "2026-08-30T02:00:00.000Z")]),
     );
     await conversation?.loadOlderAgentMessages("chief");
     flush();
@@ -455,22 +443,9 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await waitFor(() => expect(resolveInitialPage).toBeDefined());
-    const unreadPage = testConversationPage(
-      "chief",
-      [
-        {
-          id: "reply-reload-race",
-          author: "assistant",
-          text: "Reply before the reload resolves",
-          createdAt: "2026-08-30T02:02:00.000Z",
-          status: "completed",
-        },
-      ],
-      {
-        revision: 2,
-        readState: { unreadCount: 1, firstUnreadMessageId: "reply-reload-race", throughMessageId: null },
-      },
-    );
+    const unreadPage = unreadConversationPage("chief", [
+      agentReply("reply-reload-race", "Reply before the reload resolves", "2026-08-30T02:02:00.000Z"),
+    ]);
 
     emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
     await waitFor(() => expect(window.openbot.agent.markConversationRead).toHaveBeenCalledOnce());
@@ -506,22 +481,9 @@ describe("OpenBot connected desktop shell", () => {
 
     emitAgentEvent?.({
       type: "conversation-page",
-      page: testConversationPage(
-        "chief",
-        [
-          {
-            id: "reply-read-a",
-            author: "assistant",
-            text: "First queued reply",
-            createdAt: "2026-08-30T02:02:00.000Z",
-            status: "completed",
-          },
-        ],
-        {
-          revision: 2,
-          readState: { unreadCount: 1, firstUnreadMessageId: "reply-read-a", throughMessageId: null },
-        },
-      ),
+      page: unreadConversationPage("chief", [
+        agentReply("reply-read-a", "First queued reply", "2026-08-30T02:02:00.000Z"),
+      ]),
     });
     await waitFor(() => expect(window.openbot.agent.markConversationRead).toHaveBeenCalledOnce());
 
@@ -530,20 +492,8 @@ describe("OpenBot connected desktop shell", () => {
       page: testConversationPage(
         "chief",
         [
-          {
-            id: "reply-read-a",
-            author: "assistant",
-            text: "First queued reply",
-            createdAt: "2026-08-30T02:02:00.000Z",
-            status: "completed",
-          },
-          {
-            id: "reply-read-b",
-            author: "assistant",
-            text: "Newer queued reply",
-            createdAt: "2026-08-30T02:03:00.000Z",
-            status: "completed",
-          },
+          agentReply("reply-read-a", "First queued reply", "2026-08-30T02:02:00.000Z"),
+          agentReply("reply-read-b", "Newer queued reply", "2026-08-30T02:03:00.000Z"),
         ],
         {
           revision: 3,
@@ -557,22 +507,10 @@ describe("OpenBot connected desktop shell", () => {
     resolveFirstRead?.({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "reply-read-a" });
     await waitFor(() => expect(window.openbot.agent.markConversationRead).toHaveBeenCalledTimes(2));
     vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValueOnce(
-      testConversationPage(
-        "chief",
-        [
-          {
-            id: "reply-read-b",
-            author: "assistant",
-            text: "Newer queued reply",
-            createdAt: "2026-08-30T02:03:00.000Z",
-            status: "completed",
-          },
-        ],
-        {
-          revision: 3,
-          readState: { unreadCount: 1, firstUnreadMessageId: "reply-read-b", throughMessageId: "reply-read-a" },
-        },
-      ),
+      testConversationPage("chief", [agentReply("reply-read-b", "Newer queued reply", "2026-08-30T02:03:00.000Z")], {
+        revision: 3,
+        readState: { unreadCount: 1, firstUnreadMessageId: "reply-read-b", throughMessageId: "reply-read-a" },
+      }),
     );
     rejectSecondRead?.(new Error("Newer read unavailable"));
 
@@ -599,15 +537,7 @@ describe("OpenBot connected desktop shell", () => {
       if (selectedServerId === "remote-1") {
         return testConversationPage(
           input.agentId,
-          [
-            {
-              id: "reply-remote-loaded",
-              author: "assistant",
-              text: "Remote loaded reply",
-              createdAt: "2026-08-30T02:02:30.000Z",
-              status: "completed",
-            },
-          ],
+          [agentReply("reply-remote-loaded", "Remote loaded reply", "2026-08-30T02:02:30.000Z")],
           {
             readState: { unreadCount: 1, firstUnreadMessageId: "reply-remote-loaded", throughMessageId: null },
           },
@@ -616,15 +546,7 @@ describe("OpenBot connected desktop shell", () => {
       if (returningToLocal) {
         return testConversationPage(
           input.agentId,
-          [
-            {
-              id: "reply-local",
-              author: "assistant",
-              text: "Local reply after returning",
-              createdAt: "2026-08-30T02:02:00.000Z",
-              status: "completed",
-            },
-          ],
+          [agentReply("reply-local", "Local reply after returning", "2026-08-30T02:02:00.000Z")],
           {
             readState: { unreadCount: 1, firstUnreadMessageId: "reply-local", throughMessageId: null },
           },
@@ -651,22 +573,9 @@ describe("OpenBot connected desktop shell", () => {
 
     emitAgentEvent?.({
       type: "conversation-page",
-      page: testConversationPage(
-        "chief",
-        [
-          {
-            id: "reply-local",
-            author: "assistant",
-            text: "Local visible reply",
-            createdAt: "2026-08-30T02:02:00.000Z",
-            status: "completed",
-          },
-        ],
-        {
-          revision: 2,
-          readState: { unreadCount: 1, firstUnreadMessageId: "reply-local", throughMessageId: null },
-        },
-      ),
+      page: unreadConversationPage("chief", [
+        agentReply("reply-local", "Local visible reply", "2026-08-30T02:02:00.000Z"),
+      ]),
     });
     await waitFor(() => expect(window.openbot.agent.markConversationRead).toHaveBeenCalledOnce());
 
@@ -680,22 +589,9 @@ describe("OpenBot connected desktop shell", () => {
 
     emitAgentEvent?.({
       type: "conversation-page",
-      page: testConversationPage(
-        "chief",
-        [
-          {
-            id: "reply-remote",
-            author: "assistant",
-            text: "Remote unread reply",
-            createdAt: "2026-08-30T02:03:00.000Z",
-            status: "completed",
-          },
-        ],
-        {
-          revision: 2,
-          readState: { unreadCount: 1, firstUnreadMessageId: "reply-remote", throughMessageId: null },
-        },
-      ),
+      page: unreadConversationPage("chief", [
+        agentReply("reply-remote", "Remote unread reply", "2026-08-30T02:03:00.000Z"),
+      ]),
     });
     await screen.findByText("Remote unread reply");
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -744,22 +640,9 @@ describe("OpenBot connected desktop shell", () => {
 
     emitAgentEvent?.({
       type: "conversation-page",
-      page: testConversationPage(
-        "chief",
-        [
-          {
-            id: "reply-first-local",
-            author: "assistant",
-            text: "First local reply",
-            createdAt: "2026-08-30T02:02:00.000Z",
-            status: "completed",
-          },
-        ],
-        {
-          revision: 2,
-          readState: { unreadCount: 1, firstUnreadMessageId: "reply-first-local", throughMessageId: null },
-        },
-      ),
+      page: unreadConversationPage("chief", [
+        agentReply("reply-first-local", "First local reply", "2026-08-30T02:02:00.000Z"),
+      ]),
     });
     await waitFor(() => expect(window.openbot.agent.markConversationRead).toHaveBeenCalledOnce());
 
@@ -768,20 +651,8 @@ describe("OpenBot connected desktop shell", () => {
       page: testConversationPage(
         "chief",
         [
-          {
-            id: "reply-first-local",
-            author: "assistant",
-            text: "First local reply",
-            createdAt: "2026-08-30T02:02:00.000Z",
-            status: "completed",
-          },
-          {
-            id: "reply-second-local",
-            author: "assistant",
-            text: "Second local reply",
-            createdAt: "2026-08-30T02:03:00.000Z",
-            status: "completed",
-          },
+          agentReply("reply-first-local", "First local reply", "2026-08-30T02:02:00.000Z"),
+          agentReply("reply-second-local", "Second local reply", "2026-08-30T02:03:00.000Z"),
         ],
         {
           revision: 3,
@@ -816,15 +687,7 @@ describe("OpenBot connected desktop shell", () => {
     };
     const currentPage = testConversationPage(
       "chief",
-      [
-        {
-          id: "reply-current-revision",
-          author: "assistant",
-          text: "Current revision reply",
-          createdAt: "2026-08-30T02:03:00.000Z",
-          status: "completed",
-        },
-      ],
+      [agentReply("reply-current-revision", "Current revision reply", "2026-08-30T02:03:00.000Z")],
       { revision: 2, readState: unreadState },
     );
     vi.mocked(window.openbot.agent.listConversationReads).mockResolvedValueOnce({ chief: unreadState });
@@ -848,15 +711,7 @@ describe("OpenBot connected desktop shell", () => {
       .mockResolvedValueOnce(
         testConversationPage(
           "chief",
-          [
-            {
-              id: "reply-stale-revision",
-              author: "assistant",
-              text: "Stale revision reply",
-              createdAt: "2026-08-30T02:02:00.000Z",
-              status: "completed",
-            },
-          ],
+          [agentReply("reply-stale-revision", "Stale revision reply", "2026-08-30T02:02:00.000Z")],
           {
             revision: 1,
             readState: { unreadCount: 1, firstUnreadMessageId: "reply-stale-revision", throughMessageId: null },
@@ -893,22 +748,9 @@ describe("OpenBot connected desktop shell", () => {
   it("applies an explicit read after an older automatic read", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    const firstPage = testConversationPage(
-      "chief",
-      [
-        {
-          id: "reply-automatic-first",
-          author: "assistant",
-          text: "First automatic reply",
-          createdAt: "2026-08-30T02:03:00.000Z",
-          status: "completed",
-        },
-      ],
-      {
-        revision: 2,
-        readState: { unreadCount: 1, firstUnreadMessageId: "reply-automatic-first", throughMessageId: null },
-      },
-    );
+    const firstPage = unreadConversationPage("chief", [
+      agentReply("reply-automatic-first", "First automatic reply", "2026-08-30T02:03:00.000Z"),
+    ]);
     emitAgentEvent?.({ type: "conversation-page", page: firstPage });
     await waitFor(() => expect(window.openbot.agent.markConversationRead).toHaveBeenCalledOnce());
 
@@ -918,13 +760,7 @@ describe("OpenBot connected desktop shell", () => {
       "chief",
       [
         ...firstPage.messages,
-        {
-          id: "reply-explicit-newer",
-          author: "assistant",
-          text: "Newer reply while closed",
-          createdAt: "2026-08-30T02:04:00.000Z",
-          status: "completed",
-        },
+        agentReply("reply-explicit-newer", "Newer reply while closed", "2026-08-30T02:04:00.000Z"),
       ],
       {
         revision: 3,
@@ -997,13 +833,7 @@ describe("OpenBot connected desktop shell", () => {
             ],
           },
         },
-        {
-          id: "agent-new-2",
-          author: "assistant",
-          text: "Second unseen answer",
-          createdAt: "2026-08-19T09:02:00.000Z",
-          status: "completed",
-        },
+        agentReply("agent-new-2", "Second unseen answer", "2026-08-19T09:02:00.000Z"),
       ],
     });
     vi.mocked(window.openbot.agent.markConversationRead).mockResolvedValueOnce({
@@ -1032,26 +862,9 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("keeps a reply unread while the open agent chat is in the background and clears it on focus", async () => {
-    const unreadPage = testConversationPage(
-      "chief",
-      [
-        {
-          id: "agent-background-answer",
-          author: "assistant",
-          text: "Ready while OpenBot was in the background",
-          createdAt: "2026-08-19T09:03:00.000Z",
-          status: "completed",
-        },
-      ],
-      {
-        revision: 2,
-        readState: {
-          unreadCount: 1,
-          firstUnreadMessageId: "agent-background-answer",
-          throughMessageId: null,
-        },
-      },
-    );
+    const unreadPage = unreadConversationPage("chief", [
+      agentReply("agent-background-answer", "Ready while OpenBot was in the background", "2026-08-19T09:03:00.000Z"),
+    ]);
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     await waitFor(() => expect(emitDynamicIslandAction).toBeDefined());
@@ -1091,34 +904,12 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("extends an in-flight focus read to a newer visible agent reply", async () => {
-    const oldPage = testConversationPage(
-      "chief",
-      [
-        {
-          id: "agent-focus-old",
-          author: "assistant",
-          text: "Older background reply",
-          createdAt: "2026-08-19T09:03:00.000Z",
-          status: "completed",
-        },
-      ],
-      {
-        revision: 2,
-        readState: { unreadCount: 1, firstUnreadMessageId: "agent-focus-old", throughMessageId: null },
-      },
-    );
+    const oldPage = unreadConversationPage("chief", [
+      agentReply("agent-focus-old", "Older background reply", "2026-08-19T09:03:00.000Z"),
+    ]);
     const newPage = testConversationPage(
       "chief",
-      [
-        ...oldPage.messages,
-        {
-          id: "agent-focus-new",
-          author: "assistant",
-          text: "Newer reply during focus read",
-          createdAt: "2026-08-19T09:04:00.000Z",
-          status: "completed",
-        },
-      ],
+      [...oldPage.messages, agentReply("agent-focus-new", "Newer reply during focus read", "2026-08-19T09:04:00.000Z")],
       {
         revision: 3,
         readState: { unreadCount: 2, firstUnreadMessageId: "agent-focus-old", throughMessageId: null },
@@ -1170,26 +961,9 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("keeps another agent new until that agent is opened after focus returns", async () => {
-    const unreadPage = testConversationPage(
-      "sales-outbound",
-      [
-        {
-          id: "sales-background-answer",
-          author: "assistant",
-          text: "Sales result from the background",
-          createdAt: "2026-08-19T09:04:00.000Z",
-          status: "completed",
-        },
-      ],
-      {
-        revision: 2,
-        readState: {
-          unreadCount: 1,
-          firstUnreadMessageId: "sales-background-answer",
-          throughMessageId: null,
-        },
-      },
-    );
+    const unreadPage = unreadConversationPage("sales-outbound", [
+      agentReply("sales-background-answer", "Sales result from the background", "2026-08-19T09:04:00.000Z"),
+    ]);
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     vi.mocked(window.openbot.agent.markConversationRead).mockClear();
@@ -1269,26 +1043,9 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("keeps an agent reply unread while the Usage report covers the conversation", async () => {
-    const unreadPage = testConversationPage(
-      "chief",
-      [
-        {
-          id: "agent-hidden-answer",
-          author: "assistant",
-          text: "Ready while the report was open",
-          createdAt: "2026-08-19T09:04:00.000Z",
-          status: "completed",
-        },
-      ],
-      {
-        revision: 2,
-        readState: {
-          unreadCount: 1,
-          firstUnreadMessageId: "agent-hidden-answer",
-          throughMessageId: null,
-        },
-      },
-    );
+    const unreadPage = unreadConversationPage("chief", [
+      agentReply("agent-hidden-answer", "Ready while the report was open", "2026-08-19T09:04:00.000Z"),
+    ]);
 
     render(() => (
       <AppProviders>
@@ -1304,37 +1061,19 @@ describe("OpenBot connected desktop shell", () => {
     flush();
     emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
 
+    // The report leaves the conversation mounted and aria-hidden, so the reply is still in the DOM
+    // while it is covered - which is the same reason it must not count as seen.
     expect(await screen.findByText("Ready while the report was open")).toBeInTheDocument();
     expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
 
-    // Back uncovers the conversation, and the reply is still waiting there. The unread state
-    // is queryable only now: while the report is open the content it covers is aria-hidden,
-    // which is the same reason the reply must not count as seen.
     fireEvent.click(screen.getByRole("button", { name: "Close usage" }));
     expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
   });
 
   it("keeps an agent reply unread while an open channel covers the conversation", async () => {
-    const unreadPage = testConversationPage(
-      "chief",
-      [
-        {
-          id: "agent-channel-answer",
-          author: "assistant",
-          text: "Ready while the channel was open",
-          createdAt: "2026-08-19T09:06:00.000Z",
-          status: "completed",
-        },
-      ],
-      {
-        revision: 2,
-        readState: {
-          unreadCount: 1,
-          firstUnreadMessageId: "agent-channel-answer",
-          throughMessageId: null,
-        },
-      },
-    );
+    const unreadPage = unreadConversationPage("chief", [
+      agentReply("agent-channel-answer", "Ready while the channel was open", "2026-08-19T09:06:00.000Z"),
+    ]);
 
     render(() => (
       <AppProviders>
@@ -1351,8 +1090,8 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByRole("heading", { level: 1, name: "Project" });
     emitAgentEvent?.({ type: "conversation-page", page: unreadPage });
 
-    // Leaving the channel uncovers the chat, and the reply is still waiting there. The boundary is
-    // queryable only now, which is the same reason the reply could not count as seen before.
+    // Unlike the Usage report, the channel replaces the conversation rather than covering it, so the
+    // reply is not in the DOM until the channel closes. Both paths must leave it unread.
     fireEvent.click(screen.getByRole("button", { name: "Close channel" }));
     expect(await screen.findByRole("status", { name: "1 new message" })).toBeInTheDocument();
     expect(window.openbot.agent.markConversationRead).not.toHaveBeenCalled();
@@ -1423,15 +1162,7 @@ describe("OpenBot connected desktop shell", () => {
             activeTurnId: null,
             revision: 1,
             readState: unreadState,
-            messages: [
-              {
-                id: "sales-new",
-                author: "assistant",
-                text: "A new sales reply",
-                createdAt: "2026-08-19T09:03:00.000Z",
-                status: "completed",
-              },
-            ],
+            messages: [agentReply("sales-new", "A new sales reply", "2026-08-19T09:03:00.000Z")],
           }
         : {
             agentId,
@@ -1484,13 +1215,7 @@ describe("OpenBot connected desktop shell", () => {
           createdAt: "2026-08-19T09:00:00.000Z",
           status: "completed",
         },
-        {
-          id: "agent-new",
-          author: "assistant",
-          text: "Unseen answer",
-          createdAt: "2026-08-19T09:01:00.000Z",
-          status: "completed",
-        },
+        agentReply("agent-new", "Unseen answer", "2026-08-19T09:01:00.000Z"),
       ],
     });
     vi.mocked(window.openbot.agent.markConversationRead).mockRejectedValueOnce(new Error("Read state unavailable"));

@@ -20,10 +20,18 @@ import {
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
+import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import type { AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
-import { acpMcpServers, type McpServerSource, usableMcpServers } from "./mcp-provider-shapes";
+import {
+  acpMcpServers,
+  type McpAuthorizationSource,
+  type McpDropReporter,
+  type McpServerSource,
+  type McpToolRuntimeSource,
+  usableMcpServers,
+} from "./mcp-provider-shapes";
 import {
   type AccountRateLimitsReadResult,
   type AppServerNotification,
@@ -141,6 +149,10 @@ export interface AcpProviderOptions {
    * so a configuration can never displace the tools the agent depends on.
    */
   mcpServers?: McpServerSource;
+  /** What this provider could not be given. Reported once per spawn, by `AgentService`. */
+  reportMcpDrops?: McpDropReporter;
+  mcpToolRuntimes?: McpToolRuntimeSource;
+  mcpAuthorization?: McpAuthorizationSource;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   /**
    * Reads optional identity fields that ACP does not define. A provider extension failing must not
@@ -585,7 +597,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       let currentModelId: string | null;
       // OpenBot's bridge servers last: all providers key MCP servers by name, so a user
       // configuration that reached one of those names would take the agent's own tools away.
-      const mcpServers = [...acpMcpServers(await usableMcpServers(this.options.mcpServers?.() ?? [])), ...mcp.servers];
+      const handoff = acpMcpServers(
+        await usableMcpServers(
+          this.options.mcpServers?.() ?? [],
+          this.options.mcpToolRuntimes?.(),
+          this.options.mcpAuthorization,
+        ),
+      );
+      this.options.reportMcpDrops?.(this.provider, handoff.dropped);
+      const mcpServers = [...handoff.servers, ...mcp.servers];
       if (resume && requestedThreadId) {
         const response = await connection.loadSession({
           sessionId: requestedThreadId,
@@ -938,6 +958,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           id,
           header: getString(property, "title") ?? id,
           question: getString(property, "description") ?? getString(params, "message") ?? "ACP needs more information.",
+          isSecret: secretElicitationField(id, property),
           options: elicitationOptions(property),
         },
       ];
@@ -947,6 +968,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         id: "response",
         header: "ACP",
         question: getString(params, "message") ?? "ACP needs confirmation.",
+        isSecret: false,
         options: null,
       });
     }
@@ -1216,37 +1238,6 @@ function printableInput(value: unknown): string | null {
 function bestPermissionOption(options: PermissionOption[], accepted: boolean): PermissionOption | null {
   const kinds = accepted ? ["allow_once", "allow_always"] : ["reject_once", "reject_always"];
   return kinds.flatMap((kind) => options.filter((option) => option.kind === kind))[0] ?? null;
-}
-
-function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
-  if (Array.isArray(property.oneOf)) {
-    return property.oneOf.filter(isRecord).flatMap((option) => {
-      const value = getString(option, "const");
-      if (!value) return [];
-      return [{ label: getString(option, "title") ?? value, description: getString(option, "description") ?? "" }];
-    });
-  }
-  if (Array.isArray(property.enum)) {
-    return property.enum.filter(isString).map((value) => ({ label: value, description: "" }));
-  }
-  if (property.type === "boolean") {
-    return [
-      { label: "Yes", description: "" },
-      { label: "No", description: "" },
-    ];
-  }
-  return null;
-}
-
-function elicitationValue(property: DynamicRecord | undefined, answers: string[]): ElicitationContentValue {
-  if (!property) return answers[0] ?? "";
-  if (property.type === "array") return answers;
-  if (property.type === "boolean") return /^(yes|true|1)$/i.test(answers[0] ?? "");
-  if (property.type === "number" || property.type === "integer") {
-    const parsed = Number(answers[0]);
-    return Number.isFinite(parsed) ? parsed : (answers[0] ?? "");
-  }
-  return answers[0] ?? "";
 }
 
 function isDynamicToolResult(value: unknown): value is DynamicToolResult {

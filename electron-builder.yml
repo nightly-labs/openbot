@@ -35,6 +35,8 @@ asarUnpack:
 extraResources:
   - from: resources/managed-skills
     to: managed-skills
+  - from: resources/plugin-catalog
+    to: plugin-catalog
   - from: build/icon-production.png
     to: icons/icon-production.png
   - from: build/icon-dev.png

@@ -1,19 +1,15 @@
-import { type MarketplaceSkillQuery, SKILL_CATEGORIES, type SkillCategory } from "@openbot/contracts/ipc";
+import {
+  type MarketplaceSkillQuery,
+  SKILL_CATEGORIES,
+  SKILL_CATEGORY_LABELS,
+  type SkillCategory,
+} from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, For, onCleanup, onSettled, Show } from "solid-js";
 import { Button, Skeleton, UserAvatar } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 
-export const CATEGORY_LABELS: Record<SkillCategory, string> = {
-  coding: "Coding",
-  design: "Design",
-  "data-analytics": "Data & Analytics",
-  documents: "Documents",
-  productivity: "Productivity",
-  research: "Research",
-  automation: "Automation",
-  other: "Other",
-};
+export const CATEGORY_LABELS: Record<SkillCategory, string> = SKILL_CATEGORY_LABELS;
 
 /** Whether an answer's row is the row already on screen, so the list can keep the element it has. */
 function same(a: CatalogItem, b: CatalogItem) {
@@ -50,7 +46,7 @@ export function MarketplaceIdentity(props: { item: CatalogItem; children: JSX.El
 }
 
 export function MarketplaceCatalog<T extends CatalogItem>(props: {
-  kind: "skills" | "agents";
+  kind: "skills" | "agents" | "plugins";
   /** The search text, held by the dialog chrome that shows the field next to the kind switch. */
   query: string;
   refreshVersion: number;

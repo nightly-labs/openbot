@@ -173,6 +173,12 @@ export class SkillMarketplaceService {
   }
 
   async install(input: InstallSkillInput): Promise<InstalledSkill> {
+    // A pinned version is served by the versions endpoint, which a local skill has no entry in: a
+    // local skill is held on this computer and has no published version to ask for.
+    if (input.versionId) {
+      if (input.skillId.startsWith("local-skill-")) throw new Error("A local skill has no published version.");
+      return this.installVersion({ ...input, versionId: input.versionId });
+    }
     const agent = this.requireAgent(input.agentId);
     const detail = await this.get(input.skillId);
     const bundle = input.skillId.startsWith("local-skill-")
