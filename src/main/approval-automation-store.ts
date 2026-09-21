@@ -69,6 +69,7 @@ export class ApprovalAutomation {
   readonly #knownAgentIds: () => Iterable<string>;
   #preference: ApprovalAutomationPreference;
   #pendingWrite: Promise<unknown> = Promise.resolve();
+  readonly #deletingAgentIds = new Set<string>();
 
   constructor(options: ApprovalAutomationOptions) {
     this.#path = options.path;
@@ -90,12 +91,28 @@ export class ApprovalAutomation {
   }
 
   set(input: SetApprovalAutomationInput): Promise<ApprovalAutomationPreference> {
+    if (input.autoApprove && input.agentId && this.#deletingAgentIds.has(input.agentId)) {
+      return Promise.reject(new Error("Cannot grant approval while the agent is being deleted."));
+    }
     const write = this.#pendingWrite.then(
       () => this.#apply(input),
       () => this.#apply(input),
     );
     this.#pendingWrite = write.catch(() => undefined);
     return write;
+  }
+
+  /** Persist revocation before deleting data, and keep grant writes behind the deletion. */
+  deleteAgent(agentId: string, remove: () => Promise<void>): Promise<void> {
+    this.#deletingAgentIds.add(agentId);
+    const deletion = this.#pendingWrite
+      .then(async () => {
+        await this.#apply({ agentId, autoApprove: false });
+        await remove();
+      })
+      .finally(() => this.#deletingAgentIds.delete(agentId));
+    this.#pendingWrite = deletion.catch(() => undefined);
+    return deletion;
   }
 
   async #apply(input: SetApprovalAutomationInput): Promise<ApprovalAutomationPreference> {
@@ -118,7 +135,7 @@ export class ApprovalAutomation {
     const kept = this.#preference.autoApproveAgentIds.filter((id) => known.has(id));
     const granted = new Set(kept);
     if (input.agentId !== undefined && input.autoApprove !== undefined) {
-      if (input.autoApprove) granted.add(input.agentId);
+      if (input.autoApprove && known.has(input.agentId)) granted.add(input.agentId);
       else granted.delete(input.agentId);
     }
     return {

@@ -3,7 +3,7 @@
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApprovalAutomation, readApprovalAutomation, writeApprovalAutomation } from "./approval-automation-store";
 
 const roots: string[] = [];
@@ -96,6 +96,49 @@ describe("ApprovalAutomation", () => {
     const [, last] = await Promise.all([automation.set({ turbo: true }), automation.set({ turbo: false })]);
     expect(last).toEqual({ turbo: false, autoApproveAgentIds: [] });
     expect(automation.autoApproves("agent-1")).toBe(false);
+  });
+
+  it("revokes before deletion and prevents queued grants from surviving recreation", async () => {
+    const agents = new Set(["agent-1", "agent-2"]);
+    const path = join(await temporaryRoot(), "automation.json");
+    const automation = new ApprovalAutomation({
+      path,
+      initial: { turbo: false, autoApproveAgentIds: ["agent-2"] },
+      knownAgentIds: () => agents,
+    });
+    const pendingGrant = automation.set({ agentId: "agent-1", autoApprove: true });
+    const deletion = automation.deleteAgent("agent-1", async () => {
+      expect(automation.autoApproves("agent-1")).toBe(false);
+      await expect(readApprovalAutomation(path)).resolves.toEqual({
+        turbo: false,
+        autoApproveAgentIds: ["agent-2"],
+      });
+      agents.delete("agent-1");
+    });
+    await expect(automation.set({ agentId: "agent-1", autoApprove: true })).rejects.toThrow(
+      "Cannot grant approval while the agent is being deleted.",
+    );
+    await Promise.all([pendingGrant, deletion]);
+    agents.add("agent-1");
+    expect(automation.autoApproves("agent-1")).toBe(false);
+    expect(automation.autoApproves("agent-2")).toBe(true);
+    const reloaded = new ApprovalAutomation({
+      path,
+      initial: await readApprovalAutomation(path),
+      knownAgentIds: () => agents,
+    });
+    expect(reloaded.autoApproves("agent-1")).toBe(false);
+  });
+
+  it("does not delete agent data if revocation cannot be saved", async () => {
+    const automation = new ApprovalAutomation({
+      path: join(await temporaryRoot(), "missing", "automation.json"),
+      initial: { turbo: false, autoApproveAgentIds: ["agent-1"] },
+      knownAgentIds: () => ["agent-1"],
+    });
+    const remove = vi.fn(async () => undefined);
+    await expect(automation.deleteAgent("agent-1", remove)).rejects.toThrow();
+    expect(remove).not.toHaveBeenCalled();
   });
 });
 

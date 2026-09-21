@@ -531,6 +531,7 @@ export async function createApplicationServices({
     },
     localSkillTools: () => localSkillTools(skills),
     approvalAutomation,
+    deleteWithRevokedApproval: (agentId, remove) => approvalAutomation.deleteAgent(agentId, remove),
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
