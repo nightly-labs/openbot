@@ -206,8 +206,15 @@ describe("TeamWebRtcFileTransfer", () => {
   });
 
   it("uses the last acknowledged progress instead of a fixed whole-transfer deadline", async () => {
+    // The bridge acknowledges each chunk after CHUNK_ACK_DELAY_MS and the last
+    // one a further FINAL_ACK_DELAY_MS on. The resume window has to sit between
+    // the longest single gap (CHUNK_ACK_DELAY_MS + FINAL_ACK_DELAY_MS) and the
+    // whole transfer (3 * CHUNK_ACK_DELAY_MS + FINAL_ACK_DELAY_MS): below the
+    // gap a correct implementation times out, above the total a fixed
+    // whole-transfer deadline would pass and prove nothing. Keep the margin on
+    // both sides wide, because a loaded CI machine adds latency to each step.
     const bridge = new SlowFinalAcknowledgementBridge();
-    const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory(), 20);
+    const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory(), 250);
     transfers.setPeerAuthenticated("host-1", true);
     const bytes = new Uint8Array(2 * 60 * 1024 + 1);
 
@@ -328,6 +335,9 @@ class ResumingBridge extends TeamWebRtcBridge {
   }
 }
 
+const CHUNK_ACK_DELAY_MS = 100;
+const FINAL_ACK_DELAY_MS = 50;
+
 class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
   transferId = "";
   #received = 0;
@@ -356,7 +366,7 @@ class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
     }
     const chunk = decodeTeamProtocolV2FileChunk(data);
     this.#received = chunk.offset + chunk.bytes.byteLength;
-    await new Promise((resolve) => setTimeout(resolve, 12));
+    await new Promise((resolve) => setTimeout(resolve, CHUNK_ACK_DELAY_MS));
     if (chunk.bytes.byteLength === 60 * 1024) {
       this.emit(
         "data",
@@ -383,7 +393,7 @@ class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
               receivedThrough: this.#received,
             }),
           ),
-        5,
+        FINAL_ACK_DELAY_MS,
       );
     }
   }
