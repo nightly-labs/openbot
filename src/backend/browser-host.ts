@@ -539,6 +539,7 @@ export class BrowserHost {
           this.#invalidateViews(tab);
           protection.running = true;
           this.#syncAttachedView();
+          let phase = "submit";
           try {
             await this.#enqueue(
               args.tabId,
@@ -565,6 +566,7 @@ export class BrowserHost {
                   });
                 }
                 if (!protection.replaced) {
+                  phase = "reload";
                   // Load with GET rather than replaying a possible form POST. Keep capture
                   // blocked until navigation has replaced the document and this operation ends.
                   await this.#boundEngineOperation(
@@ -580,6 +582,9 @@ export class BrowserHost {
               },
               true,
             );
+          } catch (error) {
+            logger.warn("Secure authentication did not finish.", { phase, documentReplaced: protection.replaced });
+            throw error;
           } finally {
             protection.running = false;
             tab.diagnostics.clearDiagnostics();
