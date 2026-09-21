@@ -1,0 +1,667 @@
+.composer-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0 var(--openbot-space-1-5) var(--openbot-space-1-5);
+}
+
+.team-typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.team-typing-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success);
+  animation: typing-dot-pulse 900ms ease-in-out infinite;
+}
+
+.team-typing-dots i:nth-child(2) {
+  animation-delay: var(--openbot-duration-fast);
+}
+
+.team-typing-dots i:nth-child(3) {
+  animation-delay: var(--openbot-duration-overlay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-row-thinking-dots i,
+  .team-typing-dots i,
+  .image-generation-dots,
+  .image-generation-glow,
+  .image-generation-canvas,
+  .image-generation-preview,
+  .image-generation-label,
+  /* Matches the scoped shimmer above, which outranks the bare class on its own. */
+  .image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label,
+  .agent-activity-label {
+    animation: none;
+    transition: none;
+  }
+
+  .image-generation-hover-download {
+    transition: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .image-generation-hover-download {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .message-entry-agent .ui-bubble:has(.image-generation) {
+    width: calc(100% - var(--message-actions-inline-size) - 5px);
+    max-width: calc(100% - var(--message-actions-inline-size) - 5px);
+  }
+
+  .image-generation-stage,
+  .image-generation-meta {
+    width: 100%;
+  }
+}
+
+.composer-reply-preview {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  margin: 0 10px 6px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  padding: 6px 8px 6px 12px;
+  box-shadow: 0 7px 22px var(--openbot-shadow-popover-ambient);
+}
+
+.composer-reply-preview > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.composer-reply-preview span {
+  display: block;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: 550;
+  line-height: 14px;
+}
+
+.composer-reply-preview p {
+  overflow: hidden;
+  margin: 1px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-reply-preview > button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  color: var(--openbot-text-muted);
+}
+
+.composer-reply-preview > button:hover {
+  background: var(--openbot-border);
+  color: var(--openbot-text-secondary);
+}
+
+.composer {
+  position: relative;
+  z-index: 11;
+  display: grid;
+  max-width: none;
+  min-height: 96px;
+  gap: 4px;
+  margin: 0 auto;
+  border: 0.5px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  padding: 10px;
+  box-shadow: none;
+  transition:
+    border-color var(--openbot-duration-hover) var(--openbot-ease-out),
+    box-shadow var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.composer[data-compact] {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.composer:focus-within {
+  border-color: var(--openbot-text-dim);
+  box-shadow: 0 0 0 3px var(--openbot-hover);
+}
+
+.composer:has(.composer-editor-surface[aria-disabled="true"]) {
+  border-color: var(--openbot-border);
+}
+
+.composer button:disabled,
+.composer-editor-surface[aria-disabled="true"] {
+  cursor: default;
+}
+
+.composer-recording {
+  border-color: var(--openbot-warning);
+}
+
+.composer-button,
+.dictation-button,
+.voice-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  /* Without this the button primitive's inline padding outgrows the 28px width
+     under border-box sizing and stretches the circle into a pill. */
+  padding: 0;
+  background: var(--openbot-hover);
+  color: var(--openbot-text-secondary);
+  transition:
+    background-color var(--openbot-duration-hover) var(--openbot-ease-out),
+    color var(--openbot-duration-hover) var(--openbot-ease-out),
+    transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.composer-button:hover {
+  background: var(--openbot-border);
+  color: var(--openbot-text-primary);
+}
+
+.composer-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voice-model-progress {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.voice-recording-status {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-hover);
+  padding: 0 7px 0 4px;
+  color: var(--openbot-text-secondary);
+}
+
+.voice-recording-stop {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  padding: 0;
+  background: transparent;
+  color: var(--openbot-text-primary);
+  transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.voice-recording-stop:hover {
+  background: var(--openbot-border);
+}
+
+.voice-recording-stop:active {
+  transform: scale(0.96);
+}
+
+.voice-recording-stop svg {
+  width: 14px;
+  height: 14px;
+}
+
+.voice-recording-duration {
+  min-width: 2.5em;
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+.voice-recording-status > .conversation-more-icon {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  color: var(--openbot-text-muted);
+}
+
+.dictation-button:hover:not(:disabled) {
+  background: var(--openbot-border);
+  color: var(--openbot-text-primary);
+}
+
+.composer-button svg,
+.dictation-button svg,
+.voice-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.composer-spinner {
+  animation: ui-spin 720ms linear infinite;
+}
+
+.voice-button {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-sidebar);
+}
+
+.voice-button-active {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-sidebar);
+}
+
+.voice-button:hover,
+.voice-button-active:hover {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-canvas);
+}
+
+.composer-input-label {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  max-height: 117px;
+  align-items: flex-end;
+  cursor: text;
+}
+
+.composer-toolbar {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.composer[data-compact] .composer-input-label {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 28px;
+}
+
+.composer[data-compact] .composer-toolbar {
+  display: contents;
+}
+
+.composer[data-compact] .composer-toolbar > .composer-button {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.composer[data-compact] .composer-toolbar > .composer-primary-actions {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.composer[data-compact] .composer-editor-root,
+.composer[data-compact] .composer-editor-surface {
+  min-height: 28px;
+}
+
+.composer[data-compact] .composer-editor-surface {
+  padding: 4px 0;
+}
+
+.composer[data-compact] .composer-editor-placeholder {
+  top: 4px;
+  left: 0;
+}
+
+.composer[data-has-attachments] .composer-input-label,
+.composer[data-has-attachments] .composer-editor-root,
+.composer[data-has-attachments] .composer-editor-surface {
+  min-height: 28px;
+}
+
+.composer[data-has-attachments] .composer-editor-surface {
+  padding: 4px;
+}
+
+.composer[data-has-attachments] .composer-editor-placeholder {
+  top: 4px;
+}
+
+.composer-editor-root {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  max-height: 117px;
+  cursor: text;
+}
+
+.composer-editor-surface {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  max-height: 117px;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 2px 4px 8px;
+  caret-color: var(--openbot-text-primary);
+  color: var(--openbot-text-primary);
+  cursor: text;
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.composer-editor-surface[aria-disabled="true"] {
+  pointer-events: none;
+}
+
+.composer-editor-placeholder {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.composer-trailing-line {
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */
+.composer-mention-token.composer-tag-unavailable {
+  border: 1px dashed var(--openbot-border-strong);
+  background: transparent;
+  /* No leading icon, so the left inset matches the right one. */
+  padding-left: var(--openbot-space-1-5);
+  color: var(--openbot-text-muted);
+}
+
+.composer-file-reference {
+  height: 24px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/*
+ * Hangs off the composer's top edge inside `.composer-wrap`, like `.agent-queue-panel`: the
+ * composer paints over the overlap, so the panel grows out from under the input. The bottom comes
+ * from the composer's measured height, which changes as the input grows.
+ */
+.mention-picker {
+  --mention-picker-overlap: 14px;
+  --mention-picker-side-inset: calc(var(--openbot-space-1-5) + 12px);
+  --mention-picker-row-height: 29px;
+  --mention-picker-gutter: 5px;
+  --mention-picker-visible-rows: 7;
+
+  position: absolute;
+  z-index: 10;
+  right: var(--mention-picker-side-inset);
+  bottom: calc(var(--mention-picker-bottom, 0px) - var(--mention-picker-overlap));
+  left: var(--mention-picker-side-inset);
+  border: 1px solid var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-queue-surface);
+  padding-bottom: var(--mention-picker-overlap);
+  color: var(--openbot-queue-text);
+  box-shadow: none;
+  transform-origin: bottom center;
+  animation: mention-picker-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/*
+ * The scroll lives on the list, not the panel, so the scroll fade masks the rows and leaves the
+ * panel border and background whole. The scrollbar stays hidden: the fade carries the same news.
+ */
+.mention-picker-list {
+  display: grid;
+  /* A plain auto track grows to the widest row, which would push the badges out of view. */
+  grid-template-columns: minmax(0, 1fr);
+  /*
+   * Every row is the same height, so the list can state the height its rows need instead of
+   * leaving it to the content. A length on both sides of the change is what lets the panel
+   * travel to its new size while the query narrows, rather than jump to it.
+   */
+  height: calc(var(--mention-picker-rows, 0) * var(--mention-picker-row-height) + 2 * var(--mention-picker-gutter));
+  max-height: calc(
+    var(--mention-picker-visible-rows) *
+    var(--mention-picker-row-height) +
+    2 *
+    var(--mention-picker-gutter)
+  );
+  overflow-y: auto;
+  /* An even inset all round: the row's own 8px carries the rest of the gap beside the text. */
+  padding: var(--mention-picker-gutter);
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  transition: height var(--openbot-duration-normal) var(--openbot-ease-out);
+  will-change: height;
+}
+
+.mention-picker-list::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes mention-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scaleY(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+/* The queue panel's row rhythm and colors: a 29px row, a small leading glyph, muted trailing text. */
+.mention-picker-option {
+  display: flex;
+  width: 100%;
+  /* The list computes its own height from this one, so the two must not drift apart. */
+  height: var(--mention-picker-row-height);
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  padding: 0 8px;
+  color: var(--openbot-queue-text);
+  text-align: left;
+}
+
+.mention-picker-file-option .attachment-reference-visual {
+  width: 20px;
+  height: 20px;
+}
+
+.mention-picker-option:hover,
+.mention-picker-option-active {
+  background: var(--openbot-hover);
+}
+
+.mention-picker-option .agent-avatar {
+  --agent-avatar-optical-offset: -2px;
+
+  width: 20px;
+  height: 20px;
+}
+
+.mention-picker-skill-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--openbot-queue-action);
+}
+
+.mention-picker-skill-icon > svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mention-picker-option > strong {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  font-size: var(--openbot-text-lg);
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-picker-description {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  color: var(--openbot-queue-action);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-picker-badge {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--openbot-queue-action);
+}
+
+.composer-attachments {
+  position: relative;
+  z-index: 11;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+
+.composer-attachment {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.composer-attachment[data-kind="image"] {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  padding: 0;
+}
+
+.composer-attachment[data-kind="file"] {
+  width: 220px;
+  max-width: 100%;
+  height: 52px;
+  gap: 10px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  padding: 7px 12px 7px 8px;
+}
+
+.composer-attachment-copy {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+
+.composer-attachment-copy strong,
+.composer-attachment-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-attachment-copy strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.composer-attachment-copy small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 14px;
+}
+
+.composer-attachment-preview {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--file-reference-soft, var(--openbot-hover));
+  color: var(--file-reference-color, var(--openbot-text-muted));
+  font-size: var(--openbot-text-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.composer-attachment[data-kind="image"] .composer-attachment-preview {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--openbot-radius-media-preview);
+}
+
+.composer-attachment-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

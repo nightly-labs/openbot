@@ -176,7 +176,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 ? (activeBrowserTab()?.id ?? null)
                 : null
             }
-            liveViewRuntime={props.browserRuntime}
+            liveViewRuntime={props.browserRuntime ?? window.openbot.browser}
             onBack={() => setActiveRightPanel("browser")}
             onEnterPip={props.runtime ? () => undefined : showBrowserPip}
           />
@@ -265,7 +265,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
 }
 
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
-const BrowserPanel = lazy(() => import("./BrowserPanel"));
+const BrowserPanel = lazy(() => import("@openbot/ui/features/browser/BrowserPanel"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
 
 const BrowserPreviewSidebar = lazy(() => import("./BrowserPreviewSidebar"));

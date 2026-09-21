@@ -10,15 +10,15 @@ import {
   toast,
 } from "@openbot/ui";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
+import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
+import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { toAgentMessage } from "../../app-message-projection";
-import { computeAgentAvatarMoods } from "../agents/agent-avatar-mood";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
-import { computeSidebarAgentStates } from "../sidebar/sidebar-agent-states";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";

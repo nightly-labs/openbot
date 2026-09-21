@@ -1,5 +1,5 @@
+import { mapBrowserViewPoint } from "@openbot/ui/features/browser/BrowserLiveView";
 import { describe, expect, it } from "vitest";
-import { mapBrowserViewPoint } from "./BrowserLiveView";
 
 describe("live browser view coordinates", () => {
   it("maps through the contain-sized image and ignores letterboxed space", () => {

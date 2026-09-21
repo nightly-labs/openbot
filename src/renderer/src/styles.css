@@ -19,7 +19,7 @@
 @import "./features/servers/join-server-dialog.css";
 @import "@openbot/ui/styles/settings-panel.css";
 @import "@openbot/ui/styles/provider-code-login.css";
-@import "./features/conversation/conversation.css";
+@import "@openbot/ui/features/conversation/conversation.css";
 @import "./features/channels/channels.css";
 @import "./features/usage/usage.css";
 @import "./features/settings/settings-modal.css";

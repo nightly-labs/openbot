@@ -189,7 +189,14 @@
     "./styles/provider-code-login.css": "./src/styles/provider-code-login.css",
     "./features/custom-providers/custom-providers.css": "./src/features/custom-providers/custom-providers.css",
     "./styles/reference-chip.css": "./src/styles/reference-chip.css",
-    "./skill-preview.css": "./src/skill-preview.css"
+    "./skill-preview.css": "./src/skill-preview.css",
+    "./features/browser/BrowserLiveView": "./src/features/browser/BrowserLiveView.tsx",
+    "./features/browser/BrowserPanel": "./src/features/browser/BrowserPanel.tsx",
+    "./features/sidebar/sidebar-agent-states": "./src/features/sidebar/sidebar-agent-states.ts",
+    "./features/agents/agent-avatar-mood": "./src/features/agents/agent-avatar-mood.ts",
+    "./features/conversation/conversation.css": "./src/features/conversation/conversation.css",
+    "./features/conversation/AgentSettingsPanel": "./src/features/conversation/AgentSettingsPanel.tsx",
+    "./features/conversation/ConversationHeader": "./src/features/conversation/ConversationHeader.tsx"
   },
   "dependencies": {
     "@openbot/contracts": "workspace:*",

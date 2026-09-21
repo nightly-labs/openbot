@@ -13,7 +13,7 @@ export type BrowserViewRuntime = Pick<
 >;
 
 interface BrowserLiveViewProps {
-  runtime?: BrowserViewRuntime;
+  runtime: BrowserViewRuntime;
   tabId: string;
   /** False while the panel is closed: a view nobody is looking at still costs the host a screencast. */
   active: boolean;
@@ -28,7 +28,7 @@ interface BrowserLiveViewProps {
  * back on the same socket as a fraction of the frame the user was actually looking at.
  */
 export default function BrowserLiveView(props: BrowserLiveViewProps) {
-  const runtime = props.runtime ?? window.openbot.browser;
+  const runtime = props.runtime;
   const [state, setState] = createStore<{ live: boolean; message: string }>({
     live: false,
     message: "Connecting to the page on the host…",

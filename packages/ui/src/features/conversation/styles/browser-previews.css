@@ -1,0 +1,319 @@
+/* Browser cards use captured images; only the expanded view owns a live surface. */
+.browser-preview-sidebar[hidden] {
+  display: none;
+}
+
+.browser-preview-header {
+  display: flex;
+  height: var(--left-header-height, 38px);
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: 0 var(--openbot-space-3);
+  color: var(--openbot-text-secondary);
+}
+
+.browser-preview-header > span {
+  flex: 1;
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-preview-header > .ui-button,
+.browser-preview-close {
+  border-radius: var(--openbot-radius-sm);
+}
+
+.browser-preview-header > .ui-button:focus-visible,
+.browser-preview-close:focus-visible {
+  outline: 1px solid var(--openbot-text-muted);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.browser-preview-sidebar .ui-button:active:not(:disabled):not([data-disabled]) {
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
+}
+
+.browser-preview-header > .ui-button > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-preview-list {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: var(--openbot-space-2) var(--openbot-space-4) var(--openbot-space-4);
+}
+
+.browser-preview-list > .browser-empty-state {
+  height: auto;
+  justify-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-8) var(--openbot-space-4);
+}
+
+.browser-preview-list > .browser-empty-state > svg,
+.browser-preview-image > svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  color: var(--openbot-text-muted);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-preview-list > .browser-empty-state > svg {
+  margin-bottom: var(--openbot-space-1);
+}
+
+.browser-preview-list > .browser-empty-state > strong {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: 500;
+}
+
+.browser-preview-list > .browser-empty-state > .ui-button {
+  margin-top: var(--openbot-space-1);
+}
+
+.browser-preview-card {
+  position: relative;
+  margin-bottom: var(--openbot-space-4);
+}
+
+.browser-preview-open {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-weight: 400;
+}
+
+.browser-preview-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface);
+}
+
+.browser-preview-image img,
+.browser-preview-loading {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.browser-preview-title {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-preview-open-label {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.browser-preview-open-label > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-preview-open:hover .browser-preview-open-label {
+  opacity: 1;
+}
+
+.browser-preview-close {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  opacity: 0;
+}
+
+.browser-preview-close > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.browser-preview-card:hover .browser-preview-close,
+.browser-preview-card:focus-within .browser-preview-close {
+  opacity: 1;
+}
+
+/* Keep app navigation below the portaled browser and its backdrop. */
+body:has(.browser-panel-expanded) .app-frame {
+  isolation: isolate;
+}
+
+.browser-expanded-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--openbot-layer-dropdown) - 2);
+}
+
+/*
+ * The expanded browser fills the window edge to edge. `border: 0` is not redundant: the shared
+ * `.browser-panel` rule above gives every browser surface a `border-left`, which would otherwise
+ * draw a seam down the left edge of a panel that has nothing beside it.
+ *
+ * The panel appears and disappears in one frame, with no transition. The page inside it is a native
+ * view that the renderer cannot animate: it can only be attached once the panel has stopped moving
+ * (`BrowserPanel.tsx`), so any opening transition is time spent looking at an empty panel before the
+ * page arrives.
+ */
+.browser-panel-expanded {
+  position: fixed;
+  inset: 0;
+  /* The shared `.browser-panel` rule sizes the sidebar with `--browser-panel-width`; a set width
+   * wins over `inset`, so the panel has to give it up to reach the right window edge. */
+  width: auto;
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.browser-panel-expanded[hidden],
+.browser-expanded-backdrop[hidden] {
+  display: none;
+}
+
+/*
+ * The button is portaled beside the panel rather than laid out inside the header, so it is placed
+ * against the window instead of against the row it belongs to. It is a square box with the same gap
+ * on every side: a 24px square in the 34px header leaves 10px, so 5px above and below, and the same
+ * 5px against the window's right edge. The header reserves this width so the strip cannot scroll
+ * underneath.
+ */
+.browser-hide {
+  position: fixed;
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--openbot-radius-xs);
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
+}
+
+.browser-panel-expanded .browser-panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  /* The inline end reserves the corner `.browser-hide` sits in, which is fixed to the window rather
+   * than to this header, so the tab strip would otherwise scroll underneath it: the button's own
+   * 8px inset and 24px box, and 8px between it and the last tab. */
+  padding-inline: var(--openbot-space-2) calc(var(--openbot-space-8) + var(--openbot-space-2));
+}
+
+/*
+ * On macOS the window is `titleBarStyle: "hidden"` and the traffic lights are drawn over the page.
+ * `trafficLightPosition: { x: 12, y: 13 }` (`src/main/main-window.ts`) is the top left of the group,
+ * not of one dot: macOS spaces the three 13px dots 23px apart, so they cover x 12..71 and y 13..26,
+ * centre line y 19.5. A full-bleed panel puts this header under them, so the inset clears the whole
+ * group rather than one dot, and it is the same 82px where the app frame's top row starts beside
+ * those dots - one gutter width across the app instead of a second, tighter one here. The header
+ * keeps its default height, which leaves the tab row's centre line on the dots'. The inset stays
+ * part of the drag region, which keeps the window movable at full bleed.
+ */
+.browser-panel-expanded.browser-panel-mac-controls .browser-panel-header {
+  padding-inline-start: 82px;
+}
+
+.browser-panel-expanded .browser-tabs {
+  min-width: 0;
+  flex: 1;
+}
+
+.browser-secret-card {
+  display: grid;
+  gap: var(--openbot-space-4);
+}
+
+.browser-secret-card > p {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-lg);
+}
+
+.browser-secret-card strong {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.browser-secret-card .browser-takeover-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+
+.browser-secret-password,
+.browser-secret-code {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.browser-secret-label {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.browser-secret-code .otp-input {
+  container-type: inline-size;
+  justify-items: start;
+}
+
+.browser-secret-code .otp-input-slots {
+  --otp-slot-size: min(
+    34px,
+    calc((100cqw - (var(--otp-length) - 1) * var(--otp-slot-gap) - var(--otp-group-gap)) / var(--otp-length))
+  );
+}
+
+.browser-secret-code .otp-input-message {
+  text-align: start;
+  justify-content: flex-start;
+}
+
+.browser-secret-card > .browser-secret-error {
+  color: var(--openbot-danger);
+}
+
+.browser-secret-card .browser-takeover-preview-viewport {
+  width: 100%;
+  max-height: 280px;
+}
+
+.browser-secret-card .browser-takeover-preview-viewport img {
+  min-height: 0;
+  object-fit: contain;
+}

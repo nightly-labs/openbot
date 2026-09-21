@@ -18,8 +18,8 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
+import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import type { JSX } from "@solidjs/web";
-import type { BrowserViewRuntime } from "../browser/BrowserLiveView";
 import type { ConversationRuntime } from "./conversation-runtime";
 
 /**

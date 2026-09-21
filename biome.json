@@ -207,6 +207,7 @@
     },
     {
       "includes": ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
+      "plugins": ["./tools/ui-foundation/no-desktop-preload.grit"],
       "linter": {
         "rules": {
           "style": {

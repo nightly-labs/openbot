@@ -14,6 +14,11 @@ Do not import renderer, main, backend, or preload code, or call `window.openbot`
 Receive data and actions through typed props and callbacks. Move components; do not copy them.
 Preserve existing markup, styles, and behavior unless the user requests a design change.
 Shared feature CSS lives in this package. The app stylesheet imports it in the existing order.
+`features/conversation/conversation.css` is the ordered style manifest. Keep component rules in
+its `styles/` directory and preserve override order. Do not import those fragments separately.
+Keep platform features in typed content slots or adapters, not environment checks in shared UI.
+Biome rejects desktop preload access as well as application imports; keep its boundary fixtures
+in `tools/ui-foundation/fixtures` when extending the rule.
 
 Check affected desktop, public web, preview, and Storybook consumers. Existing feature tests
 remain in the renderer test harness and import this package. Run focused checks only, as required

@@ -1,7 +1,7 @@
 import type { BrowserControlSession, BrowserTab } from "@openbot/contracts/ipc";
+import BrowserPanel from "@openbot/ui/features/browser/BrowserPanel";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import BrowserPanel from "../src/features/conversation/BrowserPanel";
 
 const tab: BrowserTab = {
   id: "tab-docs",
@@ -28,6 +28,13 @@ const meta = {
   component: BrowserPanel,
   args: {
     open: true,
+    liveViewTabId: null,
+    liveViewRuntime: {
+      startLiveView: fn(async () => undefined),
+      stopLiveView: fn(async () => undefined),
+      sendLiveViewInput: fn(async () => undefined),
+      onLiveViewEvent: fn(() => () => undefined),
+    },
     tabs: [tab],
     activeTab: tab,
     activeControl: undefined,

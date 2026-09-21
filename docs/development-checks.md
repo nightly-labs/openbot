@@ -151,6 +151,11 @@ The UI fixtures have two trees. `renderer` breaks every check beside valid examp
 `renderer-clean` breaks none. Both are needed: a check that reports once per file can falsely reject
 a valid example without changing the failure count in the first tree.
 
+The shared UI Biome override also runs `tools/ui-foundation/no-desktop-preload.grit`.
+It rejects direct `window.openbot` and `globalThis.openbot` access, including optional and
+literal indexed forms. Browser APIs, comments, and string documentation remain valid.
+Its positive and negative fixtures run in `scripts/ui-foundation-check.test.ts`.
+
 ### Removed rules and their limits
 
 - `no-runtime-typeof` could not distinguish valid narrowing of `unknown` at a trust boundary from

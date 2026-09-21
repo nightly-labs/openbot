@@ -1,0 +1,383 @@
+.message-attachments {
+  display: grid;
+  width: min(100%, 256px);
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.message-attachment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
+  min-width: 0;
+  min-height: 56px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface-raised);
+  padding: 7px;
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    border-color var(--openbot-duration-hover) ease;
+}
+
+[data-slot="bubble"]:not([data-variant="ghost"]) > [data-slot="bubble-content"] > .message-attachments:last-child {
+  margin-bottom: var(--openbot-space-1);
+}
+
+[data-slot="bubble"]:not([data-variant="ghost"])
+  > [data-slot="bubble-content"]
+  > .message-attachments-group:last-child {
+  margin-bottom: var(--openbot-space-1);
+}
+
+[data-slot="bubble"]:not([data-variant="ghost"])
+  > [data-slot="bubble-content"]
+  > .message-attachments:last-child
+  .message-attachment {
+  border-radius: var(--openbot-radius-bubble-inset);
+}
+
+.message-attachments-group {
+  display: grid;
+  width: min(100%, 256px);
+  margin-top: var(--openbot-space-2);
+  gap: var(--openbot-space-1-5);
+}
+
+/* The cards paint over the island's tucked bottom edge, so they need to sit in
+   the positioned layer the island's own `z-index` puts it in. */
+.message-attachments-group .message-attachments {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: 0;
+}
+
+/* The island tucks its lower corners under the attachment stack, so the gap the
+   group would otherwise add is cancelled by the same amount the island pads. */
+.message-attachments-group:has(.attachment-download-island) {
+  gap: 0;
+}
+
+.attachment-download-island {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  min-height: var(--openbot-control-xl);
+  align-items: center;
+  border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
+  background: var(--openbot-accent-strong);
+  box-shadow: 0 0 0 1px var(--openbot-accent-soft);
+  -webkit-backdrop-filter: blur(var(--openbot-space-3));
+  backdrop-filter: blur(var(--openbot-space-3));
+  padding: calc(var(--openbot-space-1) + 1px) var(--openbot-space-1-5)
+    calc(var(--openbot-space-4) + var(--openbot-space-1) - 1px);
+  margin-bottom: calc(var(--openbot-space-4) * -1);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-accent-text);
+}
+
+.attachment-download-island__copy {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--openbot-accent-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-download-island__action-shell {
+  display: grid;
+  flex-shrink: 0;
+}
+
+.attachment-download-island__action.ui-button {
+  width: 100%;
+  height: var(--openbot-control-sm);
+  min-height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-surface-light);
+  box-shadow: 0 1px 2px var(--openbot-shadow-popover-ambient);
+  padding: 0 var(--openbot-space-3) 0 var(--openbot-space-2);
+  color: var(--openbot-text-on-light);
+  transition:
+    box-shadow var(--openbot-duration-normal) var(--openbot-ease-out),
+    transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.attachment-download-island__action.ui-button:disabled {
+  cursor: progress;
+  opacity: 1;
+}
+
+.attachment-download-island__action.ui-button:active:not(:disabled):not([data-disabled]) {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attachment-download-island__action.ui-button:hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-surface-light);
+    box-shadow:
+      0 0 0 1px var(--openbot-text-dim-on-light),
+      0 1px 2px var(--openbot-shadow-popover-ambient);
+    color: var(--openbot-text-on-light);
+  }
+}
+
+.attachment-download-island__action-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.attachment-download-island__action-label {
+  --text-swap-dur: var(--openbot-duration-normal);
+  --text-swap-translate-y: var(--openbot-space-1);
+  --text-swap-blur: var(--openbot-space-0-5);
+  --text-swap-ease: var(--openbot-ease-in-out);
+
+  display: inline-grid;
+  min-width: calc(var(--openbot-control-xl) + var(--openbot-space-3));
+  color: var(--openbot-text-on-light);
+  font-weight: var(--openbot-weight-semibold);
+  text-align: left;
+}
+
+.attachment-download-island__action-label > [data-text] {
+  transform: translateY(0);
+  opacity: 1;
+  filter: blur(0);
+  grid-area: 1 / 1;
+  transition:
+    transform var(--text-swap-dur) var(--text-swap-ease),
+    filter var(--text-swap-dur) var(--text-swap-ease),
+    opacity var(--text-swap-dur) var(--text-swap-ease);
+}
+
+.attachment-download-island__action-label[data-state="action"] > [data-text="pending"] {
+  transform: translateY(var(--text-swap-translate-y));
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+}
+
+.attachment-download-island__action-label[data-state="pending"] > [data-text="action"] {
+  transform: translateY(calc(var(--text-swap-translate-y) * -1));
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+}
+
+.attachment-download-island__icon.t-icon-swap {
+  --icon-swap-dur: var(--openbot-duration-overlay);
+  --icon-swap-blur: var(--openbot-space-0-5);
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: var(--openbot-ease-in-out);
+
+  position: relative;
+  display: inline-grid;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.attachment-download-island__icon.t-icon-swap .t-icon {
+  position: relative;
+  top: 1px;
+  display: grid;
+  grid-area: 1 / 1;
+  place-items: center;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease);
+}
+
+.attachment-download-island__icon.t-icon-swap svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.attachment-download-island__icon.t-icon-swap .ui-spinner {
+  border-color: var(--openbot-text-dim-on-light);
+  border-top-color: currentColor;
+}
+
+.attachment-download-island__icon.t-icon-swap[data-state="a"] .t-icon[data-icon="a"],
+.attachment-download-island__icon.t-icon-swap[data-state="b"] .t-icon[data-icon="b"] {
+  transform: scale(1);
+  opacity: 1;
+  filter: blur(0);
+}
+
+.attachment-download-island__icon.t-icon-swap[data-state="a"] .t-icon[data-icon="b"],
+.attachment-download-island__icon.t-icon-swap[data-state="b"] .t-icon[data-icon="a"] {
+  transform: scale(var(--icon-swap-start-scale));
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attachment-download-island__action.ui-button,
+  .attachment-download-island__icon.t-icon-swap .t-icon,
+  .attachment-download-island__action-label > [data-text] {
+    transition: none;
+  }
+}
+
+.ui-button.attachment-preview-button {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+}
+
+.attachment-preview-button:disabled {
+  cursor: default;
+}
+
+.attachment-file-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-file-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.message-attachment strong {
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: 560;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-attachment small {
+  color: var(--openbot-text-readable);
+  font-size: var(--openbot-text-sm);
+  line-height: 15px;
+}
+
+.attachment-open-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  padding: 0;
+  color: var(--openbot-text-muted);
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.attachment-open-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.attachment-open-button:focus-visible,
+.attachment-preview-button:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.attachment-open-button:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .message-attachment:hover {
+    border-color: var(--openbot-border-strong);
+    background: var(--openbot-bg-control-hover);
+  }
+
+  .attachment-open-button:hover {
+    background: var(--openbot-bg-control-active);
+    color: var(--openbot-text-primary);
+  }
+}
+
+.agent-queue-panel {
+  --queue-row-height: 29px;
+  --queue-composer-overlap: 14px;
+  /* The leading glyph fills its column, so this inset is the gap the eye sees on the left. */
+  --queue-row-inset-start: 13px;
+  /* The trailing buttons are 26px boxes around 16px glyphs, so 5px of the gap is already in them. */
+  --queue-row-inset-end: 8px;
+  /* What stays between the panel edge and a row's hover fill, the same on all four sides. */
+  --queue-row-gutter: 5px;
+
+  position: relative;
+  z-index: 10;
+  overflow: visible;
+  margin: 0 12px calc(-1 * var(--queue-composer-overlap));
+  border: 1px solid var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-queue-surface);
+  padding-bottom: var(--queue-composer-overlap);
+  box-shadow: none;
+  animation: queue-panel-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.agent-queue-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.agent-queue-slot[data-open="false"] {
+  grid-template-rows: 0fr;
+}
+
+.agent-queue-slot-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-queue-panel-resize {
+  min-height: 0;
+}
+
+/*
+ * Why the queue waits, above the rows that wait. Sits inside the panel's own
+ * padding because the list below owns the row insets, not the panel.
+ */
+.agent-queue-hold {
+  margin: 0;
+  padding: var(--queue-row-gutter) var(--queue-row-inset-end) 0 var(--queue-row-inset-start);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

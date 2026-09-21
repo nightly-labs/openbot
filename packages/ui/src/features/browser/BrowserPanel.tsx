@@ -26,7 +26,7 @@ import {
 } from "@openbot/ui/features/conversation/ConversationIcons";
 import { Portal } from "@solidjs/web";
 import { createEffect, For, onSettled, Show } from "solid-js";
-import BrowserLiveView, { type BrowserViewRuntime } from "../browser/BrowserLiveView";
+import BrowserLiveView, { type BrowserViewRuntime } from "./BrowserLiveView";
 
 const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailAction, string> = {
   open: "Opening a page…",
@@ -74,7 +74,7 @@ interface BrowserPanelProps {
   onSurface: (element: HTMLDivElement | undefined) => void;
   /** The tab to draw here, for a host whose browser is not a view on this screen. Local: `null`. */
   liveViewTabId: string | null;
-  liveViewRuntime?: BrowserViewRuntime;
+  liveViewRuntime: BrowserViewRuntime;
   canCloseTabs?: boolean;
   onBack: () => void;
   onEnterPip: () => void;

@@ -56,7 +56,7 @@ import {
   type RemoteFileUpload,
   type RemoteTeamConnectionUpdate,
 } from "@openbot/team-client/remote-peer";
-import type { BrowserViewRuntime } from "../browser/BrowserLiveView";
+import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { acquireWebHostLock } from "./web-host-lock";
 
 export interface WebWorkspaceRuntime {

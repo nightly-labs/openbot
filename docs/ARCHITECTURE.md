@@ -1137,6 +1137,22 @@ exports use explicit subpaths such as `@openbot/ui/features/sidebar/Sidebar`. Sh
 models live at `@openbot/ui/data`. Source files are moved, not copied or re-exported from the
 renderer. Tests remain in the renderer test harness and import the package directly.
 
+The browser panel and live canvas also live in this package. Their typed `BrowserViewRuntime`
+is required; the renderer supplies the desktop preload adapter or the web host adapter.
+Shared sidebar activity and avatar mood functions use caller-supplied state. The conversation
+stylesheet is exported as `@openbot/ui/features/conversation/conversation.css`; applications
+import it in the same cascade position as the former renderer stylesheet. This file is an ordered
+manifest of component styles in `features/conversation/styles/`. Preserve import order: later
+surface and responsive rules override earlier component rules.
+
+`AgentSettingsPanel` owns the form draft, ordered save queue, avatar editor, and model controls.
+Its renderer adapter owns persisted width and native memories, routines, skills, and tables,
+which it supplies as content slots. `ConversationHeader` owns the header controls; its renderer
+adapter owns context reads, capabilities, translations, and action error handling. Both shared
+components receive typed props and callbacks. The shared-package Biome override rejects
+application imports and direct desktop preload access. Boundary fixtures run with the focused
+`scripts/ui-foundation-check.test.ts` test.
+
 Desktop sidebar persistence stays in `sidebar-pins-storage.ts` and `sidebar-sections-storage.ts`.
 The main conversation controller, application contexts, and platform adapters stay in the
 renderer. Further extraction requires explicit runtime inputs for those dependencies. React

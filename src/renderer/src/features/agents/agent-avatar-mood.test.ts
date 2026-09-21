@@ -1,6 +1,6 @@
 import type { AgentApproval, QueueSnapshot } from "@openbot/contracts/ipc";
+import { type AgentAvatarMoodsInput, computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { describe, expect, it } from "vitest";
-import { type AgentAvatarMoodsInput, computeAgentAvatarMoods } from "./agent-avatar-mood";
 
 const APPROVAL: AgentApproval = {
   requestId: "approval-1",
