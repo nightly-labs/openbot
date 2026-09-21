@@ -4,7 +4,6 @@
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { delimiter, isAbsolute, join } from "node:path";
-import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
 
 /**
  * The targets `cua-driver` ships a binary for.
@@ -65,30 +64,6 @@ export async function resolveCuaDriver(input: CuaDriverArtifactInput): Promise<s
     if (await isExecutable(candidate)) return candidate;
   }
   return null;
-}
-
-export interface CuaCursorThemeInput {
-  isPackaged: boolean;
-  resourcesPath: string;
-  sourceRoot: string;
-}
-
-/**
- * The directory that holds the OpenBot cursor, or `null` when this build ships none.
- *
- * The driver draws an agent cursor over the desktop while it acts, and reads the theme for it from
- * `CUA_DRIVER_CURSOR_THEME_DIR`. Any `<id>.cua-theme` in that directory is available by its id, so
- * OpenBot points the daemon at its own directory and needs no install step and no write at runtime.
- *
- * `null` is a status, as it is for the executable: the driver falls back to its own cursor, so a
- * build without the artifact still acts on the desktop. `scripts/build-cursor-theme.ts` writes the
- * checkout path and `electron-builder.yml` copies it to the packaged one.
- */
-export async function resolveCuaCursorTheme(input: CuaCursorThemeInput): Promise<string | null> {
-  const directory = input.isPackaged
-    ? join(input.resourcesPath, "cua-driver-theme")
-    : join(input.sourceRoot, "build", "cua-driver-theme");
-  return (await isReadable(join(directory, `${OPENBOT_CURSOR_THEME_ID}.cua-theme`))) ? directory : null;
 }
 
 /**
@@ -169,10 +144,6 @@ function* candidatePaths(input: CuaDriverArtifactInput): Generator<string> {
 
 async function isExecutable(path: string): Promise<boolean> {
   return await isAccessible(path, constants.X_OK);
-}
-
-async function isReadable(path: string): Promise<boolean> {
-  return await isAccessible(path, constants.R_OK);
 }
 
 async function isAccessible(path: string, mode: number): Promise<boolean> {

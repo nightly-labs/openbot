@@ -4,7 +4,6 @@ import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
-import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
@@ -47,9 +46,7 @@ await Promise.all([
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/static/stream.html")),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/SHA256SUMS.txt")),
   access(resolve(resourcesPath, "cua-driver/win32/x64/cua-driver.exe")),
-  access(resolve(resourcesPath, "cua-driver/win32/x64/cua-cursor-theme.exe")),
   access(resolve(resourcesPath, "cua-driver/win32/x64/LICENSE.md")),
-  access(resolve(resourcesPath, `cua-driver-theme/${OPENBOT_CURSOR_THEME_ID}.cua-theme`)),
 ]);
 // Only this platform's driver ships, so a shared `extraResources` entry is a loud failure.
 await Promise.all(["darwin", "linux"].map((name) => assertAbsent(resolve(resourcesPath, "cua-driver", name))));

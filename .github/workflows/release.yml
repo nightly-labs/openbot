@@ -210,7 +210,6 @@ jobs:
           bun run install:remote-desktop-runtime
           bun run verify:remote-desktop-runtime
           bun run prepare:cua-driver
-          bun run prepare:cursor-theme
 
       - name: Install Developer ID provisioning profile
         shell: bash

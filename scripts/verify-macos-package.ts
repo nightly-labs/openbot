@@ -4,7 +4,6 @@ import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
-import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 
@@ -65,9 +64,7 @@ await Promise.all([
   access(resolve(remoteRuntimePath, "static/stream.html")),
   access(resolve(remoteRuntimePath, "SHA256SUMS.txt")),
   access(resolve(cuaDriverPath, "cua-driver")),
-  access(resolve(cuaDriverPath, "cua-cursor-theme")),
   access(resolve(cuaDriverPath, "LICENSE.md")),
-  access(resolve(resourcesPath, `cua-driver-theme/${OPENBOT_CURSOR_THEME_ID}.cua-theme`)),
 ]);
 // Only this Mac's driver ships. A `from: build/cua-driver` that forgot the target would put the
 // Windows and Linux builds in every installer.

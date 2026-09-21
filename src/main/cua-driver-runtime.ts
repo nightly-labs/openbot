@@ -62,7 +62,6 @@ const PERMISSION_TIMEOUT_MS = 10_000;
  */
 const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
-const CURSOR_THEME_DIRECTORY_ENV = "CUA_DRIVER_CURSOR_THEME_DIR";
 const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
 
 /**
@@ -255,25 +254,6 @@ export interface CuaDriverRuntimeOptions {
   supported: boolean;
   /** Advisory only. The driver logs it; it is not a trust signal, so nothing may treat it as one. */
   hostBundleId: string;
-  /**
-   * The OpenBot cursor the driver draws while an agent acts, or `null` to leave the driver's own.
-   *
-   * The directory is where the theme file is, and the id names the theme inside it. Both reach the
-   * daemon, which owns the overlay: the `mcp` proxies are clients and configure nothing.
-   */
-  cursorTheme?: { directory: string; id: string } | null;
-  /**
-   * Whether the driver may draw its own agent cursor, asked each time the daemon starts.
-   *
-   * The driver's overlay is one window over the main screen, and it paints a cursor at the
-   * desktop's own coordinates inside that window without taking the screen's origin off them. On
-   * one screen the two are the same and the cursor lands where the agent acts. On a second screen
-   * they are not: the cursor is drawn as far from the work as the main screen's origin is from the
-   * desktop's, and a screen the overlay does not cover cannot hold it at all. A cursor in the wrong
-   * window says the agent works there, so on more than one screen OpenBot asks for no cursor
-   * rather than a misplaced one.
-   */
-  drawsAgentCursor?: () => boolean;
   platform: NodeJS.Platform;
   spawnProcess?: SpawnDriverProcess;
   onDiagnostic?: (message: string) => void;
@@ -301,8 +281,6 @@ export class CuaDriverRuntime {
   #state: ComputerUseState;
   /** Mutable, because a user may install the driver while OpenBot runs. */
   #executable: string | null;
-  /** What the running daemon was asked for, which is decided once, at the spawn below. */
-  #drawsOwnCursor = false;
   readonly #tap: CuaDriverActionTap;
 
   constructor(options: CuaDriverRuntimeOptions) {
@@ -349,12 +327,9 @@ export class CuaDriverRuntime {
 
   /**
    * Where an agent last aimed the pointer, which is where OpenBot draws its own agent cursor.
-   *
-   * `null` while the daemon draws a cursor of its own: two cursors for one agent would say the
-   * agent is in two places, and the driver's is the one the user already knows.
    */
   lastPointer(maxAgeMs: number): ObservedPointer | null {
-    return this.#drawsOwnCursor ? null : this.#tap.lastPointer(maxAgeMs);
+    return this.#tap.lastPointer(maxAgeMs);
   }
 
   /**
@@ -440,8 +415,8 @@ export class CuaDriverRuntime {
     // would have its own socket removed by it, and the daemon would then serve an address no client
     // can reach, with nothing to say it had happened.
     if (this.#stopping) await this.#stopping.catch(() => undefined);
-    if (this.running()) return;
     if (this.#starting) return this.#starting;
+    if (this.running()) return;
     this.#starting = this.#start();
     try {
       await this.#starting;
@@ -565,26 +540,19 @@ export class CuaDriverRuntime {
       await this.#removeSocket();
     }
     this.#command = await this.#linkCommandAlias(executable);
-    const drawsCursor = this.#options.drawsAgentCursor?.() ?? true;
-    this.#drawsOwnCursor = drawsCursor;
-    const cursorTheme = drawsCursor ? (this.#options.cursorTheme ?? null) : null;
-    const child = this.#spawn(
-      executable,
-      ["serve", "--socket", socketPath, ...cursorArguments(drawsCursor, cursorTheme)],
-      {
-        cwd: dirname(executable),
-        env: {
-          ...process.env,
-          [EMBEDDED_ENV]: "1",
-          ...CUA_DRIVER_VENDOR_CALLS_OFF,
-          [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
-          ...(cursorTheme ? { [CURSOR_THEME_DIRECTORY_ENV]: cursorTheme.directory } : {}),
-          ...waylandEnvironment(this.#options.platform),
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
+    // OpenBot owns the cursor on every display, including displays connected after startup.
+    const child = this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
+      cwd: dirname(executable),
+      env: {
+        ...process.env,
+        [EMBEDDED_ENV]: "1",
+        ...CUA_DRIVER_VENDOR_CALLS_OFF,
+        [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
+        ...waylandEnvironment(this.#options.platform),
       },
-    );
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
     this.#child = child;
     this.#pipeDiagnostics(child);
     // `spawn` reports a missing or unreadable executable through this event, after it returns. An
@@ -766,18 +734,6 @@ function describe(error: unknown): string {
  * A value the user set already is left alone, so the fallback stays reachable when a compositor
  * handles the native backend badly.
  */
-/**
- * The `serve` flags for the agent cursor: none at all, or the OpenBot theme when the build ships one.
- *
- * The theme is named only together with the directory it is in. A daemon that cannot find the id
- * falls back to its own cursor without a word, so passing the flag on its own would claim a cursor
- * OpenBot does not ship and say nothing when the claim is wrong.
- */
-function cursorArguments(draws: boolean, theme: { directory: string; id: string } | null): readonly string[] {
-  if (!draws) return ["--no-overlay"];
-  return theme ? ["--cursor-theme", theme.id] : [];
-}
-
 function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
   if (platform !== "linux" || process.env[WAYLAND_ENV] !== undefined) return {};
   return process.env.XDG_SESSION_TYPE === "wayland" ? { [WAYLAND_ENV]: "1" } : {};

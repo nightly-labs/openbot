@@ -55,7 +55,7 @@ describe("the cua-driver pin", () => {
     expect(() =>
       parseCuaDriverLock(
         withLock((value) => {
-          const { "cua-cursor-theme": _dropped, ...files } = value.artifacts["darwin-arm64"].files;
+          const { "cua-driver": _dropped, ...files } = value.artifacts["darwin-arm64"].files;
           return {
             ...value,
             artifacts: { ...value.artifacts, "darwin-arm64": { ...value.artifacts["darwin-arm64"], files } },

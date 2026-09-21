@@ -62,7 +62,7 @@ describe("CuaDriverRuntime", () => {
 
     expect(spawned).toHaveLength(1);
     expect(spawned[0].command).toBe("/opt/cua/bin/cua-driver");
-    expect(spawned[0].args).toEqual(["serve", "--socket", join(socketDirectory, "driver.sock")]);
+    expect(spawned[0].args).toEqual(["serve", "--socket", join(socketDirectory, "driver.sock"), "--no-overlay"]);
     expect(driver.socketPath().startsWith(tmpdir())).toBe(true);
     expect(driver.socketPath()).not.toBe(join(tmpdir(), "driver.sock"));
   });
@@ -100,60 +100,17 @@ describe("CuaDriverRuntime", () => {
     expect(spawned[0].options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
   });
 
-  it("gives the daemon the OpenBot cursor, so a user sees which pointer an agent moves", async () => {
-    const { driver, spawned } = await runtime({
-      cursorTheme: {
-        directory: "/Applications/OpenBot.app/Contents/Resources/cua-driver-theme",
-        id: "run.openbot.cursor",
-      },
-    });
-    await driver.start();
-
-    expect(spawned[0].args).toContain("--cursor-theme");
-    expect(spawned[0].args.at(-1)).toBe("run.openbot.cursor");
-    expect(spawned[0].options.env.CUA_DRIVER_CURSOR_THEME_DIR).toBe(
-      "/Applications/OpenBot.app/Contents/Resources/cua-driver-theme",
-    );
-  });
-
-  it("asks for no cursor on a second screen, where the driver draws it away from the work", async () => {
-    // The driver's overlay covers the main screen and paints at the desktop's coordinates inside
-    // it, so on a second screen the cursor lands as far from the agent as that screen's origin.
-    const { driver, spawned } = await runtime({
-      cursorTheme: {
-        directory: "/Applications/OpenBot.app/Contents/Resources/cua-driver-theme",
-        id: "run.openbot.cursor",
-      },
-      drawsAgentCursor: () => false,
-    });
-    await driver.start();
-
-    expect(spawned[0].args).toContain("--no-overlay");
-    expect(spawned[0].args).not.toContain("--cursor-theme");
-    expect(spawned[0].options.env.CUA_DRIVER_CURSOR_THEME_DIR).toBeUndefined();
-  });
-
-  it("keeps its own agent cursor to itself while the driver draws one, so a user sees one pointer", async () => {
+  it("leaves the cursor to OpenBot on every display", async () => {
     class ActingTap extends CuaDriverActionTap {
       override lastPointer() {
         return { tool: "click", x: 600, y: 500, at: 0 };
       }
     }
-    const drawn = await runtime({ actionTap: new ActingTap(), drawsAgentCursor: () => true });
-    await drawn.driver.start();
-    const instead = await runtime({ actionTap: new ActingTap(), drawsAgentCursor: () => false });
-    await instead.driver.start();
-
-    expect(drawn.driver.lastPointer(60_000)).toBeNull();
-    expect(instead.driver.lastPointer(60_000)).toEqual({ tool: "click", x: 600, y: 500, at: 0 });
-  });
-
-  it("names no cursor when the build ships none, so the driver keeps its own", async () => {
-    const { driver, spawned } = await runtime({ cursorTheme: null });
+    const { driver, spawned } = await runtime({ actionTap: new ActingTap() });
     await driver.start();
 
-    expect(spawned[0].args).not.toContain("--cursor-theme");
-    expect(spawned[0].options.env.CUA_DRIVER_CURSOR_THEME_DIR).toBeUndefined();
+    expect(spawned[0].args).toContain("--no-overlay");
+    expect(driver.lastPointer(60_000)).toEqual({ tool: "click", x: 600, y: 500, at: 0 });
   });
 
   it("makes neither call the driver makes to its own vendor, because OpenBot ships the driver and pins it", async () => {
@@ -180,6 +137,32 @@ describe("CuaDriverRuntime", () => {
     await Promise.all([driver.start(), driver.start(), driver.start()]);
 
     expect(spawned).toHaveLength(1);
+  });
+
+  it("waits for socket readiness before a second state probe reads permissions", async () => {
+    const socket = Promise.withResolvers<void>();
+    const waiting = Promise.withResolvers<void>();
+    const readPermissions = vi.fn(async () => [{ id: "accessibility" as const, granted: true }]);
+    const { driver, spawned } = await runtime({
+      waitForSocket: () => {
+        waiting.resolve();
+        return socket.promise;
+      },
+      readPermissions,
+    });
+    const first = driver.state();
+    await waiting.promise;
+    const second = driver.state();
+    // Drain the second caller's continuation while the socket is still unavailable.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(readPermissions).not.toHaveBeenCalled();
+    socket.resolve();
+    await Promise.all([first, second]);
+
+    expect(spawned).toHaveLength(1);
+    expect(readPermissions).toHaveBeenCalledTimes(2);
+    await driver.stop();
   });
 
   it("offers no MCP entry before the daemon runs, and one with no working directory after", async () => {
@@ -472,7 +455,7 @@ describe("CuaDriverRuntime", () => {
     await driver.start();
 
     expect(spawned).toHaveLength(1);
-    expect(spawned[0].args).toEqual(["serve", "--socket", driver.socketPath()]);
+    expect(spawned[0].args).toEqual(["serve", "--socket", driver.socketPath(), "--no-overlay"]);
     expect(driver.socketPath().startsWith("\\\\.\\pipe\\")).toBe(true);
     // A Windows process started without `SystemRoot` cannot load the system libraries it links
     // against, so the proxy would fail before it reached the daemon.

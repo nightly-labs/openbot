@@ -29,7 +29,6 @@ import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
 import type {
   AgentStatus,
   AppVariant,
@@ -68,7 +67,7 @@ import {
   chooseTarget,
   liveSession,
 } from "./computer-use-target-window";
-import { isSupportedCuaDriverTarget, resolveCuaCursorTheme, resolveCuaDriver } from "./cua-driver-artifact";
+import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
 import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
@@ -579,11 +578,6 @@ export async function createApplicationServices({
       localAppDataDirectory: process.env.LOCALAPPDATA,
       applicationsDirectory: "/Applications",
     });
-  const cuaCursorThemeDirectory = await resolveCuaCursorTheme({
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-    sourceRoot: resolve(__dirname, "../.."),
-  });
   const cuaDriver = new CuaDriverRuntime({
     executable: await resolveCuaDriverExecutable(),
     resolveExecutable: resolveCuaDriverExecutable,
@@ -603,10 +597,6 @@ export async function createApplicationServices({
     }),
     supported: isSupportedCuaDriverTarget(process.platform, process.arch),
     hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
-    cursorTheme: cuaCursorThemeDirectory ? { directory: cuaCursorThemeDirectory, id: OPENBOT_CURSOR_THEME_ID } : null,
-    // Keep cursor ownership stable when displays are connected or removed. The OpenBot overlay
-    // follows display changes without restarting the daemon or its provider connections.
-    drawsAgentCursor: () => false,
     platform: process.platform,
     onDiagnostic: (message) => {
       void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);

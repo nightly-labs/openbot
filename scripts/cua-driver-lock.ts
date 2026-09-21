@@ -21,8 +21,6 @@ interface CuaDriverTargetDescriptor {
   readonly archive: "tar.gz" | "zip";
   /** The name `resolveCuaDriver` looks for inside the installed directory. */
   readonly executable: "cua-driver" | "cua-driver.exe";
-  /** The theme compiler, which `scripts/build-cursor-theme.ts` runs at packaging time. */
-  readonly cursorThemeTool: "cua-cursor-theme" | "cua-cursor-theme.exe";
   readonly files: readonly CuaDriverShippedFile[];
 }
 
@@ -48,11 +46,7 @@ export const CUA_DRIVER_TARGETS = {
     assetSuffix: "darwin-universal-binary.tar.gz",
     archive: "tar.gz",
     executable: "cua-driver",
-    cursorThemeTool: "cua-cursor-theme",
-    files: [
-      { path: "cua-driver", executable: true },
-      { path: "cua-cursor-theme", executable: true },
-    ],
+    files: [{ path: "cua-driver", executable: true }],
   },
   "linux-x64": {
     platform: "linux",
@@ -60,12 +54,10 @@ export const CUA_DRIVER_TARGETS = {
     assetSuffix: "linux-x86_64-binary.tar.gz",
     archive: "tar.gz",
     executable: "cua-driver",
-    cursorThemeTool: "cua-cursor-theme",
     // `wayland-helper` holds the GNOME shell extension that gives the driver window rectangles on
     // Wayland. OpenBot does not install or enable it, but the user cannot get it separately.
     files: [
       { path: "cua-driver", executable: true },
-      { path: "cua-cursor-theme", executable: true },
       { path: "wayland-helper/install.sh", executable: true },
       { path: "wayland-helper/README.md", executable: false },
       { path: "wayland-helper/winrects@cua/metadata.json", executable: false },
@@ -78,11 +70,7 @@ export const CUA_DRIVER_TARGETS = {
     assetSuffix: "windows-x86_64-binary.zip",
     archive: "zip",
     executable: "cua-driver.exe",
-    cursorThemeTool: "cua-cursor-theme.exe",
-    files: [
-      { path: "cua-driver.exe", executable: true },
-      { path: "cua-cursor-theme.exe", executable: true },
-    ],
+    files: [{ path: "cua-driver.exe", executable: true }],
   },
 } as const satisfies Record<CuaDriverTarget, CuaDriverTargetDescriptor>;
 
@@ -167,11 +155,6 @@ export function cuaDriverLicenseUrl(lock: CuaDriverLock): string {
 export function cuaDriverInstallRoot(sourceRoot: string, target: CuaDriverTarget): string {
   const { platform, architecture } = CUA_DRIVER_TARGETS[target];
   return resolve(sourceRoot, "build/cua-driver", platform, architecture);
-}
-
-/** The theme compiler inside an installed tree. It ships with the driver and shares its pin. */
-export function cuaCursorThemeToolPath(sourceRoot: string, target: CuaDriverTarget): string {
-  return resolve(cuaDriverInstallRoot(sourceRoot, target), CUA_DRIVER_TARGETS[target].cursorThemeTool);
 }
 
 export function cuaDriverTarget(

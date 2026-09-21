@@ -4,7 +4,6 @@ import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
-import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
@@ -33,10 +32,8 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
   // Computer Use is the one native runtime the Linux build does ship.
   access(resolve(resourcesPath, "cua-driver/linux/x64/cua-driver")),
-  access(resolve(resourcesPath, "cua-driver/linux/x64/cua-cursor-theme")),
   access(resolve(resourcesPath, "cua-driver/linux/x64/wayland-helper/winrects@cua/extension.js")),
   access(resolve(resourcesPath, "cua-driver/linux/x64/LICENSE.md")),
-  access(resolve(resourcesPath, `cua-driver-theme/${OPENBOT_CURSOR_THEME_ID}.cua-theme`)),
 ]);
 await Promise.all(
   ["darwin", "win32"].map((name) =>
