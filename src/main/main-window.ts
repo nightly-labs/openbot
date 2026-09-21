@@ -10,7 +10,12 @@
  */
 
 import { join } from "node:path";
-import { type AgentEvent, IPC_CHANNELS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type ComputerUseHighlightPlacement,
+  IPC_CHANNELS,
+  LOCAL_SERVER_ID,
+} from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { app, BrowserWindow, clipboard, type Display, Menu, type Rectangle, screen } from "electron";
 import type { AgentService } from "../backend/agent-service";
@@ -21,6 +26,7 @@ import {
   isSelectAllShortcut,
   isToggleDevToolsShortcut,
 } from "../backend/browser-shortcuts";
+import type { HighlightDisplay } from "./computer-use-highlight-window";
 import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import {
@@ -329,6 +335,90 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
     if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
   });
   return window;
+}
+
+/**
+ * The overlay that carries the Computer Use rim over the window an agent works in.
+ *
+ * It covers the whole desktop and then stays still: the rim moves inside it, so a window the user
+ * drags is followed by a repaint rather than by a window move on every frame.
+ *
+ * It is a panel that is never focusable and never in Mission Control, so it does not enter the
+ * user's window order. It floats over the desktop, because macOS gives no way to hold one
+ * application's window between two of another's, and a rim the user cannot see says nothing about
+ * where the agent works. It is created hidden and click-through.
+ */
+export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWindow {
+  const window = new BrowserWindow({
+    ...bounds,
+    show: false,
+    transparent: true,
+    frame: false,
+    focusable: false,
+    hiddenInMissionControl: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    enableLargerThanScreen: true,
+    hasShadow: false,
+    skipTaskbar: true,
+    acceptFirstMouse: false,
+    type: "panel",
+    backgroundColor: "#00000000",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.cjs"),
+      contextIsolation: true,
+      devTools: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  });
+  // A floating level, which is the only thing that holds this window in front on macOS: both
+  // `moveAbove` and `moveTop` return without an error and leave a transparent panel where it was.
+  // The level stays below the menu bar, and the rim is a thin edge around one window, so being in
+  // front costs the user almost none of what is behind it.
+  window.setAlwaysOnTop(true, "floating");
+  // The agent works wherever the user left the window, which can be another Space or another
+  // application's full screen. One overlay on every Space is what lets the rim follow it there
+  // without a second window and without pulling the user out of the Space they are on.
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Nothing on this surface may be pressed, and it covers another application's whole window, so
+  // every event is handed straight on to the window below it.
+  window.setIgnoreMouseEvents(true, { forward: true });
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event, targetUrl) => {
+    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
+  });
+  return window;
+}
+
+export function loadComputerUseHighlightRenderer(window: BrowserWindow): Promise<void> {
+  const developmentUrl = process.env.ELECTRON_RENDERER_URL;
+  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  url.searchParams.set("surface", "computer-use-highlight");
+  return window.loadURL(url.toString());
+}
+
+/**
+ * Every display the Computer Use overlay is built over, one overlay for each.
+ *
+ * Not one window over all of them: macOS gives every display its own Space, so a window the size of
+ * the desktop is drawn on one display and clipped away on all the others. An agent working on the
+ * second display would then be marked by a rim nobody can see.
+ */
+export function computerUseDisplays(): HighlightDisplay[] {
+  return screen.getAllDisplays().map((display) => ({ id: display.id, bounds: display.bounds }));
+}
+
+/** Where the overlay draws the rim. Sent on every placement, and read by that surface only. */
+export function sendComputerUseHighlightPlacement(
+  window: BrowserWindow,
+  placement: ComputerUseHighlightPlacement,
+): void {
+  sendToRenderer(window, IPC_CHANNELS.computerUseHighlightPlacement, placement);
 }
 
 export function showMainWindow(window: BrowserWindow): void {

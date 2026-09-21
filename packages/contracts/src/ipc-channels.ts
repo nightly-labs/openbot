@@ -21,6 +21,7 @@ export const IPC_CHANNELS = {
   dynamicIslandSetInteractive: "dynamic-island:set-interactive",
   computerUseGetState: "computer-use:get-state",
   computerUseOpenPermissionPane: "computer-use:open-permission-pane",
+  computerUseHighlightPlacement: "computer-use:highlight-placement",
   openExternal: "app:open-external",
   connectProvider: "app:connect-provider",
   refreshAgentProviders: "app:refresh-agent-providers",

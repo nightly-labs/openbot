@@ -67,13 +67,20 @@ const ARROW = [
   [27, 31],
   [14, 49],
 ] as const;
-/** How much of the canvas the arrow takes. */
-const ARROW_SCALE = 0.86;
+/**
+ * How much of the canvas the arrow takes.
+ *
+ * The arrow grows from the tip down and to the right, and the tip is fixed at `TIP`, so the canvas
+ * leaves 90 units to the right of it and 87 below. That, and the room the glow needs around the
+ * shape, is the whole budget: a larger arrow is cut off at the edge of the canvas rather than
+ * drawn larger on the screen.
+ */
+const ARROW_SCALE = 1.55;
 /** How round each corner is, which is what keeps the dart soft rather than sharp. */
 const ARROW_CORNER = 5 * ARROW_SCALE;
 /** The middle of the arrow, which is what a glow grows around. */
 const ARROW_CENTRE = { x: 21.5 * ARROW_SCALE, y: 25 * ARROW_SCALE } as const;
-const ARROW_OUTLINE_WIDTH = 4.4;
+const ARROW_OUTLINE_WIDTH = 8;
 
 /**
  * The glow behind the arrow: the same shape, larger, in weaker copies of the accent.
@@ -82,16 +89,16 @@ const ARROW_OUTLINE_WIDTH = 4.4;
  * faint enough that the sum reads as a halo rather than as an outline.
  */
 const GLOW = [
-  { scale: 158, opacity: 7 },
-  { scale: 146, opacity: 9 },
-  { scale: 134, opacity: 11 },
-  { scale: 122, opacity: 14 },
-  { scale: 110, opacity: 18 },
+  { scale: 127, opacity: 7 },
+  { scale: 121, opacity: 9 },
+  { scale: 115, opacity: 11 },
+  { scale: 109, opacity: 14 },
+  { scale: 104, opacity: 18 },
 ] as const;
 
 /** The mark the click draws on the point, in the same accent-and-outline treatment. */
-const MARK_DIAMETER = 16;
-const MARK_OUTLINE_WIDTH = 3;
+const MARK_DIAMETER = 29;
+const MARK_OUTLINE_WIDTH = 5;
 /** How far a Bezier control point travels toward a corner to draw a circular arc. */
 const CIRCULAR_TANGENT = 0.5523;
 const PULSE_FRAMES = 15;

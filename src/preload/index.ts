@@ -11,6 +11,9 @@ import {
   type AttachmentImportEvent,
   type BrowserPreview,
   COMPUTER_USE_STATUSES,
+  type ComputerUseCoveredArea,
+  type ComputerUseCursorPoint,
+  type ComputerUseHighlightPlacement,
   type ComputerUsePermission,
   type ComputerUseState,
   type ConversationMessage,
@@ -145,6 +148,52 @@ function decodeComputerUseState(value: unknown): ComputerUseState {
     permissions: value.permissions.map(decodeComputerUsePermission),
     message: value.message,
   };
+}
+
+function decodeComputerUseCursorPoint(value: unknown): ComputerUseCursorPoint | null {
+  if (value === null || value === undefined) return null;
+  if (!isDynamicRecord(value) || typeof value.x !== "number" || typeof value.y !== "number") {
+    throw new Error("Invalid Computer Use highlight placement.");
+  }
+  return { x: value.x, y: value.y };
+}
+
+function decodeComputerUseHighlightPlacement(value: unknown): ComputerUseHighlightPlacement {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.x !== "number" ||
+    typeof value.y !== "number" ||
+    typeof value.width !== "number" ||
+    typeof value.height !== "number" ||
+    typeof value.cornerRadius !== "number" ||
+    typeof value.windowTitle !== "string" ||
+    !Array.isArray(value.covered)
+  ) {
+    throw new Error("Invalid Computer Use highlight placement.");
+  }
+  return {
+    x: value.x,
+    y: value.y,
+    width: value.width,
+    height: value.height,
+    cornerRadius: value.cornerRadius,
+    windowTitle: value.windowTitle,
+    cursor: decodeComputerUseCursorPoint(value.cursor),
+    covered: value.covered.map(decodeComputerUseCoveredArea),
+  };
+}
+
+function decodeComputerUseCoveredArea(value: unknown): ComputerUseCoveredArea {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.x !== "number" ||
+    typeof value.y !== "number" ||
+    typeof value.width !== "number" ||
+    typeof value.height !== "number"
+  ) {
+    throw new Error("Invalid Computer Use highlight placement.");
+  }
+  return { x: value.x, y: value.y, width: value.width, height: value.height };
 }
 
 function decodeComputerUsePermission(value: unknown): ComputerUsePermission {
@@ -831,6 +880,12 @@ const openbotApi: OpenBotDesktopApi = {
   getComputerUseState: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseGetState).then(decodeComputerUseState),
   openComputerUsePermissionPane: (permission) =>
     ipcRenderer.invoke(IPC_CHANNELS.computerUseOpenPermissionPane, permission).then(decodeComputerUseState),
+  onComputerUseHighlightPlacement: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, placement: unknown) =>
+      listener(decodeComputerUseHighlightPlacement(placement));
+    ipcRenderer.on(IPC_CHANNELS.computerUseHighlightPlacement, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.computerUseHighlightPlacement, handler);
+  },
   openExternal: (destination) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, destination),
   connectProvider: (provider) => ipcRenderer.invoke(IPC_CHANNELS.connectProvider, provider),
   // Decoded, unlike its two neighbours: this reply is read straight after the user's own CLI was

@@ -634,6 +634,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       grantedComputerUsePermissions.add(permission);
       return computerUseState();
     },
+    // The rim is drawn over another application's window, which the preview has none of, so this
+    // subscribes to a stream that never carries anything.
+    onComputerUseHighlightPlacement: () => () => undefined,
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),

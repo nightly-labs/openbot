@@ -91,6 +91,7 @@ export const IPC_ENDPOINTS = {
   computerUse: {
     getState: request(IPC_CHANNELS.computerUseGetState),
     openPermissionPane: request(IPC_CHANNELS.computerUseOpenPermissionPane),
+    highlightPlacement: event(IPC_CHANNELS.computerUseHighlightPlacement),
   },
   skills: {
     localList: request(IPC_CHANNELS.skillsLocalList),

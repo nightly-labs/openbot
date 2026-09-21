@@ -145,3 +145,92 @@
   justify-content: flex-end;
   margin-top: var(--openbot-space-2);
 }
+
+/*
+ * The hue over the window an agent works in: one even rim of the accent around the whole border,
+ * with a short fall inward. The middle of the window keeps no paint at all, because the agent may
+ * hold the window for minutes and what it types has to stay as readable as before.
+ *
+ * Nothing here moves. A turning or breathing edge is movement at the side of the eye for the whole
+ * length of the task, which costs more attention than it returns.
+ */
+.computer-use-window-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--computer-use-window-radius);
+  /*
+   * The rim, then two falls inward from every edge: a near one that carries most of the hue and a
+   * far one that takes it out slowly, so the window reads as tinted rather than outlined. All three
+   * are even the whole way round.
+   */
+  box-shadow:
+    inset 0 0 0 2px var(--openbot-accent),
+    inset 0 0 44px -4px var(--openbot-accent-strong),
+    inset 0 0 120px -8px var(--openbot-accent-soft);
+  /* The surface itself is click-through; this keeps a stray pointer rule from undoing that. */
+  pointer-events: none;
+}
+
+/*
+ * The overlay window that carries the rim. It covers the whole desktop and paints nothing of its
+ * own: every pixel outside the rim stays transparent, so the applications below are seen and
+ * clicked exactly as before. The frame inside it is what main places over one window.
+ */
+html:has(.computer-use-highlight-surface),
+body:has(.computer-use-highlight-surface),
+#root:has(.computer-use-highlight-surface) {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.computer-use-highlight-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  pointer-events: none;
+}
+
+.computer-use-highlight-surface-frame {
+  position: absolute;
+  pointer-events: none;
+}
+
+/*
+ * The agent cursor OpenBot draws when the driver draws none, which is every desktop of more than
+ * one display. The same dart as the driver theme, at about the size the driver renders it.
+ *
+ * The tip sits on the origin of the drawing, so the point main sends is the point the cursor holds
+ * without any offset. `overflow: visible` keeps the outline, which is half outside the path, from
+ * being cut at the edge of the box.
+ */
+.computer-use-agent-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 24px;
+  overflow: visible;
+  fill: var(--openbot-accent);
+  /* The colour the accent carries text in, so the outline holds over any wallpaper. */
+  stroke: var(--openbot-text-on-accent);
+  stroke-width: 5;
+  /* Under the fill, so the outline reads as an edge rather than as a second, thicker dart. */
+  paint-order: stroke fill;
+  filter: drop-shadow(0 0 6px var(--openbot-accent-strong));
+  /*
+   * One step between two points the agent asked for. The cursor has to move - that is the whole of
+   * what it says - and a jump of a thousand pixels tells the eye nothing about where it came from.
+   * The shortest token, because a slower cursor would still be travelling when the click lands.
+   */
+  transition: translate var(--openbot-duration-fast) linear;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .computer-use-agent-cursor {
+    transition: none;
+  }
+}

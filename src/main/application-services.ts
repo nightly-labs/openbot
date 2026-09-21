@@ -58,7 +58,15 @@ import { readAnalyticsPreference } from "./analytics-preference-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
+import { ComputerUseHighlightController } from "./computer-use-highlight-window";
+import {
+  COMPUTER_USE_ACTION_MAX_AGE_MS,
+  COMPUTER_USE_CURSOR_MAX_AGE_MS,
+  chooseTarget,
+  liveSession,
+} from "./computer-use-target-window";
 import { isSupportedCuaDriverTarget, resolveCuaCursorTheme, resolveCuaDriver } from "./cua-driver-artifact";
+import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
 import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
 import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
@@ -75,9 +83,13 @@ import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
+  computerUseDisplays,
+  createComputerUseHighlightWindow,
   createDynamicIslandWindow,
+  loadComputerUseHighlightRenderer,
   loadDynamicIslandRenderer,
   type MainWindowController,
+  sendComputerUseHighlightPlacement,
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
@@ -153,6 +165,7 @@ const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 const TEARDOWN_ORDER = {
   updater: 10,
   hostUpdateCoordinator: 12,
+  computerUseHighlight: 18,
   dynamicIsland: 20,
   browser: 30,
   browserPictureInPicture: 40,
@@ -220,6 +233,7 @@ export interface ApplicationServices {
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
   cuaDriver: CuaDriverRuntime;
+  computerUseHighlight: ComputerUseHighlightController;
   analytics: HostAnalytics;
   teamStore: TeamStore;
   /**
@@ -538,6 +552,8 @@ export async function createApplicationServices({
     supported: isSupportedCuaDriverTarget(process.platform, process.arch),
     hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
     cursorTheme: cuaCursorThemeDirectory ? { directory: cuaCursorThemeDirectory, id: OPENBOT_CURSOR_THEME_ID } : null,
+    // One screen is where the driver's cursor lands where the agent acts. See `drawsAgentCursor`.
+    drawsAgentCursor: () => screen.getAllDisplays().length === 1,
     platform: process.platform,
     onDiagnostic: (message) => {
       void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);
@@ -546,6 +562,40 @@ export async function createApplicationServices({
   // After the provider runtimes, which hold the `cua-driver mcp` children that talk to this
   // daemon: stopping it first would leave them reading a socket nothing answers.
   teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => cuaDriver.stop());
+  /*
+   * The rim OpenBot draws over the window an agent works in.
+   *
+   * It asks the daemon two read-only questions over a connection of its own: whether any agent
+   * holds a live session, and where every window is. Both answers come from the daemon's own view,
+   * which an MCP client of OpenBot's could not see: the tools report only the sessions of the lease
+   * that asks, and the agent's lease is its own.
+   */
+  const computerUseReads = new CuaDriverDaemonClient(() =>
+    cuaDriver.mcpServerForProviders() ? cuaDriver.socketPath() : null,
+  );
+  const computerUseHighlight = new ComputerUseHighlightController({
+    createWindow: createComputerUseHighlightWindow,
+    loadWindow: loadComputerUseHighlightRenderer,
+    place: sendComputerUseHighlightPlacement,
+    displays: computerUseDisplays,
+    // The driver's own cursor on one screen, OpenBot's inside this overlay on more than one. The
+    // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
+    readPointer: () => cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS),
+    readTarget: async (previous) => {
+      if (!cuaDriver.mcpServerForProviders()) return null;
+      const session = liveSession(await computerUseReads.sessions());
+      if (!session) return null;
+      const windows = await computerUseReads.listWindows();
+      const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
+      return chooseTarget({ windows, session, action, ownPid: process.pid, previous });
+    },
+  });
+  // Before the daemon stops, so the rim is gone rather than left over a window nothing drives, and
+  // so the read connection lets its lease go while there is still a daemon to tell.
+  teardown.push(TEARDOWN_ORDER.computerUseHighlight, "the Computer Use highlight", async () => {
+    computerUseHighlight.destroy();
+    await computerUseReads.close();
+  });
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -599,6 +649,16 @@ export async function createApplicationServices({
   // provider session, so the driver stays quiet for a grant, for the warm-up below, and for the
   // stop at teardown, where the sessions are being left for the next run.
   cuaDriver.onMcpServerChanged(() => service.notifyComputerUseChanged());
+  // The rim follows the daemon: it can show nothing while the agents hold no tools, and polling a
+  // socket nothing answers would only log failures.
+  cuaDriver.onMcpServerChanged(() => {
+    if (cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+    else {
+      computerUseHighlight.stop();
+      // The daemon this connection was opened to is gone, so the socket behind it is too.
+      void computerUseReads.close();
+    }
+  });
   // A user who granted the permissions expects the tools after a restart without opening the panel,
   // and a remote request or a scheduled task opens no window at all. This starts the daemon once and
   // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees
@@ -606,6 +666,13 @@ export async function createApplicationServices({
   // written by a run that had this same entry.
   const computerUseWarmUp = cuaDriver.warmUp();
   computerUseWarmUp.catch(() => undefined);
+  // The warm-up tells no listener on purpose, so the rim has to read the result itself: a user who
+  // granted the permissions has a running daemon from here on, and nothing else would start it.
+  void computerUseWarmUp
+    .then(() => {
+      if (cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+    })
+    .catch(() => undefined);
   /*
    * Where the decision put the download: onboarding, which is the screen this start is about to
    * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for
@@ -987,6 +1054,7 @@ export async function createApplicationServices({
     voice,
     dynamicIsland,
     cuaDriver,
+    computerUseHighlight,
     analytics,
     teamStore,
     appliedAccount: signedInState,

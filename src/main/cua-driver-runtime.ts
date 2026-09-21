@@ -17,10 +17,13 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
 import { stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
+/** The address OpenBot listens on itself, between the agents' proxies and the daemon. */
+const TAP_SOCKET_FILE = "tap.sock";
 /** Where the Windows pipe name is kept, below the profile directory. */
 const PIPE_NAME_FILE = ["cua-driver", "pipe-name"] as const;
 /**
@@ -259,12 +262,26 @@ export interface CuaDriverRuntimeOptions {
    * daemon, which owns the overlay: the `mcp` proxies are clients and configure nothing.
    */
   cursorTheme?: { directory: string; id: string } | null;
+  /**
+   * Whether the driver may draw its own agent cursor, asked each time the daemon starts.
+   *
+   * The driver's overlay is one window over the main screen, and it paints a cursor at the
+   * desktop's own coordinates inside that window without taking the screen's origin off them. On
+   * one screen the two are the same and the cursor lands where the agent acts. On a second screen
+   * they are not: the cursor is drawn as far from the work as the main screen's origin is from the
+   * desktop's, and a screen the overlay does not cover cannot hold it at all. A cursor in the wrong
+   * window says the agent works there, so on more than one screen OpenBot asks for no cursor
+   * rather than a misplaced one.
+   */
+  drawsAgentCursor?: () => boolean;
   platform: NodeJS.Platform;
   spawnProcess?: SpawnDriverProcess;
   onDiagnostic?: (message: string) => void;
   /** Injected by the test, which has no driver to ask. */
   readPermissions?: (config: McpServerConfig, platform: NodeJS.Platform) => Promise<readonly ComputerUsePermission[]>;
   waitForSocket?: (path: string) => Promise<void>;
+  /** Injected by the test, which listens on no address of its own. */
+  actionTap?: CuaDriverActionTap;
 }
 
 export class CuaDriverRuntime {
@@ -284,11 +301,15 @@ export class CuaDriverRuntime {
   #state: ComputerUseState;
   /** Mutable, because a user may install the driver while OpenBot runs. */
   #executable: string | null;
+  /** What the running daemon was asked for, which is decided once, at the spawn below. */
+  #drawsOwnCursor = false;
+  readonly #tap: CuaDriverActionTap;
 
   constructor(options: CuaDriverRuntimeOptions) {
     this.#options = options;
     this.#spawn = options.spawnProcess ?? nodeSpawn;
     this.#executable = options.executable;
+    this.#tap = options.actionTap ?? new CuaDriverActionTap();
     this.#state = initialState(options.platform, options.supported, options.executable);
   }
 
@@ -304,6 +325,36 @@ export class CuaDriverRuntime {
   socketPath(): string {
     const endpoint = this.#options.endpoint;
     return endpoint.kind === "windows-pipe" ? endpoint.name : join(endpoint.directory, SOCKET_FILE);
+  }
+
+  /**
+   * The address the agents are handed: OpenBot's own while it listens, the daemon's own otherwise.
+   *
+   * The tap forwards every byte unchanged, so an agent cannot tell the two apart - and a tap that
+   * failed to listen costs the rim its answer, never the agent its tools.
+   */
+  tapAddress(): string {
+    return this.#tap.address ?? this.socketPath();
+  }
+
+  /**
+   * Where an agent last asked the daemon to act, as far as the window is concerned.
+   *
+   * This is the only answer OpenBot has to "which window is the agent working in": it comes from
+   * the request the agent's own proxy sent, not from which window happens to be in front.
+   */
+  lastAction(maxAgeMs: number): ObservedAction | null {
+    return this.#tap.lastAction(maxAgeMs);
+  }
+
+  /**
+   * Where an agent last aimed the pointer, which is where OpenBot draws its own agent cursor.
+   *
+   * `null` while the daemon draws a cursor of its own: two cursors for one agent would say the
+   * agent is in two places, and the driver's is the one the user already knows.
+   */
+  lastPointer(maxAgeMs: number): ObservedPointer | null {
+    return this.#drawsOwnCursor ? null : this.#tap.lastPointer(maxAgeMs);
   }
 
   /**
@@ -326,7 +377,7 @@ export class CuaDriverRuntime {
       transport: "stdio",
       enabled: true,
       command,
-      args: ["mcp", "--socket", this.socketPath()],
+      args: ["mcp", "--socket", this.tapAddress()],
       env: [
         { key: EMBEDDED_ENV, value: "1" },
         ...Object.entries(CUA_DRIVER_VENDOR_CALLS_OFF).map(([key, value]) => ({ key, value })),
@@ -483,6 +534,7 @@ export class CuaDriverRuntime {
   async #stop(): Promise<void> {
     const child = this.#child;
     this.#child = null;
+    await this.#tap.close();
     if (child) await stopRemoteProcess(child);
     await this.#removeSocket();
     // No announcement: a stop this process asked for is the teardown, and telling the providers
@@ -513,23 +565,26 @@ export class CuaDriverRuntime {
       await this.#removeSocket();
     }
     this.#command = await this.#linkCommandAlias(executable);
-    // The theme is named only together with the directory it is in. A daemon that cannot find the
-    // id falls back to its own cursor without a word, so passing the flag on its own would claim a
-    // cursor OpenBot does not ship and say nothing when the claim is wrong.
-    const cursorTheme = this.#options.cursorTheme ?? null;
-    const child = this.#spawn(executable, ["serve", "--socket", socketPath, ...cursorThemeArguments(cursorTheme)], {
-      cwd: dirname(executable),
-      env: {
-        ...process.env,
-        [EMBEDDED_ENV]: "1",
-        ...CUA_DRIVER_VENDOR_CALLS_OFF,
-        [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
-        ...(cursorTheme ? { [CURSOR_THEME_DIRECTORY_ENV]: cursorTheme.directory } : {}),
-        ...waylandEnvironment(this.#options.platform),
+    const drawsCursor = this.#options.drawsAgentCursor?.() ?? true;
+    this.#drawsOwnCursor = drawsCursor;
+    const cursorTheme = drawsCursor ? (this.#options.cursorTheme ?? null) : null;
+    const child = this.#spawn(
+      executable,
+      ["serve", "--socket", socketPath, ...cursorArguments(drawsCursor, cursorTheme)],
+      {
+        cwd: dirname(executable),
+        env: {
+          ...process.env,
+          [EMBEDDED_ENV]: "1",
+          ...CUA_DRIVER_VENDOR_CALLS_OFF,
+          [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
+          ...(cursorTheme ? { [CURSOR_THEME_DIRECTORY_ENV]: cursorTheme.directory } : {}),
+          ...waylandEnvironment(this.#options.platform),
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       },
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
+    );
     this.#child = child;
     this.#pipeDiagnostics(child);
     // `spawn` reports a missing or unreadable executable through this event, after it returns. An
@@ -563,6 +618,26 @@ export class CuaDriverRuntime {
       // `#stop`, not `stop`: this runs inside the start that `stop()` waits for.
       await this.#stop();
       throw error;
+    }
+    await this.#startTap(socketPath);
+  }
+
+  /**
+   * The address the agents are handed, once the daemon answers on its own.
+   *
+   * A failure here is reported and then left: Computer Use works without the tap, and the rim is
+   * worth less than the tools. The address is only ever inside the private state directory, which
+   * the daemon's own socket already proved is private.
+   */
+  async #startTap(socketPath: string): Promise<void> {
+    const endpoint = this.#options.endpoint;
+    const address =
+      endpoint.kind === "windows-pipe" ? `${endpoint.name}-tap` : join(endpoint.directory, TAP_SOCKET_FILE);
+    if (endpoint.kind === "unix-socket") await rm(address, { force: true }).catch(() => undefined);
+    try {
+      await this.#tap.listen({ upstream: socketPath, tap: address });
+    } catch (error) {
+      this.#options.onDiagnostic?.(`OpenBot: the Computer Use tap could not listen. ${describe(error)}\n`);
     }
   }
 
@@ -685,8 +760,15 @@ function describe(error: unknown): string {
  * A value the user set already is left alone, so the fallback stays reachable when a compositor
  * handles the native backend badly.
  */
-/** The `serve` flag that selects the OpenBot cursor, or nothing when the build ships no theme. */
-function cursorThemeArguments(theme: { directory: string; id: string } | null): readonly string[] {
+/**
+ * The `serve` flags for the agent cursor: none at all, or the OpenBot theme when the build ships one.
+ *
+ * The theme is named only together with the directory it is in. A daemon that cannot find the id
+ * falls back to its own cursor without a word, so passing the flag on its own would claim a cursor
+ * OpenBot does not ship and say nothing when the claim is wrong.
+ */
+function cursorArguments(draws: boolean, theme: { directory: string; id: string } | null): readonly string[] {
+  if (!draws) return ["--no-overlay"];
   return theme ? ["--cursor-theme", theme.id] : [];
 }
 

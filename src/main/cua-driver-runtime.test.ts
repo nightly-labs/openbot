@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CuaDriverActionTap } from "./cua-driver-action-tap";
 import {
   type CuaDriverCommandAliasInput,
   CuaDriverRuntime,
@@ -114,6 +115,38 @@ describe("CuaDriverRuntime", () => {
     );
   });
 
+  it("asks for no cursor on a second screen, where the driver draws it away from the work", async () => {
+    // The driver's overlay covers the main screen and paints at the desktop's coordinates inside
+    // it, so on a second screen the cursor lands as far from the agent as that screen's origin.
+    const { driver, spawned } = await runtime({
+      cursorTheme: {
+        directory: "/Applications/OpenBot.app/Contents/Resources/cua-driver-theme",
+        id: "run.openbot.cursor",
+      },
+      drawsAgentCursor: () => false,
+    });
+    await driver.start();
+
+    expect(spawned[0].args).toContain("--no-overlay");
+    expect(spawned[0].args).not.toContain("--cursor-theme");
+    expect(spawned[0].options.env.CUA_DRIVER_CURSOR_THEME_DIR).toBeUndefined();
+  });
+
+  it("keeps its own agent cursor to itself while the driver draws one, so a user sees one pointer", async () => {
+    class ActingTap extends CuaDriverActionTap {
+      override lastPointer() {
+        return { tool: "click", x: 600, y: 500, at: 0 };
+      }
+    }
+    const drawn = await runtime({ actionTap: new ActingTap(), drawsAgentCursor: () => true });
+    await drawn.driver.start();
+    const instead = await runtime({ actionTap: new ActingTap(), drawsAgentCursor: () => false });
+    await instead.driver.start();
+
+    expect(drawn.driver.lastPointer(60_000)).toBeNull();
+    expect(instead.driver.lastPointer(60_000)).toEqual({ tool: "click", x: 600, y: 500, at: 0 });
+  });
+
   it("names no cursor when the build ships none, so the driver keeps its own", async () => {
     const { driver, spawned } = await runtime({ cursorTheme: null });
     await driver.start();
@@ -158,8 +191,25 @@ describe("CuaDriverRuntime", () => {
     // ACP drops a stdio entry that carries a working directory, and Codex accepts none, so an entry
     // with one would vanish for two of the three providers with no error.
     expect(config?.workingDirectory).toBe("");
-    expect(config?.args).toEqual(["mcp", "--socket", driver.socketPath()]);
+    // The agents are handed OpenBot's own address, which forwards to the daemon. It is the only
+    // place OpenBot can see which window an agent works in.
+    expect(config?.args).toEqual(["mcp", "--socket", driver.tapAddress()]);
+    expect(driver.tapAddress()).not.toBe(driver.socketPath());
     expect(config?.env.map((entry) => entry.key)).toContain("CUA_DRIVER_EMBEDDED");
+  });
+
+  it("hands the agents the daemon itself when OpenBot cannot listen, rather than no tools", async () => {
+    // A tap that cannot listen, the way a profile that refuses the address would leave it.
+    class DeafTap extends CuaDriverActionTap {
+      override listen(): Promise<void> {
+        return Promise.reject(new Error("no such directory"));
+      }
+    }
+    const { driver } = await runtime({ actionTap: new DeafTap() });
+
+    await driver.start();
+
+    expect(driver.mcpServerConfig()?.args).toEqual(["mcp", "--socket", driver.socketPath()]);
   });
 
   it("stops the daemon it started", async () => {

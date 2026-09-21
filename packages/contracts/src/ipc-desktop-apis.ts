@@ -27,6 +27,7 @@ import type {
   AppInfo,
   AppSetupState,
   CentralAuthDesktopApi,
+  ComputerUseHighlightPlacement,
   ComputerUseState,
   ExportResult,
   ExternalDestination,
@@ -509,6 +510,13 @@ export interface OpenBotDesktopApi {
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseState: () => Promise<ComputerUseState>;
   openComputerUsePermissionPane: (permission: MacPermissionId) => Promise<ComputerUseState>;
+  /**
+   * Where to draw the rim over the window an agent works in. Only the overlay surface listens.
+   *
+   * It is pushed rather than asked for: the overlay carries no control and invokes nothing, so a
+   * window that floats over another application's has no channel it could be driven through.
+   */
+  onComputerUseHighlightPlacement: (listener: (placement: ComputerUseHighlightPlacement) => void) => () => void;
   openExternal: (destination: ExternalDestination) => Promise<void>;
   connectProvider: (provider: AgentProviderId) => Promise<AgentStatus>;
   refreshAgentProviders: () => Promise<AgentStatus>;
