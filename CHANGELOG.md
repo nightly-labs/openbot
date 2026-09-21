@@ -5,7 +5,7 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
-## [0.15.1] - 2026-09-21
+## [0.15.2] - 2026-09-21
 
 ### Added
 
