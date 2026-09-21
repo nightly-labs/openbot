@@ -33,6 +33,11 @@ on:
       - "scripts/verify-remote-desktop-runtime.ts"
       - "vendor/remote-desktop/**"
   workflow_dispatch:
+    inputs:
+      verify_only:
+        description: Verify an existing immutable runtime release without rebuilding or publishing
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -123,8 +128,15 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_EXISTS: ${{ steps.release.outputs.exists }}
+          VERIFY_ONLY: ${{ inputs.verify_only == true }}
         run: |
-          if [[ "$EVENT_NAME" != "workflow_dispatch" && "$RELEASE_EXISTS" == "true" ]]; then
+          if [[ "$VERIFY_ONLY" == "true" ]]; then
+            if [[ "$RELEASE_EXISTS" != "true" ]]; then
+              echo "Verification requires a published release for the current native inputs." >&2
+              exit 1
+            fi
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" != "workflow_dispatch" && "$RELEASE_EXISTS" == "true" ]]; then
             echo "should_build=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_build=true" >> "$GITHUB_OUTPUT"
@@ -140,7 +152,7 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     needs: prepare
-    if: needs.prepare.outputs.release_exists != 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.prepare.outputs.should_build == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 75
     permissions:
@@ -384,7 +396,7 @@ jobs:
   verify-published:
     name: Verify published ${{ matrix.target }}
     needs: [prepare, publish]
-    if: needs.publish.result == 'success'
+    if: always() && needs.prepare.result == 'success' && (needs.publish.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.verify_only == true && needs.prepare.outputs.release_exists == 'true'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:
@@ -434,6 +446,8 @@ jobs:
           bun scripts/pin-remote-desktop-runtime.ts "$RUNNER_TEMP/runtime-manifest/remote-desktop-runtime-manifest.json"
 
       - name: Install published runtime
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bun scripts/install-remote-desktop-runtime.ts ${{ matrix.platform }} ${{ matrix.architecture }}
 
       - name: Verify published runtime
@@ -445,6 +459,8 @@ jobs:
         run: bun run test:remote-desktop-runtime
 
       - name: Package OpenBot from the downloaded runtime
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: ${{ matrix.platform == 'win32' && 'bun run package:win:verify' || 'bun run package:verify' }}
 
   pin:

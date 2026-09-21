@@ -86,6 +86,11 @@ gh release download remote-desktop-runtime-<input-digest> --pattern remote-deskt
 bun scripts/pin-remote-desktop-runtime.ts remote-desktop-runtime-manifest.json
 ```
 
+To repeat verification after a download or CI setup failure, without replacing the published
+artifacts, run `gh workflow run remote-desktop-runtime.yml --ref <branch> -f verify_only=true`.
+This mode requires an existing release for the current input digest and runs installation, runtime
+verification, the macOS smoke test, and application packaging. It does not build or publish.
+
 Commit the rewritten `native-runtime.lock.json` to the branch and merge it with the recipe, so `main`
 never sees the two apart. The pin does not change the input digest -- it covers `recipeVersion`, both
 source entries and `targets`, not the artifacts -- so it cannot invalidate the release it just pinned.
