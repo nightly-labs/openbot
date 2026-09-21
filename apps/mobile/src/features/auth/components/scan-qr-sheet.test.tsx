@@ -36,6 +36,7 @@ const native = vi.hoisted(() => {
 
 // Native camera, permission, animation and input APIs have no DOM implementation.
 // Keep the scanner and sheet real; complete motion through its callback, not a timer.
+vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: vi.fn(async () => {}) } }));
 vi.mock("react-native", () => ({
   View: ({
     children,
