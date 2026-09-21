@@ -14,6 +14,29 @@ import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } fr
 import type { NativeImage, WebContents } from "electron";
 import { createFramePacer } from "./browser-screencast-pacing";
 
+async function dispatchMouseClick(
+  send: SendCommand,
+  coordinates: { x: number; y: number },
+  button: "left" | "middle" | "right",
+  totalClicks: number,
+  modifiers: number,
+  sessionId?: string,
+): Promise<void> {
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
+  for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
+    await send(
+      "Input.dispatchMouseEvent",
+      { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
+      sessionId,
+    );
+    await send(
+      "Input.dispatchMouseEvent",
+      { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
+      sessionId,
+    );
+  }
+}
+
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
 const MAX_RESULT_BYTES = 64 * 1024;
@@ -176,12 +199,12 @@ export class BrowserCdpEngine {
           }
           for (const [index, node] of nodes.inputs.entries()) {
             if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            await send("DOM.focus", { backendNodeId: node.backendNodeId });
             await this.#callOnNode(
               send,
               node.backendNodeId,
               `function(origin) {
                 if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly) throw new Error('Authentication target changed.');
-                this.focus();
                 this.select();
               }`,
               [origin],
@@ -196,9 +219,25 @@ export class BrowserCdpEngine {
             await this.#callOnNode(
               send,
               nodes.button.backendNodeId,
-              `function(origin, expected) { if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.getAttribute('aria-disabled') === 'true' || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) throw new Error('Authentication target changed.'); this.click(); }`,
+              `function(origin, expected) {
+                return new Promise((resolve, reject) => {
+                  const finish = (error) => { observer.disconnect(); clearTimeout(timer); error ? reject(new Error(error)) : resolve(); };
+                  const check = () => {
+                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) return finish('Authentication target changed.');
+                    if (!this.disabled && this.getAttribute('aria-disabled') !== 'true') finish();
+                  };
+                  const observer = new MutationObserver(check);
+                  const timer = setTimeout(() => finish('Authentication submit button is not ready.'), 2000);
+                  observer.observe(this, { attributes: true });
+                  observer.observe(this.getRootNode(), { childList: true, subtree: true });
+                  check();
+                });
+              }`,
               [origin, nodes.fingerprints.at(-1)],
             );
+            const point = await this.#elementPoint(send, nodes.button.backendNodeId, true);
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            await dispatchMouseClick(send, point, "left", 1, 0);
           } else if (submission === "enter") {
             const last = nodes.inputs.at(-1);
             if (!last) throw new Error("Authentication target changed.");
@@ -306,19 +345,7 @@ export class BrowserCdpEngine {
       const modifiers = modifierMask(options.modifiers ?? []);
       assertBeforeDeadline(deadline);
       onDispatch?.();
-      await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
-      for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
-          sessionId,
-        );
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
-          sessionId,
-        );
-      }
+      await dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId);
     });
   }
 
