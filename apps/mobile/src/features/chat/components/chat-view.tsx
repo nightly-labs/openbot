@@ -584,9 +584,15 @@ export function ChatView({
             </Animated.View>
           </KeyboardGestureArea>
         </View>
-        {attachments.menuAnchor && isFocused && appActive ? (
+        {/* Not gated on `appActive`. The camera permission prompt makes iOS
+            report the app inactive, and unmounting the card under it lost the
+            selection that asked for the prompt: the card came back on the
+            options and the first Camera never opened. The card stays and stops
+            its preview instead. */}
+        {attachments.menuAnchor && isFocused ? (
           <ChatAttachmentPanel
             anchor={attachments.menuAnchor}
+            appActive={appActive}
             attachments={attachments}
             fallbackBackground={fieldBackground}
             foreground={foreground}

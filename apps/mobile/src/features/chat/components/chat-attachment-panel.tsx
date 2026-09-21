@@ -110,6 +110,7 @@ function AttachmentOption({
  */
 export function ChatAttachmentPanel({
   anchor,
+  appActive,
   attachments,
   fallbackBackground,
   foreground,
@@ -124,6 +125,8 @@ export function ChatAttachmentPanel({
    * before the keyboard lifts the composer.
    */
   anchor: ChatAttachmentAnchor;
+  /** False while a system prompt or another app holds the foreground. */
+  appActive: boolean;
   attachments: ChatAttachments;
   fallbackBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
@@ -335,18 +338,19 @@ export function ChatAttachmentPanel({
             />
           </Animated.View>
           <Animated.View
-            pointerEvents={mode === "camera" && !closing ? "auto" : "none"}
+            pointerEvents={mode === "camera" && !closing && appActive ? "auto" : "none"}
             style={[
               { position: "absolute", left: 0, bottom: 0, width: cameraWidth, height: cameraHeight },
               cameraStyle,
             ]}
           >
-            {/* The preview stops the moment the card is told to leave. A live
-                capture session inside a view that changes size every frame and
-                is clipped by a mask makes iOS composite the card offscreen on
-                each of those frames, which is why only this exit stuttered and
-                the one from the options never did. */}
-            {mode === "camera" && !closing ? (
+            {/* The preview stops the moment the card is told to leave, and
+                for as long as the app is not in front. A live capture session
+                inside a view that changes size every frame and is clipped by a
+                mask makes iOS composite the card offscreen on each of those
+                frames, which is why only this exit stuttered and the one from
+                the options never did. */}
+            {mode === "camera" && !closing && appActive ? (
               <ChatCameraContent
                 onBusyChange={(busy) => {
                   busyRef.current = busy;
