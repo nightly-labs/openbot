@@ -114,21 +114,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-.computer-use-install-command {
-  display: block;
-  margin-top: var(--openbot-space-2);
-  padding: var(--openbot-space-2);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-control);
-  color: var(--openbot-text-primary);
-  font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-  /* The one thing the user must do by hand, so it has to survive a double-click. */
-  user-select: text;
-  overflow-wrap: anywhere;
-}
-
 @media (max-width: 640px) {
   .computer-use-row.ui-item {
     align-items: flex-start;

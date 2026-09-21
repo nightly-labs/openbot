@@ -731,7 +731,9 @@ function initialState(platform: NodeJS.Platform, supported: boolean, executable:
     return {
       status: "driver-missing",
       permissions: ungranted(platform),
-      message: "Install the Computer Use driver, then check again.",
+      // Never an instruction to install one: every release carries the driver, so a build without
+      // it is a broken build. The message says what is wrong and leaves the fix to the developer.
+      message: "This build of OpenBot carries no Computer Use driver.",
     };
   }
   return { status: "permissions-required", permissions: ungranted(platform), message: null };

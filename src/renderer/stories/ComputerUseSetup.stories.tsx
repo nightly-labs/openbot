@@ -1,4 +1,4 @@
-import type { ComputerUseState, DesktopPlatform, MacPermissionId } from "@openbot/contracts/ipc";
+import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
 import { onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ComputerUseSetup } from "../src/features/computer-use/ComputerUseSetup";
@@ -14,12 +14,7 @@ const permissionsRequired: ComputerUseState = {
   message: null,
 };
 
-function MockedSetup(props: {
-  state?: ComputerUseState;
-  error?: Error;
-  loading?: boolean;
-  platform?: DesktopPlatform;
-}) {
+function MockedSetup(props: { state?: ComputerUseState; error?: Error; loading?: boolean }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
   mock.api.getComputerUseState = props.loading
@@ -36,7 +31,7 @@ function MockedSetup(props: {
   });
   return (
     <main class="foundation-story foundation-interaction-stage">
-      <ComputerUseSetup platform={props.platform ?? "darwin"} variant="compact" />
+      <ComputerUseSetup variant="compact" />
     </main>
   );
 }
@@ -70,13 +65,14 @@ export const Loading: Story = {
   render: () => <MockedSetup loading />,
 };
 
+/** A build that carries no driver. A fault of that build, so the panel names no command to run. */
 export const DriverMissing: Story = {
   render: () => (
     <MockedSetup
       state={{
         status: "driver-missing",
         permissions: permissions([]),
-        message: "Install the Computer Use driver, then check again.",
+        message: "This build of OpenBot carries no Computer Use driver.",
       }}
     />
   ),
@@ -84,21 +80,7 @@ export const DriverMissing: Story = {
 
 /** Windows and Linux grant no permission, so a driver that answers is all the panel has to report. */
 export const ReadyWithoutPermissions: Story = {
-  render: () => <MockedSetup platform="win32" state={{ status: "ready", permissions: [], message: null }} />,
-};
-
-/** Each desktop has its own installer, so the command and the shell named change with the platform. */
-export const DriverMissingOnWindows: Story = {
-  render: () => (
-    <MockedSetup
-      platform="win32"
-      state={{
-        status: "driver-missing",
-        permissions: [],
-        message: "Install the Computer Use driver, then check again.",
-      }}
-    />
-  ),
+  render: () => <MockedSetup state={{ status: "ready", permissions: [], message: null }} />,
 };
 
 export const Failure: Story = {

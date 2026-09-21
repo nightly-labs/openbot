@@ -1,4 +1,4 @@
-import type { ComputerUseState, DesktopPlatform, MacPermissionId } from "@openbot/contracts/ipc";
+import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
 import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import {
   Alert,
@@ -28,21 +28,14 @@ import {
 import { errorMessage } from "../../error-message";
 
 export interface ComputerUseSetupProps {
-  platform: DesktopPlatform;
+  /**
+   * Which of the two shapes to draw: the settings panel, or the compact card of the setup flow.
+   *
+   * There is no platform here. What one desktop asks for and another does not is the driver's own
+   * answer - the list of permissions, and the status - never a table this component keeps.
+   */
   variant: "settings" | "compact";
 }
-
-/**
- * What the user must install, when this computer has no driver. Shown, never run for them.
- *
- * Each desktop has its own installer and its own shell to run it in, so the command and the shell
- * that is named are chosen together.
- */
-const DRIVER_INSTALL: Record<DesktopPlatform, { shell: string; command: string }> = {
-  darwin: { shell: "Terminal", command: '/bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"' },
-  linux: { shell: "a terminal", command: '/bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"' },
-  win32: { shell: "PowerShell", command: "irm https://cua.ai/driver/install.ps1 | iex" },
-};
 
 /**
  * How each grant is described. Which of them apply is the driver's answer, never this table: only
@@ -104,7 +97,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
   // sees when it is asked. Coming back to OpenBot is the moment the answer may have changed, so the
   // panel asks again rather than keeping a row that is granted already.
   const recheckOnReturn = () => {
-    if (state()?.status === "permissions-required") void loadState();
+    if (showPermissions()) void loadState();
   };
   window.addEventListener("focus", recheckOnReturn);
 
@@ -119,9 +112,21 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     return (status === "permissions-required" || status === "ready") && permissions().length > 0;
   };
 
-  /** The manual way back, for a user whose desktop gave this window no focus event. */
+  /** Every status that leaves Computer Use not working, which the one alert below reports. */
+  const unavailable = () => {
+    const status = state()?.status;
+    return status === "unsupported" || status === "driver-missing" || status === "error";
+  };
+
+  /**
+   * The manual way back, for a user whose desktop gave this window no focus event.
+   *
+   * Offered while the rows are up, granted or not: a grant is taken away in System Settings as
+   * easily as it is given, and a panel that reads "Granted" with no way to ask again would keep
+   * saying so long after macOS stopped agreeing.
+   */
   const recheck = () => (
-    <Show when={state()?.status === "permissions-required"}>
+    <Show when={showPermissions()}>
       <div class="computer-use-recheck">
         <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
           <RefreshCw aria-hidden="true" />
@@ -151,28 +156,12 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
         </ItemGroup>
       </Show>
 
-      <Show when={state()?.status === "driver-missing"}>
-        <Alert tone="warning" class="computer-use-alert" role="status">
-          <AlertIcon>
-            <TriangleAlert />
-          </AlertIcon>
-          <AlertContent>
-            <AlertTitle>Install the Computer Use driver</AlertTitle>
-            <AlertDescription>
-              Run this in {DRIVER_INSTALL[props.platform].shell}, then check again.
-              <code class="computer-use-install-command">{DRIVER_INSTALL[props.platform].command}</code>
-            </AlertDescription>
-          </AlertContent>
-          <AlertActions>
-            <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
-              <RefreshCw aria-hidden="true" />
-              Check again
-            </Button>
-          </AlertActions>
-        </Alert>
-      </Show>
-
-      <Show when={state()?.status === "unsupported" || state()?.status === "error" || (!loading() && error() !== null)}>
+      {/*
+       * One alert for every fault, the missing driver included. OpenBot carries the driver, so a
+       * build without one is a fault of that build and not a thing the user installs by hand; the
+       * panel therefore names no command and offers the same way back as the rest.
+       */}
+      <Show when={unavailable() || (!loading() && error() !== null)}>
         <Alert tone="warning" class="computer-use-alert" role="status">
           <AlertIcon>
             <TriangleAlert />
@@ -279,27 +268,28 @@ function PermissionGroup(props: {
                 <ItemDescription>{details.description}</ItemDescription>
               </ItemContent>
               <ItemActions>
-                <Show
-                  when={permission.granted}
-                  fallback={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      loading={props.busy === permission.id}
-                      loadingLabel="Opening…"
-                      disabled={props.busy !== null}
-                      onClick={() => void props.onOpen(permission.id)}
-                    >
-                      Open settings
-                    </Button>
-                  }
-                >
+                {/*
+                 * The badge says where the grant stands; the button stays beside it. A grant is
+                 * taken away in the same pane it is given in, and a row that offered no way back
+                 * once it read "Granted" would leave the user to find that pane by themselves.
+                 */}
+                <Show when={permission.granted}>
                   <Badge variant="success-light">
                     <CircleCheck aria-hidden="true" />
                     Granted
                   </Badge>
                 </Show>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={props.busy === permission.id}
+                  loadingLabel="Opening…"
+                  disabled={props.busy !== null}
+                  onClick={() => void props.onOpen(permission.id)}
+                >
+                  Open settings
+                </Button>
               </ItemActions>
             </Item>
           );

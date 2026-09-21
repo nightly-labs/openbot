@@ -600,7 +600,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                   </div>
                 </div>
 
-                <ComputerUseSetup platform={props.platform} variant="compact" />
+                <ComputerUseSetup variant="compact" />
               </section>
             </Match>
 

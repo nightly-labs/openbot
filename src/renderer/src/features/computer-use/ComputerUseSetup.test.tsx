@@ -31,7 +31,7 @@ describe("ComputerUseSetup", () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
     const openPane = vi.spyOn(mock.api, "openComputerUsePermissionPane");
-    const view = render(() => <ComputerUseSetup platform="darwin" variant="settings" />);
+    const view = render(() => <ComputerUseSetup variant="settings" />);
 
     const section = (await view.findByRole("heading", { name: "System permissions" })).closest("section");
     if (!section) throw new Error("The System permissions section is missing.");
@@ -41,7 +41,7 @@ describe("ComputerUseSetup", () => {
     await waitFor(() => expect(openPane).toHaveBeenCalledWith("screen-recording"));
   });
 
-  it("replaces a granted permission's button with a badge", async () => {
+  it("keeps the way back to System Settings on a permission already granted", async () => {
     mock = createMockOpenBot();
     mock.api.getComputerUseState = vi.fn().mockResolvedValue(
       state({
@@ -52,10 +52,11 @@ describe("ComputerUseSetup", () => {
       }),
     );
     window.openbot = mock.api;
-    const view = render(() => <ComputerUseSetup platform="darwin" variant="compact" />);
+    const view = render(() => <ComputerUseSetup variant="compact" />);
 
     expect(await view.findByText("Granted")).toBeInTheDocument();
-    expect(view.getAllByRole("button", { name: "Open settings" })).toHaveLength(1);
+    // Both rows, the granted one included: a grant is taken away in the same pane it is given in.
+    expect(view.getAllByRole("button", { name: "Open settings" })).toHaveLength(2);
   });
 
   // A grant is given in System Settings, outside this window. The driver reports only what it sees
@@ -68,37 +69,33 @@ describe("ComputerUseSetup", () => {
       .mockResolvedValue(state({ status: "ready", permissions: [{ id: "screen-recording", granted: true }] }));
     mock.api.getComputerUseState = read;
     window.openbot = mock.api;
-    const view = render(() => <ComputerUseSetup platform="darwin" variant="compact" />);
+    const view = render(() => <ComputerUseSetup variant="compact" />);
 
     await view.findByRole("button", { name: "Check again" });
     fireEvent(window, new Event("focus"));
 
     await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
     expect(await view.findByText("Granted")).toBeInTheDocument();
-    // Granted: nothing left to check, so the button goes with the rows it belonged to.
-    expect(view.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+    // Still offered once everything is granted: macOS takes a grant away as easily as it gives one.
+    expect(view.getByRole("button", { name: "Check again" })).toBeInTheDocument();
   });
 
-  it("names the install command when this computer has no driver", async () => {
+  // Every release carries the driver, so a build without one is a broken build and not a thing the
+  // user installs by hand. The panel must name no command, on any desktop.
+  it("reports a build with no driver as a fault, and offers no command to run", async () => {
     mock = createMockOpenBot();
-    mock.api.getComputerUseState = vi.fn().mockResolvedValue(state({ status: "driver-missing" }));
+    mock.api.getComputerUseState = vi
+      .fn()
+      .mockResolvedValue(
+        state({ status: "driver-missing", message: "This build of OpenBot carries no Computer Use driver." }),
+      );
     window.openbot = mock.api;
-    const view = render(() => <ComputerUseSetup platform="darwin" variant="compact" />);
+    const view = render(() => <ComputerUseSetup variant="compact" />);
 
-    expect(await view.findByText("Install the Computer Use driver")).toBeInTheDocument();
-    expect(view.getByText(/cua\.ai\/driver\/install\.sh/)).toBeInTheDocument();
-    expect(view.queryByRole("button", { name: "Open settings" })).not.toBeInTheDocument();
-  });
-
-  // Each desktop has its own installer, and a command for the wrong shell cannot be run.
-  it("names the Windows installer on Windows", async () => {
-    mock = createMockOpenBot();
-    mock.api.getComputerUseState = vi.fn().mockResolvedValue(state({ status: "driver-missing", permissions: [] }));
-    window.openbot = mock.api;
-    const view = render(() => <ComputerUseSetup platform="win32" variant="compact" />);
-
-    expect(await view.findByText(/cua\.ai\/driver\/install\.ps1/)).toBeInTheDocument();
-    expect(view.queryByText(/install\.sh/)).not.toBeInTheDocument();
+    expect(await view.findByText("Computer Use isn’t available yet")).toBeInTheDocument();
+    expect(view.getByText("This build of OpenBot carries no Computer Use driver.")).toBeInTheDocument();
+    expect(view.queryByText(/cua\.ai\/driver\/install/)).not.toBeInTheDocument();
+    expect(view.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   // Windows and Linux put no permission between OpenBot and the desktop. An empty list must read as
@@ -107,7 +104,7 @@ describe("ComputerUseSetup", () => {
     mock = createMockOpenBot();
     mock.api.getComputerUseState = vi.fn().mockResolvedValue(state({ status: "ready", permissions: [] }));
     window.openbot = mock.api;
-    const view = render(() => <ComputerUseSetup platform="linux" variant="settings" />);
+    const view = render(() => <ComputerUseSetup variant="settings" />);
 
     expect(await view.findByText("Computer Use is ready")).toBeInTheDocument();
     expect(view.queryByText("Screen Recording")).not.toBeInTheDocument();

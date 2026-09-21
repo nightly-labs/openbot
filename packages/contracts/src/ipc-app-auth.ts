@@ -184,10 +184,10 @@ export type MacPermissionId = "screen-recording" | "accessibility";
 /**
  * How far Computer Use is from working, as one value the panel switches on.
  *
- * `driver-missing` and `permissions-required` are both "not yet", and they are separate because the
- * user's next action differs: one installs a program, the other opens System Settings. `error` is
- * what the panel shows when the driver is there and answered with something else, which a status
- * that only said "not ready" would hide.
+ * `permissions-required` is the only one the user can act on, by opening System Settings.
+ * `driver-missing` says the build carries no driver, which every release does, and `error` says the
+ * driver is there and answered with something else. Both are faults rather than steps, and they
+ * stay apart because a report that only said "not ready" would hide which one happened.
  */
 export const COMPUTER_USE_STATUSES = [
   "unsupported",

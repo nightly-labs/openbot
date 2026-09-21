@@ -264,7 +264,7 @@ export function InitialSetup(props: InitialSetupProps) {
                 onChange={setSelectedProvider}
               />
 
-              <ComputerUseSetup platform={props.platform} variant="compact" />
+              <ComputerUseSetup variant="compact" />
             </div>
           </Show>
 

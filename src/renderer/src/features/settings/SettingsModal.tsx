@@ -348,7 +348,7 @@ export function SettingsModal(props: SettingsModalProps) {
         </Tabs.Content>
 
         <Tabs.Content value="computer-use" class="settings-modal-tab-panel" data-tab="computer-use">
-          <ComputerUseSetup platform={props.appInfo?.platform ?? "darwin"} variant="settings" />
+          <ComputerUseSetup variant="settings" />
         </Tabs.Content>
 
         <Tabs.Content value="profile" class="settings-modal-tab-panel" data-tab="profile">
