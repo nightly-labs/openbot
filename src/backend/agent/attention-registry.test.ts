@@ -5,6 +5,7 @@ import {
   AGENT_RUNTIME_TEXT_LIMIT,
   type AgentEvent,
   type BrowserTab,
+  COMPUTER_USE_MCP_SERVER_NAME,
   isAgentEvent,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -151,7 +152,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       params: {
         threadId,
         turnId,
-        serverName: "computer-use",
+        serverName: COMPUTER_USE_MCP_SERVER_NAME,
         mode: "openai/form",
         _meta: { persist: ["always"] },
         message: "Allow ChatGPT to use Telegram?",
@@ -194,7 +195,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       params: {
         threadId,
         turnId,
-        serverName: "computer-use",
+        serverName: COMPUTER_USE_MCP_SERVER_NAME,
         mode: "form",
         _meta: { persist: ["always"] },
         message: "Allow ChatGPT to use Preview?",

@@ -18,7 +18,7 @@ import type { ProviderCodeLoginApi } from "../../components/provider-code-login-
 import { ArrowUp, Button, Plus } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
+import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -627,7 +627,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                   </div>
                 </div>
 
-                <ComputerUseMacSetup platform={props.platform} variant="compact" />
+                <ComputerUseSetup variant="compact" />
               </section>
             </Match>
 
