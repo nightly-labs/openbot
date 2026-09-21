@@ -17,7 +17,10 @@ function approval(kind: AgentApprovalKind, agentId = "agent-1"): AgentApproval {
   };
 }
 
-const grants = (...agentIds: string[]) => ({ autoApproves: (agentId: string) => agentIds.includes(agentId) });
+const grants = (...agentIds: string[]) => ({
+  turboEnabled: () => false,
+  autoApproves: (agentId: string) => agentIds.includes(agentId),
+});
 
 describe("shouldAutoApprove", () => {
   it("asks about everything without a grant", () => {

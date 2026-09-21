@@ -74,24 +74,34 @@ export interface RespondToApprovalInput {
 export interface ApprovalAutomationPreference {
   /** Turbo mode. Every local agent's eligible approvals are answered automatically. */
   turbo: boolean;
-  /**
-   * The agents granted "Always allow" one at a time. Turbo does not clear the list, so turning
-   * Turbo off returns each agent to the grant the user gave it rather than to asking.
-   */
-  autoApproveAgentIds: string[];
+  /** Default for agents without an explicit choice. */
+  defaultAutoApprove: boolean;
+  /** Saved choices survive Turbo being enabled and disabled. */
+  autoApproveOverrides: Record<string, boolean>;
 }
 
 export const DEFAULT_APPROVAL_AUTOMATION_PREFERENCE: ApprovalAutomationPreference = {
   turbo: false,
-  autoApproveAgentIds: [],
+  defaultAutoApprove: true,
+  autoApproveOverrides: {},
 };
 
 export function isApprovalAutomationPreference(value: unknown): value is ApprovalAutomationPreference {
-  return isDynamicRecord(value) && isBoolean(value.turbo) && isAgentIdList(value.autoApproveAgentIds);
+  if (!isDynamicRecord(value) || !isBoolean(value.turbo) || !isBoolean(value.defaultAutoApprove)) return false;
+  if (!isDynamicRecord(value.autoApproveOverrides)) return false;
+  const entries = Object.entries(value.autoApproveOverrides);
+  return (
+    entries.length <= INPUT_LIMITS.agents && entries.every(([id, enabled]) => isIdentifier(id) && isBoolean(enabled))
+  );
 }
 
-function isAgentIdList(value: unknown): value is string[] {
-  return Array.isArray(value) && value.length <= INPUT_LIMITS.agents && value.every(isIdentifier);
+export function agentAutoApprovalEnabled(preference: ApprovalAutomationPreference, agentId: string): boolean {
+  return (
+    preference.turbo ||
+    (Object.hasOwn(preference.autoApproveOverrides, agentId)
+      ? preference.autoApproveOverrides[agentId]
+      : preference.defaultAutoApprove)
+  );
 }
 
 /**

@@ -899,7 +899,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       store,
       mailbox,
       preferredProvider: "codex",
-      approvalAutomation: { autoApproves: (agentId) => agentId === "chief" },
+      approvalAutomation: { turboEnabled: () => false, autoApproves: (agentId) => agentId === "chief" },
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);
@@ -967,7 +967,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       store,
       mailbox,
       preferredProvider: "codex",
-      approvalAutomation: { autoApproves: (agentId) => agentId === "someone-else" },
+      approvalAutomation: { turboEnabled: () => false, autoApproves: (agentId) => agentId === "someone-else" },
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
         clients.set(provider, client);

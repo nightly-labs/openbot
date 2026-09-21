@@ -403,7 +403,10 @@ export async function createApplicationServices({
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
     path: approvalAutomationFile,
-    initial: await readApprovalAutomation(approvalAutomationFile),
+    initial: await readApprovalAutomation(
+      approvalAutomationFile,
+      store.list().map((agent) => agent.id),
+    ),
     knownAgentIds: () => store.list().map((agent) => agent.id),
   });
   /*

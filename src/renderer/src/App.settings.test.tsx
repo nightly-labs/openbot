@@ -39,7 +39,11 @@ describe("OpenBot connected desktop shell", () => {
 
   it("reports a failed Turbo disable after Settings closes and restores its enabled state", async () => {
     const write = Promise.withResolvers<ApprovalAutomationPreference>();
-    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: true, autoApproveAgentIds: [] });
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({
+      turbo: true,
+      defaultAutoApprove: false,
+      autoApproveOverrides: {},
+    });
     vi.mocked(window.openbot.setApprovalAutomation).mockReturnValueOnce(write.promise);
     render(() => <App />);
     await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
@@ -62,8 +66,29 @@ describe("OpenBot connected desktop shell", () => {
     expect(restored).toBeEnabled();
   });
 
+  it.each<ApprovalAutomationPreference & { enabled: boolean }>([
+    { defaultAutoApprove: true, autoApproveOverrides: {}, turbo: false, enabled: true },
+    { defaultAutoApprove: false, autoApproveOverrides: {}, turbo: false, enabled: false },
+    { defaultAutoApprove: true, autoApproveOverrides: { chief: false }, turbo: false, enabled: false },
+    { defaultAutoApprove: true, autoApproveOverrides: { chief: false }, turbo: true, enabled: true },
+  ])("shows the effective auto-approval choice: %j", async ({ enabled, ...preference }) => {
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue(preference);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const toggle = await screen.findByRole("switch", { name: "Auto approve this agent's actions" });
+    if (enabled) expect(toggle).toBeChecked();
+    else expect(toggle).not.toBeChecked();
+    if (preference.turbo) expect(toggle).toBeDisabled();
+    else expect(toggle).toBeEnabled();
+  });
+
   it("reports a failed model-picker revocation and keeps the grant available for retry", async () => {
-    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: false, autoApproveAgentIds: ["chief"] });
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({
+      turbo: false,
+      defaultAutoApprove: false,
+      autoApproveOverrides: { chief: true },
+    });
     vi.mocked(window.openbot.setApprovalAutomation).mockRejectedValueOnce(new Error("Write failed"));
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
@@ -117,7 +142,7 @@ describe("OpenBot connected desktop shell", () => {
     await screen.findByRole("heading", { name: "Sales Outbound" });
     requestApproval("sales-outbound");
     await screen.findByRole("button", { name: "Deny" });
-    write.resolve({ turbo: false, autoApproveAgentIds: ["chief"] });
+    write.resolve({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: { chief: true } });
     await waitFor(() => expect(window.openbot.agent.respondToApproval).toHaveBeenCalledOnce());
     expect(window.openbot.agent.respondToApproval).toHaveBeenCalledWith({
       requestId: "approval-chief",
@@ -129,7 +154,8 @@ describe("OpenBot connected desktop shell", () => {
   it("shows Turbo without per-agent approval controls in Settings", async () => {
     vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({
       turbo: false,
-      autoApproveAgentIds: ["chief", "sales-outbound"],
+      defaultAutoApprove: false,
+      autoApproveOverrides: { chief: true, "sales-outbound": true },
     });
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
@@ -796,7 +822,11 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("permits approval revocation during active work while locking model and effort changes", async () => {
-    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: false, autoApproveAgentIds: ["chief"] });
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({
+      turbo: false,
+      defaultAutoApprove: false,
+      autoApproveOverrides: { chief: true },
+    });
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     const trigger = screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" });
