@@ -1,3 +1,4 @@
+import { type ApprovalAutomationPreference, agentAutoApprovalEnabled } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { toast } from "../../components/ui";
@@ -43,7 +44,11 @@ const Settings = createSimpleContext({
     const [pendingPluginSlug, setPendingPluginSlug] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(DEFAULT_GENERAL_SETTINGS);
-    const [autoApproveAgentIds, setAutoApproveAgentIds] = createSignal<readonly string[]>([]);
+    const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
+      turbo: false,
+      defaultAutoApprove: false,
+      autoApproveOverrides: {},
+    });
     let appSettingsRestoreTarget: HTMLElement | null = null;
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
@@ -113,7 +118,7 @@ const Settings = createSimpleContext({
           .setApprovalAutomation({ turbo: turboMode })
           .then((preference) => {
             setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
-            setAutoApproveAgentIds(preference.autoApproveAgentIds);
+            setApprovalAutomation(preference);
           })
           .catch(() => {
             setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode }));
@@ -180,13 +185,13 @@ const Settings = createSimpleContext({
      */
     async function setAgentAutoApprove(agentId: string, autoApprove: boolean): Promise<void> {
       const preference = await window.openbot.setApprovalAutomation({ agentId, autoApprove });
-      setAutoApproveAgentIds(preference.autoApproveAgentIds);
+      setApprovalAutomation(preference);
       setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
     }
 
     /** Whether this agent acts without asking, by its own grant or because Turbo covers every agent. */
     function agentAutoApproves(agentId: string): boolean {
-      return generalSettings().turboMode || autoApproveAgentIds().includes(agentId);
+      return agentAutoApprovalEnabled({ ...approvalAutomation(), turbo: generalSettings().turboMode }, agentId);
     }
 
     /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
@@ -226,7 +231,7 @@ const Settings = createSimpleContext({
       void window.openbot
         .getApprovalAutomation()
         .then((preference) => {
-          setAutoApproveAgentIds(preference.autoApproveAgentIds);
+          setApprovalAutomation(preference);
           // A toggle made before this read resolves has already been persisted, so the older value
           // must not be painted back over it.
           if (turboModeChanged) return;
@@ -261,7 +266,6 @@ const Settings = createSimpleContext({
       generalSettings,
       turboModePending,
       updateGeneralSettings,
-      autoApproveAgentIds,
       setAgentAutoApprove,
       agentAutoApproves,
       appSettingsOpen,

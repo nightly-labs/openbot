@@ -14,6 +14,29 @@ import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } fr
 import type { NativeImage, WebContents } from "electron";
 import { createFramePacer } from "./browser-screencast-pacing";
 
+async function dispatchMouseClick(
+  send: SendCommand,
+  coordinates: { x: number; y: number },
+  button: "left" | "middle" | "right",
+  totalClicks: number,
+  modifiers: number,
+  sessionId?: string,
+): Promise<void> {
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
+  for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
+    await send(
+      "Input.dispatchMouseEvent",
+      { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
+      sessionId,
+    );
+    await send(
+      "Input.dispatchMouseEvent",
+      { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
+      sessionId,
+    );
+  }
+}
+
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
 const MAX_RESULT_BYTES = 64 * 1024;
@@ -124,6 +147,109 @@ export class BrowserCdpEngine {
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
   #navigationGeneration = 0;
+
+  /** Resolves nodes before consent; the returned operation never resolves a replacement target. */
+  async prepareSecret(
+    targets: BrowserTarget[],
+    origin: string,
+    submission: "on_input" | "enter" | "click",
+    submitTarget?: BrowserTarget,
+  ): Promise<(secret: string) => Promise<void>> {
+    const generation = this.#navigationGeneration;
+    const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
+    const nodes = await this.#lease(async (send) => {
+      const inputs = [];
+      for (const target of targets) inputs.push(await this.#resolveElement(send, target, Date.now() + 10_000));
+      const button = submitTarget ? await this.#resolveElement(send, submitTarget, Date.now() + 10_000) : undefined;
+      for (const node of [...inputs, ...(button ? [button] : [])]) {
+        if (node.sessionId) throw new Error("Use takeover for authentication inside a frame.");
+        const valid = await this.#callOnNode(
+          send,
+          node.backendNodeId,
+          `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
+          [origin, inputs.includes(node)],
+        );
+        if (valid !== true) throw new Error("Authentication target is unavailable.");
+      }
+      if (new Set(inputs.map((node) => node.backendNodeId)).size !== inputs.length)
+        throw new Error("Authentication fields must be distinct.");
+      const fingerprints: string[] = [];
+      for (const node of [...inputs, ...(button ? [button] : [])]) {
+        const value = await this.#callOnNode(send, node.backendNodeId, fingerprint, []);
+        if (!isString(value)) throw new Error("Authentication target is unavailable.");
+        fingerprints.push(value);
+      }
+      return { inputs, button, fingerprints };
+    });
+    if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+    return async (secret) => {
+      try {
+        await this.#lease(async (send) => {
+          if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+          for (const [index, node] of [...nodes.inputs, ...(nodes.button ? [nodes.button] : [])].entries()) {
+            if ((await this.#callOnNode(send, node.backendNodeId, fingerprint, [])) !== nodes.fingerprints[index])
+              throw new Error("Authentication target changed.");
+            const valid = await this.#callOnNode(
+              send,
+              node.backendNodeId,
+              `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (!this.disabled && !this.readOnly)); }`,
+              [origin, nodes.inputs.includes(node)],
+            );
+            if (valid !== true) throw new Error("Authentication target changed.");
+          }
+          for (const [index, node] of nodes.inputs.entries()) {
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            await send("DOM.focus", { backendNodeId: node.backendNodeId });
+            await this.#callOnNode(
+              send,
+              node.backendNodeId,
+              `function(origin) {
+                if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly) throw new Error('Authentication target changed.');
+                this.select();
+              }`,
+              [origin],
+            );
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            // Native entry emits trusted input events across shadow roots, as regular browser typing
+            // does. Synthetic value setters can leave component forms unaware of the filled field.
+            await send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
+          }
+          if (submission === "on_input" || generation !== this.#navigationGeneration) return;
+          if (submission === "click" && nodes.button) {
+            await this.#callOnNode(
+              send,
+              nodes.button.backendNodeId,
+              `function(origin, expected) {
+                return new Promise((resolve, reject) => {
+                  const finish = (error) => { observer.disconnect(); clearTimeout(timer); error ? reject(new Error(error)) : resolve(); };
+                  const check = () => {
+                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) return finish('Authentication target changed.');
+                    if (!this.disabled && this.getAttribute('aria-disabled') !== 'true') finish();
+                  };
+                  const observer = new MutationObserver(check);
+                  const timer = setTimeout(() => finish('Authentication submit button is not ready.'), 2000);
+                  observer.observe(this, { attributes: true });
+                  observer.observe(this.getRootNode(), { childList: true, subtree: true });
+                  check();
+                });
+              }`,
+              [origin, nodes.fingerprints.at(-1)],
+            );
+            const point = await this.#elementPoint(send, nodes.button.backendNodeId, true);
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            await dispatchMouseClick(send, point, "left", 1, 0);
+          } else if (submission === "enter") {
+            const last = nodes.inputs.at(-1);
+            if (!last) throw new Error("Authentication target changed.");
+            await send("DOM.focus", { backendNodeId: last.backendNodeId });
+            await dispatchShortcut(send, "Enter");
+          }
+        });
+      } catch {
+        throw new Error("Secure authentication could not be completed. Take over to check the page.");
+      }
+    };
+  }
   #retainDebugger = false;
   #ownsDebugger = false;
   /**
@@ -219,19 +345,7 @@ export class BrowserCdpEngine {
       const modifiers = modifierMask(options.modifiers ?? []);
       assertBeforeDeadline(deadline);
       onDispatch?.();
-      await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
-      for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
-          sessionId,
-        );
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
-          sessionId,
-        );
-      }
+      await dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId);
     });
   }
 

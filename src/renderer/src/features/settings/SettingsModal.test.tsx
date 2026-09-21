@@ -244,6 +244,72 @@ describe("SettingsModal", () => {
     expect(await screen.findByText("OpenBot is up to date on the Stable track.")).toBeInTheDocument();
   });
 
+  it("reports host management instead of tenant update controls on a managed host", async () => {
+    const onUpdateAction = vi.fn(async () => undefined);
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.16.0", platform: "darwin", variant: "dev" }}
+        updateStatus={{ ...idleUpdateStatus, phase: "up-to-date", currentVersion: "0.16.0", managedByHost: true }}
+        onUpdateAction={onUpdateAction}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Updates" }));
+    expect(await screen.findByText("Managed by Host")).toBeInTheDocument();
+    expect(screen.getByText(/managed automatically by OpenBot Host Manager/)).toBeInTheDocument();
+    expect(screen.getByText(/Up to date/)).toBeInTheDocument();
+    // The host owns both the shared application and the download schedule, so neither the manual
+    // action nor the per-user download preference can change anything.
+    expect(screen.queryByRole("switch", { name: "Automatically download updates" })).not.toBeInTheDocument();
+    for (const name of ["Check for updates", "Download update", "Restart to update", "Managed by host"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(onUpdateAction).not.toHaveBeenCalled();
+  });
+
+  it("shows the live host update status while the host installs a new version", async () => {
+    const [status, setStatus] = createSignal<UpdateStatus>({
+      ...idleUpdateStatus,
+      phase: "downloading",
+      currentVersion: "0.16.0",
+      availableVersion: "0.17.0",
+      progress: 42,
+      managedByHost: true,
+    });
+
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.16.0", platform: "darwin", variant: "dev" }}
+        updateStatus={status()}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Updates" }));
+    expect(await screen.findByText(/Downloading OpenBot v0.17.0 · 42%/)).toBeInTheDocument();
+
+    setStatus((current) => ({ ...current, phase: "ready", progress: null }));
+    expect(await screen.findByText(/Waiting for the other users of this Mac to be idle/)).toBeInTheDocument();
+
+    setStatus((current) => ({ ...current, phase: "installing" }));
+    expect(await screen.findByText("Installing OpenBot v0.17.0…")).toBeInTheDocument();
+    expect(screen.getByText("Managed by Host")).toBeInTheDocument();
+  });
+
   it("disables busy update actions and shows action failures", async () => {
     const onUpdateAction = vi.fn(async () => {
       throw new Error("Update service is offline.");

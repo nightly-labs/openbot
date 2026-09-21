@@ -1,7 +1,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
+  describeUnusableRedirectUrl,
   McpOAuth,
   type McpOAuthAuthority,
   type McpOAuthRecord,
@@ -26,9 +28,14 @@ interface FakeServer {
   base: string;
   url: string;
   registrations: number;
+  /** Every address a registration asked grants to be sent to, in the order they were registered. */
+  registeredRedirectUris: string[];
   tokenRequests: URLSearchParams[];
   close: () => Promise<void>;
 }
+
+/** The one field of a registration request this fake reads back. */
+const registrationRequestSchema = z.object({ redirect_uris: z.array(z.string()).default(["openbot://mcp-auth"]) });
 
 async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -67,8 +74,14 @@ interface FakeServerOptions {
 async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeServer> {
   const { quoteTokenOnError = false, hangToken = false, delayTokenMs = 0 } = options;
   const { quoteCredentialsOnTokenError = false, rejectEveryToken = false } = options;
-  const state: { registrations: number; tokenRequests: URLSearchParams[]; refreshToken: string } = {
+  const state: {
+    registrations: number;
+    registeredRedirectUris: string[];
+    tokenRequests: URLSearchParams[];
+    refreshToken: string;
+  } = {
     registrations: 0,
+    registeredRedirectUris: [],
     tokenRequests: [],
     refreshToken: REFRESH_TOKEN,
   };
@@ -104,9 +117,13 @@ async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeSer
         return;
       }
       if (path === "/register") {
-        await readBody(request);
+        const body = await readBody(request);
         state.registrations += 1;
-        sendJson(response, 201, { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] });
+        // Echoed, as RFC 7591 says a registration answer does, so a test can read back the
+        // address this installation asked its grants to be sent to.
+        const { redirect_uris: uris } = registrationRequestSchema.parse(JSON.parse(body || "{}"));
+        state.registeredRedirectUris.push(...uris);
+        sendJson(response, 201, { client_id: "test-client", redirect_uris: uris });
         return;
       }
       if (path === "/token") {
@@ -230,6 +247,9 @@ async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeSer
     },
     get tokenRequests() {
       return state.tokenRequests;
+    },
+    get registeredRedirectUris() {
+      return state.registeredRedirectUris;
     },
     close: () =>
       new Promise<void>((resolve, reject) => {
@@ -858,5 +878,132 @@ describe("signing in to an http MCP server", () => {
     expect(normalizeResource("https://mcp.example.com/mcp#tab")).toBe("https://mcp.example.com/mcp");
     expect(oauth.signIn("http://mcp.example.com/mcp")).toBeNull();
     expect(oauth.signIn("http://localhost:4000/mcp")).not.toBeNull();
+  });
+});
+
+/**
+ * The address a grant comes back to. Canva registers `openbot://mcp-auth` without complaint and
+ * then answers the authorization request with `Invalid redirect URI.`, which happens on its own
+ * page where OpenBot sees nothing - so what is checked here is what leaves this machine.
+ */
+describe("the address a returning grant is sent to", () => {
+  const LOOPBACK = "http://127.0.0.1:54321/mcp-auth";
+
+  it("registers and sends the loopback address it listens on", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    const opened: string[] = [];
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: LOOPBACK,
+      openExternal: async (url) => {
+        opened.push(url);
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({ toolCount: 1, error: null });
+
+    // Registered, sent to the authorization endpoint and repeated at the token endpoint: an
+    // authorization server compares all three, and a mismatch between any two ends the sign-in.
+    expect(server.registeredRedirectUris).toEqual([LOOPBACK]);
+    expect(new URL(opened[0] ?? "").searchParams.get("redirect_uri")).toBe(LOOPBACK);
+    expect(server.tokenRequests[0]?.get("redirect_uri")).toBe(LOOPBACK);
+  });
+
+  it("registers again when the stored registration names another address", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    // What a build that used the deep link left behind. Sending the loopback address against this
+    // registration is exactly the refusal the user cannot act on.
+    storage.records.set(server.url, { client: { client_id: "old-client", redirect_uris: ["openbot://mcp-auth"] } });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: LOOPBACK,
+      openExternal: async (url) => {
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({ toolCount: 1, error: null });
+
+    // Once, and only once: a sign-in that registered again for every request the exchange makes
+    // would spend its grant against a `client_id` that grant was never issued to.
+    expect(server.registrations).toBe(1);
+    expect(server.registeredRedirectUris).toEqual([LOOPBACK]);
+    expect(storage.read(server.url)?.client?.redirect_uris).toEqual([LOOPBACK]);
+    expect(storage.read(server.url)?.tokens?.access_token).toBe(ACCESS_TOKEN);
+  });
+
+  it("refreshes against the stored registration before it registers again", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      // Stale in two ways at once, which is what a restart leaves behind: the registration names
+      // the address of another run, and the access token is one the server no longer takes.
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: {
+        access_token: "stale-access-token",
+        token_type: "Bearer",
+        expires_in: 3600,
+        refresh_token: REFRESH_TOKEN,
+      },
+      obtainedAt: Date.now(),
+    });
+    const opened: string[] = [];
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: LOOPBACK,
+      openExternal: async (url) => {
+        opened.push(url);
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({ toolCount: 1, error: null });
+
+    // A refresh uses no redirect address. Registering in front of it would spend this refresh
+    // token against a `client_id` it was never issued to, and cost the user a browser sign-in.
+    expect(server.registrations).toBe(0);
+    expect(opened).toEqual([]);
+    expect(storage.read(server.url)?.tokens?.access_token).toBe(REFRESHED_TOKEN);
+    expect(storage.read(server.url)?.client?.client_id).toBe("test-client");
+  });
+
+  it("keeps the stored registration for a silent refresh", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600, refresh_token: REFRESH_TOKEN },
+      obtainedAt: Date.now() - 7_200_000,
+    });
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: LOOPBACK,
+      openExternal: async () => expect.unreachable("A refresh must never open a browser."),
+    });
+
+    // A refresh has no browser to register a new address for, and its refresh token belongs to
+    // the `client_id` on file. Registering here would spend it against a client that never got it.
+    expect(await oauth.accessToken(server.url)).toBe(REFRESHED_TOKEN);
+    expect(server.registrations).toBe(0);
+  });
+
+  it("refuses an address no MCP authorization server would send a grant to", () => {
+    const storage = memoryStorage();
+    const openExternal = async () => undefined;
+    expect(() => new McpOAuth({ storage, openExternal, redirectUrl: "https://openbot.run/mcp-auth" })).toThrow(
+      /web address/,
+    );
+    expect(() => new McpOAuth({ storage, openExternal, redirectUrl: "http://openbot.run/mcp-auth" })).toThrow(
+      /clear text/,
+    );
+    expect(() => new McpOAuth({ storage, openExternal, redirectUrl: "mcp-auth" })).toThrow(/complete address/);
+    expect(describeUnusableRedirectUrl(LOOPBACK)).toBeNull();
+    expect(describeUnusableRedirectUrl("openbot://mcp-auth")).toBeNull();
   });
 });

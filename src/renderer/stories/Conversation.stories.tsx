@@ -1069,7 +1069,6 @@ const args: Parameters<typeof Conversation>[0] = {
   onActivateBrowserTab: fn(),
   onCloseBrowserTab: fn(),
   onOpenRemoteDesktop: async (_serverId: string, _trigger: HTMLElement) => undefined,
-  onOpenAgentSetup: async () => undefined,
   onStop: fn(),
 };
 

@@ -94,6 +94,7 @@ type TeamApiAgentMethods = Pick<
   | "interrupt"
   | "respondToPrompt"
   | "respondToApproval"
+  | "respondToBrowserSecret"
   | "respondToBrowserTakeover"
 >;
 

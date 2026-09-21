@@ -26,7 +26,14 @@ export type DeepLink =
   | { kind: "plugin"; slug: string }
   | { kind: "mcp-auth"; state: string; code: string };
 
-/** The one address every MCP authorization server is registered to send its grant back to. */
+/**
+ * Where an MCP grant comes back when this machine could not bind a loopback port.
+ *
+ * The listener in `mcp-oauth-redirect-server.ts` is the address a sign-in registers and sends;
+ * some authorization servers, Canva among them, refuse a private-use scheme at `/authorize` even
+ * after they accept it at registration. This stays as the fallback, and for the servers that take
+ * it, it is the shorter path: the operating system hands the link straight to the running app.
+ */
 export const MCP_OAUTH_REDIRECT_URL = "openbot://mcp-auth";
 
 const MCP_OAUTH_HOST = "mcp-auth";

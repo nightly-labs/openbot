@@ -5,7 +5,7 @@
  *
  * Nothing about the sign-in happens here, and nothing about it is faked here either. The connect
  * attempt is what starts it: the test the main process runs opens the browser, waits for the grant
- * to come back on `openbot://mcp-auth`, and only then answers. So this dialog is the shell, the
+ * to come back on the address the main process listens on, and only then answers. So this dialog is the shell, the
  * server's own words, and one button, and `busy()` covers the whole trip rather than a request.
  *
  * A grant is a secret, so it never reaches this side. What comes back is the same pass or fail a
