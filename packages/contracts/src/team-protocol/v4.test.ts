@@ -67,6 +67,34 @@ describe("Team protocol v4", () => {
     expect(() =>
       decodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, { ...test, keyboard: "yes" }),
     ).toThrow();
+    // Neither transport may publish new IPC fields or accept them as wire fields.
+    for (const [path, payload] of [
+      [setupPath, setup],
+      [testPath, test],
+    ] as const) {
+      const extended = { ...payload, internalDetail: { secret: "host-only" } };
+      expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, extended))).toEqual(payload);
+      expect(decodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, extended)).toEqual(payload);
+      expect(encodeTeamProtocolV4WebRtcHttpResponse("POST", path, 200, extended)).toEqual(payload);
+      expect(decodeTeamProtocolV4WebRtcHttpResponse("POST", path, 200, extended)).toEqual(payload);
+    }
+    for (const invalid of [
+      { platform: "future-os" },
+      { screenRecording: "future-state" },
+      { accessibility: "future-state" },
+      { service: "future-state" },
+      { displays: "future-state" },
+      { guiSession: "future-state" },
+      { activeSessions: -1 },
+      { activeSessions: 0.5 },
+      { checkedAt: "not-a-date" },
+      { hostName: "x".repeat(256) },
+      { username: "x".repeat(256) },
+      { message: "x".repeat(1001) },
+    ]) {
+      expect(() => decodeTeamProtocolV4CurrentHttpResponse("POST", setupPath, 200, { ...setup, ...invalid })).toThrow();
+    }
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, { ...test, code: "12345" })).toThrow();
     expect(() => decodeTeamProtocolV3CurrentHttpResponse("POST", setupPath, 200, setup)).toThrow();
   });
 
