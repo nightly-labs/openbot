@@ -496,7 +496,6 @@ jobs:
           : > "$last_message_file"
           timeout 900 codex exec \
             --ephemeral \
-            --ignore-user-config \
             --sandbox read-only \
             --model chatgpt-web/extra-high \
             --config 'model_reasoning_effort="xhigh"' \
