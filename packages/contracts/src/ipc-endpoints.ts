@@ -64,6 +64,8 @@ export const IPC_ENDPOINTS = {
     setProviderApiKey: request(IPC_CHANNELS.setProviderApiKey),
     clearProviderApiKey: request(IPC_CHANNELS.clearProviderApiKey),
     getProviderApiKeyState: request(IPC_CHANNELS.getProviderApiKeyState),
+    startProviderCodeLogin: request(IPC_CHANNELS.startProviderCodeLogin),
+    cancelProviderCodeLogin: request(IPC_CHANNELS.cancelProviderCodeLogin),
   },
   providerRuntimes: {
     getStatus: request(IPC_CHANNELS.providerRuntimesGetStatus),

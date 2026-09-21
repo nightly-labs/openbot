@@ -39,6 +39,9 @@ export function providerIpcHandlers({
         return service.getStatus();
       }),
       refreshAgentProviders: handler(() => service.refreshProviders()),
+      // The code and the page it is typed on come back; nothing the code is later traded for does.
+      startProviderCodeLogin: payloadHandler(parseProviderId, (provider) => service.startProviderCodeLogin(provider)),
+      cancelProviderCodeLogin: payloadHandler(parseProviderId, (provider) => service.cancelProviderCodeLogin(provider)),
       // The key and the process that uses it change as one step, because the catalog the CLI
       // advertises is decided at spawn time: the service writes the key only when it can restart
       // the provider on it, and reports success only once the new process is up.

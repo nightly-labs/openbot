@@ -33,6 +33,8 @@ export const IPC_CHANNELS = {
   setProviderApiKey: "app:set-provider-api-key",
   clearProviderApiKey: "app:clear-provider-api-key",
   getProviderApiKeyState: "app:get-provider-api-key-state",
+  startProviderCodeLogin: "app:start-provider-code-login",
+  cancelProviderCodeLogin: "app:cancel-provider-code-login",
   providerRuntimesGetStatus: "provider-runtimes:get-status",
   providerRuntimesDownload: "provider-runtimes:download",
   providerRuntimesCancel: "provider-runtimes:cancel",
