@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { HOST_MANAGER_DIRECTORY } from "../src/main/host-update-files";
 import { HOST_FILES, HOST_PACKAGE_ID, hostFileMode } from "./host-installation";
-import { expectedHostPaths, verifyHostBom, verifyHostPayload } from "./verify-host-installer";
+import { expectedHostPaths, verifyHostBom, verifyHostPayload, verifyHostSignature } from "./verify-host-installer";
 
 const exec = promisify(execFile);
 function validBom(): string {
@@ -31,6 +31,64 @@ describe("host package manifest", () => {
     (text: string) => `${text}\n./Users/client-acme/password.txt\t100600\t0\t0`,
   ])("rejects unexpected content, links, ownership or modes", (change) => {
     expect(() => verifyHostBom(change(validBom()))).toThrow();
+  });
+});
+
+// Captured from `pkgutil --check-signature` on a package signed by the real Developer ID Installer
+// identity. The wording is Apple's, so it is reproduced exactly rather than paraphrased.
+const signedByDeveloperId = `Package "probe.pkg":
+   Status: signed by a developer certificate issued by Apple for distribution
+   Signed with a trusted timestamp on: 2026-09-21 09:07:44 +0000
+   Certificate Chain:
+    1. Developer ID Installer: Akudama GmbH (ZTRDTUL87R)
+       Expires: 2031-09-17 00:00:00 +0000
+       SHA256 Fingerprint:
+           3E B7 39 0D 0F 82 32 B2 06 FC 16 17 9D BB D9 A3 A6 2F 54 07 70 11 
+           79 D4 89 63 30 9A 1C BD AF 41
+       ------------------------------------------------------------------------
+    2. Developer ID Certification Authority
+       Expires: 2031-09-17 00:00:00 +0000
+       ------------------------------------------------------------------------
+    3. Apple Root CA
+       Expires: 2035-02-09 21:40:36 +0000
+`;
+
+describe("host package signature", () => {
+  it("accepts the status a Developer ID Installer package really reports", () => {
+    expect(() => verifyHostSignature(signedByDeveloperId)).not.toThrow();
+  });
+
+  it("reports what the package said, so a wrong status does not have to be guessed at", () => {
+    expect(() => verifyHostSignature('Package "probe.pkg":\n   Status: no signature\n')).toThrow(
+      "Status: no signature",
+    );
+  });
+
+  it.each([
+    [
+      "an App Store installer certificate, which cannot install this package",
+      signedByDeveloperId
+        .replace(
+          "signed by a developer certificate issued by Apple for distribution",
+          "signed by a certificate trusted by macOS",
+        )
+        .replace("Developer ID Installer:", "3rd Party Mac Developer Installer:"),
+    ],
+    ["another team", signedByDeveloperId.replace("ZTRDTUL87R", "A1B2C3D4E5")],
+    ["no signature at all", 'Package "probe.pkg":\n   Status: no signature\n'],
+    [
+      "a signature with no trusted timestamp",
+      signedByDeveloperId.replace(/ *Signed with a trusted timestamp on: .*\n/, ""),
+    ],
+    [
+      "a status that only appears inside another line",
+      signedByDeveloperId.replace(
+        /^ *Status: .*$/m,
+        "   Note: not signed by a developer certificate issued by Apple for distribution",
+      ),
+    ],
+  ])("rejects %s", (_case, signature) => {
+    expect(() => verifyHostSignature(signature)).toThrow("Unexpected installer signing identity");
   });
 });
 

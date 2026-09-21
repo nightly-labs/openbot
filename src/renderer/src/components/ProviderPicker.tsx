@@ -12,7 +12,18 @@ import type { AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import { createEffect, createUniqueId, For, Show } from "solid-js";
 import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
 import { useI18n } from "../i18n-context";
-import { Badge, Button, Input, RefreshCw, SlidersHorizontal, Spinner } from "./ui";
+import {
+  Badge,
+  Button,
+  buttonVariants,
+  DropdownMenu,
+  Ellipsis,
+  Input,
+  RefreshCw,
+  SlidersHorizontal,
+  Smartphone,
+  Spinner,
+} from "./ui";
 
 export interface ProviderPickerOption {
   id: AgentProviderId;
@@ -55,6 +66,17 @@ export interface ProviderPickerProps {
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * Starts the sign-in the user finishes on another device. Offered beside the row's usual sign-in,
+   * never instead of it: this is the way out for a computer whose browser cannot complete the
+   * hand-off, and only for a provider whose descriptor says `codeSignIn`.
+   */
+  onSignInWithCodeProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * The dialog element a row's actions menu portals into. Without it the menu lands beside the
+   * dialog in `body`, where a modal makes it inert and out of reach.
+   */
+  menuMount?: HTMLElement;
   onRefreshProviders?: () => void | Promise<void>;
   /** Add row gated by OpenCode install; else offers install. */
   onAddCustomProvider?: () => void;
@@ -300,6 +322,17 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 updatable() && props.onUpdateProvider && runtimeStatus()?.phase === "not-downloaded"
                   ? undefined
                   : providerRuntimeAction(state(), connecting(), runtimeStatus());
+              /**
+               * The row has a way in the user finishes elsewhere, and something to run it with.
+               *
+               * Offered while connected as well: that is how the user reaches a second account,
+               * which is otherwise only possible by signing out first and hoping the new sign-in
+               * works. A runtime still being downloaded has no CLI to ask for a code yet.
+               */
+              const codeSignInOffered = () =>
+                Boolean(props.onSignInWithCodeProvider) &&
+                agentProviderDescriptor(option().id).codeSignIn &&
+                (runtimeStatus()?.phase ?? "ready") === "ready";
               const inputId = () => `${pickerId}-${option().id}`;
               return (
                 <div
@@ -479,6 +512,31 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       >
                         {i18n.t("provider.action.signIn")}
                       </Button>
+                    </Show>
+                    {/* The second way in, for the computer the first one cannot serve: no browser,
+                      a remote session, or a browser signed in to the wrong account.
+
+                      Behind a menu rather than beside Connect: it is the rarer way in, and a second
+                      button on every row would make the rows argue about which one to press. The
+                      menu holds whatever else a row offers later. */}
+                    <Show when={codeSignInOffered()}>
+                      <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+                        <DropdownMenu.Trigger
+                          class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
+                          aria-label={i18n.t("provider.aria.moreSignIn", { name: option().name })}
+                          disabled={props.disabled || props.refreshingProviders}
+                        >
+                          <Ellipsis aria-hidden="true" />
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal mount={props.menuMount}>
+                          <DropdownMenu.Content>
+                            <DropdownMenu.Item onSelect={() => void props.onSignInWithCodeProvider?.(option().id)}>
+                              <Smartphone aria-hidden="true" />
+                              {i18n.t("provider.action.signInWithCode")}
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
                     </Show>
                   </div>
                 </div>

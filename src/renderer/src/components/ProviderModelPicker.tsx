@@ -26,6 +26,7 @@ import {
   type PickerModelGroup,
   pickerModels,
 } from "./provider-model-options";
+import { StandingApprovalConfirmation } from "./StandingApprovalConfirmation";
 import {
   Button,
   Input,
@@ -39,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
   SlidersHorizontal,
+  Switch,
   Tabs,
   Tooltip,
 } from "./ui";
@@ -55,6 +57,8 @@ interface ProviderModelPickerProps {
   reasoningEffort?: AgentReasoningEffort;
   onReasoningEffortChange?: (effort: AgentReasoningEffort) => void;
   disabled?: boolean;
+  /** Keep approval controls available while model and effort changes are locked. */
+  modelChangesDisabled?: boolean;
   disabledReason?: string;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -63,6 +67,16 @@ interface ProviderModelPickerProps {
   /** Endpoints the user named; served by OpenCode, separated out only by the picker. */
   customProviders?: readonly CustomProviderSummary[];
   onAddCustomProvider?: () => void;
+  /**
+   * This agent's standing approval, below Effort. Without the callback the row is absent, which is
+   * how a remote agent and the setup screen show the picker they always showed: the grant belongs
+   * to the computer that runs the agent.
+   */
+  autoApprove?: boolean;
+  agentName?: string;
+  /** Turbo mode already covers every agent, so the switch reads on and cannot be turned off here. */
+  autoApproveLocked?: boolean;
+  onAutoApproveChange?: (autoApprove: boolean) => void;
   onChange: (model: AgentModelId, provider: AgentProviderId) => void;
 }
 
@@ -79,6 +93,8 @@ const RAIL_TOOLTIP_OPEN_DELAY = 150;
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
   const [search, setSearch] = createSignal("");
+  const [grantConfirmation, setGrantConfirmation] = createSignal<{ name?: string; confirm: () => void } | null>(null);
+  let trigger: HTMLButtonElement | undefined;
   const providerButtons = new Map<RailId, HTMLButtonElement>();
   let root: HTMLDivElement | undefined;
 
@@ -155,6 +171,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   }
 
   function selectModel(model: AgentModelId, rail: RailId): void {
+    if (props.disabled || props.modelChangesDisabled) return;
     if (providerAvailability(props.agentStatus, props.modelOptions, rail).state !== "available") return;
     if (
       !showsReasoningEffort() &&
@@ -180,12 +197,17 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     >
       <Popover.Root open={open()} onOpenChange={setPickerOpen} placement="bottom-end" gutter={8} sameWidth={field()}>
         <Popover.Trigger
+          ref={trigger}
           type="button"
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
           aria-label={`${props.ariaLabel ?? "Agent model"}: ${triggerModelName()}`}
           disabled={props.disabled}
-          title={props.disabled ? props.disabledReason : `${railName(activeProvider())} · ${triggerModelName()}`}
-          onKeyDown={(event) => {
+          title={
+            props.disabled || props.modelChangesDisabled
+              ? props.disabledReason
+              : `${railName(activeProvider())} · ${triggerModelName()}`
+          }
+          onKeyDown={(event: KeyboardEvent) => {
             if (event.key !== "ArrowDown") return;
             event.preventDefault();
             setPickerOpen(true);
@@ -427,7 +449,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           )}
                           optionValue="id"
                           optionTextValue={(model) => displayModelName(model.name, model.id)}
-                          optionDisabled={() => !available()}
+                          optionDisabled={() => !available() || props.modelChangesDisabled === true}
                           value={[selected()?.id ?? props.value]}
                           selectionMode="single"
                           disallowEmptySelection
@@ -444,7 +466,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 aria-label={`${displayModelName(model.name, model.id)}${
                                   model.id === railDefaultModel(provider) ? ", default" : ""
                                 }`}
-                                disabled={!available()}
+                                disabled={!available() || props.modelChangesDisabled}
                                 onClick={() => {
                                   if (!isSelected() || props.provider !== provider) selectModel(model.id, provider);
                                 }}
@@ -477,7 +499,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           optionTextValue="name"
                           value={effortOptions().find((option) => option.id === effortValue())}
                           onChange={(option) => {
-                            if (!available() || !option || option.id === effortValue()) return;
+                            if (
+                              props.disabled ||
+                              props.modelChangesDisabled ||
+                              !available() ||
+                              !option ||
+                              option.id === effortValue()
+                            )
+                              return;
                             if (selected()?.variants.length) props.onChange(option.id, wireProvider(provider));
                             else {
                               const effort = selectedModel()?.supportedReasoningEfforts.find(
@@ -488,7 +517,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           }}
                           itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
                         >
-                          <SelectTrigger size="sm" aria-label="Agent reasoning effort" disabled={!available()}>
+                          <SelectTrigger
+                            size="sm"
+                            aria-label="Agent reasoning effort"
+                            disabled={!available() || props.modelChangesDisabled}
+                          >
                             <SelectValue<{ id: string; name: string }>>
                               {(state) => state.selectedOption()?.name ?? "Select effort"}
                             </SelectValue>
@@ -497,6 +530,25 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Select>
                       </div>
                     </Show>
+                    <Show when={props.onAutoApproveChange}>
+                      {(change) => (
+                        <div class="provider-model-effort">
+                          <span>Auto approve</span>
+                          <Switch
+                            size="sm"
+                            aria-label="Auto approve this agent's actions"
+                            checked={props.autoApprove === true}
+                            disabled={props.autoApproveLocked === true}
+                            onChange={(next) => {
+                              const save = change();
+                              if (!next) return save(false);
+                              setGrantConfirmation({ name: props.agentName, confirm: () => save(true) });
+                              setOpen(false);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </Show>
                   </Tabs.Content>
                 );
               }}
@@ -504,6 +556,17 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           </Tabs.Root>
         </Popover.Content>
       </Popover.Root>
+      <StandingApprovalConfirmation
+        open={grantConfirmation() !== null}
+        agentName={grantConfirmation()?.name}
+        restoreFocusTarget={trigger}
+        onCancel={() => setGrantConfirmation(null)}
+        onConfirm={() => {
+          const grant = grantConfirmation();
+          setGrantConfirmation(null);
+          grant?.confirm();
+        }}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import type {
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ProviderCodeLoginState } from "../../components/ProviderCodeLoginDialog";
 import { Toaster, toast } from "../../components/ui";
 import { STORY_AGENT_STATUS } from "../../preview/fixtures";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
@@ -372,5 +373,53 @@ describe("OnboardingFlow", () => {
     expect(view.queryByRole("button", { name: "Download OpenCode" })).toBeNull();
     // The version the user's own CLI reports, which is the one the row must show.
     expect(view.getByText("v1.18.27")).toBeInTheDocument();
+  });
+
+  it("offers the code sign-in on the first-run provider step and shows the code to type", async () => {
+    const agentStatus: AgentStatus = {
+      ...STORY_AGENT_STATUS,
+      providers: (STORY_AGENT_STATUS.providers ?? []).map((provider) =>
+        provider.id === "codex" ? { ...provider, state: "sign-in-required" as const, email: null } : provider,
+      ),
+    };
+    const [state, setState] = createSignal<ProviderCodeLoginState>({ phase: "starting" });
+    const [provider, setProvider] = createSignal<AgentProviderId | null>(null);
+    const codeLogin = {
+      provider,
+      state,
+      start: vi.fn((id: AgentProviderId) => {
+        setProvider(id);
+        setState({
+          phase: "waiting",
+          userCode: "KTQ4-B62MX",
+          verificationUrl: "https://auth.openai.com/codex/device",
+          expiresAt: Date.now() + 600_000,
+        });
+      }),
+      cancel: vi.fn(() => setProvider(null)),
+      openVerificationUrl: vi.fn(),
+    };
+    const view = render(() => (
+      <OnboardingFlow
+        state={{ completed: false, preferredProvider: null, preferredModel: null }}
+        agentStatus={agentStatus}
+        platform="darwin"
+        codeLogin={codeLogin}
+        onSave={async () => undefined}
+      />
+    ));
+
+    // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
+    const moreActions = view.getByRole("button", { name: "More ways to log in to ChatGPT" });
+    await fireEvent.pointerDown(moreActions, { button: 0 });
+    await fireEvent.click(moreActions);
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Log in with code" }), { button: 0 });
+
+    await waitFor(() => expect(codeLogin.start).toHaveBeenCalledWith("codex"));
+    expect(await screen.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Close log in to ChatGPT" }));
+    await waitFor(() => expect(codeLogin.cancel).toHaveBeenCalledTimes(1));
+    expect(screen.queryByLabelText("Login code K T Q 4 - B 6 2 M X")).toBeNull();
   });
 });

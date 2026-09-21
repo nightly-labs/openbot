@@ -1,10 +1,11 @@
-import type { AccountUsage, AgentSummary } from "@openbot/contracts/ipc";
+import type { AccountUsage, AgentSummary, ApprovalAutomationPreference } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { desktopAnalytics } from "./analytics";
 import {
   AGENTS,
+  confirmOnboardingModel,
   emitAgentEvent,
   emitScopedAgentEvent,
   emitUpdateStatus,
@@ -13,6 +14,7 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
+import { toast } from "./components/ui";
 import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
 
 describe("OpenBot connected desktop shell", () => {
@@ -32,6 +34,110 @@ describe("OpenBot connected desktop shell", () => {
   });
   beforeEach(() => {
     installOpenbotStub();
+  });
+  afterEach(() => toast.dismiss());
+
+  it("reports a failed Turbo disable after Settings closes and restores its enabled state", async () => {
+    const write = Promise.withResolvers<ApprovalAutomationPreference>();
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: true, autoApproveAgentIds: [] });
+    vi.mocked(window.openbot.setApprovalAutomation).mockReturnValueOnce(write.promise);
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    const toggle = await screen.findByRole("switch", { name: "Turbo mode" });
+    await waitFor(() => expect(toggle).toBeChecked());
+    await fireEvent.click(toggle);
+    await waitFor(() => expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({ turbo: false }));
+    expect(toggle).toBeDisabled();
+    await fireEvent.click(toggle);
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledOnce();
+    await fireEvent.keyDown(screen.getByRole("dialog", { name: "General" }), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "General" })).not.toBeInTheDocument());
+    write.reject(new Error("Write failed"));
+    expect(
+      await screen.findByText("Could not turn off Turbo mode. It is still active. Try again."),
+    ).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const restored = await screen.findByRole("switch", { name: "Turbo mode" });
+    expect(restored).toBeChecked();
+    expect(restored).toBeEnabled();
+  });
+
+  it("reports a failed model-picker revocation and keeps the grant available for retry", async () => {
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: false, autoApproveAgentIds: ["chief"] });
+    vi.mocked(window.openbot.setApprovalAutomation).mockRejectedValueOnce(new Error("Write failed"));
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const toggle = await screen.findByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(toggle).toBeChecked();
+    await fireEvent.click(toggle);
+    expect(
+      await screen.findByText("Could not revoke the standing approval for Chief. It is still active. Try again."),
+    ).toBeInTheDocument();
+    expect(toggle).toBeChecked();
+    await fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledTimes(2);
+  });
+
+  it("answers the original approval after switching agents during a grant write", async () => {
+    vi.mocked(window.openbot.agent.listAgents).mockResolvedValue(
+      AGENTS.map((agent) => ({ ...agent, threadId: `thread-${agent.id}` })),
+    );
+    const write = Promise.withResolvers<ApprovalAutomationPreference>();
+    vi.mocked(window.openbot.setApprovalAutomation).mockReturnValueOnce(write.promise);
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await confirmOnboardingModel();
+    const requestApproval = (agentId: string) => {
+      emitAgentEvent?.({
+        type: "approval",
+        approval: {
+          requestId: `approval-${agentId}`,
+          agentId,
+          threadId: `thread-${agentId}`,
+          turnId: `turn-${agentId}`,
+          kind: "command",
+          command: "bun run lint",
+          cwd: null,
+          reason: null,
+          grantRoot: null,
+          permissions: null,
+        },
+      });
+    };
+    requestApproval("chief");
+    await fireEvent.click(await screen.findByRole("button", { name: "Always allow" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Always allow" }));
+    await waitFor(() =>
+      expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({ agentId: "chief", autoApprove: true }),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /Sales Outbound, Outbound specialist/ }));
+    await screen.findByRole("heading", { name: "Sales Outbound" });
+    requestApproval("sales-outbound");
+    await screen.findByRole("button", { name: "Deny" });
+    write.resolve({ turbo: false, autoApproveAgentIds: ["chief"] });
+    await waitFor(() => expect(window.openbot.agent.respondToApproval).toHaveBeenCalledOnce());
+    expect(window.openbot.agent.respondToApproval).toHaveBeenCalledWith({
+      requestId: "approval-chief",
+      decision: "accept",
+    });
+    expect(screen.getByRole("button", { name: "Deny" })).toBeEnabled();
+  });
+
+  it("shows Turbo without per-agent approval controls in Settings", async () => {
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({
+      turbo: false,
+      autoApproveAgentIds: ["chief", "sales-outbound"],
+    });
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    expect(await screen.findByRole("switch", { name: "Turbo mode" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Revoke the standing approval/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Revoke all" })).not.toBeInTheDocument();
+    expect(window.openbot.setApprovalAutomation).not.toHaveBeenCalled();
   });
 
   it("refreshes skill suggestions after settings closes", async () => {
@@ -689,11 +795,14 @@ describe("OpenBot connected desktop shell", () => {
     expect(screen.getByLabelText("Message Chief")).toHaveAttribute("contenteditable", "true");
   });
 
-  it("locks the header model picker during active work", async () => {
+  it("permits approval revocation during active work while locking model and effort changes", async () => {
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: false, autoApproveAgentIds: ["chief"] });
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     const trigger = screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" });
     await waitFor(() => expect(trigger).toBeEnabled());
+    await fireEvent.click(trigger);
+    await screen.findByRole("option", { name: "GPT-5.6 Sol" });
 
     emitAgentEvent?.({
       type: "turn-started",
@@ -701,7 +810,14 @@ describe("OpenBot connected desktop shell", () => {
       threadId: "thread-chief",
       turnId: "turn-1",
     });
-    await waitFor(() => expect(trigger).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeDisabled());
+    expect(trigger).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Agent reasoning effort/ })).toBeDisabled();
+    const approval = screen.getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(approval).toBeChecked();
+    await fireEvent.click(approval);
+    await waitFor(() => expect(approval).not.toBeChecked());
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledWith({ agentId: "chief", autoApprove: false });
 
     emitAgentEvent?.({
       type: "turn-completed",
@@ -710,7 +826,8 @@ describe("OpenBot connected desktop shell", () => {
       turnId: "turn-1",
       status: "completed",
     });
-    await waitFor(() => expect(trigger).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: /Agent reasoning effort/ })).toBeEnabled();
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_started", expect.anything());
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_completed", expect.anything());
   });

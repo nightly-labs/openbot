@@ -9,7 +9,14 @@ import { Camera, ScanLine } from "lucide-react-native";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
-import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
@@ -127,6 +134,29 @@ export function QrScanner({
   const [scanState, setScanState] = useState<ScanState>({ status: "idle" });
   const [foregroundColor, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
   const { width: windowWidth } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
+  const connecting = useSharedValue(0);
+  const isConnecting = scanState.status === "connecting";
+  useEffect(() => {
+    connecting.set(
+      withTiming(isConnecting ? 1 : 0, {
+        duration: 220,
+        easing: Easing.bezier(0.23, 1, 0.32, 1),
+        reduceMotion: ReduceMotion.Never,
+      }),
+    );
+  }, [connecting, isConnecting]);
+  const frameStyle = useAnimatedStyle(() => ({
+    opacity: 1 - connecting.get(),
+    transform: [{ scale: reducedMotion ? 1 : 1 - connecting.get() * 0.04 }],
+  }));
+  const statusStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: reducedMotion ? 0 : -16 * connecting.get() }],
+  }));
+  const controlsStyle = useAnimatedStyle(() => ({
+    opacity: 1 - connecting.get(),
+    transform: [{ translateY: reducedMotion ? 0 : -8 * connecting.get() }],
+  }));
   const scannerFrameSize = Math.min(windowWidth - 80, 280);
   useEffect(() => {
     // Permission controls must be visible before the camera can start.
@@ -273,14 +303,21 @@ export function QrScanner({
           />
         ) : null}
 
-        <View pointerEvents="none" className="absolute inset-0 items-center justify-center px-10 pb-24">
+        <Animated.View
+          pointerEvents="none"
+          style={frameStyle}
+          className="absolute inset-0 items-center justify-center px-10 pb-24"
+        >
           <View
             className="rounded-[28px] border-2 border-white"
             style={{ borderCurve: "continuous", height: scannerFrameSize, width: scannerFrameSize }}
           />
-        </View>
+        </Animated.View>
 
-        <View className={embedded ? "absolute inset-x-4 bottom-4" : "absolute inset-x-5 bottom-safe-offset-5"}>
+        <Animated.View
+          style={statusStyle}
+          className={embedded ? "absolute inset-x-4 bottom-4" : "absolute inset-x-5 bottom-safe-offset-5"}
+        >
           <ScannerStatus
             scanState={scanState}
             onRetry={() => {
@@ -291,8 +328,15 @@ export function QrScanner({
               setScanState({ status: "idle" });
             }}
           />
-        </View>
-        {renderOverlay?.(true)}
+        </Animated.View>
+        <Animated.View
+          pointerEvents={isConnecting ? "none" : "box-none"}
+          accessibilityElementsHidden={isConnecting}
+          importantForAccessibility={isConnecting ? "no-hide-descendants" : "auto"}
+          style={[StyleSheet.absoluteFill, controlsStyle]}
+        >
+          {renderOverlay?.(true)}
+        </Animated.View>
       </View>
     </>
   );

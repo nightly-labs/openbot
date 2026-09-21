@@ -14,6 +14,8 @@ import type {
   QueueSnapshot,
   RespondToPromptInput,
   Routine,
+  SidebarLayoutAction,
+  SidebarLayoutSnapshot,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -66,6 +68,8 @@ interface AddRemoteServerInput {
 }
 
 export interface MobileWorkspaceContextValue {
+  sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
+  mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   changeQueue: (
@@ -75,6 +79,7 @@ export interface MobileWorkspaceContextValue {
     input: { deliveryId?: string; expectedTurnId?: string; deliveryIds?: string[] },
   ) => Promise<void>;
   editQueue: (agentId: string, serverId: string, input: QueueEditRequest) => Promise<QueueSnapshot>;
+  interruptTurn: (agentId: string, turnId: string, serverId?: string) => Promise<void>;
   channelStore: MobileChannelStore;
   servers: MobileServer[];
   teamDirectory: RemoteTeamDirectoryClient;

@@ -23,7 +23,16 @@ All notable changes to OpenBot will be documented here. The project follows
 - Remove the separately installed Codex Computer Use plugin and its setup window. Nothing to install
   by hand: the release carries the driver.
 
-## [0.15.1] - 2026-09-21
+## [0.16.0] - 2026-09-21
+
+### Added
+
+- Sign in to ChatGPT with a code typed on another device. OpenBot shows the code, opens the
+  verification page, and reports when the sign-in finishes.
+- Set standing approval for one agent or enable Turbo mode for all local agents. Turbo keeps each
+  agent's individual approval when it is turned off.
+
+## [0.15.3] - 2026-09-21
 
 ### Added
 

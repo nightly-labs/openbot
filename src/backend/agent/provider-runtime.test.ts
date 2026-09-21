@@ -703,6 +703,111 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  /**
+   * The sign-in the user finishes elsewhere. What is asserted here is the contract the dialog is
+   * built on: a code comes back, a deadline comes with it, and the account arrives the same way a
+   * browser sign-in's does - in the provider's status, not in the reply.
+   */
+  it("signs in to ChatGPT with a code typed on another device", async () => {
+    const { store, mailbox } = stores(root);
+    const codexClients: FakeAgentClient[] = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex");
+        if (provider === "codex") codexClients.push(client);
+        return client;
+      },
+    });
+    await service.initialize();
+
+    const started = await service.startProviderCodeLogin("codex");
+
+    expect(started).toEqual({
+      kind: "code",
+      userCode: "TEST-CODE",
+      verificationUrl: "https://auth.openai.test/device",
+      expiresAt: expect.any(Number),
+    });
+    expect(started.kind === "code" && started.expiresAt).toBeGreaterThan(Date.now());
+    expect(codexClients[1]?.requests).toContainEqual({
+      method: "account/login/start",
+      // No `appBrand`: the device-code variant of this request does not take one.
+      params: { type: "chatgptDeviceCode" },
+    });
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "codex", state: "sign-in-required", connectionState: "connecting" }),
+    );
+
+    codexClients[1]?.completeLogin(true);
+
+    await waitFor(
+      () => service?.getStatus().providers?.find((provider) => provider.id === "codex")?.state === "available",
+    );
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "codex", state: "available", email: "codex@example.com" }),
+    );
+  });
+
+  it("tells ChatGPT to drop the code when the user cancels the sign-in", async () => {
+    const { store, mailbox } = stores(root);
+    const codexClients: FakeAgentClient[] = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex");
+        if (provider === "codex") codexClients.push(client);
+        return client;
+      },
+    });
+    await service.initialize();
+    await service.startProviderCodeLogin("codex");
+
+    await service.cancelProviderCodeLogin("codex");
+
+    expect(codexClients[1]?.requests).toContainEqual({
+      method: "account/login/cancel",
+      params: { loginId: "login-1" },
+    });
+    expect(codexClients[1]?.running).toBe(false);
+    // Back to the row the user pressed, with nothing left running behind it.
+    const codex = service.getStatus().providers?.find((provider) => provider.id === "codex");
+    expect(codex).toMatchObject({ state: "sign-in-required", message: null });
+    expect(codex?.connectionState).toBeUndefined();
+  });
+
+  it("issues a code for an account already on this computer, so another account can be reached", async () => {
+    const { service: agentService } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider, "DONE", true, true),
+      preferredProvider: "codex",
+    });
+    service = agentService;
+
+    expect(await service.startProviderCodeLogin("codex")).toEqual({
+      kind: "code",
+      userCode: "TEST-CODE",
+      verificationUrl: "https://auth.openai.test/device",
+      expiresAt: expect.any(Number),
+    });
+    // The account in use is untouched while the new one is being signed in to: a user who gives up
+    // on the code has to be left with the provider they already had.
+    expect(service.getStatus().providers).toContainEqual(expect.objectContaining({ id: "codex", state: "available" }));
+  });
+
+  it("refuses a code sign-in for a provider that has none", async () => {
+    const { service: agentService } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider, "DONE", true, provider !== "claude"),
+      preferredProvider: "codex",
+    });
+    service = agentService;
+
+    await expect(service.startProviderCodeLogin("claude")).rejects.toThrow("cannot be signed in with a code");
+  });
+
   it("runs provider logins independently and Refresh cancels both generations", async () => {
     const claudeLoginLog = join(root, "claude-login.log");
     process.env.OPENBOT_FAKE_CLAUDE_LOGIN_LOG = claudeLoginLog;

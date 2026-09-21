@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { toast } from "../../components/ui";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -42,10 +43,13 @@ const Settings = createSimpleContext({
     const [pendingPluginSlug, setPendingPluginSlug] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(DEFAULT_GENERAL_SETTINGS);
+    const [autoApproveAgentIds, setAutoApproveAgentIds] = createSignal<readonly string[]>([]);
     let appSettingsRestoreTarget: HTMLElement | null = null;
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
     let autoDownloadUpdatesChanged = false;
+    let turboModeChanged = false;
+    const [turboModePending, setTurboModePending] = createSignal(false);
 
     createEffect(
       () => ({
@@ -84,7 +88,8 @@ const Settings = createSimpleContext({
 
     function updateGeneralSettings(value: GeneralSettingsValue): void {
       const previous = generalSettings();
-      setGeneralSettings(value);
+      const turboMode = turboModePending() ? previous.turboMode : value.turboMode;
+      setGeneralSettings({ ...value, turboMode });
       if (previous.productAnalytics !== value.productAnalytics) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics);
         setAnalyticsPreferenceLoaded(value.productAnalytics);
@@ -100,6 +105,25 @@ const Settings = createSimpleContext({
             setAnalyticsPreferenceLoaded(previous.productAnalytics);
             setGeneralSettings((current) => ({ ...current, productAnalytics: previous.productAnalytics }));
           });
+      }
+      if (previous.turboMode !== turboMode) {
+        turboModeChanged = true;
+        setTurboModePending(true);
+        void window.openbot
+          .setApprovalAutomation({ turbo: turboMode })
+          .then((preference) => {
+            setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
+            setAutoApproveAgentIds(preference.autoApproveAgentIds);
+          })
+          .catch(() => {
+            setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode }));
+            toast.error(
+              previous.turboMode
+                ? "Could not turn off Turbo mode. It is still active. Try again."
+                : "Could not turn on Turbo mode. Try again.",
+            );
+          })
+          .finally(() => setTurboModePending(false));
       }
       if (previous.autoDownloadUpdates !== value.autoDownloadUpdates) {
         autoDownloadUpdatesChanged = true;
@@ -146,6 +170,25 @@ const Settings = createSimpleContext({
       }
     }
 
+    /**
+     * Grants or revokes one agent's standing approval.
+     *
+     * Not part of `updateGeneralSettings`: the grant is per agent rather than a field of the one
+     * settings record, and it is written from the approval card as well as from Settings. The
+     * promise is returned so the approval card only accepts the pending request once the grant is
+     * stored - accepting first would leave an agent the user believes is trusted still asking.
+     */
+    async function setAgentAutoApprove(agentId: string, autoApprove: boolean): Promise<void> {
+      const preference = await window.openbot.setApprovalAutomation({ agentId, autoApprove });
+      setAutoApproveAgentIds(preference.autoApproveAgentIds);
+      setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
+    }
+
+    /** Whether this agent acts without asking, by its own grant or because Turbo covers every agent. */
+    function agentAutoApproves(agentId: string): boolean {
+      return generalSettings().turboMode || autoApproveAgentIds().includes(agentId);
+    }
+
     /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
     function openAppSettings(trigger?: HTMLElement | null): void {
       const target = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -180,6 +223,16 @@ const Settings = createSimpleContext({
           setAnalyticsPreferenceLoaded(false);
           setGeneralSettings((current) => ({ ...current, productAnalytics: false }));
         });
+      void window.openbot
+        .getApprovalAutomation()
+        .then((preference) => {
+          setAutoApproveAgentIds(preference.autoApproveAgentIds);
+          // A toggle made before this read resolves has already been persisted, so the older value
+          // must not be painted back over it.
+          if (turboModeChanged) return;
+          setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
+        })
+        .catch(() => undefined);
       void window.openbot.update
         .getPreference()
         .then((preference) => {
@@ -206,7 +259,11 @@ const Settings = createSimpleContext({
     return {
       analyticsPreferenceLoaded,
       generalSettings,
+      turboModePending,
       updateGeneralSettings,
+      autoApproveAgentIds,
+      setAgentAutoApprove,
+      agentAutoApproves,
       appSettingsOpen,
       setAppSettingsOpen,
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,

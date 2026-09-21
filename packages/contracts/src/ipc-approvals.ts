@@ -64,6 +64,56 @@ export interface RespondToApprovalInput {
   decision: "accept" | "decline";
 }
 
+/**
+ * Which agents answer approvals without asking, and whether every agent does.
+ *
+ * This belongs to the computer that runs the agent, not to the approval, and is never carried over
+ * the Team API: the released adapters freeze an approval response to `accept` or `decline`. A
+ * remote host that has automation on answers its own approvals, so they never reach a client.
+ */
+export interface ApprovalAutomationPreference {
+  /** Turbo mode. Every local agent's eligible approvals are answered automatically. */
+  turbo: boolean;
+  /**
+   * The agents granted "Always allow" one at a time. Turbo does not clear the list, so turning
+   * Turbo off returns each agent to the grant the user gave it rather than to asking.
+   */
+  autoApproveAgentIds: string[];
+}
+
+export const DEFAULT_APPROVAL_AUTOMATION_PREFERENCE: ApprovalAutomationPreference = {
+  turbo: false,
+  autoApproveAgentIds: [],
+};
+
+export function isApprovalAutomationPreference(value: unknown): value is ApprovalAutomationPreference {
+  return isDynamicRecord(value) && isBoolean(value.turbo) && isAgentIdList(value.autoApproveAgentIds);
+}
+
+function isAgentIdList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length <= INPUT_LIMITS.agents && value.every(isIdentifier);
+}
+
+/**
+ * One call changes one thing: the global switch, or one agent's grant. Both are optional so a
+ * caller never has to read the preference back before it can write a single field.
+ */
+export interface SetApprovalAutomationInput {
+  turbo?: boolean;
+  agentId?: string;
+  autoApprove?: boolean;
+}
+
+export function isSetApprovalAutomationInput(value: unknown): value is SetApprovalAutomationInput {
+  if (!isDynamicRecord(value)) return false;
+  if (value.turbo !== undefined && !isBoolean(value.turbo)) return false;
+  // A grant needs both halves. An id without a decision says nothing, and a decision without an id
+  // would become a second, unreviewed way to write the global switch.
+  const hasGrant = value.agentId !== undefined || value.autoApprove !== undefined;
+  if (hasGrant && !(isIdentifier(value.agentId) && isBoolean(value.autoApprove))) return false;
+  return value.turbo !== undefined || hasGrant;
+}
+
 export interface BrowserTakeoverRequest {
   requestId: string | number;
   agentId: string;
