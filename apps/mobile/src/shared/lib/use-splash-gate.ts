@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useEffect, useRef, useState } from "react";
+import type { SharedValue } from "react-native-reanimated";
 
 export interface SplashController {
   /** Removes the native splash, uncovering whatever the app renders below it. */
@@ -11,46 +12,46 @@ export interface SplashController {
 export const SPLASH_ARTWORK = ["wallpaper", "mark"] as const;
 export type SplashArtwork = (typeof SPLASH_ARTWORK)[number];
 
-// How long the artwork stays after it reaches the screen. The splash exists to
-// be seen and carries product copy, so this is a floor, not a timeout.
-export const SPLASH_MIN_VISIBLE_MS = 900;
+export interface SplashLogoTarget {
+  x: number;
+  y: number;
+  size: number;
+}
+
+export const SplashContentReadyContext = createContext((_target?: SplashLogoTarget) => {});
+export const SplashMotionContext = createContext<{
+  progress: SharedValue<number>;
+  revealing: boolean;
+  complete: boolean;
+  reducedMotion: boolean;
+  finish: () => void;
+} | null>(null);
 
 // The artwork may never report: expo-image reports nothing for a source it
 // cannot decode. Uncover anyway at this point, so a broken asset costs the
 // wallpaper and never the app.
 export const SPLASH_HANDOFF_DEADLINE_MS = 1500;
 
-/**
- * Keeps the splash artwork on screen for {@link SPLASH_MIN_VISIBLE_MS} once it
- * has actually painted, and hides the native splash at that same moment.
- *
- * `busy` extends the cover for as long as the app has nothing to show yet. The
- * minimum window is independent of it and latches once, so a later busy state
- * reuses the backdrop without arming the wait again.
- */
-export function useSplashGate(busy: boolean, splash: SplashController) {
+// Readiness, not a display timer, controls when the app becomes available.
+export function useSplashGate(busy: boolean, splash: SplashController, nativeReady = true) {
   const shown = useRef(new Set<SplashArtwork>());
   const uncovered = useRef(false);
   const [handedOff, setHandedOff] = useState(false);
-  const [minimumElapsed, setMinimumElapsed] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
+  const reportContentReady = useCallback(() => setContentReady(true), []);
 
   const handOff = useCallback(() => {
-    if (uncovered.current) return;
+    if (uncovered.current || !nativeReady) return;
     uncovered.current = true;
     splash.hide();
     setHandedOff(true);
-  }, [splash]);
+  }, [nativeReady, splash]);
 
   useEffect(() => {
+    if (!nativeReady) return;
     const deadline = setTimeout(handOff, SPLASH_HANDOFF_DEADLINE_MS);
     return () => clearTimeout(deadline);
-  }, [handOff]);
-
-  useEffect(() => {
-    if (!handedOff) return;
-    const minimum = setTimeout(() => setMinimumElapsed(true), SPLASH_MIN_VISIBLE_MS);
-    return () => clearTimeout(minimum);
-  }, [handedOff]);
+  }, [handOff, nativeReady]);
 
   const reportArtwork = useCallback(
     (artwork: SplashArtwork) => {
@@ -60,5 +61,5 @@ export function useSplashGate(busy: boolean, splash: SplashController) {
     [handOff],
   );
 
-  return { covered: busy || !minimumElapsed, reportArtwork };
+  return { covered: busy || !handedOff || !contentReady, reportArtwork, reportContentReady };
 }
