@@ -80,6 +80,8 @@ export const en = {
   "settings.autoApprove.agentDescription": "Runs commands, changes files and widens its own access without asking.",
   "settings.autoApprove.revoke": "Revoke",
   "settings.autoApprove.revokeLabel": "Revoke the standing approval for {name}",
+  "settings.autoApprove.revokeFailed":
+    "Could not revoke the standing approval for {name}. It is still active. Try again.",
   "settings.autoApprove.resetTitle": "Every standing approval",
   "settings.autoApprove.resetDescription": "Make every agent above ask again.",
   "settings.autoApprove.reset": "Revoke all",

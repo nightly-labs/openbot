@@ -25,6 +25,7 @@ import {
   SettingsSection,
   SwitchField,
   Text,
+  toast,
 } from "../../components/ui";
 import { useI18n } from "../../i18n-context";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
@@ -85,6 +86,13 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
    */
   const [customSelected, setCustomSelected] = createSignal(false);
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
+  async function revokeGrant(revoke: (agentId: string) => Promise<void>, agent: { id: string; name: string }) {
+    try {
+      await revoke(agent.id);
+    } catch {
+      toast.error(i18n.t("settings.autoApprove.revokeFailed", { name: agent.name }));
+    }
+  }
   let cancelTurboButton: HTMLButtonElement | undefined;
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
@@ -239,7 +247,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
                         variant="outline"
                         size="sm"
                         type="button"
-                        onClick={() => void revoke()(agent.id)}
+                        onClick={() => void revokeGrant(revoke(), agent)}
                         aria-label={i18n.t("settings.autoApprove.revokeLabel", { name: agent.name })}
                       >
                         {i18n.t("settings.autoApprove.revoke")}
@@ -267,7 +275,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
                       // The list is bounded by the agent roster, so this is never a long queue.
                       const revokeOne = revoke();
                       void (props.autoApprovedAgents ?? []).reduce(
-                        (queue, agent) => queue.then(() => revokeOne(agent.id)),
+                        (queue, agent) => queue.then(() => revokeGrant(revokeOne, agent)),
                         Promise.resolve(),
                       );
                     }}

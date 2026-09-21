@@ -13,6 +13,7 @@ import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
+import { Toaster, toast } from "../../components/ui";
 import { DEFAULT_GENERAL_SETTINGS } from "./app-settings";
 import { SettingsModal } from "./SettingsModal";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
@@ -89,6 +90,7 @@ describe("SettingsModal", () => {
     expect(sessions).toEqual([current]);
   });
   afterEach(() => {
+    toast.dismiss();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -1027,6 +1029,61 @@ describe("SettingsModal", () => {
     setAgents([{ id: "agent-1", name: "Chief" }]);
     await waitFor(() => expect(screen.queryByRole("button", { name: "Revoke all" })).not.toBeInTheDocument());
   });
+
+  it.each(["Revoke the standing approval for Chief", "Revoke all"])(
+    "reports failures from %s, keeps failed grants visible, and permits retry",
+    async (action) => {
+      const [agents, setAgents] = createSignal([
+        { id: "chief", name: "Chief" },
+        { id: "scout", name: "Scout" },
+      ]);
+      const failure = Promise.withResolvers<void>();
+      const revoke = vi.fn(async (agentId: string) => {
+        if (agentId === "chief") await failure.promise;
+        setAgents((current) => current.filter((agent) => agent.id !== agentId));
+      });
+      render(() => (
+        <>
+          <Toaster />
+          <SettingsModal
+            open
+            onOpenChange={() => undefined}
+            value={DEFAULT_GENERAL_SETTINGS}
+            onValueChange={() => undefined}
+            appInfo={null}
+            updateStatus={idleUpdateStatus}
+            onUpdateAction={async () => {}}
+            account={account}
+            onUpdateAccountName={async () => {}}
+            onUpdateAccountAvatar={async () => {}}
+            autoApprovedAgents={agents()}
+            onRevokeAutoApprove={revoke}
+          />
+        </>
+      ));
+      await fireEvent.click(await screen.findByRole("button", { name: action }));
+      await waitFor(() => expect(revoke).toHaveBeenCalledWith("chief"));
+      failure.reject(new Error("Write failed"));
+      expect(
+        await screen.findByText("Could not revoke the standing approval for Chief. It is still active. Try again."),
+      ).toBeInTheDocument();
+      if (action === "Revoke all") {
+        await waitFor(() => expect(revoke).toHaveBeenCalledWith("scout"));
+        expect(
+          screen.queryByRole("button", { name: "Revoke the standing approval for Scout" }),
+        ).not.toBeInTheDocument();
+      }
+      revoke.mockImplementation(async (agentId) => {
+        setAgents((current) => current.filter((agent) => agent.id !== agentId));
+      });
+      await fireEvent.click(screen.getByRole("button", { name: "Revoke the standing approval for Chief" }));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Revoke the standing approval for Chief" }),
+        ).not.toBeInTheDocument(),
+      );
+    },
+  );
 
   it("says so when no agent has a standing approval", async () => {
     render(() => (

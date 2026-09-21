@@ -76,6 +76,8 @@ export const ja = {
     "確認なしでコマンドを実行し、ファイルを変更し、自身のアクセス範囲を広げます。",
   "settings.autoApprove.revoke": "取り消す",
   "settings.autoApprove.revokeLabel": "{name} の常時許可を取り消す",
+  "settings.autoApprove.revokeFailed":
+    "{name} の常時許可を取り消せませんでした。許可はまだ有効です。もう一度お試しください。",
   "settings.autoApprove.resetTitle": "すべての常時許可",
   "settings.autoApprove.resetDescription": "上のすべてのエージェントが再び確認するようにします。",
   "settings.autoApprove.reset": "すべて取り消す",
