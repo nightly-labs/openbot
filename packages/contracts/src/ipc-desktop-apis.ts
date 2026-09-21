@@ -57,6 +57,8 @@ import type {
   BrowserBounds,
   BrowserControlState,
   BrowserDisplayState,
+  BrowserLiveViewEvent,
+  BrowserLiveViewInput,
   BrowserNavigateInput,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
@@ -150,6 +152,7 @@ import type {
   TestRoutineInput,
   UpdateRoutineInput,
 } from "./ipc-routines";
+import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import type {
   CreateLocalSkillInput,
@@ -210,7 +213,7 @@ export interface AgentDesktopApi {
   getStatus: () => Promise<AgentStatus>;
   getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
-  getUsage: (agentId: string) => Promise<AccountUsage>;
+  getUsage: (agentId?: string) => Promise<AccountUsage>;
   listModels: () => Promise<AgentModelOption[]>;
   listAgents: (serverId?: string) => Promise<AgentSummary[]>;
   listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
@@ -228,6 +231,12 @@ export interface AgentDesktopApi {
   updateMemory: (input: UpdateAgentMemoryInput) => Promise<AgentMemory>;
   deleteMemory: (input: DeleteAgentMemoryInput) => Promise<void>;
   clearMemories: (agentId: string) => Promise<void>;
+  /**
+   * Shared tables are not scoped to an agent: there is no `agentId` on either call. The list is
+   * every table in the one shared database, and the user's delete is not owner-gated.
+   */
+  listTables: () => Promise<SharedTable[]>;
+  deleteTable: (input: DeleteSharedTableInput) => Promise<void>;
   listRoutines: (agentId: string) => Promise<Routine[]>;
   createRoutine: (input: CreateRoutineInput) => Promise<Routine>;
   updateRoutine: (input: UpdateRoutineInput) => Promise<Routine>;
@@ -304,6 +313,11 @@ export interface BrowserDesktopApi {
   getControlState: () => Promise<BrowserControlState>;
   capturePreview: (tabId: string) => Promise<BrowserPreview>;
   setVisible: (input: BrowserVisibilityInput) => Promise<void>;
+  /** Starts a live view of a tab on the active remote server. A local tab is already on screen. */
+  startLiveView: (tabId: string) => Promise<void>;
+  stopLiveView: () => Promise<void>;
+  sendLiveViewInput: (input: BrowserLiveViewInput) => Promise<void>;
+  onLiveViewEvent: (listener: (event: BrowserLiveViewEvent) => void) => () => void;
   onDisplayState: (listener: (state: BrowserDisplayState) => void) => () => void;
   openPictureInPicture: (bounds?: BrowserBounds) => Promise<BrowserBounds>;
   closePictureInPicture: () => Promise<void>;
@@ -397,6 +411,15 @@ export interface ServersDesktopApi {
   onDirectTyping: (listener: (event: DirectTypingRealtimeEvent) => void) => () => void;
   onEvent: (listener: (servers: ServerSummary[]) => void) => () => void;
   onInvite: (listener: (inviteUrl: string) => void) => () => void;
+}
+
+/**
+ * The plugin deep link. Both carry a slug, never a listing: the catalog is already in the renderer,
+ * and a link that carried the listing itself would let the address bar describe what gets installed.
+ */
+export interface PluginsDesktopApi {
+  takePendingListing: () => Promise<string | null>;
+  onOpenListing: (listener: (slug: string) => void) => () => void;
 }
 
 export interface HostDesktopApi {
@@ -528,6 +551,7 @@ export interface OpenBotDesktopApi {
   update: UpdateDesktopApi;
   maintenance: MaintenanceDesktopApi;
   servers: ServersDesktopApi;
+  plugins: PluginsDesktopApi;
   host: HostDesktopApi;
   remoteDesktop: RemoteDesktopDesktopApi;
 }

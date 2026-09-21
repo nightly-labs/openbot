@@ -1,6 +1,7 @@
 import type {
   HostStatus,
   McpServerConfig,
+  ProviderRuntimeStatus,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -9,6 +10,7 @@ import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { Toaster } from "../../components/ui";
+import { mcpToolRuntimeNote as note } from "./mcp-servers";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "./ServerSettingsModal";
 
 const localServer: ServerSummary = {
@@ -126,6 +128,8 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
       usedAt: null,
       inviteUrl: "https://studio.example.com/invite/new",
       email: input.email ?? null,
+      permanent: input.permanent ?? false,
+      useCount: 0,
     })),
     onUpdateMember: vi.fn(async () => undefined),
     onRemoveMember: vi.fn(async () => undefined),
@@ -284,6 +288,28 @@ describe("ServerSettingsModal", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(onRetryMcpServers).toHaveBeenCalledTimes(1);
+  });
+
+  // The runtime a STDIO server is started with is downloaded in the background, and a server that
+  // needs it cannot start before it arrives. Saying so here is the difference between "not yet" and
+  // a connection failure the user would otherwise go looking for in their own configuration.
+  it("says what the managed runtime under a STDIO server is doing", async () => {
+    const [status, setStatus] = createSignal<ProviderRuntimeStatus>({
+      phase: "downloading",
+      progress: 40,
+      message: null,
+      version: "1.4.2",
+    });
+    render(() => <ServerSettingsModal {...props({ mcpServers: [mcpServer] })} mcpToolRuntimeNote={note(status())} />);
+
+    await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
+    expect(
+      await screen.findByText(/Downloading the runtime a STDIO server is started with \(40%\)/),
+    ).toBeInTheDocument();
+
+    // Ready is the ordinary state and says nothing: a note that never leaves is a note nobody reads.
+    setStatus({ phase: "ready", progress: 100, message: null, version: "1.4.2" });
+    await waitFor(() => expect(screen.queryByText(/Downloading the runtime/)).not.toBeInTheDocument());
   });
 
   // The same rule on a row: the answer names the endpoint that row held, so a saved edit - or a slow
@@ -519,13 +545,15 @@ describe("ServerSettingsModal", () => {
   });
 
   it("lets a remote administrator invite, search, revoke, and change member roles", async () => {
-    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string }) => ({
+    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => ({
       id: "invite-new",
       role: input.role,
       expiresAt: "2099-01-01T00:00:00.000Z",
       usedAt: null,
       inviteUrl: "https://studio.example.com/invite/new",
       email: input.email ?? null,
+      permanent: input.permanent ?? false,
+      useCount: 0,
     }));
     const onUpdateMember = vi.fn(async () => undefined);
     const onRevokeInvite = vi.fn(async () => undefined);
@@ -542,6 +570,8 @@ describe("ServerSettingsModal", () => {
               expiresAt: "2099-01-01T00:00:00.000Z",
               usedAt: null,
               email: "pending@example.com",
+              permanent: false,
+              useCount: 0,
             },
           ],
           onCreateInvite,
@@ -629,6 +659,8 @@ describe("ServerSettingsModal", () => {
       expiresAt: "2099-01-01T00:00:00.000Z",
       usedAt: null,
       email: null,
+      permanent: false,
+      useCount: 0,
       inviteUrl: "https://openbot.run/join?invite=live",
     };
     const [invites, setInvites] = createSignal<TeamInviteSummary[]>([invite]);
@@ -650,13 +682,15 @@ describe("ServerSettingsModal", () => {
   });
 
   it("associates invite validation with the email field and creates invite links", async () => {
-    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string }) => ({
+    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => ({
       id: "invite-new",
       role: input.role,
       expiresAt: "2099-01-01T00:00:00.000Z",
       usedAt: null,
       inviteUrl: "https://studio.example.com/invite/new",
       email: input.email ?? null,
+      permanent: input.permanent ?? false,
+      useCount: 0,
     }));
     render(() => (
       <ServerSettingsModal {...props({ server: remoteServer, hostStatus: null, members, onCreateInvite })} />
@@ -687,5 +721,58 @@ describe("ServerSettingsModal", () => {
     expect(screen.queryByRole("img", { name: "Invitation QR code" })).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Create new invitation link" }));
     await waitFor(() => expect(onCreateInvite).toHaveBeenCalledTimes(2));
+  });
+
+  it("creates a permanent link that lists as never expiring", async () => {
+    const onCreateInvite = vi.fn(async (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => ({
+      id: "invite-perma",
+      role: input.role,
+      expiresAt: "+275760-09-13T00:00:00.000Z",
+      usedAt: null,
+      inviteUrl: "https://studio.example.com/invite/perma",
+      email: null,
+      permanent: true,
+      useCount: 0,
+    }));
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          // An account-plane host reports no HTTP origin, which is what carries the flag.
+          server: { ...remoteServer, apiUrl: null },
+          hostStatus: null,
+          members,
+          invites: [
+            {
+              id: "invite-perma",
+              role: "member",
+              expiresAt: "+275760-09-13T00:00:00.000Z",
+              usedAt: null,
+              email: null,
+              permanent: true,
+              useCount: 3,
+            },
+          ],
+          onCreateInvite,
+        })}
+      />
+    ));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    await fireEvent.click(screen.getByRole("tab", { name: "Perma link" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create link" }));
+    await waitFor(() => expect(onCreateInvite).toHaveBeenCalledWith({ role: "member", permanent: true }));
+
+    expect(await screen.findByText("Permanent invitation link")).toBeInTheDocument();
+    expect(screen.getByText(/Never expires · 3 joins/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("hides the permanent tab on legacy HTTP hosts whose wire strips the flag", async () => {
+    render(() => <ServerSettingsModal {...props({ server: remoteServer, hostStatus: null, members })} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    expect(screen.getByRole("tab", { name: "Email" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Invite link" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Perma link" })).not.toBeInTheDocument();
   });
 });

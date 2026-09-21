@@ -13,12 +13,7 @@ import { channelRoutingConversationEvent, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@
 import type { AgentMessage, AgentProfile, ChatActionMarkerModel } from "../../data";
 import type { ChatMessageAuthor } from "../conversation/ChatMessageRow";
 import { type DayMarkerOptions, dayMarkerLabel } from "../conversation/chat-day-markers";
-
-/**
- * How long a run of messages by one author stays one block. Beyond it the name and the face return,
- * because a reply an hour later is a new turn of the conversation, not a continuation.
- */
-export const CHANNEL_GROUPING_WINDOW_MS = 5 * 60_000;
+import { withinGroupingWindow } from "../conversation/chat-grouping";
 
 export interface ChannelTimelineEntry {
   id: string;
@@ -126,10 +121,7 @@ export function channelTimelineEntries(
     const marker = channelRoutingMarker(source);
     const sameAuthor =
       previousAuthored !== undefined && previousAuthored === previous && previousAuthored.authorId === source.author.id;
-    const withinWindow =
-      previousAuthored !== undefined &&
-      new Date(source.message.createdAt).getTime() - new Date(previousAuthored.message.createdAt ?? "").getTime() <=
-        CHANNEL_GROUPING_WINDOW_MS;
+    const withinWindow = withinGroupingWindow(previousAuthored?.message.createdAt, source.message.createdAt);
     const entry: ChannelTimelineEntry = {
       id: source.id,
       sequence: source.sequence,

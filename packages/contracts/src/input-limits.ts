@@ -20,6 +20,8 @@ export const INPUT_LIMITS = {
   agentDescription: 2_000,
   agentMemories: 64,
   agentSkills: 32,
+  sharedTables: 64,
+  sharedTableName: 64,
   // Half the agent cap. A channel packet is rebuilt every turn and the memories block is paid in
   // full each time, against `ChannelHistory.prepare`'s hard character budget.
   channelMemories: 32,
@@ -70,6 +72,9 @@ export const INPUT_LIMITS = {
   mcpErrorText: 2_000,
   teamMembers: 100,
   activeInvites: 100,
+  // Permanent links accept unlimited joins until revoked, so a leaked link is open
+  // enrollment. The cap stays small; single-use invitations keep the larger budget.
+  maxPermanentInvites: 5,
   sessionsPerMember: 10,
 } as const;
 

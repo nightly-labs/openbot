@@ -67,8 +67,8 @@ path in the profile if you keep the AppImage outside the usual locations. Do not
 `--no-sandbox`: that removes the boundary between a renderer and the rest of the computer.
 
 On the first start from an AppImage, OpenBot writes `~/.local/share/applications/openbot.desktop`
-and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` invitation link open the
-app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
+and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` link - an invitation, or
+a plugin listing - open the app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
 
 Voice prompts and remote desktop are not available on Linux.
 
@@ -239,6 +239,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
+| `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |
@@ -325,7 +326,7 @@ Cloudflare Workers
 - `src/backend` owns provider adapters, persistence, message scheduling, transfers, and the browser host.
 - `src/preload` exposes only the typed `window.openbot` API.
 - `src/renderer` contains the SolidJS interface.
-- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations.
+- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the plugin pages at `/plugins` and `/plugins/<slug>`.
 - `packages/contracts` contains process-boundary contracts, shared limits, and pure validation.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and
@@ -415,3 +416,12 @@ See [NOTICE](NOTICE) for attribution and third-party notices.
 OpenBot is an independent source-available project and is not affiliated with, endorsed by, or
 sponsored by OpenAI. OpenAI, ChatGPT, and Codex are used only to describe compatibility with their
 respective products and services.
+
+### Shared macOS hosts
+
+For one native Standard user per tenant, install the normal OpenBot DMG and the optional
+`OpenBot-Host-<VERSION>-arm64.pkg` from the same release. The Host package provides
+`sudo openbot-host setup --create-user client-acme --create-user client-bravo` and
+`sudo openbot-host verify`. No Git checkout, Bun, or compilation is required on the host.
+Normal desktop users need only the DMG. See the [host deployment guide](docs/multi-tenant-hosting.md)
+for existing-user enrollment, password handling, package upgrades, and required target-host checks.

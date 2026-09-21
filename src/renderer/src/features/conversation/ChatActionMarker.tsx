@@ -210,7 +210,7 @@ function AgentTarget(props: {
                     onSelect={() => props.onSelectAgent(delivery.agentId)}
                   >
                     <AgentAvatar agent={agent()} class="chat-action-agent-avatar" />
-                    <span>{agent()?.name ?? "Unavailable agent"}</span>
+                    <span class="chat-action-agent-menu-name">{agent()?.name ?? "Unavailable agent"}</span>
                     <span class="chat-action-agent-menu-status">{deliveryStatusLabel(delivery.status)}</span>
                   </DropdownMenu.Item>
                 );

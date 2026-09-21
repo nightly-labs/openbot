@@ -61,8 +61,8 @@ interface TeamWebRtcClientTransportOptions {
   endSession: (sessionId: string) => Promise<void>;
   createInvite: (
     hostId: string,
-    input: { role: "admin" | "member"; email?: string },
-  ) => Promise<{ inviteId: string; token: string; expiresAt: number }>;
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
+  ) => Promise<{ inviteId: string; token: string; expiresAt: number; permanent: boolean; useCount: number }>;
   listInvites: (hostId: string) => Promise<RemoteInviteRecord[]>;
   previewInvite: (token: string) => Promise<RemoteInvitePreview>;
   acceptInvite: (token: string) => Promise<{ hostId: string; membershipId: string; role: "admin" | "member" }>;
@@ -341,6 +341,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#options.bridge.off("path", this.#onPath);
     this.#options.bridge.off("error", this.#onError);
     await this.#files.stop();
+  }
+
+  /** Whether a transfer is moving right now, either direction. */
+  hasActiveTransfers(): boolean {
+    return this.#files.hasActiveTransfers();
   }
 
   async #ensureConnected(hostId: string): Promise<void> {

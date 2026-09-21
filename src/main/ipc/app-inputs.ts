@@ -117,7 +117,6 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "claude-install" &&
     input !== "opencode-install" &&
     input !== "opencode-auth" &&
-    input !== "claude-sign-in" &&
     input !== "feedback" &&
     input !== "message" &&
     input !== "mac-screen-recording"
@@ -189,6 +188,7 @@ export function parseInstallSkill(input: unknown): InstallSkillInput {
   return {
     agentId: requireString(input.agentId, "agentId"),
     skillId: requireString(input.skillId, "skillId"),
+    ...(input.versionId === undefined ? {} : { versionId: requireString(input.versionId, "versionId") }),
     ...(input.replaceModified === true ? { replaceModified: true } : {}),
   };
 }

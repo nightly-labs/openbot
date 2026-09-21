@@ -132,8 +132,13 @@ export async function routeTeam(
     const role = stringField(body, "role");
     if (role !== "admin" && role !== "member") throw new HttpError(400, "Invalid role.");
     const email = nullableString(body, "email", INPUT_LIMITS.email) ?? undefined;
+    // Unknown to released hosts, which ignore it and mint single-use. The frozen HTTP
+    // projections strip `permanent` from the reply, so a caller on this transport reads the
+    // link back as single-use; joining with it still works, and IPC callers see the full shape.
+    const permanent = body.permanent === undefined ? undefined : body.permanent === true;
+    if (body.permanent !== undefined && !isBoolean(body.permanent)) throw new HttpError(400, "Invalid invitation.");
     if (!createInvite) throw new HttpError(503, "Invitation service is unavailable.");
-    return json(201, await createInvite({ role, ...(email ? { email } : {}) }));
+    return json(201, await createInvite({ role, ...(email ? { email } : {}), ...(permanent ? { permanent } : {}) }));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.team.invites) {
     requireAdmin(member);

@@ -22,6 +22,7 @@ import type {
   MarketplaceSkillSummary,
   RemoteDesktopSession,
   ServerSummary,
+  SharedTable,
   SkillPackagePreview,
   SkillSubmission,
   TeamInviteSummary,
@@ -32,6 +33,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "../data";
 import type { McpServerConfig } from "../features/servers/mcp-servers";
+import type { MarketplacePluginDetail } from "../features/settings/marketplace-plugins";
 
 export const STORY_NOW = "2026-08-19T10:00:00.000Z";
 
@@ -106,6 +108,15 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   time: index === 0 ? "10:00" : index === 1 ? "Yesterday" : "Mon",
   preview: agent.preview,
 }));
+
+export const STORY_SHARED_TABLES: SharedTable[] = [
+  { name: "citations", ownerAgentId: "research", rowCount: null },
+  { name: "companies", ownerAgentId: "chief", rowCount: 37 },
+  { name: "handled_mail", ownerAgentId: null, rowCount: 46 },
+  { name: "people", ownerAgentId: "chief", rowCount: 214 },
+  { name: "sources", ownerAgentId: "research", rowCount: 688 },
+  { name: "touchpoints", ownerAgentId: "chief", rowCount: 1_902 },
+];
 
 export const STORY_MODELS: AgentModelOption[] = [
   {
@@ -204,6 +215,16 @@ export const STORY_USAGE: AccountUsage = {
       id: "codex",
       primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: 1_786_563_600 },
       secondary: { usedPercent: 41, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+    },
+    {
+      id: "claude",
+      primary: { usedPercent: 91, windowDurationMins: 300, resetsAt: 1_786_563_600 },
+      secondary: { usedPercent: 64, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+    },
+    {
+      id: "grok",
+      primary: null,
+      secondary: { usedPercent: 22, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
     },
   ],
 };
@@ -496,6 +517,8 @@ export const STORY_INVITES: TeamInviteSummary[] = [
     expiresAt: "2026-08-29T10:00:00.000Z",
     usedAt: null,
     email: "new-person@example.com",
+    permanent: false,
+    useCount: 0,
   },
 ];
 
@@ -1269,6 +1292,272 @@ export const STORY_MARKETPLACE_AGENT_DETAILS: Record<string, MarketplaceAgentDet
     },
   ]),
 );
+
+/**
+ * The plugin listing, while plugins are still being designed. A plugin is one developer's bundle:
+ * the MCP server it publishes, shown as an app, and the skills that drive it. The example follows a
+ * real server (`mcp.aave.com`) so the page is reviewed against the lengths a published listing
+ * really has, rather than against text written to fit the layout.
+ */
+export const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
+  id: "plugin-aave",
+  slug: "aave",
+  name: "Aave",
+  tagline: "Aave data and transactions",
+  description:
+    "Aave helps users explore live Aave V3 and V4 markets, review wallet positions and DAO governance, " +
+    "simulate lending actions, and prepare non-custodial transactions. Every transaction is returned " +
+    "unsigned: the plugin reads the markets and writes the call, and the wallet stays with the user.",
+  category: "data-analytics",
+  creatorName: "avara.xyz",
+  creatorAvatarUrl: null,
+  iconUrl: skillPreviewIcon("👻", "#6b5ce7"),
+  version: "1.0.0",
+  installs: 2_410,
+  featured: true,
+  updatedAt: "2026-09-02T11:30:00.000Z",
+  shareUrl: "https://openbot.run/plugins/aave",
+  prompts: [
+    { id: "prompt-stablecoin-yield", text: "Where can I earn the most on stablecoins across Aave right now?" },
+    { id: "prompt-usdc-rates", text: "Which pays more for USDC right now, Aave V3 or V4 on Ethereum?" },
+    {
+      id: "prompt-health-factor",
+      text: "What's the health factor of 0x0a42b2f3a0d54157dbd7cc346335a4f1909fc02c, and how far from liquidation?",
+    },
+  ],
+  apps: [
+    {
+      id: "app-aave-mcp",
+      name: "Aave",
+      description:
+        "Live V3 and V4 markets, wallet positions, DAO governance, and prepared transactions, over one MCP server.",
+      iconUrl: skillPreviewIcon("👻", "#6b5ce7"),
+      server: { name: "aave", transport: "http", url: "https://mcp.aave.com/mcp" },
+    },
+  ],
+  skills: [
+    {
+      id: "plugin-skill-account-activity",
+      versionId: "plugin-skill-account-activity-v1",
+      slug: "account-activity",
+      description:
+        "An Aave account's history — past supplies, borrows, repays, withdrawals and collateral changes, and how net worth moved with them.",
+    },
+    {
+      id: "plugin-skill-deleverage",
+      versionId: "plugin-skill-deleverage-v1",
+      slug: "deleverage",
+      description:
+        'Reduce the risk on an Aave position — "reduce my risk", "unwind", "get my health factor up", "I\'m close to liquidation".',
+    },
+    {
+      id: "plugin-skill-safe-transactions",
+      versionId: "plugin-skill-safe-transactions-v1",
+      slug: "safe-transactions",
+      description:
+        "Prepare an Aave state change — supply, borrow, withdraw, repay, or any other prepare_* action — when asked to act rather than to read.",
+    },
+    {
+      id: "plugin-skill-tx-confirmation",
+      versionId: "plugin-skill-tx-confirmation-v1",
+      slug: "tx-confirmation",
+      description:
+        'Confirm what an Aave transaction did after the user signed it — "did it go through", "was my supply counted".',
+    },
+    {
+      id: "plugin-skill-yield-analysis",
+      versionId: "plugin-skill-yield-analysis-v1",
+      slug: "yield-analysis",
+      description:
+        "Compare Aave yields and rates — best APY for an asset, rates across chains or between V3 and V4, APY history.",
+    },
+  ],
+  websiteUrl: "https://aave.com",
+  privacyPolicyUrl: "https://aave.com/privacy",
+  termsUrl: "https://aave.com/terms",
+};
+
+/**
+ * The rest of the listing, so the catalog is reviewed as a list: several categories, publishers of
+ * different name lengths, and a plugin that publishes no app.
+ */
+export const STORY_MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
+  STORY_MARKETPLACE_PLUGIN_AAVE,
+  {
+    id: "plugin-linear",
+    slug: "linear",
+    name: "Linear",
+    tagline: "Issues, cycles and project status",
+    description:
+      "Read and write Linear from a conversation: find the issues assigned to a team, open one with the " +
+      "right labels and estimate, move it through a cycle, and answer what is left before a project ships.",
+    category: "productivity",
+    creatorName: "linear.app",
+    creatorAvatarUrl: null,
+    iconUrl: skillPreviewIcon("📐", "#2f2f46"),
+    version: "2.3.1",
+    installs: 5_180,
+    featured: true,
+    updatedAt: "2026-08-28T09:10:00.000Z",
+    shareUrl: "https://openbot.run/plugins/linear",
+    prompts: [
+      { id: "prompt-linear-cycle", text: "What is still open in the current cycle, and who is it on?" },
+      { id: "prompt-linear-file", text: "File a bug for the crash I just described, on the Desktop team." },
+      { id: "prompt-linear-project", text: "Is the Billing project on track for its target date?" },
+    ],
+    apps: [
+      {
+        id: "app-linear-mcp",
+        name: "Linear",
+        description: "Issues, projects, cycles and comments, over the Linear MCP server.",
+        iconUrl: skillPreviewIcon("📐", "#2f2f46"),
+        server: {
+          name: "linear",
+          transport: "http",
+          url: "https://mcp.linear.app/mcp",
+          auth: [
+            { id: "oauth", kind: "link", label: "Sign in" },
+            {
+              id: "api-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "lin_api_…",
+                  hint: "Settings · Security & access · Personal API keys.",
+                },
+              ],
+              docsUrl: "https://linear.app/settings/api",
+              docsLabel: "Get an API key",
+            },
+          ],
+        },
+      },
+    ],
+    skills: [
+      {
+        id: "plugin-skill-issue-triage",
+        versionId: "plugin-skill-issue-triage-v1",
+        slug: "issue-triage",
+        description: "Turn a described problem into an issue with the right team, labels, priority and estimate.",
+      },
+      {
+        id: "plugin-skill-cycle-review",
+        versionId: "plugin-skill-cycle-review-v1",
+        slug: "cycle-review",
+        description: "Summarise a cycle — what shipped, what slipped, and what is unassigned with days left.",
+      },
+    ],
+    websiteUrl: "https://linear.app",
+    privacyPolicyUrl: "https://linear.app/privacy",
+    termsUrl: "https://linear.app/terms",
+  },
+  {
+    id: "plugin-figma",
+    slug: "figma",
+    name: "Figma",
+    tagline: "Frames, variables and design comments",
+    description:
+      "Read a Figma file the way a developer reads it: the frames in a page, the variables a component " +
+      "binds to, and the comments still waiting for an answer. Nothing in the file is changed.",
+    category: "design",
+    creatorName: "figma.com",
+    creatorAvatarUrl: null,
+    iconUrl: skillPreviewIcon("🎨", "#d4452c"),
+    version: "0.9.4",
+    installs: 3_060,
+    featured: false,
+    updatedAt: "2026-09-08T16:45:00.000Z",
+    shareUrl: "https://openbot.run/plugins/figma",
+    prompts: [
+      { id: "prompt-figma-frames", text: "What frames are on the Settings page of this file?" },
+      { id: "prompt-figma-tokens", text: "Which colour variables does the button component bind to?" },
+    ],
+    apps: [
+      {
+        id: "app-figma-mcp",
+        name: "Figma",
+        description: "Files, pages, frames, variables and comments, read-only, over the Figma MCP server.",
+        iconUrl: skillPreviewIcon("🎨", "#d4452c"),
+        server: {
+          name: "figma",
+          transport: "http",
+          url: "https://mcp.figma.com/mcp",
+          auth: [
+            {
+              id: "token",
+              kind: "key",
+              label: "Personal access token",
+              fields: [
+                {
+                  id: "token",
+                  label: "Personal access token",
+                  header: "X-Figma-Token",
+                  placeholder: "figd_…",
+                  hint: "Settings · Security · Personal access tokens.",
+                },
+              ],
+              docsUrl: "https://www.figma.com/developers/api#access-tokens",
+              docsLabel: "Get a token",
+            },
+          ],
+        },
+      },
+    ],
+    skills: [
+      {
+        id: "plugin-skill-design-handoff",
+        versionId: "plugin-skill-design-handoff-v1",
+        slug: "design-handoff",
+        description: "Describe a frame for implementation — its layers, spacing, and the variables it uses.",
+      },
+    ],
+    websiteUrl: "https://figma.com",
+    privacyPolicyUrl: "https://figma.com/privacy",
+    termsUrl: null,
+  },
+  {
+    id: "plugin-changelog-writer",
+    slug: "changelog-writer",
+    name: "Changelog writer",
+    tagline: "Release notes from merged work",
+    description:
+      "A plugin of skills only: no server to connect and nothing to authorise. It turns merged pull " +
+      "requests into release notes in the voice a product already uses.",
+    category: "documents",
+    creatorName: "Marta Kowalczyk",
+    creatorAvatarUrl: null,
+    iconUrl: null,
+    version: "1.2.0",
+    installs: 640,
+    featured: false,
+    updatedAt: "2026-07-19T08:00:00.000Z",
+    shareUrl: "https://openbot.run/plugins/changelog-writer",
+    prompts: [{ id: "prompt-changelog", text: "Write the release notes for everything merged since the last tag." }],
+    apps: [],
+    skills: [
+      {
+        id: "plugin-skill-release-notes",
+        versionId: "plugin-skill-release-notes-v1",
+        slug: "release-notes",
+        description: "Group merged work by what it changes for a reader, and write it in the product's own voice.",
+      },
+      {
+        id: "plugin-skill-upgrade-notes",
+        versionId: "plugin-skill-upgrade-notes-v1",
+        slug: "upgrade-notes",
+        description: "Call out the changes a reader must act on before upgrading, and what happens if they do not.",
+      },
+    ],
+    websiteUrl: null,
+    privacyPolicyUrl: null,
+    termsUrl: null,
+  },
+];
 
 export const STORY_AGENT_SUBMISSIONS: AgentSubmission[] = [
   {

@@ -446,16 +446,6 @@
   min-width: 0;
 }
 
-.markdown-file-preview-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding-bottom: var(--openbot-space-3);
-}
-
-.markdown-file-preview-source-action {
-  flex: 0 0 auto;
-}
-
 .file-preview-markdown {
   max-width: 760px;
   margin: 0 auto;
@@ -469,7 +459,6 @@
   line-height: 1.6;
 }
 
-.file-preview-markdown-source,
 .file-preview-markdown-status {
   min-width: 0;
   margin: 0;
@@ -1209,6 +1198,19 @@
   flex: 1;
   overflow: hidden;
   background: var(--openbot-bg-canvas);
+}
+
+/* The live view of a host's tab. It fills the surface the native view would have covered. */
+.browser-live-view {
+  position: absolute;
+  inset: 0;
+}
+
+.browser-live-view canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .browser-empty-state {
@@ -2030,6 +2032,65 @@
   color: var(--openbot-danger);
 }
 
+.shared-table-list {
+  min-height: 0;
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: var(--openbot-space-0-5);
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--openbot-border-strong) transparent;
+}
+
+.shared-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.shared-table-main {
+  min-width: 0;
+  display: grid;
+  gap: var(--openbot-space-1);
+}
+
+.shared-table-name {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-md);
+}
+
+.shared-table-confirm {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-3);
+}
+
+.shared-table-confirm p {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.shared-table-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
+}
+
 .agent-memories-footer {
   display: flex;
   min-height: 48px;
@@ -2717,6 +2778,35 @@
   border-right: 1px solid var(--openbot-border);
   background: var(--openbot-bg-sidebar);
   padding: 9px 7px;
+}
+
+.provider-model-rail-tooltip-trigger {
+  display: flex;
+}
+
+.provider-model-rail-tooltip {
+  z-index: var(--openbot-layer-popover);
+  display: flex;
+  max-width: min(240px, calc(100vw - 16px));
+  flex-direction: column;
+  gap: var(--openbot-space-0-5);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.provider-model-rail-tooltip small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
 }
 
 .provider-model-rail-button {
@@ -3948,14 +4038,24 @@ button.chat-action-target:active,
   margin-left: -6px;
 }
 
-.chat-action-agent-menu {
+/* The shared .ui-action-menu item rule outranks a single class, so the grid template and the
+ * truncation below have to be compounded to reach the row. */
+.ui-action-menu.chat-action-agent-menu {
   min-width: 220px;
+  max-width: min(320px, calc(100vw - var(--openbot-space-4)));
 }
 
-.chat-action-agent-menu-item {
+.ui-action-menu.chat-action-agent-menu .chat-action-agent-menu-item[role="menuitem"] {
   display: grid;
+  align-items: center;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: var(--openbot-space-2);
+}
+
+.chat-action-agent-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-action-agent-menu-item .chat-action-agent-avatar {
@@ -3967,6 +4067,7 @@ button.chat-action-target:active,
 .chat-action-agent-menu-status {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+  white-space: nowrap;
 }
 
 .chat-action-attachments {

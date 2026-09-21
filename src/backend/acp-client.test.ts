@@ -21,7 +21,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentClient } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
 import type { CustomProviderConfig } from "./opencode-config";
-import { decodeAccountReadResult, decodeModelListResponse, decodeRecordResponse } from "./protocol";
+import {
+  decodeAccountReadResult,
+  decodeModelListResponse,
+  decodeRecordResponse,
+  decodeThreadResponse,
+} from "./protocol";
 import { requireProviderDriver } from "./provider-drivers";
 
 const started: AgentClient[] = [];
@@ -104,7 +109,14 @@ process.stdin.on("data", (chunk) => {
 function handle(message) {
   if (typeof message.id === "undefined") return;
   if (message.method === "initialize") {
-    write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities: {} } });
+    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1" ? { loadSession: true } : {};
+    write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities } });
+    return;
+  }
+  if (message.method === "session/load") {
+    const loadLog = process.env.OPENBOT_FAKE_ACP_LOAD_LOG;
+    if (loadLog) fs.appendFileSync(loadLog, JSON.stringify(message.params) + NL);
+    write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
   if (message.method === "session/prompt") {
@@ -161,9 +173,12 @@ function handle(message) {
 
 interface FakeOpencode {
   cli: OpencodeCliInfo;
+  directory: string;
   envLog: string;
   promptLog: string;
   configLog: string;
+  loadLog: string;
+  readLoadedSessions: () => Promise<Array<{ sessionId: string; cwd: string }>>;
   readPrompts: () => Promise<string[]>;
   readConfigCalls: () => Promise<Array<{ configId: string; value: string }>>;
   readSpawnEnvironments: () => Promise<
@@ -184,11 +199,21 @@ async function createFakeOpencodeAgent(source?: "system" | "managed"): Promise<F
   const envLog = join(directory, "spawn-env.ndjson");
   const promptLog = join(directory, "prompts.ndjson");
   const configLog = join(directory, "config-options.ndjson");
+  const loadLog = join(directory, "loaded-sessions.ndjson");
   return {
     cli: { executable, version: "1.18.30", ...(source ? { source } : {}) },
+    directory,
     envLog,
     promptLog,
     configLog,
+    loadLog,
+    readLoadedSessions: async () => {
+      const source = await readFile(loadLog, "utf8").catch(() => "");
+      return source
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line));
+    },
     readPrompts: async () => {
       const source = await readFile(promptLog, "utf8").catch(() => "");
       return source.split("\n").filter((line) => line.trim());
@@ -223,6 +248,8 @@ function startOpencode(
     servesModel?: (modelId: string) => boolean;
     /** Read at every session, the same way the real source is. */
     mcpServers?: () => McpServerConfig[];
+    /** The bearer token a signed-in http server is given, minted at the hand-off and never stored. */
+    mcpAuthorization?: (config: McpServerConfig) => Promise<string | null>;
     /** How long one request may take, which is also the deadline model discovery works inside. */
     requestTimeoutMs?: number;
   } = {},
@@ -233,6 +260,7 @@ function startOpencode(
     apiKey,
     customProviders: options.customProviders ?? (() => []),
     mcpServers: options.mcpServers ?? (() => []),
+    mcpAuthorization: options.mcpAuthorization,
     servesModel: options.servesModel,
   };
   const timeoutMs = options.requestTimeoutMs ?? 10_000;
@@ -593,5 +621,104 @@ describe("OpenCode ACP MCP servers", () => {
     // directory, and a server told to open `./data.db` somewhere else creates a second database
     // rather than reading the one the user named.
     expect(params.mcpServers.map((server: { name: string }) => server.name)).toEqual(["Filesystem"]);
+  });
+});
+
+describe("OpenCode MCP sign-in", () => {
+  it("gives the session the token OpenBot minted for an http server", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const sessionLog = join(tmpdir(), `openbot-acp-signin-${Date.now()}.ndjson`);
+    vi.stubEnv("OPENBOT_FAKE_ACP_SESSION_LOG", sessionLog);
+    const config: McpServerConfig = {
+      id: "mcp-1",
+      name: "Signed in",
+      transport: "http",
+      enabled: true,
+      command: "",
+      args: [],
+      env: [],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "https://mcp.example.com/mcp",
+      headers: [],
+    };
+    const client = startOpencode(fake.cli, () => null, fake.envLog, {
+      mcpServers: () => [config],
+      mcpAuthorization: async () => "minted-access-token",
+    });
+    await client.request("initialize", {}, decodeRecordResponse);
+    await client.request("thread/start", { cwd: tmpdir(), runtimeWorkspaceRoots: [tmpdir()] }, decodeRecordResponse);
+
+    // The row holds no credential: a native sign-in keeps the token in OpenBot's own store, so the
+    // only way OpenCode can reach the server is the header written here, at the hand-off.
+    const logged = (await readFile(sessionLog, "utf8")).split("\n").filter((line) => line.trim());
+    const params = JSON.parse(logged.at(-1) ?? "{}");
+    expect(params.mcpServers).toEqual([
+      {
+        type: "http",
+        name: "Signed in",
+        url: "https://mcp.example.com/mcp",
+        headers: [{ name: "Authorization", value: "Bearer minted-access-token" }],
+      },
+    ]);
+  });
+});
+
+describe("OpenCode ACP session loading", () => {
+  it("answers a read for a session this process does not hold by loading it", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    // What boot recovery sends after a restart: a session id from the database that no turn has
+    // resumed yet. Before the session is loaded the client holds nothing under that id.
+    const response = await client.request(
+      "thread/read",
+      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+      decodeThreadResponse,
+    );
+
+    expect(response.thread.id).toBe("ses_stored");
+    expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: "ses_stored", cwd: fake.directory }]);
+  });
+
+  it("loads a session once when a read and a resume ask for it together", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    // The startup race: the history read and the first drain reach the same stored session id in
+    // the same tick. Two loads would leave two threads and two MCP bridge sessions under one id.
+    await Promise.all([
+      client.request(
+        "thread/read",
+        { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+        decodeThreadResponse,
+      ),
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ]);
+
+    expect(await fake.readLoadedSessions()).toHaveLength(1);
+  });
+
+  it("reports a session an agent cannot load as missing instead of asking for it", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    // An agent that does not advertise `loadSession` cannot give the session back. The read answers
+    // an empty thread, so a restart reports no failure to the user, and the resume fails as a
+    // missing session, which is what starts the replacement.
+    const read = await client.request(
+      "thread/read",
+      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+      decodeThreadResponse,
+    );
+    expect(read.thread.turns).toEqual([]);
+    await expect(
+      client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
+    ).rejects.toThrow(/unknown acp session/i);
+    expect(await fake.readLoadedSessions()).toEqual([]);
   });
 });

@@ -18,19 +18,9 @@ export interface I18nValue {
 }
 
 /**
- * The language the interface reads in.
- *
- * Outermost of the providers, because every screen under it renders text, and because the value it
- * holds is owned by the main process rather than by any one screen: the native menu, the
- * notifications and this window all draw from the same saved setting. The window learns about a
- * change from `onAppLanguagePreference`, so the Dynamic Island - which has no Settings of its own -
- * follows a choice made in the main window.
- *
- * Ungated. `DEFAULT_APP_LANGUAGE` is the system language, which is what the first frame would have
- * shown anyway, so nothing waits for the read below.
- *
- * `t` reads the memo on every call, which is what makes a language change repaint the screen: a
- * component that calls `t("...")` in its JSX subscribes to the memo the same as to any signal.
+ * Interface language, owned by main (native menu, notifications, and this window share one
+ * saved setting). Outermost provider since every screen renders text. `t` reads the memo per
+ * call so a language change repaints subscribers. Ungated: system language is the first frame.
  */
 function createI18nValue(): I18nValue {
   const [language, setLanguage] = createSignal<AppLanguage>(DEFAULT_APP_LANGUAGE);

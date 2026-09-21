@@ -126,3 +126,43 @@ export const EDITABLE_FOCUS_SCRIPT = `(() => {
   if (name === "INPUT" || name === "TEXTAREA" || name === "SELECT") return true;
   return !node.shadowRoot && (name.includes("-") || hosts.has(name));
 })()`;
+
+export type BrowserContextMenuItem =
+  | "copy-link"
+  | "copy-image-address"
+  | "separator"
+  | "cut"
+  | "copy"
+  | "paste"
+  | "select-all";
+
+export interface BrowserContextMenuParams {
+  selectionText: string;
+  isEditable: boolean;
+  linkURL: string;
+  srcURL: string;
+  mediaType: string;
+}
+
+/**
+ * The native items a right-click offers on an embedded page. Electron draws no menu of its own for
+ * a `WebContentsView`, so without this a page offers no way at all to copy what it shows, and a
+ * "copy link" the page draws itself is the only route to a URL the label truncates.
+ *
+ * `linkURL` and `srcURL` are the resolved targets Chromium reports, not the rendered label, so the
+ * copy items give the whole URL. The edit items come from the same reading as the chat menu, plus
+ * cut and paste, because an embedded page has real form fields the chat does not.
+ */
+export function browserContextMenuItems(params: BrowserContextMenuParams): BrowserContextMenuItem[] {
+  const items: BrowserContextMenuItem[] = [];
+  if (params.linkURL) items.push("copy-link");
+  if (params.srcURL && params.mediaType === "image") items.push("copy-image-address");
+  const hasSelection = params.selectionText.trim().length > 0;
+  if (!hasSelection && !params.isEditable) return items;
+  if (items.length > 0) items.push("separator");
+  if (hasSelection && params.isEditable) items.push("cut");
+  if (hasSelection) items.push("copy");
+  if (params.isEditable) items.push("paste");
+  items.push("select-all");
+  return items;
+}

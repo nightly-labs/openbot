@@ -16,6 +16,7 @@ import type {
   AppSetupState,
   AttachmentImportEvent,
   BrowserControlState,
+  BrowserLiveViewEvent,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
   BrowserPreview,
@@ -61,6 +62,7 @@ import type {
   SetAgentAvatarInput,
   SetMessageReactionInput,
   SetTeamTypingInput,
+  SharedTable,
   SidebarLayoutSnapshot,
   SkillSubmission,
   SteerQueuedMessageInput,
@@ -107,6 +109,7 @@ import {
   STORY_REMOTE_DESKTOP_SESSION,
   STORY_SERVERS,
   STORY_SESSIONS,
+  STORY_SHARED_TABLES,
   STORY_SKILL_PACKAGE_PREVIEW,
   STORY_SKILL_SUBMISSIONS,
   STORY_SNAPSHOTS,
@@ -148,20 +151,14 @@ export interface MockOpenBotOptions {
   remoteDesktopSessions?: RemoteDesktopSession[];
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
+  tables?: SharedTable[];
   routines?: Record<string, Routine[]>;
   localSkills?: MarketplaceSkillDetail[];
   installedSkills?: Record<string, InstalledSkill[]>;
   customProviders?: CustomProviderSummary[];
 }
 
-/**
- * What the OpenCode CLI would report for one endpoint, read from the endpoint itself. Preview
- * composes these into `listModels()` instead of putting them in `STORY_MODELS`, which several
- * stories read directly as their whole catalogue.
- *
- * OpenCode names a custom model `<provider name>/<model name>` and ids it
- * `<provider id>/<model id>`.
- */
+/** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): AgentModelOption[] {
   return provider.models.map((model) => ({
     provider: "opencode",
@@ -202,11 +199,7 @@ export interface MockOpenBotControls {
   dispose: () => void;
 }
 
-/**
- * The preview build has no main process to read a file, so it answers with the same fixtures that
- * the file preview stories use. A path with no fixture keeps the unsupported shape, which is what
- * the panel shows for a kind it cannot render.
- */
+/** Preview file fixtures; a path with no fixture keeps the unsupported shape. */
 function mockFilePreview(path: string, fallbackName: string): FilePreview {
   return (
     filePreviewForPath(path) ?? {
@@ -303,8 +296,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let updateStatus = clone(options.updateStatus ?? STORY_UPDATE_STATUS);
   const usage = clone(options.usage ?? STORY_USAGE);
-  const usageTarget = agents[0];
-  const usageTargetKey = usageTarget ? `${usageTarget.provider}:${usageTarget.model}` : null;
   let agentCounter = agents.length;
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
   const localSkills = clone(
@@ -362,6 +353,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         grok: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         opencode: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
+      // No `availableVersion`: a tool runtime is downloaded once and replaced by a release, so the
+      // preview never offers an update for one.
+      toolRuntimes: { bun: { phase: "not-downloaded", progress: null, message: null, version: null } },
     },
   );
   let failRuntimeDownload = options.providerRuntimeFailure ?? false;
@@ -374,6 +368,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   };
   const agentListeners = new Set<Listener<AgentEvent>>();
   const browserDisplayListeners = new Set<Listener<{ tabs: BrowserTab[]; activeTabId: string | null }>>();
+  const browserLiveViewListeners = new Set<Listener<BrowserLiveViewEvent>>();
   const browserPictureInPictureListeners = new Set<Listener<BrowserPictureInPictureEvent>>();
   const authListeners = new Set<Listener<CentralAuthState>>();
   const presenceListeners = new Set<Listener<TeamPresenceSnapshot>>();
@@ -402,6 +397,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const queueEdits = new Map<string, { agentId: string; delivery: QueueDelivery }>();
   const queues = new Map<string, QueueSnapshot>(agents.map((agent) => [agent.id, emptyQueue(agent.id)]));
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
+  let tables: SharedTable[] = clone(options.tables ?? STORY_SHARED_TABLES);
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));
   const routineRuns = new Map<string, RoutineRun[]>();
 
@@ -1185,8 +1181,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return mockAgentAnalytics(input, agent);
       },
       getUsage: async (agentId) => {
+        if (!agentId) return clone(usage);
         const agent = agents.find((candidate) => candidate.id === agentId);
-        return clone(agent && `${agent.provider}:${agent.model}` === usageTargetKey ? usage : { limits: [] });
+        return clone({
+          limits: agent ? usage.limits.filter((limit) => limit.id === agent.provider) : [],
+        });
       },
       // A saved endpoint's models are composed here, not stored, so a removal drops them the way a
       // respawned OpenCode would: it lists what its config names and nothing else.
@@ -1400,6 +1399,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       clearMemories: async (agentId) => {
         memories.delete(agentId);
         emitAgentEvent({ type: "memories-changed", agentId });
+      },
+      listTables: async () => clone(tables),
+      deleteTable: async (input) => {
+        tables = tables.filter((table) => table.name !== input.name);
       },
       listRoutines: async (agentId) => clone(routines.get(agentId) ?? []),
       createRoutine: async (input) => {
@@ -1773,6 +1776,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(preview);
       },
       setVisible: async () => undefined,
+      // The preview has no host, so it answers the one thing that is true: there is nothing live to
+      // show. The panel draws its own message for that rather than an empty rectangle.
+      startLiveView: async (tabId) => {
+        emit(browserLiveViewListeners, { type: "stopped", tabId, reason: "The preview has no host to watch." });
+      },
+      stopLiveView: async () => undefined,
+      sendLiveViewInput: async () => undefined,
+      onLiveViewEvent: (listener) => {
+        browserLiveViewListeners.add(listener);
+        return () => browserLiveViewListeners.delete(listener);
+      },
       onDisplayState: (listener) => {
         browserDisplayListeners.add(listener);
         return () => browserDisplayListeners.delete(listener);
@@ -1875,6 +1889,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: "member",
         expiresAt: "2026-09-19T10:00:00.000Z",
         emailBound: false,
+        permanent: false,
       }),
       takePendingInvite: async () => null,
       login: async (input) => {
@@ -1919,6 +1934,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: input.role,
         usedAt: null,
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       setTyping: async (_input: SetTeamTypingInput) => undefined,
       onPresence: (listener, serverId) => {
@@ -2014,6 +2031,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => inviteListeners.delete(listener);
       },
     },
+    plugins: {
+      // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
     host: {
       getStatus: async () => clone(hostStatus),
       configure: async (input: ConfigureHostInput) => {
@@ -2077,6 +2102,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         usedAt: null,
         inviteUrl: "https://openbot.run/join?invite=mock-invite",
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       onEvent: (listener) => {
         hostListeners.add(listener);

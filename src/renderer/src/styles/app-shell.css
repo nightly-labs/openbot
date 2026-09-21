@@ -1592,7 +1592,6 @@ textarea {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-success);
   color: var(--openbot-success);
-  animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .agent-row-agent-status-responded svg {
@@ -1615,6 +1614,9 @@ textarea {
   font-size: var(--openbot-text-sm);
   font-weight: 650;
   line-height: 12px;
+}
+
+.agent-row-agent-status-entering {
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1810,15 +1812,54 @@ textarea {
   object-fit: cover;
 }
 
-/* An activity state. The ring sits outside the circle, so the parent stops
+/* A mood that flies rings. They sit outside the circle, so the parent stops
    clipping and the image rounds itself instead. */
-.agent-avatar[data-avatar="image"][data-animation-state] {
+.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) {
   position: relative;
   overflow: visible;
 }
 
-.agent-avatar[data-avatar="image"][data-animation-state] > img {
+.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) > img {
   border-radius: var(--openbot-radius-pill);
+}
+
+/* Breathing, as a scale on the whole avatar. It is deliberately not a silhouette
+   edit: the shape an agent is recognised by has to survive every mood, so the
+   only thing allowed to move here is the box the shape is drawn in. The amplitude
+   comes from the mood table, and 0 - every mood but `working` - holds still. */
+.agent-avatar[data-breathe] {
+  animation: agent-avatar-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes agent-avatar-breathe {
+  0%,
+  100% {
+    scale: calc(1 - var(--agent-avatar-breathe, 0));
+  }
+
+  50% {
+    scale: calc(1 + var(--agent-avatar-breathe, 0));
+  }
+}
+
+/* The mood glow. It reads before the face does at sidebar sizes, and it never
+   touches the Bloub's own colour, which is identity and comes from the seed. */
+.agent-avatar[data-mood="waiting"] {
+  filter: drop-shadow(0 0 3px var(--openbot-accent));
+}
+
+.agent-avatar[data-mood="failed"] {
+  filter: drop-shadow(0 0 3px var(--openbot-danger));
+}
+
+.agent-avatar[data-mood="asleep"] {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-avatar[data-breathe] {
+    animation: none;
+  }
 }
 
 /* The rings reach 1.4 ball radii, which is the margin the Bloub viewBox carries
@@ -1831,38 +1872,6 @@ textarea {
   height: auto;
   overflow: visible;
   translate: none;
-}
-
-/* The `thinking` pose: the Bloub hides its body and leaves three dots, and a
-   custom image does the same rather than sitting still through it. The surface
-   the image sat on goes with it, so the dots stand alone. */
-.agent-avatar[data-avatar="dots"] {
-  background: none;
-  box-shadow: none;
-}
-
-.agent-avatar-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.agent-avatar-dots i {
-  --typing-dot-travel: -2px;
-
-  width: 5px;
-  height: 5px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-secondary);
-  animation: typing-dot-pulse 900ms ease-in-out infinite;
-}
-
-.agent-avatar-dots i:nth-child(2) {
-  animation-delay: var(--openbot-duration-fast);
-}
-
-.agent-avatar-dots i:nth-child(3) {
-  animation-delay: var(--openbot-duration-overlay);
 }
 
 .agent-row .agent-avatar {
@@ -2556,7 +2565,9 @@ textarea {
   position: relative;
   z-index: 80;
   display: grid;
-  width: min(232px, calc(100vw - var(--openbot-space-4)));
+  width: min(260px, calc(100vw - var(--openbot-space-4)));
+  max-height: min(60vh, 420px);
+  overflow: auto;
   padding: var(--openbot-space-2);
   gap: var(--openbot-space-2);
   opacity: 1;
@@ -2573,8 +2584,7 @@ textarea {
 }
 
 .account-usage-popover-header,
-.account-usage-popover-heading,
-.account-usage-popover-reset {
+.account-usage-popover-heading {
   display: flex;
   align-items: center;
 }
@@ -2585,6 +2595,9 @@ textarea {
 
 .account-usage-popover-heading {
   min-width: 0;
+  /* Match the horizontal padding of a provider row, so the gauge icon lines up
+     with the provider logos below it. */
+  padding-inline-start: var(--openbot-space-1);
   gap: var(--openbot-space-2);
 }
 
@@ -2603,52 +2616,79 @@ textarea {
   line-height: var(--openbot-leading-md);
 }
 
-.account-usage-popover-meter {
+.account-usage-providers {
   display: grid;
-  place-items: center;
-  padding-block: var(--openbot-space-0-5) var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  gap: var(--openbot-space-1);
+  list-style: none;
 }
 
-.account-usage-popover-meter .ui-radial-progress-content > strong {
-  color: var(--ui-radial-progress-color);
-  font-size: var(--openbot-text-3xl);
-  font-weight: var(--openbot-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--openbot-tracking-tight);
-  line-height: var(--openbot-leading-3xl);
-}
-
-.account-usage-popover-reset {
+.account-usage-provider {
+  display: grid;
   min-width: 0;
-  border-top: 1px solid var(--openbot-border);
-  padding-top: var(--openbot-space-2);
+  align-items: center;
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-1);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--openbot-space-2);
-  color: var(--openbot-text-secondary);
 }
 
-.account-usage-popover-reset > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
+.account-usage-provider-logo {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   flex: 0 0 auto;
-  color: var(--openbot-text-muted);
+  overflow: visible;
+  fill: var(--openbot-provider-current);
 }
 
-.account-usage-popover-reset > span {
+.account-usage-provider-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.account-usage-provider-name {
   overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-usage-provider-meta {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.account-usage-popover-reset > strong {
-  margin-left: auto;
-  color: var(--openbot-text-secondary);
+.account-usage-provider-remaining {
+  color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  font-weight: var(--openbot-weight-medium);
+  font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: var(--openbot-leading-sm);
   white-space: nowrap;
+}
+
+.account-usage-provider[data-usage-tone="warning"] .account-usage-provider-remaining {
+  color: var(--openbot-warning);
+}
+
+.account-usage-provider[data-usage-tone="critical"] .account-usage-provider-remaining {
+  color: var(--openbot-danger);
+}
+
+.account-usage-empty {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .account-usage-refresh.ui-button {
@@ -2917,9 +2957,10 @@ textarea {
 
 .account-popover {
   position: relative;
-  width: min(232px, calc(100vw - var(--openbot-space-4)));
+  width: min(260px, calc(100vw - var(--openbot-space-4)));
+  max-height: min(60vh, 420px);
   z-index: 80;
-  overflow: hidden;
+  overflow: auto;
   padding: var(--openbot-space-1);
   opacity: 1;
   transform: scale(1);
@@ -3082,11 +3123,6 @@ textarea {
   }
 
   .account-dock-usage-loading i {
-    animation: none;
-  }
-
-  /* The rings hold a still frame of their own, drawn once by `OrbitedAvatarImage`. */
-  .agent-avatar-dots i {
     animation: none;
   }
 }

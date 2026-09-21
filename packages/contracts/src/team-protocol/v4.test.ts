@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isAgentSummary } from "../ipc-agents";
 import { isDynamicRecord } from "../runtime-values";
+import { TEAM_API_ROUTES } from "../team-api-routes";
+import { browserViewStreamPath } from "./browser-view-v1";
 import request from "./fixtures/v4/client-http-request.json";
 import response from "./fixtures/v4/host-http-response.json";
 import profileResponseFixture from "./fixtures/v4/profile-host-response.json";
@@ -33,6 +35,39 @@ describe("Team protocol v4", () => {
     expect(() =>
       decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/agents", 200, [{ ...response[0], provider: "unknown" }]),
     ).toThrow();
+  });
+
+  it("carries an address and the active tab that the frozen browser routes cannot", () => {
+    const load = { tabId: "tab-1", url: "https://example.com/next" };
+    expect(JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", load))).toEqual(load);
+    expect(decodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", load)).toEqual(load);
+
+    // The released navigate route names `direction` only, so the address the user typed is dropped
+    // on the way out - which is the whole reason the route above exists.
+    expect(
+      JSON.parse(
+        encodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/navigate", {
+          tabId: "tab-1",
+          direction: "back",
+          url: "https://example.com/next",
+        }),
+      ),
+    ).toEqual({ tabId: "tab-1", direction: "back" });
+
+    const tab = { id: "tab-2", title: "Example", url: "https://example.com", loading: false, ownerThreadId: null };
+    const current = { tabs: [{ ...tab, ownerAgentId: "chief" }], activeTabId: "tab-2" };
+    const wire = { tabs: [{ ...tab, ownerBotId: "chief" }], activeTabId: "tab-2" };
+    // The tab list keeps the released vocabulary, so the owner reaches the wire as `ownerBotId` and
+    // comes back as `ownerAgentId`, exactly as it does on `/v1/browser/tabs`.
+    expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/browser/display", 200, current))).toEqual(
+      wire,
+    );
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/browser/display", 200, wire)).toEqual(current);
+    // The display route is a GET with no body, and the frozen v2 frame cannot name a route added
+    // after it, so the WebRTC request frame is empty rather than a classification failure.
+    expect(encodeTeamProtocolV4WebRtcHttpRequest("GET", "/v1/browser/display", undefined)).toEqual({});
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/browser/display", 200, { tabs: [tab] })).toThrow();
+    expect(() => decodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", { tabId: "tab-1" })).toThrow();
   });
 
   it("carries the queue edit mark to a current client and drops it for a frozen one", () => {
@@ -357,4 +392,39 @@ it("freezes the v4 profile draft bounds independently of the current profile mod
   expect(() => decodeProfileV4Response(true, blank)).toThrow("Invalid profile v4 draft.");
   expect(() => decodeProfileV4Request(false, { operationId: "invalid", draft })).toThrow("Invalid profile v4 save.");
   expect(() => decodeProfileV4Request(true, { prompt: " ", draft })).toThrow("Invalid profile v4 prompt.");
+});
+
+it("carries a browser view session and refuses one the host did not name", () => {
+  const path = TEAM_API_ROUTES.browser.viewSessions;
+  const request = { tabId: "tab-1" };
+  expect(
+    decodeTeamProtocolV4CurrentHttpRequest(
+      "POST",
+      path,
+      JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", path, request)),
+    ),
+  ).toEqual(request);
+  const session = {
+    id: "view-1",
+    tabId: "tab-1",
+    streamPath: browserViewStreamPath("view-1"),
+  };
+  expect(
+    decodeTeamProtocolV4CurrentHttpResponse(
+      "POST",
+      path,
+      200,
+      JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, session)),
+    ),
+  ).toEqual(session);
+  // The client opens a socket at the path the host answers with, so a path for another session -- or
+  // for anything that is not a stream -- must not survive the response.
+  expect(() =>
+    encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, { ...session, streamPath: "/v1/browser/view/other" }),
+  ).toThrow("Invalid browser view response.");
+  // Ending the session is a DELETE, and the v3 frame a WebRTC request falls through to cannot learn
+  // a route added after it was frozen, so the frame it sends is empty.
+  const ended = TEAM_API_ROUTES.browser.viewSession("view-1");
+  expect(encodeTeamProtocolV4WebRtcHttpRequest("DELETE", ended, null)).toEqual({});
+  expect(decodeTeamProtocolV4WebRtcHttpRequest("DELETE", ended, {})).toEqual({});
 });

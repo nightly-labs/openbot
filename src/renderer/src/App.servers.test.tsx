@@ -203,32 +203,7 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.servers.list).toHaveBeenCalledOnce());
     expect(window.openbot.agent.listAgents).not.toHaveBeenCalled();
 
-    resolveServers?.([
-      {
-        id: "local",
-        name: "Local",
-        logoUrl: null,
-        notificationsMuted: false,
-        kind: "local",
-        state: "online",
-        apiUrl: null,
-        remoteDesktopAvailable: false,
-        role: null,
-        active: false,
-      },
-      {
-        id: "remote-1",
-        name: "Studio Mac",
-        logoUrl: null,
-        notificationsMuted: false,
-        kind: "remote",
-        state: "online",
-        apiUrl: "https://studio.example.com",
-        remoteDesktopAvailable: false,
-        role: "member",
-        active: true,
-      },
-    ]);
+    resolveServers?.([testServer("local", false), testServer("remote-1", true)]);
 
     expect(await screen.findByRole("heading", { name: "Remote Chief" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Studio Mac server" })).toHaveAttribute("aria-pressed", "true");
@@ -465,43 +440,18 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     expect(window.openbot.agent.getSidebarLayout).not.toHaveBeenCalled();
-    expect(window.openbot.browser.listTabs).not.toHaveBeenCalled();
+    expect(window.openbot.browser.getDisplayState).not.toHaveBeenCalled();
 
     emitServers?.([local, negotiated]);
     await waitFor(() => expect(window.openbot.agent.getSidebarLayout).toHaveBeenCalled());
-    expect(window.openbot.browser.listTabs).toHaveBeenCalled();
+    expect(window.openbot.browser.getDisplayState).toHaveBeenCalled();
     // The server was already active, so the workspace reloads on
     // the completed handshake. Nothing asks main to select it a second time.
     expect(window.openbot.servers.select).not.toHaveBeenCalled();
   });
 
   it("keeps a remote approval when Review in OpenBot switches to its host", async () => {
-    const servers: ServerSummary[] = [
-      {
-        id: "local",
-        name: "Local",
-        logoUrl: null,
-        notificationsMuted: false,
-        kind: "local",
-        state: "online",
-        apiUrl: null,
-        remoteDesktopAvailable: false,
-        role: null,
-        active: true,
-      },
-      {
-        id: "remote-1",
-        name: "Studio Mac",
-        logoUrl: null,
-        notificationsMuted: false,
-        kind: "remote",
-        state: "online",
-        apiUrl: "https://studio.example.com",
-        remoteDesktopAvailable: false,
-        role: "member",
-        active: false,
-      },
-    ];
+    const servers = [testServer("local", true), testServer("remote-1", false)];
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce(servers);
     vi.mocked(window.openbot.servers.select).mockResolvedValueOnce(
       servers.map((server) => ({ ...server, active: server.id === "remote-1" })),
@@ -577,30 +527,8 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("removes stale Dynamic Island attention when a remote host goes offline", async () => {
-    const local: ServerSummary = {
-      id: "local",
-      name: "Local",
-      logoUrl: null,
-      notificationsMuted: false,
-      kind: "local",
-      state: "online",
-      apiUrl: null,
-      remoteDesktopAvailable: false,
-      role: null,
-      active: true,
-    };
-    const remote: ServerSummary = {
-      id: "remote-1",
-      name: "Studio Mac",
-      logoUrl: null,
-      notificationsMuted: false,
-      kind: "remote",
-      state: "online",
-      apiUrl: "https://studio.example.com",
-      remoteDesktopAvailable: false,
-      role: "member",
-      active: false,
-    };
+    const local = testServer("local", true);
+    const remote = testServer("remote-1", false);
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
 
     render(() => <App />);
@@ -641,30 +569,8 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("reports a remote reply that arrives while its host is offline", async () => {
-    const local: ServerSummary = {
-      id: "local",
-      name: "Local",
-      logoUrl: null,
-      notificationsMuted: false,
-      kind: "local",
-      state: "online",
-      apiUrl: null,
-      remoteDesktopAvailable: false,
-      role: null,
-      active: true,
-    };
-    const remote: ServerSummary = {
-      id: "remote-1",
-      name: "Studio Mac",
-      logoUrl: null,
-      notificationsMuted: false,
-      kind: "remote",
-      state: "online",
-      apiUrl: "https://studio.example.com",
-      remoteDesktopAvailable: false,
-      role: "member",
-      active: false,
-    };
+    const local = testServer("local", true);
+    const remote = testServer("remote-1", false);
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
     const snapshot = (messageId: string, text: string) => ({
       type: "runtime-snapshot" as const,
@@ -974,28 +880,20 @@ describe("OpenBot connected desktop shell", () => {
   it("disconnects a hidden Remote Control session when the server changes", async () => {
     const servers = [
       {
-        id: "remote-1",
-        name: "Studio Mac",
-        logoUrl: null,
-        notificationsMuted: false,
+        ...testServer("remote-1", true),
         kind: "remote" as const,
         state: "online" as const,
-        apiUrl: "https://studio.example.com",
         remoteDesktopAvailable: true,
         role: "owner" as const,
-        active: true,
       },
       {
-        id: "remote-2",
+        ...testServer("remote-2", false),
         name: "Office PC",
-        logoUrl: null,
-        notificationsMuted: false,
         kind: "remote" as const,
         state: "online" as const,
         apiUrl: "https://office.example.com",
         remoteDesktopAvailable: true,
         role: "member" as const,
-        active: false,
       },
     ];
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce(servers);
@@ -1274,6 +1172,31 @@ describe("OpenBot connected desktop shell", () => {
     expect(await screen.findByRole("heading", { name: "Sales Outbound copy" })).toBeInTheDocument();
     await waitFor(() => expect(window.openbot.agent.readConversation).toHaveBeenCalledWith("sales-outbound-copy"));
     expect(
+      screen.getByRole("button", {
+        name: "Sales Outbound copy, Outbound specialist. No messages yet",
+      }),
+    ).toBeInTheDocument();
+    emitAgentEvent?.({
+      type: "agents-changed",
+      agents: [
+        ...AGENTS,
+        {
+          ...AGENTS[1],
+          id: "sales-outbound-copy",
+          name: "Sales Outbound copy",
+          threadId: "thread-sales-outbound-copy",
+          workspacePath: "/tmp/OpenBot/Agents/sales-outbound-copy",
+          preview: "I finished the copied task.",
+          updatedAt: "2026-09-18T10:33:00.000Z",
+        },
+      ],
+    });
+    expect(
+      await screen.findByRole("button", {
+        name: "Sales Outbound copy, Outbound specialist. I finished the copied task.",
+      }),
+    ).toBeInTheDocument();
+    expect(
       within(screen.getByRole("region", { name: "Pinned chats" })).queryByRole("button", {
         name: /Sales Outbound copy/,
       }),
@@ -1327,32 +1250,14 @@ describe("OpenBot connected desktop shell", () => {
 
   it("opens settings for the clicked server without selecting it", async () => {
     const remote = {
-      id: "studio",
+      ...testServer("studio", false),
       name: "Design studio",
-      logoUrl: null,
-      notificationsMuted: false,
       kind: "remote" as const,
       state: "online" as const,
-      apiUrl: "https://studio.example.com",
       remoteDesktopAvailable: true,
       role: "admin" as const,
-      active: false,
     };
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
-      {
-        id: "local",
-        name: "Local",
-        logoUrl: null,
-        notificationsMuted: false,
-        kind: "local",
-        state: "online",
-        apiUrl: null,
-        remoteDesktopAvailable: false,
-        role: null,
-        active: true,
-      },
-      remote,
-    ]);
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([testServer("local", true), remote]);
     vi.mocked(window.openbot.servers.refreshIdentity).mockResolvedValueOnce(remote);
     vi.mocked(window.openbot.servers.getPresenceFor).mockResolvedValueOnce({
       serverId: remote.id,
@@ -1388,20 +1293,7 @@ describe("OpenBot connected desktop shell", () => {
     for (const character of "Design") {
       draft += character;
       await fireEvent.input(name, { target: { value: draft } });
-      emitServers?.([
-        {
-          id: "local",
-          name: "Local",
-          logoUrl: null,
-          notificationsMuted: false,
-          kind: "local",
-          state: "online",
-          apiUrl: null,
-          remoteDesktopAvailable: false,
-          role: null,
-          active: true,
-        },
-      ]);
+      emitServers?.([testServer("local", true)]);
       expect(name).toHaveValue(draft);
     }
 

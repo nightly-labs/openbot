@@ -250,5 +250,42 @@
       "manifestAsset": "remote-desktop-runtime-manifest.json",
       "manifestSha256": "1a618320fed986c37444776a0fb47411f6ffb123e4886cfbb9fcb251c74c0e40"
     }
+  },
+  "bun": {
+    "registry": "https://registry.npmjs.org",
+    "repository": "https://github.com/oven-sh/bun",
+    "version": "1.4.2",
+    "tag": "bun-v1.4.2",
+    "license": "MIT",
+    "licenseSha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a",
+    "artifacts": {
+      "darwin-arm64": {
+        "package": "@oven/bun-darwin-aarch64",
+        "asset": "bun-darwin-aarch64-1.4.2.tgz",
+        "assetSha256": "a9df486eaf7e9db9bdebb1fa425e8c9809abd783b1c518d1dbc5096a53b861ed",
+        "binarySha256": "35d20dd0263e5c950194434b925454fdfa9ba6e4467da960410fa05b08a7a5b5",
+        "downloadBytes": 26145119,
+        "installedBytes": 130000000,
+        "executable": "bun"
+      },
+      "linux-x64": {
+        "package": "@oven/bun-linux-x64-baseline",
+        "asset": "bun-linux-x64-baseline-1.4.2.tgz",
+        "assetSha256": "129ae8dfaca565e8008735e3d6adae7515421c5b226d6f1f90c4bcb35803a647",
+        "binarySha256": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c",
+        "downloadBytes": 37119716,
+        "installedBytes": 170000000,
+        "executable": "bun"
+      },
+      "win32-x64": {
+        "package": "@oven/bun-windows-x64-baseline",
+        "asset": "bun-windows-x64-baseline-1.4.2.tgz",
+        "assetSha256": "3a4f6d0453afcc1ed1f736e3a4356306ff359efe75fa11c9a0d82c59f76d4801",
+        "binarySha256": "15277c59ccd6c6c20f8dc9716c2b59c1776320d606b6a8658f70be8799519ca4",
+        "downloadBytes": 40496025,
+        "installedBytes": 190000000,
+        "executable": "bun.exe"
+      }
+    }
   }
 }

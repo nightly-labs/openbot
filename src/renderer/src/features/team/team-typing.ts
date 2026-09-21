@@ -1,10 +1,7 @@
 /**
- * Telling the team server whether the user is composing.
- *
- * It sits in its own module because two owners with different lifetimes need it:
- * the conversation domain, which is scoped to one server, and the conversation
- * controller in `app-providers.tsx`, which is not. Neither can import the other,
- * and the call carries no cached state - it is one fire-and-forget IPC.
+ * Telling the team server whether the user is composing. Its own module because two owners with
+ * different lifetimes need it and neither can import the other: the server-scoped conversation
+ * domain, and the controller in `app-providers.tsx`. It caches nothing - one fire-and-forget IPC.
  */
 export function notifyTeamTyping(agentId: string, typing: boolean): void {
   void window.openbot.servers.setTyping({ agentId: typing ? agentId : null, typing }).catch(() => {

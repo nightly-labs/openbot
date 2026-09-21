@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  browserContextMenuItems,
   chatContextMenuItems,
   isCloseBrowserTabShortcut,
   isCollapseBrowserShortcut,
@@ -111,5 +112,50 @@ describe("chatContextMenuItems", () => {
 
   it("keeps no menu where there is nothing to copy", () => {
     expect(chatContextMenuItems({ selectionText: "", isEditable: false, linkURL: "" })).toEqual([]);
+  });
+});
+
+describe("browserContextMenuItems", () => {
+  const page = (overrides: Partial<Parameters<typeof browserContextMenuItems>[0]> = {}) => ({
+    selectionText: "",
+    isEditable: false,
+    linkURL: "",
+    srcURL: "",
+    mediaType: "none",
+    ...overrides,
+  });
+
+  it("offers copy and select-all for text selected on a page", () => {
+    expect(browserContextMenuItems(page({ selectionText: "Uber Eats" }))).toEqual(["copy", "select-all"]);
+  });
+
+  it("puts copy-link first when right-clicking a link", () => {
+    expect(browserContextMenuItems(page({ linkURL: "https://example.com/very/long/path?share=1" }))).toEqual([
+      "copy-link",
+    ]);
+  });
+
+  it("offers the full edit set in a page form field", () => {
+    expect(browserContextMenuItems(page({ selectionText: "draft", isEditable: true }))).toEqual([
+      "cut",
+      "copy",
+      "paste",
+      "select-all",
+    ]);
+  });
+
+  it("offers paste in an empty form field", () => {
+    expect(browserContextMenuItems(page({ isEditable: true }))).toEqual(["paste", "select-all"]);
+  });
+
+  it("offers the image address only for an image", () => {
+    expect(browserContextMenuItems(page({ srcURL: "https://example.com/a.png", mediaType: "image" }))).toEqual([
+      "copy-image-address",
+    ]);
+    expect(browserContextMenuItems(page({ srcURL: "https://example.com/a.mp4", mediaType: "video" }))).toEqual([]);
+  });
+
+  it("keeps no menu where there is nothing to copy", () => {
+    expect(browserContextMenuItems(page())).toEqual([]);
   });
 });

@@ -231,6 +231,12 @@ export function createProviderRuntimeStore(
   });
   return {
     providerRuntimeStatuses: () => providerRuntimeSnapshot().providers,
+    /**
+     * The runtimes the MCP servers are started with, which no provider card shows. They belong to
+     * this computer and not to the workspace on screen, so a reader that draws them for a remote
+     * server has to gate on `isLocalServer` itself, as the update offers above do.
+     */
+    toolRuntimeStatuses: () => providerRuntimeSnapshot().toolRuntimes,
     providerAvailableVersions: () => ({
       codex: providerUpdate("codex").availableVersion,
       claude: providerUpdate("claude").availableVersion,

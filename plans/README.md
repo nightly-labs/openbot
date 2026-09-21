@@ -10,6 +10,7 @@ changes, and respect the `STOP` conditions.
 |------|-------|----------|------|--------------|-------|
 | 001 | Add a central account API and a host whitelist | P1 | L | — | SUPERSEDED BY 002 |
 | 002 | TanStack Start, Solid 2, Cloudflare Workers and D1 | P1 | L | — | IN PROGRESS |
+| 003 | MCP is robust and future-proof | P1 | M | — | DONE |
 
 Allowed states: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED: <reason>`,
 `REJECTED: <reason>`.
@@ -18,6 +19,10 @@ Allowed states: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED: <reason>`,
 
 - Plan 002 supersedes the backend part of plan 001. The host whitelist part is
   the next stage of plan 002.
+- Plan 003 is independent of 001 and 002. It was written against a clean
+  worktree at commit `4980fb58`, after #633 gave Codex HTTP MCP servers, and
+  rewritten once the developer decided the runtime, the configuration policy and
+  the OAuth question. Stages 1 to 3 are implemented; Stage 4 is open.
 - The plan was written against a dirty working tree at commit `8229759`.
   Uncommitted files of the OpenBot Remote feature are part of the input state.
   The implementer must preserve them and check them before making a change.

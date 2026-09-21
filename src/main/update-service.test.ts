@@ -15,6 +15,7 @@ import {
   supportsInstalledUpdates,
   UpdateService,
 } from "./update-service";
+import type { OpenBotSiblingInstance } from "./update-sibling-instances";
 
 const CHECK_TIMEOUT = 1_000;
 const CHECK_INTERVAL = 10_000;
@@ -60,6 +61,7 @@ function createService(
     beforeInstall?: () => Promise<void>;
     autoDownload?: boolean;
     checkIntervalMs?: number;
+    checkSiblingInstances?: () => Promise<readonly OpenBotSiblingInstance[]>;
   } = {},
 ) {
   return new UpdateService(updater, {
@@ -67,6 +69,7 @@ function createService(
     enabled: true,
     autoDownload: options.autoDownload ?? false,
     beforeInstall: options.beforeInstall ?? vi.fn(async () => undefined),
+    ...(options.checkSiblingInstances ? { checkSiblingInstances: options.checkSiblingInstances } : {}),
     platform: options.platform ?? "darwin",
     checkIntervalMs: options.checkIntervalMs ?? CHECK_INTERVAL,
     checkTimeoutMs: CHECK_TIMEOUT,
@@ -220,6 +223,137 @@ describe("UpdateService", () => {
     expect(beforeInstall).toHaveBeenCalledOnce();
     expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
     await expect(service.installUpdate()).rejects.toThrow("not ready");
+  });
+
+  it("refuses the install while another session runs from the same application", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    let siblings: readonly OpenBotSiblingInstance[] = [{ pid: 4242, uid: 502 }];
+    const checkSiblingInstances = vi.fn(async () => siblings);
+    const service = createService(updater, { platform: "darwin", beforeInstall, checkSiblingInstances });
+    service.start(false);
+
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    expect(service.getStatus().phase).toBe("ready");
+
+    await expect(service.installUpdate()).rejects.toThrow(/every other macOS user account/iu);
+    expect(checkSiblingInstances).toHaveBeenCalledOnce();
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    // Nothing was torn down, so the update stays ready and the install stays available.
+    expect(service.getStatus().phase).toBe("ready");
+
+    siblings = [];
+    await service.installUpdate();
+    expect(beforeInstall).toHaveBeenCalledOnce();
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+  });
+
+  it("installs without a sibling check when none is configured", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    const service = createService(updater, { platform: "darwin", beforeInstall });
+    service.start(false);
+
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    await service.installUpdate();
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+  });
+
+  it("keeps the app running when the sibling scan fails", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    const service = createService(updater, {
+      platform: "darwin",
+      beforeInstall,
+      checkSiblingInstances: async () => {
+        throw new Error("scan failed");
+      },
+    });
+    service.start(false);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    await expect(service.installUpdate()).rejects.toThrow("scan failed");
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    expect(service.getStatus().phase).toBe("ready");
+  });
+
+  it("refuses tenant installs in host-managed mode and restores manual updates when disabled", async () => {
+    const updater = new FakeUpdater();
+    const beforeInstall = vi.fn(async () => undefined);
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    const service = createService(updater, { platform: "darwin", beforeInstall });
+    service.start(false);
+
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    expect(service.getStatus().managedByHost).toBeUndefined();
+
+    service.setManagedByHost(true);
+    expect(service.getStatus().managedByHost).toBe(true);
+
+    await expect(service.installUpdate()).rejects.toThrow(/installed by the host/iu);
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    expect(service.getStatus().phase).toBe("ready");
+
+    service.setManagedByHost(false);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    await service.installUpdate();
+    expect(beforeInstall).toHaveBeenCalledOnce();
+    expect(updater.quitAndInstall).toHaveBeenCalledWith(false, true);
+  });
+
+  it("serializes concurrent install requests after the sibling scan", async () => {
+    const updater = new FakeUpdater();
+    makeUpdateAvailable(updater);
+    completeDownload(updater);
+    let finishScan: (value: readonly OpenBotSiblingInstance[]) => void = () => undefined;
+    const scan = new Promise<readonly OpenBotSiblingInstance[]>((resolve) => {
+      finishScan = resolve;
+    });
+    let finishPrepare: () => void = () => undefined;
+    const prepare = new Promise<void>((resolve) => {
+      finishPrepare = resolve;
+    });
+    const beforeInstall = vi.fn(() => prepare);
+    const service = createService(updater, { beforeInstall, checkSiblingInstances: () => scan });
+    service.start(false);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    const first = service.installUpdate();
+    const second = service.installUpdate();
+    const rejected = expect(second).rejects.toThrow("not ready");
+    finishScan([]);
+    await rejected;
+    expect(beforeInstall).toHaveBeenCalledOnce();
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+    finishPrepare();
+    await first;
+    expect(updater.quitAndInstall).toHaveBeenCalledOnce();
+  });
+
+  it("does not use tenant download preferences in managed mode", async () => {
+    const updater = new FakeUpdater();
+    const service = createService(updater, { autoDownload: false });
+    service.start(false);
+    service.setManagedByHost(true);
+    await service.checkForUpdates();
+    await service.downloadUpdate();
+    expect(updater.checkForUpdates).not.toHaveBeenCalled();
+    expect(updater.downloadUpdate).not.toHaveBeenCalled();
+    expect(service.getAutoDownload()).toBe(false);
   });
 
   it("reports errors for the active update stage without raw provider details", async () => {

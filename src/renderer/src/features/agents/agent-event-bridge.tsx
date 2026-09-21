@@ -58,7 +58,7 @@ export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServerId } = useServers();
-  const { invalidateAccountUsage } = useAuth();
+  const { applyAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents } = useAgents();
   const { setConversationErrors } = useConversationController();
@@ -105,11 +105,7 @@ export function AgentEventBridge() {
         }
         return;
       case "usage-changed":
-        // The payload is dropped on purpose. A broadcast read carries no model scope and comes from
-        // the Codex client whatever agent is active, so it cannot say whose limit it is. The dock's
-        // own reading is scoped to the active agent's provider and model, so it is the only one the
-        // composer can name a provider from.
-        invalidateAccountUsage();
+        applyAccountUsage(event.usage);
         return;
       case "agents-changed":
         applyStoredAgents(event.agents);
@@ -298,7 +294,10 @@ export function AgentEventBridge() {
         const now = Date.now();
         if ((lastErrorToastAt.get(toastKey) ?? 0) + ERROR_TOAST_DEDUPE_MS < now) {
           lastErrorToastAt.set(toastKey, now);
-          toast.error("Provider error", { description: toastKey });
+          // An MCP server left out at hand-off is not the provider failing, and calling it a
+          // provider error sends the user to the wrong settings page.
+          const title = event.code === "mcp_server_not_started" ? "MCP server not started" : "Provider error";
+          toast.error(title, { description: toastKey });
         }
       }
     }

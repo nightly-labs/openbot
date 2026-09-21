@@ -9,6 +9,7 @@ import { ChatMessageRow } from "./ChatMessageRow";
 import { ChatSearch } from "./ChatSearch";
 import { BrowserTakeoverCard } from "./ConversationPrompts";
 import { dayMarkerLabel } from "./chat-day-markers";
+import { continuesSenderRun } from "./chat-grouping";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
 import { ScrollToLatestButton } from "./MessageNavigation";
@@ -25,6 +26,16 @@ function markerOnlyMessage(message: AgentMessage): boolean {
     marker.kind === "routine-lifecycle" ||
     marker.kind === "unavailable"
   );
+}
+
+/**
+ * Does this row draw a time of its own?
+ *
+ * A marker-only row carries the marker's own time, and a question prompt draws a card instead of a
+ * message row. Neither shows the header a run continues under, so neither can hold a run open.
+ */
+function rowDrawsTime(message: AgentMessage): boolean {
+  return !markerOnlyMessage(message) && !message.questionPrompt;
 }
 
 /** Marker-only rows that render attachment cards below the marker do not end with one. */
@@ -231,6 +242,22 @@ export function ConversationTimeline() {
                   if (current.createdAt) return dayMarkerLabel(previous?.createdAt, current.createdAt);
                   return previous === undefined ? (current.time ?? "now") : null;
                 });
+                /*
+                 * A row that continues a run by the same sender draws no time: the run carries one
+                 * time at its top, and a header on every row leaves an empty line between them. A
+                 * row that draws a marker of its own opens a run, because the marker stands between
+                 * it and the message above it.
+                 */
+                const continuesRun = createMemo(() => {
+                  const current = message();
+                  if (!current) return false;
+                  if (current.id === props.firstUnreadMessageId || current.actionMarker) return false;
+                  const previous = timelineMessages()[virtualRow.index - 1];
+                  return continuesSenderRun(previous, current, {
+                    previousDrawsTime: previous !== undefined && rowDrawsTime(previous),
+                    startsDay: dayMarker() !== null,
+                  });
+                });
                 const markerOnly = markerOnlyMessage(initialMessage);
                 // Consecutive markers keep the tighter marker gap so they read as one group.
                 const groupedWithMarker = createMemo(() => {
@@ -318,7 +345,7 @@ export function ConversationTimeline() {
                 return (
                   <div
                     data-index={virtualRow.index}
-                    data-grouped={groupedWithMarker() ? "marker" : undefined}
+                    data-grouped={groupedWithMarker() ? "marker" : continuesRun() ? "sender" : undefined}
                     ref={messageVirtualizer.measureElement}
                     class="virtual-chat-row"
                     style={{
@@ -367,7 +394,7 @@ export function ConversationTimeline() {
                               kind: message()?.author === "you" ? "you" : "agent",
                               name: message()?.author === "you" ? "You" : (props.agent?.name ?? "Agent"),
                             }}
-                            showTime
+                            showTime={!continuesRun()}
                             animate={animateEntrance}
                             agents={props.agents}
                             skills={installedSkills()}
@@ -465,7 +492,7 @@ export function ConversationTimeline() {
                 <AgentActivityIndicator
                   agent={activity().agent}
                   detail={activity().detail}
-                  presentation={activity().presentation}
+                  label={activity().label}
                   phase={activity().phase}
                 />
               )}

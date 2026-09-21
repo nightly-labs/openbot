@@ -17,6 +17,7 @@ import {
   FakeAgentClient,
   readTextOrEmpty,
   startAgentTestFixture,
+  startService,
   stopAgentTestFixture,
   stores,
   waitFor,
@@ -27,6 +28,7 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
+import { isUsageLimitDiagnostic } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -73,14 +75,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("keeps another provider's live delivery running when OpenCode reconnects", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider, "", false),
       preferredProvider: "codex",
-      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
-    await service.initialize();
+    service = agentService;
     await service.sendMessage({ agentId: "chief", text: "Keep working." });
     const running = service;
     await waitFor(async () => Boolean((await running.readConversation("chief")).activeTurnId));
@@ -276,14 +275,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("keeps the CLI version with sign-in-required and no models when OpenCode reports no account", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider, "DONE", false, provider !== "opencode"),
       preferredProvider: "opencode",
-      clientFactory: (provider) => new FakeAgentClient(provider, "DONE", false, provider !== "opencode"),
     });
-    await service.initialize();
+    service = agentService;
     // The version comes from the resolve step while the models come from the later discovery, so a
     // connected CLI with no account keeps its version on the row while the catalog stays empty.
     expect(service.getStatus().providers).toContainEqual(
@@ -642,14 +638,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   });
 
   it("restores the connect action when the login page cannot open", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider, "DONE", true, provider !== "codex"),
       preferredProvider: "codex",
-      clientFactory: (provider) => new FakeAgentClient(provider, "DONE", true, provider !== "codex"),
     });
-    await service.initialize();
+    service = agentService;
 
     await expect(
       service.connectProvider("codex", async () => Promise.reject(new Error("browser failed"))),
@@ -802,14 +795,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         process.env.OPENBOT_FAKE_CLAUDE_LOGIN_LOG = join(root, "pending-claude-login.log");
         process.env.OPENBOT_CLAUDE_PATH = await createPendingFakeClaude(root);
       }
-      const { store, mailbox } = stores(root);
-      service = createTestService({
-        store,
-        mailbox,
+      const { service: agentService } = await startService(root, {
+        client: (provider) => new FakeAgentClient(provider),
         preferredProvider: target,
-        clientFactory: (provider) => new FakeAgentClient(provider),
       });
-      await service.initialize();
+      service = agentService;
       await service.connectProvider(target, async () => undefined);
       const install = vi.fn(async () => managed);
 
@@ -1189,6 +1179,87 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
   });
 
+  it.each([
+    "Grok Build usage balance exhausted",
+    "insufficient_quota",
+    "Your credit balance is too low to access the Anthropic API",
+    "You have exceeded your current quota",
+    "Billing hard limit has been reached",
+  ])("recognizes an exhausted provider usage limit: %s", (message) => {
+    expect(isUsageLimitDiagnostic(message)).toBe(true);
+  });
+
+  it.each([
+    "402 Payment Required",
+    "429 Too Many Requests",
+    "The provider failed to reach the model endpoint",
+    "Authentication failed",
+  ])("does not hide another provider failure: %s", (message) => {
+    expect(isUsageLimitDiagnostic(message)).toBe(false);
+  });
+
+  it("replaces Grok's repeated exhausted-balance errors with one usage refresh", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    const client = clients.get("grok");
+    if (!client) throw new Error("Grok did not start.");
+    client.accountRateLimits = {
+      rateLimits: {
+        limitId: "grok",
+        secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
+      },
+      rateLimitsByLimitId: null,
+    };
+    const usageReadsBefore = client.requests.filter((request) => request.method === "account/rateLimits/read").length;
+    events.length = 0;
+
+    client.emit(
+      "diagnostic",
+      '2026-09-18T08:54:24.476465Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
+    );
+    client.emit(
+      "diagnostic",
+      '2026-09-18T08:54:24.476222Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
+    );
+    client.emit("notification", {
+      method: "error",
+      params: {
+        message:
+          'responses API error status=402 Payment Required error_message=Grok Build usage balance exhausted body_preview={"error":"Grok Build usage balance exhausted"} model_id=grok-4.6',
+      },
+    });
+
+    await waitFor(() => events.some((event) => event.type === "usage-changed"));
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
+    expect(client.requests.filter((request) => request.method === "account/rateLimits/read")).toHaveLength(
+      usageReadsBefore + 1,
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "usage-changed",
+        usage: expect.objectContaining({
+          limits: [expect.objectContaining({ id: "grok", secondary: expect.objectContaining({ usedPercent: 100 }) })],
+        }),
+      }),
+    );
+  });
+
   it("refuses to replace a CLI that is running a turn", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({
@@ -1265,14 +1336,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   });
 
   it("refuses to replace a CLI that is running a channel turn", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider, "", false),
       preferredProvider: "codex",
-      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
     });
-    await service.initialize();
+    service = agentService;
     await store.getOrCreate("chief");
     const actor = { id: "human", name: "Alex" };
     await service.channels.command(
@@ -1322,19 +1390,16 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       releaseTurnStart = resolve;
     });
     let turnStartReached = false;
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService } = await startService(root, {
       preferredProvider: "codex",
-      clientFactory: (provider) =>
+      client: (provider) =>
         new FakeAgentClient(provider, "", false, true, {}, async (method, target) => {
           if (method !== "turn/start" || target !== "codex") return;
           turnStartReached = true;
           await blocked;
         }),
     });
-    await service.initialize();
+    service = agentService;
     void service.sendMessage({ agentId: "chief", text: "Keep working." });
     // The delivery has no turn id yet, and the client it is about to prompt must not be replaced.
     await waitFor(() => turnStartReached);
@@ -1477,14 +1542,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("keeps the owner of a CLI whose provider is signed out", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider, undefined, true, provider !== "claude"),
       preferredProvider: "codex",
-      clientFactory: (provider) => new FakeAgentClient(provider, undefined, true, provider !== "claude"),
     });
-    await service.initialize();
+    service = agentService;
 
     // Signed out, the provider keeps no client, so the row would name no owner - and an unowned CLI
     // is read as the managed copy, which sends the user's own install to a download.
@@ -1495,15 +1557,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
   it("reports installation failure without replacing the working client", async () => {
     const managed = await createFakeClaude(root);
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
+    const { service: agentService } = await startService(root, {
+      client: (provider) => new FakeAgentClient(provider),
       preferredProvider: "claude",
-      clientFactory: (provider) => new FakeAgentClient(provider),
       bundledExecutables: { claude: managed },
     });
-    await service.initialize();
+    service = agentService;
     await expect(
       service.updateProviderCli("claude", async () => {
         throw new Error("Runtime verification failed.");

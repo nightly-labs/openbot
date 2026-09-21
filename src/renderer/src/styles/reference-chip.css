@@ -24,6 +24,9 @@
   text-decoration: none;
 }
 
+/* A plugin and an MCP server read as the skill chips do: each names something the agent was given. */
+.reference-chip[data-kind="mcp"],
+.reference-chip[data-kind="plugin"],
 .reference-chip[data-kind="skill"] {
   background: var(--openbot-accent-soft);
   color: var(--openbot-accent-text);

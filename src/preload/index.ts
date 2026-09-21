@@ -69,6 +69,7 @@ import {
   isRoutine,
   isRoutineRun,
   isRoutineSchedule,
+  isSharedTable,
   isSidebarLayoutSnapshot,
   isSkillCategory,
   LOCAL_SERVER_ID,
@@ -85,6 +86,7 @@ import {
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
   type ScopedTeamPresenceSnapshot,
+  type SharedTable,
   type SidebarLayoutSnapshot,
   type SkillPackagePreview,
   type SkillSubmission,
@@ -100,6 +102,7 @@ import {
   requiredNumber,
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
+import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { clipboardFiles } from "./clipboard-files";
@@ -379,6 +382,11 @@ function decodeAgents(value: unknown): AgentSummary[] {
 
 function decodeMemory(value: unknown): AgentMemory {
   if (!isAgentMemory(value)) throw new Error("Invalid agent memory response.");
+  return value;
+}
+
+function decodeTables(value: unknown): SharedTable[] {
+  if (!Array.isArray(value) || !value.every(isSharedTable)) throw new Error("Invalid shared tables response.");
   return value;
 }
 
@@ -931,7 +939,7 @@ const openbotApi: OpenBotDesktopApi = {
       invokeAgentForServer(serverId, IPC_CHANNELS.hostGetAnalytics, input, decodeHostAnalyticsFromMain),
     getAnalytics: (input, serverId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentGetAnalytics, input, decodeAgentAnalyticsFromMain),
-    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId, decodeAccountUsageFromMain),
+    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId ?? null, decodeAccountUsageFromMain),
     listModels: () => invokeAgent(IPC_CHANNELS.agentListModels, null, decodeAgentModels),
     listAgents: (serverId) =>
       serverId === undefined
@@ -957,6 +965,8 @@ const openbotApi: OpenBotDesktopApi = {
     updateMemory: (input) => invokeAgent(IPC_CHANNELS.agentUpdateMemory, input, decodeMemory),
     deleteMemory: (input) => invokeAgent(IPC_CHANNELS.agentDeleteMemory, input, decodeVoid),
     clearMemories: (agentId) => invokeAgent(IPC_CHANNELS.agentClearMemories, agentId, decodeVoid),
+    listTables: () => invokeAgent(IPC_CHANNELS.sharedListTables, null, decodeTables),
+    deleteTable: (input) => invokeAgent(IPC_CHANNELS.sharedDeleteTable, input, decodeVoid),
     listRoutines: (agentId) => invokeAgent(IPC_CHANNELS.agentListRoutines, agentId, decodeRoutines),
     createRoutine: (input) => invokeAgent(IPC_CHANNELS.agentCreateRoutine, input, decodeRoutine),
     updateRoutine: (input) => invokeAgent(IPC_CHANNELS.agentUpdateRoutine, input, decodeRoutine),
@@ -1051,6 +1061,14 @@ const openbotApi: OpenBotDesktopApi = {
     capturePreview: (tabId) =>
       ipcRenderer.invoke(IPC_CHANNELS.browserCapturePreview, tabId).then(decodeBrowserPreviewFromMain),
     setVisible: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSetVisible, input),
+    startLiveView: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserStartLiveView, tabId),
+    stopLiveView: () => ipcRenderer.invoke(IPC_CHANNELS.browserStopLiveView),
+    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input),
+    onLiveViewEvent: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) => listener(event);
+      ipcRenderer.on(IPC_CHANNELS.browserLiveViewEvent, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.browserLiveViewEvent, handler);
+    },
     onDisplayState: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
       ipcRenderer.on(IPC_CHANNELS.browserDisplayStateEvent, handler);
@@ -1153,6 +1171,21 @@ const openbotApi: OpenBotDesktopApi = {
       const handler = (_event: Electron.IpcRendererEvent, inviteUrl: string) => listener(inviteUrl);
       ipcRenderer.on(IPC_CHANNELS.serversInvite, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversInvite, handler);
+    },
+  },
+  plugins: {
+    // The slug is checked again on arrival rather than trusted because it came from main. It began
+    // life in a URL a web page chose, and this is the last point before the renderer looks it up.
+    takePendingListing: async () => {
+      const slug = await ipcRenderer.invoke(IPC_CHANNELS.pluginsTakePendingListing);
+      return typeof slug === "string" && isPluginSlug(slug) ? slug : null;
+    },
+    onOpenListing: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, slug: unknown) => {
+        if (typeof slug === "string" && isPluginSlug(slug)) listener(slug);
+      };
+      ipcRenderer.on(IPC_CHANNELS.pluginsOpenListing, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.pluginsOpenListing, handler);
     },
   },
   host: {

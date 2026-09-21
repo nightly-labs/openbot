@@ -47,6 +47,11 @@ export class TeamWebRtcHostGateway {
     await Promise.all([...this.#peers.values()].map((peer) => peer.revokeSession(sessionId)));
   }
 
+  /** Whether any connected device has a file transfer moving right now, either direction. */
+  hasActiveTransfers(): boolean {
+    return [...this.#peers.values()].some((peer) => peer.hasActiveTransfers());
+  }
+
   dispose(): void {
     this.#hostId = null;
     this.#clearPeers();

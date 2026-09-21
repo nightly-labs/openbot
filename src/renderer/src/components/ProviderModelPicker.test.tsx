@@ -1,4 +1,4 @@
-import type { AgentModelOption, AgentStatus } from "@openbot/contracts/ipc";
+import type { AgentModelOption, AgentProviderStatus, AgentStatus } from "@openbot/contracts/ipc";
 import { fireEvent, render, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
@@ -219,6 +219,18 @@ const openCodeModels: AgentModelOption[] = [
   supportedReasoningEfforts: ["medium"],
 }));
 
+const openCodeBase: AgentProviderStatus = {
+  id: "opencode",
+  state: "not-installed",
+  version: "1.18.30",
+  message: null,
+  email: null,
+};
+
+function withOpenCodeProvider(overrides: Partial<AgentProviderStatus>): AgentProviderStatus[] {
+  return [...(agentStatus.providers ?? []), { ...openCodeBase, ...overrides }];
+}
+
 async function openOpenCodePicker() {
   const onChange = vi.fn();
   const [model, setModel] = createSignal("opencode/free/low");
@@ -277,16 +289,10 @@ it("shows the sign-in message and a Connect action when OpenCode lists no models
   const onConnect = vi.fn();
   const status: AgentStatus = {
     ...agentStatus,
-    providers: [
-      ...(agentStatus.providers ?? []),
-      {
-        id: "opencode",
-        state: "sign-in-required",
-        version: "1.18.30",
-        message: "OpenCode listed no model. Add an OpenCode Go key to continue.",
-        email: null,
-      },
-    ],
+    providers: withOpenCodeProvider({
+      state: "sign-in-required",
+      message: "OpenCode listed no model. Add an OpenCode Go key to continue.",
+    }),
   };
   const view = render(() => (
     <ProviderModelPicker
@@ -303,4 +309,34 @@ it("shows the sign-in message and a Connect action when OpenCode lists no models
   expect(dialog.getByRole("status")).toHaveTextContent("OpenCode listed no model.");
   await fireEvent.click(dialog.getByRole("button", { name: "Connect" }));
   expect(onConnect).toHaveBeenCalledWith("opencode");
+});
+
+// Main keeps the provider "connecting" for the whole install it wraps around a download, so this
+// is the state of every download this panel starts, and Cancel is the only way to stop one.
+it("keeps Cancel on a connecting provider while its download runs", async () => {
+  const onCancel = vi.fn();
+  const status: AgentStatus = {
+    ...agentStatus,
+    providers: withOpenCodeProvider({
+      state: "not-installed",
+      version: null,
+      connectionState: "connecting",
+    }),
+  };
+  const view = render(() => (
+    <ProviderModelPicker
+      provider="opencode"
+      value="opencode/free"
+      modelOptions={[]}
+      agentStatus={status}
+      runtimeStatuses={{ opencode: { phase: "downloading", progress: 40, message: null, version: null } }}
+      onCancelProviderDownload={onCancel}
+      onChange={vi.fn()}
+    />
+  ));
+  await fireEvent.click(view.getByRole("button", { name: /Agent model:/ }));
+  const dialog = within(view.getByRole("dialog", { name: "Choose agent model" }));
+  expect(dialog.getByRole("status")).toHaveTextContent("Downloading 40%");
+  await fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+  expect(onCancel).toHaveBeenCalledWith("opencode");
 });

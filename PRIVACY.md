@@ -197,7 +197,10 @@ provider logs are outside the OpenBot application database and its daily mainten
 
 - `~/OpenBot/Agents` contains one workspace per agent. A profile written by a release before the
   bot-to-agent rename holds them under `~/OpenBot/Bots`; the application moves them on first launch.
-- `~/OpenBot/Shared` contains managed transfers shared between agents.
+- `~/OpenBot/Shared` contains managed transfers shared between agents, and
+  `~/OpenBot/Shared/Data/agent-data.db` holds the records the agents keep for themselves between tasks.
+  Every agent on this computer can read and write every table in that file, and the user can delete any
+  table in agent settings.
 - `~/OpenBot/Downloads` contains files downloaded by the embedded browser.
 - `~/Library/Application Support/OpenBot` contains the OpenBot SQLite database, agent metadata,
   conversations, message queues, direct messages, reactions, read state, attachment drafts and
@@ -210,6 +213,10 @@ provider logs are outside the OpenBot application database and its daily mainten
   manage Codex credentials.
 - `~/.claude` is owned by Claude CLI and contains its login and session data. OpenBot does not copy
   or manage Claude credentials.
+- The MCP sign-ins are kept in `~/Library/Application Support/OpenBot`, encrypted by the operating
+  system's secret storage in the same way as provider API keys. One record per server address holds
+  the client registration and the access and refresh tokens. Removing the server in settings deletes
+  its record. These values are redacted from logs, exports and diagnostics.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. All agents share the embedded browser profile, including cookies and website sessions.
@@ -219,8 +226,9 @@ deleted. All agents share the embedded browser profile, including cookies and we
 When the owner publishes OpenBot, the app starts an authenticated Team API on a localhost port. The
 client and host use a separate OpenBot Signal service to establish WebRTC. Signal carries only
 short-lived authentication, SDP, and ICE messages. Team API data uses WebRTC DataChannels. Remote
-Desktop media and input use a separate WebRTC connection. ICE uses a direct peer-to-peer path when
-possible. If a direct path is not possible, encrypted WebRTC traffic uses an OpenBot coturn relay.
+Desktop media and input use a separate WebRTC connection. The live browser view sends compressed
+images of the host's browser tab, and the watching member's pointer and key input, over that same
+media connection. ICE uses a direct peer-to-peer path when possible. If a direct path is not possible, encrypted WebRTC traffic uses an OpenBot coturn relay.
 
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
@@ -236,8 +244,16 @@ Network traffic can also occur when:
 - a user or an agent visits a page in the embedded browser;
 - a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
 - a locally installed Codex plugin connects to its service;
+- an MCP server the user enabled is reached at its own address, and, when that server asks for a
+  sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
+  the grant the browser returns, and to renew the token. Nothing about the user's agents,
+  conversations or files is sent in those requests;
 - an installed build checks GitHub Releases for updates;
 - a user opens an explicitly labeled external support or setup link.
+
+Plugin pages on openbot.run show each listing's own icon. The page asks `openbot.run` for that
+picture, and the website fetches it there from the address the plugin catalog holds, so reading a
+plugin page does not connect your browser to the plugin developer's servers.
 
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
@@ -268,7 +284,7 @@ counts. It contains no conversations, visited URLs, account email, file contents
 
 Quit OpenBot, then remove the OpenBot folders listed above. Removing
 `~/Library/Application Support/OpenBot` also removes the embedded browser's cookies and logins.
-Removing `~/OpenBot` removes agent workspaces, transfers, and downloads. OpenBot does not delete
+Removing `~/OpenBot` removes agent workspaces, transfers, downloads, and the records the agents kept. OpenBot does not delete
 `~/.codex` or `~/.claude`; use each CLI's own controls if you also want to remove its local data.
 
 Review folders before deleting them and keep a backup of anything you need.
@@ -335,3 +351,20 @@ local application storage. This lets it recover the held draft after restart. Ne
 releases the host hold merely because the editor closes or disconnects. The host also preserves
 attachment drafts released by edit cancellation or message deletion until they are sent or
 discarded. This lets a disconnected desktop recover its saved composer backup after host restart.
+
+## Optional macOS Host Manager
+
+An administrator can install a local Host Manager for several native macOS users. It reads only
+registered UIDs, process IDs, application versions, restart readiness, timestamps, and health
+booleans through separate local status directories. It does not read or back up tenant homes,
+workspaces, databases, provider directories, browser data, or conversations. It requests release
+metadata and application downloads from the fixed OpenBot GitHub repository; those requests
+expose the host's network address to GitHub. It sends no tenant status or tenant content to GitHub.
+
+The separate, optional administrator account-setup command creates new local Standard users and
+empty private homes. It saves generated login passwords in a root-only file under
+`/private/var/root` for the administrator to retrieve. It does not transmit those credentials or
+include them in logs. The installed administrator CLI shows each password once on the controlling terminal after setup,
+then removes the recovery file. A failed setup retains that root-only file for administrator recovery.
+The administrator controls secure password delivery. Host verification reads home metadata only
+and tests cross-user access using harmless temporary files outside tenant homes.

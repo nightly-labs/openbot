@@ -20,7 +20,6 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
     startChatDragging,
   } = useSidebarScope();
   const title = () => rowProps.agent.title.trim();
-  const working = () => props.agentStates[rowProps.agent.id]?.kind === "working";
   return (
     /* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */
     <div
@@ -56,10 +55,8 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
           }}
         >
           <span class="agent-row-avatar">
-            <AgentAvatar agent={rowProps.agent} motion={working() ? "working" : "idle"} />
-            <Show when={props.agentStates[rowProps.agent.id]}>
-              {(state) => <SidebarAgentIndicator state={state()} />}
-            </Show>
+            <AgentAvatar agent={rowProps.agent} motion="idle" mood={props.agentMoods[rowProps.agent.id] ?? "idle"} />
+            <SidebarAgentIndicator state={() => props.agentStates[rowProps.agent.id]} />
           </span>
           <span class="agent-row-copy">
             <span class="agent-row-heading">

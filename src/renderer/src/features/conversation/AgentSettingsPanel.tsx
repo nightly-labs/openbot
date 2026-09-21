@@ -12,7 +12,7 @@ import type {
   ProviderRuntimeStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, onCleanup, onSettled, Show } from "solid-js";
 import { normalizeAvatarFile } from "../../avatar-image";
 import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "../../bloub-avatar";
 import { ProviderModelPicker, reasoningLabel } from "../../components/ProviderModelPicker";
@@ -45,6 +45,7 @@ import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRout
 import { AgentSkillsModal, type AgentSkillsMode, userAssignedSkills } from "./AgentSkillsModal";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
+import { SharedTablesModal } from "./SharedTablesModal";
 
 export interface AgentRuntimeSettings {
   provider: AgentProviderId;
@@ -83,12 +84,18 @@ interface AgentSettingsPanelProps {
   onOpenRoutineRun?: (messageId: string) => void;
   skillsMode?: AgentSkillsMode;
   skillsMarketplaceOpen?: boolean;
+  /** The shared data lives on the computer that runs the agents, so a remote server hides it. */
+  tablesVisible?: boolean;
+  /** Names the agent that keeps each set of records. Threaded like `customProviders`, for the same reason. */
+  agents?: readonly AgentProfile[];
   onCreateSkill?: () => void;
   onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
 }
 
 export type { AgentSkillsMode };
+
+const INSTRUCTIONS_SAVE_DELAY_MS = 400;
 
 /** The three free-text fields of the panel, each with a flag for edits made since the last save. */
 interface AgentTextFields {
@@ -115,12 +122,20 @@ interface AgentSettingsDraft {
   avatar: AvatarEditor;
   dirty: Record<keyof AgentTextFields, boolean>;
   fields: AgentTextFields;
+  tables: { count: number; open: boolean };
   memories: { count: number; open: boolean };
   notifications: boolean;
   routines: { count: number; open: boolean };
   skills: { count: number; open: boolean; reopenAfterMarketplace: boolean };
   runtime: AgentRuntimeSettings;
   saveError: string | null;
+}
+
+interface TextSaveRequest {
+  agentId: string;
+  draftValue: string;
+  field: keyof AgentTextFields;
+  storedValue: string;
 }
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
@@ -136,6 +151,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     },
     dirty: { description: false, name: false, title: false },
     fields: { description: "", name: "", title: "" },
+    tables: { count: 0, open: false },
     memories: { count: 0, open: false },
     notifications: true,
     routines: { count: 0, open: false },
@@ -169,6 +185,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   let avatarFileInput: HTMLInputElement | undefined;
   let lastSignature: string | undefined;
   let lastAgentId: string | undefined;
+  // Instructions save while the field remains focused. One queue also keeps blur, panel-close and
+  // agent-change saves ordered, so an older completion cannot declare a newer draft clean.
+  let instructionsSaveTimer: ReturnType<typeof setTimeout> | undefined;
+  let activeTextSave: TextSaveRequest | null = null;
+  let disposed = false;
+  const pendingTextSaves = new Map<string, TextSaveRequest>();
 
   createEffect(
     () => panelWidth(),
@@ -201,6 +223,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     ({ agent, runtimeSettings, signature }) => {
       if (signature === lastSignature) return;
       const agentChanged = agent.id !== lastAgentId;
+      if (agentChanged && lastAgentId) flushDirtyTextFields(lastAgentId);
       // A field the user has edited keeps its draft, unless this is a different agent, whose values
       // replace the panel wholesale. Read before the write, so a fresh agent clears the flags here.
       const keep = {
@@ -229,6 +252,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.avatar.candidateSeed = agent.avatarSeed;
           state.avatar.batch = 0;
           state.avatar.pickerOpen = false;
+          state.tables.open = false;
           state.memories.open = false;
           state.routines.open = false;
           state.skills.open = false;
@@ -236,6 +260,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         }
       });
       if (agentChanged) {
+        void window.openbot.agent
+          .listTables()
+          .catch(() => [])
+          .then((items) => {
+            setDraft((state) => {
+              state.tables.count = items.length;
+            });
+          });
         void window.openbot.agent
           .listMemories(agent.id)
           .catch(() => [])
@@ -325,14 +357,109 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return () => window.removeEventListener("pointerdown", closeAvatarPicker);
   });
 
-  async function saveAgentPatch(updates: Omit<UpdateAgentInput, "agentId">): Promise<boolean> {
-    setSaveError(null);
+  onCleanup(() => {
+    if (lastAgentId) flushDirtyTextFields(lastAgentId);
+    disposed = true;
+  });
+
+  async function saveAgentPatch(
+    updates: Omit<UpdateAgentInput, "agentId">,
+    agentId = props.agent.id,
+  ): Promise<boolean> {
+    if (!disposed && props.agent.id === agentId) setSaveError(null);
     try {
-      await props.onUpdateAgent(props.agent.id, updates);
+      await props.onUpdateAgent(agentId, updates);
       return true;
     } catch (error) {
-      setSaveError(errorMessage(error, "Could not save agent settings."));
+      if (!disposed && props.agent.id === agentId) {
+        setSaveError(errorMessage(error, "Could not save agent settings."));
+      }
       return false;
+    }
+  }
+
+  function textSaveRequest(
+    field: keyof AgentTextFields,
+    agentId: string,
+    draftValue = draft.fields[field],
+  ): TextSaveRequest {
+    return {
+      agentId,
+      draftValue,
+      field,
+      storedValue:
+        field === "name" ? draftValue.trim() || "New agent" : field === "title" ? draftValue.trim() : draftValue,
+    };
+  }
+
+  function textSaveKey(request: TextSaveRequest): string {
+    return `${request.agentId}\u0000${request.field}`;
+  }
+
+  function textSavePatch(request: TextSaveRequest): Omit<UpdateAgentInput, "agentId"> {
+    switch (request.field) {
+      case "name":
+        return { name: request.storedValue };
+      case "title":
+        return { title: request.storedValue };
+      case "description":
+        return { description: request.storedValue };
+    }
+  }
+
+  function queueTextSave(request: TextSaveRequest): void {
+    if (
+      activeTextSave?.agentId === request.agentId &&
+      activeTextSave.field === request.field &&
+      activeTextSave.draftValue === request.draftValue
+    ) {
+      return;
+    }
+    pendingTextSaves.set(textSaveKey(request), request);
+    void drainTextSaves();
+  }
+
+  async function drainTextSaves(): Promise<void> {
+    if (activeTextSave) return;
+    const entry = pendingTextSaves.entries().next().value;
+    if (!entry) return;
+    const [key, request] = entry;
+    pendingTextSaves.delete(key);
+    activeTextSave = request;
+    const saved = await saveAgentPatch(textSavePatch(request), request.agentId);
+    if (
+      !disposed &&
+      saved &&
+      props.agent.id === request.agentId &&
+      draft.fields[request.field] === request.draftValue
+    ) {
+      setDraft((state) => {
+        state.dirty[request.field] = false;
+      });
+    }
+    activeTextSave = null;
+    if (pendingTextSaves.size > 0) void drainTextSaves();
+  }
+
+  function cancelInstructionsSaveTimer(): void {
+    if (instructionsSaveTimer === undefined) return;
+    clearTimeout(instructionsSaveTimer);
+    instructionsSaveTimer = undefined;
+  }
+
+  function scheduleInstructionsSave(value: string): void {
+    cancelInstructionsSaveTimer();
+    const request = textSaveRequest("description", props.agent.id, value);
+    instructionsSaveTimer = setTimeout(() => {
+      instructionsSaveTimer = undefined;
+      queueTextSave(request);
+    }, INSTRUCTIONS_SAVE_DELAY_MS);
+  }
+
+  function flushDirtyTextFields(agentId: string): void {
+    cancelInstructionsSaveTimer();
+    for (const field of ["name", "title", "description"] as const) {
+      if (draft.dirty[field]) queueTextSave(textSaveRequest(field, agentId));
     }
   }
 
@@ -355,45 +482,24 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   function saveName(): void {
-    const agentId = props.agent.id;
     const value = draft.fields.name.trim() || "New agent";
     setDraft((state) => {
       state.fields.name = value;
     });
-    void saveAgentPatch({ name: value }).then((saved) => {
-      if (saved && props.agent.id === agentId && draft.fields.name === value) {
-        setDraft((state) => {
-          state.dirty.name = false;
-        });
-      }
-    });
+    queueTextSave(textSaveRequest("name", props.agent.id));
   }
 
   function saveTitle(): void {
-    const agentId = props.agent.id;
     const value = draft.fields.title.trim();
     setDraft((state) => {
       state.fields.title = value;
     });
-    void saveAgentPatch({ title: value }).then((saved) => {
-      if (saved && props.agent.id === agentId && draft.fields.title === value) {
-        setDraft((state) => {
-          state.dirty.title = false;
-        });
-      }
-    });
+    queueTextSave(textSaveRequest("title", props.agent.id));
   }
 
   function saveDescription(): void {
-    const agentId = props.agent.id;
-    const value = draft.fields.description;
-    void saveAgentPatch({ description: value }).then((saved) => {
-      if (saved && props.agent.id === agentId && draft.fields.description === value) {
-        setDraft((state) => {
-          state.dirty.description = false;
-        });
-      }
-    });
+    cancelInstructionsSaveTimer();
+    queueTextSave(textSaveRequest("description", props.agent.id));
   }
 
   async function setCustomAvatar(image: AvatarImageInput | null): Promise<boolean> {
@@ -717,12 +823,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               aria-label="Agent instructions"
               placeholder="What this agent is for"
               maxlength={INPUT_LIMITS.agentDescription}
-              onValueChange={(value) =>
+              onValueChange={(value) => {
                 setDraft((state) => {
                   state.fields.description = value;
                   state.dirty.description = true;
-                })
-              }
+                });
+                scheduleInstructionsSave(value);
+              }}
               onBlur={saveDescription}
             />
           </SettingsField>
@@ -744,6 +851,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 onClick={() =>
                   setDraft((state) => {
                     state.skills.open = true;
+                  })
+                }
+              />
+            </Show>
+            <Show when={props.tablesVisible !== false}>
+              <SettingsLinkRow
+                label="Tables"
+                value={`${draft.tables.count} ${draft.tables.count === 1 ? "table" : "tables"}`}
+                onClick={() =>
+                  setDraft((state) => {
+                    state.tables.open = true;
                   })
                 }
               />
@@ -869,6 +987,22 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             onOpenRun={props.onOpenRoutineRun}
           />
         </div>
+      </Show>
+      <Show when={props.tablesVisible !== false}>
+        <SharedTablesModal
+          agents={props.agents ?? []}
+          open={draft.tables.open}
+          onOpenChange={(open) =>
+            setDraft((state) => {
+              state.tables.open = open;
+            })
+          }
+          onCountChange={(count) =>
+            setDraft((state) => {
+              state.tables.count = count;
+            })
+          }
+        />
       </Show>
       <AgentMemoriesModal
         port={memoriesPort()}

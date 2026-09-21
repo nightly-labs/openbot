@@ -3,6 +3,7 @@ import { Link } from "@tanstack/solid-router";
 import { For } from "solid-js";
 import { CONTENT_COLLECTIONS } from "../../lib/content";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
+import { PLUGIN_INDEX_ROUTE } from "../../lib/plugins";
 import { Button, ButtonLink } from "../ui/button";
 
 // The same header as the landing page. The collection links come from the one
@@ -26,6 +27,9 @@ export function ContentHeader() {
             </Link>
           )}
         </For>
+        <Link class="landing-header-link" to={PLUGIN_INDEX_ROUTE}>
+          Plugins
+        </Link>
         <Button
           href={OPENBOT_LINKS.contact}
           target="_blank"

@@ -9,6 +9,7 @@ const preview = {
   role: "member" as const,
   expiresAt: "2026-08-21T10:00:00.000Z",
   emailBound: false,
+  permanent: false,
 };
 
 const args: Parameters<typeof JoinServerDialog>[0] = {

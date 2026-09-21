@@ -42,6 +42,7 @@ export function ConversationComposer() {
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
+    mcpServers,
     editQueuedMessage,
     editingDeliveryId,
     editingPendingSave,
@@ -87,6 +88,9 @@ export function ConversationComposer() {
   const signInRequired = createMemo(() => {
     const provider = props.agent?.provider;
     if (!provider || !props.onSignInProvider) return null;
+    // OpenCode is signed in by pasting a key in settings, not by a login this button can start, so
+    // its notice would carry a button that does nothing. Every other provider opens its own OAuth.
+    if (provider === "opencode") return null;
     const status = props.agentStatus.providers?.find((item) => item.id === provider);
     return status?.state === "sign-in-required" ? status : null;
   });
@@ -103,6 +107,7 @@ export function ConversationComposer() {
     const provider = props.agent?.provider;
     if (!provider || signInRequired()) return null;
     for (const limit of props.accountUsage?.limits ?? []) {
+      if (limit.id !== provider) continue;
       for (const plan of [limit.primary, limit.secondary]) {
         if (!plan || plan.usedPercent < 100) continue;
         if (plan.resetsAt !== null && plan.resetsAt * 1_000 <= now()) continue;
@@ -263,6 +268,7 @@ export function ConversationComposer() {
               agentId={props.agent?.id}
               agents={props.agents}
               skills={installedSkills()}
+              mcpServers={mcpServers()}
               attachments={currentDraft().attachments}
               value={currentDraft().text}
               disabled={

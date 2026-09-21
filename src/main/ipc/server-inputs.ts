@@ -109,9 +109,13 @@ export function parseCreateTeamInvite(value: unknown): CreateTeamInviteInput {
   if (isString(value.email) && value.email.length > INPUT_LIMITS.email) {
     throw new Error("Invitation email is too long.");
   }
+  if (value.permanent !== undefined && !isBoolean(value.permanent)) {
+    throw new Error("Invalid permanent invitation flag.");
+  }
   return {
     role: value.role,
     ...(value.email?.trim() ? { email: value.email.trim() } : {}),
+    ...(value.permanent === true ? { permanent: true as const } : {}),
   };
 }
 

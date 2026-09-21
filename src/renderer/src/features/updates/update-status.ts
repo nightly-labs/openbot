@@ -7,11 +7,14 @@ export interface UpdateStatusPresentation {
   busy: boolean;
   detail: string;
   supported: boolean;
+  /** The host installs updates for every tenant: status stays visible, actions stay disabled. */
+  managed: boolean;
 }
 
 export function presentUpdateStatus(status: UpdateStatus): UpdateStatusPresentation {
   const available = isUpdateActivePhase(status.phase);
   const busy = isUpdateBusyPhase(status.phase);
+  const managed = status.managedByHost === true;
   let actionLabel = "Check for updates";
 
   switch (status.phase) {
@@ -45,10 +48,11 @@ export function presentUpdateStatus(status: UpdateStatus): UpdateStatusPresentat
   else if (status.currentVersion) detail = `v${status.currentVersion}`;
 
   return {
-    actionLabel,
+    actionLabel: managed ? "Managed by host" : actionLabel,
     available,
     busy,
     detail,
     supported: status.phase !== "unsupported",
+    managed,
   };
 }

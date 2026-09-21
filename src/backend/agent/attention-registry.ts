@@ -35,7 +35,7 @@ import {
   browserTakeoverResult,
   commandText,
   dynamicPromptResult,
-  mcpElicitationQuestion,
+  mcpElicitationQuestions,
   mcpElicitationResult,
   promptQuestions,
   promptResolution,
@@ -522,8 +522,8 @@ export class AttentionRegistry {
     const turnId = getString(request.params, "turnId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
     const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
-    const question = mcpElicitationQuestion(request.params);
-    if (!threadId || !turnId || !agentId || !publicThreadId || !question) {
+    const questions = mcpElicitationQuestions(request.params);
+    if (!threadId || !turnId || !agentId || !publicThreadId || !questions) {
       client.respond(request.id, { action: "decline", content: null, _meta: null });
       this.#emitError(
         "mcp_safety_handoff",
@@ -533,7 +533,6 @@ export class AttentionRegistry {
       return;
     }
 
-    const questions = [question];
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
     this.#prompts.set(request.id, {
       client,

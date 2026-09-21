@@ -18,6 +18,7 @@ import {
   TriangleAlert,
 } from "../../components/ui";
 import type { AgentProfile } from "../../data";
+import BrowserLiveView from "../browser/BrowserLiveView";
 import {
   BrowserBackIcon,
   BrowserControlIcon,
@@ -71,6 +72,8 @@ interface BrowserPanelProps {
   onActivateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onSurface: (element: HTMLDivElement | undefined) => void;
+  /** The tab to draw here, for a host whose browser is not a view on this screen. Local: `null`. */
+  liveViewTabId: string | null;
   onBack: () => void;
   onEnterPip: () => void;
   /**
@@ -114,6 +117,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
 
   const surface = () => (
     <div class="browser-surface" ref={(element) => (surfaceElement = element)}>
+      <Show when={props.liveViewTabId}>{(tabId) => <BrowserLiveView tabId={tabId()} active={props.open} />}</Show>
       <Show when={props.tabs.length === 0}>
         <div class="browser-empty-state">
           <strong>Open a page</strong>

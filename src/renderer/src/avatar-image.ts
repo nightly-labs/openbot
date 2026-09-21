@@ -27,7 +27,7 @@ export async function normalizeAvatarFile(file: File): Promise<AvatarImageInput>
   throw new Error("OpenBot could not make this image small enough. Choose a simpler image.");
 }
 
-export function avatarCrop(width: number, height: number): { sourceX: number; sourceY: number; sourceSize: number } {
+function avatarCrop(width: number, height: number): { sourceX: number; sourceY: number; sourceSize: number } {
   const sourceSize = Math.min(width, height);
   return {
     sourceX: Math.max(0, (width - sourceSize) / 2),

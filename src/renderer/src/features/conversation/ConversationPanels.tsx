@@ -1,4 +1,5 @@
 import { usePlatform } from "../../platform";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useSettings } from "../settings/settings-context";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
@@ -169,6 +170,11 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             onActivateTab={activateBrowserTab}
             onCloseTab={(tabId) => void closeBrowserTab(tabId)}
             onSurface={setBrowserSurfaceElement}
+            liveViewTabId={
+              props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view")
+                ? (activeBrowserTab()?.id ?? null)
+                : null
+            }
             onBack={() => setActiveRightPanel("browser")}
             onEnterPip={showBrowserPip}
           />
@@ -182,6 +188,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
               skillsMarketplaceOpen={skillsMarketplaceOpen()}
               onAddFromMarketplace={props.server?.kind === "local" ? () => setSkillsMarketplaceOpen(true) : undefined}
               skillsMode={props.server?.kind === "local" ? "mutable" : "readonly"}
+              tablesVisible={props.server?.kind === "local"}
+              agents={props.agents}
               onCreateSkill={
                 props.server?.kind === "local" &&
                 agentReady() &&

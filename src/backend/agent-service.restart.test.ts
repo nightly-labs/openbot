@@ -1,4 +1,4 @@
-import { type AgentEvent, isAgentEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import { type AgentEvent, type BrowserTab, isAgentEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -6,6 +6,7 @@ import {
   createFakeClaude,
   createTestService,
   FakeAgentClient,
+  fakeBrowser,
   firstInputText,
   nextRoutinesChanged,
   notification,
@@ -16,6 +17,15 @@ import {
   waitFor,
 } from "./agent-service-test-harness";
 import { getString } from "./protocol";
+
+const browserTab = (id: string, ownerAgentId: string | null, ownerThreadId: string | null): BrowserTab => ({
+  id,
+  title: id,
+  url: `https://example.com/${id}`,
+  loading: false,
+  ownerThreadId,
+  ownerAgentId,
+});
 
 let root: string;
 let logPath: string;
@@ -136,6 +146,53 @@ describe.sequential("AgentService: restart", () => {
     expect(recovered.messages.find((message) => message.questionPrompt)?.questionPrompt?.resolution).toEqual({
       status: "expired",
     });
+  });
+
+  it("reads a stored session with the workspace an ACP agent needs to load it", async () => {
+    const { store } = stores(root);
+    await store.initialize();
+    await store.getOrCreate("chief");
+    const threadId = await store.ensureThreadId("chief");
+    store.bindProviderSession("chief", "ses_stored");
+    const local = {
+      id: "local-message",
+      author: "user" as const,
+      text: "Keep this local message",
+      createdAt: "2026-08-01T12:00:00.000Z",
+      status: "completed" as const,
+    };
+    store.database.persistConversation(
+      { agentId: "chief", threadId, activeTurnId: null, revision: 0, messages: [local] },
+      "test.saved-before-restart",
+    );
+    store.database.close();
+
+    const events: AgentEvent[] = [];
+    const restored = stores(root);
+    service = createTestService({
+      store: restored.store,
+      mailbox: restored.mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        // An ACP session lives in the agent process alone, so a read answers only for a session the
+        // client can load - which it cannot do without the workspace the session belongs to.
+        client.threadRead = (params) => {
+          if (!getString(params, "cwd")) throw new Error(`Unknown ACP session: ${getString(params, "threadId")}`);
+          return { thread: { id: getString(params, "threadId"), turns: [] } };
+        };
+        return client;
+      },
+    });
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+
+    // The banner above the composer is what a failed read costs the user at every start.
+    await waitFor(async () => (await service?.readConversation("chief"))?.messages.length === 1);
+    expect(events.some((event) => event.type === "error" && event.code === "provider_history_backfill_pending")).toBe(
+      false,
+    );
+    expect((await service.readConversation("chief")).messages).toEqual([expect.objectContaining(local)]);
   });
 
   it("recovers history from sessions retired by an upgrade and retries failed reads without losing local messages", async () => {
@@ -664,5 +721,49 @@ describe.sequential("AgentService: restart", () => {
     await service.initialize();
 
     expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toHaveLength(1);
+  });
+  it("closes a deleted agent's browser tabs and leaves another agent's tabs open", async () => {
+    const { store, mailbox } = stores(root);
+    const tabs: BrowserTab[] = [];
+    const closed: string[] = [];
+    const browser = fakeBrowser(tabs);
+    browser.close = async (tabId: string) => {
+      closed.push(tabId);
+    };
+    service = createTestService({ store, mailbox, browser });
+    await service.initialize();
+    const deleted = await store.getOrCreate("tab-owner");
+    const kept = await store.getOrCreate("tab-keeper");
+    // A fresh agent holds no thread until its first turn, and the legacy owner rule matches on the
+    // thread id, so give both agents one.
+    const deletedThreadId = store.ensureThreadIdNow(deleted.id);
+    const keptThreadId = store.ensureThreadIdNow(kept.id);
+    tabs.push(
+      browserTab("tab-owned", deleted.id, deletedThreadId),
+      // A tab from a build that stored only the thread id. The renderer still groups it under this
+      // agent, so deleting the agent has to take it too.
+      browserTab("tab-legacy", null, deletedThreadId),
+      browserTab("tab-other", kept.id, keptThreadId),
+    );
+
+    await service.deleteAgent(deleted.id);
+
+    expect(closed).toEqual(["tab-owned", "tab-legacy"]);
+  });
+
+  it("still deletes the agent when closing one of its browser tabs fails", async () => {
+    const { store, mailbox } = stores(root);
+    const tabs: BrowserTab[] = [];
+    const browser = fakeBrowser(tabs);
+    browser.close = async () => {
+      throw new Error("could not close");
+    };
+    service = createTestService({ store, mailbox, browser });
+    await service.initialize();
+    const agent = await store.getOrCreate("tab-close-failure");
+    tabs.push(browserTab("tab-stuck", agent.id, store.ensureThreadIdNow(agent.id)));
+
+    await expect(service.deleteAgent(agent.id)).resolves.toBeUndefined();
+    expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(false);
   });
 });

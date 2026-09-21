@@ -58,6 +58,7 @@ export interface InvitePreview {
   role: Exclude<TeamRole, "owner">;
   expiresAt: string;
   emailBound: boolean;
+  permanent: boolean;
 }
 
 export interface LoginServerInput {
@@ -337,6 +338,8 @@ export interface InviteSummary {
   usedAt: string | null;
   inviteUrl: string;
   email: string | null;
+  permanent: boolean;
+  useCount: number;
 }
 
 export interface TeamInviteSummary {
@@ -345,11 +348,14 @@ export interface TeamInviteSummary {
   expiresAt: string;
   usedAt: string | null;
   email: string | null;
+  permanent: boolean;
+  useCount: number;
 }
 
 export interface CreateTeamInviteInput {
   role: Exclude<TeamRole, "owner">;
   email?: string;
+  permanent?: boolean;
 }
 
 export interface TeamSessionSummary {

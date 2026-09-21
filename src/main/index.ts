@@ -7,6 +7,7 @@ import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-direct
 import { app, BrowserWindow, dialog, powerMonitor, protocol, screen } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
+import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
 import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
@@ -15,6 +16,7 @@ import {
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
+import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
@@ -30,8 +32,10 @@ import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
+import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
+import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
 import { skillIpcHandlers } from "./ipc/skill-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
@@ -147,8 +151,22 @@ let isQuitting = false;
 let shutdownStarted = false;
 let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
-let pendingInviteUrl: string | null = findInviteUrl(process.argv);
-let inviteReceiverReady = false;
+/**
+ * The link kinds a renderer is ever told about.
+ *
+ * `mcp-auth` is not one of them. It carries an OAuth grant for an MCP server, which is a secret,
+ * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
+ * answered by the sign-in that started it, and there is no such sign-in before the app is running.
+ */
+type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" }>;
+
+// One link at a time, of whichever kind: a second replaces the first, because what a user opened
+// last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
+// tells a link that arrives now to be sent rather than held.
+let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(
+  findDeepLink(process.argv, developmentInviteLinkOptions),
+);
+let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
 
@@ -208,7 +226,7 @@ const windows = createMainWindowController({
   getServices: () => services,
   forwardAgentEvent,
   onRendererLoadStarted: () => {
-    inviteReceiverReady = false;
+    deepLinkReceiverReady = false;
   },
   onMainWindowCreated: attachWindowsSessionEndHandlers,
   reportError: (message, error) => logger.error(message, toLogValue(error)),
@@ -261,6 +279,7 @@ function registerIpcHandlers({
   mailbox,
   browser,
   browserPictureInPicture,
+  browserView,
   updater,
   setupFile,
   analyticsPreferenceFile,
@@ -318,21 +337,26 @@ function registerIpcHandlers({
       host,
       remoteDesktop,
       remoteServers,
-      takePendingInvite: () => {
-        inviteReceiverReady = true;
-        const inviteUrl = pendingInviteUrl;
-        pendingInviteUrl = null;
-        return inviteUrl;
-      },
+      takePendingInvite: () => takePendingDeepLink("invite"),
+    }),
+    ...pluginIpcHandlers({
+      takePendingPluginSlug: () => takePendingDeepLink("plugin"),
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
+    ...sharedTableIpcHandlers({ service }),
     ...routineIpcHandlers({ service, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
-    ...mcpServerIpcHandlers({ service, remoteServers }),
+    ...mcpServerIpcHandlers({
+      service,
+      remoteServers,
+      startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
+      ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
+      toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+    }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
-    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers }),
+    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView }),
   });
 }
 
@@ -416,44 +440,62 @@ function forwardCentralAuth(state: CentralAuthState): void {
   sendToRenderer(window, IPC_CHANNELS.authEvent, state);
 }
 
-function acceptInviteUrl(value: string): void {
-  try {
-    parseInviteUrl(value, developmentInviteLinkOptions);
-  } catch {
+/**
+ * Holds the link, and hands it over when there is a window listening for that kind.
+ *
+ * A link the renderer never received stays pending rather than being dropped, which is what makes a
+ * cold start work: the window that the link itself opened asks for it once it is ready.
+ */
+function acceptDeepLink(link: DeepLink): void {
+  if (link.kind === "mcp-auth") {
+    receiveMcpAuthorizationCode(link.state, link.code);
     return;
   }
-  pendingInviteUrl = value;
+  pendingDeepLink = link;
   const window = windowHolder.current;
-  if (window && !window.isDestroyed() && inviteReceiverReady) {
-    showMainWindow(window);
-    if (sendToRenderer(window, IPC_CHANNELS.serversInvite, value)) pendingInviteUrl = null;
-  }
+  if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
+  showMainWindow(window);
+  const delivered =
+    link.kind === "invite"
+      ? sendToRenderer(window, IPC_CHANNELS.serversInvite, link.url)
+      : sendToRenderer(window, IPC_CHANNELS.pluginsOpenListing, link.slug);
+  if (delivered) pendingDeepLink = null;
 }
 
-function acceptOpenbotUrl(value: string): void {
-  acceptInviteUrl(value);
+/**
+ * The pending link, if it is the kind that asked. Either request marks the receiver ready, because
+ * the renderer subscribes to both before it asks for either.
+ */
+function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
+  deepLinkReceiverReady = true;
+  const link = pendingDeepLink;
+  if (link?.kind !== kind) return null;
+  pendingDeepLink = null;
+  return link.kind === "invite" ? link.url : link.slug;
 }
 
-function findInviteUrl(values: string[]): string | null {
-  for (const value of values) {
-    try {
-      parseInviteUrl(value, developmentInviteLinkOptions);
-      return value;
-    } catch {
-      // Most command-line arguments are not invitations.
-    }
-  }
-  return null;
+/** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
+function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
+  return link && link.kind !== "mcp-auth" ? link : null;
+}
+
+/**
+ * Hands one MCP sign-in the grant it is waiting for, and shows the window that asked for it.
+ *
+ * The grant travels no further. A `state` this run did not start finds no sign-in and does nothing,
+ * which is what makes a forged or replayed link inert - so an unknown one raises no window either.
+ */
+function receiveMcpAuthorizationCode(state: string, code: string): void {
+  if (!services?.mcpOAuth.receiveAuthorizationCode(state, code)) return;
+  const window = windowHolder.current;
+  if (window && !window.isDestroyed()) showMainWindow(window);
 }
 
 app.on("open-url", (event, url) => {
-  try {
-    parseInviteUrl(url, developmentInviteLinkOptions);
-  } catch {
-    return;
-  }
+  const link = parseDeepLink(url, developmentInviteLinkOptions);
+  if (!link) return;
   event.preventDefault();
-  acceptOpenbotUrl(url);
+  acceptDeepLink(link);
 });
 
 app.on("continue-activity", (event, type, _userInfo, details) => {
@@ -464,7 +506,7 @@ app.on("continue-activity", (event, type, _userInfo, details) => {
     return;
   }
   event.preventDefault();
-  acceptInviteUrl(details.webpageURL);
+  acceptDeepLink({ kind: "invite", url: details.webpageURL });
 });
 
 if (!hasSingleInstanceLock) {
@@ -472,8 +514,8 @@ if (!hasSingleInstanceLock) {
   process.exit(0);
 } else {
   app.on("second-instance", (_event, argv) => {
-    const deepLink = findInviteUrl(argv);
-    if (deepLink) acceptOpenbotUrl(deepLink);
+    const deepLink = findDeepLink(argv, developmentInviteLinkOptions);
+    if (deepLink) acceptDeepLink(deepLink);
     const window = windowHolder.current;
     if (!window || window.isDestroyed()) return;
     showMainWindow(window);
@@ -482,6 +524,10 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
+      if (!(await hostAllowsTenantLaunch())) {
+        app.quit();
+        return;
+      }
       await ensureMacApplicationPresence(
         process.platform,
         (policy) => app.setActivationPolicy(policy),
@@ -562,6 +608,11 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directTyping", forwardDirectTyping);
       updater.on("status", forwardUpdateStatus);
       updater.start();
+      // Each tenant quits only itself. The host verifies process exit independently.
+      built.hostUpdateCoordinator.setStopHandler(async () => {
+        await prepareForUpdateInstall();
+        app.quit();
+      });
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);

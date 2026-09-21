@@ -1,7 +1,8 @@
 import { fileURLToPath } from "node:url";
 import solidPlugin from "@solidjs/vite-plugin";
 import { configDefaults, defineConfig } from "vitest/config";
-import { NODE_TEST_TIMEOUT_MS } from "./src/backend/test-deadlines";
+import { TEST_TIMEOUT_MS } from "./src/backend/test-deadlines";
+import BalancedSequencer from "./tools/vitest/balanced-sequencer";
 
 export default defineConfig({
   plugins: [solidPlugin()],
@@ -15,6 +16,9 @@ export default defineConfig({
     // Every spy, global patch and fake timer a test file installs is undone
     // after each test, in both projects, so nothing depends on file order.
     restoreMocks: true,
+    // Only `shard()` is overridden, so a local run orders files exactly as before. See the
+    // sequencer for why `--shard` alone splits this suite badly.
+    sequence: { sequencer: BalancedSequencer },
     onConsoleLog(log) {
       // Solid 2 RC dependencies still emit this dev-only diagnostic while
       // their components initialize. Keep other console output visible.
@@ -42,7 +46,7 @@ export default defineConfig({
           // Strictly longer than the harness deadline, so a stalled wait fails
           // with the predicate that never held rather than with vitest's
           // generic "test timed out" - see src/backend/test-deadlines.ts.
-          testTimeout: NODE_TEST_TIMEOUT_MS,
+          testTimeout: TEST_TIMEOUT_MS,
           // The file name routes the file, so the project is never a decision:
           // `*.test.ts` runs here without a DOM, `*.test.tsx` needs JSX and
           // gets jsdom, and `*.dom.test.ts` is the narrow case of needing a DOM
@@ -54,6 +58,7 @@ export default defineConfig({
             "src/preload/**/*.test.ts",
             "src/renderer/**/*.test.ts",
             "scripts/**/*.test.ts",
+            "packages/brand/**/*.test.ts",
             "packages/contracts/**/*.test.ts",
             "packages/i18n/**/*.test.ts",
             "packages/logging/**/*.test.ts",
@@ -76,6 +81,10 @@ export default defineConfig({
           // faster option is not used here.
           pool: "vmThreads",
           environment: "jsdom",
+          // Strictly longer than the DOM wait deadline, for the reason the node
+          // project states: a slow runner should fail with the query that never
+          // matched, not with vitest's generic "test timed out".
+          testTimeout: TEST_TIMEOUT_MS,
           // The `*.dom.test.ts` half of the include mirrors the node project's exclude of the same
           // pattern, so a DOM test lands here wherever it lives: a page script the main process
           // injects needs a document as much as a renderer module does.

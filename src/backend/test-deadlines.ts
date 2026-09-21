@@ -1,4 +1,4 @@
-// One source of truth for the two deadlines that used to be equal by accident.
+// One source of truth for the deadlines that used to be equal by accident.
 //
 // The harness `waitFor` had a hardcoded 5000 ms deadline and vitest's default
 // `testTimeout` is also 5000 ms, so under load it was a coin flip which one
@@ -10,5 +10,11 @@
 /** How long a harness `waitFor` polls before failing with the predicate that never held. */
 export const HARNESS_WAIT_TIMEOUT_MS = 10_000;
 
-/** Vitest's per-test budget. Strictly greater, so the harness always reports first. */
-export const NODE_TEST_TIMEOUT_MS = HARNESS_WAIT_TIMEOUT_MS * 2;
+/*
+ * A renderer test waits on the DOM rather than on this harness, so its deadline is configured in
+ * `src/renderer/src/setupTests.ts`, which cannot import from here. It is the same 10 s, for the
+ * same reason, and `TEST_TIMEOUT_MS` below is the budget for both projects.
+ */
+
+/** Vitest's per-test budget. Strictly greater, so a wait deadline always reports first. */
+export const TEST_TIMEOUT_MS = HARNESS_WAIT_TIMEOUT_MS * 2;

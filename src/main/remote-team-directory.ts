@@ -33,8 +33,8 @@ export interface RemoteControlPlaneTransport {
   listInvites(hostId: string): Promise<RemoteInviteRecord[]>;
   createInvite(
     hostId: string,
-    input: { role: "admin" | "member"; email?: string },
-  ): Promise<{ inviteId: string; token: string; expiresAt: number }>;
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
+  ): Promise<{ inviteId: string; token: string; expiresAt: number; permanent: boolean; useCount: number }>;
   revokeInvite(inviteId: string): Promise<void>;
 }
 
@@ -125,6 +125,8 @@ export class RemoteTeamDirectory {
             expiresAt: new Date(invite.expiresAt).toISOString(),
             usedAt: invite.usedAt === null ? null : new Date(invite.usedAt).toISOString(),
             email: invite.email,
+            permanent: invite.permanent,
+            useCount: invite.useCount,
           })),
       );
     }
@@ -137,7 +139,10 @@ export class RemoteTeamDirectory {
     return this.#request(serverId, TEAM_API_ROUTES.team.invite(inviteId), decodeVoid, { method: "DELETE" });
   }
 
-  async createInvite(serverId: string, input: { role: "admin" | "member"; email?: string }): Promise<InviteSummary> {
+  async createInvite(
+    serverId: string,
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
+  ): Promise<InviteSummary> {
     const server = this.#servers.require(serverId);
     const transport = this.#controlPlaneFor(serverId);
     if (transport) {
@@ -151,6 +156,8 @@ export class RemoteTeamDirectory {
         expiresAt: new Date(invite.expiresAt).toISOString(),
         usedAt: null,
         email: input.email ?? null,
+        permanent: invite.permanent,
+        useCount: invite.useCount,
         inviteUrl: createInviteUrl({
           apiUrl: transport.controlPlaneUrl,
           serverId,
@@ -175,6 +182,9 @@ export class RemoteTeamDirectory {
       }
       return result;
     }
+    // The frozen Team API projections strip `permanent` on this transport, so the request
+    // would silently mint single-use. Fail loudly instead of handing back the wrong kind.
+    if (input.permanent) throw new Error("This server connection does not support permanent invitation links.");
     return this.#request(serverId, TEAM_API_ROUTES.team.invites, decodeInviteSummary, { method: "POST", body: input });
   }
 

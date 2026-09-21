@@ -128,6 +128,8 @@ export const IPC_CHANNELS = {
   agentUpdateMemory: "agent:update-memory",
   agentDeleteMemory: "agent:delete-memory",
   agentClearMemories: "agent:clear-memories",
+  sharedListTables: "shared:list-tables",
+  sharedDeleteTable: "shared:delete-table",
   agentListRoutines: "agent:list-routines",
   agentCreateRoutine: "agent:create-routine",
   agentUpdateRoutine: "agent:update-routine",
@@ -172,6 +174,10 @@ export const IPC_CHANNELS = {
   browserGetControlState: "browser:get-control-state",
   browserCapturePreview: "browser:capture-preview",
   browserSetVisible: "browser:set-visible",
+  browserStartLiveView: "browser:start-live-view",
+  browserStopLiveView: "browser:stop-live-view",
+  browserSendLiveViewInput: "browser:send-live-view-input",
+  browserLiveViewEvent: "browser:live-view-event",
   browserDisplayStateEvent: "browser:display-state-event",
   browserPictureInPictureOpen: "browser:picture-in-picture-open",
   browserPictureInPictureClose: "browser:picture-in-picture-close",
@@ -216,6 +222,12 @@ export const IPC_CHANNELS = {
   serversRemoveMcpServer: "servers:mcp:remove",
   serversSetMcpServerEnabled: "servers:mcp:set-enabled",
   serversTestMcpServer: "servers:mcp:test",
+  // The plugin deep link. `openbot://plugins/<slug>` opens a listing and nothing more, so there is
+  // no install channel beside these two: the user still presses Install inside the dialog and picks
+  // an agent. The pair mirrors the invitation's, because it solves the same problem - a link can
+  // arrive before the window that shows it exists.
+  pluginsOpenListing: "plugins:open-listing",
+  pluginsTakePendingListing: "plugins:take-pending-listing",
   hostGetStatus: "host:get-status",
   hostConfigure: "host:configure",
   hostUpdateIdentity: "host:update-identity",

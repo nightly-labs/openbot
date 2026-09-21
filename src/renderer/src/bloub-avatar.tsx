@@ -4,7 +4,12 @@ import type { AvatarHue } from "@openbot/contracts/ipc";
 import { render } from "@solidjs/web";
 import { flush } from "solid-js";
 
-export type AvatarMotion = "hover" | "always" | "idle" | "working" | "connecting";
+/**
+ * When an avatar animates, which is a performance decision and not a state one: `hover` and `idle`
+ * rest until a pointer or focus reaches them, `always` runs. What the avatar *expresses* is its
+ * `AvatarMood` - see `@openbot/brand/bloub-avatar-motion`.
+ */
+export type AvatarMotion = "hover" | "always" | "idle";
 export {
   AVATAR_HUE_OPTIONS,
   avatarCandidateSeeds,
@@ -14,6 +19,13 @@ export {
   bloubAvatarProfile,
   type SupportedAvatarSilhouetteId,
 } from "@openbot/brand/bloub-avatar";
+export {
+  type AvatarMood,
+  avatarMoodIsBusy,
+  avatarMoodPresentation,
+  SHAPE_SAFE_STATES,
+  type ShapeSafeStateId,
+} from "@openbot/brand/bloub-avatar-motion";
 
 export function createStaticAvatarSvg(seed: string, hue: AvatarHue | null): SVGSVGElement {
   const host = document.createElement("span");

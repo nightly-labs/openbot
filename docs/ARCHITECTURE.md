@@ -81,6 +81,16 @@ the `media-attachments` capability; released protocol adapters keep their existi
   Nothing copies it first, so `src/backend/browser-state.ts` re-validates every bound it reads rather
   than trusting it: a tab whose environment fails validation is still returned, without that
   environment, because losing the user's open tab is worse than losing an emulated viewport.
+- `~/OpenBot/Shared/Data/agent-data.db` is one SQLite file that holds every table the agents create
+  for themselves, outside `openbot.db` and outside the migration runner. One file gives the agents
+  one namespace and lets them join across each other's tables. Every agent can read and write every
+  table; the `openbot_metadata` table records the agent that created each one, and that owner is the
+  only agent allowed to drop or alter it. SQLite's own authorizer refuses the other cases, so the
+  rule does not depend on reading the model's SQL. The agents own these schemas, so nothing copies
+  or migrates them before a release, and a table stays when the agent that made it is deleted. The
+  user deletes one from agent settings, which is the only way to remove a table whose owner is gone.
+  The guidance the agents read ships as the managed skill `resources/managed-skills/openbot-data`,
+  beside site hosting and the skill creator, so the always-on prompt only names the tools.
 - Renderer signals and stores are projections for the current screen only. They are not durable
   state, and one concern is one record - a row of parallel signals over its fields lets a screen
   hold states the product does not have.
@@ -97,6 +107,44 @@ the `media-attachments` capability; released protocol adapters keep their existi
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
+
+### Tab lifetime
+
+The agent decides when a tab closes. Nothing closes a tab when a turn ends: `close_tab` is the only
+cleanup path, and the prompt asks the agent to use it once a task no longer needs the tab. A tab
+therefore outlives its turn by design, which is what lets the next turn in the same thread carry on in
+the page the last one left, and what lets the user read the result afterwards.
+
+There is no user-owned tab. A tab carries `ownerThreadId` and `ownerAgentId`, and an agent may read
+and close any tab in its own thread, including one the user opened there. The one hard block is a
+takeover: while the user holds a tab, no agent tool touches it. That is enforced in
+`BrowserHost.#requireToolTab`, which is the lowest point every tab-bearing tool passes through, so it
+holds for callers that never reach `AgentService` -- the view gateway and remote hosts. The agent-wide
+refusal in `AgentService` stays beside it rather than being folded in: it also covers `open` and
+`list_tabs`, which name no tab, and it answers with a refusal instead of an error.
+
+| Event | Tabs |
+| --- | --- |
+| Turn succeeds | Stay open unless the agent called `close_tab`. |
+| Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
+| Retry | Same thread and agent, so the same tabs are still reachable. |
+| Restart | Restored from the browser's own state file. |
+| Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. |
+| Takeover held | No agent tool touches that tab, `close_tab` included. |
+
+Deleting an agent is the one sweep, and it exists because those tabs are otherwise unreachable: no
+agent passes the owner check for them, and the renderer lists tabs per agent, so they would hold a
+view the user cannot see to close, across restarts. Closing is idempotent -- `close()` returns early
+on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
+can never name a tab that took its place.
+
+A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
+own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`
+streams the tab through CDP, and the gateway sends each frame as bytes and dispatches the pointer and
+key input that comes back, in fractions of the last frame, through the same access checks. Frames stay
+outside the per-tab operation queue, so watching never delays a tool call. `browser-view-client.ts` is
+the client half, and it reuses the Remote Desktop websocket tunnel rather than adding a WebRTC channel.
+The `browser-view` capability says whether a host has both.
 
 ## Provider CLI updates
 
@@ -892,3 +940,34 @@ a file in the share sheet. The thumbnail reads the attachment through the query 
 so a file already read in a message is not fetched again. The editor changes the text, removes the
 files the message already has, and adds new ones.
 
+
+## Plugin distribution
+
+A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
+
+See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Plugins tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, the literal in `packages/contracts/src/plugin-catalog.ts`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
+
+## macOS Host Manager
+
+`scripts/macos-tenant-setup.swift` is a separate administrator command for new Standard accounts.
+It uses OpenDirectory directly, creates only new empty homes, and stores generated credentials
+in a new root-only file before account creation. It is not installed or called by the daemon.
+The Host PKG installs this as `create-tenants`, alongside the standalone `openbot-host` CLI.
+`openbot-host-service.ts` owns setup/verification sequencing; `openbot-host-macos.ts` owns OS
+operations. Passwords cross only the native helper's captured pipe and the administrator's tty,
+not the host protocol. The root-only recovery file is removed after successful presentation.
+`build-host-installer.ts` and `verify-host-installer.ts` own release packaging and the exact
+payload manifest. Package installation preserves host registration and state; only the application
+is automatically updated. A Host Manager upgrade requires an administrator-installed signed PKG.
+
+The optional standalone root helper (`scripts/host-manager.ts`) uses the lifecycle in
+`src/main/host-manager.ts` and fixed macOS operations in `scripts/host-manager-macos.ts`.
+`src/main/host-update-coordinator.ts` is the unprivileged tenant client, not an update leader.
+The local protocol types live in `packages/contracts/src/host-manager.ts`; bounded file parsing
+and owner checks live in `src/main/host-update-files.ts`. Only the helper publishes host control
+state or replaces the shared application. It has no dependency on tenant storage services.
+The tenant process owns an in-memory activity generation in `src/backend/restart-activity.ts`.
+Backend work and main-process sessions advance it, so work between status polls resets the idle
+grace. This counter contains no user data and is never sent to the host. Health and restart
+readiness remain false until agent initialization succeeds.
+See [multi-tenant hosting](multi-tenant-hosting.md) for installation, permissions, and acceptance.
