@@ -247,21 +247,21 @@
       }
     },
     "moonlightWeb": {
-      "sourceMode": "openbot-fork",
-      "repository": "https://github.com/NorbertBodziony/moonlight-web-stream.git",
+      "sourceMode": "upstream-with-patch",
+      "repository": "https://github.com/MrCreativ3001/moonlight-web-stream.git",
       "version": "v2.10.0",
-      "commit": "f1d20ab348978e39c80734a7302db2646e2231d7",
+      "commit": "cd9d03cbf9a42b394f7b72a733a2f39cb5f0edd8",
       "upstream": {
         "repository": "https://github.com/MrCreativ3001/moonlight-web-stream.git",
         "commit": "cd9d03cbf9a42b394f7b72a733a2f39cb5f0edd8"
       },
-      "sourceArchive": "https://github.com/NorbertBodziony/moonlight-web-stream/archive/f1d20ab348978e39c80734a7302db2646e2231d7.tar.gz",
-      "sourceSha256": "7b7ac01b7b7e995ec352415eca3338997882af3d7e49ede5b113ce207b1e28f1",
+      "sourceArchive": "https://github.com/MrCreativ3001/moonlight-web-stream/archive/cd9d03cbf9a42b394f7b72a733a2f39cb5f0edd8.tar.gz",
+      "sourceSha256": "ff4800657812eb7c7e56f62cae8c9f859aac19b196fe47df255ae8792ec970ec",
       "license": "GPL-3.0",
       "licenseSha256": "8b1ba204bb69a0ade2bfcf65ef294a920f6bb361b317dba43c7ef29d96332b9b",
       "patch": {
         "path": "vendor/remote-desktop/patches/moonlight-web-stream-v2.10.0-openbot.patch",
-        "sha256": "977e5974ba7281006de533575aef16535e3744fbbd1bbbafb559728785ce7057"
+        "sha256": "916fcf57ec3f3d5a7517d488d106d698dbc7f4c8c2d12acc6be9982510a05444"
       },
       "overrides": [],
       "submodules": {}

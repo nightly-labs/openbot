@@ -123,6 +123,8 @@ The OpenBot patch includes these upstream security changes and regression tests:
 Backport adaptations retain the older platform APIs and test fixtures. Native CI builds and runs
 only the relevant packet, pairing, REST authorization, and certificate regression tests. The local
 Moonlight client uses a random pairing name and approves only its matching loopback request ID.
+Moonlight now builds from the same upstream commit with the existing OpenBot patch and a fix
+that sends the configured pairing name instead of the upstream hard-coded name.
 The published runtime uses a new recipe/input digest; no existing release assets are replaced.
 The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
 on Linux.
