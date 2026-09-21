@@ -353,6 +353,7 @@ it("instruments message commands without sending their contents or changing the 
     loadQueue: async (agentId) => ({ agentId, deliveries: [] }),
     canEditQueue: () => false,
     changeQueue: async () => {},
+    interruptTurn: async () => {},
     editQueue: async (agentId) => ({ agentId, deliveries: [] }),
     channelStore: new MobileChannelStore(async () => {
       throw new Error("Unexpected channel request");

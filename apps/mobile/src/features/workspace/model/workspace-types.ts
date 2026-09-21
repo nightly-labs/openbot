@@ -79,6 +79,7 @@ export interface MobileWorkspaceContextValue {
     input: { deliveryId?: string; expectedTurnId?: string; deliveryIds?: string[] },
   ) => Promise<void>;
   editQueue: (agentId: string, serverId: string, input: QueueEditRequest) => Promise<QueueSnapshot>;
+  interruptTurn: (agentId: string, turnId: string, serverId?: string) => Promise<void>;
   channelStore: MobileChannelStore;
   servers: MobileServer[];
   teamDirectory: RemoteTeamDirectoryClient;
