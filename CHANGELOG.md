@@ -23,7 +23,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - Remove the separately installed Codex Computer Use plugin and its setup window. Nothing to install
   by hand: the release carries the driver.
 
-## [0.15.0] - 2026-09-20
+## [0.15.1] - 2026-09-21
 
 ### Added
 
