@@ -1,3 +1,4 @@
+import type { RemoteDesktopSetupStatus } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol";
 // @vitest-environment node
 
@@ -68,20 +69,22 @@ describe("TeamApiServer remote screen", () => {
         activeSessions: 0,
         maxSessions: 4,
       }),
-      checkSetup: vi.fn(async () => ({
-        platform: "darwin",
-        hostName: "Mac mini",
-        username: "tenant",
-        checkedAt: "2026-09-21T10:00:00.000Z",
-        screenRecording: "blocked",
-        accessibility: "blocked",
-        service: "allowed",
-        displays: "allowed",
-        guiSession: "allowed",
-        restartRequired: false,
-        activeSessions: 0,
-        message: null,
-      })),
+      checkSetup: vi.fn(
+        async (): Promise<RemoteDesktopSetupStatus> => ({
+          platform: "darwin",
+          hostName: "Mac mini",
+          username: "tenant",
+          checkedAt: "2026-09-21T10:00:00.000Z",
+          screenRecording: "blocked",
+          accessibility: "blocked",
+          service: "allowed",
+          displays: "allowed",
+          guiSession: "allowed",
+          restartRequired: false,
+          activeSessions: 0,
+          message: null,
+        }),
+      ),
       test: vi.fn(async () => ({ active: true, mouse: false, keyboard: false, code: "1234" })),
       createSession,
       selectDisplay: vi.fn(async () => undefined),
