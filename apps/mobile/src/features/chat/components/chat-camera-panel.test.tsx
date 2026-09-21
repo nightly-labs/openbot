@@ -43,20 +43,17 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 function mount() {
-  const onPhoto = vi.fn<(uri: string) => Promise<void>>().mockResolvedValue();
+  const onCaptured = vi.fn<(uri: string) => void>();
   const onCancel = vi.fn();
-  const onDone = vi.fn();
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  act(() =>
-    root.render(<ChatCameraContent onPhoto={onPhoto} onCancel={onCancel} onDone={onDone} onBusyChange={() => {}} />),
-  );
+  act(() => root.render(<ChatCameraContent onCaptured={onCaptured} onCancel={onCancel} onBusyChange={() => {}} />));
   cleanups.push(() => {
     act(() => root.unmount());
     container.remove();
   });
-  return { onPhoto, onCancel, onDone, unmount: () => act(() => root.render(null)) };
+  return { onCaptured, onCancel, unmount: () => act(() => root.render(null)) };
 }
 
 function shutter() {
@@ -73,41 +70,38 @@ it("reaches the controls before the camera is ready and holds the shutter", () =
   expect(shutter().disabled).toBe(false);
 });
 
-it("waits for camera readiness, attaches the captured photo, then reports it is done", async () => {
+it("waits for camera readiness and hands the captured photo up", async () => {
   native.capture.mockResolvedValue({ uri: "file:///captured.jpg" });
-  const { onPhoto, onDone } = mount();
+  const { onCaptured } = mount();
   await act(async () => fireEvent.click(shutter()));
   expect(native.capture).not.toHaveBeenCalled();
   act(() => native.ready());
   await act(async () => fireEvent.click(shutter()));
-  expect(onPhoto).toHaveBeenCalledWith("file:///captured.jpg");
-  // The card leaves only once the photo is held, so it never disappears from
-  // under a capture that is still running.
-  expect(onDone).toHaveBeenCalledOnce();
+  // Handed over, not held here: the panel holds it once it has left.
+  expect(onCaptured).toHaveBeenCalledWith("file:///captured.jpg");
 });
 
 it("waits for the switched camera before capture and cancels without a photo", async () => {
-  const { onCancel, onPhoto, onDone } = mount();
+  const { onCancel, onCaptured } = mount();
   act(() => native.ready());
   act(() => fireEvent.click(screen.getByRole("button", { name: "Switch camera" })));
   await act(async () => fireEvent.click(shutter()));
   expect(native.capture).not.toHaveBeenCalled();
   act(() => fireEvent.click(screen.getByRole("button", { name: "Close camera" })));
   expect(onCancel).toHaveBeenCalledOnce();
-  expect(onPhoto).not.toHaveBeenCalled();
-  expect(onDone).not.toHaveBeenCalled();
+  expect(onCaptured).not.toHaveBeenCalled();
 });
 
 it("shows a capture error and permits another attempt", async () => {
   native.capture
     .mockRejectedValueOnce(new Error("Camera interrupted."))
     .mockResolvedValue({ uri: "file:///retry.jpg" });
-  const { onPhoto } = mount();
+  const { onCaptured } = mount();
   act(() => native.ready());
   await act(async () => fireEvent.click(shutter()));
   expect(screen.getByText("Camera interrupted.")).toBeTruthy();
   await act(async () => fireEvent.click(shutter()));
-  expect(onPhoto).toHaveBeenCalledWith("file:///retry.jpg");
+  expect(onCaptured).toHaveBeenCalledWith("file:///retry.jpg");
 });
 
 it("does not attach a pending capture after the camera is removed", async () => {
@@ -117,10 +111,10 @@ it("does not attach a pending capture after the camera is removed", async () => 
       finish = resolve;
     }),
   );
-  const { onPhoto, unmount } = mount();
+  const { onCaptured, unmount } = mount();
   act(() => native.ready());
   act(() => fireEvent.click(shutter()));
   unmount();
   await act(async () => finish({ uri: "file:///late.jpg" }));
-  expect(onPhoto).not.toHaveBeenCalled();
+  expect(onCaptured).not.toHaveBeenCalled();
 });

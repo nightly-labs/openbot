@@ -18,15 +18,17 @@ const PREVIEW_EASING = cubicBezier(0.23, 1, 0.32, 1);
 export function ChatCameraContent({
   onBusyChange,
   onCancel,
-  onDone,
-  onPhoto,
+  onCaptured,
 }: {
   /** True while a capture is in flight, when the panel must not be dismissed. */
   onBusyChange: (busy: boolean) => void;
   onCancel: () => void;
-  /** The photo is held: the panel may leave. */
-  onDone: () => void;
-  onPhoto: (uri: string) => Promise<void>;
+  /**
+   * A photo exists at this uri. Holding it is the panel's business and waits
+   * for the card to leave: reading and encoding a full-size photo on the
+   * frames of that exit is what made it stutter.
+   */
+  onCaptured: (uri: string) => void;
 }) {
   const camera = useRef<CameraView>(null);
   const busyRef = useRef(false);
@@ -48,13 +50,16 @@ export function ChatCameraContent({
     setBusy(true);
     onBusyChange(true);
     setError(null);
-    let taken = false;
     try {
       const photo = await camera.current.takePictureAsync({ quality: 1 });
       if (!mounted.current) return;
       if (!photo?.uri) throw new Error("Could not take the photo. Try again.");
-      await onPhoto(photo.uri);
-      taken = true;
+      // Clear busy before handing the photo over: the panel refuses to leave
+      // while a capture is in flight, and this one has landed.
+      busyRef.current = false;
+      setBusy(false);
+      onBusyChange(false);
+      onCaptured(photo.uri);
     } catch (cause) {
       if (mounted.current) setError(cause instanceof Error ? cause.message : "Could not take the photo. Try again.");
     } finally {
@@ -62,9 +67,6 @@ export function ChatCameraContent({
       if (mounted.current) setBusy(false);
       onBusyChange(false);
     }
-    // The photo is held, so the panel can leave the way it arrived. It used to
-    // be unmounted from under the user the moment the attachment landed.
-    if (taken && mounted.current) onDone();
   }
   return (
     <>

@@ -190,9 +190,10 @@ export function useChatAttachments(
     menuOpen: menuAnchor !== null,
     openMenu: (anchor: ChatAttachmentAnchor) => setMenuAnchor(anchor),
     closeMenu: () => setMenuAnchor(null),
-    // Holds the photo only. The card closes itself once it is held, so it can
-    // collapse back into the control it opened from instead of disappearing.
-    addPhoto: (uri: string) => addFile(uri, "photo.jpg"),
+    // Held after the card has left, so the file read, the base64 encode and
+    // the composer's re-render do not land on the frames of its exit. It
+    // reports its own failure, because by then there is no card to show one in.
+    addPhoto: (uri: string) => report(() => addFile(uri, "photo.jpg")),
     choosePhotos: () => report(choosePhotos),
     requestCamera,
     chooseFiles: () => report(chooseFiles),

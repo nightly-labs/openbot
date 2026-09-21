@@ -149,6 +149,8 @@ export function ChatAttachmentPanel({
   // moment the card is told to leave, so the rows, the material and the size
   // all finish together and nothing is left sitting on the plus.
   const [glassLit, setGlassLit] = useState(true);
+  // A photo taken but not yet held. It waits for the card to be gone.
+  const captured = useRef<string | null>(null);
   const morph = useSharedValue(0);
   const cameraWidth = Math.min(440, width - 24);
   // Read once, for this card's whole life: the keyboard is not dismissed for
@@ -165,6 +167,15 @@ export function ChatAttachmentPanel({
     progress.set(withSpring(1, MORPH));
   }, [progress]);
 
+  // Runs once the card has finished leaving, so the heavy part of holding a
+  // photo has the thread to itself.
+  const finish = useCallback(() => {
+    const uri = captured.current;
+    captured.current = null;
+    onClose();
+    if (uri) void attachments.addPhoto(uri);
+  }, [attachments, onClose]);
+
   const dismiss = useCallback(() => {
     if (closingRef.current || busyRef.current) return;
     closingRef.current = true;
@@ -172,10 +183,10 @@ export function ChatAttachmentPanel({
     setGlassLit(false);
     progress.set(
       withSpring(0, MORPH, (finished) => {
-        if (finished) scheduleOnRN(onClose);
+        if (finished) scheduleOnRN(finish);
       }),
     );
-  }, [onClose, progress]);
+  }, [finish, progress]);
 
   const showOptions = useCallback(() => {
     if (busyRef.current) return;
@@ -324,20 +335,27 @@ export function ChatAttachmentPanel({
             />
           </Animated.View>
           <Animated.View
-            pointerEvents={mode === "camera" ? "auto" : "none"}
+            pointerEvents={mode === "camera" && !closing ? "auto" : "none"}
             style={[
               { position: "absolute", left: 0, bottom: 0, width: cameraWidth, height: cameraHeight },
               cameraStyle,
             ]}
           >
-            {mode === "camera" ? (
+            {/* The preview stops the moment the card is told to leave. A live
+                capture session inside a view that changes size every frame and
+                is clipped by a mask makes iOS composite the card offscreen on
+                each of those frames, which is why only this exit stuttered and
+                the one from the options never did. */}
+            {mode === "camera" && !closing ? (
               <ChatCameraContent
                 onBusyChange={(busy) => {
                   busyRef.current = busy;
                 }}
                 onCancel={showOptions}
-                onDone={dismiss}
-                onPhoto={attachments.addPhoto}
+                onCaptured={(uri) => {
+                  captured.current = uri;
+                  dismiss();
+                }}
               />
             ) : null}
           </Animated.View>
