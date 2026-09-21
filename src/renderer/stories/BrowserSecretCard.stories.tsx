@@ -2,6 +2,7 @@ import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { BrowserSecretCard } from "../src/features/conversation/BrowserSecretCard";
+import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 
 const request: BrowserTakeoverRequest = {
   requestId: "authentication",
@@ -14,7 +15,11 @@ const request: BrowserTakeoverRequest = {
 const meta = {
   title: "Conversation/BrowserSecretCard",
   component: BrowserSecretCard,
-  args: { request, onRespond: async () => undefined },
+  args: {
+    request,
+    onRespond: async () => undefined,
+    loadPreview: async () => ({ dataUrl: browserTakeoverPreviewUrl, width: 960, height: 600 }),
+  },
   decorators: [
     (Story) => (
       <main class="foundation-story">
@@ -64,4 +69,12 @@ export const PartiallyFilled: Story = {
 export const TwelveDigitsNarrow: Story = {
   args: { request: { ...request, secret: { method: "otp", origin: "https://accounts.example.com", digits: 12 } } },
   render: Narrow.render,
+};
+
+export const PreviewUnavailable: Story = {
+  args: {
+    loadPreview: async () => {
+      throw new Error("Preview unavailable.");
+    },
+  },
 };

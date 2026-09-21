@@ -168,11 +168,13 @@ describe("secure authentication card", () => {
     render(() => (
       <BrowserSecretCard
         request={request}
+        loadPreview={async () => ({ dataUrl: "data:image/png;base64,AA==", width: 960, height: 600 })}
         onRespond={async (input) => {
           responses.push({ ...input });
         }}
       />
     ));
+    expect(await screen.findByRole("img", { name: "Preview of Sign-in page" })).toBeInTheDocument();
     const input = screen.getByLabelText("6-digit code");
     await fireEvent.input(input, { target: { value: "12 34 56" } });
     expect(responses).toEqual([]);
@@ -183,7 +185,31 @@ describe("secure authentication card", () => {
       expect(responses).toEqual([{ requestId: "auth", agentId: "agent", decision: "submit", secret: "123456" }]),
     );
     expect(input).toHaveValue("");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByRole("form", { name: "Secure authentication" })).not.toHaveTextContent("123456");
+  });
+
+  it("discards a late preview after a rejected submission", async () => {
+    let resolvePreview: (() => void) | undefined;
+    const ready = new Promise<void>((resolve) => {
+      resolvePreview = resolve;
+    });
+    const image = ready.then(() => ({ dataUrl: "data:image/png;base64,AA==", width: 960, height: 600 }));
+    render(() => (
+      <BrowserSecretCard
+        request={request}
+        loadPreview={() => image}
+        onRespond={async () => {
+          throw new Error("Disconnected");
+        }}
+      />
+    ));
+    await fireEvent.input(screen.getByLabelText("6-digit code"), { target: { value: "123456" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByRole("alert");
+    resolvePreview?.();
+    await image;
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("does not send the entered value when cancelled", async () => {

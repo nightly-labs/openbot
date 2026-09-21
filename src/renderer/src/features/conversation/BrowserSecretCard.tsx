@@ -1,12 +1,17 @@
-import type { BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
+import type { BrowserPreview, BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { Button, Input } from "../../components/ui";
+import { Button, Input, Monitor } from "../../components/ui";
 import { OtpInput } from "../../components/ui/otp-input";
+import { BrowserTakeoverPreview } from "./BrowserTakeoverPreview";
 
 export function BrowserSecretCard(props: {
   request: BrowserTakeoverRequest;
+  loadPreview?: (tabId: string) => Promise<BrowserPreview>;
   onRespond: (input: RespondToBrowserSecretInput) => Promise<void>;
 }) {
+  const [preview, setPreview] = createSignal<BrowserPreview | null>(null);
+  const [previewStatus, setPreviewStatus] = createSignal<"loading" | "ready" | "failed">("loading");
+  const [previewHidden, setPreviewHidden] = createSignal(false);
   const [value, setValue] = createSignal("");
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal("");
@@ -26,10 +31,33 @@ export function BrowserSecretCard(props: {
     () => {
       setValue("");
       setError("");
+      setPreview(null);
+      setPreviewHidden(false);
+      setPreviewStatus("loading");
+      let active = true;
+      onCleanup(() => {
+        active = false;
+      });
+      if (!props.loadPreview) {
+        setPreviewStatus("failed");
+        return;
+      }
+      void props.loadPreview(props.request.tabId).then(
+        (image) => {
+          if (!active || previewHidden()) return;
+          setPreview(image);
+          setPreviewStatus("ready");
+        },
+        () => {
+          if (active && !previewHidden()) setPreviewStatus("failed");
+        },
+      );
     },
   );
   const respond = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending() || (decision === "submit" && !valid())) return;
+    setPreviewHidden(true);
+    setPreview(null);
     setPending(true);
     setError("");
     const identity = { requestId: props.request.requestId, agentId: props.request.agentId };
@@ -69,6 +97,22 @@ export function BrowserSecretCard(props: {
             : "Use the code sent by email or text message."}{" "}
         This value is not added to chat.
       </p>
+      <Show when={!previewHidden()}>
+        <figure class="browser-takeover-preview">
+          <figcaption class="browser-takeover-preview-bar">
+            <Monitor aria-hidden="true" />
+            <span>Sign-in page</span>
+            <small>{props.request.secret?.origin}</small>
+          </figcaption>
+          <div class="browser-takeover-preview-viewport">
+            <BrowserTakeoverPreview
+              preview={preview()}
+              previewStatus={previewStatus()}
+              page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
+            />
+          </div>
+        </figure>
+      </Show>
       <Show
         when={password()}
         fallback={

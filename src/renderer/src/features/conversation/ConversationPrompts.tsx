@@ -11,13 +11,13 @@ import {
   Maximize2,
   Monitor,
   RadioGroup,
-  Skeleton,
   toast,
   X,
 } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { useServers } from "../servers/servers-context";
 import { BrowserSecretCard } from "./BrowserSecretCard";
+import { BrowserTakeoverPreview } from "./BrowserTakeoverPreview";
 
 export function ChoiceCard(props: {
   title: string;
@@ -245,6 +245,7 @@ function ConnectedBrowserSecretCard(props: { request: BrowserTakeoverRequest }) 
     <Show when={connected()} fallback={<p role="status">Reconnect to enter the authentication value.</p>}>
       <BrowserSecretCard
         request={props.request}
+        loadPreview={(tabId) => window.openbot.browser.capturePreview(tabId)}
         onRespond={(input) => window.openbot.agent.respondToBrowserSecret(input)}
       />
     </Show>
@@ -380,41 +381,6 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
         </footer>
       </Show>
     </section>
-  );
-}
-
-function BrowserTakeoverPreview(props: {
-  preview: BrowserPreview | null;
-  previewStatus: "idle" | "loading" | "ready" | "failed";
-  page: { title: string; host: string };
-}) {
-  return (
-    <Show
-      when={props.previewStatus === "ready" ? props.preview : null}
-      fallback={
-        <Show
-          when={props.previewStatus === "loading" || props.previewStatus === "idle"}
-          fallback={
-            <div class="browser-takeover-preview-fallback">
-              <Monitor aria-hidden="true" />
-              <strong>{props.page.title}</strong>
-              <span>{props.page.host}</span>
-            </div>
-          }
-        >
-          <Skeleton class="browser-takeover-preview-skeleton" />
-        </Show>
-      }
-    >
-      {(preview) => (
-        <img
-          src={preview().dataUrl}
-          width={preview().width}
-          height={preview().height}
-          alt={`Preview of ${props.page.title}`}
-        />
-      )}
-    </Show>
   );
 }
 

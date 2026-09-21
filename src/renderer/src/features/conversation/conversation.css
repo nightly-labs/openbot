@@ -8862,3 +8862,13 @@ body:has(.browser-panel-expanded) .app-frame {
 .browser-secret-card > .browser-secret-error {
   color: var(--openbot-danger);
 }
+
+.browser-secret-card .browser-takeover-preview-viewport {
+  width: 100%;
+  max-height: 280px;
+}
+
+.browser-secret-card .browser-takeover-preview-viewport img {
+  min-height: 0;
+  object-fit: contain;
+}
