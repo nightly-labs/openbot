@@ -101,15 +101,22 @@ describe("mobile attachment selection", () => {
   });
   it("handles camera permission, native picker cancellation, and a captured photo", async () => {
     const state = mount();
+    const plus = { left: 28, bottom: 18, size: 32 };
+    act(() => state().openMenu(plus));
+    expect(state().menuOpen).toBe(true);
+    expect(state().menuAnchor).toEqual(plus);
     native.permission.mockResolvedValue({ granted: false });
+    // A refusal keeps the card open on the options, so it reports the refusal
+    // instead of throwing at a caller that has nothing to unwind.
     await act(async () => {
-      await state().takePhoto();
+      expect(await state().requestCamera()).toBe(false);
     });
     expect(native.camera).not.toHaveBeenCalled();
     expect(native.alert).toHaveBeenCalledWith(
       "Could not add attachment",
       "Allow camera access in Settings to take a photo.",
     );
+    expect(state().menuOpen).toBe(true);
     native.photos.mockResolvedValue({ canceled: true });
     await act(async () => {
       await state().choosePhotos();
@@ -118,13 +125,17 @@ describe("mobile attachment selection", () => {
     native.permission.mockResolvedValue({ granted: true });
 
     await act(async () => {
-      await state().takePhoto();
+      expect(await state().requestCamera()).toBe(true);
     });
-    expect(state().cameraOpen).toBe(true);
     await act(async () => {
       await state().addPhoto("file:///photo.jpg");
     });
-    expect(state().cameraOpen).toBe(false);
+    // Holding the photo no longer closes the card: it dismisses itself once the
+    // photo is held, so it can collapse back into the control it opened from.
+    expect(state().menuOpen).toBe(true);
+    act(() => state().closeMenu());
+    expect(state().menuOpen).toBe(false);
+    expect(state().menuAnchor).toBeNull();
     expect(state().items.map((item) => ({ name: item.name, mime: item.mimeType }))).toEqual([
       { name: "photo.jpg", mime: "image/jpeg" },
     ]);

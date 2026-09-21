@@ -14,6 +14,7 @@ const native = vi.hoisted(() => ({
   listeners: new Set<(state: string) => void>(),
   storage: new Map<string, string>(),
 }));
+const sent = vi.hoisted((): { method: string; path: string; body: unknown }[] => []);
 const host = {
   hostId: "host",
   name: "Desktop",
@@ -80,7 +81,14 @@ vi.mock("../components/remote-team-transport", () => ({
           if (reconnectSnapshot) emit(reconnectSnapshot);
         },
         disconnect: async () => {},
-        request: async <T,>(_method: string, path: string, decode: (value: unknown) => T): Promise<T> => {
+        request: async <T,>(
+          method: string,
+          path: string,
+          decode: (value: unknown) => T,
+          body?: unknown,
+        ): Promise<T> => {
+          sent.push({ method, path, body });
+          if (path === TEAM_API_ROUTES.agent.interrupt("working")) return decode({});
           if (path === TEAM_API_ROUTES.compatibility)
             return decode({ appVersion: "test", protocol: { minimum: 3, maximum: 3 }, capabilities: [] });
           if (path === TEAM_API_ROUTES.agents.all)
@@ -120,6 +128,7 @@ afterEach(async () => {
   queryClient.clear();
   native.state = "active";
   native.storage.clear();
+  sent.length = 0;
   reconnectSnapshot = null;
 });
 
@@ -220,4 +229,22 @@ it.each(["memories", "routines"] as const)("refreshes active channel %s after a 
   expect(queryClient.getQueryData(otherKey)).toEqual(["unchanged"]);
   expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
   close();
+});
+
+it("stops a running turn through the interrupt route", async () => {
+  await act(async () =>
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <MobileWorkspaceProvider>
+          <Workspace />
+        </MobileWorkspaceProvider>
+      </QueryClientProvider>,
+    ),
+  );
+  await act(async () => current.interruptTurn("working", "running-turn", host.hostId));
+  expect(sent.at(-1)).toEqual({
+    method: "POST",
+    path: TEAM_API_ROUTES.agent.interrupt("working"),
+    body: { turnId: "running-turn" },
+  });
 });
