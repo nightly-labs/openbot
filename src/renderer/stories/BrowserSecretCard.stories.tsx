@@ -18,6 +18,7 @@ const meta = {
   args: {
     request,
     onRespond: async () => undefined,
+    onOpen: () => undefined,
     loadPreview: async () => ({ dataUrl: browserTakeoverPreviewUrl, width: 960, height: 600 }),
   },
   decorators: [
@@ -76,5 +77,14 @@ export const PreviewUnavailable: Story = {
     loadPreview: async () => {
       throw new Error("Preview unavailable.");
     },
+  },
+};
+
+export const SubmittingPassword: Story = {
+  args: { ...Password.args, onRespond: () => new Promise<void>(() => {}) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByLabelText("Password"), "example-password");
+    await userEvent.click(canvas.getByRole("button", { name: "Submit" }));
   },
 };

@@ -165,9 +165,11 @@ describe("secure authentication card", () => {
 
   it("sends the code only through the secure response and clears the input", async () => {
     const responses: RespondToBrowserSecretInput[] = [];
+    const openPage = vi.fn();
     render(() => (
       <BrowserSecretCard
         request={request}
+        onOpen={openPage}
         loadPreview={async () => ({ dataUrl: "data:image/png;base64,AA==", width: 960, height: 600 })}
         onRespond={async (input) => {
           responses.push({ ...input });
@@ -175,6 +177,9 @@ describe("secure authentication card", () => {
       />
     ));
     expect(await screen.findByRole("img", { name: "Preview of Sign-in page" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Open sign-in page in browser" }));
+    expect(openPage).toHaveBeenCalledOnce();
+    expect(responses).toEqual([]);
     const input = screen.getByLabelText("6-digit code");
     await fireEvent.input(input, { target: { value: "12 34 56" } });
     expect(responses).toEqual([]);
@@ -186,6 +191,7 @@ describe("secure authentication card", () => {
     );
     expect(input).toHaveValue("");
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open sign-in page in browser" })).not.toBeInTheDocument();
     expect(screen.getByRole("form", { name: "Secure authentication" })).not.toHaveTextContent("123456");
   });
 
@@ -228,17 +234,24 @@ describe("secure authentication card", () => {
     expect(screen.getByLabelText("6-digit code")).toHaveValue("");
   });
 
-  it("clears a rejected password and never displays a raw transport error", async () => {
+  it("hides the submitted password input and restores it empty after a rejected response", async () => {
+    let rejectResponse: ((error: Error) => void) | undefined;
     render(() => (
       <BrowserSecretCard
         request={{ ...request, secret: { ...request.secret, method: "password" } }}
-        onRespond={async () => {
-          throw new Error("private-password");
-        }}
+        onRespond={() =>
+          new Promise<void>((_resolve, reject) => {
+            rejectResponse = reject;
+          })
+        }
       />
     ));
     await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "private-password" } });
     await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByRole("button", { name: "Submitting…" })).toBeDisabled();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    if (!rejectResponse) throw new Error("Missing pending response.");
+    rejectResponse(new Error("private-password"));
     expect(await screen.findByRole("alert")).not.toHaveTextContent("private-password");
     expect(screen.getByLabelText("Password")).toHaveValue("");
   });

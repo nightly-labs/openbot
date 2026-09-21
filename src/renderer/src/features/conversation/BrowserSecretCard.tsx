@@ -1,11 +1,12 @@
 import type { BrowserPreview, BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { Button, Input, Monitor } from "../../components/ui";
+import { Button, Input, Maximize2, Monitor } from "../../components/ui";
 import { OtpInput } from "../../components/ui/otp-input";
 import { BrowserTakeoverPreview } from "./BrowserTakeoverPreview";
 
 export function BrowserSecretCard(props: {
   request: BrowserTakeoverRequest;
+  onOpen?: () => void;
   loadPreview?: (tabId: string) => Promise<BrowserPreview>;
   onRespond: (input: RespondToBrowserSecretInput) => Promise<void>;
 }) {
@@ -118,22 +119,24 @@ export function BrowserSecretCard(props: {
           </div>
         }
       >
-        <label class="browser-secret-password">
-          <span class="browser-secret-label">Password</span>
-          <Input
-            aria-label="Password"
-            type="password"
-            autocomplete="off"
-            maxlength={4096}
-            value={value()}
-            disabled={pending()}
-            invalid={Boolean(error())}
-            onInput={(event) => {
-              setValue(event.currentTarget.value);
-              setError("");
-            }}
-          />
-        </label>
+        <Show when={!pending()}>
+          <label class="browser-secret-password">
+            <span class="browser-secret-label">Password</span>
+            <Input
+              aria-label="Password"
+              type="password"
+              autocomplete="off"
+              maxlength={4096}
+              value={value()}
+              disabled={pending()}
+              invalid={Boolean(error())}
+              onInput={(event) => {
+                setValue(event.currentTarget.value);
+                setError("");
+              }}
+            />
+          </label>
+        </Show>
         <Show when={error()}>
           <p class="browser-secret-error" role="alert">
             {error()}
@@ -147,13 +150,36 @@ export function BrowserSecretCard(props: {
             <span>Sign-in page</span>
             <small>{props.request.secret?.origin}</small>
           </figcaption>
-          <div class="browser-takeover-preview-viewport">
-            <BrowserTakeoverPreview
-              preview={preview()}
-              previewStatus={previewStatus()}
-              page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
-            />
-          </div>
+          <Show
+            when={props.onOpen}
+            fallback={
+              <div class="browser-takeover-preview-viewport">
+                <BrowserTakeoverPreview
+                  preview={preview()}
+                  previewStatus={previewStatus()}
+                  page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
+                />
+              </div>
+            }
+          >
+            <Button
+              variant="ghost"
+              type="button"
+              class="browser-takeover-preview-viewport browser-takeover-preview-open"
+              aria-label="Open sign-in page in browser"
+              onClick={() => props.onOpen?.()}
+            >
+              <BrowserTakeoverPreview
+                preview={preview()}
+                previewStatus={previewStatus()}
+                page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
+              />
+              <span class="browser-takeover-preview-open-label" aria-hidden="true">
+                <Maximize2 />
+                Open in browser
+              </span>
+            </Button>
+          </Show>
         </figure>
       </Show>
       <footer class="browser-takeover-actions">

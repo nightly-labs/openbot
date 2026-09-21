@@ -233,18 +233,19 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
       when={props.request?.secret && !props.request.secret.requiresReload && props.request}
       fallback={<BrowserManualTakeoverCard {...props} />}
     >
-      {(request) => <ConnectedBrowserSecretCard request={request()} />}
+      {(request) => <ConnectedBrowserSecretCard request={request()} onOpen={props.onOpen} />}
     </Show>
   );
 }
 
-function ConnectedBrowserSecretCard(props: { request: BrowserTakeoverRequest }) {
+function ConnectedBrowserSecretCard(props: { request: BrowserTakeoverRequest; onOpen?: () => void }) {
   const { activeServer } = useServers();
   const connected = () => !activeServer() || activeServer()?.id === "local" || activeServer()?.state === "online";
   return (
     <Show when={connected()} fallback={<p role="status">Reconnect to enter the authentication value.</p>}>
       <BrowserSecretCard
         request={props.request}
+        onOpen={props.onOpen}
         loadPreview={(tabId) => window.openbot.browser.capturePreview(tabId)}
         onRespond={(input) => window.openbot.agent.respondToBrowserSecret(input)}
       />
