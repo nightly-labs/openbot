@@ -191,6 +191,7 @@ export class BrowserViewGateway {
 
   async #detach(session: ManagedViewSession, client: Ws.WebSocket): Promise<void> {
     if (session.socket !== client) return;
+    this.#sessions.delete(session.id);
     session.socket = null;
     const stopView = session.stopView;
     session.stopView = null;

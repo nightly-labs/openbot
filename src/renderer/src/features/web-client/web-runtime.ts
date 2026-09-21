@@ -384,17 +384,7 @@ export function createWebWorkspaceRuntime(
     },
     async conversation(id, before) {
       if (!capabilities.includes("conversation-pagination")) {
-        const snapshot: unknown = await request("GET", TEAM_API_ROUTES.agent.conversation(id));
-        if (!isConversationSnapshot(snapshot)) throw new Error("The host returned an invalid conversation.");
-        return {
-          agentId: snapshot.agentId,
-          threadId: snapshot.threadId,
-          activeTurnId: snapshot.activeTurnId,
-          revision: snapshot.revision,
-          messages: snapshot.messages,
-          references: {},
-          pageInfo: { hasOlder: false, olderCursor: null },
-        };
+        return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
       }
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
@@ -580,6 +570,11 @@ function decodeWebBrowserPreview(value: unknown): BrowserPreview {
   )
     throw new Error("The host returned an invalid browser preview.");
   return { dataUrl: value.dataUrl, width: value.width, height: value.height };
+}
+
+function decodeWebConversationSnapshot(value: unknown): ConversationPage {
+  if (!isConversationSnapshot(value)) throw new Error("The host returned an invalid conversation.");
+  return { ...value, references: {}, pageInfo: { hasOlder: false, olderCursor: null } };
 }
 
 export function decodeWebConversationPage(value: unknown): ConversationPage {

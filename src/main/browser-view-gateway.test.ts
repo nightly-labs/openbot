@@ -151,6 +151,35 @@ describe("the live browser view on a host", () => {
     expect(restartActivityGeneration()).toBeGreaterThan(before);
     await gateway.stop();
   });
+
+  it("releases a session after an abrupt stream disconnect", async () => {
+    const startView = vi.fn(async () => async () => undefined);
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView,
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: () => null,
+      maxSessions: 1,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(startView).toHaveBeenCalledOnce());
+
+    const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+    socket.terminate();
+    await closed;
+    await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
+
+    expect(() =>
+      gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-2" }),
+    ).not.toThrow();
+    await gateway.stop();
+  });
 });
 
 async function serve(gateway: BrowserViewGateway): Promise<string> {
