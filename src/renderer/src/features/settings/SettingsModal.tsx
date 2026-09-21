@@ -15,8 +15,11 @@ import type {
   SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { createEffect, createSignal, Show } from "solid-js";
+import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
+import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import {
   Button,
   CircleArrowDown,
@@ -78,6 +81,11 @@ export interface SettingsModalProps {
    * computer, which is also what takes the row's sign-in button away.
    */
   providerKeys?: ProviderKeyApi;
+  /**
+   * The code sign-in, for the providers that offer one. Absent for the same reason as
+   * `providerKeys`: a remote server's provider is not signed in from this computer.
+   */
+  codeLogin?: ProviderCodeLoginApi;
   hostedSitesApi?: HostedSitesDesktopApi;
   restoreFocusTarget?: HTMLElement | null;
 }
@@ -239,18 +247,31 @@ export function SettingsModal(props: SettingsModalProps) {
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
         floatingContent={
-          <Show when={openCodeKeyOpen() && props.providerKeys}>
-            {(api) => (
-              <OpenCodeKeyDialog
-                api={api()}
-                onClose={() => {
-                  setOpenCodeKeyOpen(false);
-                  void refreshOpenCodeKeyStatus();
-                }}
-                onReconnect={props.onConnectProvider ? () => props.onConnectProvider?.("opencode") : undefined}
-              />
-            )}
-          </Show>
+          <>
+            <Show when={openCodeKeyOpen() && props.providerKeys}>
+              {(api) => (
+                <OpenCodeKeyDialog
+                  api={api()}
+                  onClose={() => {
+                    setOpenCodeKeyOpen(false);
+                    void refreshOpenCodeKeyStatus();
+                  }}
+                  onReconnect={props.onConnectProvider ? () => props.onConnectProvider?.("opencode") : undefined}
+                />
+              )}
+            </Show>
+            <Show when={props.codeLogin?.provider() ? props.codeLogin : undefined}>
+              {(api) => (
+                <ProviderCodeLoginDialog
+                  open={true}
+                  providerName={agentProviderDescriptor(api().provider() ?? "codex").displayName}
+                  state={api().state()}
+                  onOpenVerificationUrl={api().openVerificationUrl}
+                  onCancel={api().cancel}
+                />
+              )}
+            </Show>
+          </>
         }
         footer={
           <SaveBarDock value={profile.nameDirty() ? true : null}>
@@ -321,6 +342,7 @@ export function SettingsModal(props: SettingsModalProps) {
             customProviders={props.customProviders}
             onDeleteCustomProvider={props.onDeleteCustomProvider}
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
+            onSignInWithCodeProvider={props.codeLogin?.start}
           />
         </Tabs.Content>
 

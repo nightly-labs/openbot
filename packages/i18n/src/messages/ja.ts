@@ -136,6 +136,7 @@ export const ja = {
   "provider.action.update": "アップデート",
   "provider.action.install": "インストール",
   "provider.action.signIn": "サインイン",
+  "provider.action.signInWithCode": "コードでログイン",
   "provider.action.add": "追加",
   "provider.aria.download": "{name} をダウンロード",
   "provider.aria.cancel": "{name} をキャンセル",
@@ -146,4 +147,6 @@ export const ja = {
   "provider.aria.update": "{name} を {version} にアップデート",
   "provider.aria.install": "{name} をインストール",
   "provider.aria.signIn": "{name} にサインイン",
+  "provider.aria.moreSignIn": "{name} の他のログイン方法",
+  "provider.aria.signInWithCode": "別のデバイスのコードで {name} にログイン",
 } as const satisfies Translation<AppMessages>;

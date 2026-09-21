@@ -15,6 +15,7 @@ import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
 import { DEFAULT_GENERAL_SETTINGS } from "../src/features/settings/app-settings";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
+import { createFakeCodeLogin } from "./code-login-fixture";
 import { createMockOpenBot } from "./mock-openbot";
 
 const storyAppInfo = { name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" } as const;
@@ -83,6 +84,15 @@ const openCodeInstalledAgentStatus: AgentStatus = {
     { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null },
   ],
 };
+/** ChatGPT installed and signed out, so its row offers both ways in. The rest are connected. */
+const codeSignInAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: (providerUpdateAgentStatus.providers ?? []).map((provider) =>
+    provider.id === "codex"
+      ? { ...provider, state: "sign-in-required", version: "0.149.1", message: "Connect ChatGPT to continue." }
+      : provider,
+  ),
+};
 /** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
 const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
@@ -118,6 +128,7 @@ function SettingsModalStory(props: {
   openCodeInstalled?: boolean;
   customProviderList?: boolean;
   customProviderSaveFails?: boolean;
+  codeSignIn?: boolean;
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
@@ -156,6 +167,7 @@ function SettingsModalStory(props: {
     if (mobileConnectionTimer !== undefined) window.clearTimeout(mobileConnectionTimer);
   });
 
+  const codeLogin = createFakeCodeLogin({ finishAfterMs: 0 });
   const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
     props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
   );
@@ -246,14 +258,17 @@ function SettingsModalStory(props: {
           }}
           onUpdateAction={runUpdateAction}
           agentStatus={
-            props.providerUpdate
-              ? providerUpdateAgentStatus
-              : props.providerDownloads
-                ? providerAgentStatus
-                : props.openCodeInstalled
-                  ? openCodeInstalledAgentStatus
-                  : undefined
+            props.codeSignIn
+              ? codeSignInAgentStatus
+              : props.providerUpdate
+                ? providerUpdateAgentStatus
+                : props.providerDownloads
+                  ? providerAgentStatus
+                  : props.openCodeInstalled
+                    ? openCodeInstalledAgentStatus
+                    : undefined
           }
+          codeLogin={props.codeSignIn ? codeLogin : undefined}
           providerRuntimeStatuses={
             props.providerUpdate
               ? runtimes.providerRuntimeStatuses()
@@ -269,7 +284,7 @@ function SettingsModalStory(props: {
           onCancelProviderDownload={
             props.providerUpdate ? runtimes.cancelProviderRuntimeDownload : props.providerDownloads ? fn() : undefined
           }
-          onConnectProvider={props.providerDownloads || props.providerUpdate ? fn() : undefined}
+          onConnectProvider={props.providerDownloads || props.providerUpdate || props.codeSignIn ? fn() : undefined}
           onAddCustomProvider={addCustomProvider}
           onDeleteCustomProvider={deleteCustomProvider}
           customProviders={customProviders()}
@@ -381,6 +396,20 @@ export const CustomProviderSaveFails: Story = {
 
     await expect(body.findByText("House Router refused the API key.")).resolves.toBeTruthy();
     await expect(body.getByLabelText(/^Provider ID/)).toHaveValue("house-router");
+  },
+};
+
+/**
+ * The ChatGPT row signed out. The sign-in finished on another device sits in the row's actions
+ * menu, so the row still leads with one button; choosing it opens the code over the modal.
+ */
+export const CodeSignIn: Story = {
+  render: () => <SettingsModalStory initialOpen codeSignIn />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("button", { name: "More ways to log in to ChatGPT" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "Log in with code" }));
+    await expect(await body.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
   },
 };
 

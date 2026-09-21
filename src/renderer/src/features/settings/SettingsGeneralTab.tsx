@@ -66,6 +66,8 @@ interface SettingsGeneralTabProps {
   /** Without it the rows are listed but not removable, which is what a story without the callback shows. */
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /** Opens the code sign-in. Absent in the stories, where there is no provider to answer it. */
+  onSignInWithCodeProvider?: (provider: AgentProviderId) => void | Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
@@ -113,6 +115,8 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           onSelectCustomProvider={props.onAddCustomProvider ? () => setCustomSelected(true) : undefined}
           onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
           onSignInProvider={props.onSignInProvider}
+          onSignInWithCodeProvider={props.onSignInWithCodeProvider}
+          menuMount={props.selectMount}
         />
         {/* The outcome is shown where the user is looking. While the list is open the section behind
             it is hidden from assistive technology, so a status left here could not be read. */}

@@ -304,6 +304,7 @@ function AppSettings(props: AccountProps) {
     cancelProviderRuntimeDownload,
     connectProvider,
     openProviderInstallGuide,
+    codeLogin,
   } = useProviders();
   const { customProviders, saveCustomProvider, deleteCustomProvider } = useCustomProviders();
   /** Provider downloads are the local machine's business, never a remote host's. */
@@ -348,6 +349,7 @@ function AppSettings(props: AccountProps) {
         onAddCustomProvider={localCustomProviders() ? saveCustomProvider : undefined}
         onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
+        codeLogin={localProviderDownloads() ? codeLogin : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />

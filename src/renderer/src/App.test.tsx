@@ -16,7 +16,7 @@ import {
   testConversationPage,
   testServer,
 } from "./app-test-harness";
-import { toast } from "./components/ui";
+import { Toaster, toast } from "./components/ui";
 import { AGENT_SELECTION_STORAGE_KEY } from "./features/agents/agent-selection";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversation } from "./features/conversation/conversation-context";
@@ -25,6 +25,7 @@ import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
 import { SIDEBAR_COLLAPSED_STORAGE_KEY } from "./features/sidebar/sidebar-sections";
 import { useLayout } from "./layout";
 import { useNavigation } from "./navigation";
+import { useProviders } from "./providers";
 
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
@@ -1072,5 +1073,76 @@ describe("OpenBot connected desktop shell", () => {
     emitAgentEvent?.({ type: "usage-changed", usage: { limits: [] } });
 
     await waitFor(() => expect(screen.queryByText("Usage limit reached")).not.toBeInTheDocument());
+  });
+  /**
+   * A ChatGPT row signed in to one account, and the code sign-in that reaches another one.
+   *
+   * The provider is `available` before the login starts, so nothing about the account alone says
+   * this login is over. What says it is the row reporting it is no longer connecting. The end of it
+   * is a notification rather than a last screen, so the dialog is gone by the time it arrives.
+   */
+  it("keeps a code sign-in waiting on a provider that is already signed in", async () => {
+    function CodeLoginProbe() {
+      const { codeLogin } = useProviders();
+      const { agentStatus } = useAgents();
+      const phase = () => {
+        if (codeLogin.provider() === null) return "closed";
+        const state = codeLogin.state();
+        return state.phase === "waiting" ? `waiting ${state.userCode}` : state.phase;
+      };
+      const row = () => agentStatus().providers?.find((provider) => provider.id === "codex");
+      return (
+        <>
+          <button type="button" onClick={() => codeLogin.start("codex")}>
+            Log in with code
+          </button>
+          <output aria-label="Code sign-in">{phase()}</output>
+          <output aria-label="ChatGPT row">{`${row()?.state} ${row()?.connectionState ?? "idle"} ${row()?.email}`}</output>
+          <Toaster />
+        </>
+      );
+    }
+    function codexStatus(codex: Partial<NonNullable<AgentStatus["providers"]>[number]>): AgentStatus {
+      return {
+        phase: "ready",
+        cliVersion: "0.155.0",
+        auth: { kind: "chatgpt", email: "first@example.com" },
+        providers: [{ id: "codex", state: "available", version: "0.155.0", message: null, ...codex }],
+        capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
+        message: null,
+        fullAccess: true,
+      };
+    }
+
+    render(() => (
+      <AppProviders>
+        <CodeLoginProbe />
+      </AppProviders>
+    ));
+    emitAgentEvent?.({ type: "status", status: codexStatus({ email: "first@example.com" }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText("ChatGPT row")).toHaveTextContent("available idle first@example.com"),
+    );
+
+    await fireEvent.click(screen.getByRole("button", { name: "Log in with code" }));
+    await waitFor(() => expect(screen.getByLabelText("Code sign-in")).toHaveTextContent("waiting KTQ4-B62MX"));
+
+    // The provider is working on the login, and the account the user already has is still on the
+    // row. Reading that account as the answer would end the dialog before anyone typed the code.
+    emitAgentEvent?.({
+      type: "status",
+      status: codexStatus({ connectionState: "connecting", email: "first@example.com" }),
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("ChatGPT row")).toHaveTextContent("available connecting first@example.com"),
+    );
+    expect(screen.getByLabelText("Code sign-in")).toHaveTextContent("waiting KTQ4-B62MX");
+
+    // The second account arrives, and only now is the sign-in over: the dialog closes, and what
+    // says which account was signed in to is a notification.
+    emitAgentEvent?.({ type: "status", status: codexStatus({ email: "second@example.com" }) });
+    await waitFor(() => expect(screen.getByLabelText("Code sign-in")).toHaveTextContent("closed"));
+    expect(await screen.findByText("ChatGPT connected")).toBeVisible();
+    expect(screen.getByText("Signed in as second@example.com.")).toBeVisible();
   });
 });
