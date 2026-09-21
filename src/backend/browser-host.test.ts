@@ -762,25 +762,8 @@ describe("secure browser handoff", () => {
     await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
   });
 
-  it("recovers after a submission error without asking for manual completion or replaying the secret", async () => {
-    const { tab, prepared, contents } = await prepare("password", 0);
-    secretEntry.mockRejectedValueOnce(new Error("Authentication target changed."));
-    const load = vi.spyOn(contents, "loadURL");
-    vi.useFakeTimers();
-    const submitted = prepared.submit("fixture-password");
-    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledOnce());
-    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
-    await vi.advanceTimersByTimeAsync(5_000);
-    await expect(submitted).resolves.toBe("submitted");
-    expect(load).toHaveBeenCalledOnce();
-    expect(load.mock.calls[0]?.[0]).toBe(tab.url);
-    expect(secretEntry).toHaveBeenCalledOnce();
-    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
-  });
-
-  it.each([false, true])("keeps protection without document replacement (entry fails: %s)", async (entryFails) => {
+  it("keeps protection when automatic navigation does not replace the document", async () => {
     const { tab, prepared, contents } = await prepare();
-    if (entryFails) secretEntry.mockRejectedValueOnce(new Error("Authentication target changed."));
     vi.spyOn(contents, "loadURL").mockResolvedValue(undefined);
     vi.useFakeTimers();
     const submitted = prepared.submit("123456");

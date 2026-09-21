@@ -92,17 +92,16 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       });
       const contents = webContents.getAllWebContents().find((item) => item.getURL() === staleTab.url);
       if (!contents) throw new Error("Missing stale-target fixture.");
-      await contents.executeJavaScript(`
-        document.querySelector('#code').name = 'changed';
-        document.querySelector('#code').addEventListener('input', () => sessionStorage.setItem('stale-input', 'received'));
-        true;
-      `);
-      if ((await handoff.submit("729104")) !== "submitted")
-        throw new Error("A rejected target did not recover browser access.");
-      if ((await contents.executeJavaScript("sessionStorage.getItem('stale-input')")) !== null)
-        throw new Error("A changed authentication target received input before recovery.");
-      const recovered = await browser.snapshot(staleTab.id);
-      if (!recovered.url.endsWith("/login")) throw new Error("Recovery incorrectly completed authentication.");
+      await contents.executeJavaScript("document.querySelector('#code').name = 'changed'; true");
+      let rejected = false;
+      try {
+        await handoff.submit("729104");
+      } catch {
+        rejected = true;
+      }
+      if (!rejected) throw new Error("A changed authentication target was accepted.");
+      if ((await contents.executeJavaScript("document.querySelector('#code').value")) !== "")
+        throw new Error("A changed authentication target received a value.");
     } finally {
       await browser.close(staleTab.id);
     }
