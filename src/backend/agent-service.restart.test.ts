@@ -427,7 +427,12 @@ describe.sequential("AgentService: restart", () => {
 
   it("deletes idle agents and refuses to orphan active work", async () => {
     const { store, mailbox } = stores(root);
-    service = createTestService({ store, mailbox });
+    let revokeFails = true;
+    const deleteWithRevokedApproval = vi.fn(async (_agentId: string, remove: () => Promise<void>) => {
+      if (revokeFails) throw new Error("Approval revocation failed.");
+      await remove();
+    });
+    service = createTestService({ store, mailbox, deleteWithRevokedApproval });
     await service.initialize();
 
     const deletedAgent = await store.getOrCreate("sales-outbound");
@@ -449,6 +454,11 @@ describe.sequential("AgentService: restart", () => {
       createdAt: "2026-09-01T12:00:00.000Z",
     });
     expect(store.database.pendingHostedSiteTerminalEvents()).toHaveLength(1);
+    await expect(service.deleteAgent("sales-outbound")).rejects.toThrow(
+      "The agent data could not be removed completely.",
+    );
+    expect(service.listAgents().some((agent) => agent.id === "sales-outbound")).toBe(true);
+    revokeFails = false;
     await service.deleteAgent("sales-outbound");
     await expect(service.deleteAgent("sales-outbound")).resolves.toBeUndefined();
     expect(service.listAgents().some((agent) => agent.id === "sales-outbound")).toBe(false);

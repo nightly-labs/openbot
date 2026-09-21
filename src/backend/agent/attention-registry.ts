@@ -24,6 +24,7 @@ import {
   getString,
   type RequestId,
 } from "../protocol";
+import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   HOSTED_SITE_APPROVAL_METHOD,
@@ -119,6 +120,8 @@ export interface AttentionRegistryOptions {
   browser: AttentionBrowserHost;
   hostedSites: HostedSiteApprovals;
   routines: RoutineAttention;
+  /** Read at each approval, so a grant the user gives now applies to the next request. */
+  approvalAutomation?: ApprovalAutomationPolicy;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
@@ -144,6 +147,7 @@ export class AttentionRegistry {
   readonly #browser: AttentionBrowserHost;
   readonly #hostedSites: HostedSiteApprovals;
   readonly #routines: RoutineAttention;
+  readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
@@ -156,6 +160,7 @@ export class AttentionRegistry {
     this.#browser = options.browser;
     this.#hostedSites = options.hostedSites;
     this.#routines = options.routines;
+    this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
@@ -313,6 +318,30 @@ export class AttentionRegistry {
     this.#emitRuntimeSnapshot();
   }
 
+  /**
+   * Answers an approval the user has already consented to, and reports whether it did.
+   *
+   * Nothing is registered and no `approval` event is emitted on this path, which is the whole point:
+   * an emitted approval opens a card, raises an operating-system notification and lights the
+   * Dynamic Island, and an automated grant that did all three before resolving itself a moment
+   * later would be worse than the prompt it replaced. What the agent then does is still visible -
+   * the command and the file change are ordinary timeline items either way.
+   *
+   * The response shapes are the ones `respondToApproval` uses for an accepted request; they are
+   * what the provider on the other end of each method understands.
+   */
+  #answerWithoutAsking(client: AgentClient, request: AppServerRequest, approval: AgentApproval): boolean {
+    if (!shouldAutoApprove(this.#approvalAutomation, approval)) return false;
+    if (approval.kind === "permissions") {
+      client.respond(request.id, { permissions: getRecord(request.params, "permissions") ?? {}, scope: "turn" });
+    } else if (request.method === "applyPatchApproval" || request.method === "execCommandApproval") {
+      client.respond(request.id, { decision: "approved" });
+    } else {
+      client.respond(request.id, { decision: "accept" });
+    }
+    return true;
+  }
+
   surfaceApproval(client: AgentClient, request: AppServerRequest, kind: AgentApprovalKind): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId") ?? (kind === "file-change" ? String(request.id) : null);
@@ -334,6 +363,7 @@ export class AttentionRegistry {
       grantRoot: getString(request.params, "grantRoot"),
       permissions: kind === "permissions" ? approvalPermissions(request.params) : null,
     };
+    if (this.#answerWithoutAsking(client, request, approval)) return;
     this.#approvals.set(request.id, {
       client,
       id: request.id,
@@ -353,6 +383,14 @@ export class AttentionRegistry {
   ): Promise<void> {
     const prepared = await this.#hostedSites.prepareApproval(client, request, params, tool);
     if (!prepared) return;
+    if (shouldAutoApprove(this.#approvalAutomation, prepared.approval)) {
+      await this.#hostedSites.resolveApproval(
+        prepared.mutation,
+        { client, id: request.id, agentId: prepared.approval.agentId },
+        "accept",
+      );
+      return;
+    }
     this.#approvals.set(request.id, {
       client,
       id: request.id,
@@ -386,6 +424,7 @@ export class AttentionRegistry {
       grantRoot: getString(request.params, "grantRoot"),
       permissions: null,
     };
+    if (this.#answerWithoutAsking(client, request, approval)) return;
     this.#approvals.set(request.id, {
       client,
       id: request.id,

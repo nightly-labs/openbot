@@ -69,6 +69,13 @@ the `media-attachments` capability; released protocol adapters keep their existi
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
 - A local team host owns conversations, files, agents, and the local member projection used by Team API.
+- `openbot-approval-automation-v1.json` holds Turbo mode and the agents granted "Always allow". It
+  belongs to the computer that runs the agent and never crosses the Team API, whose released
+  adapters freeze an approval response to `accept` or `decline`: a remote host that has automation
+  on answers its own approvals, so they never reach a client, and a client cannot grant one on a
+  remote host's behalf. `AttentionRegistry` reads it at each approval, including hosted-site
+  publishing, replacement and deletion. Site validation, ownership checks and activity markers
+  still apply. Questions and browser takeovers remain interactive.
 - `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
   migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
   carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.

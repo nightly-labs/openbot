@@ -37,7 +37,12 @@ import type {
   UpdatePreference,
   UpdateStatus,
 } from "./ipc-app-auth";
-import type { RespondToApprovalInput, RespondToBrowserTakeoverInput } from "./ipc-approvals";
+import type {
+  ApprovalAutomationPreference,
+  RespondToApprovalInput,
+  RespondToBrowserTakeoverInput,
+  SetApprovalAutomationInput,
+} from "./ipc-approvals";
 import type {
   AttachmentImportEvent,
   ChooseAttachmentsInput,
@@ -504,6 +509,8 @@ export interface OpenBotDesktopApi {
   saveSetup: (input: SaveSetupInput) => Promise<AppSetupState>;
   getAnalyticsPreference: () => Promise<AnalyticsPreference>;
   setAnalyticsPreference: (input: SetAnalyticsPreferenceInput) => Promise<AnalyticsPreference>;
+  getApprovalAutomation: () => Promise<ApprovalAutomationPreference>;
+  setApprovalAutomation: (input: SetApprovalAutomationInput) => Promise<ApprovalAutomationPreference>;
   getAppLanguagePreference: () => Promise<AppLanguagePreference>;
   setAppLanguagePreference: (input: SetAppLanguagePreferenceInput) => Promise<AppLanguagePreference>;
   onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
