@@ -1420,7 +1420,7 @@ index 4db8c6e4..594254c7 100644
 +#endif
  }  // namespace nvhttp
 diff --git a/src/nvhttp.h b/src/nvhttp.h
-index c24d018c..a6f70c08 100644
+index c24d018c..fc3e32dd 100644
 --- a/src/nvhttp.h
 +++ b/src/nvhttp.h
 @@ -6,7 +6,11 @@
@@ -1592,12 +1592,13 @@ index c24d018c..a6f70c08 100644
  
    /**
     * @brief Remove single client.
-@@ -208,4 +313,39 @@ namespace nvhttp {
+@@ -208,4 +313,40 @@ namespace nvhttp {
     * @examples_end
     */
    void erase_all_clients();
 +
 +#ifdef SUNSHINE_TESTS
++  std::string get_cert_by_uuid(std::string_view uuid);
 +  /**
 +   * @brief Test-only accessors for paired-client authorization state.
 +   */
@@ -2578,7 +2579,7 @@ index 00000000..bb953de7
 +  EXPECT_NE(certificate_chain.verify(derived_certificate.get()), nullptr);
 +}
 diff --git a/tests/unit/test_http_pairing.cpp b/tests/unit/test_http_pairing.cpp
-index 0b75e32b..0c62cd27 100644
+index 0b75e32b..a7dfb888 100644
 --- a/tests/unit/test_http_pairing.cpp
 +++ b/tests/unit/test_http_pairing.cpp
 @@ -5,6 +5,15 @@
@@ -2663,7 +2664,7 @@ index 0b75e32b..0c62cd27 100644
    ASSERT_FALSE(tree.get<int>("root.paired") == 1);
  
    // This should work, it's the first time we call it
-@@ -265,3 +284,199 @@ TEST(PairingTest, OutOfOrderCalls) {
+@@ -265,3 +284,200 @@ TEST(PairingTest, OutOfOrderCalls) {
    getservercert(sess, tree, "test");
    ASSERT_FALSE(tree.get<int>("root.paired") == 1);
  }
@@ -2847,7 +2848,7 @@ index 0b75e32b..0c62cd27 100644
 +TEST_F(PairingSessionRegistryTest, ConcurrentInsertionAndCancellationLeaveConsistentState) {
 +  constexpr std::size_t session_count = 16;
 +  std::atomic<std::size_t> successful_cancellations {0};
-+  std::vector<std::jthread> workers;
++  std::vector<std::thread> workers;
 +  workers.reserve(session_count);
 +
 +  for (std::size_t index = 0; index < session_count; ++index) {
@@ -2858,6 +2859,7 @@ index 0b75e32b..0c62cd27 100644
 +      }
 +    });
 +  }
++  for (auto &worker : workers) worker.join();
 +  workers.clear();
 +
 +  EXPECT_EQ(successful_cancellations, session_count);
@@ -3017,10 +3019,10 @@ index 00000000..c67e3189
 +}
 diff --git a/tests/unit/test_nvhttp_client_auth.cpp b/tests/unit/test_nvhttp_client_auth.cpp
 new file mode 100644
-index 00000000..20ae6fed
+index 00000000..9e539d1e
 --- /dev/null
 +++ b/tests/unit/test_nvhttp_client_auth.cpp
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,163 @@
 +/**
 + * @file tests/unit/test_nvhttp_client_auth.cpp
 + * @brief Test exact paired-client certificate authorization and persistence.
@@ -3166,7 +3168,7 @@ index 00000000..20ae6fed
 +  ASSERT_FALSE(uuid.empty());
 +
 +  std::atomic_bool operations_succeeded {true};
-+  std::vector<std::jthread> workers;
++  std::vector<std::thread> workers;
 +  for (std::size_t worker = 0; worker < 4; ++worker) {
 +    workers.emplace_back([&operations_succeeded, uuid, certificate = credentials.x509, worker]() {
 +      for (std::size_t iteration = 0; iteration < 8; ++iteration) {
@@ -3177,6 +3179,7 @@ index 00000000..20ae6fed
 +      }
 +    });
 +  }
++  for (auto &worker : workers) worker.join();
 +  workers.clear();
 +
 +  EXPECT_TRUE(operations_succeeded);
