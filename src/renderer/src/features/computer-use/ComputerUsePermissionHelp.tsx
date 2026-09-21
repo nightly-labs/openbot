@@ -47,15 +47,17 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
   const [dragging, setDragging] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   let disposed = false;
+  let reading = false;
 
   function close(): void {
     void desktopApi.closeComputerUsePermissionHelp();
   }
 
-  // The grant is given in another application, so nothing tells this window it happened. Asking
-  // again on a timer is what puts the accent on Done the moment the user is finished, in a window
-  // that otherwise says the same thing whether they did it or not.
+  // Computer Use can poll its driver. Sunshine checks start the runtime when it is idle,
+  // so refresh those only on open and when the user returns from System Settings.
   async function read(): Promise<void> {
+    if (reading || disposed) return;
+    reading = true;
     try {
       if (props.sunshine) {
         const state = await desktopApi.remoteDesktop.checkSetup(LOCAL_SERVER_ID);
@@ -68,6 +70,9 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
     } catch {
       // Left as it was. A read that failed says nothing about the grant, and an error in this window
       // would only take the steps off the screen the user is working on.
+      if (!disposed && props.sunshine) setGranted(false);
+    } finally {
+      reading = false;
     }
   }
 
@@ -95,7 +100,9 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
   };
 
   window.addEventListener("keydown", closeOnEscape);
-  const timer = setInterval(() => void read(), POLL_INTERVAL_MS);
+  const refreshOnFocus = () => void read();
+  const timer = props.sunshine ? undefined : setInterval(() => void read(), POLL_INTERVAL_MS);
+  if (props.sunshine) window.addEventListener("focus", refreshOnFocus);
 
   onSettled(() => {
     void read();
@@ -104,6 +111,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
   onCleanup(() => {
     disposed = true;
     clearInterval(timer);
+    window.removeEventListener("focus", refreshOnFocus);
     window.removeEventListener("keydown", closeOnEscape);
   });
 

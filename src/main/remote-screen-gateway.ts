@@ -296,7 +296,13 @@ export class RemoteScreenGateway {
 
   async createLocalTestSession(): Promise<RemoteDesktopSession> {
     const server = createServer((request, response) => {
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      let url: URL;
+      try {
+        url = new URL(request.url ?? "/", "http://127.0.0.1");
+      } catch {
+        response.writeHead(400).end();
+        return;
+      }
       if (!this.handlesHttp(url)) {
         response.writeHead(404);
         response.end();
@@ -307,7 +313,13 @@ export class RemoteScreenGateway {
       });
     });
     server.on("upgrade", (request, socket, head) => {
-      const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      let url: URL;
+      try {
+        url = new URL(request.url ?? "/", "http://127.0.0.1");
+      } catch {
+        socket.destroy();
+        return;
+      }
       this.handleUpgrade(request, socket, head, url);
     });
     try {

@@ -12,6 +12,7 @@ afterEach(() => {
   mock?.dispose();
   mock = undefined;
   window.openbot = previousApi;
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -128,5 +129,15 @@ describe("Sunshine permission help", () => {
     ).toBeInTheDocument();
     await waitFor(() => expect(readSunshine).toHaveBeenCalledWith(LOCAL_SERVER_ID));
     expect(readComputerUse).not.toHaveBeenCalled();
+    vi.useFakeTimers();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(readSunshine).toHaveBeenCalledOnce();
+    fireEvent(window, new Event("focus"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(readSunshine).toHaveBeenCalledTimes(2);
+    view.unmount();
+    fireEvent(window, new Event("focus"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(readSunshine).toHaveBeenCalledTimes(2);
   });
 });

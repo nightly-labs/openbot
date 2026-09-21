@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { createRequire } from "node:module";
+import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
@@ -73,6 +74,38 @@ describe("RemoteScreenGateway", () => {
     expect(gateway.list()).toHaveLength(0);
     await expect(fetch(session.viewerUrl)).rejects.toThrow();
     await gateway.stop();
+  });
+
+  it.each([false, true])("rejects a malformed local request target (upgrade: %s)", async (upgrade) => {
+    const gateway = createGateway();
+    const session = await gateway.createLocalTestSession();
+    try {
+      const socket = connect({ host: "127.0.0.1", port: Number(new URL(session.viewerUrl).port) });
+      const response = await new Promise<string>((resolve, reject) => {
+        let received = "";
+        socket.on("error", reject);
+        socket.on("data", (chunk: Buffer) => {
+          received += chunk.toString("utf8");
+        });
+        socket.on("close", () => resolve(received));
+        socket.on("connect", () =>
+          socket.write(
+            [
+              "GET //[ HTTP/1.1",
+              "Host: 127.0.0.1",
+              ...(upgrade ? ["Connection: Upgrade", "Upgrade: websocket"] : ["Connection: close"]),
+              "",
+              "",
+            ].join("\r\n"),
+          ),
+        );
+      });
+      if (upgrade) expect(response).toBe("");
+      else expect(response).toMatch(/^HTTP\/1\.1 400 /);
+      expect((await fetch(session.viewerUrl)).status).toBe(200);
+    } finally {
+      await gateway.stop();
+    }
   });
 
   it("does not request account ICE settings for a local test", async () => {
