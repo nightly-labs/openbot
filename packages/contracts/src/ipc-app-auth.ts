@@ -217,6 +217,20 @@ export interface ComputerUseState {
 }
 
 /**
+ * The application the user drags into a System Settings list, as the help window draws it.
+ *
+ * macOS grants a permission to an application bundle, and the list in System Settings does not
+ * always offer the one that asked. Dragging the bundle in is the way past that, so the window has
+ * to show the user the same name and icon the list will show - which in a development build is
+ * Electron, not OpenBot. `null` where there is no bundle to drag: every system that is not macOS,
+ * and a build that runs from a directory rather than an application.
+ */
+export interface ComputerUsePermissionApp {
+  name: string;
+  iconDataUrl: string | null;
+}
+
+/**
  * Where the rim is drawn inside the overlay window, and what it is drawn around.
  *
  * The overlay covers the whole desktop and never moves, so the rectangle here - in the overlay's

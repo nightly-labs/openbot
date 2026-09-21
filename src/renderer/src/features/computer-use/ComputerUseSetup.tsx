@@ -125,14 +125,18 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
    * easily as it is given, and a panel that reads "Granted" with no way to ask again would keep
    * saying so long after macOS stopped agreeing.
    */
+  const recheckButton = () => (
+    <Show when={showPermissions()}>
+      <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
+        <RefreshCw aria-hidden="true" />
+        Check again
+      </Button>
+    </Show>
+  );
+
   const recheck = () => (
     <Show when={showPermissions()}>
-      <div class="computer-use-recheck">
-        <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
-          <RefreshCw aria-hidden="true" />
-          Check again
-        </Button>
-      </div>
+      <div class="computer-use-recheck">{recheckButton()}</div>
     </Show>
   );
 
@@ -184,12 +188,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
       <Show when={showPermissions()}>
         <Show
           when={props.variant === "settings"}
-          fallback={
-            <>
-              <PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />
-              {recheck()}
-            </>
-          }
+          fallback={<PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />}
         >
           <SettingsSection title="System permissions" description="Permissions are managed by macOS.">
             <PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />
@@ -236,7 +235,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
               <h2 id="computer-use-compact-title">Enable Computer Use</h2>
               <p>Let OpenBot see and interact with apps on this computer.</p>
             </div>
-            <span>Optional</span>
+            {recheckButton()}
           </header>
           {content()}
         </section>
@@ -272,6 +271,10 @@ function PermissionGroup(props: {
                  * The badge says where the grant stands; the button stays beside it. A grant is
                  * taken away in the same pane it is given in, and a row that offered no way back
                  * once it read "Granted" would leave the user to find that pane by themselves.
+                 *
+                 * The accent is on the one row that still needs the user, so a panel of two rows
+                 * says at a glance which one is left. A granted row keeps the way back and drops
+                 * both the accent and the word "Grant", which would ask for what it already has.
                  */}
                 <Show when={permission.granted}>
                   <Badge variant="success-light">
@@ -283,12 +286,16 @@ function PermissionGroup(props: {
                   type="button"
                   variant="outline"
                   size="sm"
+                  class={permission.granted ? undefined : "computer-use-grant"}
                   loading={props.busy === permission.id}
                   loadingLabel="Opening…"
                   disabled={props.busy !== null}
+                  // "Grant" alone is the same word on both rows, which says nothing about which
+                  // permission it opens to anybody who reads the buttons on their own.
+                  aria-label={`${permission.granted ? "Manage" : "Grant"} ${details.title}`}
                   onClick={() => void props.onOpen(permission.id)}
                 >
-                  Open settings
+                  {permission.granted ? "Manage" : "Grant"}
                 </Button>
               </ItemActions>
             </Item>

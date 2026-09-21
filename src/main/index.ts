@@ -299,6 +299,7 @@ function registerIpcHandlers({
   voice,
   dynamicIsland,
   cuaDriver,
+  computerUsePermissionHelp,
   analytics,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -324,7 +325,11 @@ function registerIpcHandlers({
       setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
-    ...computerUseIpcHandlers({ cuaDriver, openExternal: (url) => shell.openExternal(url) }),
+    ...computerUseIpcHandlers({
+      cuaDriver,
+      openExternal: (url) => shell.openExternal(url),
+      permissionHelp: computerUsePermissionHelp,
+    }),
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials }),
     ...voiceIpcHandlers({ voice }),
     ...accountIpcHandlers({ centralAuth, host }),

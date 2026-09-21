@@ -28,6 +28,7 @@ import type {
   AppSetupState,
   CentralAuthDesktopApi,
   ComputerUseHighlightPlacement,
+  ComputerUsePermissionApp,
   ComputerUseState,
   ExportResult,
   ExternalDestination,
@@ -539,6 +540,11 @@ export interface OpenBotDesktopApi {
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseState: () => Promise<ComputerUseState>;
   openComputerUsePermissionPane: (permission: MacPermissionId) => Promise<ComputerUseState>;
+  closeComputerUsePermissionHelp: () => Promise<void>;
+  getComputerUsePermissionApp: () => Promise<ComputerUsePermissionApp | null>;
+  /** Starts the native drag. Only the help window may call it; every other sender is refused. */
+  startComputerUsePermissionAppDrag: () => Promise<void>;
+  revealComputerUsePermissionApp: () => Promise<void>;
   /**
    * Where to draw the rim over the window an agent works in. Only the overlay surface listens.
    *

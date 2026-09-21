@@ -15,6 +15,7 @@ import {
   type ComputerUseHighlightPlacement,
   IPC_CHANNELS,
   LOCAL_SERVER_ID,
+  type MacPermissionId,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { app, BrowserWindow, clipboard, type Display, Menu, type Rectangle, screen } from "electron";
@@ -393,6 +394,71 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
     if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
   });
   return window;
+}
+
+/**
+ * The small window that stands beside the System Settings pane a permission is granted in.
+ *
+ * System Settings opens in front of everything and covers OpenBot, so the panel that asked for the
+ * grant is no longer on screen at the moment the user has to act. This window carries the steps
+ * there: it floats, it is small enough to leave the pane readable, and it reports the grant landing
+ * so the user knows they are done without going back to look.
+ *
+ * It holds no secret and asks for nothing. Every hardening the other surfaces carry is kept:
+ * sandboxed, context-isolated, no window may be opened from it, and no navigation away from the
+ * renderer's own origin.
+ */
+export function createComputerUsePermissionHelpWindow(): BrowserWindow {
+  const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const width = 340;
+  // The card the user drags out of it, the two steps, and nothing else: a window taller than its
+  // own contents would put empty space over the pane it stands beside.
+  const height = 322;
+  const window = new BrowserWindow({
+    width,
+    height,
+    x: workArea.x + workArea.width - width - 16,
+    y: workArea.y + 52,
+    show: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    backgroundColor: "#0b0d0e",
+    title: "Turn on Computer Use",
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 12, y: 13 } }
+      : {}),
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.cjs"),
+      contextIsolation: true,
+      devTools: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+  });
+  // Over System Settings, which opens in front of everything: a window the pane covers would carry
+  // the steps to nobody.
+  window.setAlwaysOnTop(true, "floating");
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event, targetUrl) => {
+    if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
+  });
+  return window;
+}
+
+export function loadComputerUsePermissionHelpRenderer(
+  window: BrowserWindow,
+  permission: MacPermissionId,
+): Promise<void> {
+  const developmentUrl = process.env.ELECTRON_RENDERER_URL;
+  const url = new URL(developmentUrl ?? "openbot-app://app/index.html");
+  url.searchParams.set("surface", "computer-use-permission-help");
+  url.searchParams.set("permission", permission);
+  return window.loadURL(url.toString());
 }
 
 export function loadComputerUseHighlightRenderer(window: BrowserWindow): Promise<void> {

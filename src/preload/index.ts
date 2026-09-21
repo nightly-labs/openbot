@@ -15,6 +15,7 @@ import {
   type ComputerUseCursorPoint,
   type ComputerUseHighlightPlacement,
   type ComputerUsePermission,
+  type ComputerUsePermissionApp,
   type ComputerUseState,
   type ConversationMessage,
   type ConversationPage,
@@ -195,6 +196,18 @@ function decodeComputerUseCoveredArea(value: unknown): ComputerUseCoveredArea {
     throw new Error("Invalid Computer Use highlight placement.");
   }
   return { x: value.x, y: value.y, width: value.width, height: value.height };
+}
+
+function decodeComputerUsePermissionApp(value: unknown): ComputerUsePermissionApp | null {
+  if (value === null) return null;
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.name) ||
+    (value.iconDataUrl !== null && !isString(value.iconDataUrl))
+  ) {
+    throw new Error("Invalid Computer Use application.");
+  }
+  return { name: value.name, iconDataUrl: value.iconDataUrl };
 }
 
 function decodeComputerUsePermission(value: unknown): ComputerUsePermission {
@@ -909,6 +922,14 @@ const openbotApi: OpenBotDesktopApi = {
   getComputerUseState: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseGetState).then(decodeComputerUseState),
   openComputerUsePermissionPane: (permission) =>
     ipcRenderer.invoke(IPC_CHANNELS.computerUseOpenPermissionPane, permission).then(decodeComputerUseState),
+  closeComputerUsePermissionHelp: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseClosePermissionHelp).then(decodeVoid),
+  getComputerUsePermissionApp: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseGetPermissionApp).then(decodeComputerUsePermissionApp),
+  startComputerUsePermissionAppDrag: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseStartPermissionAppDrag).then(decodeVoid),
+  revealComputerUsePermissionApp: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseRevealPermissionApp).then(decodeVoid),
   onComputerUseHighlightPlacement: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, placement: unknown) =>
       listener(decodeComputerUseHighlightPlacement(placement));

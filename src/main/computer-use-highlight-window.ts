@@ -101,6 +101,13 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   #timer: ReturnType<typeof setInterval> | null = null;
   #tick: Promise<void> | null = null;
   #destroyed = false;
+  /**
+   * Which run of the controller a placement belongs to. A tick reads the driver and loads a window,
+   * and `stop()` may land between either of those and the placement that follows it. Hiding alone
+   * would not hold: the tick would go on to show the overlay again, with no timer left to take it
+   * down, and the rim would stay over a desktop no agent is working on.
+   */
+  #generation = 0;
 
   constructor(options: ComputerUseHighlightControllerOptions<W>) {
     this.#options = options;
@@ -125,6 +132,7 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   }
 
   stop(): void {
+    this.#generation += 1;
     if (this.#timer) {
       clearInterval(this.#timer);
       this.#timer = null;
@@ -157,7 +165,10 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
   }
 
   async #refresh(): Promise<void> {
+    const generation = this.#generation;
+    const stale = () => this.#destroyed || this.#generation !== generation;
     const target = await this.#options.readTarget(this.#target);
+    if (stale()) return;
     this.#target = target;
     // Only the move from one window to another, not every tick, and never the title: a window
     // title carries the user's own work.
@@ -165,7 +176,6 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
       this.#loggedWindowId = target?.windowId ?? null;
       this.#logger.debug("Computer Use highlight moved", { window: toLogValue(this.#loggedWindowId) });
     }
-    if (this.#destroyed) return;
     if (!target) {
       this.#hide();
       return;
@@ -184,7 +194,7 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
       if (!overlay.loaded) {
         overlay.loaded = true;
         await this.#options.loadWindow(overlay.window);
-        if (this.#destroyed || overlay.window.isDestroyed()) return;
+        if (stale() || overlay.window.isDestroyed()) return;
       }
       // Only when the display is resized or moved. Every other tick leaves the window alone, which
       // is the whole point of an overlay the size of the display it sits on.

@@ -66,6 +66,39 @@ const target = (
 });
 
 describe("ComputerUseHighlightController", () => {
+  // The daemon may stop while a tick sits between the window load and the placement. `stop()` hides
+  // the overlays and clears the timer, so a tick that went on to show one would leave the rim over a
+  // desktop no agent works on, with no further tick left to take it down.
+  it("shows no overlay when it is stopped while a window is loading", async () => {
+    const windows: ReturnType<typeof fakeWindow>[] = [];
+    let loaded: () => void = () => {};
+    const loading = new Promise<void>((resolve) => {
+      loaded = resolve;
+    });
+    const place = vi.fn();
+    const controller = new ComputerUseHighlightController({
+      createWindow: () => {
+        const window = fakeWindow();
+        windows.push(window);
+        return window;
+      },
+      loadWindow: () => loading,
+      place,
+      displays: () => DESKTOP,
+      readTarget: async () => target(7, "Notes", { x: 0, y: 0, width: 800, height: 600 }),
+    });
+
+    const tick = controller.refresh();
+    await vi.waitFor(() => expect(windows).toHaveLength(1));
+    controller.stop();
+    loaded();
+    await tick;
+
+    expect(place).not.toHaveBeenCalled();
+    expect(windows[0].showInactive).not.toHaveBeenCalled();
+    expect(controller.visible).toBe(false);
+  });
+
   it("follows the window the agent works in without moving the overlay", async () => {
     const first = { x: 100, y: 80, width: 900, height: 600 };
     const moved = { x: 140, y: 120, width: 900, height: 600 };

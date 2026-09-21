@@ -26,7 +26,7 @@ import { localSkillTools } from "./local-skill-tools";
  */
 
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { OPENBOT_CURSOR_THEME_ID } from "@openbot/brand/cursor-theme";
@@ -43,7 +43,7 @@ import type {
 import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
+import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
@@ -60,6 +60,8 @@ import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
+import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
+import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
 import {
   COMPUTER_USE_ACTION_MAX_AGE_MS,
   COMPUTER_USE_CURSOR_MAX_AGE_MS,
@@ -86,8 +88,10 @@ import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   computerUseDisplays,
   createComputerUseHighlightWindow,
+  createComputerUsePermissionHelpWindow,
   createDynamicIslandWindow,
   loadComputerUseHighlightRenderer,
+  loadComputerUsePermissionHelpRenderer,
   loadDynamicIslandRenderer,
   type MainWindowController,
   sendComputerUseHighlightPlacement,
@@ -169,6 +173,7 @@ const TEARDOWN_ORDER = {
   updater: 10,
   hostUpdateCoordinator: 12,
   computerUseHighlight: 18,
+  computerUsePermissionHelp: 19,
   dynamicIsland: 20,
   browser: 30,
   browserPictureInPicture: 40,
@@ -239,6 +244,7 @@ export interface ApplicationServices {
   dynamicIsland: DynamicIslandWindowController;
   cuaDriver: CuaDriverRuntime;
   computerUseHighlight: ComputerUseHighlightController;
+  computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
   teamStore: TeamStore;
   /**
@@ -641,6 +647,31 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.computerUseHighlight, "the Computer Use highlight", async () => {
     computerUseHighlight.destroy();
     await computerUseReads.close();
+  });
+  const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
+    createWindow: createComputerUsePermissionHelpWindow,
+    loadWindow: loadComputerUsePermissionHelpRenderer,
+    // The bundle that owns this process, which is the one macOS attributes every click and capture
+    // to. In a development build that is Electron itself, and the window says so.
+    bundlePath: () => applicationBundlePath(app.getPath("exe"), process.platform),
+    // `large` is 32 points, which is the size a drag image is drawn at.
+    // Read out of the bundle rather than asked of macOS: `app.getFileIcon` ends the main process
+    // on this Electron. The app's own icon stands in for a bundle that carries none, because a drag
+    // with no image is refused and would leave the user with a card that does nothing.
+    bundleIcon: async (path) => {
+      const resources = join(path, "Contents", "Resources");
+      const names: string[] = await readdir(resources).catch(() => []);
+      const iconName = applicationIconName(path, names);
+      const icon = iconName ? nativeImage.createFromPath(join(resources, iconName)) : nativeImage.createEmpty();
+      // A bundle icon is drawn at up to 1024 points, and a drag carries the image at its own size:
+      // unresized it covers the pane the user is dragging onto.
+      return (icon.isEmpty() ? nativeImage.createFromPath(appIconPath) : icon).resize({ width: 32, height: 32 });
+    },
+    revealPath: (path) => shell.showItemInFolder(path),
+  });
+  // An always-on-top window that outlived the quit would be the last thing on the desktop.
+  teardown.push(TEARDOWN_ORDER.computerUsePermissionHelp, "the Computer Use permission help", () => {
+    computerUsePermissionHelp.close();
   });
   const service: AgentService = new AgentService({
     store,
@@ -1104,6 +1135,7 @@ export async function createApplicationServices({
     dynamicIsland,
     cuaDriver,
     computerUseHighlight,
+    computerUsePermissionHelp,
     analytics,
     teamStore,
     appliedAccount: signedInState,

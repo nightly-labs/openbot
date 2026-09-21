@@ -53,8 +53,13 @@
   margin-top: var(--openbot-space-2);
 }
 
+/*
+ * Wide enough that nothing here wraps or is cut: the header sentence beside "Check again", and each
+ * permission description beside its badge and button. `.ui-item-description` ends in an ellipsis
+ * rather than a second line, so a card too narrow loses the words instead of folding them.
+ */
 .computer-use-compact {
-  width: min(100%, 430px);
+  width: min(100%, 520px);
   margin-top: var(--openbot-space-4);
   text-align: left;
 }
@@ -82,11 +87,12 @@
   line-height: var(--openbot-leading-sm);
 }
 
-.computer-use-compact-header > span {
+/*
+ * "Check again" sits on the same line as the heading, not under the rows: the grant it asks about is
+ * given outside this window, so the button belongs to the card and not to any one permission.
+ */
+.computer-use-compact-header > .ui-button {
   flex: 0 0 auto;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-md);
 }
 
 .computer-use-compact .computer-use-card {
@@ -129,6 +135,17 @@
   display: flex;
   justify-content: flex-end;
   margin-top: var(--openbot-space-2);
+}
+
+/* A label-and-icon button carries no size of its own for the mark beside the word, and a 24px icon
+   dwarfs a two-word label. */
+.computer-use-recheck .ui-button > svg,
+.computer-use-compact-header .ui-button > svg,
+.computer-use-alert .ui-button > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 /*
@@ -218,4 +235,189 @@ body:has(.computer-use-highlight-surface),
   .computer-use-agent-cursor {
     transition: none;
   }
+}
+
+/*
+ * The accent on the one row that still needs the user. `--openbot-accent` is the colour of an
+ * action here, and a panel of two rows says at a glance which one is left when only the ungranted
+ * one carries it.
+ */
+.computer-use-grant:is(.ui-button) {
+  border-color: transparent;
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 601px) {
+  .computer-use-grant:is(.ui-button):hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-accent-hover);
+  }
+}
+
+/*
+ * The window that stands beside the System Settings pane. It is small, it is the only thing in its
+ * own window, and the user reads it while looking at another application - so it carries the steps
+ * and nothing else.
+ */
+.computer-use-help {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  /* Clear of the traffic lights, which sit over this surface on macOS. */
+  padding: 44px var(--openbot-space-4) var(--openbot-space-4);
+  background: var(--openbot-bg-canvas);
+  text-align: left;
+}
+
+.computer-use-help-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--openbot-space-3);
+}
+
+.computer-use-help-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-accent-soft);
+}
+
+.computer-use-help-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-accent-text);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.computer-use-help h1 {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+}
+
+.computer-use-help-header p {
+  margin: var(--openbot-space-0-5) 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.computer-use-help-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding-left: var(--openbot-space-4);
+  /* The order of the two steps is the whole of the instruction, so the numbers have to be drawn. */
+  list-style: decimal;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.computer-use-help-status {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.computer-use-help-status svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  color: var(--openbot-success);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.computer-use-help-status.is-error {
+  color: var(--openbot-danger);
+}
+
+/*
+ * The bundle the user drags onto the list in System Settings. The list offers no way to browse for
+ * an application, so this card is the only way in, and it has to read as something to pick up.
+ */
+.computer-use-drag-card {
+  position: relative;
+  width: 210px;
+  min-height: 94px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--openbot-space-1);
+  align-self: center;
+  box-sizing: border-box;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+  cursor: grab;
+  -webkit-app-region: no-drag;
+}
+
+.computer-use-drag-card:hover {
+  border-color: var(--openbot-accent-strong);
+  background: var(--openbot-bg-control-hover);
+}
+
+.computer-use-drag-card:active,
+.computer-use-drag-card.is-dragging {
+  cursor: grabbing;
+}
+
+.computer-use-drag-handle {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  color: var(--openbot-text-dim);
+}
+
+.computer-use-drag-handle svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.computer-use-drag-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+}
+
+.computer-use-drag-icon img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.computer-use-drag-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-text-secondary);
+}
+
+.computer-use-drag-card strong {
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.computer-use-drag-card > span:last-child {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.computer-use-help-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
 }

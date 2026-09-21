@@ -649,6 +649,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       grantedComputerUsePermissions.add(permission);
       return computerUseState();
     },
+    // The help window belongs to the desktop app. The preview has no second window to close, and
+    // the panel never waits on the answer.
+    closeComputerUsePermissionHelp: async () => undefined,
+    // No bundle to drag in a browser, so the window draws its steps and nothing else.
+    getComputerUsePermissionApp: async () => null,
+    startComputerUsePermissionAppDrag: async () => undefined,
+    revealComputerUsePermissionApp: async () => undefined,
     // The rim is drawn over another application's window, which the preview has none of, so this
     // subscribes to a stream that never carries anything.
     onComputerUseHighlightPlacement: () => () => undefined,

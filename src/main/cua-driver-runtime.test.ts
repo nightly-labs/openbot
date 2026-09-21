@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -210,6 +211,43 @@ describe("CuaDriverRuntime", () => {
     await driver.start();
 
     expect(driver.mcpServerConfig()?.args).toEqual(["mcp", "--socket", driver.socketPath()]);
+  });
+
+  // A daemon that stops on its own leaves the tap listening, and the panel's "Try again" is a start
+  // that follows. A restart that unlinked the address without closing the listener would hand the
+  // providers a path nothing answers on, and no further retry could recover it.
+  it("listens again on the tap address after the daemon stops on its own", async () => {
+    const children: ChildProcess[] = [];
+    const { driver } = await runtime({
+      spawnProcess: (_command, _args, options) => {
+        const [standIn, ...standInArgs] = STAND_IN_DAEMON;
+        const child = spawn(standIn, standInArgs, { stdio: options.stdio, windowsHide: true });
+        children.push(child);
+        return child;
+      },
+    });
+    await driver.start();
+    const address = driver.tapAddress();
+    expect(address).not.toBe(driver.socketPath());
+
+    const exited = new Promise<void>((resolve) => children[0].once("exit", () => resolve()));
+    children[0].kill("SIGKILL");
+    await exited;
+    await vi.waitFor(() => expect(driver.running()).toBe(false));
+
+    await driver.start();
+
+    expect(driver.tapAddress()).toBe(address);
+    expect(existsSync(address)).toBe(true);
+    await new Promise<void>((resolve, reject) => {
+      const client = connect(address);
+      client.once("connect", () => {
+        client.destroy();
+        resolve();
+      });
+      client.once("error", reject);
+    });
+    await driver.stop();
   });
 
   it("stops the daemon it started", async () => {

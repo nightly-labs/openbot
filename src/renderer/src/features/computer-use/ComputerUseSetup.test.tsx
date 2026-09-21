@@ -35,7 +35,7 @@ describe("ComputerUseSetup", () => {
 
     const section = (await view.findByRole("heading", { name: "System permissions" })).closest("section");
     if (!section) throw new Error("The System permissions section is missing.");
-    const [screenRecording] = within(section).getAllByRole("button", { name: "Open settings" });
+    const screenRecording = within(section).getByRole("button", { name: "Grant Screen Recording" });
     await fireEvent.click(screenRecording);
 
     await waitFor(() => expect(openPane).toHaveBeenCalledWith("screen-recording"));
@@ -56,7 +56,9 @@ describe("ComputerUseSetup", () => {
 
     expect(await view.findByText("Granted")).toBeInTheDocument();
     // Both rows, the granted one included: a grant is taken away in the same pane it is given in.
-    expect(view.getAllByRole("button", { name: "Open settings" })).toHaveLength(2);
+    // The granted row asks for nothing, so it reads "Manage" rather than "Grant".
+    expect(view.getByRole("button", { name: "Manage Screen Recording" })).toBeInTheDocument();
+    expect(view.getByRole("button", { name: "Grant Accessibility" })).toBeInTheDocument();
   });
 
   // A grant is given in System Settings, outside this window. The driver reports only what it sees
@@ -108,6 +110,6 @@ describe("ComputerUseSetup", () => {
 
     expect(await view.findByText("Computer Use is ready")).toBeInTheDocument();
     expect(view.queryByText("Screen Recording")).not.toBeInTheDocument();
-    expect(view.queryByRole("button", { name: "Open settings" })).not.toBeInTheDocument();
+    expect(view.queryByRole("button", { name: "Grant Screen Recording" })).not.toBeInTheDocument();
   });
 });

@@ -633,6 +633,10 @@ export class CuaDriverRuntime {
     const endpoint = this.#options.endpoint;
     const address =
       endpoint.kind === "windows-pipe" ? `${endpoint.name}-tap` : join(endpoint.directory, TAP_SOCKET_FILE);
+    // A daemon that stops on its own leaves the tap listening, and `listen` returns at once while it
+    // does. Without this, the restart would unlink the address below and then hand the providers a
+    // path nothing answers on, with no way back except restarting OpenBot.
+    await this.#tap.close();
     if (endpoint.kind === "unix-socket") await rm(address, { force: true }).catch(() => undefined);
     try {
       await this.#tap.listen({ upstream: socketPath, tap: address });
