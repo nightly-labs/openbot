@@ -125,7 +125,7 @@ only the relevant packet, pairing, REST authorization, and certificate regressio
 Moonlight client uses a random pairing name and approves only its matching loopback request ID.
 The published runtime uses a new recipe/input digest; no existing release assets are replaced.
 The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
-on Linux, and the macOS/Windows runtime disables the tray.
+on Linux.
 
 ## Pin the OpenCode CLI
 

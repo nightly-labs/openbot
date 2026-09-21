@@ -114,6 +114,7 @@ interface Harness {
   sunshineHits: Array<{ path: string; localPort: number }>;
   pinBodies: string[];
   pairingName: string;
+  duplicatePairing: boolean;
   pendingPairings: Array<{ id: string; name: string; address: string }>;
   pinSubmitted: Deferred<void>;
   servers: Array<HttpServer | HttpsServer>;
@@ -269,6 +270,8 @@ function moonlightHandler(harness: Harness): (request: IncomingMessage, response
           { id: "3".repeat(32), name: harness.pairingName, address: "192.0.2.1" },
           { id: "1".repeat(32), name: harness.pairingName, address: "127.0.0.1" },
         ];
+        if (harness.duplicatePairing)
+          harness.pendingPairings.push({ id: "4".repeat(32), name: harness.pairingName, address: "127.0.0.1" });
         response.write(`${JSON.stringify({ Pin: "4242" })}\n`);
         const submitted = await Promise.race([
           harness.pinSubmitted.promise.then(() => true),
@@ -309,6 +312,7 @@ function createHarness(stateDirectory: string): Harness {
     sunshineHits: [],
     pinBodies: [],
     pairingName: "",
+    duplicatePairing: false,
     pendingPairings: [],
     pinSubmitted: createDeferred<void>(),
     servers: [],
@@ -384,12 +388,14 @@ function createHarness(stateDirectory: string): Harness {
 
 async function createStartedRuntime(
   getIceServers: () => Promise<RemoteDesktopIceServer[]> = async () => [{ urls: "stun:127.0.0.1:3478" }],
+  configureHarness?: (harness: Harness) => void,
 ): Promise<{
   runtime: SunshineMoonlightRuntime;
   harness: Harness;
 }> {
   const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-sunshine-port-test-"));
   const harness = createHarness(stateDirectory);
+  configureHarness?.(harness);
   const runtime = new SunshineMoonlightRuntime({
     paths: TEST_PATHS,
     stateDirectory,
@@ -399,9 +405,15 @@ async function createStartedRuntime(
     getIceServers,
     spawnProcess: harness.spawn,
   });
-  await runtime.start();
-  if (harness.serverErrors.length > 0) throw harness.serverErrors[0];
-  return { runtime, harness };
+  try {
+    await runtime.start();
+    if (harness.serverErrors.length > 0) throw harness.serverErrors[0];
+    return { runtime, harness };
+  } catch (error) {
+    harness.pinSubmitted.resolve();
+    await disposeRuntime(runtime, harness);
+    throw error;
+  }
 }
 
 async function disposeRuntime(runtime: SunshineMoonlightRuntime, harness: Harness): Promise<void> {
@@ -420,6 +432,17 @@ async function blockTcp(port: number): Promise<TcpServer> {
 }
 
 describe("sunshine port family helpers", () => {
+  it("refuses ambiguous local pairing requests without submitting the PIN", async () => {
+    let pinBodies: string[] = [];
+    await expect(
+      createStartedRuntime(undefined, (harness) => {
+        harness.duplicatePairing = true;
+        pinBodies = harness.pinBodies;
+      }),
+    ).rejects.toThrow("ambiguous local pairing requests");
+    expect(pinBodies).toEqual([]);
+  });
+
   it.each(["throw", "reject"])("returns 503 for an ICE callback that can %s and recovers", async (failure) => {
     let fail = true;
     const { runtime, harness } = await createStartedRuntime(() => {
