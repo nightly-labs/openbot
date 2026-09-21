@@ -1,0 +1,61 @@
+name: Computer Use driver pin
+
+# The driver is a vendor release, pinned by tag, asset digest, and one digest per shipped file.
+# Nothing builds it, so there is no recipe to check - only the question of whether the pin still
+# resolves. `release.yml` is the first place that asks today, which makes a deleted or rewritten
+# upstream asset a failure at tag time. This job asks on the pull request that moves the pin, and
+# once a week for a pin that stopped resolving while nobody touched it.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/cua-driver.yml"
+      - "native-runtime.lock.json"
+      - "scripts/cua-driver-archive.ts"
+      - "scripts/cua-driver-lock.ts"
+      - "scripts/install-cua-driver.ts"
+      - "scripts/pin-cua-driver.ts"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cua-driver-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  install:
+    # Every target, because each release job installs its own and a pin that resolves for one
+    # platform says nothing about the other two. The installer checks the archive digest, then each
+    # file's digest after extraction, so a download that answers is not by itself a pass.
+    name: Install the pinned driver (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            platform: darwin
+            architecture: arm64
+          - target: win32-x64
+            platform: win32
+            architecture: x64
+          - target: linux-x64
+            platform: linux
+            architecture: x64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Install and verify the pinned driver
+        run: bun scripts/install-cua-driver.ts ${{ matrix.platform }} ${{ matrix.architecture }}
