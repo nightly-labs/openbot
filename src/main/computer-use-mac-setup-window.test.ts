@@ -31,6 +31,7 @@ describe("ComputerUseMacSetupWindowController", () => {
     const fakeWindow = {
       isDestroyed: () => false,
       webContents: sender,
+      setTitle: vi.fn(),
       show,
       focus,
       close: vi.fn(),
@@ -79,6 +80,16 @@ describe("ComputerUseMacSetupWindowController", () => {
 
     await controller.revealHelper();
     expect(revealPath).toHaveBeenCalledWith(join(root, COMPUTER_USE_HELPER_RELATIVE_PATH));
+
+    await controller.openHelper("accessibility", "/runtime/Sunshine.app", "Sunshine");
+    expect(await controller.getState(41)).toMatchObject({ helperName: "Sunshine" });
+    expect(await controller.getState(99)).toMatchObject({ helperName: "Codex Computer Use" });
+    await controller.startDrag(createWindow().webContents);
+    expect(startDrag).toHaveBeenLastCalledWith({ file: "/runtime/Sunshine.app", icon: "helper-icon.png" });
+    await controller.revealHelper();
+    expect(revealPath).toHaveBeenLastCalledWith("/runtime/Sunshine.app");
+    await controller.open("accessibility");
+    expect(await controller.getState(41)).toMatchObject({ helperName: "Codex Computer Use" });
   });
 
   it("does not create an orphaned helper window when setup closes during opening", async () => {

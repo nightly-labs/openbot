@@ -338,6 +338,9 @@ export const IPC_ENDPOINTS = {
     event: event(IPC_CHANNELS.hostEvent),
   },
   remoteDesktop: {
+    checkSetup: request(IPC_CHANNELS.remoteDesktopCheckSetup),
+    openSetup: request(IPC_CHANNELS.remoteDesktopOpenSetup),
+    test: request(IPC_CHANNELS.remoteDesktopTest),
     list: request(IPC_CHANNELS.remoteDesktopList),
     connect: request(IPC_CHANNELS.remoteDesktopConnect),
     selectDisplay: request(IPC_CHANNELS.remoteDesktopSelectDisplay),

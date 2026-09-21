@@ -244,6 +244,12 @@ function buildSunshine(source: string, version: string, commit: string): void {
   execFileSync("cmake", ["--build", build, "--config", "Release", "--parallel", "--target", "sunshine"], {
     stdio: "inherit",
   });
+  if (platform === "darwin") {
+    execFileSync("cmake", ["--build", build, "--config", "Release", "--target", "openbot-setup-test"], {
+      stdio: "inherit",
+    });
+    execFileSync(join(build, "openbot-setup-test"), [], { stdio: "inherit" });
+  }
 }
 
 function buildMoonlight(source: string): void {

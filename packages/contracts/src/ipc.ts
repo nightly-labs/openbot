@@ -28,6 +28,7 @@ export * from "./ipc-hosted-sites";
 export * from "./ipc-marketplace-agents";
 export * from "./ipc-mcp-servers";
 export * from "./ipc-queue";
+export * from "./ipc-remote-desktop-setup";
 export * from "./ipc-routines";
 export * from "./ipc-shared-tables";
 export * from "./ipc-sidebar-layout";
@@ -35,5 +36,4 @@ export * from "./ipc-skills";
 export * from "./ipc-team-host";
 export * from "./ipc-voice";
 export * from "./mobile-connect";
-
 export * from "./skill-conversation-events";

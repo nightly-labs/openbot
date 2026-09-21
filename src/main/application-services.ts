@@ -651,6 +651,9 @@ export async function createApplicationServices({
     platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
     unattended: false,
     remoteDesktopRuntimePaths: remoteDesktopRuntime,
+    openRemoteDesktopPermissionSetup: async (permission, appPath) => {
+      await computerUseMacSetup.openHelper(permission, appPath, "Sunshine");
+    },
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => {
       if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
@@ -783,7 +786,20 @@ export async function createApplicationServices({
     },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => browserView.stop());
-  const remoteDesktop = new RemoteDesktopManager(remoteServers);
+  const remoteDesktop = new RemoteDesktopManager({
+    createRemoteDesktopSession: (serverId) =>
+      serverId === "local"
+        ? host.createLocalRemoteDesktopTestSession()
+        : remoteServers.createRemoteDesktopSession(serverId),
+    closeRemoteDesktopSession: (serverId, sessionId) =>
+      serverId === "local"
+        ? host.closeLocalRemoteDesktopTestSession(sessionId)
+        : remoteServers.closeRemoteDesktopSession(serverId, sessionId),
+    selectRemoteDesktopDisplay: (serverId, displayId) => {
+      if (serverId === "local") return Promise.reject(new Error("Finish the local test before switching displays."));
+      return remoteServers.selectRemoteDesktopDisplay(serverId, displayId);
+    },
+  });
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => remoteDesktop.stop());
   const voice = new VoiceTranscriptionService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "whisper") : resolve(".openbot-build/whisper"),

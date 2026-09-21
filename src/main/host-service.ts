@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createInviteUrl } from "@openbot/contracts/invite-links";
 import type {
   AvatarImageInput,
@@ -26,6 +26,7 @@ import type {
   MarkDirectReadInput,
   RemoteDesktopDisplay,
   RemoteDesktopIceServer,
+  RemoteDesktopSetupAction,
   SendDirectMessageInput,
   SetTeamTypingInput,
   TeamInviteSummary,
@@ -37,6 +38,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { shell } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
@@ -92,6 +94,10 @@ interface HostServiceOptions {
     inviteUrl: string;
     role: "admin" | "member";
   }) => Promise<void>;
+  openRemoteDesktopPermissionSetup?: (
+    permission: "screen-recording" | "accessibility",
+    appPath: string,
+  ) => Promise<void>;
   remoteDesktopRuntimePaths?: RemoteDesktopRuntimePaths | null;
   remoteDesktopStateDirectory?: string;
   /** Only a test supplies this. The gateway builds the real Sunshine and Moonlight runtime itself. */
@@ -277,6 +283,35 @@ export class HostService extends EventEmitter<HostEvents> {
    * The host owner is the only one who can give that grant, and until they can check it here the
    * warning they are shown outlives the repair that answered it.
    */
+  checkRemoteDesktopSetup() {
+    return this.#remoteScreen.checkSetup();
+  }
+
+  createLocalRemoteDesktopTestSession() {
+    return this.#remoteScreen.createLocalTestSession();
+  }
+
+  testLocalRemoteDesktop(sessionId: string, action: "start" | "status" | "stop") {
+    return this.#remoteScreen.testLocalSession(sessionId, action);
+  }
+
+  closeLocalRemoteDesktopTestSession(sessionId: string) {
+    return this.#remoteScreen.closeLocalTestSession(sessionId);
+  }
+
+  async openRemoteDesktopSetup(action: RemoteDesktopSetupAction): Promise<void> {
+    if (process.platform !== "darwin") throw new Error("Permission setup is available on macOS.");
+    const executable = this.#options.remoteDesktopRuntimePaths?.sunshine;
+    if (!executable) throw new Error("The remote desktop runtime is not installed.");
+    const appPath = dirname(dirname(dirname(executable)));
+    if (action === "reveal") {
+      shell.showItemInFolder(appPath);
+      return;
+    }
+    if (!this.#options.openRemoteDesktopPermissionSetup) throw new Error("Permission setup is not available.");
+    await this.#options.openRemoteDesktopPermissionSetup(action, appPath);
+  }
+
   async recheckScreenRecording(): Promise<HostStatus> {
     await this.#remoteScreen.recheckScreenRecording();
     return this.getStatus();

@@ -102,6 +102,8 @@ export const TEAM_API_ROUTES = {
   remoteScreen: {
     prefix: REMOTE_SCREEN,
     capabilities: `${REMOTE_SCREEN}/capabilities`,
+    setup: `${REMOTE_SCREEN}/setup`,
+    test: `${REMOTE_SCREEN}/test`,
     sessions: `${REMOTE_SCREEN}/sessions`,
     session: (sessionId: string) => `${REMOTE_SCREEN}/sessions/${segment(sessionId)}`,
     display: `${REMOTE_SCREEN}/display`,

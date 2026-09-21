@@ -1,3 +1,4 @@
+import { TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol";
 // @vitest-environment node
 
 // Remote control and the Remote Desktop upgrade: `src/main/team-api/route-remote-screen.ts`, plus
@@ -67,6 +68,21 @@ describe("TeamApiServer remote screen", () => {
         activeSessions: 0,
         maxSessions: 4,
       }),
+      checkSetup: vi.fn(async () => ({
+        platform: "darwin",
+        hostName: "Mac mini",
+        username: "tenant",
+        checkedAt: "2026-09-21T10:00:00.000Z",
+        screenRecording: "blocked",
+        accessibility: "blocked",
+        service: "allowed",
+        displays: "allowed",
+        guiSession: "allowed",
+        restartRequired: false,
+        activeSessions: 0,
+        message: null,
+      })),
+      test: vi.fn(async () => ({ active: true, mouse: false, keyboard: false, code: "1234" })),
       createSession,
       selectDisplay: vi.fn(async () => undefined),
       closeMemberSession: vi.fn(async () => true),
@@ -97,6 +113,39 @@ describe("TeamApiServer remote screen", () => {
         teamSessionExpiresAt: joined.sessionExpiresAt,
       }),
     );
+
+    for (const endpoint of ["setup", "test"]) {
+      const denied = await fetch(`${base}/v1/remote-screen/${endpoint}`, { method: "POST", body: "{}" });
+      expect(denied.status).toBe(401);
+    }
+    expect(remoteScreen.checkSetup).not.toHaveBeenCalled();
+    expect(remoteScreen.test).not.toHaveBeenCalled();
+    const setupHeaders = {
+      Authorization: `Bearer ${joined.sessionToken}`,
+      "Content-Type": "application/json",
+      [TEAM_PROTOCOL_VERSION_HEADER]: "4",
+    };
+    const setup = await fetch(`${base}/v1/remote-screen/setup`, { method: "POST", headers: setupHeaders, body: "{}" });
+    expect(setup.status).toBe(200);
+    await expect(setup.json()).resolves.toMatchObject({
+      username: "tenant",
+      screenRecording: "blocked",
+      accessibility: "blocked",
+    });
+    const liveTest = await fetch(`${base}/v1/remote-screen/test`, {
+      method: "POST",
+      headers: setupHeaders,
+      body: JSON.stringify({ sessionId: "remote-session-1", action: "start" }),
+    });
+    expect(liveTest.status).toBe(200);
+    expect(remoteScreen.test).toHaveBeenCalledWith("remote-session-1", joined.member.id, "start");
+    const invalid = await fetch(`${base}/v1/remote-screen/test`, {
+      method: "POST",
+      headers: setupHeaders,
+      body: JSON.stringify({ sessionId: "remote-session-1", action: "approve" }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(remoteScreen.test).toHaveBeenCalledTimes(1);
 
     const owner = await store.login("owner", "correct horse battery");
     const disabled = await fetch(`${base}/v1/team/members/${joined.member.id}`, {

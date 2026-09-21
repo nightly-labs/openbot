@@ -13,7 +13,7 @@ export function computerUseIpcHandlers({
 }: ComputerUseIpcDependencies): Pick<IpcGroupHandlers, "computerUse"> {
   return {
     computerUse: {
-      getMacSetupState: handler(() => computerUseMacSetup.getState()),
+      getMacSetupState: eventHandler((event) => computerUseMacSetup.getState(event.sender.id)),
       openMacPermissionSetup: payloadHandler(parseMacPermission, (parsed) => computerUseMacSetup.open(parsed)),
       startHelperDrag: eventHandler((event) => computerUseMacSetup.startDrag(event.sender)),
       revealHelper: handler(() => computerUseMacSetup.revealHelper()),

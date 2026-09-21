@@ -69,7 +69,9 @@ export function ComputerUseSetupSurface() {
           <PermissionIcon />
         </span>
         <div>
-          <h1>Add Computer Use to {copy.title}</h1>
+          <h1>
+            Add {state()?.helperName ?? "application"} to {copy.title}
+          </h1>
           <p>Drag this app into the list in System Settings.</p>
         </div>
       </header>

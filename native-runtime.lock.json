@@ -166,23 +166,23 @@
     }
   },
   "remoteDesktop": {
-    "recipeVersion": 9,
+    "recipeVersion": 10,
     "sunshine": {
-      "sourceMode": "openbot-fork",
-      "repository": "https://github.com/NorbertBodziony/Sunshine.git",
+      "sourceMode": "upstream-with-patch",
+      "repository": "https://github.com/LizardByte/Sunshine.git",
       "version": "v2026.516.143833",
-      "commit": "cde2ca692b9002c2d0a5418c6e077eba02e6c483",
+      "commit": "14ffa6fdaa53f7b51512be2b3d24f3939695403c",
       "upstream": {
         "repository": "https://github.com/LizardByte/Sunshine.git",
         "commit": "14ffa6fdaa53f7b51512be2b3d24f3939695403c"
       },
-      "sourceArchive": "https://github.com/NorbertBodziony/Sunshine/archive/cde2ca692b9002c2d0a5418c6e077eba02e6c483.tar.gz",
-      "sourceSha256": "55a5df4a75f8c7eb4d7b77dbc6d4312b9f647bbb043b11852d2e9032dce13cc3",
+      "sourceArchive": "https://github.com/LizardByte/Sunshine/archive/14ffa6fdaa53f7b51512be2b3d24f3939695403c.tar.gz",
+      "sourceSha256": "4e9501d4758f0cde4d37425aad26e22d5691667c4aa7fbe419a42e11bd68b369",
       "license": "GPL-3.0",
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "ba2d7bba1f17f1d5f8c054edd3de8a60a7a3f890205f7db1a67d6d3829c4deec"
+        "sha256": "8fa6f597ec4225bda9fc478c0a8ce03e36493b5dbbbd904cf1b4016e76a880fc"
       },
       "overrides": [],
       "submodules": {
@@ -229,26 +229,10 @@
       "overrides": [],
       "submodules": {}
     },
-    "releaseArtifacts": {
-      "darwin-arm64": {
-        "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "bb8d66f4f87dedc193c760de4a04cdd9ff2e037aa6252947f7544ff9700aa85e"
-      },
-      "win32-x64": {
-        "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "4c0330eef1560cc846a7d902b545cfa905b01b93e8ae641529737a0b10edf713"
-      }
-    },
+    "releaseArtifacts": {},
     "targets": {
       "darwin-arm64": ["Sunshine.app/Contents/MacOS/Sunshine", "web-server", "streamer"],
       "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"]
-    },
-    "artifactRelease": {
-      "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-a6e49e7ac064584df4e4bc3dd9531b98e99fcfa1bf0f690ee1557ac351d60ab9",
-      "inputDigest": "a6e49e7ac064584df4e4bc3dd9531b98e99fcfa1bf0f690ee1557ac351d60ab9",
-      "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "1a618320fed986c37444776a0fb47411f6ffb123e4886cfbb9fcb251c74c0e40"
     }
   },
   "bun": {

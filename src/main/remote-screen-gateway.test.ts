@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
 import { RemoteScreenGateway, type RemoteScreenRuntime } from "./remote-screen-gateway";
+import { SunshineApiError } from "./sunshine-moonlight-runtime";
 
 const displays = [
   { id: "main", label: "Main", width: 1920, height: 1080, primary: true },
@@ -48,6 +49,30 @@ describe("RemoteScreenGateway", () => {
       await gateway.stop();
     },
   );
+
+  it("serves a local test on loopback and closes its listener with the session", async () => {
+    const gateway = createGateway();
+    const session = await gateway.createLocalTestSession();
+    try {
+      expect(new URL(session.viewerUrl).hostname).toBe("127.0.0.1");
+      expect(session.serverId).toBe("local");
+      const response = await fetch(session.viewerUrl);
+      expect(response.status).toBe(200);
+      const authorized = await fetch(session.viewerUrl.replace(/viewer$/, "authorize"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grant: session.viewerGrant }),
+      });
+      expect(authorized.status).toBe(204);
+      expect(authorized.headers.get("set-cookie")).toContain("HttpOnly; Secure; SameSite=None");
+      expect(() => gateway.testLocalSession("another-session", "start")).toThrow();
+    } finally {
+      await gateway.closeLocalTestSession(session.id);
+    }
+    expect(gateway.list()).toHaveLength(0);
+    await expect(fetch(session.viewerUrl)).rejects.toThrow();
+    await gateway.stop();
+  });
 
   it("issues and consumes a one-time 60 second viewer grant", async () => {
     const gateway = createGateway();
@@ -150,6 +175,170 @@ describe("RemoteScreenGateway", () => {
     // The check left no runtime behind, so a member still opens a session of their own.
     await createSession(gateway, "https://remote.example");
     expect(gateway.list()).toHaveLength(1);
+  });
+
+  it("checks the Sunshine user and permissions without interrupting a session", async () => {
+    let accessibility: "allowed" | "blocked" = "blocked";
+    const checkSetup = vi.fn(async () => ({
+      hostName: "Mac mini",
+      username: "tenant",
+      screenRecording: "allowed" as const,
+      accessibility,
+      guiSession: "allowed" as const,
+      displays: "allowed" as const,
+      restartRequired: false,
+    }));
+    const gateway = createGateway({ checkSetup });
+    await createSession(gateway, "https://remote.example");
+    const runtime = runtimes[0];
+    await expect(gateway.checkSetup()).resolves.toMatchObject({
+      username: "tenant",
+      accessibility: "blocked",
+      service: "allowed",
+      activeSessions: 1,
+    });
+    accessibility = "allowed";
+    await expect(gateway.checkSetup()).resolves.toMatchObject({ accessibility: "allowed" });
+    accessibility = "blocked";
+    await expect(gateway.checkSetup()).resolves.toMatchObject({ accessibility: "blocked" });
+    expect(runtime?.stop).not.toHaveBeenCalled();
+    await gateway.stop();
+  });
+
+  it("does not report permission approval from an absent endpoint or failed check", async () => {
+    await expect(createGateway().checkSetup()).resolves.toMatchObject({
+      screenRecording: "unavailable",
+      accessibility: "unavailable",
+    });
+    const gateway = createGateway({
+      checkSetup: async () => {
+        throw new Error("private native details");
+      },
+    });
+    const result = await gateway.checkSetup();
+    expect(result).toMatchObject({ screenRecording: "failed", accessibility: "failed", service: "allowed" });
+    expect(JSON.stringify(result)).not.toContain("private native details");
+    expect(runtimes.at(-1)?.stop).toHaveBeenCalledOnce();
+    await expect(createGateway({ runtimeInstalled: false }).checkSetup()).resolves.toMatchObject({
+      service: "unavailable",
+    });
+  });
+
+  it("reports an older native endpoint as unavailable", async () => {
+    const gateway = createGateway({
+      checkSetup: async () => {
+        throw new SunshineApiError(404);
+      },
+    });
+    await expect(gateway.checkSetup()).resolves.toMatchObject({
+      accessibility: "unavailable",
+      screenRecording: "unavailable",
+      service: "allowed",
+    });
+  });
+
+  it("rechecks permissions before starting a test and clears the test lock on refusal", async () => {
+    const test = vi.fn(async (action: "start" | "status" | "stop") => ({
+      active: action !== "stop",
+      mouse: false,
+      keyboard: false,
+      code: "1234",
+    }));
+    const gateway = createGateway({
+      test,
+      checkSetup: async () => ({
+        hostName: "Mac mini",
+        username: "tenant",
+        screenRecording: "allowed",
+        accessibility: "blocked",
+        guiSession: "allowed",
+        displays: "allowed",
+        restartRequired: false,
+      }),
+    });
+    const session = await createSession(gateway, "https://remote.example");
+    await expect(gateway.test(session.id, "member-a", "start")).rejects.toMatchObject({
+      code: "host_permissions_required",
+    });
+    expect(test).not.toHaveBeenCalledWith("start");
+    await createSession(gateway, "https://remote.example", "member-b");
+    expect(gateway.list()).toHaveLength(2);
+    await gateway.stop();
+  });
+
+  it("reports missing displays and inactive GUI sessions independently", async () => {
+    const gateway = createGateway({
+      checkSetup: async () => ({
+        hostName: "Mac mini",
+        username: "tenant",
+        screenRecording: "blocked",
+        accessibility: "allowed",
+        guiSession: "blocked",
+        displays: "unavailable",
+        restartRequired: false,
+      }),
+    });
+    await expect(gateway.checkSetup()).resolves.toMatchObject({
+      screenRecording: "blocked",
+      accessibility: "allowed",
+      guiSession: "blocked",
+      displays: "unavailable",
+    });
+  });
+
+  it("restricts a test to its session owner and releases the panel on disconnect", async () => {
+    const test = vi.fn(async (action: "start" | "status" | "stop") => ({
+      active: action !== "stop",
+      mouse: false,
+      keyboard: false,
+      code: "1234",
+    }));
+    const gateway = createGateway({
+      test,
+      checkSetup: async () => ({
+        hostName: "Mac mini",
+        username: "tenant",
+        screenRecording: "allowed",
+        accessibility: "allowed",
+        guiSession: "allowed",
+        displays: "allowed",
+        restartRequired: false,
+      }),
+    });
+    const session = await createSession(gateway, "https://remote.example");
+    await expect(gateway.test(session.id, "outsider", "start")).rejects.toMatchObject({ status: 404 });
+    expect(test).not.toHaveBeenCalled();
+    await expect(gateway.test(session.id, "member-a", "start")).resolves.toMatchObject({
+      active: true,
+      mouse: false,
+      keyboard: false,
+    });
+    await expect(createSession(gateway, "https://remote.example", "member-b")).rejects.toMatchObject({ status: 409 });
+    await gateway.closeSession(session.id);
+    expect(test).toHaveBeenLastCalledWith("stop");
+    expect(runtimes[0]?.stop).toHaveBeenCalledOnce();
+  });
+
+  it("does not start a test while another member has a session", async () => {
+    const test = vi.fn(async () => ({ active: true, mouse: false, keyboard: false, code: "1234" }));
+    const gateway = createGateway({
+      test,
+      checkSetup: async () => ({
+        hostName: "Mac mini",
+        username: "tenant",
+        screenRecording: "allowed",
+        accessibility: "allowed",
+        guiSession: "allowed",
+        displays: "allowed",
+        restartRequired: false,
+      }),
+    });
+    const session = await createSession(gateway, "https://remote.example");
+    await createSession(gateway, "https://remote.example", "member-b");
+    await expect(gateway.test(session.id, "member-a", "start")).rejects.toMatchObject({ status: 409 });
+    expect(test).not.toHaveBeenCalled();
+    expect(gateway.list()).toHaveLength(2);
+    await gateway.stop();
   });
 
   it("limits the host to four active sessions", async () => {
@@ -372,6 +561,8 @@ describe("RemoteScreenGateway", () => {
 
 function createGateway(
   options: {
+    checkSetup?: RemoteScreenRuntime["checkSetup"];
+    test?: RemoteScreenRuntime["test"];
     platform?: "darwin" | "win32" | "linux";
     runtimeInstalled?: boolean;
     now?: () => number;
@@ -396,6 +587,8 @@ function createGateway(
     ...(options.now ? { now: options.now } : {}),
     createRuntime: () => {
       const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay, options.screenCaptureDenied?.());
+      runtime.checkSetup = options.checkSetup;
+      runtime.test = options.test;
       runtimes.push(runtime);
       return runtime;
     },
@@ -418,6 +611,8 @@ function createSession(
 }
 
 class FakeRuntime implements RemoteScreenRuntime {
+  checkSetup?: RemoteScreenRuntime["checkSetup"];
+  test?: RemoteScreenRuntime["test"];
   selectedDisplays: string[] = [];
   readonly stop = vi.fn(async () => undefined);
 

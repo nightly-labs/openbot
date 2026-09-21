@@ -8,10 +8,13 @@ import type {
 } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "../../components/ui";
+import { createMockOpenBot } from "../../preview/mock-openbot";
 import { mcpToolRuntimeNote as note } from "./mcp-servers";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "./ServerSettingsModal";
+
+afterEach(() => vi.unstubAllGlobals());
 
 const localServer: ServerSummary = {
   id: "local",
@@ -141,6 +144,53 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
 }
 
 describe("ServerSettingsModal", () => {
+  it("keeps account errors on account settings tabs", async () => {
+    render(() => (
+      <ServerSettingsModal {...props({ loadError: "The account cannot perform this remote operation." })} />
+    ));
+    expect(screen.getByText("Server settings unavailable")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+    expect(screen.queryByText("Server settings unavailable")).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("tab", { name: "Members" }));
+    expect(screen.getByText("Server settings unavailable")).toBeInTheDocument();
+  });
+
+  it.each(["Set up", "Later"])("offers optional desktop setup after publishing: %s", async (action) => {
+    const onSetPublished = vi.fn(async () => undefined);
+    render(() => (
+      <ServerSettingsModal
+        {...props({
+          hostStatus: { ...configuredHost, phase: "idle" },
+          onSetPublished,
+        })}
+      />
+    ));
+    expect(screen.queryByText("Set up remote desktop")).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("switch", { name: "Publish this server" }));
+    const button = await screen.findByRole("button", { name: action, exact: true });
+    expect(onSetPublished).toHaveBeenCalledWith(true);
+    await fireEvent.click(button);
+    expect(screen.queryByText("Set up remote desktop")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: action === "Set up" ? "Remote desktop" : "General" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(onSetPublished).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer desktop setup when publication fails", async () => {
+    const onSetPublished = vi.fn(async () => {
+      throw new Error("Publication failed");
+    });
+    render(() => (
+      <ServerSettingsModal {...props({ hostStatus: { ...configuredHost, phase: "idle" }, onSetPublished })} />
+    ));
+    await fireEvent.click(screen.getByRole("switch", { name: "Publish this server" }));
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Publish this server" })).toBeEnabled());
+    expect(onSetPublished).toHaveBeenCalledOnce();
+    expect(screen.queryByText("Set up remote desktop")).not.toBeInTheDocument();
+  });
+
   it.each([true, false])("does not request an update for a compatible host with availability %s", async (ready) => {
     render(() => (
       <ServerSettingsModal
@@ -189,47 +239,153 @@ describe("ServerSettingsModal", () => {
     },
   );
 
-  // The member who is refused cannot fix this: the grant lives on the host, so the host owner is the
-  // one who is told, and only after a member was actually refused.
-  it.each([true, false])("offers the screen recording settings to a refused host: %s", async (denied) => {
-    const onOpenScreenRecordingSettings = vi.fn(async () => undefined);
+  it.each([true, false])("offers both permissions before or after a refusal: %s", async (denied) => {
+    const mock = createMockOpenBot();
+    vi.stubGlobal("openbot", mock.api);
+    const open = vi.spyOn(mock.api.remoteDesktop, "openSetup");
     render(() => (
       <ServerSettingsModal
-        {...props({
-          hostStatus: { ...configuredHost, remoteDesktopScreenRecordingDenied: denied },
-          onOpenScreenRecordingSettings,
-        })}
+        {...props({ hostStatus: { ...configuredHost, remoteDesktopScreenRecordingDenied: denied } })}
       />
     ));
     await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
-
-    const openSettings = screen.queryByRole("button", { name: "Open System Settings" });
-    if (!denied) {
-      expect(openSettings).not.toBeInTheDocument();
-      return;
-    }
-    expect(await screen.findByText("OpenBot may not record this screen")).toBeInTheDocument();
-    if (!openSettings) throw new Error("The settings action is missing.");
-    await fireEvent.click(openSettings);
-    await waitFor(() => expect(onOpenScreenRecordingSettings).toHaveBeenCalledOnce());
+    await fireEvent.click(await screen.findByRole("button", { name: "Grant Accessibility access" }));
+    await waitFor(() => expect(open).toHaveBeenCalledWith("accessibility"));
+    expect(screen.getByRole("button", { name: "Grant Screen Recording access" })).toBeEnabled();
+    expect(screen.getAllByText("Not checked")).toHaveLength(5);
+    mock.dispose();
   });
 
-  // Granting the permission is silent: without this the owner who gave it keeps reading that they
-  // did not, because only another member's attempt could answer.
-  it("reads the grant again for the host owner who just gave it", async () => {
-    const onRecheckScreenRecording = vi.fn(async () => undefined);
-    render(() => (
-      <ServerSettingsModal
-        {...props({
-          hostStatus: { ...configuredHost, remoteDesktopScreenRecordingDenied: true },
-          onRecheckScreenRecording,
-        })}
-      />
-    ));
+  it("reads Sunshine permissions again after the owner returns from macOS settings", async () => {
+    const mock = createMockOpenBot();
+    vi.stubGlobal("openbot", mock.api);
+    const check = vi.spyOn(mock.api.remoteDesktop, "checkSetup");
+    render(() => <ServerSettingsModal {...props({ hostStatus: configuredHost })} />);
     await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
-
     await fireEvent.click(await screen.findByRole("button", { name: "Check again" }));
-    await waitFor(() => expect(onRecheckScreenRecording).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Blocked")).toBeInTheDocument();
+    expect(screen.getByText(/Mac mini · openbot/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Grant Accessibility access" }));
+    await fireEvent(window, new Event("focus"));
+    await waitFor(() => expect(check).toHaveBeenCalledTimes(2));
+    mock.dispose();
+  });
+
+  it("does not offer client privacy settings for a remote Mac", async () => {
+    render(() => <ServerSettingsModal {...props({ server: remoteServer })} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+    expect(
+      await screen.findByText("Update OpenBot on the host to check permissions and test remote desktop."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Grant Accessibility access" })).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    "separates video confirmation from mouse and keyboard results and closes its test session",
+    async (localTest) => {
+      const mock = createMockOpenBot({ remoteDesktopSessions: [] });
+      vi.stubGlobal("openbot", mock.api);
+      const originalCheck = mock.api.remoteDesktop.checkSetup;
+      mock.api.remoteDesktop.checkSetup = async (serverId) => ({
+        ...(await originalCheck(serverId)),
+        accessibility: "allowed",
+      });
+      const test = vi.spyOn(mock.api.remoteDesktop, "test").mockImplementation(async (input) => ({
+        active: input.action !== "stop",
+        mouse: true,
+        keyboard: true,
+        code: "1234",
+      }));
+      const disconnect = vi.spyOn(mock.api.remoteDesktop, "disconnect");
+      const server: ServerSummary = {
+        ...remoteServer,
+        compatibility: {
+          localAppVersion: "0.5.0",
+          hostAppVersion: "0.5.0",
+          localProtocol: { minimum: 1, maximum: 4 },
+          hostProtocol: { minimum: 1, maximum: 4 },
+          negotiatedProtocol: 4,
+          capabilities: ["remote-desktop", "remote-desktop-setup"],
+        },
+      };
+      const targetServer = localTest ? localServer : server;
+      render(() => <ServerSettingsModal {...props({ server: targetServer, hostStatus: null })} />);
+      await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+      await fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+      const start = await screen.findByRole("button", { name: localTest ? "Test on this Mac" : "Test remote desktop" });
+      await waitFor(() => expect(start).toBeEnabled());
+      await fireEvent.click(start);
+      const confirm = await screen.findByRole("button", { name: "I can see the test panel" });
+      expect(confirm).toBeDisabled();
+      const frame = screen.getByTitle<HTMLIFrameElement>("Sunshine remote desktop");
+      const session = (await mock.api.remoteDesktop.list())[0];
+      await fireEvent(
+        window,
+        new MessageEvent("message", {
+          source: frame.contentWindow,
+          origin: new URL(session.viewerUrl).origin,
+          data: { source: "openbot-moonlight", type: "viewer-state", sessionId: session.id, state: "connected" },
+        }),
+      );
+      await waitFor(() => expect(confirm).toBeEnabled());
+      await fireEvent.click(confirm);
+      await fireEvent.click(screen.getByRole("button", { name: "Finish test" }));
+      await waitFor(() =>
+        expect(test).toHaveBeenCalledWith({ serverId: targetServer.id, sessionId: session.id, action: "stop" }),
+      );
+      expect(disconnect).toHaveBeenCalledWith(session.id);
+      expect(
+        await screen.findByText(/Video: received · Picture: confirmed · Mouse: received · Keyboard: received/u),
+      ).toBeInTheDocument();
+      mock.dispose();
+    },
+  );
+
+  it("runs a local video test without native permission diagnostics", async () => {
+    const mock = createMockOpenBot({ remoteDesktopSessions: [] });
+    vi.stubGlobal("openbot", mock.api);
+    window.openbot = mock.api;
+    const test = vi.spyOn(mock.api.remoteDesktop, "test");
+    const disconnect = vi.spyOn(mock.api.remoteDesktop, "disconnect");
+    render(() => <ServerSettingsModal {...props()} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Test on this Mac" }));
+    const confirm = await screen.findByRole("button", { name: "I can see my desktop" });
+    expect(confirm).toBeDisabled();
+    expect(test).not.toHaveBeenCalled();
+    const frame = screen.getByTitle<HTMLIFrameElement>("Sunshine remote desktop");
+    expect(frame).toHaveAttribute("inert");
+    const session = (await mock.api.remoteDesktop.list())[0];
+    await fireEvent(
+      window,
+      new MessageEvent("message", {
+        source: frame.contentWindow,
+        origin: new URL(session.viewerUrl).origin,
+        data: { source: "openbot-moonlight", type: "viewer-state", sessionId: session.id, state: "connected" },
+      }),
+    );
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await fireEvent.click(confirm);
+    await fireEvent.click(screen.getByRole("button", { name: "Finish test" }));
+    await waitFor(() => expect(disconnect).toHaveBeenCalledWith(session.id));
+    expect(test).not.toHaveBeenCalled();
+    mock.dispose();
+  });
+
+  it("removes a previous allowed result when the next check fails", async () => {
+    const mock = createMockOpenBot();
+    vi.stubGlobal("openbot", mock.api);
+    const check = vi.spyOn(mock.api.remoteDesktop, "checkSetup");
+    render(() => <ServerSettingsModal {...props({ hostStatus: configuredHost })} />);
+    await fireEvent.click(screen.getByRole("tab", { name: "Remote desktop" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(await screen.findByText("Allowed")).toBeInTheDocument();
+    check.mockRejectedValueOnce(new Error("Host disconnected."));
+    await fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Host disconnected.");
+    expect(screen.queryByText("Allowed")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Check failed")).toHaveLength(5);
+    mock.dispose();
   });
 
   // `mcpServers` gates the tab and the panel together, so the prop is the whole feature gate: a
