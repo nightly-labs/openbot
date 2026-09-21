@@ -9,6 +9,8 @@ import type { AppTextKey } from "@openbot/i18n";
 import { createSignal, Show } from "solid-js";
 import { ProviderPicker } from "../../components/ProviderPicker";
 import {
+  AlertDialog,
+  Button,
   Item,
   ItemActions,
   ItemContent,
@@ -66,6 +68,9 @@ interface SettingsGeneralTabProps {
   /** Without it the rows are listed but not removable, which is what a story without the callback shows. */
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /** Opens the code sign-in. Absent in the stories, where there is no provider to answer it. */
+  onSignInWithCodeProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  turboModePending?: boolean;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
@@ -79,6 +84,8 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
    * first deciding what a saved default means for the four rows beside it.
    */
   const [customSelected, setCustomSelected] = createSignal(false);
+  const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
+  let cancelTurboButton: HTMLButtonElement | undefined;
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
@@ -113,6 +120,8 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           onSelectCustomProvider={props.onAddCustomProvider ? () => setCustomSelected(true) : undefined}
           onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
           onSignInProvider={props.onSignInProvider}
+          onSignInWithCodeProvider={props.onSignInWithCodeProvider}
+          menuMount={props.selectMount}
         />
         {/* The outcome is shown where the user is looking. While the list is open the section behind
             it is hidden from assistive technology, so a status left here could not be read. */}
@@ -204,6 +213,65 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           </Item>
         </ItemGroup>
       </SettingsSection>
+
+      <SettingsSection title={i18n.t("settings.autonomy.title")}>
+        <ItemGroup class="settings-modal-card">
+          <SwitchField
+            checked={props.value.turboMode}
+            disabled={props.turboModePending}
+            onChange={(checked) => {
+              // Turning it on is the move that needs the warning. Turning it off restores asking and
+              // is never something a user needs protecting from, so it is written straight away.
+              if (checked) setConfirmingTurbo(true);
+              else props.onUpdateSetting("turboMode", false);
+            }}
+            label={i18n.t("settings.turbo.title")}
+            description={i18n.t("settings.turbo.description")}
+          />
+        </ItemGroup>
+      </SettingsSection>
+
+      <AlertDialog.Root
+        open={confirmingTurbo()}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingTurbo(false);
+        }}
+      >
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay class="approval-confirm-backdrop">
+            <AlertDialog.Content
+              class="approval-confirm-dialog"
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+                cancelTurboButton?.focus({ preventScroll: true });
+              }}
+            >
+              <AlertDialog.Title>{i18n.t("settings.turbo.confirmTitle")}</AlertDialog.Title>
+              <AlertDialog.Description>{i18n.t("settings.turbo.confirmDescription")}</AlertDialog.Description>
+              <div class="approval-confirm-actions">
+                <Button
+                  ref={cancelTurboButton}
+                  variant="outline"
+                  type="button"
+                  onClick={() => setConfirmingTurbo(false)}
+                >
+                  {i18n.t("settings.turbo.confirmCancel")}
+                </Button>
+                <Button
+                  variant="default"
+                  type="button"
+                  onClick={() => {
+                    setConfirmingTurbo(false);
+                    props.onUpdateSetting("turboMode", true);
+                  }}
+                >
+                  {i18n.t("settings.turbo.confirmAccept")}
+                </Button>
+              </div>
+            </AlertDialog.Content>
+          </AlertDialog.Overlay>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
 
       <SettingsSection title={i18n.t("settings.notifications.title")}>
         <ItemGroup class="settings-modal-card">

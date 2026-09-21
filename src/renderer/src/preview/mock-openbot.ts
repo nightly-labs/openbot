@@ -12,6 +12,7 @@ import type {
   AnalyticsPreference,
   AppInfo,
   AppLanguagePreference,
+  ApprovalAutomationPreference,
   AppSetupState,
   AttachmentImportEvent,
   BrowserControlState,
@@ -77,6 +78,7 @@ import type {
 import {
   composedCustomModelId,
   createMcpServerId,
+  DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   normalizeMcpConfig,
   SIDEBAR_PEOPLE_SECTION_ID,
@@ -233,6 +235,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
   );
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
+  let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
@@ -581,6 +584,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       analyticsPreference = { enabled };
       return clone(analyticsPreference);
     },
+    getApprovalAutomation: async () => clone(approvalAutomation),
+    setApprovalAutomation: async ({ turbo, agentId, autoApprove }) => {
+      const granted = new Set(approvalAutomation.autoApproveAgentIds);
+      if (agentId !== undefined && autoApprove !== undefined) {
+        if (autoApprove) granted.add(agentId);
+        else granted.delete(agentId);
+      }
+      approvalAutomation = { turbo: turbo ?? approvalAutomation.turbo, autoApproveAgentIds: [...granted] };
+      return clone(approvalAutomation);
+    },
     getAppLanguagePreference: async () => clone(languagePreference),
     setAppLanguagePreference: async ({ language }) => {
       languagePreference = { language };
@@ -631,6 +644,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
+    // A code that never completes: the preview has no provider to finish the sign-in, so this shows
+    // the waiting screen and leaves it there.
+    startProviderCodeLogin: async () => ({
+      kind: "code",
+      userCode: "KTQ4-B62MX",
+      verificationUrl: "https://auth.openai.com/codex/device",
+      expiresAt: Date.now() + 10 * 60_000,
+    }),
+    cancelProviderCodeLogin: async () => clone(agentStatus),
     setProviderApiKey: async ({ provider, key }) => {
       if (!key.trim()) throw new Error("A provider key is required.");
       providerApiKeys.add(provider);

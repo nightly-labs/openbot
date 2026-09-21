@@ -1,5 +1,6 @@
 import type {
   AccountSession,
+  AgentProviderId,
   AgentStatus,
   AvatarImageInput,
   CentralAuthUser,
@@ -13,6 +14,8 @@ import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
+import type { ProviderCodeLoginState } from "../../components/ProviderCodeLoginDialog";
+import { toast } from "../../components/ui";
 import { DEFAULT_GENERAL_SETTINGS } from "./app-settings";
 import { SettingsModal } from "./SettingsModal";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
@@ -34,6 +37,17 @@ const openCodeReadyStatus: AgentStatus = {
   auth: { kind: "chatgpt", email: "norbert@example.com" },
   providers: [{ id: "opencode", state: "available", version: "1.3.13", message: null, cliSource: "system" }],
   capabilities: { chat: "ready", browser: "ready", computerUse: "unavailable" },
+  message: null,
+  fullAccess: true,
+};
+
+/** ChatGPT installed and signed out: the state both sign-in buttons are offered from. */
+const codexSignedOutStatus: AgentStatus = {
+  phase: "ready",
+  cliVersion: "0.55.0",
+  auth: { kind: "signed-out" },
+  providers: [{ id: "codex", state: "sign-in-required", version: "0.55.0", message: null, cliSource: "system" }],
+  capabilities: { chat: "unavailable", browser: "unavailable", computerUse: "unavailable" },
   message: null,
   fullAccess: true,
 };
@@ -89,6 +103,7 @@ describe("SettingsModal", () => {
     expect(sessions).toEqual([current]);
   });
   afterEach(() => {
+    toast.dismiss();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -939,6 +954,109 @@ describe("SettingsModal", () => {
     // Free badge is gone, leaving the single runtime Connected.
     await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(1));
     expect(screen.queryByText("Free")).toBeNull();
+  });
+
+  it("warns before Turbo mode is turned on, and turns it off without asking", async () => {
+    const [value, setValue] = createSignal({ ...DEFAULT_GENERAL_SETTINGS });
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={value()}
+        onValueChange={setValue}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+      />
+    ));
+
+    const toggle = await screen.findByRole("switch", { name: "Turbo mode" });
+    await fireEvent.click(toggle);
+    // Nothing is on yet: the switch is a request to turn it on, and the dialog is where it is given.
+    expect(value().turboMode).toBe(false);
+    await fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(value().turboMode).toBe(false);
+
+    await fireEvent.click(toggle);
+    await fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+    await waitFor(() => expect(value().turboMode).toBe(true));
+
+    await fireEvent.click(await screen.findByRole("switch", { name: "Turbo mode" }));
+    await waitFor(() => expect(value().turboMode).toBe(false));
+  });
+
+  it("keeps Turbo available without per-agent approval controls", async () => {
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+      />
+    ));
+
+    expect(await screen.findByRole("switch", { name: "Turbo mode" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Revoke all" })).not.toBeInTheDocument();
+  });
+
+  // The second way in, for the computer whose browser cannot finish the first one. What Settings
+  // owns is the entry point and the dialog; the phase itself comes from main.
+  it("opens the code sign-in from the ChatGPT row and shows the code to type", async () => {
+    const [state, setState] = createSignal<ProviderCodeLoginState>({ phase: "starting" });
+    const [provider, setProvider] = createSignal<AgentProviderId | null>(null);
+    const codeLogin = {
+      provider,
+      state,
+      start: vi.fn((id: AgentProviderId) => {
+        setProvider(id);
+        setState({
+          phase: "waiting",
+          userCode: "KTQ4-B62MX",
+          verificationUrl: "https://auth.openai.com/codex/device",
+          expiresAt: Date.now() + 600_000,
+        });
+      }),
+      cancel: vi.fn(() => setProvider(null)),
+      openVerificationUrl: vi.fn(),
+    };
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        agentStatus={codexSignedOutStatus}
+        codeLogin={codeLogin}
+      />
+    ));
+
+    // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
+    const moreActions = await screen.findByRole("button", { name: "More ways to log in to ChatGPT" });
+    fireEvent.pointerDown(moreActions, { button: 0 });
+    fireEvent.click(moreActions);
+    fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Log in with code" }), { button: 0 });
+
+    await waitFor(() => expect(codeLogin.start).toHaveBeenCalledWith("codex"));
+    expect(await screen.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close log in to ChatGPT" }));
+
+    await waitFor(() => expect(codeLogin.cancel).toHaveBeenCalledTimes(1));
   });
 });
 

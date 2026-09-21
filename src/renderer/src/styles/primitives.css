@@ -1332,6 +1332,13 @@
   line-height: var(--openbot-leading-sm);
 }
 
+/* A toned alert puts a wash over whatever is behind it, which lifts the background towards the
+   muted text colour and leaves this line under 4.5:1 on a panel. The tone carries the meaning;
+   the description only has to be readable. */
+.ui-alert[data-tone] .ui-alert-description {
+  color: var(--openbot-text-secondary);
+}
+
 .ui-alert-actions {
   display: flex;
   align-items: center;

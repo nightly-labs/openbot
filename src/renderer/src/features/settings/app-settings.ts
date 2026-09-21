@@ -11,6 +11,11 @@ export interface GeneralSettingsValue {
   macBookNotchIdle: boolean;
   macBookNotchAdditionalDisplays: boolean;
   taskCompletionSound: boolean;
+  /**
+   * Turbo mode. Agents run commands and change files without asking. Permission grants and site
+   * publishing still ask, so this is not the same as "no boundary at all".
+   */
+  turboMode: boolean;
   autoDownloadUpdates: boolean;
   productAnalytics: boolean;
 }
@@ -26,6 +31,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   macBookNotchIdle: true,
   macBookNotchAdditionalDisplays: true,
   taskCompletionSound: false,
+  turboMode: false,
   autoDownloadUpdates: true,
   productAnalytics: true,
 };

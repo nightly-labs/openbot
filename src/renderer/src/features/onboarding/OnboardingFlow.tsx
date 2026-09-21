@@ -12,7 +12,9 @@ import {
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
+import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { ArrowUp, Button, Plus } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -33,6 +35,11 @@ export interface OnboardingFlowProps {
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * The sign-in finished on another device. First run is where it is needed most: the browser this
+   * computer opens is the part of the hand-off that is most likely to be missing or wrong here.
+   */
+  codeLogin?: ProviderCodeLoginApi;
   onRefreshProviders?: () => void | Promise<void>;
   /**
    * Records the choice. The model is `null` for a built-in provider, which keeps its own default, and
@@ -77,6 +84,11 @@ type OnboardingAvatarVariants = {
 export function OnboardingFlow(props: OnboardingFlowProps) {
   const [step, setStep] = createSignal<OnboardingStep>("meet");
   const [direction, setDirection] = createSignal<StepDirection>("forward");
+  /**
+   * The first-run screen sits on the dialog layer, so a row menu portalled to `body` would paint
+   * behind it. Menus mount here instead.
+   */
+  const [screenElement, setScreenElement] = createSignal<HTMLElement | undefined>();
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
   /**
    * Whether the user chose their own endpoints rather than a built-in provider. `selectedProvider`
@@ -375,7 +387,12 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   const stepNumber = () => (step() === "meet" ? 1 : step() === "computer" ? 2 : 3);
 
   return (
-    <main class="onboarding-screen" data-step={step()} data-direction={direction()}>
+    <main
+      class="onboarding-screen"
+      data-step={step()}
+      data-direction={direction()}
+      ref={(element) => setScreenElement(element)}
+    >
       <div class="onboarding-shell">
         <nav class="onboarding-progress" aria-label={`Onboarding step ${stepNumber()} of 3`}>
           <For each={[1, 2, 3]}>
@@ -462,6 +479,8 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         ? (provider) => openProviderGuide(provider, props.onSignInProvider, "sign-in")
                         : undefined
                     }
+                    onSignInWithCodeProvider={props.codeLogin?.start}
+                    menuMount={screenElement()}
                     onRefreshProviders={!lazyProviderMode() && props.onRefreshProviders ? refreshProviders : undefined}
                     onAddCustomProvider={props.onAddCustomProvider ? host.openForm : undefined}
                     customProviders={props.customProviders}
@@ -491,6 +510,19 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       onDelete={(provider) => void host.remove(provider)}
                       onClose={host.closeList}
                     />
+                  </Show>
+                  {/* Sits beside the picker it was started from, so the code covers the row rather
+                    than a step the user has not reached. */}
+                  <Show when={props.codeLogin?.provider() ? props.codeLogin : undefined}>
+                    {(api) => (
+                      <ProviderCodeLoginDialog
+                        open={true}
+                        providerName={PROVIDERS.find((candidate) => candidate.id === api().provider())?.name ?? ""}
+                        state={api().state()}
+                        onOpenVerificationUrl={api().openVerificationUrl}
+                        onCancel={api().cancel}
+                      />
+                    )}
                   </Show>
                 </div>
               </section>

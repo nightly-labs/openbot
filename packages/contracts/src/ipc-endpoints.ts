@@ -38,6 +38,8 @@ export const IPC_ENDPOINTS = {
     saveSetup: request(IPC_CHANNELS.saveSetup),
     getAnalyticsPreference: request(IPC_CHANNELS.getAnalyticsPreference),
     setAnalyticsPreference: request(IPC_CHANNELS.setAnalyticsPreference),
+    getApprovalAutomation: request(IPC_CHANNELS.getApprovalAutomation),
+    setApprovalAutomation: request(IPC_CHANNELS.setApprovalAutomation),
     getAppLanguagePreference: request(IPC_CHANNELS.getAppLanguagePreference),
     setAppLanguagePreference: request(IPC_CHANNELS.setAppLanguagePreference),
     // Every window draws its own text, so the choice is broadcast rather than returned: the
@@ -62,6 +64,8 @@ export const IPC_ENDPOINTS = {
     setProviderApiKey: request(IPC_CHANNELS.setProviderApiKey),
     clearProviderApiKey: request(IPC_CHANNELS.clearProviderApiKey),
     getProviderApiKeyState: request(IPC_CHANNELS.getProviderApiKeyState),
+    startProviderCodeLogin: request(IPC_CHANNELS.startProviderCodeLogin),
+    cancelProviderCodeLogin: request(IPC_CHANNELS.cancelProviderCodeLogin),
   },
   providerRuntimes: {
     getStatus: request(IPC_CHANNELS.providerRuntimesGetStatus),

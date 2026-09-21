@@ -416,6 +416,8 @@ export function installOpenbotStub(): void {
       getSetupState: vi.fn().mockResolvedValue({ completed: true, preferredProvider: "codex" }),
       getAnalyticsPreference: vi.fn().mockResolvedValue({ enabled: true }),
       setAnalyticsPreference: vi.fn(async ({ enabled }) => ({ enabled })),
+      getApprovalAutomation: vi.fn().mockResolvedValue({ turbo: false, autoApproveAgentIds: [] }),
+      setApprovalAutomation: vi.fn(async () => ({ turbo: false, autoApproveAgentIds: [] })),
       getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
       setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
       onAppLanguagePreference: vi.fn(() => () => undefined),
@@ -461,6 +463,15 @@ export function installOpenbotStub(): void {
       // One channel, so the mock has to answer for whichever provider the caller names:
       // each response marks that provider connecting and reports its own CLI version.
       connectProvider: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
+      // The code and the page it is typed on are all that come back. How the sign-in ends arrives
+      // in the agent status, so a test that drives it to an end emits that status itself.
+      startProviderCodeLogin: vi.fn(async () => ({
+        kind: "code",
+        userCode: "KTQ4-B62MX",
+        verificationUrl: "https://auth.openai.com/codex/device",
+        expiresAt: Date.now() + 600_000,
+      })),
+      cancelProviderCodeLogin: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
       refreshAgentProviders: vi.fn().mockResolvedValue({
         phase: "ready",
         cliVersion: "0.144.1",
