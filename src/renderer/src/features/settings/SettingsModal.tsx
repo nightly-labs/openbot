@@ -87,6 +87,8 @@ export interface SettingsModalProps {
    */
   codeLogin?: ProviderCodeLoginApi;
   hostedSitesApi?: HostedSitesDesktopApi;
+  /** The agents granted a standing approval, so the user can see and undo each one. */
+  turboModePending?: boolean;
   restoreFocusTarget?: HTMLElement | null;
 }
 
@@ -343,6 +345,7 @@ export function SettingsModal(props: SettingsModalProps) {
             onDeleteCustomProvider={props.onDeleteCustomProvider}
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
+            turboModePending={props.turboModePending}
           />
         </Tabs.Content>
 

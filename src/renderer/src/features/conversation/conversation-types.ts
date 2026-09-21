@@ -123,6 +123,21 @@ export interface ConversationProps {
   onAnswerPrompt: (answers: Record<string, string[]>) => Promise<boolean>;
   onPromptResolutionPresented?: (agentId: string, turnId: string, requestId: string | number) => void;
   onRespondToApproval: (decision: "accept" | "decline") => Promise<boolean>;
+  /**
+   * Grants the agent a standing approval and accepts the request in hand. Absent where the grant
+   * cannot be given: the approval widens the agent's access, or the agent belongs to a remote
+   * server, whose own computer holds that choice.
+   */
+  onAlwaysAllowApproval?: () => Promise<boolean>;
+  /**
+   * Whether this agent acts without asking, by Turbo mode or by its own grant. Shown in the header,
+   * because standing consent the user cannot see is consent they cannot take back.
+   */
+  agentAutoApproves?: boolean;
+  /** Turbo mode covers every agent, so the per-agent switch is read-only while it is on. */
+  agentAutoApproveLocked?: boolean;
+  /** Absent for a remote agent: its own computer holds that choice. */
+  onSetAgentAutoApprove?: (autoApprove: boolean) => Promise<void>;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel") => Promise<boolean>;
   onCancelQueuedMessage: (deliveryId: string) => void;
   onSteerQueuedMessage: (deliveryId: string) => void;

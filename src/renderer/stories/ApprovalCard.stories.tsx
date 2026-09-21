@@ -91,3 +91,16 @@ export const Pending: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Allow" }));
   },
 };
+/** The three-button card: the agent runs on this computer, so the standing grant is the user's to give. */
+export const AlwaysAllow: Story = {
+  args: { agentName: "Chief", onAlwaysAllow: fn(async () => false) },
+};
+/** The same card without that option, which is what a remote agent and a permissions request both show. */
+export const WithoutAlwaysAllow: Story = { args: { agentName: "Chief" } };
+export const AlwaysAllowConfirmation: Story = {
+  args: { agentName: "Chief", onAlwaysAllow: fn(async () => false) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Always allow" }));
+  },
+};

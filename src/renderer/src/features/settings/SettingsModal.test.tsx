@@ -15,6 +15,7 @@ import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import type { ProviderCodeLoginState } from "../../components/ProviderCodeLoginDialog";
+import { toast } from "../../components/ui";
 import { DEFAULT_GENERAL_SETTINGS } from "./app-settings";
 import { SettingsModal } from "./SettingsModal";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
@@ -102,6 +103,7 @@ describe("SettingsModal", () => {
     expect(sessions).toEqual([current]);
   });
   afterEach(() => {
+    toast.dismiss();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -952,6 +954,58 @@ describe("SettingsModal", () => {
     // Free badge is gone, leaving the single runtime Connected.
     await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(1));
     expect(screen.queryByText("Free")).toBeNull();
+  });
+
+  it("warns before Turbo mode is turned on, and turns it off without asking", async () => {
+    const [value, setValue] = createSignal({ ...DEFAULT_GENERAL_SETTINGS });
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={value()}
+        onValueChange={setValue}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+      />
+    ));
+
+    const toggle = await screen.findByRole("switch", { name: "Turbo mode" });
+    await fireEvent.click(toggle);
+    // Nothing is on yet: the switch is a request to turn it on, and the dialog is where it is given.
+    expect(value().turboMode).toBe(false);
+    await fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(value().turboMode).toBe(false);
+
+    await fireEvent.click(toggle);
+    await fireEvent.click(await screen.findByRole("button", { name: "Turn on" }));
+    await waitFor(() => expect(value().turboMode).toBe(true));
+
+    await fireEvent.click(await screen.findByRole("switch", { name: "Turbo mode" }));
+    await waitFor(() => expect(value().turboMode).toBe(false));
+  });
+
+  it("keeps Turbo available without per-agent approval controls", async () => {
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={null}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={async () => {}}
+        account={account}
+        onUpdateAccountName={async () => {}}
+        onUpdateAccountAvatar={async () => {}}
+      />
+    ));
+
+    expect(await screen.findByRole("switch", { name: "Turbo mode" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Revoke all" })).not.toBeInTheDocument();
   });
 
   // The second way in, for the computer whose browser cannot finish the first one. What Settings

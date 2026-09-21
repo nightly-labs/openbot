@@ -4,6 +4,8 @@ export const IPC_CHANNELS = {
   saveSetup: "app:save-setup",
   getAnalyticsPreference: "app:get-analytics-preference",
   setAnalyticsPreference: "app:set-analytics-preference",
+  getApprovalAutomation: "app:get-approval-automation",
+  setApprovalAutomation: "app:set-approval-automation",
   getAppLanguagePreference: "app:get-language-preference",
   setAppLanguagePreference: "app:set-language-preference",
   appLanguagePreference: "app:language-preference",

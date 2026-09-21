@@ -293,8 +293,14 @@ function AppSettings(props: AccountProps) {
   const updates = useUpdates();
   const { agentStatus } = useAgents();
   const { activeServer } = useServers();
-  const { appSettingsOpen, setAppSettingsOpen, generalSettings, updateGeneralSettings, appSettingsRestoreTarget } =
-    useSettings();
+  const {
+    appSettingsOpen,
+    setAppSettingsOpen,
+    generalSettings,
+    updateGeneralSettings,
+    appSettingsRestoreTarget,
+    turboModePending,
+  } = useSettings();
   const {
     providerRuntimeStatuses,
     providerAvailableVersions,
@@ -351,6 +357,7 @@ function AppSettings(props: AccountProps) {
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         codeLogin={localProviderDownloads() ? codeLogin : undefined}
         hostedSitesApi={window.openbot.hostedSites}
+        turboModePending={turboModePending()}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />
     </Loading>

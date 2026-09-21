@@ -96,14 +96,27 @@ export async function verifyHostPayload(expanded: string, version: string): Prom
   }
 }
 
-export async function verifyHostInstaller(pkg: string, version: string, requireNotarization = true): Promise<void> {
-  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Invalid release version.");
-  const signature = await command("/usr/sbin/pkgutil", ["--check-signature", pkg]);
+// `pkgutil` describes a Developer ID Installer package as issued "for distribution". A Mac
+// Installer Distribution certificate reports "signed by a certificate trusted by" instead: that is
+// the App Store type, it cannot install this package outside the Mac App Store, and it was issued
+// by mistake once already. So the whole status line is the check, not the word "signed".
+const HOST_SIGNATURE_STATUS = "signed by a developer certificate issued by Apple for distribution";
+
+// Takes the text so the accepted and rejected wordings are provable without a signing identity:
+// the release path is the only place this runs, and a status no real package produces would fail
+// there for the first time with the package already built.
+export function verifyHostSignature(signature: string): void {
   if (
     !new RegExp(`^\\s*1[.:] Developer ID Installer:.*\\(${HOST_TEAM_ID}\\)\\s*$`, "m").test(signature) ||
-    !signature.includes("signed by a certificate trusted by")
+    !new RegExp(`^\\s*Status: ${HOST_SIGNATURE_STATUS}\\s*$`, "m").test(signature) ||
+    !/^\s*Signed with a trusted timestamp on: /m.test(signature)
   )
-    throw new Error("Unexpected installer signing identity.");
+    throw new Error(`Unexpected installer signing identity:\n${signature}`);
+}
+
+export async function verifyHostInstaller(pkg: string, version: string, requireNotarization = true): Promise<void> {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Invalid release version.");
+  verifyHostSignature(await command("/usr/sbin/pkgutil", ["--check-signature", pkg]));
   if (requireNotarization) {
     await command("/usr/sbin/spctl", ["--assess", "--type", "install", "--verbose=2", pkg]);
     await command("/usr/bin/xcrun", ["stapler", "validate", pkg]);
