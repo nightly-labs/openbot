@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { StandingApprovalConfirmation } from "../../components/StandingApprovalConfirmation";
 import {
   Badge,
   Button,
@@ -11,8 +12,10 @@ import {
   Monitor,
   RadioGroup,
   Skeleton,
+  toast,
   X,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
 
 export function ChoiceCard(props: {
   title: string;
@@ -100,13 +103,36 @@ export function ApprovalCard(props: {
   approval: AgentApproval;
   onApprove: () => Promise<boolean>;
   onReject: () => Promise<boolean>;
+  /**
+   * Grants this agent a standing approval, then accepts the request in hand. Absent where the grant
+   * cannot be given: a `permissions` request, or an agent on a remote server whose own computer
+   * owns that choice. The card then reads exactly as it did before this option existed.
+   */
+  onAlwaysAllow?: () => Promise<boolean>;
+  /** The agent this grant would cover, for the confirmation the grant deserves. */
+  agentName?: string;
 }) {
   const [submitting, setSubmitting] = createSignal(false);
+  const [confirmingAlways, setConfirmingAlways] = createSignal(false);
+  let alwaysAllowButton: HTMLButtonElement | undefined;
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
     const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
     if (!completed) setSubmitting(false);
+  };
+  const alwaysAllow = async () => {
+    const grant = props.onAlwaysAllow;
+    if (!grant || submitting()) return;
+    setConfirmingAlways(false);
+    setSubmitting(true);
+    try {
+      const completed = await grant();
+      if (!completed) setSubmitting(false);
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not save the standing approval. Try again."));
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -154,6 +180,18 @@ export function ApprovalCard(props: {
         >
           {submitting() ? "Sending…" : "Allow"}
         </Button>
+        <Show when={props.onAlwaysAllow}>
+          <Button
+            ref={alwaysAllowButton}
+            variant="secondary"
+            type="button"
+            class="approval-button"
+            disabled={submitting()}
+            onClick={() => setConfirmingAlways(true)}
+          >
+            Always allow
+          </Button>
+        </Show>
         <Button
           variant="secondary"
           type="button"
@@ -164,6 +202,13 @@ export function ApprovalCard(props: {
           {submitting() ? "Waiting…" : "Deny"}
         </Button>
       </footer>
+      <StandingApprovalConfirmation
+        open={confirmingAlways()}
+        agentName={props.agentName}
+        onCancel={() => setConfirmingAlways(false)}
+        onConfirm={() => void alwaysAllow()}
+        restoreFocusTarget={alwaysAllowButton}
+      />
     </section>
   );
 }
