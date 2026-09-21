@@ -26,6 +26,7 @@ import {
   type PickerModelGroup,
   pickerModels,
 } from "./provider-model-options";
+import { StandingApprovalConfirmation } from "./StandingApprovalConfirmation";
 import {
   Button,
   Input,
@@ -70,6 +71,7 @@ interface ProviderModelPickerProps {
    * to the computer that runs the agent.
    */
   autoApprove?: boolean;
+  agentName?: string;
   /** Turbo mode already covers every agent, so the switch reads on and cannot be turned off here. */
   autoApproveLocked?: boolean;
   onAutoApproveChange?: (autoApprove: boolean) => void;
@@ -89,6 +91,8 @@ const RAIL_TOOLTIP_OPEN_DELAY = 150;
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const [open, setOpen] = createSignal(false);
   const [search, setSearch] = createSignal("");
+  const [grantConfirmation, setGrantConfirmation] = createSignal<{ name?: string; confirm: () => void } | null>(null);
+  let trigger: HTMLButtonElement | undefined;
   const providerButtons = new Map<RailId, HTMLButtonElement>();
   let root: HTMLDivElement | undefined;
 
@@ -190,12 +194,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     >
       <Popover.Root open={open()} onOpenChange={setPickerOpen} placement="bottom-end" gutter={8} sameWidth={field()}>
         <Popover.Trigger
+          ref={trigger}
           type="button"
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
           aria-label={`${props.ariaLabel ?? "Agent model"}: ${triggerModelName()}`}
           disabled={props.disabled}
           title={props.disabled ? props.disabledReason : `${railName(activeProvider())} · ${triggerModelName()}`}
-          onKeyDown={(event) => {
+          onKeyDown={(event: KeyboardEvent) => {
             if (event.key !== "ArrowDown") return;
             event.preventDefault();
             setPickerOpen(true);
@@ -516,7 +521,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             aria-label="Auto approve this agent's actions"
                             checked={props.autoApprove === true}
                             disabled={props.autoApproveLocked === true}
-                            onChange={(next) => change()(next)}
+                            onChange={(next) => {
+                              const save = change();
+                              if (!next) return save(false);
+                              setGrantConfirmation({ name: props.agentName, confirm: () => save(true) });
+                              setOpen(false);
+                            }}
                           />
                         </div>
                       )}
@@ -528,6 +538,17 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           </Tabs.Root>
         </Popover.Content>
       </Popover.Root>
+      <StandingApprovalConfirmation
+        open={grantConfirmation() !== null}
+        agentName={grantConfirmation()?.name}
+        restoreFocusTarget={trigger}
+        onCancel={() => setGrantConfirmation(null)}
+        onConfirm={() => {
+          const grant = grantConfirmation();
+          setGrantConfirmation(null);
+          grant?.confirm();
+        }}
+      />
     </div>
   );
 }

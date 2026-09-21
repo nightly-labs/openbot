@@ -1,8 +1,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { StandingApprovalConfirmation } from "../../components/StandingApprovalConfirmation";
 import {
-  AlertDialog,
   Badge,
   Button,
   Check,
@@ -115,7 +115,6 @@ export function ApprovalCard(props: {
   const [submitting, setSubmitting] = createSignal(false);
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
-  let cancelAlwaysButton: HTMLButtonElement | undefined;
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
@@ -203,50 +202,13 @@ export function ApprovalCard(props: {
           {submitting() ? "Waiting…" : "Deny"}
         </Button>
       </footer>
-      <AlertDialog.Root
+      <StandingApprovalConfirmation
         open={confirmingAlways()}
-        onOpenChange={(open) => {
-          if (!open) setConfirmingAlways(false);
-        }}
-      >
-        <AlertDialog.Portal>
-          <AlertDialog.Overlay class="approval-confirm-backdrop">
-            <AlertDialog.Content
-              class="approval-confirm-dialog"
-              onOpenAutoFocus={(event) => {
-                // Focus lands on the way out rather than on the grant, so confirming a standing
-                // approval takes a deliberate move and never one stray Enter.
-                event.preventDefault();
-                cancelAlwaysButton?.focus({ preventScroll: true });
-              }}
-              onCloseAutoFocus={(event) => {
-                event.preventDefault();
-                alwaysAllowButton?.focus({ preventScroll: true });
-              }}
-            >
-              <AlertDialog.Title>Always allow {props.agentName ?? "this agent"}?</AlertDialog.Title>
-              <AlertDialog.Description>
-                {props.agentName ?? "This agent"} will run commands, change files and widen its own filesystem and
-                network access on this computer without asking again. Changes to a published site still ask. You can
-                take this back in Settings.
-              </AlertDialog.Description>
-              <div class="approval-confirm-actions">
-                <Button
-                  ref={cancelAlwaysButton}
-                  variant="outline"
-                  type="button"
-                  onClick={() => setConfirmingAlways(false)}
-                >
-                  Cancel
-                </Button>
-                <Button variant="default" type="button" onClick={() => void alwaysAllow()}>
-                  Always allow
-                </Button>
-              </div>
-            </AlertDialog.Content>
-          </AlertDialog.Overlay>
-        </AlertDialog.Portal>
-      </AlertDialog.Root>
+        agentName={props.agentName}
+        onCancel={() => setConfirmingAlways(false)}
+        onConfirm={() => void alwaysAllow()}
+        restoreFocusTarget={alwaysAllowButton}
+      />
     </section>
   );
 }

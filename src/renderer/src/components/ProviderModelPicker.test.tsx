@@ -1,5 +1,5 @@
 import type { AgentModelOption, AgentProviderStatus, AgentStatus } from "@openbot/contracts/ipc";
-import { fireEvent, render, within } from "@solidjs/testing-library";
+import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { STORY_MODELS } from "../preview/fixtures";
@@ -104,10 +104,24 @@ describe("ProviderModelPicker", () => {
     expect(grant).not.toBeChecked();
 
     await fireEvent.click(grant);
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+    let confirmation = await screen.findByRole("alertdialog");
+    expect(confirmation).toHaveTextContent("filesystem and network access");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(await view.findByRole("switch", { name: "Auto approve this agent's actions" }));
+    confirmation = await screen.findByRole("alertdialog");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Always allow" }));
     expect(onAutoApproveChange).toHaveBeenCalledWith(true);
-    await vi.waitFor(() => expect(grant).toBeChecked());
-    // Changing it is not a reason to lose the picker, the same way choosing an effort is not.
-    expect(dialog).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const enabled = await view.findByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(enabled).toBeChecked();
+    await fireEvent.click(enabled);
+    expect(onAutoApproveChange).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("reads the grant as on and read-only while Turbo mode covers every agent", async () => {

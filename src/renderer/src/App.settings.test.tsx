@@ -14,6 +14,7 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
+import { toast } from "./components/ui";
 import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
 
 describe("OpenBot connected desktop shell", () => {
@@ -33,6 +34,25 @@ describe("OpenBot connected desktop shell", () => {
   });
   beforeEach(() => {
     installOpenbotStub();
+  });
+  afterEach(() => toast.dismiss());
+
+  it("reports a failed model-picker revocation and keeps the grant available for retry", async () => {
+    vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue({ turbo: false, autoApproveAgentIds: ["chief"] });
+    vi.mocked(window.openbot.setApprovalAutomation).mockRejectedValueOnce(new Error("Write failed"));
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const toggle = await screen.findByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(toggle).toBeChecked();
+    await fireEvent.click(toggle);
+    expect(
+      await screen.findByText("Could not revoke the standing approval for Chief. It is still active. Try again."),
+    ).toBeInTheDocument();
+    expect(toggle).toBeChecked();
+    await fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    expect(window.openbot.setApprovalAutomation).toHaveBeenCalledTimes(2);
   });
 
   it("answers the original approval after switching agents during a grant write", async () => {

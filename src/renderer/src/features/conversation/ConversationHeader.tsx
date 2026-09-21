@@ -2,14 +2,17 @@ import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
-import { Show } from "solid-js";
+import { createMemo, Show } from "solid-js";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
-import { Button } from "../../components/ui";
+import { Button, toast } from "../../components/ui";
+import { errorMessage } from "../../error-message";
+import { useI18n } from "../../i18n-context";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComputerIcon, RemoteDesktopIcon } from "./ConversationIcons";
 
 /** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {
+  const i18n = useI18n();
   const {
     actingBrowserControl,
     agentActivity,
@@ -25,6 +28,20 @@ export function ConversationHeader() {
     settingsReasoning,
     showBrowserPanel,
   } = useConversationViewScope();
+  const changeAutoApprove = createMemo(() => {
+    const save = props.onSetAgentAutoApprove;
+    const name = props.agent?.name ?? "This agent";
+    if (!save) return undefined;
+    return (next: boolean) => {
+      void save(next).catch((error) => {
+        toast.error(
+          next
+            ? errorMessage(error, `Could not save the standing approval for ${name}. Try again.`)
+            : i18n.t("settings.autoApprove.revokeFailed", { name }),
+        );
+      });
+    };
+  });
   return (
     <header class="window-drag conversation-header">
       <div class="conversation-heading-group">
@@ -68,8 +85,9 @@ export function ConversationHeader() {
             onChange={(model, provider) => void selectAndConfirmModel(model, provider)}
             onReasoningEffortChange={(effort) => void selectAndConfirmReasoning(effort)}
             autoApprove={props.agentAutoApproves}
+            agentName={props.agent?.name}
             autoApproveLocked={props.agentAutoApproveLocked}
-            onAutoApproveChange={props.onSetAgentAutoApprove && ((next) => void props.onSetAgentAutoApprove?.(next))}
+            onAutoApproveChange={changeAutoApprove()}
           />
         </Show>
         <Show when={props.remoteDesktopEnabled !== false && props.server?.kind === "remote" ? props.server : undefined}>
