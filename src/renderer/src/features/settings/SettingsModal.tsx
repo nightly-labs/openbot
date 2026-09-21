@@ -80,9 +80,7 @@ export interface SettingsModalProps {
   providerKeys?: ProviderKeyApi;
   hostedSitesApi?: HostedSitesDesktopApi;
   /** The agents granted a standing approval, so the user can see and undo each one. */
-  autoApprovedAgents?: readonly { id: string; name: string }[];
   turboModePending?: boolean;
-  onRevokeAutoApprove?: (agentId: string) => Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
 }
 
@@ -325,9 +323,7 @@ export function SettingsModal(props: SettingsModalProps) {
             customProviders={props.customProviders}
             onDeleteCustomProvider={props.onDeleteCustomProvider}
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
-            autoApprovedAgents={props.autoApprovedAgents}
             turboModePending={props.turboModePending}
-            onRevokeAutoApprove={props.onRevokeAutoApprove}
           />
         </Tabs.Content>
 

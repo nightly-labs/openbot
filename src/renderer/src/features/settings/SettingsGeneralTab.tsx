@@ -6,7 +6,7 @@ import type {
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { ProviderPicker } from "../../components/ProviderPicker";
 import {
   AlertDialog,
@@ -25,7 +25,6 @@ import {
   SettingsSection,
   SwitchField,
   Text,
-  toast,
 } from "../../components/ui";
 import { useI18n } from "../../i18n-context";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
@@ -69,10 +68,7 @@ interface SettingsGeneralTabProps {
   /** Without it the rows are listed but not removable, which is what a story without the callback shows. */
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  /** The agents granted a standing approval. Without the pair the autonomy rows are read-only. */
-  autoApprovedAgents?: readonly { id: string; name: string }[];
   turboModePending?: boolean;
-  onRevokeAutoApprove?: (agentId: string) => Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
@@ -87,13 +83,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
    */
   const [customSelected, setCustomSelected] = createSignal(false);
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
-  async function revokeGrant(revoke: (agentId: string) => Promise<void>, agent: { id: string; name: string }) {
-    try {
-      await revoke(agent.id);
-    } catch {
-      toast.error(i18n.t("settings.autoApprove.revokeFailed", { name: agent.name }));
-    }
-  }
   let cancelTurboButton: HTMLButtonElement | undefined;
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
@@ -235,67 +224,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.turbo.title")}
             description={i18n.t("settings.turbo.description")}
           />
-          <For each={props.autoApprovedAgents ?? []}>
-            {(agent) => (
-              <Item class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>{agent.name}</ItemTitle>
-                  <ItemDescription>{i18n.t("settings.autoApprove.agentDescription")}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Show when={props.onRevokeAutoApprove}>
-                    {(revoke) => (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        onClick={() => void revokeGrant(revoke(), agent)}
-                        aria-label={i18n.t("settings.autoApprove.revokeLabel", { name: agent.name })}
-                      >
-                        {i18n.t("settings.autoApprove.revoke")}
-                      </Button>
-                    )}
-                  </Show>
-                </ItemActions>
-              </Item>
-            )}
-          </For>
-          <Show when={(props.autoApprovedAgents ?? []).length > 1 && props.onRevokeAutoApprove}>
-            {(revoke) => (
-              <Item class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>{i18n.t("settings.autoApprove.resetTitle")}</ItemTitle>
-                  <ItemDescription>{i18n.t("settings.autoApprove.resetDescription")}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    onClick={() => {
-                      // One call per agent, in order, because one grant is what the contract writes.
-                      // The list is bounded by the agent roster, so this is never a long queue.
-                      const revokeOne = revoke();
-                      void (props.autoApprovedAgents ?? []).reduce(
-                        (queue, agent) => queue.then(() => revokeGrant(revokeOne, agent)),
-                        Promise.resolve(),
-                      );
-                    }}
-                  >
-                    {i18n.t("settings.autoApprove.reset")}
-                  </Button>
-                </ItemActions>
-              </Item>
-            )}
-          </Show>
-          <Show when={(props.autoApprovedAgents ?? []).length === 0}>
-            <Item class="settings-modal-row">
-              <ItemContent>
-                <ItemTitle>{i18n.t("settings.autoApprove.emptyTitle")}</ItemTitle>
-                <ItemDescription>{i18n.t("settings.autoApprove.emptyDescription")}</ItemDescription>
-              </ItemContent>
-            </Item>
-          </Show>
         </ItemGroup>
       </SettingsSection>
 

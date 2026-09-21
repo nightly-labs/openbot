@@ -171,6 +171,15 @@ export function ApprovalCard(props: {
         </Show>
       </div>
       <footer class="approval-card-footer">
+        <Button
+          variant="default"
+          type="button"
+          class="approval-button"
+          disabled={submitting()}
+          onClick={() => void submit("accept")}
+        >
+          {submitting() ? "Sending…" : "Allow"}
+        </Button>
         <Show when={props.onAlwaysAllow}>
           <Button
             ref={alwaysAllowButton}
@@ -183,15 +192,6 @@ export function ApprovalCard(props: {
             Always allow
           </Button>
         </Show>
-        <Button
-          variant="default"
-          type="button"
-          class="approval-button"
-          disabled={submitting()}
-          onClick={() => void submit("accept")}
-        >
-          {submitting() ? "Sending…" : "Allow"}
-        </Button>
         <Button
           variant="secondary"
           type="button"

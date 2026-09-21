@@ -30,6 +30,92 @@ afterEach(async () => {
 });
 
 describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () => {
+  it.each(["publish", "replace", "delete"] as const)(
+    "auto-approves site %s with a grant, then asks after revocation",
+    async (action) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "", false);
+      const site = {
+        id: "site-1",
+        hostname: "approval-test.openbot.site",
+        url: "https://approval-test.openbot.site/",
+        title: "Approval test",
+        description: "Test content",
+        framework: "vanilla" as const,
+        status: "active" as const,
+        fileCount: 1,
+        size: 20,
+        expiresAt: "2026-09-30T12:00:00.000Z",
+        updatedAt: "2026-09-01T12:00:00.000Z",
+      };
+      const hostedSites = {
+        list: vi.fn(async () => [site]),
+        publish: vi.fn(async () => site),
+        replace: vi.fn(async () => site),
+        delete: vi.fn(async () => undefined),
+      };
+      let granted = true;
+      service = createTestService({
+        store,
+        mailbox,
+        preferredProvider: "codex",
+        clientFactory: () => client,
+        hostedSites,
+        approvalAutomation: { autoApproves: (agentId) => granted && agentId === "chief" },
+      });
+      const events: AgentEvent[] = [];
+      service.on("event", (event) => events.push(event));
+      await service.initialize();
+      const agent = await store.getOrCreate("chief");
+      await service.sendMessage({ agentId: agent.id, text: "Change my site." });
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!threadId || !turnId) throw new Error("The site test turn did not start.");
+      const params = {
+        threadId,
+        turnId,
+        namespace: "openbot",
+        tool: `${action}_site`,
+        arguments: {
+          siteId: site.id,
+          sourcePath: agent.workspacePath,
+          title: site.title,
+          description: site.description,
+        },
+      };
+      client.emit("request", {
+        method: "item/tool/call",
+        id: "automatic-site",
+        params: { ...params, callId: "automatic-site" },
+      });
+      await waitFor(() => client.responses.some((response) => response.id === "automatic-site"));
+      expect(hostedSites[action]).toHaveBeenCalledTimes(1);
+      expect(events.some((event) => event.type === "approval")).toBe(false);
+      expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
+      expect(
+        (await service.readConversation(agent.id)).messages.flatMap(
+          (message) => hostedSiteConversationEvent(message) ?? [],
+        ),
+      ).toEqual([
+        expect.objectContaining({ action, status: "running" }),
+        expect.objectContaining({ action, status: "succeeded" }),
+      ]);
+
+      granted = false;
+      client.emit("request", {
+        method: "item/tool/call",
+        id: "manual-site",
+        params: { ...params, callId: "manual-site" },
+      });
+      await waitFor(() => events.some((event) => event.type === "approval"));
+      expect(hostedSites[action]).toHaveBeenCalledTimes(1);
+      expect(client.responses.some((response) => response.id === "manual-site")).toBe(false);
+      await service.respondToApproval({ requestId: "manual-site", decision: "decline" });
+      expect(hostedSites[action]).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("requires user approval before an agent mutates hosted sites", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

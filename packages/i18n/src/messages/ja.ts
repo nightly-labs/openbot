@@ -66,23 +66,14 @@ export const ja = {
   "settings.autonomy.title": "エージェントの自律動作",
   "settings.turbo.title": "ターボモード",
   "settings.turbo.description":
-    "すべてのエージェントが確認なしでコマンドを実行し、ファイルを変更し、ファイルシステムやネットワークのアクセス範囲を広げます。公開サイトの変更は引き続き確認します。",
+    "すべてのエージェントが確認なしでコマンドを実行し、ファイルを変更し、ファイルシステムやネットワークのアクセス範囲を広げ、公開サイトの公開・更新・削除を行います。",
   "settings.turbo.confirmTitle": "ターボモードを有効にしますか？",
   "settings.turbo.confirmDescription":
-    "エージェントは確認なしでこのコンピューターのコマンドを実行し、ファイルを変更し、自身のアクセス範囲を広げます。ここでいつでも無効にできます。",
+    "エージェントは確認なしでこのコンピューターのコマンドを実行し、ファイルを変更し、自身のアクセス範囲を広げ、公開サイトの公開・更新・削除を行います。ここでいつでも無効にできます。",
   "settings.turbo.confirmCancel": "キャンセル",
   "settings.turbo.confirmAccept": "有効にする",
-  "settings.autoApprove.agentDescription":
-    "確認なしでコマンドを実行し、ファイルを変更し、自身のアクセス範囲を広げます。",
-  "settings.autoApprove.revoke": "取り消す",
-  "settings.autoApprove.revokeLabel": "{name} の常時許可を取り消す",
   "settings.autoApprove.revokeFailed":
     "{name} の常時許可を取り消せませんでした。許可はまだ有効です。もう一度お試しください。",
-  "settings.autoApprove.resetTitle": "すべての常時許可",
-  "settings.autoApprove.resetDescription": "上のすべてのエージェントが再び確認するようにします。",
-  "settings.autoApprove.reset": "すべて取り消す",
-  "settings.autoApprove.emptyTitle": "常時許可のエージェントはありません",
-  "settings.autoApprove.emptyDescription": "承認画面で「常に許可」を選ぶとここに表示されます。",
   "settings.notifications.title": "通知",
   "settings.desktopNotifications.title": "デスクトップ通知",
   "settings.desktopNotifications.description": "エージェントに対応が必要なときに通知を表示します。",

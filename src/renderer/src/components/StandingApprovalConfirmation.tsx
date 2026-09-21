@@ -32,8 +32,8 @@ export function StandingApprovalConfirmation(props: {
             <AlertDialog.Title>Always allow {props.agentName ?? "this agent"}?</AlertDialog.Title>
             <AlertDialog.Description>
               {props.agentName ?? "This agent"} will run commands, change files and widen its own filesystem and network
-              access on this computer without asking again. Changes to a published site still ask. You can take this
-              back in Settings.
+              access on this computer without asking again. This also allows publishing, updating and deleting public
+              sites. You can turn off Auto approve in this agent's model menu.
             </AlertDialog.Description>
             <div class="approval-confirm-actions">
               <Button ref={cancelButton} variant="outline" type="button" onClick={props.onCancel}>

@@ -1,8 +1,6 @@
-import type { AgentSummary, CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
+import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, Loading, onSettled, Show } from "solid-js";
-import { toast } from "./components/ui";
-import { errorMessage } from "./error-message";
+import { createMemo, Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
@@ -301,45 +299,8 @@ function AppSettings(props: AccountProps) {
     generalSettings,
     updateGeneralSettings,
     appSettingsRestoreTarget,
-    autoApproveAgentIds,
     turboModePending,
-    setAgentAutoApprove,
   } = useSettings();
-  const [localAgents, setLocalAgents] = createSignal<AgentSummary[]>([]);
-  createEffect(
-    () => appSettingsOpen(),
-    (open) => {
-      if (!open) return;
-      let current = true;
-      void window.openbot.agent
-        .listAgents("local")
-        .then((agents) => {
-          if (current) setLocalAgents(agents);
-        })
-        .catch((error) => {
-          if (current) toast.error(errorMessage(error, "Could not load local agents. Reopen Settings to retry."));
-        });
-      return () => {
-        current = false;
-      };
-    },
-  );
-  onSettled(() =>
-    window.openbot.agent.onScopedEvent(({ serverId, event }) => {
-      if (serverId === "local" && event.type === "agents-changed") setLocalAgents(event.agents);
-    }),
-  );
-  /**
-   * The granted agents, named. Ids the roster does not know are left out rather than shown as an
-   * unnamed row: main prunes them on its next write, and a row the user cannot recognise is not
-   * something they can decide about.
-   */
-  const autoApprovedAgents = createMemo(() => {
-    const granted = new Set(autoApproveAgentIds());
-    return localAgents()
-      .filter((agent) => granted.has(agent.id))
-      .map((agent) => ({ id: agent.id, name: agent.name }));
-  });
   const {
     providerRuntimeStatuses,
     providerAvailableVersions,
@@ -394,9 +355,7 @@ function AppSettings(props: AccountProps) {
         onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         hostedSitesApi={window.openbot.hostedSites}
-        autoApprovedAgents={autoApprovedAgents()}
         turboModePending={turboModePending()}
-        onRevokeAutoApprove={(agentId) => setAgentAutoApprove(agentId, false)}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />
     </Loading>

@@ -338,6 +338,14 @@ export class AttentionRegistry {
   ): Promise<void> {
     const prepared = await this.#hostedSites.prepareApproval(client, request, params, tool);
     if (!prepared) return;
+    if (shouldAutoApprove(this.#approvalAutomation, prepared.approval)) {
+      await this.#hostedSites.resolveApproval(
+        prepared.mutation,
+        { client, id: request.id, agentId: prepared.approval.agentId },
+        "accept",
+      );
+      return;
+    }
     this.#approvals.set(request.id, {
       client,
       id: request.id,

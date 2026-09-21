@@ -271,6 +271,11 @@ explicitly accept it. The acceptance record stays in OpenBot's local application
 Computer Use is provided by a separately installed local Codex plugin. macOS permission prompts and
 any plugin safety hand-offs remain controlled by macOS and that plugin.
 
+Auto approve also permits that agent to publish, update and delete public hosted sites without
+another confirmation. Turbo mode extends this permission to every agent on that host. Publishing
+makes the selected site content publicly accessible. Without either grant, hosted-site changes
+require confirmation. Site ownership and source validation still apply.
+
 ## Exports
 
 The account menu can export a local ZIP containing agent profiles, conversation snapshots, queues,

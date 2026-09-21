@@ -73,8 +73,9 @@ the `media-attachments` capability; released protocol adapters keep their existi
   belongs to the computer that runs the agent and never crosses the Team API, whose released
   adapters freeze an approval response to `accept` or `decline`: a remote host that has automation
   on answers its own approvals, so they never reach a client, and a client cannot grant one on a
-  remote host's behalf. `AttentionRegistry` reads it at each approval; a hosted-site mutation is the
-  one action outside any grant it can carry.
+  remote host's behalf. `AttentionRegistry` reads it at each approval, including hosted-site
+  publishing, replacement and deletion. Site validation, ownership checks and activity markers
+  still apply. Questions and browser takeovers remain interactive.
 - `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
   migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
   carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.

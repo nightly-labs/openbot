@@ -7,10 +7,9 @@ import type { AgentApproval } from "@openbot/contracts/ipc";
  * widen its filesystem or network reach before it can do the ordinary work the grant was given for,
  * so holding that class back left one card for each agent that the user could not turn off.
  *
- * One class stays outside any grant: a hosted-site mutation publishes to the internet. It never
- * reaches this function, because the registry surfaces it through `surfaceHostedSiteApproval`,
- * which has no automated path at all. Browser takeover is a separate flow with its own gate and is
- * likewise never asked about here.
+ * Hosted-site publishing, replacement and deletion use the same grant. Their validated mutations
+ * still run through the hosted-site coordinator so results and activity markers are preserved.
+ * Browser takeover is a separate flow with its own gate and is never asked about here.
  */
 export interface ApprovalAutomationPolicy {
   /** Whether this agent's eligible approvals are answered for it. */
