@@ -937,6 +937,42 @@ describe("the address a returning grant is sent to", () => {
     expect(storage.read(server.url)?.tokens?.access_token).toBe(ACCESS_TOKEN);
   });
 
+  it("refreshes against the stored registration before it registers again", async () => {
+    const server = await fakeServer();
+    const storage = memoryStorage();
+    storage.records.set(server.url, {
+      // Stale in two ways at once, which is what a restart leaves behind: the registration names
+      // the address of another run, and the access token is one the server no longer takes.
+      client: { client_id: "test-client", redirect_uris: ["openbot://mcp-auth"] },
+      tokens: {
+        access_token: "stale-access-token",
+        token_type: "Bearer",
+        expires_in: 3600,
+        refresh_token: REFRESH_TOKEN,
+      },
+      obtainedAt: Date.now(),
+    });
+    const opened: string[] = [];
+    const oauth = new McpOAuth({
+      storage,
+      redirectUrl: LOOPBACK,
+      openExternal: async (url) => {
+        opened.push(url);
+        oauth.receiveAuthorizationCode(new URL(url).searchParams.get("state") ?? "", GRANT);
+      },
+      signInTimeoutMs: 10_000,
+    });
+
+    expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({ toolCount: 1, error: null });
+
+    // A refresh uses no redirect address. Registering in front of it would spend this refresh
+    // token against a `client_id` it was never issued to, and cost the user a browser sign-in.
+    expect(server.registrations).toBe(0);
+    expect(opened).toEqual([]);
+    expect(storage.read(server.url)?.tokens?.access_token).toBe(REFRESHED_TOKEN);
+    expect(storage.read(server.url)?.client?.client_id).toBe("test-client");
+  });
+
   it("keeps the stored registration for a silent refresh", async () => {
     const server = await fakeServer();
     const storage = memoryStorage();

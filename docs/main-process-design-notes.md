@@ -95,11 +95,14 @@ There is no configuration for a developer or for a packaged build:
 - The port is the one the operating system gives, and it changes on each start. An authorization
   server must ignore the port of a loopback redirect, and the registration is dynamic, so no port
   is registered anywhere by hand.
-- A stored registration that names a different address is replaced. `clientInformation()` in
-  `src/backend/mcp-oauth-provider.ts` answers `undefined` one time for each interactive sign-in
-  when the stored `redirect_uris` do not hold this run's address, which makes the SDK register
-  again. The stored tokens stay. A silent refresh never does this: its refresh token belongs to the
-  `client_id` on file.
+- A stored registration that names a different address is replaced, but only for the attempt that
+  needs the browser. `clientInformation()` in `src/backend/mcp-oauth-provider.ts` answers
+  `undefined` when the stored `redirect_uris` do not hold this run's address, which makes the SDK
+  register again. A record that still has a refresh token keeps its client for one pass first: a
+  refresh uses no redirect address, and a refresh token spent against a new `client_id` is refused
+  and costs the user a sign-in. Two attempts never replace the registration: a silent refresh, and
+  the exchange of a grant already in hand, which must use the `client_id` that grant was issued
+  to.
 - `describeUnusableRedirectUrl` refuses an address that cannot receive a grant: an `https` address,
   or a plain-text address that is not on this machine.
 

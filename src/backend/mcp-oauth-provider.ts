@@ -249,6 +249,9 @@ export class McpOAuth implements McpOAuthAuthority {
           // The grant is a credential until it is spent, and a token endpoint that refuses it
           // commonly quotes it back in `error_description`.
           provider.recordSecret(code);
+          // From here the registration on file is the one the grant was issued to, whatever
+          // address it names: registering again would trade the code against another client.
+          provider.beginCodeExchange();
           // The grant waited on the person; the trade waits on the server, and on nothing else.
           // Without this a hung token endpoint holds the test past its own deadline after the user
           // has done everything right.
@@ -361,8 +364,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * is too late: `invalidateCredentials` has often already dropped the value the attempt spent.
    */
   readonly #secrets = new Set<string>();
-  /** Whether the stored registration has been checked against this run's redirect address. */
-  #registrationChecked = false;
+  /** Whether the stored registration has already had its one pass with a stale redirect address. */
+  #redirectAddressChecked = false;
+  /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
+  #exchangingCode = false;
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
@@ -398,28 +403,44 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   /**
    * The registration this installation already has with that authorization server - unless it
-   * names an address the grant can no longer come back to.
+   * names an address the grant can no longer come back to, and the attempt in hand needs one.
    *
    * The redirect address is not fixed for all time. A build that sent `openbot://mcp-auth` and one
-   * that listens on a loopback port register different `redirect_uris`, and a server checks what
-   * it was sent against what was registered: a stored registration from the other build earns an
-   * `Invalid redirect URI.` on the authorization page, where the user can do nothing about it.
-   * Answering `undefined` makes the SDK register again, which costs one request and is the whole
-   * repair. The stored tokens are a separate field and are kept.
+   * that listens on a loopback port register different `redirect_uris`, and the port changes on
+   * each start - so a stored registration often names another address. An authorization request
+   * made against it earns an `Invalid redirect URI.` on the authorization page, where the user can
+   * do nothing about it. Answering `undefined` makes the SDK register again, which costs one
+   * request and is the whole repair.
    *
-   * Only while a sign-in is running, and only the first time it is asked. A silent refresh has no
-   * browser to re-register for and needs the `client_id` its refresh token was issued to; and an
-   * authorization server that answers a registration with `redirect_uris` other than the ones it
-   * was sent must not make the exchange that follows register over and over, each time with a
-   * `client_id` the grant in hand was never issued to.
+   * It is answered that way as late as it can be, because a refresh uses no redirect address at
+   * all. Registering in front of one would spend a refresh token against a `client_id` it was
+   * never issued to: the authorization server refuses it, and the user is sent to the browser for
+   * a sign-in a plain refresh would have avoided. So a record with a refresh token keeps its
+   * client for one pass; when that refresh is refused the SDK drops the tokens and asks again,
+   * and the pass that goes to the browser is the one that registers.
+   *
+   * Two attempts never reach here: a silent refresh, which has no browser to register for, and
+   * the exchange of a grant already in hand, which must spend it against the `client_id` it was
+   * issued to.
    */
   clientInformation(): OAuthClientInformationFull | undefined {
-    const client = this.#record().client;
+    const record = this.#record();
+    const client = record.client;
     this.recordSecret(client?.client_secret);
     if (!client) return undefined;
-    if (this.#registrationChecked || !this.#options.state) return client;
-    this.#registrationChecked = true;
-    return client.redirect_uris.includes(this.#options.redirectUrl) ? client : undefined;
+    if (!this.#options.state || this.#exchangingCode) return client;
+    if (client.redirect_uris.includes(this.#options.redirectUrl)) return client;
+    const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
+    this.#redirectAddressChecked = true;
+    return refreshWorthTrying ? client : undefined;
+  }
+
+  /**
+   * The grant is in hand, so the registration on file is the one that has to spend it.
+   * `McpOAuth` calls this before the exchange; nothing else does.
+   */
+  beginCodeExchange(): void {
+    this.#exchangingCode = true;
   }
 
   async saveClientInformation(information: OAuthClientInformationFull): Promise<void> {
