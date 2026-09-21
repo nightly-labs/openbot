@@ -69,7 +69,8 @@ press **Check again**. The command is different on each desktop: macOS and Linux
 and Windows uses `irm https://cua.ai/driver/install.ps1 | iex` in PowerShell. In a checkout,
 `bun run prepare:cua-driver` writes the same pinned build the release ships.
 `bun run cua-driver:doctor` reports which binary OpenBot would use, and `OPENBOT_CUA_DRIVER_PATH`
-selects a different one.
+selects a different one. The installed application ignores that variable: it runs only the driver it
+was released with.
 
 On Linux the driver reads the desktop through AT-SPI, so it needs the session bus of the desktop it
 is to drive. A daemon started from a container, from `runuser`, or as root against another user's

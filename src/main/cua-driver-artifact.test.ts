@@ -53,6 +53,21 @@ describe("resolveCuaDriver", () => {
     await expect(resolveCuaDriver(input({ isPackaged: true }))).resolves.toBe(packaged);
   });
 
+  it("reads nothing but the packaged copy, so a release runs the driver it shipped", async () => {
+    const packaged = await writeExecutable("resources", "cua-driver", "darwin", "arm64", "cua-driver");
+    const pinned = await writeExecutable("pinned", "cua-driver");
+    await writeExecutable("home", ".local", "bin", "cua-driver");
+    await expect(
+      resolveCuaDriver(input({ isPackaged: true, overrides: [pinned], pathVariable: join(root, "pinned") })),
+    ).resolves.toBe(packaged);
+  });
+
+  it("reports no driver for a packaged build that shipped without one", async () => {
+    const pinned = await writeExecutable("pinned", "cua-driver");
+    await writeExecutable("home", ".local", "bin", "cua-driver");
+    await expect(resolveCuaDriver(input({ isPackaged: true, overrides: [pinned] }))).resolves.toBeNull();
+  });
+
   it("prefers an override over the checkout build", async () => {
     await writeExecutable("source", "build", "cua-driver", "darwin", "arm64", "cua-driver");
     const pinned = await writeExecutable("pinned", "cua-driver");

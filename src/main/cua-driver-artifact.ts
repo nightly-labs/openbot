@@ -50,10 +50,13 @@ export function isSupportedCuaDriverTarget(platform: NodeJS.Platform, architectu
  * binary must never throw out of startup. Every candidate is checked for the execute bit rather
  * than for existence, because a half-extracted download is a file that cannot be spawned.
  *
- * A packaged build carries the binary under `resources/cua-driver/<platform>/<architecture>`, and a
- * checkout under `build/cua-driver/<platform>/<architecture>`. `scripts/install-cua-driver.ts`
- * writes the second path from the pin in `native-runtime.lock.json`, and `electron-builder.yml`
- * copies it to the first. A hand-installed driver is still found, one candidate later.
+ * A packaged build carries the binary under `resources/cua-driver/<platform>/<architecture>` and
+ * reads nothing else: the release is pinned and signed against that build, so an override or an
+ * install the user already had must not take its place. A checkout reads
+ * `build/cua-driver/<platform>/<architecture>` first and then an override, an install directory and
+ * `PATH`, because a developer does pin a driver by hand. `scripts/install-cua-driver.ts` writes the
+ * checkout path from the pin in `native-runtime.lock.json`, and `electron-builder.yml` copies it to
+ * the packaged one.
  */
 export async function resolveCuaDriver(input: CuaDriverArtifactInput): Promise<string | null> {
   if (!isSupportedCuaDriverTarget(input.platform, input.architecture)) return null;
@@ -120,14 +123,21 @@ function executableName(platform: NodeJS.Platform): "cua-driver" | "cua-driver.e
 function* candidatePaths(input: CuaDriverArtifactInput): Generator<string> {
   const name = executableName(input.platform);
 
+  // A release carries the driver it was pinned, built and signed against, and that one only. An
+  // environment variable or an install the user already had would otherwise decide which program
+  // drives their desktop, and OpenBot would have no way to say which build it spawned. A release
+  // that shipped without the binary is a broken build, and reporting no driver says so.
+  if (input.isPackaged) {
+    yield join(input.resourcesPath, "cua-driver", input.platform, input.architecture, name);
+    return;
+  }
+
   for (const override of input.overrides ?? []) {
     const trimmed = override?.trim();
     if (trimmed && isAbsolute(trimmed)) yield trimmed;
   }
 
-  yield input.isPackaged
-    ? join(input.resourcesPath, "cua-driver", input.platform, input.architecture, name)
-    : join(input.sourceRoot, "build", "cua-driver", input.platform, input.architecture, name);
+  yield join(input.sourceRoot, "build", "cua-driver", input.platform, input.architecture, name);
 
   const installDirectory = input.installDirectory?.trim();
   if (installDirectory) yield join(installDirectory, name);
