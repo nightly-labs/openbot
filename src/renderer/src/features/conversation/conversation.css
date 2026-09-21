@@ -8804,3 +8804,71 @@ body:has(.browser-panel-expanded) .app-frame {
   min-width: 0;
   flex: 1;
 }
+
+.browser-secret-card {
+  display: grid;
+  gap: var(--openbot-space-4);
+}
+
+.browser-secret-card > p {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-lg);
+}
+
+.browser-secret-card strong {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.browser-secret-card .browser-takeover-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+
+.browser-secret-password,
+.browser-secret-code {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.browser-secret-label {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.browser-secret-code .otp-input {
+  container-type: inline-size;
+  justify-items: start;
+}
+
+.browser-secret-code .otp-input-slots {
+  --otp-slot-size: min(
+    34px,
+    calc((100cqw - (var(--otp-length) - 1) * var(--otp-slot-gap) - var(--otp-group-gap)) / var(--otp-length))
+  );
+}
+
+.browser-secret-code .otp-input-message {
+  text-align: start;
+  justify-content: flex-start;
+}
+
+.browser-secret-card > .browser-secret-error {
+  color: var(--openbot-danger);
+}
+
+.browser-secret-card .browser-takeover-preview-viewport {
+  width: 100%;
+  max-height: 280px;
+}
+
+.browser-secret-card .browser-takeover-preview-viewport img {
+  min-height: 0;
+  object-fit: contain;
+}

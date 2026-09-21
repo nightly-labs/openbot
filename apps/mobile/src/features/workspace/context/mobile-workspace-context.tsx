@@ -2,6 +2,8 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   type AgentEvent,
   type AgentSummary,
+  BROWSER_SECRET_RESPONSE_PATH,
+  type BrowserTakeoverRequest,
   type CreateAgentInput,
   isAgentMemory,
   isAgentModel,
@@ -194,6 +196,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? [];
   const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? [];
   const readWrites = useRef(new Map<string, Promise<void>>());
+  const [browserRequests, setBrowserRequests] = useState<Record<string, BrowserTakeoverRequest[]>>({});
   const [unreadAgentIds, setUnreadAgentIds] = useState<string[]>([]);
 
   const installHosts = useCallback(
@@ -488,6 +491,32 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
+      if (event.type === "runtime-snapshot") {
+        setBrowserRequests((current) => ({
+          ...current,
+          [serverId]: event.snapshot.attentionComplete
+            ? event.snapshot.pendingBrowserTakeovers
+            : [
+                ...(current[serverId] ?? []).filter(
+                  (item) => !event.snapshot.pendingBrowserTakeovers.some((next) => next.requestId === item.requestId),
+                ),
+                ...event.snapshot.pendingBrowserTakeovers,
+              ],
+        }));
+      } else if (event.type === "browser-takeover-requested") {
+        setBrowserRequests((current) => ({
+          ...current,
+          [serverId]: [
+            ...(current[serverId] ?? []).filter((item) => item.requestId !== event.request.requestId),
+            event.request,
+          ],
+        }));
+      } else if (event.type === "browser-takeover-resolved") {
+        setBrowserRequests((current) => ({
+          ...current,
+          [serverId]: (current[serverId] ?? []).filter((item) => item.requestId !== event.requestId),
+        }));
+      }
       if (event.type === "sidebar-layout-changed") {
         applySidebarLayout(serverId, event.layout);
         return;
@@ -700,6 +729,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       unreadAgentIds,
       conversationStore,
       activityByServer,
+      browserRequests,
+      respondToBrowserTakeover: async (serverId, input) => {
+        await request("POST", TEAM_API_ROUTES.respond.browserTakeover, ignoreResponse, input, serverId);
+      },
+      respondToBrowserSecret: async (serverId, input) => {
+        await request("POST", BROWSER_SECRET_RESPONSE_PATH, ignoreResponse, input, serverId);
+      },
       selectServer: (id) => {
         loadGeneration.current += 1;
         conversationStore.cancelRequests();
@@ -1165,6 +1201,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     sidebarByServer,
     applySidebarLayout,
     channelStore,
+    browserRequests,
     activeServerId,
     activityByServer,
     agents,

@@ -147,13 +147,21 @@ export class BrowserViewGateway {
     client.once("close", () => void this.#detach(session, client));
     client.once("error", () => void this.#detach(session, client));
     try {
-      session.stopView = await this.#options.browser.startView(session.tabId, (frame) => {
-        if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
-        session.frameWidth = frame.width;
-        session.frameHeight = frame.height;
-        if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
-        client.send(encodeBrowserViewFrame(frame), { binary: true });
-      });
+      const stopView = await this.#options.browser.startView(
+        session.tabId,
+        (frame) => {
+          if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
+          session.frameWidth = frame.width;
+          session.frameHeight = frame.height;
+          if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
+          client.send(encodeBrowserViewFrame(frame), { binary: true });
+        },
+        () => {
+          void this.#closeSession(session, "Authentication changed the browser view. Open a new view to continue.");
+        },
+      );
+      if (session.socket === client) session.stopView = stopView;
+      else await stopView();
     } catch (error) {
       client.close(1011, String(error instanceof Error ? error.message : error).slice(0, 120));
       await this.#detach(session, client);

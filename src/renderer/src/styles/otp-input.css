@@ -1,0 +1,217 @@
+.otp-input {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.otp-input-fieldset {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.otp-input .otp-input-native {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0;
+  color: transparent;
+  caret-color: transparent;
+  cursor: text;
+  opacity: 0;
+}
+
+.otp-input .otp-input-native:focus {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.otp-input-slots {
+  --otp-slot-size: 34px;
+  --otp-slot-height: 50px;
+  --otp-slot-gap: 6px;
+  --otp-group-gap: 8px;
+
+  position: relative;
+  display: flex;
+  gap: var(--otp-slot-gap);
+}
+
+.otp-input-slot,
+.otp-input-focus-ring {
+  width: var(--otp-slot-size);
+  height: var(--otp-slot-height);
+  border-radius: var(--openbot-radius-md);
+}
+
+.otp-input-slot {
+  position: relative;
+  display: grid;
+  flex: 0 0 var(--otp-slot-size);
+  place-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 1;
+  transition:
+    border-color var(--openbot-duration-hover) ease,
+    background-color var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease;
+}
+
+.otp-input-slot[data-group-start="true"] {
+  margin-left: var(--otp-group-gap);
+}
+
+.otp-input-focus-ring {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  border: 1px solid var(--openbot-border-focus);
+  box-shadow: var(--openbot-focus-ring);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(
+    calc(var(--otp-active-index) * (var(--otp-slot-size) + var(--otp-slot-gap)) + var(--otp-group-offset))
+  );
+  transition:
+    transform var(--openbot-duration-hover) var(--openbot-ease-out),
+    opacity var(--openbot-duration-hover) ease;
+}
+
+.otp-input-focus-ring[data-visible="true"] {
+  opacity: 1;
+}
+
+.otp-input-character {
+  position: relative;
+  z-index: 1;
+  animation: otp-character-enter var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.otp-input-caret {
+  position: absolute;
+  z-index: 2;
+  top: 13px;
+  left: 50%;
+  width: 1px;
+  height: 24px;
+  background: var(--openbot-text-primary);
+  animation: otp-caret-blink 1s steps(1, end) infinite;
+  transform: translateX(-50%);
+}
+
+.otp-input-caret[data-trailing="true"] {
+  margin-left: 7px;
+}
+
+.otp-input[data-status="verifying"] .otp-input-slot {
+  color: var(--openbot-text-secondary);
+}
+
+.otp-input[data-status="error"] .otp-input-slot {
+  border-color: var(--openbot-danger);
+  background: var(--openbot-danger-soft);
+}
+
+.otp-input[data-status="error"] .otp-input-focus-ring {
+  border-color: var(--openbot-danger);
+  box-shadow: 0 0 0 3px var(--openbot-danger-soft);
+}
+
+.otp-input[data-status="success"] .otp-input-slot {
+  border-color: var(--openbot-success);
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success);
+}
+
+.otp-input-success {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  overflow: visible;
+  color: var(--openbot-success);
+}
+
+.otp-input-success path {
+  fill: none;
+  stroke: currentcolor;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* Heavier than the shared glyph scale on purpose: this tick is drawn by animation and
+   * reads as a confirmation, the same exception the badge tick takes. */
+  stroke-width: 2;
+  animation: otp-check-draw 350ms var(--openbot-duration-fast) var(--openbot-ease-out) forwards;
+}
+
+.otp-input-message {
+  min-height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+  text-align: center;
+}
+
+.otp-input[data-status="error"] .otp-input-message {
+  color: var(--openbot-danger);
+}
+
+.otp-input[data-status="success"] .otp-input-message {
+  color: var(--openbot-success);
+}
+
+@keyframes otp-character-enter {
+  from {
+    filter: blur(2px);
+    opacity: 0;
+    transform: translateY(9px);
+  }
+}
+
+@keyframes otp-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes otp-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otp-input-slot,
+  .otp-input-focus-ring {
+    transition: none;
+  }
+  .otp-input-character,
+  .otp-input-caret,
+  .otp-input-success path {
+    animation: none;
+  }
+  .otp-input-success path {
+    stroke-dashoffset: 0;
+  }
+}

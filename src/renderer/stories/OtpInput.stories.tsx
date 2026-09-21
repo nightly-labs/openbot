@@ -1,6 +1,6 @@
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { OtpInput } from "../src/features/account/OtpInput";
+import { OtpInput } from "../src/components/ui/otp-input";
 
 const meta = {
   title: "Auth/OtpInput",

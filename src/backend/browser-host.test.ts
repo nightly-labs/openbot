@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { isBrowserSecretRequest } from "@openbot/contracts/ipc";
 import { BrowserWindow, type WebContents, WebContentsView, webContents } from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
@@ -133,11 +134,23 @@ vi.mock("electron", async () => {
   };
 });
 
+import type { BrowserScreencastFrame, BrowserScreencastOptions } from "./browser-cdp";
+
+const viewFrames = vi.hoisted((): Array<(frame: BrowserScreencastFrame) => void> => []);
+const secretEntry = vi.hoisted(() => vi.fn<(secret: string) => Promise<void>>());
+
 vi.mock("./browser-cdp", () => ({
   BrowserCdpEngine: class {
     constructor(private readonly contents: WebContents) {}
     destroy() {}
     invalidateReferences() {}
+    async prepareSecret() {
+      return secretEntry;
+    }
+    async startScreencast(_options: BrowserScreencastOptions, onFrame: (frame: BrowserScreencastFrame) => void) {
+      viewFrames.push(onFrame);
+      return async () => undefined;
+    }
     async setEnvironment() {}
     async navigate(url: string) {
       await this.contents.loadURL(url);
@@ -150,6 +163,9 @@ let host: BrowserHost;
 let browserWindow: BrowserWindow;
 let statePath: string;
 beforeEach(async () => {
+  viewFrames.length = 0;
+  secretEntry.mockReset();
+  secretEntry.mockResolvedValue(undefined);
   windowOpenHandlers.length = 0;
   menuTemplates.length = 0;
   clipboardWrites.length = 0;
@@ -662,4 +678,140 @@ describe("agent tab cleanup", () => {
     // file catches up a moment later. It still has to catch up: a tab left in it would come back.
     await vi.waitFor(async () => expect(JSON.parse(await readFile(statePath, "utf8")).tabs).toEqual([]));
   });
+});
+
+describe("secure browser handoff", () => {
+  async function prepare(method: "password" | "otp" | "authenticator" = "otp", digits?: number) {
+    const tab = await host.open("https://example.com/secure", "thread", "agent");
+    const prepared = await host.prepareSecret({
+      namespace: "openbot_browser",
+      tool: "submit_secret",
+      threadId: "thread",
+      ownerAgentId: "agent",
+      turnId: "turn",
+      callId: "secret",
+      arguments: {
+        tabId: tab.id,
+        method,
+        ...(digits === undefined ? {} : { digits }),
+        targets: [{ kind: "css", selector: "input" }],
+        submission: "on_input",
+      },
+    });
+    const contents = webContents.getAllWebContents().findLast((item) => item.getURL() === tab.url);
+    if (!contents) throw new Error("Missing browser tab.");
+    return { tab, prepared, contents };
+  }
+
+  it("prepares a password card when the provider supplies zero unused digits", async () => {
+    const { prepared } = await prepare("password", 0);
+    expect(prepared.request.method).toBe("password");
+    expect(isBrowserSecretRequest(prepared.request)).toBe(true);
+    expect(secretEntry).not.toHaveBeenCalled();
+    prepared.cancel();
+  });
+
+  it.each(["otp", "authenticator"] as const)("rejects zero digits for %s", async (method) => {
+    await expect(prepare(method, 0)).rejects.toThrow();
+    expect(secretEntry).not.toHaveBeenCalled();
+  });
+
+  it("blocks every capture endpoint after entry, even if the request is cancelled", async () => {
+    const { tab, prepared, contents } = await prepare();
+    vi.spyOn(contents, "loadURL").mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    const submitted = prepared.submit("123456");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalled());
+    await vi.advanceTimersByTimeAsync(5_000);
+    await submitted;
+    await expect(host.snapshot(tab.id)).rejects.toThrow("protected");
+    await expect(host.screenshot(tab.id)).rejects.toThrow("protected");
+    await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    expect(host.listTabs()[0]?.url).toBe("https://example.com");
+    prepared.cancel();
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    expect(secretEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("submits once and resumes only after document replacement", async () => {
+    const { tab, prepared, contents } = await prepare();
+    const submitted = prepared.submit("123456");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("123456"));
+    await expect(prepared.submit("123456")).rejects.toThrow("expired");
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    contents.emit("did-navigate", {}, "https://example.com/account");
+    await expect(submitted).resolves.toBe("submitted");
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+    expect(secretEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("automatically loads a new document after same-page submission without replaying the secret", async () => {
+    const { tab, prepared, contents } = await prepare("password", 0);
+    const load = vi.spyOn(contents, "loadURL");
+    vi.useFakeTimers();
+    const submitted = prepared.submit("fixture-password");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("fixture-password"));
+    contents.emit("did-navigate-in-page", {}, tab.url);
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(submitted).resolves.toBe("submitted");
+    expect(load).toHaveBeenCalledOnce();
+    expect(load.mock.calls[0]?.[0]).toBe(tab.url);
+    expect(secretEntry).toHaveBeenCalledOnce();
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+
+  it("keeps protection when automatic navigation does not replace the document", async () => {
+    const { tab, prepared, contents } = await prepare();
+    vi.spyOn(contents, "loadURL").mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    const submitted = prepared.submit("123456");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalled());
+    contents.emit("did-navigate-in-page", {}, "https://example.com/secure#done");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(submitted).resolves.toBe("takeover");
+    prepared.cancel();
+    host.endTakeover(tab.id);
+    await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
+    await host.reload(tab.id);
+    await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
+    contents.emit("did-navigate", {}, "https://example.com/account");
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+
+  it("does not enter a value with the wrong code length", async () => {
+    const { tab, prepared } = await prepare();
+    await expect(prepared.submit("123")).rejects.toThrow("digits");
+    expect(secretEntry).not.toHaveBeenCalled();
+    prepared.cancel();
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+});
+
+it("does not resume an existing stream after a secure handoff", async () => {
+  const tab = await host.open("https://example.com/stream", "thread", "agent");
+  const receive = vi.fn();
+  const invalidated = vi.fn();
+  await host.startView(tab.id, receive, invalidated);
+  const frame = { sequence: 1, width: 1, height: 1, image: new Uint8Array([1]) };
+  viewFrames[0]?.(frame);
+  expect(receive).toHaveBeenCalledTimes(1);
+  const prepared = await host.prepareSecret({
+    namespace: "openbot_browser",
+    tool: "submit_secret",
+    threadId: "thread",
+    ownerAgentId: "agent",
+    turnId: "turn",
+    callId: "secret",
+    arguments: { tabId: tab.id, method: "otp", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
+  });
+  expect(invalidated).toHaveBeenCalledOnce();
+  viewFrames[0]?.(frame);
+  prepared.cancel();
+  viewFrames[0]?.(frame);
+  expect(receive).toHaveBeenCalledTimes(1);
+  await host.startView(tab.id, receive);
+  viewFrames[1]?.(frame);
+  expect(receive).toHaveBeenCalledTimes(2);
 });
