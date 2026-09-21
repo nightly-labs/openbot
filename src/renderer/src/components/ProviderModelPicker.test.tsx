@@ -1,5 +1,5 @@
 import type { AgentModelOption, AgentProviderStatus, AgentStatus } from "@openbot/contracts/ipc";
-import { fireEvent, render, within } from "@solidjs/testing-library";
+import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { STORY_MODELS } from "../preview/fixtures";
@@ -78,6 +78,89 @@ describe("ProviderModelPicker", () => {
     expect(onReasoningEffortChange).toHaveBeenCalledWith("xhigh");
     expect(effortSelect).toHaveTextContent("Extra high");
     expect(dialog).toBeInTheDocument();
+  });
+
+  it("offers the standing grant below Effort, and only where the caller gives one", async () => {
+    const onAutoApproveChange = vi.fn();
+    const [granted, setGranted] = createSignal(false);
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        autoApprove={granted()}
+        onAutoApproveChange={(next) => {
+          setGranted(next);
+          onAutoApproveChange(next);
+        }}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    const grant = within(dialog).getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(grant).not.toBeChecked();
+
+    await fireEvent.click(grant);
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+    let confirmation = await screen.findByRole("alertdialog");
+    expect(confirmation).toHaveTextContent("filesystem and network access");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(await view.findByRole("switch", { name: "Auto approve this agent's actions" }));
+    confirmation = await screen.findByRole("alertdialog");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Always allow" }));
+    expect(onAutoApproveChange).toHaveBeenCalledWith(true);
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const enabled = await view.findByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(enabled).toBeChecked();
+    await fireEvent.click(enabled);
+    expect(onAutoApproveChange).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("reads the grant as on and read-only while Turbo mode covers every agent", async () => {
+    const onAutoApproveChange = vi.fn();
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        autoApprove
+        autoApproveLocked
+        onAutoApproveChange={onAutoApproveChange}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    const grant = within(dialog).getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(grant).toBeChecked();
+    await fireEvent.click(grant);
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+  });
+
+  it("shows no standing grant for an agent this computer does not run", async () => {
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    expect(within(dialog).queryByRole("switch", { name: "Auto approve this agent's actions" })).not.toBeInTheDocument();
   });
 
   it("shows an unavailable provider without allowing its models", async () => {

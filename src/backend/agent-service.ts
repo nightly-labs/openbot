@@ -85,6 +85,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
+import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
 import { loadAvatarFile } from "./agent/avatar-file";
@@ -207,6 +208,12 @@ export interface AgentServiceOptions {
   credentials?: ProviderClientContext;
   localSkillTools?: () => LocalSkillTools;
   /**
+   * Whose approvals are answered without asking. The main process owns the preference, because it
+   * is a property of this computer and never crosses the Team API. Omitted, every approval asks.
+   */
+  approvalAutomation?: ApprovalAutomationPolicy;
+  deleteWithRevokedApproval?: (agentId: string, remove: () => Promise<void>) => Promise<void>;
+  /**
    * The shared database agents keep their tables in. Injected because the host child's packaged
    * path is the main process's knowledge, not this class's.
    */
@@ -306,6 +313,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
   readonly #developmentDefaults: boolean;
+  readonly #deleteWithRevokedApproval: NonNullable<AgentServiceOptions["deleteWithRevokedApproval"]>;
   #initialized = false;
   #stopping = false;
 
@@ -328,6 +336,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       developmentDefaults = false,
     } = options;
     this.#developmentDefaults = developmentDefaults;
+    this.#deleteWithRevokedApproval = options.deleteWithRevokedApproval ?? ((_agentId, remove) => remove());
     this.#localSkillTools = localSkillTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
@@ -484,6 +493,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       browser: this.#browser,
       hostedSites: this.#hostedSites,
       routines: this.#routines,
+      approvalAutomation: options.approvalAutomation,
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
@@ -1442,6 +1452,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async #deleteAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
+    try {
+      await this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentData(agent));
+    } catch {
+      throw new Error("The agent data could not be removed completely. Retry deleting the agent.");
+    }
+  }
+
+  async #removeAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
     const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
     let stage = "provider-files";
     try {

@@ -4,6 +4,7 @@ import { hasVisibleToasts } from "../../components/ui";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
+import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -31,10 +32,12 @@ import { useConversation } from "./conversation-context";
  * rather than captured once.
  */
 export function WorkspaceConversation(props: { account: () => CentralAuthUser }) {
+  const scopeIsCurrent = createScopeGuard();
   const platform = usePlatform();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
-  const { appSettingsOpen, skillsMarketplaceOpen } = useSettings();
+  const { appSettingsOpen, skillsMarketplaceOpen, setAgentAutoApprove, agentAutoApproves, generalSettings } =
+    useSettings();
   const {
     providerRuntimeStatuses,
     providerRuntimeDownloadsAvailable,
@@ -56,6 +59,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     turnProgress,
     answerPrompt,
     respondToApproval,
+    respondToApprovalRequest,
     respondToBrowserTakeover,
     cancelQueuedMessage,
     steerQueuedMessage,
@@ -109,6 +113,35 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return event?.type === "browser-takeover-requested" && event.request.threadId === agent?.threadId
       ? event.request
       : undefined;
+  });
+
+  /**
+   * "Always allow", where the grant is the user's to give.
+   *
+   * A remote server's agent is left out because the policy belongs to the computer that runs it:
+   * the released Team API carries an approval response and nothing else, so a grant made here would
+   * never reach that host.
+   */
+  const alwaysAllowApproval = createMemo(() => {
+    const agent = activeAgent();
+    const approval = activeApproval();
+    if (!agent || !approval) return undefined;
+    if (activeServer()?.kind !== "local") return undefined;
+    return async () => {
+      await setAgentAutoApprove(agent.id, true);
+      if (!scopeIsCurrent()) return false;
+      return respondToApprovalRequest(agent.id, approval.requestId, "accept");
+    };
+  });
+
+  /**
+   * The same grant as the approval card's, offered before an approval rather than during one, so an
+   * agent can be trusted without waiting for it to ask. Local agents only, for the reason above.
+   */
+  const setAgentAutoApproveForActiveAgent = createMemo(() => {
+    const agent = activeAgent();
+    if (!agent || activeServer()?.kind !== "local") return undefined;
+    return (autoApprove: boolean) => setAgentAutoApprove(agent.id, autoApprove);
   });
 
   /** Provider downloads are the local machine's business, never a remote host's. */
@@ -194,6 +227,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       onAnswerPrompt={answerPrompt}
       onPromptResolutionPresented={presentPromptResolution}
       onRespondToApproval={respondToApproval}
+      onAlwaysAllowApproval={alwaysAllowApproval()}
+      agentAutoApproves={activeServer()?.kind === "local" && agentAutoApproves(activeAgent()?.id ?? "")}
+      agentAutoApproveLocked={generalSettings().turboMode}
+      onSetAgentAutoApprove={setAgentAutoApproveForActiveAgent()}
       onRespondToBrowserTakeover={respondToBrowserTakeover}
       onCancelQueuedMessage={cancelQueuedMessage}
       onSteerQueuedMessage={steerQueuedMessage}

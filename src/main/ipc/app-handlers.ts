@@ -8,6 +8,7 @@ import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import { readAnalyticsPreference, writeAnalyticsPreference } from "../analytics-preference-store";
+import type { ApprovalAutomation } from "../approval-automation-store";
 import { COMPUTER_USE_PERMISSION_URLS } from "../computer-use-mac-setup-window";
 import type { LanguageService } from "../language-service";
 import { exportDiagnostics, exportOpenBotData } from "../maintenance-service";
@@ -16,6 +17,7 @@ import type { UpdateService } from "../update-service";
 import {
   parseAnalyticsPreference,
   parseAppLanguagePreference,
+  parseApprovalAutomation,
   parseExternalDestination,
   parseSetup,
 } from "./app-inputs";
@@ -50,6 +52,7 @@ export interface AppIpcDependencies {
   updater: UpdateService;
   setupFile: string;
   analyticsPreferenceFile: string;
+  approvalAutomation: ApprovalAutomation;
   language: LanguageService;
   initializeAgent: () => Promise<void>;
   appVariant: AppVariant;
@@ -64,6 +67,7 @@ export function appIpcHandlers({
   updater,
   setupFile,
   analyticsPreferenceFile,
+  approvalAutomation,
   language,
   initializeAgent,
   appVariant,
@@ -86,6 +90,8 @@ export function appIpcHandlers({
         setAnalyticsTrackingEnabled(preference.enabled);
         return preference;
       }),
+      getApprovalAutomation: handler(() => approvalAutomation.current()),
+      setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) => approvalAutomation.set(parsed)),
       getAppLanguagePreference: handler(() => language.preference),
       setAppLanguagePreference: payloadHandler(parseAppLanguagePreference, (parsed) => language.set(parsed)),
       saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
