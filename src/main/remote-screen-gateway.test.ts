@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
+import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
@@ -72,6 +73,38 @@ describe("RemoteScreenGateway", () => {
     expect(gateway.list()).toHaveLength(0);
     await expect(fetch(session.viewerUrl)).rejects.toThrow();
     await gateway.stop();
+  });
+
+  it("does not request account ICE settings for a local test", async () => {
+    const getIceServers = vi.fn(() => {
+      throw new Error("The remote host identity is unavailable.");
+    });
+    const gateway = createGateway({ getIceServers });
+    try {
+      await gateway.createLocalTestSession();
+      await expect(runtimes[0]?.getIceServers()).resolves.toEqual([]);
+      expect(getIceServers).not.toHaveBeenCalled();
+    } finally {
+      await gateway.stop();
+    }
+  });
+
+  it("keeps remote ICE settings while a local test shares the runtime", async () => {
+    const iceServers = [{ urls: "turn:relay.example", username: "user", credential: "password" }];
+    const getIceServers = vi.fn(async () => iceServers);
+    const gateway = createGateway({ getIceServers });
+    try {
+      await gateway.createLocalTestSession();
+      const remote = await createSession(gateway, "https://remote.example");
+      await expect(runtimes[0]?.getIceServers()).resolves.toEqual(iceServers);
+      expect(getIceServers).toHaveBeenCalledOnce();
+      await gateway.closeSession(remote.id);
+      await expect(runtimes[0]?.getIceServers()).resolves.toEqual([]);
+      expect(getIceServers).toHaveBeenCalledOnce();
+      expect(runtimes[0]?.stop).not.toHaveBeenCalled();
+    } finally {
+      await gateway.stop();
+    }
   });
 
   it("issues and consumes a one-time 60 second viewer grant", async () => {
@@ -561,6 +594,7 @@ describe("RemoteScreenGateway", () => {
 
 function createGateway(
   options: {
+    getIceServers?: () => Promise<RemoteDesktopIceServer[]>;
     checkSetup?: RemoteScreenRuntime["checkSetup"];
     test?: RemoteScreenRuntime["test"];
     platform?: "darwin" | "win32" | "linux";
@@ -582,11 +616,12 @@ function createGateway(
     runtimeStateDirectory: "/tmp/openbot-test-runtime",
     getRuntimeCredentials: async () => ({ username: "openbot", password: "secret" }),
     getDisplays: () => displays,
-    getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
+    getIceServers: options.getIceServers ?? (async () => [{ urls: "stun:127.0.0.1:3478" }]),
     ...(options.onScreenRecordingDenied ? { onScreenRecordingDenied: options.onScreenRecordingDenied } : {}),
     ...(options.now ? { now: options.now } : {}),
-    createRuntime: () => {
+    createRuntime: ({ getIceServers }) => {
       const runtime = new FakeRuntime(options.runtimeBaseUrl, options.selectDisplay, options.screenCaptureDenied?.());
+      runtime.getIceServers = getIceServers;
       runtime.checkSetup = options.checkSetup;
       runtime.test = options.test;
       runtimes.push(runtime);
@@ -611,6 +646,7 @@ function createSession(
 }
 
 class FakeRuntime implements RemoteScreenRuntime {
+  getIceServers: () => Promise<RemoteDesktopIceServer[]> = async () => [];
   checkSetup?: RemoteScreenRuntime["checkSetup"];
   test?: RemoteScreenRuntime["test"];
   selectedDisplays: string[] = [];

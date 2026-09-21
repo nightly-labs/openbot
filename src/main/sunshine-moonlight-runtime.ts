@@ -824,8 +824,8 @@ export class SunshineMoonlightRuntime {
         response.writeHead(401).end();
         return;
       }
-      void this.#options
-        .getIceServers()
+      void Promise.resolve()
+        .then(() => this.#options.getIceServers())
         .then((servers) => {
           response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
           response.end(JSON.stringify(servers.map((server) => ({ ...server, urls: arrayUrls(server.urls) }))));

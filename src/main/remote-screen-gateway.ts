@@ -779,7 +779,13 @@ export class RemoteScreenGateway {
       platform: this.#options.platform,
       credentials: await this.#options.getRuntimeCredentials(),
       getDisplays: () => this.#options.getDisplays?.() ?? [],
-      getIceServers: this.#options.getIceServers,
+      getIceServers: async () => {
+        // Loopback tests need no account or Signal service. Keep remote ICE configuration
+        // whenever a remote session shares this runtime.
+        if (this.#sessions.size > 0 && [...this.#sessions.keys()].every((id) => this.#localTestServers.has(id)))
+          return [];
+        return this.#options.getIceServers();
+      },
       onDiagnostic: this.#options.onDiagnostic,
     });
     this.#runtimeState = await this.#runtime.start();
