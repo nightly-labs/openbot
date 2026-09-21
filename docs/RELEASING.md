@@ -43,9 +43,9 @@ checksum, SBOM, and provenance checks.
 
 ## Build the remote desktop runtime
 
-`native-runtime.lock.json` pins the OpenBot forks of Sunshine `v2026.516.143833` and Moonlight Web
-`v2.10.0` by full commit and source archive SHA-256. Each entry also records its exact upstream base
-commit and the reviewable OpenBot patch. Build on the target platform:
+`native-runtime.lock.json` pins the upstream source for Sunshine `v2026.516.143833` and Moonlight Web
+`v2.10.0` by full commit and source archive SHA-256. Each entry also records the reviewable OpenBot
+patch applied to that source. Build on the target platform:
 
 ```bash
 bun run build:remote-desktop-runtime
