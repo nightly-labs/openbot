@@ -97,22 +97,6 @@ export function BrowserSecretCard(props: {
             : "Use the code sent by email or text message."}{" "}
         This value is not added to chat.
       </p>
-      <Show when={!previewHidden()}>
-        <figure class="browser-takeover-preview">
-          <figcaption class="browser-takeover-preview-bar">
-            <Monitor aria-hidden="true" />
-            <span>Sign-in page</span>
-            <small>{props.request.secret?.origin}</small>
-          </figcaption>
-          <div class="browser-takeover-preview-viewport">
-            <BrowserTakeoverPreview
-              preview={preview()}
-              previewStatus={previewStatus()}
-              page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
-            />
-          </div>
-        </figure>
-      </Show>
       <Show
         when={password()}
         fallback={
@@ -155,6 +139,22 @@ export function BrowserSecretCard(props: {
             {error()}
           </p>
         </Show>
+      </Show>
+      <Show when={!previewHidden()}>
+        <figure class="browser-takeover-preview">
+          <figcaption class="browser-takeover-preview-bar">
+            <Monitor aria-hidden="true" />
+            <span>Sign-in page</span>
+            <small>{props.request.secret?.origin}</small>
+          </figcaption>
+          <div class="browser-takeover-preview-viewport">
+            <BrowserTakeoverPreview
+              preview={preview()}
+              previewStatus={previewStatus()}
+              page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
+            />
+          </div>
+        </figure>
       </Show>
       <footer class="browser-takeover-actions">
         <Button type="submit" disabled={pending() || !valid()}>
