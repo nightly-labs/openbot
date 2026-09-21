@@ -995,3 +995,85 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     expect(client.responses).toHaveLength(0);
   });
 });
+
+it.each(["submitted", "takeover"] as const)(
+  "keeps secure handoff values out of events and provider responses (%s)",
+  async (outcome) => {
+    const client = new FakeAgentClient("codex");
+    const tabs: BrowserTab[] = [];
+    let resolveSubmission: ((value: "submitted" | "takeover") => void) | undefined;
+    const submission = new Promise<"submitted" | "takeover">((resolve) => {
+      resolveSubmission = resolve;
+    });
+    const submit = vi.fn(() => submission);
+    const cancel = vi.fn();
+    const browser = {
+      ...fakeBrowser(tabs),
+      prepareSecret: async () => ({
+        request: { method: "otp" as const, origin: "https://example.com", digits: 6 },
+        submit,
+        cancel,
+      }),
+    };
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(structuredClone(event)));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Sign in" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const started = events.find((event) => event.type === "turn-started");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!started || !threadId) throw new Error("Turn did not start.");
+    tabs.push({
+      id: "auth-tab",
+      title: "Sign in",
+      url: "https://example.com",
+      ownerThreadId: started.threadId,
+      ownerAgentId: "chief",
+      loading: false,
+    });
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "auth-request",
+      params: {
+        namespace: "openbot_browser",
+        tool: "submit_secret",
+        threadId,
+        turnId: started.turnId,
+        callId: "auth-request",
+        arguments: { tabId: "auth-tab" },
+      },
+    });
+    await waitFor(() => events.some((event) => event.type === "browser-takeover-requested"));
+    expect(service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.secret?.method).toBe("otp");
+    const requestId = service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.requestId;
+    if (!requestId) throw new Error("Missing authentication request.");
+    await expect(
+      service.respondToBrowserSecret({ requestId, agentId: "other-agent", decision: "submit", secret: "729104" }),
+    ).rejects.toThrow("no longer active");
+    const response = service.respondToBrowserSecret({
+      requestId,
+      agentId: "chief",
+      decision: "submit",
+      secret: "729104",
+    });
+    await waitFor(() => submit.mock.calls.length === 1);
+    await expect(
+      service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+    ).rejects.toThrow("no longer active");
+    if (!resolveSubmission) throw new Error("Missing submission resolver.");
+    resolveSubmission(outcome);
+    await response;
+    expect(JSON.stringify(events)).not.toContain("729104");
+    expect(JSON.stringify(client.responses)).not.toContain("729104");
+    if (outcome === "takeover") {
+      expect(service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.secret?.requiresReload).toBe(true);
+      await service.respondToBrowserTakeover({ requestId, decision: "complete" });
+    }
+    expect(service.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
+    await expect(
+      service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+    ).rejects.toThrow("no longer active");
+  },
+);

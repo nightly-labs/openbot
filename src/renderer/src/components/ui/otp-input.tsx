@@ -1,12 +1,16 @@
 import { ONE_TIME_CODE_ALPHABET, ONE_TIME_CODE_LENGTH } from "@openbot/contracts/validation";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
-import { Input } from "../../components/ui";
-import { prefersReducedMotion } from "../../components/ui/utils";
+import { Input } from "./form";
+import { prefersReducedMotion } from "./utils";
 
 export type OtpInputStatus = "idle" | "verifying" | "error" | "success";
 
 interface OtpInputProps {
   value: string;
+  length?: number;
+  numeric?: boolean;
+  masked?: boolean;
+  label?: string;
   status?: OtpInputStatus;
   hint?: string;
   errorMessage?: string | null;
@@ -14,10 +18,13 @@ interface OtpInputProps {
   disabled?: boolean;
   autofocus?: boolean;
   onChange: (value: string) => void;
-  onComplete: (value: string) => void;
+  onComplete?: (value: string) => void;
 }
 
 export function OtpInput(props: OtpInputProps) {
+  const length = () => props.length ?? ONE_TIME_CODE_LENGTH;
+  const alphabet = () => (props.numeric ? "0123456789" : ONE_TIME_CODE_ALPHABET);
+  const groupAt = () => Math.ceil(length() / 2);
   const inputId = `openbot-otp-${createUniqueId()}`;
   const messageId = `${inputId}-message`;
   const initialSlots = toSlots(untrack(() => props.value));
@@ -80,7 +87,7 @@ export function OtpInput(props: OtpInputProps) {
     const value = next.join("");
     props.onChange(value);
     if (value !== previous && next.every(Boolean)) {
-      props.onComplete(value);
+      props.onComplete?.(value);
       inputElement?.focus({ preventScroll: true });
     }
   }
@@ -97,12 +104,12 @@ export function OtpInput(props: OtpInputProps) {
     const next = [...slots()];
     let index = from;
     for (const character of characters) {
-      if (index >= ONE_TIME_CODE_LENGTH) break;
+      if (index >= length()) break;
       next[index] = character;
       index += 1;
     }
     commit(next);
-    setActive(Math.min(index, ONE_TIME_CODE_LENGTH - 1));
+    setActive(Math.min(index, length() - 1));
   }
 
   function handleKeyDown(event: KeyboardEvent): void {
@@ -112,7 +119,7 @@ export function OtpInput(props: OtpInputProps) {
     }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const key = event.key.toUpperCase();
-    if (key.length === 1 && ONE_TIME_CODE_ALPHABET.includes(key)) {
+    if (key.length === 1 && alphabet().includes(key)) {
       event.preventDefault();
       insert(key);
       return;
@@ -140,7 +147,7 @@ export function OtpInput(props: OtpInputProps) {
     }
     if (event.key === "ArrowRight") {
       event.preventDefault();
-      setActive((index) => Math.min(index + 1, ONE_TIME_CODE_LENGTH - 1));
+      setActive((index) => Math.min(index + 1, length() - 1));
       return;
     }
     if (event.key === "Home") {
@@ -150,7 +157,7 @@ export function OtpInput(props: OtpInputProps) {
     }
     if (event.key === "End") {
       event.preventDefault();
-      setActive(ONE_TIME_CODE_LENGTH - 1);
+      setActive(length() - 1);
     }
   }
 
@@ -159,7 +166,7 @@ export function OtpInput(props: OtpInputProps) {
     event.preventDefault();
     const slot = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("[data-otp-index]") : null;
     const requested = slot ? Number.parseInt(slot.dataset.otpIndex ?? "0", 10) : slotIndexAtX(event.clientX);
-    setActive(Math.min(Math.max(Number.isFinite(requested) ? requested : 0, 0), ONE_TIME_CODE_LENGTH - 1));
+    setActive(Math.min(Math.max(Number.isFinite(requested) ? requested : 0, 0), length() - 1));
     inputElement?.focus();
   }
 
@@ -198,15 +205,15 @@ export function OtpInput(props: OtpInputProps) {
           ref={(element) => (inputElement = element)}
           id={inputId}
           class="otp-input-native"
-          type="text"
-          inputmode="text"
+          type={props.masked ? "password" : "text"}
+          inputmode={props.numeric ? "numeric" : "text"}
           autocomplete="one-time-code"
           autocapitalize="characters"
           spellcheck={false}
           value=""
           readonly={Boolean(props.disabled || status() === "success")}
-          maxlength={ONE_TIME_CODE_LENGTH}
-          aria-label="One-time code"
+          maxlength={length()}
+          aria-label={props.label ?? "One-time code"}
           aria-invalid={status() === "error" ? "true" : undefined}
           aria-describedby={message() ? messageId : undefined}
           autofocus={props.autofocus}
@@ -235,7 +242,8 @@ export function OtpInput(props: OtpInputProps) {
           class="otp-input-slots"
           style={{
             "--otp-active-index": String(active()),
-            "--otp-group-offset": active() >= 4 ? "var(--otp-group-gap)" : "0px",
+            "--otp-length": String(length()),
+            "--otp-group-offset": active() >= groupAt() ? "var(--otp-group-gap)" : "0px",
           }}
         >
           <span class="otp-input-focus-ring" data-visible={focused() && status() !== "success" ? "true" : undefined} />
@@ -246,12 +254,13 @@ export function OtpInput(props: OtpInputProps) {
                 data-active={focused() && index === active() ? "true" : undefined}
                 data-filled={character() ? "true" : undefined}
                 data-otp-index={index}
+                data-group-start={index === groupAt() ? "true" : undefined}
               >
                 <Show when={focused() && index === active() && status() !== "success"}>
                   <span class="otp-input-caret" data-trailing={character() ? "true" : undefined} aria-hidden="true" />
                 </Show>
                 <Show when={character()} keyed>
-                  {(value) => <span class="otp-input-character">{value}</span>}
+                  {(value) => <span class="otp-input-character">{props.masked ? "•" : value}</span>}
                 </Show>
               </span>
             )}
@@ -278,23 +287,23 @@ export function OtpInput(props: OtpInputProps) {
       </Show>
     </div>
   );
-}
 
-function sanitize(value: string): string {
-  return value
-    .toUpperCase()
-    .split("")
-    .filter((character) => ONE_TIME_CODE_ALPHABET.includes(character))
-    .join("")
-    .slice(0, ONE_TIME_CODE_LENGTH);
-}
+  function sanitize(value: string): string {
+    return value
+      .toUpperCase()
+      .split("")
+      .filter((character) => alphabet().includes(character))
+      .join("")
+      .slice(0, length());
+  }
 
-function toSlots(value: string): string[] {
-  const characters = sanitize(value);
-  return Array.from({ length: ONE_TIME_CODE_LENGTH }, (_, index) => characters[index] ?? "");
-}
+  function toSlots(value: string): string[] {
+    const characters = sanitize(value);
+    return Array.from({ length: length() }, (_, index) => characters[index] ?? "");
+  }
 
-function firstEmptySlot(slots: string[]): number {
-  const index = slots.findIndex((character) => !character);
-  return index === -1 ? ONE_TIME_CODE_LENGTH - 1 : index;
+  function firstEmptySlot(slots: string[]): number {
+    const index = slots.findIndex((character) => !character);
+    return index === -1 ? length() - 1 : index;
+  }
 }

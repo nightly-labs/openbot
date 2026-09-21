@@ -7,13 +7,17 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AvatarHue,
+  BrowserTakeoverRequest,
   ConversationSnapshot,
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
   QueueSnapshot,
+  RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
+  SidebarLayoutAction,
+  SidebarLayoutSnapshot,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -66,6 +70,14 @@ interface AddRemoteServerInput {
 }
 
 export interface MobileWorkspaceContextValue {
+  respondToBrowserTakeover: (
+    serverId: string,
+    input: { requestId: string | number; decision: "complete" | "cancel" },
+  ) => Promise<void>;
+  browserRequests: Record<string, BrowserTakeoverRequest[]>;
+  respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
+  sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
+  mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
   changeQueue: (

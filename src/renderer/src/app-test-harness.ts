@@ -764,6 +764,7 @@ export function installOpenbotStub(): void {
         interrupt: vi.fn().mockResolvedValue(undefined),
         respondToPrompt: vi.fn().mockResolvedValue(undefined),
         respondToApproval: vi.fn().mockResolvedValue(undefined),
+        respondToBrowserSecret: vi.fn().mockResolvedValue(undefined),
         respondToBrowserTakeover: vi.fn().mockResolvedValue(undefined),
         onEvent: vi.fn(agentEventBridge.subscribe),
         onScopedEvent: vi.fn(scopedAgentEventBridge.subscribe),
