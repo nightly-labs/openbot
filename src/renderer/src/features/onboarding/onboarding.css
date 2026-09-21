@@ -468,6 +468,14 @@
   order: -1;
 }
 
+.onboarding-next-reason {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.45;
+  text-align: center;
+}
+
 @media (max-width: 620px) {
   .onboarding-shell {
     padding: 48px 18px;
