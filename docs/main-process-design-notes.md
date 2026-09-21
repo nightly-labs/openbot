@@ -77,6 +77,32 @@ A similar lifetime issue applies to windows: a constructor needs the current win
 that runs later must obtain it again. macOS can close and rebuild the main window without ending
 the application.
 
+## MCP sign-in redirect address
+
+An MCP server that asks its users to sign in sends the grant back to a redirect address. OpenBot
+registers that address with the authorization server (RFC 7591) and sends it again at `/authorize`
+and at `/token`. The three must agree, or the authorization server stops the sign-in on its own
+page, where OpenBot can see nothing and can explain nothing. Canva does this: it accepts
+`openbot://mcp-auth` at registration and then answers `Invalid redirect URI.` at `/authorize`.
+
+So `src/main/mcp-oauth-redirect-server.ts` listens on `127.0.0.1` and the address it listens on is
+the redirect address. This is the loopback redirect of RFC 8252, and it is the form every signed-in
+listing in the catalog accepts. `openbot://mcp-auth` stays as the fallback for a machine where no
+port can be bound, and `src/main/deep-link-router.ts` keeps that kind of link.
+
+There is no configuration for a developer or for a packaged build:
+
+- The port is the one the operating system gives, and it changes on each start. An authorization
+  server must ignore the port of a loopback redirect, and the registration is dynamic, so no port
+  is registered anywhere by hand.
+- A stored registration that names a different address is replaced. `clientInformation()` in
+  `src/backend/mcp-oauth-provider.ts` answers `undefined` one time for each interactive sign-in
+  when the stored `redirect_uris` do not hold this run's address, which makes the SDK register
+  again. The stored tokens stay. A silent refresh never does this: its refresh token belongs to the
+  `client_id` on file.
+- `describeUnusableRedirectUrl` refuses an address that cannot receive a grant: an `https` address,
+  or a plain-text address that is not on this machine.
+
 ## Remote services and released protocols
 
 `remote-server-manager.ts` was 2,828 lines before its concerns moved to the flat `remote-server-*`
