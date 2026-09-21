@@ -47,7 +47,7 @@ export function encodeTeamProtocolV4WebRtcHttpResponse(
   path: string,
   status: number,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; preserveBrowserSecrets?: boolean } = {},
 ) {
   if (status === 204) return {};
   if (isRemoteViewerRoute(path)) return encodeTeamProtocolV3WebRtcHttpResponse(method, path, status, value, options);
@@ -63,7 +63,7 @@ export function decodeTeamProtocolV4WebRtcHttpResponse(method: string, path: str
 export function createTeamProtocolV4Event(
   sequence: number,
   value: unknown,
-  options: { preserveSemanticTags?: boolean } = {},
+  options: { preserveSemanticTags?: boolean; preserveBrowserSecrets?: boolean } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV4BaseCurrentEvent(value);
   if (decoded.kind !== "known") throw new Error("Invalid Team protocol v4 event.");

@@ -51,6 +51,7 @@ import type {
   RemoveMcpServerInput,
   ReorderQueueInput,
   RespondToApprovalInput,
+  RespondToBrowserSecretInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
   Routine,
@@ -2168,6 +2169,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     await this.#attention.respondToApproval(input);
   }
 
+  async respondToBrowserSecret(input: RespondToBrowserSecretInput): Promise<void> {
+    await this.#attention.respondToBrowserSecret(input);
+  }
+
   async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {
     await this.#attention.respondToBrowserTakeover(input);
   }
@@ -2193,7 +2198,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           if (request.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(request.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
-            if (request.params.tool === "request_takeover") {
+            if (request.params.tool === "request_takeover" || request.params.tool === "submit_secret") {
               client.respond(request.id, await this.#attention.surfaceBrowserTakeover(request));
               return;
             }

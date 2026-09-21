@@ -1,7 +1,6 @@
 import { createMemo, For, Loading, lazy, Show, untrack } from "solid-js";
 import { Button } from "../../components/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "../../data";
-import { errorMessage } from "../../error-message";
 import { AgentActivityIndicator } from "./AgentActivity";
 import { AttachmentCards } from "./AttachmentCards";
 import { ChatActionMarker } from "./ChatActionMarker";
@@ -58,7 +57,6 @@ export function ConversationTimeline() {
   const {
     activeChatSearchIndex,
     agentActivitySpaceReserved,
-    agentReady,
     attachmentAction,
     downloadAttachments,
     browserTakeoverPreview,
@@ -100,7 +98,6 @@ export function ConversationTimeline() {
     replyToMessage,
     scheduleUnreadDividerVisibilityUpdate,
     setChatSearchQuery,
-    setComposerError,
     setExpandedEmojiMessageId,
     setOpenMoreMessageId,
     setOpenReactionMessageId,
@@ -174,40 +171,6 @@ export function ConversationTimeline() {
           />
         </Show>
         <Show when={props.loaded}>
-          <Show when={!agentReady()}>
-            <section class="agent-setup-card" role="status">
-              <div>
-                <strong>
-                  {props.agentStatus.phase === "starting" || props.agentStatus.phase === "restarting"
-                    ? "Connecting to agent CLIs…"
-                    : "Agent CLI setup required"}
-                </strong>
-                <p>
-                  {errorMessage(
-                    props.agentStatus.message,
-                    "Install and sign in to Codex CLI, Claude CLI, or Grok CLI, then restart OpenBot.",
-                  )}
-                </p>
-              </div>
-              <Show when={props.agentStatus.phase !== "starting" && props.agentStatus.phase !== "restarting"}>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => {
-                    const agentId = props.agent?.id;
-                    const target = agentId ? { agentId, serverId: props.server?.id ?? "local" } : undefined;
-                    void props
-                      .onOpenAgentSetup()
-                      .catch((error) =>
-                        setComposerError(errorMessage(error, "Could not open the setup guide. Try again."), target),
-                      );
-                  }}
-                >
-                  Setup guide
-                </Button>
-              </Show>
-            </section>
-          </Show>
           <Show when={props.loadingOlder || props.olderError}>
             <div class="conversation-history-status" role={props.olderError ? "alert" : "status"}>
               <Show when={props.olderError} fallback="Loading older messages…">
@@ -532,6 +495,7 @@ export function ConversationTimeline() {
           <Show when={props.browserTakeover}>
             <Loading>
               <BrowserTakeoverCard
+                request={props.browserTakeover}
                 agentName={props.agent?.name ?? "the agent"}
                 tab={browserTakeoverTab()}
                 preview={browserTakeoverPreview().preview}

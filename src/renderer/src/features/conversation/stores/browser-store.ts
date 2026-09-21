@@ -124,7 +124,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       suspended: deps.props.browserVisibilitySuspended,
     }),
     ({ request, tab, suspended }) => {
-      if (!request || suspended) {
+      if (!request || request.secret || suspended) {
         browserTakeoverPreviewKey = null;
         browserTakeoverPreviewGeneration += 1;
         setBrowserTakeoverPreview({ status: "idle", preview: null });

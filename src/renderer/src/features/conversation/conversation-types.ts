@@ -152,7 +152,6 @@ export interface ConversationProps {
   onActivateBrowserTab: (tabId: string) => void;
   onCloseBrowserTab: (tabId: string) => void | Promise<void>;
   onOpenRemoteDesktop: (serverId: string, trigger: HTMLElement) => Promise<void>;
-  onOpenAgentSetup: () => Promise<void>;
   onStop: () => void;
 }
 

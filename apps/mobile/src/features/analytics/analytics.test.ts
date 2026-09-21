@@ -348,6 +348,9 @@ it("instruments message commands without sending their contents or changing the 
   };
   const sendMessage = vi.fn(async () => "message-receipt");
   const workspace: MobileWorkspaceContextValue = {
+    browserRequests: {},
+    respondToBrowserTakeover: async () => undefined,
+    respondToBrowserSecret: async () => undefined,
     sidebarByServer: {},
     mutateSidebarLayout: async () => {},
     loadQueue: async (agentId) => ({ agentId, deliveries: [] }),

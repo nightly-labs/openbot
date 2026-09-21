@@ -4,7 +4,7 @@ import type { AppVariant, CentralAuthIssue, CentralAuthState } from "@openbot/co
 import { normalizeEmailAddress, normalizeOneTimeCode } from "@openbot/contracts/validation";
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { ArrowLeft, Button, Input, RefreshCw } from "../../components/ui";
-import { OtpInput, type OtpInputStatus } from "./OtpInput";
+import { OtpInput, type OtpInputStatus } from "../../components/ui/otp-input";
 
 interface AccountLoginProps {
   variant: AppVariant;

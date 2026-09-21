@@ -2323,7 +2323,7 @@ describe.sequential("AgentService: providers", () => {
       );
       expect(params.developerInstructions).toContain("For every browser task");
       expect(params.developerInstructions).toContain(`Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task`);
-      expect(params.developerInstructions).toContain("When you use openbot_browser");
+      expect(params.developerInstructions).toContain("openbot_browser.submit_secret");
       expect(params.developerInstructions).toContain("openbot.create_routine");
       expect(params.developerInstructions).toContain("Never use ChatGPT Sites");
       expect(params.developerInstructions).toContain("openbot.attach_files_to_response");

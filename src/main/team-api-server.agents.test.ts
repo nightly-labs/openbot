@@ -716,3 +716,27 @@ it("requires authentication and the profile capability before generating an edit
   expect(incompatible.status).toBe(400);
   expect(prompt).toBeUndefined();
 });
+
+it("requires authentication and the secure-handoff capability before accepting a remote secret", async () => {
+  const { start, signIn } = await createTeamApiFixture("secure-auth", { configure: true });
+  const submit = vi.fn(async () => undefined);
+  const { base } = await start({ agents: createAgents({ respondToBrowserSecret: submit }) });
+  const token = await signIn();
+  const input = { requestId: "auth", agentId: "chief", decision: "submit", secret: "729104" };
+  const send = (authorized: boolean, capable: boolean) =>
+    fetch(`${base}/v1/browser-secrets/respond`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [TEAM_PROTOCOL_VERSION_HEADER]: "4",
+        [TEAM_CAPABILITIES_HEADER]: capable ? "browser-secret-handoff,opencode" : "opencode",
+        ...(authorized ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(input),
+    });
+  expect((await send(false, true)).status).toBe(401);
+  expect((await send(true, false)).status).toBe(400);
+  expect(submit).not.toHaveBeenCalled();
+  expect((await send(true, true)).status).toBe(204);
+  expect(submit).toHaveBeenCalledWith(input);
+});
