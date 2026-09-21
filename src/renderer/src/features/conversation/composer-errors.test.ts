@@ -76,7 +76,6 @@ function testProps(agentId: string): ConversationProps {
     onActivateBrowserTab: () => {},
     onCloseBrowserTab: () => {},
     onOpenRemoteDesktop: async () => {},
-    onOpenAgentSetup: async () => {},
     onStop: () => {},
   };
 }
