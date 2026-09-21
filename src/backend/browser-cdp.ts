@@ -11,11 +11,8 @@ import type {
   BrowserTarget,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { createOpenBotLogger } from "@openbot/logging";
 import type { NativeImage, WebContents } from "electron";
 import { createFramePacer } from "./browser-screencast-pacing";
-
-const logger = createOpenBotLogger("browser-cdp");
 
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
@@ -163,7 +160,6 @@ export class BrowserCdpEngine {
     });
     if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
     return async (secret) => {
-      let phase = "validate-targets";
       try {
         await this.#lease(async (send) => {
           if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
@@ -179,7 +175,6 @@ export class BrowserCdpEngine {
             if (valid !== true) throw new Error("Authentication target changed.");
           }
           for (const [index, node] of nodes.inputs.entries()) {
-            phase = "focus-input";
             if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
             await this.#callOnNode(
               send,
@@ -194,12 +189,10 @@ export class BrowserCdpEngine {
             if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
             // Native entry emits trusted input events across shadow roots, as regular browser typing
             // does. Synthetic value setters can leave component forms unaware of the filled field.
-            phase = "insert-input";
             await send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
           }
           if (submission === "on_input" || generation !== this.#navigationGeneration) return;
           if (submission === "click" && nodes.button) {
-            phase = "click-submit";
             await this.#callOnNode(
               send,
               nodes.button.backendNodeId,
@@ -207,7 +200,6 @@ export class BrowserCdpEngine {
               [origin, nodes.fingerprints.at(-1)],
             );
           } else if (submission === "enter") {
-            phase = "press-enter";
             const last = nodes.inputs.at(-1);
             if (!last) throw new Error("Authentication target changed.");
             await send("DOM.focus", { backendNodeId: last.backendNodeId });
@@ -215,8 +207,6 @@ export class BrowserCdpEngine {
           }
         });
       } catch {
-        // Only fixed operation names are logged: CDP errors can contain entered values.
-        logger.warn("Secure authentication operation failed.", { phase });
         throw new Error("Secure authentication could not be completed. Take over to check the page.");
       }
     };
