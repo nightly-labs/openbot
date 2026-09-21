@@ -292,3 +292,34 @@ browser transport equivalent. Remote browser viewing and takeover use the existi
 The earlier live-test gaps remain documented above; focused tests do not establish full live
 two-host or competing-owner coverage. Broad checks remain assigned to CI. Development remains
 running, and the public release flag has not been enabled.
+
+### PR verification follow-up — 2026-09-21
+
+CI passed on `50bfa658`, including Check, API, both desktop shards, browser smoke,
+Storybook, Cloudflare preview, remote, hosted sites, and Surfaces. NorbiAI reached its
+15-minute timeout without a review result. That timeout is not a code finding or a
+successful review. The PR remains open and must not be merged by this task.
+
+The live browser disconnect check found a host session leak: an abruptly closed stream
+still occupied a browser-view slot. The gateway now removes the detached session. Its
+five focused tests pass, and five consecutive page unload/reconnect cycles each reopened
+the real host browser view without exhausting the session limit.
+
+Two isolated hosts were connected to the same local account and Signal services. The
+browser switched between them, sent a message to the second host, received its reply,
+and restored the correct history on each return. The second host's reply did not appear
+in the first host's conversation. Unsent text cleared on host switching and did not cross
+between hosts. No browser console errors appeared. A secondary local host must allow the
+same Signal URL in its Electron CSP that the shared account service returns in tickets.
+
+The approval follow-up found that interrupted turns removed prompts but left approvals
+in web state. The web controller now removes approvals for the completed agent, thread,
+and turn, as desktop does. The focused workspace suite passes 26 tests, including removal
+of an interrupted approval while other turns' and agents' approvals remain.
+
+Live approval failure/retry is still unverified: harmless commands produced no manual
+approval card, including after automatic approval was disabled for the temporary test
+agent. That agent was removed through the shared confirmation. Earlier focused approval
+failure/retry tests remain the evidence for that path. Separate-account competing takeover
+ownership is also unverified; the live run checked same-account tab locking and browser
+stream recovery. Release-switch checks and the cross-browser matrix remain deferred.

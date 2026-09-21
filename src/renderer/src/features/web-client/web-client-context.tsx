@@ -186,6 +186,10 @@ export function createWebWorkspace(props: {
               (item) =>
                 item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
             );
+            draft.approvals = draft.approvals.filter(
+              (item) =>
+                item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
+            );
           });
         }
         if (event.type === "browser-takeover-requested")

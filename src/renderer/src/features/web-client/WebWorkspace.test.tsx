@@ -424,6 +424,43 @@ describe("web workspace state", () => {
     app.events().connection({ hostId: "host", state: "offline", message: "Offline" });
     expect(app.runtime.approve).toHaveBeenCalledOnce();
   });
+  it("clears only approvals for an interrupted turn", async () => {
+    const app = harness();
+    const workspace = await connected(app);
+    const approval = (requestId: string, agentId: string, threadId: string, turnId: string) => ({
+      type: "approval" as const,
+      approval: {
+        requestId,
+        agentId,
+        threadId,
+        turnId,
+        kind: "command" as const,
+        command: "pwd",
+        cwd: null,
+        reason: "Check",
+        grantRoot: null,
+        permissions: null,
+      },
+    });
+    const target = approval("approval-interrupted", "chief", "thread-chief", "turn-interrupted");
+    const otherTurn = approval("approval-other-turn", "chief", "thread-chief", "turn-running");
+    const otherAgent = approval("approval-other-agent", "scout", "thread-scout", "turn-interrupted");
+    app.events().event("host", target);
+    app.events().event("host", otherTurn);
+    app.events().event("host", otherAgent);
+    await waitFor(() =>
+      expect(workspace.state.approvals).toEqual([target.approval, otherTurn.approval, otherAgent.approval]),
+    );
+
+    app.events().event("host", {
+      type: "turn-completed",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-interrupted",
+      status: "interrupted",
+    });
+    await waitFor(() => expect(workspace.state.approvals).toEqual([otherTurn.approval, otherAgent.approval]));
+  });
   it("does not create a workspace when the account has no hosts", async () => {
     const app = harness({ listHosts: vi.fn().mockResolvedValue([]) });
     await waitFor(() => expect(app.workspace().state.hostsLoaded).toBe(true));
