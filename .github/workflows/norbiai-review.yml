@@ -496,9 +496,9 @@ jobs:
           : > "$last_message_file"
           timeout 900 codex exec \
             --ephemeral \
-            --sandbox read-only \
+            --sandbox danger-full-access \
             --model chatgpt-web/extra-high \
-            --config 'model_reasoning_effort="xhigh"' \
+            --config 'model_reasoning_effort="high"' \
             --color never \
             --output-last-message "$last_message_file" \
             - < "$prompt_file" 2>&1 | tee "$live_file"
