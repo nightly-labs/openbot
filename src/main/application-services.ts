@@ -38,7 +38,7 @@ import type {
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
 import { AgentService } from "../backend/agent-service";
@@ -80,6 +80,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
+import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
@@ -151,6 +152,7 @@ const TEARDOWN_ORDER = {
   remoteDesktop: 80,
   host: 90,
   teamWebRtcBridge: 100,
+  mcpOAuthRedirect: 105,
   service: 110,
 } as const;
 
@@ -403,7 +405,10 @@ export async function createApplicationServices({
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
     path: approvalAutomationFile,
-    initial: await readApprovalAutomation(approvalAutomationFile),
+    initial: await readApprovalAutomation(
+      approvalAutomationFile,
+      store.list().map((agent) => agent.id),
+    ),
     knownAgentIds: () => store.list().map((agent) => agent.id),
   });
   /*
@@ -486,11 +491,43 @@ export async function createApplicationServices({
   if (mcpOAuthLoadError) {
     logger.warn(`OpenBot could not read the MCP sign-in file (${mcpOAuthLoadError.name}). It was left unchanged.`);
   }
+  /*
+   * Where a returning grant lands. The loopback listener is the address RFC 8252 gives a native
+   * app and the only one some authorization servers accept - Canva refuses `openbot://mcp-auth`
+   * on its own authorization page, where OpenBot cannot see the failure or explain it.
+   *
+   * A port that cannot be bound is not fatal: the deep link is still registered with the
+   * operating system, and the servers that accept it keep working. It is logged because it
+   * decides which address every later sign-in registers, and a sign-in that a server then
+   * refuses is otherwise a mystery in a support thread.
+   */
+  // The listener is bound before the authority that answers it exists, and a request can arrive
+  // in between - a browser tab left open on a previous run reaches this port on its own. It is
+  // held rather than closed over, so that request is refused instead of raising in the listener.
+  let mcpOAuthAuthority: McpOAuth | null = null;
+  const mcpOAuthRedirect = await startMcpOAuthRedirectServer({
+    deliver: (state, code) => {
+      if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code)) return false;
+      const current = windows.getMainWindow();
+      if (current && !current.isDestroyed()) showMainWindow(current);
+      return true;
+    },
+  }).catch((error: unknown) => {
+    logger.warn(
+      "OpenBot could not listen for MCP sign-ins on this machine, so the openbot:// link is used instead. Servers that refuse it cannot be signed in to:",
+      toLogValue(error),
+    );
+    return null;
+  });
+  if (mcpOAuthRedirect) {
+    teardown.push(TEARDOWN_ORDER.mcpOAuthRedirect, "the MCP sign-in listener", () => mcpOAuthRedirect.close());
+  }
   const mcpOAuth = new McpOAuth({
     storage: mcpOAuthStore,
     openExternal: (url) => shell.openExternal(url),
-    redirectUrl: MCP_OAUTH_REDIRECT_URL,
+    redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
   });
+  mcpOAuthAuthority = mcpOAuth;
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),

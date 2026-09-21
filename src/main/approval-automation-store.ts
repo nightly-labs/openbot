@@ -3,34 +3,46 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type ApprovalAutomationPreference,
+  agentAutoApprovalEnabled,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
+  isApprovalAutomationPreference,
   type SetApprovalAutomationInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 
-/**
- * Anything this file cannot read as the shape it wrote becomes "ask the user about everything".
- * A preference that grants standing consent has one safe failure, and it is not the one that keeps
- * the grant: a truncated write, a hand-edited file or a downgrade must cost the user extra prompts
- * rather than silently let an agent act unattended.
- */
-export async function readApprovalAutomation(path: string): Promise<ApprovalAutomationPreference> {
+/** Missing settings use the product default; invalid settings always require approval. */
+export async function readApprovalAutomation(
+  path: string,
+  knownAgentIds: Iterable<string>,
+): Promise<ApprovalAutomationPreference> {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(await readFile(path, "utf8"));
-    if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isBoolean(parsed.turbo)) {
-      return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveAgentIds: [] };
-    }
-    const ids = parsed.autoApproveAgentIds;
-    if (!Array.isArray(ids) || ids.length > INPUT_LIMITS.agents || !ids.every(isString)) {
-      return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveAgentIds: [] };
-    }
-    return { turbo: parsed.turbo, autoApproveAgentIds: [...ids] };
+    parsed = JSON.parse(await readFile(path, "utf8"));
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) {
-      return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveAgentIds: [] };
-    }
+    if (isMissing(error)) return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
+    if (error instanceof SyntaxError) return { turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} };
     throw error;
   }
+  if (isDynamicRecord(parsed) && parsed.version === 2 && isApprovalAutomationPreference(parsed)) {
+    return {
+      turbo: parsed.turbo,
+      defaultAutoApprove: parsed.defaultAutoApprove,
+      autoApproveOverrides: parsed.autoApproveOverrides,
+    };
+  }
+  if (isDynamicRecord(parsed) && parsed.version === 1 && isBoolean(parsed.turbo)) {
+    const ids = parsed.autoApproveAgentIds;
+    if (Array.isArray(ids) && ids.length <= INPUT_LIMITS.agents && ids.every(isString)) {
+      const granted = new Set(ids);
+      // Snapshot every existing choice before enabling the default for future agents.
+      return writeApprovalAutomation(path, {
+        turbo: parsed.turbo,
+        defaultAutoApprove: true,
+        autoApproveOverrides: Object.fromEntries([...knownAgentIds].map((id) => [id, granted.has(id)])),
+      });
+    }
+  }
+  return { turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} };
 }
 
 export async function writeApprovalAutomation(
@@ -38,11 +50,11 @@ export async function writeApprovalAutomation(
   preference: ApprovalAutomationPreference,
 ): Promise<ApprovalAutomationPreference> {
   const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  const payload = { version: 1, turbo: preference.turbo, autoApproveAgentIds: preference.autoApproveAgentIds };
+  const payload = { version: 2, ...preference };
   try {
     await writeFile(temporaryPath, `${JSON.stringify(payload)}\n`, { encoding: "utf8", mode: 0o600 });
     await rename(temporaryPath, path);
-    return { turbo: preference.turbo, autoApproveAgentIds: [...preference.autoApproveAgentIds] };
+    return { ...preference, autoApproveOverrides: { ...preference.autoApproveOverrides } };
   } finally {
     await rm(temporaryPath, { force: true }).catch(() => undefined);
   }
@@ -82,12 +94,23 @@ export class ApprovalAutomation {
     const known = new Set(this.#knownAgentIds());
     return {
       turbo: this.#preference.turbo,
-      autoApproveAgentIds: this.#preference.autoApproveAgentIds.filter((id) => known.has(id)),
+      defaultAutoApprove: this.#preference.defaultAutoApprove,
+      autoApproveOverrides: Object.fromEntries(
+        Object.entries(this.#preference.autoApproveOverrides).filter(([id]) => known.has(id)),
+      ),
     };
   }
 
   autoApproves(agentId: string): boolean {
-    return this.#preference.turbo || this.#preference.autoApproveAgentIds.includes(agentId);
+    return (
+      !this.#deletingAgentIds.has(agentId) &&
+      new Set(this.#knownAgentIds()).has(agentId) &&
+      agentAutoApprovalEnabled(this.#preference, agentId)
+    );
+  }
+
+  turboEnabled(): boolean {
+    return this.#preference.turbo;
   }
 
   set(input: SetApprovalAutomationInput): Promise<ApprovalAutomationPreference> {
@@ -132,15 +155,14 @@ export class ApprovalAutomation {
 
   #next(input: SetApprovalAutomationInput): ApprovalAutomationPreference {
     const known = new Set(this.#knownAgentIds());
-    const kept = this.#preference.autoApproveAgentIds.filter((id) => known.has(id));
-    const granted = new Set(kept);
-    if (input.agentId !== undefined && input.autoApprove !== undefined) {
-      if (input.autoApprove && known.has(input.agentId)) granted.add(input.agentId);
-      else granted.delete(input.agentId);
+    const overrides = new Map(Object.entries(this.#preference.autoApproveOverrides).filter(([id]) => known.has(id)));
+    if (input.agentId !== undefined && input.autoApprove !== undefined && known.has(input.agentId)) {
+      overrides.set(input.agentId, input.autoApprove);
     }
     return {
       turbo: input.turbo ?? this.#preference.turbo,
-      autoApproveAgentIds: [...granted].slice(0, INPUT_LIMITS.agents),
+      defaultAutoApprove: this.#preference.defaultAutoApprove,
+      autoApproveOverrides: Object.fromEntries(overrides),
     };
   }
 }

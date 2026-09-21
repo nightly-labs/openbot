@@ -54,6 +54,23 @@ describe("browser tool catalog", () => {
     });
   });
 
+  it("requires an explicit submission mode instead of ambiguous auto for secret entry", () => {
+    const args = {
+      tabId: "tab",
+      method: "otp",
+      digits: 6,
+      targets: [{ kind: "ref", ref: "code", revision: 1 }],
+      submitTarget: { kind: "ref", ref: "continue", revision: 1 },
+    };
+    expect(() => parseBrowserToolArguments("submit_secret", { ...args, submission: "auto" })).toThrow(
+      "Invalid browser tool arguments",
+    );
+    expect(parseBrowserToolArguments("submit_secret", { ...args, submission: "click" })).toMatchObject({
+      submission: "click",
+      submitTarget: args.submitTarget,
+    });
+  });
+
   it("bounds evaluate input and rejects remote-object mode", () => {
     expect(
       parseBrowserToolArguments("evaluate", {

@@ -986,3 +986,23 @@ Backend work and main-process sessions advance it, so work between status polls 
 grace. This counter contains no user data and is never sent to the host. Health and restart
 readiness remain false until agent initialization succeeds.
 See [multi-tenant hosting](multi-tenant-hosting.md) for installation, permissions, and acceptance.
+
+### Secure browser authentication
+
+`openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public
+secret-request metadata. The attention registry creates a fresh request ID and owns the pending
+response. The secret travels through a dedicated typed IPC endpoint or the optional
+`browser-secret-handoff` Team API capability, never a prompt answer or provider tool argument.
+Frozen protocol projections continue to show ordinary takeover to older clients. Current codecs
+carry validated metadata beside those projections. There is no database schema change.
+
+The browser host owns the protection state and serializes entry behind existing browser work. CDP
+resolves fields before consent and checks the document and origin again before entry. The host
+stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
+and invalidates existing live-view streams. Capture protection remains after same-document navigation
+or an uncertain submission. After a completed submit action without document replacement, the host
+waits up to five seconds, then loads the current URL with GET to replace the document without replaying
+a form POST. Failure retains protection and falls back to takeover. A new document releases it and
+clears navigation history; manual takeover
+completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
+OAuth selection, CAPTCHA, passkeys, and payment confirmation use takeover.

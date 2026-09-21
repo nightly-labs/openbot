@@ -1,7 +1,8 @@
-import type { AgentApproval } from "@openbot/contracts/ipc";
+import type { AgentApproval, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 import { Toaster, toast } from "../../components/ui";
+import { BrowserSecretCard } from "./BrowserSecretCard";
 import { ApprovalCard, BrowserTakeoverCard, ChoiceCard } from "./ConversationPrompts";
 
 describe("ChoiceCard", () => {
@@ -149,5 +150,109 @@ describe("BrowserTakeoverCard", () => {
     expect(send).toHaveBeenCalledTimes(1);
     response.resolve(false);
     await vi.waitFor(() => expect(button).toBeEnabled());
+  });
+});
+
+describe("secure authentication card", () => {
+  const request = {
+    requestId: "auth",
+    agentId: "agent",
+    threadId: "thread",
+    turnId: "turn",
+    tabId: "tab",
+    secret: { method: "otp" as const, origin: "https://example.com", digits: 6 },
+  };
+
+  it("sends the code only through the secure response and clears the input", async () => {
+    const responses: RespondToBrowserSecretInput[] = [];
+    const openPage = vi.fn();
+    render(() => (
+      <BrowserSecretCard
+        request={request}
+        onOpen={openPage}
+        loadPreview={async () => ({ dataUrl: "data:image/png;base64,AA==", width: 960, height: 600 })}
+        onRespond={async (input) => {
+          responses.push({ ...input });
+        }}
+      />
+    ));
+    expect(await screen.findByRole("img", { name: "Preview of Sign-in page" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Open sign-in page in browser" }));
+    expect(openPage).toHaveBeenCalledOnce();
+    expect(responses).toEqual([]);
+    const input = screen.getByLabelText("6-digit code");
+    await fireEvent.input(input, { target: { value: "12 34 56" } });
+    expect(responses).toEqual([]);
+    expect(input).toHaveValue("");
+    expect(screen.getByRole("form", { name: "Secure authentication" })).not.toHaveTextContent("123456");
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await vi.waitFor(() =>
+      expect(responses).toEqual([{ requestId: "auth", agentId: "agent", decision: "submit", secret: "123456" }]),
+    );
+    expect(input).toHaveValue("");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open sign-in page in browser" })).not.toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Secure authentication" })).not.toHaveTextContent("123456");
+  });
+
+  it("discards a late preview after a rejected submission", async () => {
+    let resolvePreview: (() => void) | undefined;
+    const ready = new Promise<void>((resolve) => {
+      resolvePreview = resolve;
+    });
+    const image = ready.then(() => ({ dataUrl: "data:image/png;base64,AA==", width: 960, height: 600 }));
+    render(() => (
+      <BrowserSecretCard
+        request={request}
+        loadPreview={() => image}
+        onRespond={async () => {
+          throw new Error("Disconnected");
+        }}
+      />
+    ));
+    await fireEvent.input(screen.getByLabelText("6-digit code"), { target: { value: "123456" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByRole("alert");
+    resolvePreview?.();
+    await image;
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("does not send the entered value when cancelled", async () => {
+    const responses: RespondToBrowserSecretInput[] = [];
+    render(() => (
+      <BrowserSecretCard
+        request={request}
+        onRespond={async (input) => {
+          responses.push({ ...input });
+        }}
+      />
+    ));
+    await fireEvent.input(screen.getByLabelText("6-digit code"), { target: { value: "123456" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(responses).toEqual([{ requestId: "auth", agentId: "agent", decision: "cancel" }]);
+    expect(screen.getByLabelText("6-digit code")).toHaveValue("");
+  });
+
+  it("hides the submitted password input and restores it empty after a rejected response", async () => {
+    let rejectResponse: ((error: Error) => void) | undefined;
+    render(() => (
+      <BrowserSecretCard
+        request={{ ...request, secret: { ...request.secret, method: "password" } }}
+        onRespond={() =>
+          new Promise<void>((_resolve, reject) => {
+            rejectResponse = reject;
+          })
+        }
+      />
+    ));
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "private-password" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByRole("button", { name: "Submitting…" })).toBeDisabled();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    if (!rejectResponse) throw new Error("Missing pending response.");
+    rejectResponse(new Error("private-password"));
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("private-password");
+    expect(screen.getByLabelText("Password")).toHaveValue("");
   });
 });

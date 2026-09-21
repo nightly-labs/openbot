@@ -373,3 +373,22 @@ include them in logs. The installed administrator CLI shows each password once o
 then removes the recovery file. A failed setup retains that root-only file for administrator recovery.
 The administrator controls secure password delivery. Host verification reads home metadata only
 and tests cross-user access using harmless temporary files outside tenant homes.
+
+## Secure browser authentication
+
+Passwords, email/SMS codes, and authenticator codes entered in a secure chat card are sent to the
+shown HTTPS site for one submission. Connected desktop and mobile clients send the value through
+the authenticated Team API to the computer running the browser. The handoff does not add the value
+to chat, provider tool arguments, diagnostics, analytics, or a credential store. Input and submission
+values are held in memory for the operation; cancellation and submission clear the input.
+
+OpenBot blocks agent browser access while consent is pending. Before entering a submitted value, it
+blocks image capture and live browser streams, and stops
+and discards the active browser recording before entry. After entry, protection stays until the
+browser replaces the document. After a same-page submission, OpenBot automatically loads the current
+URL as a new document with a GET request. This can reset an unfinished login step. Failed submission
+or reload requires manual takeover. Recording does not restart
+automatically, and the tab's back/forward history is cleared after replacement to prevent restoring
+the sensitive document. The destination site receives the value and controls its own processing.
+This protection does not isolate credentials from the operating system or agents with unrestricted
+machine access. Values pasted into ordinary chat are not covered by secure handoff.
