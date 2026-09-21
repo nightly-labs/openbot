@@ -1,10 +1,12 @@
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import type { RemoteInvitePreview } from "@openbot/team-client/remote-directory";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router } from "expo-router";
+import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ScanLine, Server } from "lucide-react-native";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Keyboard, Pressable, View } from "react-native";
 
 import { AppLogo } from "@/features/auth/components/app-logo";
@@ -24,18 +26,54 @@ function normalizeInviteUrl(value: string): string | null {
 export function AddServerScreen({
   initialInvite = "",
   onJoined,
+  onCancel,
 }: {
   initialInvite?: string;
   onJoined?: () => void;
+  onCancel?: () => void;
 } = {}) {
   const [foreground, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
-  const { addRemoteServer, servers } = useMobileWorkspace();
+  const { addRemoteServer, servers, teamDirectory } = useMobileWorkspace();
   const [joinedId, setJoinedId] = useState<string | null>(null);
   const joinedServer = servers.find((server) => server.id === joinedId);
   const [inviteLink, setInviteLink] = useState(initialInvite);
-  const [reviewedInvite, setReviewedInvite] = useState<string | null>(initialInvite || null);
+  const [reviewRequest, setReviewRequest] = useState(() => {
+    const url = normalizeInviteUrl(initialInvite);
+    return url ? { url } : null;
+  });
+  const reviewedInvite = reviewRequest?.url ?? null;
+  const [preview, setPreview] = useState<RemoteInvitePreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setPreview(null);
+    setError(null);
+    if (!reviewRequest) {
+      setPreviewing(false);
+      return;
+    }
+    setPreviewing(true);
+    void teamDirectory.previewInvite(reviewRequest.url).then(
+      (value) => {
+        if (!active) return;
+        setPreview(value);
+        setPreviewing(false);
+      },
+      (cause) => {
+        if (!active) return;
+        setError(errorMessage(cause, "OpenBot could not load this invitation."));
+        setPreviewing(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [reviewRequest, teamDirectory]);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  usePreventRemove(joining, () => {
+    // A join can consume a single-use token; wait for its result before leaving.
+  });
   const joinInFlight = useRef(false);
   const canReview = inviteLink.trim().length > 0;
 
@@ -47,11 +85,11 @@ export function AddServerScreen({
     }
     Keyboard.dismiss();
     setError(null);
-    setReviewedInvite(normalizedInvite);
+    setReviewRequest({ url: normalizedInvite });
   }
 
   async function joinServer(): Promise<void> {
-    if (!reviewedInvite || joinInFlight.current) return;
+    if (!reviewedInvite || !preview || previewing || joinInFlight.current) return;
     joinInFlight.current = true;
     setJoining(true);
     setError(null);
@@ -65,8 +103,6 @@ export function AddServerScreen({
       setJoining(false);
     }
   }
-
-  const invitationHost = reviewedInvite ? new URL(reviewedInvite).hostname : null;
 
   return (
     <SheetScrollView
@@ -109,9 +145,13 @@ export function AddServerScreen({
               <Server color={accentForeground} size={23} strokeWidth={1.8} />
             </View>
             <View className="min-w-0 flex-1 gap-0.5">
-              <Typography.Paragraph weight="semibold">Invitation ready</Typography.Paragraph>
+              <Typography.Paragraph weight="semibold">
+                {preview?.hostName ?? (previewing ? "Checking invitation…" : "Invitation unavailable")}
+              </Typography.Paragraph>
               <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1} selectable>
-                {invitationHost}
+                {preview
+                  ? `${preview.role} · ${preview.permanent ? "No expiry" : `Expires ${new Date(preview.expiresAt).toLocaleString()}`}`
+                  : "The server identity must be verified before you join."}
               </Typography.Paragraph>
             </View>
           </View>
@@ -122,14 +162,28 @@ export function AddServerScreen({
             </Typography.Paragraph>
           ) : null}
 
-          <Button size="lg" isDisabled={joining} onPress={() => void joinServer()}>
-            <Button.Label className="font-sans font-semibold">{joining ? "Joining…" : "Join server"}</Button.Label>
-          </Button>
+          {preview ? (
+            <Button size="lg" isDisabled={joining || previewing} onPress={() => void joinServer()}>
+              <Button.Label className="font-sans font-semibold">{joining ? "Joining…" : "Join server"}</Button.Label>
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              isDisabled={previewing}
+              onPress={() => setReviewRequest(reviewedInvite ? { url: reviewedInvite } : null)}
+            >
+              <Button.Label>{previewing ? "Checking invitation…" : "Try again"}</Button.Label>
+            </Button>
+          )}
 
           <Pressable
             accessibilityRole="button"
             className="min-h-11 items-center justify-center"
-            onPress={() => setReviewedInvite(null)}
+            disabled={joining}
+            onPress={() => {
+              setPreview(null);
+              setReviewRequest(null);
+            }}
           >
             <Typography.Paragraph weight="semibold" className="text-text-secondary">
               Use another invitation
@@ -176,7 +230,7 @@ export function AddServerScreen({
           <Pressable
             accessibilityRole="button"
             className="min-h-11 items-center justify-center"
-            onPress={() => router.back()}
+            onPress={() => (onCancel ? onCancel() : router.back())}
           >
             <Typography.Paragraph weight="semibold" className="text-text-secondary">
               Cancel

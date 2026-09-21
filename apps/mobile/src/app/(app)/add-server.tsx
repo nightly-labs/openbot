@@ -1,1 +1,1 @@
-export { AddServerScreen as default } from "@/features/servers/screens/add-server-screen";
+export { AddServerLinkScreen as default } from "@/features/servers/screens/add-server-link-screen";

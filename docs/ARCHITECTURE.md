@@ -407,6 +407,20 @@ the native/DOM bridge limits each file to 10 MB and cancels transfers when its c
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+Mobile external links enter through Expo Router's `+native-intent` and the links feature.
+Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
+local request ID. Invitations wait through sign-in and show a verified host preview before an
+explicit join. Mobile Connect links require confirmation and cannot replace a signed-in account.
+Plugin links open their validated public page in the in-app browser. Unsupported links show a
+safe fallback. Permanent invitation metadata comes from the shared Team client; revocation stops
+new joins without removing existing members.
+iOS associates only `https://openbot.run/join` with `run.openbot.mobile`. Changes to associated
+domains require a new native app build and deployment of the website association file. Android
+continues to open HTTPS invitations in the browser, whose button opens `openbot://join`. Enabling
+verified Android App Links requires the release app-signing certificate's SHA-256 fingerprint,
+`/.well-known/assetlinks.json`, and a matching verified `/join` intent filter. No certificate
+fingerprint is stored in this repository yet.
+
 Mobile Settings uses one native form sheet with stable detents and a nested Expo Router stack.
 Inner pages push within the sheet and use native back navigation; standalone forms remain
 fit-to-content sheets. Both reuse SheetScrollView. General, Profile, Connections and About use HeroUI typography and shared
