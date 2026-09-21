@@ -97,7 +97,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build the Host signing keychain and sign a throwaway binary
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Build the Host signing keychain and sign a throwaway package
         shell: bash
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -110,6 +115,36 @@ jobs:
           source scripts/host-signing-keychain.sh
           echo "Application identity: $HOST_APPLICATION_IDENTITY"
           echo "Installer identity: $HOST_INSTALLER_IDENTITY"
+          # Signs a throwaway package with the installer identity and holds the real
+          # `verifyHostInstaller` wording against it. Apple writes that status text and a runner can
+          # word it differently from a developer's own Mac, so the release path must not be the first
+          # place the comparison runs: it gets there with the package already built and notarized.
+          probe="$host_signing_dir/pkg-probe"
+          mkdir -p "$probe/root/usr/local/bin"
+          cp /usr/bin/true "$probe/root/usr/local/bin/openbot-signing-probe"
+          /usr/bin/pkgbuild --root "$probe/root" --identifier app.openbot.host.signing-probe \
+            --version 0.0.0 --install-location / --ownership recommended \
+            --sign "$HOST_INSTALLER_IDENTITY" --keychain "$HOST_SIGNING_KEYCHAIN" "$probe/probe.pkg"
+          HOST_PROBE_PKG="$probe/probe.pkg" bun -e '
+            import { execFileSync } from "node:child_process";
+            import { verifyHostSignature } from "./scripts/verify-host-installer";
+            const pkg = process.env.HOST_PROBE_PKG;
+            if (!pkg) throw new Error("Missing HOST_PROBE_PKG.");
+            const status = execFileSync("/usr/sbin/pkgutil", ["--check-signature", pkg]).toString();
+            process.stdout.write(status);
+            verifyHostSignature(status);
+            process.stdout.write("This runner reports a wording verifyHostSignature accepts.\n");
+          '
+          # `verifyHostBom` allows only the fixed host paths. A macOS that stamps every new file with
+          # `com.apple.provenance` makes `pkgbuild` record an AppleDouble entry beside each one, which
+          # that allowlist rejects, so print the payload listing rather than infer it from one OS.
+          /usr/sbin/pkgutil --expand-full "$probe/probe.pkg" "$probe/expanded"
+          /usr/bin/lsbom -p fmug "$probe/expanded/Bom"
+          if /usr/bin/lsbom -p f "$probe/expanded/Bom" | grep -q '/\._'; then
+            echo "This runner records AppleDouble metadata entries, which verifyHostBom rejects." >&2
+            exit 1
+          fi
+          echo "This runner records no AppleDouble metadata entries."
 
   macos:
     name: Build signed macOS ARM64 release
