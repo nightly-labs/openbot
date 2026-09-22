@@ -1,6 +1,7 @@
 import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/ipc";
 import { createTranslate, type MessageParams, type Translate } from "./message";
 import { type AppMessages, en } from "./messages/en";
+import { fr } from "./messages/fr";
 import { ja } from "./messages/ja";
 
 export {
@@ -14,14 +15,15 @@ export {
 } from "./message";
 export type { AppMessages } from "./messages/en";
 export { en } from "./messages/en";
+export { fr } from "./messages/fr";
 export { ja } from "./messages/ja";
 
 /** The languages a catalog exists for. `"system"` resolves to one of these; it is never one itself. */
-export const TRANSLATED_LOCALES = ["en", "ja"] as const;
+export const TRANSLATED_LOCALES = ["en", "fr", "ja"] as const;
 
 export type TranslatedLocale = (typeof TRANSLATED_LOCALES)[number];
 
-const catalogs = { en, ja } as const;
+const catalogs = { en, fr, ja } as const;
 
 export type AppTranslate = Translate<typeof en>;
 
