@@ -202,8 +202,10 @@ ignored, exactly as the daemon ignores it. The commands never write host state, 
 arguments, never open a tenant home, and never start or stop maintenance.
 
 Each reported blocker mirrors the rule the host applies in that phase: `waiting` uses restart
-safety, idle state, cycle, and one matching process; `stopping` uses the process list; `released`
-uses the health report, the installed version, and the cycle. An OpenBot process under an
+safety, idle state, cycle, and one matching main process; `stopping` waits for every process inside
+the bundle, helpers included; `released` uses the health report, the installed version, and the
+cycle. A staged version is named only while one is pending, because the host keeps its version
+field after a finished update. An OpenBot process under an
 unregistered UID is reported separately, because it stops maintenance before any tenant is asked.
 
 While the host waits, each idle tenant shows the remaining five-minute grace. This value is the

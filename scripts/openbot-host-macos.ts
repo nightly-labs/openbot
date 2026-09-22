@@ -24,10 +24,10 @@ import {
   hostReleaseSchema,
 } from "./host-installation";
 import {
+  bundleProcesses,
   hostCommand,
   isNewerRelease,
   macHostOperations,
-  runningOpenBotProcesses,
   SHARED_APP,
   verifyBundleTree,
   verifyHostPath,
@@ -290,7 +290,7 @@ export function macHostAdminOperations(): HostAdminOperations {
       }
     },
     tenantForUid: async (uid) => ({ uid, name: await hostCommand("/usr/bin/id", ["-un", String(uid)]) }),
-    runningTenants: runningOpenBotProcesses,
+    bundleProcesses,
     readState: async () => {
       try {
         await verifyHostDirectory(ROOT);

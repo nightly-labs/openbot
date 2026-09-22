@@ -46,7 +46,7 @@ function fixture() {
     verifyIsolation: vi.fn(async () => undefined),
     readState: vi.fn(async () => null),
     readTenantStatus: vi.fn(async () => null),
-    runningTenants: vi.fn(async () => []),
+    bundleProcesses: vi.fn(async () => []),
   };
   return { ops, events };
 }
@@ -181,8 +181,8 @@ function statusInput(overrides: Partial<HostStatusInput> = {}): HostStatusInput 
     state: { phase: "waiting", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW - 2_000, error: null },
     daemonRunning: true,
     processes: [
-      { uid: 501, pid: 11 },
-      { uid: 502, pid: 12 },
+      { uid: 501, pid: 11, main: true },
+      { uid: 502, pid: 12, main: true },
     ],
     now: NOW,
     tenants: [
@@ -256,7 +256,7 @@ describe("host status reporting", () => {
   });
 
   it("does not promise a countdown when the process list disagrees with the report", () => {
-    const report = describeHostStatus({ ...statusInput(), processes: [{ uid: 501, pid: 99 }] });
+    const report = describeHostStatus({ ...statusInput(), processes: [{ uid: 501, pid: 99, main: true }] });
     expect(report.tenants[0]?.running).toBe(false);
     expect(report.tenants[0]?.readyInMs).toBeNull();
     expect(report.tenants[0]?.blocker).toBe("reported PID is not in the process list");
@@ -264,7 +264,7 @@ describe("host status reporting", () => {
 
   it("reports an unregistered OpenBot process that stops the host from starting maintenance", () => {
     const input = statusInput();
-    const report = describeHostStatus({ ...input, processes: [...input.processes, { uid: 700, pid: 70 }] });
+    const report = describeHostStatus({ ...input, processes: [...input.processes, { uid: 700, pid: 70, main: true }] });
     expect(report.unregisteredProcesses).toEqual([700]);
     expect(report.summary).toContain("unregistered UID 700");
   });
@@ -283,7 +283,7 @@ describe("host status reporting", () => {
 
   it("reports a tenant that still runs while the host waits for shutdown", () => {
     const state = { phase: "stopping", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
-    const report = describeHostStatus({ ...statusInput(), state, processes: [{ uid: 502, pid: 12 }] });
+    const report = describeHostStatus({ ...statusInput(), state, processes: [{ uid: 502, pid: 12, main: false }] });
     expect(report.tenants[0]?.blocker).toBeNull();
     expect(report.tenants[1]?.blocker).toBe("still running");
   });
@@ -294,6 +294,33 @@ describe("host status reporting", () => {
       tenants: [{ uid: 501, name: "client-acme", status: null }],
     });
     expect(report.tenants[0]?.blocker).toBe("runs without a status report");
+  });
+
+  it("does not present a finished release as a staged update", () => {
+    const state = { phase: "idle", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
+    const report = describeHostStatus({ ...statusInput(), state });
+    expect(report.pendingVersion).toBeNull();
+    expect(report.stateVersion).toBe("0.18.0");
+    const text = formatHostStatus(report);
+    expect(text).toContain("none staged");
+    expect(text).not.toContain("0.18.0 staged");
+  });
+
+  it("names the installed version after release and the staged version while waiting", () => {
+    const released = { phase: "released", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
+    expect(formatHostStatus(describeHostStatus({ ...statusInput(), state: released }))).toContain("0.18.0 installed");
+    expect(formatHostStatus(describeHostStatus(statusInput()))).toContain("0.18.0 staged");
+  });
+
+  it("counts every remaining bundle process while the host waits for shutdown", () => {
+    const state = { phase: "stopping", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
+    const report = describeHostStatus({
+      ...statusInput(),
+      state,
+      processes: [{ uid: 501, pid: 44, main: false }],
+    });
+    expect(report.remainingProcesses).toBe(1);
+    expect(report.summary).toContain("1 remaining bundle processes");
   });
 
   it("reports a stopped daemon and an unmanaged host before any update text", () => {

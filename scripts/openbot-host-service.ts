@@ -28,7 +28,8 @@ export interface HostAdminOperations {
   /** Read-only status reads. A missing, stale or malformed tenant report gives null, never an error. */
   readState: () => Promise<HostUpdateState | null>;
   readTenantStatus: (uid: number) => Promise<HostTenantStatus | null>;
-  runningTenants: () => Promise<Array<{ uid: number; pid: number }>>;
+  /** Every process inside the shared bundle, as the daemon reads it: main processes and helpers. */
+  bundleProcesses: () => Promise<Array<{ uid: number; pid: number; main: boolean }>>;
   verifyState: () => Promise<void>;
   verifyDaemon: () => Promise<void>;
   verifyIsolation: (tenants: HostTenant[]) => Promise<void>;
@@ -151,8 +152,12 @@ export interface HostStatusReport {
   stateAgeMs: number | null;
   /** Only `waiting` and `stopping` rewrite state on every poll, so only they prove daemon progress. */
   stateStale: boolean;
-  /** OpenBot processes outside the registered set. Each one stops the host from starting maintenance. */
+  /** Registered version field of the host state. Its meaning depends on the phase. */
+  stateVersion: string | null;
+  /** Main OpenBot processes outside the registered set. Each one stops the host from starting maintenance. */
   unregisteredProcesses: number[];
+  /** Bundle processes that still keep the host from replacing the application. */
+  remainingProcesses: number;
   summary: string;
   tenants: HostTenantReport[];
 }
@@ -162,7 +167,7 @@ export interface HostStatusInput {
   state: HostUpdateState | null;
   daemonRunning: boolean;
   tenants: Array<{ uid: number; name: string | null; status: HostTenantStatus | null }>;
-  processes: Array<{ uid: number; pid: number }>;
+  processes: Array<{ uid: number; pid: number; main: boolean }>;
   now: number;
 }
 
@@ -181,10 +186,12 @@ function describeTenant(
   now: number,
 ): HostTenantReport {
   const { status } = entry;
-  const matching = processes.filter((process) => process.uid === entry.uid);
+  // Waiting mirrors the host's main-process check; stopping waits for every bundle process to exit.
+  const matching = processes.filter((process) => process.uid === entry.uid && process.main);
+  const anyProcess = processes.some((process) => process.uid === entry.uid);
   const base = { uid: entry.uid, name: entry.name, running: false, pid: null, version: null, healthy: false };
   if (!status) {
-    const blocker = matching.length ? "runs without a status report" : "no status report";
+    const blocker = anyProcess ? "runs without a status report" : "no status report";
     return { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null, blocker };
   }
   const heartbeatAgeMs = now - status.heartbeatAt;
@@ -225,7 +232,7 @@ function describeTenant(
                 ? null
                 : "reported PID is not in the process list"
         : state?.phase === "stopping"
-          ? matching.length
+          ? anyProcess
             ? "still running"
             : null
           : null;
@@ -263,11 +270,11 @@ function summarize(report: Omit<HostStatusReport, "summary">): string {
         : `Update ${version} is staged. Shutdown starts in ${formatDuration(soonest)} at the earliest.`;
     }
     case "stopping":
-      return "Every tenant was idle. OpenBot is quitting; installation starts when all processes have exited.";
+      return `Every tenant was idle. OpenBot is quitting; installation starts when all ${report.remainingProcesses} remaining bundle processes have exited.`;
     case "installing":
       return `Replacing OpenBot.app with ${report.pendingVersion ?? "the staged release"}. Do not interrupt.`;
     case "released":
-      return `Version ${report.pendingVersion ?? "unknown"} is installed. Waiting for tenant health reports${
+      return `Version ${report.stateVersion ?? "unknown"} is installed. Waiting for tenant health reports${
         blocked.length ? `: ${names}` : "."
       }`;
     case "aborted":
@@ -287,7 +294,9 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     daemonRunning: input.daemonRunning,
     phase: state?.phase ?? null,
     cycle: state?.cycle ?? "",
-    pendingVersion: state?.version ?? null,
+    stateVersion: state?.version ?? null,
+    // The host keeps the version field after a finished update, so only these phases have a pending release.
+    pendingVersion: state && ["waiting", "stopping", "installing"].includes(state.phase) ? state.version : null,
     error: state?.error ?? null,
     stateAgeMs,
     stateStale:
@@ -295,8 +304,13 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
       stateAgeMs !== null &&
       stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS,
     unregisteredProcesses: [
-      ...new Set(input.processes.filter((process) => !registered.includes(process.uid)).map((process) => process.uid)),
+      ...new Set(
+        input.processes
+          .filter((process) => process.main && !registered.includes(process.uid))
+          .map((process) => process.uid),
+      ),
     ],
+    remainingProcesses: input.processes.length,
     tenants,
   };
   return { ...partial, summary: summarize(partial) };
@@ -306,7 +320,13 @@ export function formatHostStatus(report: HostStatusReport): string {
   const lines = [
     `Management  ${report.managed ? "on" : "off"}    Daemon ${report.daemonRunning ? "running" : "not running"}`,
     `Phase       ${report.phase ?? "unknown"}${report.stateStale ? "  (state is stale; the daemon is not polling)" : ""}`,
-    `Update      ${report.pendingVersion ?? "none staged"}${report.cycle ? `    cycle ${report.cycle.slice(0, 8)}` : ""}`,
+    `Update      ${
+      report.pendingVersion
+        ? `${report.pendingVersion} staged`
+        : report.phase === "released" && report.stateVersion
+          ? `${report.stateVersion} installed`
+          : "none staged"
+    }${report.cycle ? `    cycle ${report.cycle.slice(0, 8)}` : ""}`,
   ];
   if (report.stateAgeMs !== null) lines.push(`State age   ${formatDuration(report.stateAgeMs)}`);
   if (report.error) lines.push(`Error       ${report.error}`);
@@ -340,7 +360,7 @@ export async function collectHostStatus(ops: HostAdminOperations, now = Date.now
       () => true,
       () => false,
     ),
-    ops.runningTenants().catch(() => []),
+    ops.bundleProcesses().catch(() => []),
     Promise.all(
       (config?.tenants ?? []).map(async (uid) => ({
         uid,
