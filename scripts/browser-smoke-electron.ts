@@ -507,6 +507,15 @@ async function main(): Promise<void> {
       throw new Error("Browser fill-mode status did not use the current panel bounds.");
     }
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    const visibleContents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
+    if (!visibleContents) throw new Error("Visible browser contents were not available.");
+    // DOM.focus and Input.insertText reach the renderer before a newly resized view has a compositor
+    // surface. A native mouse event needs that surface for hit testing, especially under Xvfb. Wait
+    // for the first non-empty capture so this test acts only after a person could see and click it.
+    await waitFor(
+      async () => !(await visibleContents.capturePage()).isEmpty(),
+      "the visible browser compositor surface",
+    );
     process.stdout.write("BrowserHost: local tab opened.\n");
     const first = await browser.snapshot(tab.id);
     const input = first.elements.find((element) => element.name === "Task");
