@@ -406,7 +406,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           size="xs"
                           class="provider-picker-install"
                           aria-label={i18n.t(PROVIDER_ACTION_LABEL[action()], { name: option().name })}
-                          disabled={props.disabled || props.refreshingProviders}
+                          disabled={props.disabled || (props.refreshingProviders && !runtimeStoreAction(action()))}
                           onClick={() => {
                             if (action() === "cancel") {
                               void props.onCancelProviderDownload?.(option().id);
@@ -635,6 +635,20 @@ const PROVIDER_ACTION_LABEL = {
   restart: "provider.aria.restart",
   retry: "provider.aria.retry",
 } as const satisfies Record<ProviderAction, keyof AppMessages>;
+
+/**
+ * Whether the action reaches main's managed runtime store rather than a provider CLI.
+ *
+ * A download, its cancellation and its retry are file transfers the runtime manager owns; it neither
+ * asks the agent runtime for anything nor waits for it. The rest put a question to a CLI, so they
+ * wait while the providers are being checked. Keeping the two apart is what stops a provider check
+ * that never ends from disabling the one action that would end it: with nothing downloaded, every
+ * other button on the first-run screen is refused by design, and disabling Download as well leaves
+ * the user with no way forward at all.
+ */
+function runtimeStoreAction(action: ProviderAction): boolean {
+  return action === "download" || action === "cancel" || action === "retry";
+}
 
 function providerRuntimeAction(
   state: AgentProviderState,

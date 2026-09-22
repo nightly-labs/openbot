@@ -16,6 +16,7 @@ import type {
   AgentSummary,
   AttachmentDataInput,
   AvatarImageInput,
+  CapabilityState,
   ChannelMemory,
   ChannelRoutine,
   ChannelRoutineRun,
@@ -225,6 +226,14 @@ export interface AgentServiceOptions {
    * The main process passes the app variant; only a dev build turns it on.
    */
   developmentDefaults?: boolean;
+  /**
+   * The Computer Use driver's MCP entry while its daemon runs, or `null`.
+   *
+   * A function rather than a value because the daemon starts and stops under the user, and the
+   * answer is read at each spawn. It is the main process's knowledge: the driver is a child of the
+   * main process, not of this class.
+   */
+  computerUseMcpServer?: () => McpServerConfig | null;
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
@@ -271,6 +280,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #routineTimer: RoutineTimer;
   readonly #channelRoutines: ChannelRoutineScheduler;
   readonly #mcpServers: McpServerStore;
+  readonly #computerUseMcpServer: () => McpServerConfig | null;
   /**
    * What OpenBot downloaded for the MCP servers, read at each use. It travels with the credentials
    * because both are the main process's knowledge of this machine, and because the clients already
@@ -336,8 +346,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       credentials = NO_PROVIDER_CREDENTIALS,
       localSkillTools,
       developmentDefaults = false,
+      computerUseMcpServer = () => null,
     } = options;
     this.#developmentDefaults = developmentDefaults;
+    this.#computerUseMcpServer = computerUseMcpServer;
     this.#deleteWithRevokedApproval = options.deleteWithRevokedApproval ?? ((_agentId, remove) => remove());
     this.#localSkillTools = localSkillTools;
     this.#store = store;
@@ -1057,9 +1069,37 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return testMcpServer(config, undefined, this.#mcpToolRuntimes(), oauth);
   }
 
-  /** What the providers are given at spawn. They connect for themselves; a test is not used. */
+  /**
+   * What the providers are given at spawn. They connect for themselves; a test is not used.
+   *
+   * The Computer Use entry is appended here rather than stored, because it exists only while the
+   * driver daemon runs and the user never configured it. This one line is what gives Codex, Claude
+   * and the ACP providers the same tools: all three read this function.
+   */
   enabledMcpServers(): McpServerConfig[] {
-    return this.#mcpHandoff.record(this.#mcpServers.listEnabled());
+    const computerUse = this.#computerUseMcpServer();
+    const configured = this.#mcpServers.listEnabled();
+    return this.#mcpHandoff.record(computerUse ? [...configured, computerUse] : configured);
+  }
+
+  /**
+   * The Computer Use capability, as the main process alone can know it.
+   *
+   * Here rather than on the runtime directly, so the main process does not reach past this class
+   * into the providers it owns.
+   */
+  setComputerUseCapability(state: CapabilityState): void {
+    this.#providers.setComputerUseCapability(state);
+  }
+
+  /**
+   * The driver appeared or went away, so every loaded provider session now lists the wrong tools.
+   *
+   * Same treatment as a saved or removed server: the agents are marked for a fresh provider session
+   * and the public thread is untouched.
+   */
+  notifyComputerUseChanged(): void {
+    this.#mcpServersChanged();
   }
 
   listModels(): AgentModelOption[] {

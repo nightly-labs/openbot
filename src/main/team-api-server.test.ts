@@ -174,6 +174,8 @@ const ROUTE_METHODS: Record<string, string> = {
   "browser.viewSessions": "POST",
   "browser.viewSession": "DELETE",
   "remoteScreen.capabilities": "GET",
+  "remoteScreen.setup": "POST",
+  "remoteScreen.test": "POST",
   "remoteScreen.sessions": "POST",
   "remoteScreen.session": "DELETE",
   "remoteScreen.display": "PUT",
@@ -270,6 +272,9 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   // the deletion is answered with 204 and no body at all.
   "browser.viewSessions",
   "browser.viewSession",
+  // Optional v4 setup routes. Their separate request/response codec is tested in v4.test.ts.
+  "remoteScreen.setup",
+  "remoteScreen.test",
 ]);
 
 const ROUTE_SAMPLE_IDS = ["route-sample", "route-sample-other"];

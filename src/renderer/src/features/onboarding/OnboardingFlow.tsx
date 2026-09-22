@@ -11,14 +11,14 @@ import {
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { ArrowUp, Button, Plus } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
+import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -200,6 +200,33 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       selected && providerOptions().some((provider) => provider.id === selected && provider.state === "available"),
     );
   });
+  const nextReasonId = createUniqueId();
+  /**
+   * Why `Next` refuses, in the step the user is actually in, or an empty string when it does not.
+   *
+   * The button is disabled, so a press says nothing and the sentence is the only account the screen
+   * gives. A first run whose providers are all still being checked otherwise shows a list of rows
+   * and a dead button, which reads as a broken application rather than as work left to do.
+   */
+  const nextBlockedReason = createMemo(() => {
+    if (selectedProviderConnected()) return "";
+    const option = providerOptions().find((candidate) => candidate.id === selectedProvider());
+    if (!option) return "Select a provider to continue.";
+    switch (option.runtimeStatus?.phase) {
+      case "downloading":
+        return `${option.name} is still downloading.`;
+      case "finishing":
+        return `${option.name} is still being set up.`;
+      case "download-error":
+        return `${option.name} could not be downloaded. Retry the download to continue.`;
+      case "not-downloaded":
+        return `Download ${option.name} to continue.`;
+      default:
+        break;
+    }
+    if (option.connectionState === "connecting") return `${option.name} is connecting.`;
+    return `Connect ${option.name} to continue.`;
+  });
 
   createEffect(
     () => ({
@@ -351,7 +378,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
   function nextStep(): void {
     if (!selectedProviderConnected()) {
-      setError("Connect and select a provider to continue.");
+      setError(nextBlockedReason());
       return;
     }
     if (step() === "meet") {
@@ -600,7 +627,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                   </div>
                 </div>
 
-                <ComputerUseMacSetup platform={props.platform} variant="compact" />
+                <ComputerUseSetup variant="compact" />
               </section>
             </Match>
 
@@ -666,12 +693,21 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
             variant="default"
             class="onboarding-next"
             disabled={saving() || !selectedProviderConnected()}
+            aria-describedby={nextBlockedReason() ? nextReasonId : undefined}
             loading={saving()}
             loadingLabel="Opening OpenBot…"
             onClick={nextStep}
           >
             {step() === "jobs" ? "Open OpenBot" : "Next"}
           </Button>
+          {/* Named by the button above, so the reason is read out with it rather than hunted for. */}
+          <Show when={nextBlockedReason()}>
+            {(reason) => (
+              <p class="onboarding-next-reason" id={nextReasonId}>
+                {reason()}
+              </p>
+            )}
+          </Show>
         </div>
       </div>
     </main>

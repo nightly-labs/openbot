@@ -181,13 +181,103 @@ export interface CentralAuthDesktopApi {
 
 export type MacPermissionId = "screen-recording" | "accessibility";
 
-export type ComputerUseMacSetupStatus = "available" | "unavailable" | "unsupported";
+/**
+ * How far Computer Use is from working, as one value the panel switches on.
+ *
+ * `permissions-required` is the only one the user can act on, by opening System Settings.
+ * `driver-missing` says the build carries no driver, which every release does, and `error` says the
+ * driver is there and answered with something else. Both are faults rather than steps, and they
+ * stay apart because a report that only said "not ready" would hide which one happened.
+ */
+export const COMPUTER_USE_STATUSES = [
+  "unsupported",
+  "driver-missing",
+  "permissions-required",
+  "ready",
+  "error",
+] as const;
 
-export interface ComputerUseMacSetupState {
-  status: ComputerUseMacSetupStatus;
-  helperName: string;
-  helperIconDataUrl: string | null;
+export type ComputerUseStatus = (typeof COMPUTER_USE_STATUSES)[number];
+
+export interface ComputerUsePermission {
+  id: MacPermissionId;
+  granted: boolean;
+}
+
+/**
+ * What the Computer Use panel draws.
+ *
+ * The permissions are a list rather than two fields so the panel can render them in one loop, and
+ * so a driver that gains a third grant needs no new shape here.
+ */
+export interface ComputerUseState {
+  status: ComputerUseStatus;
+  permissions: readonly ComputerUsePermission[];
   message: string | null;
+}
+
+/**
+ * The application the user drags into a System Settings list, as the help window draws it.
+ *
+ * macOS grants a permission to an application bundle, and the list in System Settings does not
+ * always offer the one that asked. Dragging the bundle in is the way past that, so the window has
+ * to show the user the same name and icon the list will show - which in a development build is
+ * Electron, not OpenBot. `null` where there is no bundle to drag: every system that is not macOS,
+ * and a build that runs from a directory rather than an application.
+ */
+export interface ComputerUsePermissionApp {
+  name: string;
+  iconDataUrl: string | null;
+}
+
+/**
+ * Where the rim is drawn inside the overlay window, and what it is drawn around.
+ *
+ * The overlay covers the whole desktop and never moves, so the rectangle here - in the overlay's
+ * own pixels, from its top-left corner - is the only thing that follows the window an agent works
+ * in. Sending it costs a repaint, where moving the overlay would cost a window move on every
+ * frame the user drags the target.
+ */
+export interface ComputerUseHighlightPlacement {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** The corner radius of the window under the rim, so the rim follows that window's shape. */
+  cornerRadius: number;
+  /** Which application window the agent works in, for the screen reader. Never logged. */
+  windowTitle: string;
+  /**
+   * Where OpenBot draws the agent cursor, or `null` when it draws none.
+   *
+   * The driver draws a cursor of its own, and two cursors for one agent say two places. So this
+   * carries a point only while the driver draws nothing, and only while the agent's last action is
+   * recent enough to still say where it works.
+   */
+  cursor: ComputerUseCursorPoint | null;
+  /**
+   * The parts of the rim that a window in front of the marked one covers, which are cut out of it.
+   *
+   * The overlay floats over every window, because macOS keeps no window of one application between
+   * two windows of another. Drawn as it is, the rim would lie over whatever covers the window it
+   * marks and read as a rim around that other window instead. These rectangles say where the rim
+   * has to give way, and they never overlap each other, so cutting them out takes one rule.
+   */
+  covered: readonly ComputerUseCoveredArea[];
+}
+
+/** A rectangle of the rim another window covers, in the overlay's own pixels. */
+export interface ComputerUseCoveredArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A point in the overlay's own pixels, from its top-left corner, like the rim above. */
+export interface ComputerUseCursorPoint {
+  x: number;
+  y: number;
 }
 
 export type ExternalDestination =

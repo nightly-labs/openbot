@@ -8,7 +8,15 @@ describe("buildContentSecurityPolicy", () => {
     expect(policy).toContain(
       "connect-src 'self' openbot-attachment: openbot-remote-attachment: https://analytics.openbot.run ws://127.0.0.1:* wss://*.openbot.run",
     );
-    expect(policy).not.toContain("localhost");
+    expect(policy.split("; ").find((directive) => directive.startsWith("connect-src "))).not.toContain("localhost");
+  });
+
+  it.each([true, false])("allows loopback viewer frames when packaged=%s", (packaged) => {
+    const directives = buildContentSecurityPolicy(packaged).split("; ");
+    expect(directives.find((directive) => directive.startsWith("frame-src "))).toBe(
+      "frame-src 'self' openbot-attachment: openbot-remote-attachment: https://*.openbot.run http://127.0.0.1:* http://localhost:*",
+    );
+    expect(directives.find((directive) => directive.startsWith("script-src "))).toBe("script-src 'self'");
   });
 
   it("lets the renderer play an attachment recording, but only from the attachment schemes", () => {

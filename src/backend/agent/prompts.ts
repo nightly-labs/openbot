@@ -6,6 +6,7 @@ import type {
   AgentPromptResolution,
   RespondToBrowserTakeoverInput,
 } from "@openbot/contracts/ipc";
+import { COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
@@ -13,7 +14,6 @@ export const MCP_ELICITATION_DECISION_ID = "mcp-elicitation-decision";
 export const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 export const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 export const MCP_ELICITATION_DECLINE = "Don't allow";
-const COMPUTER_USE_SERVER = "computer-use";
 /** Field names a plugin uses for a credential. A match keeps the answer out of stored history. */
 const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
 
@@ -92,7 +92,7 @@ export function promptQuestions(params: unknown): AgentPromptQuestion[] {
 function elicitationConsentQuestion(params: unknown, serverName: string | null): AgentPromptQuestion | null {
   const message = getString(params, "message")?.trim();
   if (!message) return null;
-  const subject = serverName === COMPUTER_USE_SERVER ? "Computer Use" : (serverName ?? "this plugin");
+  const subject = serverName === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : (serverName ?? "this plugin");
   const persistence = getArray(getRecord(params, "_meta"), "persist").filter(isString);
   return {
     id: MCP_ELICITATION_DECISION_ID,

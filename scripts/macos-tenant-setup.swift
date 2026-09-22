@@ -256,7 +256,7 @@ enum TenantSetupCommand {
                     credentialFile: "/private/var/root/\(setup.credentialFilename)"))
                 FileHandle.standardOutput.write(data)
             } else {
-                print("Account setup complete. Log each user into a GUI session, then enroll them with the host installer.")
+                print("Account setup complete. Log each user into a GUI session, then enroll them with the host installer. In that account, open OpenBot → Server Settings → Remote desktop access. Grant Screen Recording and Accessibility, then select Check again. Use another computer to run Test remote desktop.")
             }
         } catch {
             // Directory-service errors can contain credential data. Never print the raw error.

@@ -251,9 +251,29 @@ find a probable install, but it then offers "Reinstall" and not a version.
 
 ### 3.3 Uninstall
 
-Uninstall removes the plugin's skills from that agent. It removes the app only when no other agent
-uses the plugin, and only after the user agrees. The app is host-global, so a silent removal would
-stop another agent from working.
+Uninstall removes the plugin's skills from the agent in the picker, and the plugin's apps from the
+host. Nothing is silent: the listing shows `Uninstall plugin` in the install button's place, and a
+confirmation names every app row and every skill slug that is about to go before any of them does.
+While only part of a plugin is here - one app saved before a later one failed, or one removal that
+failed - the page offers both: the install can finish the job, and what is here can still go.
+
+Built, in `SkillsMarketplaceModal.tsx`:
+
+- the plan is read from this computer, not from the listing. An app the host does not hold and a
+  skill the agent does not hold are not named and not removed;
+- a row is the plugin's only when its name and its address - or its command and words - are the
+  listing's. Names are unique on a host, so a server the user wrote by hand can hold a catalog name
+  while pointing elsewhere; that row is neither counted as installed nor removed;
+- the apps go first and the skills after, the reverse of the install order. The server stops
+  answering before the instructions that drive it are taken away;
+- every step is attempted even after one fails. What could be removed is removed, and the failures
+  are reported by name, so a partial cleanup is never silent;
+- an app row takes its sign-in with it. `AgentService.removeMcpServer` forgets the OAuth grant for
+  that URL, unless another row still names the same account.
+
+There is no per-agent record of which agent an app was installed for, so "remove the app only when
+no other agent uses the plugin" from the first design is not what ships. The host-global removal is
+stated in the confirmation instead. A receipt store (3.1) would allow the narrower rule later.
 
 ### 3.4 Known limits
 
@@ -403,7 +423,7 @@ mandatory.
 | `src/main/ipc/plugin-handlers.test.ts` | The sender check runs before the payload is read. A bad slug is refused. The pending link is given one time. |
 | `src/main/plugin-catalog-service.test.ts` | A 304 answer, a wrong hash, the offline fallback, the choice between the snapshot and the cache, and a part-completed install. |
 | `src/main/ipc-channel-coverage.test.ts` | Exists. It fails until the channels are in the contracts, the preload and the mock. |
-| `src/renderer/src/features/settings/SkillsMarketplaceModal.test.tsx` | A slug opens the Plugins tab and that listing, no install call is made, an unknown slug shows the `missing` state, and `Copy link` writes the canonical URL. |
+| `src/renderer/src/features/settings/SkillsMarketplaceModal.test.tsx` | A slug opens the Plugins tab and that listing, no install call is made, an unknown slug shows the `missing` state, and `Copy link` writes the canonical URL. For the uninstall: the confirmation names the app and the skill and removes neither, a confirmed uninstall removes the host row before the agent's skill, a cancel removes nothing, and a failed app removal still takes the skill, is reported, and still offers the uninstall, and a server that only shares the app's name is neither read as installed nor removable. |
 | `apps/auth-api/test/` page and metadata tests | The page shows the listing and both buttons. The canonical URL and the sitemap are correct. An unknown slug gives a 404. |
 
 ## 7. Open questions
@@ -446,8 +466,8 @@ Ordered by cost.
    listing counts as installed only when both halves are present. A skill installs by published
    version through the optional `versionId` on `skills.install`, which the main process routes to
    `installVersion`. A failure unwinds the skills this attempt installed, and writes no MCP record.
-   Uninstall is not built: the user removes the server in the MCP settings panel and the skill in
-   the agent's skills panel.
+   Uninstall is done as well: see 3.3. The MCP settings panel and the agent's skills panel still
+   remove one piece at a time, for a user who wants only one of them.
 8. ~~The deep-link router and the share link.~~ Done. `src/main/deep-link-router.ts` decides which
    kind an `openbot://` link is, `openbot://plugins/<slug>` opens that listing in the Plugins tab
    and installs nothing, and `openbot.run/plugins/<slug>` now answers, so the detail page offers

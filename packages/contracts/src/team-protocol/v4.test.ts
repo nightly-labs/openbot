@@ -26,6 +26,78 @@ import {
 } from "./v4-webrtc-adapter";
 
 describe("Team protocol v4", () => {
+  it("carries remote desktop setup and test results without changing released routes", () => {
+    const setup = {
+      platform: "darwin",
+      hostName: "Mac mini",
+      username: "tenant",
+      checkedAt: "2026-09-21T10:00:00.000Z",
+      screenRecording: "blocked",
+      accessibility: "allowed",
+      service: "allowed",
+      displays: "unavailable",
+      guiSession: "blocked",
+      restartRequired: false,
+      activeSessions: 0,
+      message: null,
+    };
+    const setupPath = TEAM_API_ROUTES.remoteScreen.setup;
+    const testPath = TEAM_API_ROUTES.remoteScreen.test;
+    expect(encodeTeamProtocolV4WebRtcHttpRequest("POST", setupPath, {})).toEqual({});
+    expect(
+      decodeTeamProtocolV4WebRtcHttpResponse(
+        "POST",
+        setupPath,
+        200,
+        encodeTeamProtocolV4WebRtcHttpResponse("POST", setupPath, 200, setup),
+      ),
+    ).toEqual(setup);
+    const test = { active: true, mouse: false, keyboard: false, code: "1234" };
+    expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, test))).toEqual(test);
+    expect(
+      decodeTeamProtocolV4CurrentHttpRequest("POST", testPath, { sessionId: "session-1", action: "start" }),
+    ).toEqual({ sessionId: "session-1", action: "start" });
+    expect(() =>
+      decodeTeamProtocolV4CurrentHttpRequest("POST", testPath, { sessionId: "session-1", action: "approve" }),
+    ).toThrow();
+    expect(() => decodeTeamProtocolV4CurrentHttpRequest("POST", setupPath, { username: "other-user" })).toThrow();
+    expect(() =>
+      decodeTeamProtocolV4CurrentHttpResponse("POST", setupPath, 200, { ...setup, accessibility: true }),
+    ).toThrow();
+    expect(() =>
+      decodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, { ...test, keyboard: "yes" }),
+    ).toThrow();
+    // Neither transport may publish new IPC fields or accept them as wire fields.
+    for (const [path, payload] of [
+      [setupPath, setup],
+      [testPath, test],
+    ] as const) {
+      const extended = { ...payload, internalDetail: { secret: "host-only" } };
+      expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, extended))).toEqual(payload);
+      expect(decodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, extended)).toEqual(payload);
+      expect(encodeTeamProtocolV4WebRtcHttpResponse("POST", path, 200, extended)).toEqual(payload);
+      expect(decodeTeamProtocolV4WebRtcHttpResponse("POST", path, 200, extended)).toEqual(payload);
+    }
+    for (const invalid of [
+      { platform: "future-os" },
+      { screenRecording: "future-state" },
+      { accessibility: "future-state" },
+      { service: "future-state" },
+      { displays: "future-state" },
+      { guiSession: "future-state" },
+      { activeSessions: -1 },
+      { activeSessions: 0.5 },
+      { checkedAt: "not-a-date" },
+      { hostName: "x".repeat(256) },
+      { username: "x".repeat(256) },
+      { message: "x".repeat(1001) },
+    ]) {
+      expect(() => decodeTeamProtocolV4CurrentHttpResponse("POST", setupPath, 200, { ...setup, ...invalid })).toThrow();
+    }
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, { ...test, code: "12345" })).toThrow();
+    expect(() => decodeTeamProtocolV3CurrentHttpResponse("POST", setupPath, 200, setup)).toThrow();
+  });
+
   it("round-trips OpenCode agent and model selection without widening v3", () => {
     expect(decodeTeamProtocolV4CurrentHttpRequest("PATCH", "/v1/agents/agent-opencode", request)).toEqual(request);
     expect(encodeTeamProtocolV4WebRtcHttpRequest("PATCH", "/v1/agents/agent-opencode", request)).toEqual(request);

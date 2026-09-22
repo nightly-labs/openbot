@@ -155,7 +155,8 @@ export type TeamApiRemoteScreen = Pick<
   | "closeMemberSession"
   | "revokeTeamSession"
   | "revokeMember"
->;
+> &
+  Partial<Pick<RemoteScreenGateway, "checkSetup" | "test">>;
 
 export interface TeamApiOptions {
   channels?: ChannelService;
