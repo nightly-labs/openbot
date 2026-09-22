@@ -883,12 +883,23 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           currentAnswer = null;
         }
         if (!current) continue;
+        /* One message can hold text on both sides of its thinking, and only what follows can be
+           the answer. The live turn splits it there, so restoring has to split it the same way. */
+        const beforeThinking = thinking ? textBeforeThinking(message.message) : "";
         if (thinking) {
           /* Thinking closes the step for a live turn, so it has to close it here as well. A turn
              that stopped while thinking otherwise keeps the text that led to it as the answer. */
           if (currentAnswer) {
             currentAnswer.phase = "commentary";
             currentAnswer = null;
+          }
+          if (beforeThinking) {
+            current.items?.push({
+              id: `${message.uuid}:narration`,
+              type: "agentMessage",
+              phase: "commentary",
+              text: beforeThinking,
+            });
           }
           if (currentThinking) {
             currentThinking.text = `${currentThinking.text ?? ""}\n${thinking}`;
@@ -902,9 +913,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             current.items?.push(currentThinking);
           }
         }
-        if (text) {
+        const answerText = text.slice(beforeThinking.length);
+        if (answerText) {
           if (currentAnswer) currentAnswer.phase = "commentary";
-          currentAnswer = { id: message.uuid, type: "agentMessage", text };
+          currentAnswer = { id: message.uuid, type: "agentMessage", text: answerText };
           current.items?.push(currentAnswer);
         }
         /* A tool call closes the step here too, including one the same message introduced. Without

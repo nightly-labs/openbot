@@ -1037,6 +1037,47 @@ fi
     await client.stop();
   });
 
+  it("restores text a message placed before its thinking as commentary", async () => {
+    const turnId = "18181818-1818-4181-8181-181818181818";
+    const history: SessionMessage[] = [];
+    const { client, threadId } = await createHarness(history);
+    history.push(
+      {
+        type: "user",
+        uuid: turnId,
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: "Weigh it." },
+      },
+      {
+        type: "assistant",
+        uuid: "whole-message",
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: {
+          content: [
+            { type: "text", text: "Let me weigh it." },
+            { type: "thinking", thinking: "Weighing it." },
+            { type: "text", text: "Done." },
+          ],
+        },
+      },
+    );
+
+    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
+    expect(items.filter((item) => item.type === "agentMessage" && !item.phase).map((item) => item.text)).toEqual([
+      "Done.",
+    ]);
+    expect(items.filter((item) => item.phase === "commentary").map((item) => item.text)).toEqual([
+      "Let me weigh it.\n",
+      "Weighing it.",
+    ]);
+    await client.stop();
+  });
+
   it("restores a turn whose last text gave way to thinking as commentary", async () => {
     const turnId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
     const history: SessionMessage[] = [];
