@@ -405,12 +405,11 @@ describe("OpenBot connected desktop shell", () => {
       expect.objectContaining({ type: "pointer", action: "down", x: 0.5, y: 0.5 }),
     );
 
-    // The top bar is not the top of the page: every point above the band clamps to its first row.
+    // The top bar is not the top of the page. A point there placed on the frame's first row would
+    // work whatever control the page keeps at the top, which is not what the user pointed at.
     vi.mocked(window.openbot.browser.sendLiveViewInput).mockClear();
     await fireEvent.mouseDown(view, { clientX: 190, clientY: 10, button: 0, detail: 1 });
-    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "pointer", action: "down", x: 0.5, y: 0 }),
-    );
+    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalled();
   });
 
   it("holds a click back until a frame is drawn on the live view", async () => {
@@ -440,7 +439,7 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
-  it("keeps a click on the drawn frame while a resized frame is still decoding", async () => {
+  it("sends no click while a frame of a new shape is still decoding", async () => {
     listHostThatStreamsItsBrowser();
     const tab = browserTab("remote-live-tab", "Remote live page");
     const { drawn, decodes, holdDecodes } = stubCanvasDrawing();
@@ -456,9 +455,9 @@ describe("OpenBot connected desktop shell", () => {
     view.getBoundingClientRect = () => domRect(0, 0, 400, 400);
 
     // The host's viewport changed shape, so the next frame is 400x800 where the drawn one is 800x600.
-    // Until it is painted the panel still shows the wide frame in a 400x300 band with 50 bars, and
-    // the tall frame's own geometry would call this point (0, 0.3125) - a different place on a page
-    // the user cannot see yet.
+    // The panel still shows the wide frame, but the host expands a fraction with the frame it sent
+    // last, so the drawn frame's (0.25, 0.25) would land where the tall frame's (0, 0.3125) is. The
+    // two sides name the same place again once the new frame is drawn.
     const decode = holdDecodes();
     // A screencast repeats the page until something changes, and the view drops a frame that arrives
     // while another one decodes. Offer the resized frame until it is the one being decoded; the hold
@@ -469,10 +468,15 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
-    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "pointer", action: "down", x: 0.25, y: 0.25 }),
-    );
+    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalled();
+
+    // The new frame is drawn, so the panel and the host agree on the page again.
     decode();
+    await vi.waitFor(() => expect(drawn).toHaveBeenCalledTimes(2));
+    await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pointer", action: "down", x: 0, y: 0.3125 }),
+    );
   });
 
   it("throws away a frame that finishes decoding after the live view stops", async () => {

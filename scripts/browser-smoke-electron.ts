@@ -518,30 +518,37 @@ async function main(): Promise<void> {
       ref: input.ref,
       text: "runs locally",
     });
+    // A mouse event needs the view to be drawing; a key event does not. Under a virtual display the
+    // view can still have no frame on screen here, and Chromium then drops every mouse event with no
+    // trace at all - the page records no pointer event and the click looks like a broken pipeline.
+    // An animation frame only runs while the page is being rendered, so waiting for one says the
+    // click has somewhere to land. Keys are already proven by the typing above.
+    const pageContents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
+    if (!pageContents) throw new Error("The local tab's web contents were not available.");
+    await waitFor(
+      () =>
+        Promise.race([
+          pageContents.executeJavaScript("new Promise((resolve) => requestAnimationFrame(() => resolve(true)))"),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 250)),
+        ]),
+      "the local tab to draw a frame",
+    );
+
+    const currentSave = typed.elements.find((element) => element.name === "Save");
+    if (!currentSave) throw new Error("Save control disappeared after typing.");
+    await browser.act(tab.id, typed.revision, { type: "click", ref: currentSave.ref });
     // A native click travels the input pipeline, not the snapshot channel, so the page can still be
     // running the handler when the act call returns. Wait for the text the handler writes; a click
-    // that was not native never writes it, so the check keeps its meaning.
-    //
-    // The pipeline can also swallow the first click outright: on a fresh view under a virtual
-    // display the page has recorded no pointer event at all when this fails. Click again while the
-    // deadline lasts rather than call a lost input a broken one. The page records the click as a
-    // flag, so an extra one says the same thing.
-    const clickDeadline = Date.now() + 15_000;
-    let result = typed;
+    // that was not native never writes it, so the check keeps its meaning. One click has to be
+    // enough: a view that loses the first one loses a user's first one too.
+    const clickDeadline = Date.now() + 5_000;
+    let result = await browser.snapshot(tab.id);
     while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < clickDeadline) {
-      const currentSave = result.elements.find((element) => element.name === "Save");
-      if (!currentSave) throw new Error("Save control disappeared after typing.");
-      await browser.act(tab.id, result.revision, { type: "click", ref: currentSave.ref });
-      const settleDeadline = Date.now() + 2_000;
+      await new Promise((resolve) => setTimeout(resolve, 50));
       result = await browser.snapshot(tab.id);
-      while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < settleDeadline) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        result = await browser.snapshot(tab.id);
-      }
     }
     if (!result.text.includes("runs locally|input:true|click:true")) {
-      const contents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
-      const pointerEvents = await contents?.executeJavaScript("JSON.stringify(window.smokePointerEvents)");
+      const pointerEvents = await pageContents.executeJavaScript("JSON.stringify(window.smokePointerEvents)");
       throw new Error(`Browser input was not native: ${result.text}; pointer events: ${pointerEvents}`);
     }
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");

@@ -37,6 +37,8 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
    */
   const [frameSize, setFrameSize] = createSignal<{ width: number; height: number }>();
   let pendingFrame: Promise<void> | undefined;
+  /** The newest frame's shape, drawn or not. The host expands a fraction with this one. */
+  let hostSize: { width: number; height: number } | undefined;
   /** Which stream the frames belong to. Another tab, or the same tab again, is a new one. */
   let stream = 0;
 
@@ -49,6 +51,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   const abandonStream = () => {
     stream += 1;
     pendingFrame = undefined;
+    hostSize = undefined;
     setFrameSize(undefined);
   };
 
@@ -79,14 +82,18 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       return;
     }
     if (!state.live) setState(() => ({ live: true, message: "" }));
+    hostSize = { width: event.width, height: event.height };
     // One frame decodes at a time. The next frame is the page as it is now, so a frame that arrives
     // while one is decoding is dropped rather than queued behind it.
     if (pendingFrame) return;
-    pendingFrame = draw(event)
+    // An abandoned stream leaves its decode running, so only the promise that is still the pending
+    // one may clear it. The old decode finishing must not let a second frame of the new stream in.
+    const frame: Promise<void> = draw(event)
       .catch(() => undefined)
       .finally(() => {
-        pendingFrame = undefined;
+        if (pendingFrame === frame) pendingFrame = undefined;
       });
+    pendingFrame = frame;
   });
   onCleanup(stopListening);
 
@@ -113,19 +120,26 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
    * letterboxed inside it - a wide page in a narrow panel is a band with most of the panel above and
    * below it. A fraction of the canvas box would put every click that many bars away from the point
    * the user aimed at.
+   *
+   * Null means there is no point to send. The bars are not the page, and a point on one clamped to
+   * the edge of the frame would work the first or last row of a page the user never pointed at. A
+   * frame of a new shape that has not been drawn yet is the same answer for the other side: the host
+   * expands a fraction with the newest frame it sent, so until that frame is the drawn one the two
+   * sides would name different places.
    */
   const point = (event: MouseEvent): { x: number; y: number } | null => {
     const bounds = canvas()?.getBoundingClientRect();
     const size = frameSize();
     if (!bounds || !size || bounds.width === 0 || bounds.height === 0) return null;
     if (size.width === 0 || size.height === 0) return null;
+    if (hostSize?.width !== size.width || hostSize.height !== size.height) return null;
     const scale = Math.min(bounds.width / size.width, bounds.height / size.height);
     const width = size.width * scale;
     const height = size.height * scale;
-    return {
-      x: clampFraction((event.clientX - bounds.left - (bounds.width - width) / 2) / width),
-      y: clampFraction((event.clientY - bounds.top - (bounds.height - height) / 2) / height),
-    };
+    const x = (event.clientX - bounds.left - (bounds.width - width) / 2) / width;
+    const y = (event.clientY - bounds.top - (bounds.height - height) / 2) / height;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+    return { x, y };
   };
 
   const pointer = (event: MouseEvent, action: "move" | "down" | "up") => {
@@ -195,10 +209,6 @@ function modifiers(event: MouseEvent | KeyboardEvent): number {
   return (
     (event.altKey ? ALT : 0) + (event.ctrlKey ? CONTROL : 0) + (event.metaKey ? META : 0) + (event.shiftKey ? SHIFT : 0)
   );
-}
-
-function clampFraction(value: number): number {
-  return Math.min(Math.max(value, 0), 1);
 }
 
 function errorMessage(error: unknown): string {
