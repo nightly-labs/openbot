@@ -195,12 +195,19 @@ export class BrowserViewGateway {
       return;
     }
     // Input that arrives before the first frame has no frame to be a fraction of.
-    if (input.type === "pointer" && (session.frameWidth === 0 || session.frameHeight === 0)) return;
-    // A client from before the sequence field, or one naming a frame too old to be remembered, gets
-    // the newest frame: that is what every client got before a point could name its own frame.
-    const frame = (input.type === "pointer" && input.sequence !== undefined
-      ? session.frameSizes.get(input.sequence)
-      : undefined) ?? { width: session.frameWidth, height: session.frameHeight };
+    let frame = { width: session.frameWidth, height: session.frameHeight };
+    if (input.type === "pointer") {
+      if (frame.width === 0 || frame.height === 0) return;
+      // A client from before the sequence field names no frame and gets the newest one: that is
+      // what every client got before a point could name its own. A named frame that has aged out of
+      // the remembered window is not that client. Expanding it with a newer size clicks a page the
+      // user was not looking at, so the point is dropped.
+      if (input.sequence !== undefined) {
+        const named = session.frameSizes.get(input.sequence);
+        if (!named) return;
+        frame = named;
+      }
+    }
     // The sequence names a frame on this socket. The page is dispatched pixels, and knows nothing
     // about how they were carried here.
     const dispatched =

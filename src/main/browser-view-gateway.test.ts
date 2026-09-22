@@ -178,6 +178,57 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
+  it("drops a point that names a frame the host no longer remembers", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    // Eight newer frames is the whole window, so the frame the member is still looking at is gone.
+    for (let sequence = 2; sequence <= 9; sequence += 1) {
+      send?.({ sequence, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    }
+    await vi.waitFor(() => expect(frames).toHaveLength(9));
+
+    const point = {
+      type: "pointer" as const,
+      action: "down" as const,
+      x: 0.5,
+      y: 0.25,
+      button: "left" as const,
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    // The frame still on screen. Its arrival is the barrier: the forgotten point would already
+    // have been dispatched ahead of it, at (200, 75) if it had been expanded with the newest size.
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 9 }));
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 200, y: 75 })]));
+    socket.close();
+    await gateway.stop();
+  });
+
   it("closes invalidated views and rejects reuse of their session", async () => {
     let invalidate: (() => void) | undefined;
     const stop = vi.fn(async () => undefined);
