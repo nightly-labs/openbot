@@ -888,6 +888,101 @@ fi
     await client.stop();
   });
 
+  it("corrects narration a thinking boundary already published", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    await startTurn(client, threadId, turnId);
+
+    // Thinking closes the step while the message carrying the text is still arriving.
+    output.push(streamDelta(threadId, turnId, "Pln."));
+    output.push(thinkingStreamDelta(threadId, "phase-1", "Weighing it."));
+    output.push(assistantMessage(threadId, "narration-message", "Plan."));
+    output.push(assistantMessage(threadId, "answer-message", "Done."));
+    output.push(resultMessage(threadId, turnId, "Plan.Done."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications).at(-1)).toBe("Plan.");
+    expect(answerText(notifications)).toBe("Done.");
+    await client.stop();
+  });
+
+  it("corrects published narration without taking the answer into it", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "12121212-1212-4121-8121-121212121212";
+    await startTurn(client, threadId, turnId);
+
+    // The answer streams before the message that puts the published narration right.
+    output.push(streamDelta(threadId, turnId, "Pln."));
+    output.push(thinkingStreamDelta(threadId, "phase-1", "Weighing it."));
+    output.push(streamDelta(threadId, turnId, "Done."));
+    output.push(assistantMessage(threadId, "whole-message", "Plan.Done."));
+    output.push(resultMessage(threadId, turnId, "Plan.Done."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications).at(-1)).toBe("Plan.");
+    expect(answerText(notifications)).toBe("Done.");
+    await client.stop();
+  });
+
+  it("does not repeat the answer when the correction arrives in its own message", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "13131313-1313-4131-8131-131313131313";
+    await startTurn(client, threadId, turnId);
+
+    output.push(streamDelta(threadId, turnId, "Pln."));
+    output.push(thinkingStreamDelta(threadId, "phase-1", "Weighing it."));
+    output.push(streamDelta(threadId, turnId, "Done."));
+    // The narration and the answer are confirmed one message at a time, correction first.
+    output.push(assistantMessage(threadId, "narration-message", "Plan."));
+    output.push(assistantMessage(threadId, "answer-message", "Done."));
+    output.push(resultMessage(threadId, turnId, "Plan.Done."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications).at(-1)).toBe("Plan.");
+    expect(answerText(notifications)).toBe("Done.");
+    await client.stop();
+  });
+
+  it("restores a turn whose last text gave way to thinking as commentary", async () => {
+    const turnId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    const history: SessionMessage[] = [];
+    const { client, threadId } = await createHarness(history);
+    history.push(
+      {
+        type: "user",
+        uuid: turnId,
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: "Plan the work." },
+      },
+      {
+        type: "assistant",
+        uuid: "restored-narration",
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "text", text: "Plan." }] },
+      },
+      // The turn stopped while thinking, so no later text proves the narration was not the answer.
+      {
+        type: "assistant",
+        uuid: "restored-thinking",
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "thinking", thinking: "Weighing it." }] },
+      },
+    );
+
+    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
+    expect(items.filter((item) => item.id === "restored-narration").map((item) => [item.id, item.phase])).toEqual([
+      ["restored-narration", "commentary"],
+    ]);
+    await client.stop();
+  });
+
   it("corrects narration before publishing it, so the answer still lands", async () => {
     const { client, notifications, output, threadId } = await createHarness();
     const turnId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";

@@ -74,6 +74,8 @@ interface ActiveTurn {
   seenText: string;
   /** What the narration already took, which the answer can no longer be rewritten over. */
   publishedText: string;
+  /** The segment published last, which a message contradicting it can still put right. */
+  lastNarration: { id: string; text: string } | null;
   narrationCount: number;
   thinking: string;
   thinkingStarted: boolean;
@@ -502,6 +504,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       text: "",
       seenText: "",
       publishedText: "",
+      lastNarration: null,
       narrationCount: 0,
       thinking: "",
       thinkingStarted: false,
@@ -727,28 +730,61 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       this.#bufferText(runtime, completeText.slice(turn.seenText.length));
       return;
     }
-    if (completeText.length === 0 || !completeText.startsWith(turn.publishedText)) return;
-    turn.text = completeText.slice(turn.publishedText.length);
+    if (completeText.length === 0) return;
+    if (completeText.startsWith(turn.publishedText)) {
+      turn.text = completeText.slice(turn.publishedText.length);
+      turn.seenText = completeText;
+      return;
+    }
+    this.#correctNarration(runtime, completeText);
+  }
+
+  /**
+   * Put right the narration a boundary published before any message stood behind it.
+   *
+   * Thinking closes a step while the message carrying the text is still arriving, so the only text
+   * there is to publish is what the deltas gave. When the message then disagrees, the published
+   * segment is republished under its own ID rather than left to strand every later comparison
+   * behind words Claude never sent. Text already held for the answer is not taken into it.
+   */
+  #correctNarration(runtime: ThreadRuntime, completeText: string): void {
+    const turn = runtime.activeTurn;
+    const last = turn?.lastNarration;
+    if (!turn || !last) return;
+    const prefix = turn.publishedText.slice(0, turn.publishedText.length - last.text.length);
+    if (!completeText.startsWith(prefix)) return;
+    const heldBack = turn.text.length > 0 && completeText.endsWith(turn.text) ? turn.text.length : 0;
+    const corrected = completeText.slice(prefix.length, completeText.length - heldBack);
+    if (!corrected || corrected === last.text) return;
+    last.text = corrected;
+    turn.publishedText = `${prefix}${corrected}`;
+    // Whatever the correction did not take is the answer's again, so the two stay in step.
+    turn.text = completeText.slice(prefix.length + corrected.length);
     turn.seenText = completeText;
+    this.emit("notification", {
+      method: "item/completed",
+      params: {
+        threadId: runtime.id,
+        turnId: turn.id,
+        item: { id: last.id, type: "agentMessage", phase: "commentary", text: corrected },
+      },
+    });
   }
 
   /** Publish held text as the thinking disclosure, which is what a step boundary proves it was. */
   #flushNarration(runtime: ThreadRuntime): void {
     const turn = runtime.activeTurn;
     if (!turn?.text) return;
+    const id = `${turn.id}:narration:${turn.narrationCount}`;
     this.emit("notification", {
       method: "item/completed",
       params: {
         threadId: runtime.id,
         turnId: turn.id,
-        item: {
-          id: `${turn.id}:narration:${turn.narrationCount}`,
-          type: "agentMessage",
-          phase: "commentary",
-          text: turn.text,
-        },
+        item: { id, type: "agentMessage", phase: "commentary", text: turn.text },
       },
     });
+    turn.lastNarration = { id, text: turn.text };
     turn.narrationCount += 1;
     turn.publishedText += turn.text;
     turn.text = "";
@@ -833,6 +869,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         }
         if (!current) continue;
         if (thinking) {
+          /* Thinking closes the step for a live turn, so it has to close it here as well. A turn
+             that stopped while thinking otherwise keeps the text that led to it as the answer. */
+          if (currentAnswer) {
+            currentAnswer.phase = "commentary";
+            currentAnswer = null;
+          }
           if (currentThinking) {
             currentThinking.text = `${currentThinking.text ?? ""}\n${thinking}`;
           } else {
