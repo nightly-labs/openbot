@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   BROWSER_VIEW_MAX_FRAME_BYTES,
   type BrowserViewInput,
+  browserViewInputForHost,
   decodeBrowserViewFrame,
   decodeBrowserViewInput,
   encodeBrowserViewFrame,
   encodeBrowserViewInput,
+  TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "./browser-view-v1";
+import { TEAM_CURRENT_CAPABILITIES } from "./current";
 
 describe("the browser view wire format", () => {
   it("carries a frame with the size the coordinates are a fraction of", () => {
@@ -69,6 +72,26 @@ describe("the browser view wire format", () => {
     const { sequence: _sequence, ...beforeTheField } = click;
     expect(decodeBrowserViewInput(JSON.stringify(beforeTheField))).toEqual(beforeTheField);
     expect(decodeBrowserViewInput(JSON.stringify(beforeTheField))).not.toHaveProperty("sequence");
+  });
+
+  it("omits the frame name for a host that does not advertise it", () => {
+    const click: BrowserViewInput = {
+      type: "pointer",
+      action: "down",
+      x: 0.25,
+      y: 0.5,
+      sequence: 7,
+      button: "left",
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY);
+    expect(browserViewInputForHost(click, true)).toEqual(click);
+    const released = browserViewInputForHost(click, false);
+    expect(released).not.toHaveProperty("sequence");
+    expect(JSON.parse(encodeBrowserViewInput(released))).not.toHaveProperty("sequence");
   });
 
   it("refuses input that a host would dispatch somewhere it cannot see", () => {

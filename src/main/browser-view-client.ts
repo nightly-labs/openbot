@@ -7,9 +7,11 @@
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
   type BrowserViewInput,
+  browserViewInputForHost,
   decodeBrowserViewFrame,
   encodeBrowserViewInput,
   TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { RemoteServerManager } from "./remote-server-manager";
 
@@ -76,7 +78,12 @@ export class BrowserViewClient {
   sendInput(input: BrowserViewInput): void {
     const view = this.#view;
     if (!view || view.socket.readyState !== WebSocket.OPEN) return;
-    view.socket.send(encodeBrowserViewInput(input));
+    // An older host drops an unknown sequence and would expand the point with a newer frame.
+    const namesFrames = this.#options.servers.supportsCapability(
+      view.serverId,
+      TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+    );
+    view.socket.send(encodeBrowserViewInput(browserViewInputForHost(input, namesFrames)));
   }
 
   #queue<T>(operation: () => Promise<T>): Promise<T> {

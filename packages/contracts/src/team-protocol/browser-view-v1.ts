@@ -18,6 +18,12 @@ import { isBoundedString, isIdentifier } from "../ipc-bounded-values";
 import { isDynamicRecord, isNumber, isString } from "../runtime-values";
 
 export const TEAM_BROWSER_VIEW_CAPABILITY = "browser-view";
+/**
+ * A host that expands a pointer fraction against the frame the point names. Older hosts drop an
+ * unknown `sequence` and expand with the newest frame, so a client sends the field only when the
+ * host advertises this.
+ */
+export const TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY = "browser-view-frame-point";
 
 /** A frame is one JPEG. The cap is generous for a photograph and refuses a stream that is not one. */
 export const BROWSER_VIEW_MAX_FRAME_BYTES = 2 * 1024 * 1024;
@@ -51,9 +57,9 @@ export type BrowserViewInput =
       x: number;
       y: number;
       /**
-       * The frame the fraction is a fraction of, when the client knows it. Optional because it was
-       * added after this protocol shipped: a client that omits it gets the newest frame the host
-       * sent, which is what every client used to get.
+       * The frame the fraction is a fraction of. Sent only to a host that advertises
+       * `browser-view-frame-point`. A client that omits it, including every client from before
+       * this field, gets the newest frame the host sent.
        */
       sequence?: number;
       button: "left" | "middle" | "right";
@@ -134,6 +140,16 @@ export function decodeBrowserViewFrame(data: Uint8Array): BrowserViewFrame {
 
 export function encodeBrowserViewInput(input: BrowserViewInput): string {
   return JSON.stringify(input);
+}
+
+/**
+ * The pointer a host of this capability is sent. A host that does not name frames still accepts
+ * the released payload, and it expands every point with its newest frame.
+ */
+export function browserViewInputForHost(input: BrowserViewInput, namesFrames: boolean): BrowserViewInput {
+  if (input.type !== "pointer" || input.sequence === undefined || namesFrames) return input;
+  const { sequence: _sequence, ...released } = input;
+  return released;
 }
 
 /**
