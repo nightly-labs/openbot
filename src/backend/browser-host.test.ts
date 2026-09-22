@@ -373,6 +373,34 @@ describe("browser auth popups", () => {
     expect(host.activeTabId).toBe(opener.id);
   });
 
+  it("requires takeover for connected tabs even after the popup closes", async () => {
+    const { opener, outcome } = await popupRequest();
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", { value: {} });
+    outcome.createWindow?.({ webContents: native });
+    const popup = host.listTabs().find((tab) => tab.openerTabId === opener.id);
+    if (!popup) throw new Error("Missing popup.");
+    const prepare = (tabId: string) =>
+      host.prepareSecret({
+        namespace: "openbot_browser",
+        tool: "submit_secret",
+        threadId: "thread-a",
+        ownerAgentId: "agent-a",
+        turnId: "turn",
+        callId: "secret",
+        arguments: { tabId, method: "password", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
+      });
+    await expect(prepare(popup.id)).rejects.toThrow("Use takeover");
+    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    await host.close(popup.id);
+    await host.reload(opener.id);
+    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    expect(secretEntry).not.toHaveBeenCalled();
+    const independent = await host.open("https://example.com/independent-secret", "thread-a", "agent-a");
+    const prepared = await prepare(independent.id);
+    prepared.cancel();
+  });
+
   it("keeps independent tabs when the opener closes and cleans up dependent popups", async () => {
     const { opener, outcome } = await popupRequest();
     const native = new WebContentsView().webContents;

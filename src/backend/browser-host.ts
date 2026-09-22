@@ -143,6 +143,8 @@ interface InternalTab {
   contents: WebContents;
   requestedUrl: string;
   openerTabId?: string;
+  /** Retained document references can outlive popup closure and navigation. */
+  hasSharedBrowsingContext?: boolean;
   popup: boolean;
   popupFailure?: BrowserTab["popupFailure"];
   closing?: boolean;
@@ -522,6 +524,8 @@ export class BrowserHost {
     this.#requireToolTab(params, args.tabId);
     const tab = this.#requireTab(args.tabId);
     if (tab.secret) throw new Error("Authentication is already active.");
+    if (tab.hasSharedBrowsingContext)
+      throw new Error("Secure input is unavailable in tabs with shared popup contexts. Use takeover.");
     const url = new URL(currentTabUrl(tab));
     if (url.protocol !== "https:") throw new Error("Secure authentication requires HTTPS.");
     if (args.method !== "password" && args.digits === 0) throw new Error("Authentication codes require 4–12 digits.");
@@ -1471,7 +1475,11 @@ export class BrowserHost {
             options,
           );
           // Chromium exposes no opener for noopener/noreferrer requests.
-          if (options.webContents?.opener) popup.openerTabId = tab.id;
+          if (options.webContents?.opener) {
+            popup.openerTabId = tab.id;
+            popup.hasSharedBrowsingContext = true;
+            tab.hasSharedBrowsingContext = true;
+          }
           this.#tabs.set(popup.id, popup);
           this.#bindTabEvents(popup);
           tab.popupFailure = undefined;
