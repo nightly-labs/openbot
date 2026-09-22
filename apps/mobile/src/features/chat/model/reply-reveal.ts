@@ -51,8 +51,10 @@ export function createReplyReveal(tokens: Token[]) {
             rows.push(cells(row));
           }
           result.push({ ...token, header, rows });
-        } else if (token.type === "agentMention") {
-          if (collect) words.push(token.raw);
+        } else if (token.type === "agentMention" || token.type === "code") {
+          // Code uses StreamingBlock's entrance. Keep its source intact so Copy
+          // never receives a prefix produced only by the playback animation.
+          if (collect) words.push(token.type === "code" ? token.text : token.raw);
           remaining -= 1;
           result.push(token);
         } else if (hasChildren(token)) {

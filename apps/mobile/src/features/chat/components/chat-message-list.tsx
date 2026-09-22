@@ -3,6 +3,7 @@ import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
 import {
+  type ComponentProps,
   createContext,
   forwardRef,
   type PropsWithChildren,
@@ -13,15 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  AccessibilityInfo,
-  type CellRendererProps,
-  FlatList,
-  Pressable,
-  type StyleProp,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { AccessibilityInfo, type CellRendererProps, FlatList, Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
@@ -108,7 +101,7 @@ function ChatBubble({
   agent,
   className,
   style,
-}: PropsWithChildren<{ agent: boolean; className: string; style: StyleProp<ViewStyle> }>) {
+}: PropsWithChildren<{ agent: boolean; className: string; style: ComponentProps<typeof Animated.View>["style"] }>) {
   const size = useSharedValue({ width: 0, height: 0 });
   const background = useAnimatedStyle(() => ({
     width: withTiming(size.get().width, REPLY_SIZE),

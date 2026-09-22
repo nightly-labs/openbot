@@ -48,6 +48,20 @@ it("keeps formatting and link destinations from the completed document", () => {
   });
 });
 
+it.each([
+  "```sh\nprintf '%s\\n' hello\nprintf '%s\\n' world\n```\n\nNext paragraph.",
+  "    printf '%s\\n' hello\n    printf '%s\\n' world\n\nNext paragraph.",
+])("keeps code complete for copying from the first visible playback step: %s", (body) => {
+  const tokens = parseChatMarkdown(body);
+  const code = tokens[0];
+  if (code.type !== "code") throw new Error("Expected a code block");
+  const plan = createReplyReveal(tokens);
+  expect(plan.at(0)).toEqual([]);
+  expect(plan.at(1)).toEqual([code]);
+  expect(plan.at(1)[0]).toMatchObject({ text: "printf '%s\\n' hello\nprintf '%s\\n' world" });
+  expect(plan.words).toEqual([code.text, "Next ", "paragraph."]);
+});
+
 it("gives punctuation and longer words distinct rhythm and accents", () => {
   expect(["One", "two", "extraordinary", "done."].map(replyWordFeedback)).toEqual([
     "soft",
