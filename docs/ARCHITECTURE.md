@@ -115,6 +115,12 @@ JavaScript relationship after an app restart.
 Agents use `list_tabs` after sign-in actions and inspect the new tab before continuing. Secure input
 and takeover still handle passwords, codes, CAPTCHA, and passkeys. Blocked requests produce a
 reason without including authentication URLs or request data.
+Agent instructions keep the viewport stable during sign-in and require fresh targets after page
+changes or covered-target errors. X Google sign-in starts on the landing page after cookie consent.
+X can retain a Google callback for a removed login dialog and report `Input2SSO: Unsupported provider`.
+For that error in the current attempt, agents may reload the signed-out landing page and retry once,
+then verify authenticated navigation. This recovery does not run during secure handoff or discard
+non-login work. The host does not rewrite site scripts or weaken cross-origin security policies.
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
