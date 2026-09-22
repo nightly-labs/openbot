@@ -265,7 +265,9 @@ jobs:
           # shorter one, which is how a Markdown example of a fenced block is written. A plain
           # toggle let the inner ``` of a ````-quoted example end the exclusion, and the
           # directive below it went back to being a request. Intervals like `{3,}` are avoided
-          # because not every awk on a runner has them.
+          # because not every awk on a runner has them. Only an opening fence carries an info
+          # string, so a ```bash line inside a ```markdown block is content and does not end
+          # it — a suffix on a closing fence used to release the lines under it.
           prose() {
             awk '
               {
@@ -276,8 +278,10 @@ jobs:
                   len = 0
                   while (substr(marker, len + 1, 1) == char) len++
                   if (len >= 3) {
+                    rest = substr(marker, len + 1)
+                    sub(/[[:space:]]+$/, "", rest)
                     if (!fenced) { fenced = 1; fence_char = char; fence_len = len }
-                    else if (char == fence_char && len >= fence_len) { fenced = 0 }
+                    else if (char == fence_char && len >= fence_len && rest == "") { fenced = 0 }
                     next
                   }
                 }

@@ -239,6 +239,31 @@ describe("NorbiAI reviewer selection", () => {
     expect(model).toBe("chatgpt-web/medium");
   });
 
+  // Only an opening fence carries an info string. Closing on any suffix let the ```bash line
+  // of a ```markdown example end the block, and the lines under it went back to being read.
+  it("does not treat a fence with an info string as a closing fence", () => {
+    const { model } = resolve({
+      description: [
+        "<!-- NorbiAI-Model: chatgpt-web/medium -->",
+        "",
+        "```markdown",
+        "```bash",
+        "NorbiAI-Model: gpt-6-astra",
+        "```",
+      ].join("\n"),
+    });
+
+    expect(model).toBe("chatgpt-web/medium");
+  });
+
+  it("still closes a block on a fence padded with spaces", () => {
+    const { model } = resolve({
+      description: ["```", "NorbiAI-Model: gpt-6-astra", "```   ", "NorbiAI-Model: chatgpt-web/medium"].join("\n"),
+    });
+
+    expect(model).toBe("chatgpt-web/medium");
+  });
+
   // The published review says what ran. Naming an effort beside a chatgpt-web slug described
   // a setting that model never read, and a reader asking why a review was shallow would have
   // blamed the wrong knob.
