@@ -86,7 +86,12 @@ export const BROWSER_TOOL_DEFINITIONS = [
     description: "Open an HTTP(S) URL in a new persistent private-browser tab.",
     shape: { url: requiredString(INPUT_LIMITS.browserUrl) },
   }),
-  browserTool({ name: "list_tabs", description: "List browser tabs owned by this agent.", shape: {} }),
+  browserTool({
+    name: "list_tabs",
+    description:
+      "List browser tabs owned by this agent, including popup openerTabId and blocked-popup feedback. After a sign-in click, check for a new tab, take a fresh snapshot there, and continue the sign-in. When it closes, return to the opener and verify sign-in succeeded.",
+    shape: {},
+  }),
   browserTool({
     name: "status",
     description: "Get tabs, active control state, environments, recordings, and diagnostic error counts.",
@@ -101,7 +106,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "submit_secret",
     description:
-      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, OAuth selection, CAPTCHA, passkeys, or payments.",
+      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payments.",
     shape: {
       tabId,
       method: z
@@ -141,7 +146,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for OAuth account selection, CAPTCHA, passkeys, payment confirmation, or when secure password/code handoff is unavailable.",
+      "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, payment confirmation, or when secure password/code handoff is unavailable.",
     shape: { tabId },
   }),
   browserTool({
