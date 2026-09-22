@@ -10,6 +10,9 @@ import {
   HOST_MANAGER_DIRECTORY as ROOT,
   readHostConfig,
   readOwnedJson,
+  tenantStatusSchema,
+  verifyHostDirectory,
+  verifyTenantDirectory,
 } from "../src/main/host-update-files";
 import {
   HOST_AGENT_PLIST,
@@ -286,6 +289,24 @@ export function macHostAdminOperations(): HostAdminOperations {
       }
     },
     tenantForUid: async (uid) => ({ uid, name: await hostCommand("/usr/bin/id", ["-un", String(uid)]) }),
+    readState: async () => {
+      try {
+        await verifyHostDirectory(ROOT);
+        return await readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema);
+      } catch (error) {
+        if (isMissingFile(error)) return null;
+        throw error;
+      }
+    },
+    readTenantStatus: async (uid) => {
+      // A logged-out, stopped or malformed tenant is a normal reading, not a command failure.
+      try {
+        const directory = await verifyTenantDirectory(ROOT, uid);
+        return await readOwnedJson(join(directory, "status.json"), uid, tenantStatusSchema);
+      } catch {
+        return null;
+      }
+    },
     verifyState: async () => {
       await verifyHostPath(ROOT);
       await readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema);

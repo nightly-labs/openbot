@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { validateTenantMetadata } from "./openbot-host-macos";
-import { type HostAdminOperations, parseHostSetup, setupHost, verifyHost } from "./openbot-host-service";
+import {
+  collectHostStatus,
+  describeHostStatus,
+  formatHostStatus,
+  type HostAdminOperations,
+  type HostStatusInput,
+  parseHostSetup,
+  parseHostWatch,
+  setupHost,
+  verifyHost,
+} from "./openbot-host-service";
 
 function fixture() {
   const events: string[] = [];
@@ -34,6 +44,8 @@ function fixture() {
     verifyState: vi.fn(async () => undefined),
     verifyDaemon: vi.fn(async () => undefined),
     verifyIsolation: vi.fn(async () => undefined),
+    readState: vi.fn(async () => null),
+    readTenantStatus: vi.fn(async () => null),
   };
   return { ops, events };
 }
@@ -158,4 +170,147 @@ describe("installed host verification", () => {
     expect(results.some((result) => !result.ok)).toBe(true);
     expect(JSON.stringify(results)).not.toContain("secret");
   });
+});
+
+const NOW = 1_700_000_000_000;
+
+function statusInput(overrides: Partial<HostStatusInput> = {}): HostStatusInput {
+  return {
+    config: { managed: true, tenants: [501, 502] },
+    state: { phase: "waiting", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW - 2_000, error: null },
+    daemonRunning: true,
+    now: NOW,
+    tenants: [
+      {
+        uid: 501,
+        name: "client-acme",
+        status: {
+          uid: 501,
+          pid: 11,
+          currentVersion: "0.17.0",
+          heartbeatAt: NOW - 2_000,
+          safeToRestart: true,
+          idleSince: NOW - 120_000,
+          cycle: "cycle-one",
+          healthy: true,
+        },
+      },
+      {
+        uid: 502,
+        name: "client-bravo",
+        status: {
+          uid: 502,
+          pid: 12,
+          currentVersion: "0.17.0",
+          heartbeatAt: NOW - 1_000,
+          safeToRestart: true,
+          idleSince: null,
+          cycle: "cycle-one",
+          healthy: true,
+        },
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe("host status reporting", () => {
+  it("names the working tenant that blocks a staged update", () => {
+    const report = describeHostStatus(statusInput());
+    expect(report.pendingVersion).toBe("0.18.0");
+    expect(report.tenants[1]?.blocker).toBe("working");
+    expect(report.tenants[1]?.readyInMs).toBeNull();
+    expect(report.summary).toContain("client-bravo (working)");
+  });
+
+  it("gives the earliest remaining idle grace when every tenant is idle", () => {
+    const input = statusInput();
+    const bravo = input.tenants[1];
+    if (bravo?.status) bravo.status = { ...bravo.status, idleSince: NOW - 60_000 };
+    const report = describeHostStatus(input);
+    expect(report.tenants[0]?.readyInMs).toBe(180_000);
+    expect(report.tenants[1]?.readyInMs).toBe(240_000);
+    expect(report.summary).toContain("4m00s at the earliest");
+  });
+
+  it("blocks on a stale report, an unacknowledged cycle and a missing tenant", () => {
+    const input = statusInput();
+    const acme = input.tenants[0];
+    if (acme?.status) acme.status = { ...acme.status, heartbeatAt: NOW - 60_000 };
+    const bravo = input.tenants[1];
+    if (bravo?.status) bravo.status = { ...bravo.status, idleSince: NOW - 600_000, cycle: "cycle-old" };
+    const report = describeHostStatus({
+      ...input,
+      tenants: [...input.tenants, { uid: 503, name: null, status: null }],
+    });
+    expect(report.tenants.map((tenant) => tenant.blocker)).toEqual([
+      "stale status report",
+      "has not acknowledged this update cycle",
+      "no status report",
+    ]);
+  });
+
+  it("reports a stopped daemon and an unmanaged host before any update text", () => {
+    expect(describeHostStatus({ ...statusInput(), daemonRunning: false }).summary).toContain("LaunchDaemon is not");
+    const unmanaged = describeHostStatus({
+      ...statusInput(),
+      config: { managed: false, tenants: [501] },
+    });
+    expect(unmanaged.managed).toBe(false);
+    expect(unmanaged.summary).toContain("management is off");
+  });
+
+  it("marks a state file that stopped advancing during maintenance", () => {
+    const fresh = describeHostStatus(statusInput());
+    expect(fresh.stateStale).toBe(false);
+    const stalled = describeHostStatus({
+      ...statusInput(),
+      state: { phase: "waiting", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW - 120_000, error: null },
+    });
+    expect(stalled.stateStale).toBe(true);
+  });
+
+  it("reports a failure and keeps the recorded error", () => {
+    const report = describeHostStatus({
+      ...statusInput(),
+      state: { phase: "failed", cycle: "cycle-one", version: null, updatedAt: NOW, error: "Interrupted maintenance." },
+    });
+    expect(report.error).toBe("Interrupted maintenance.");
+    expect(report.summary).toContain("Interrupted maintenance.");
+  });
+
+  it("prints tenant names, versions and the earliest-time warning", () => {
+    const text = formatHostStatus(describeHostStatus(statusInput()));
+    expect(text).toContain("client-acme (501)");
+    expect(text).toContain("0.17.0");
+    expect(text).toContain("earliest possible time");
+  });
+
+  it("collects status without failing on an unreadable tenant or a stopped daemon", async () => {
+    const f = fixture();
+    f.ops.readConfig = async () => ({ managed: true, tenants: [501] });
+    f.ops.verifyDaemon = async () => {
+      throw new Error("not running");
+    };
+    f.ops.tenantForUid = async () => {
+      throw new Error("no such user");
+    };
+    const report = await collectHostStatus(f.ops, NOW);
+    expect(report.daemonRunning).toBe(false);
+    expect(report.tenants).toEqual([expect.objectContaining({ uid: 501, name: null, blocker: "no status report" })]);
+  });
+
+  it.each<{ args: string[]; ms: number }>([
+    { args: [], ms: 5_000 },
+    { args: ["--interval", "30"], ms: 30_000 },
+  ])("accepts watch interval $args", ({ args, ms }) => {
+    expect(parseHostWatch(args)).toBe(ms);
+  });
+
+  it.each([["--interval", "0"], ["--interval", "61"], ["--interval"], ["--json"], ["--interval", "5", "extra"]])(
+    "rejects invalid watch interval %s",
+    (...args: string[]) => {
+      expect(() => parseHostWatch(args)).toThrow();
+    },
+  );
 });

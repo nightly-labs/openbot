@@ -190,6 +190,23 @@ macOS tests build and expand an unsigned fixture package without installing it. 
 verification also requires Developer ID signatures, notarization, stapling, an exact ownership/mode
 manifest, standalone launch checks without Bun/Node in PATH, and the expected source scripts.
 
+## Live status
+
+`sudo openbot-host status` prints one read-only snapshot: management flag, daemon state, phase,
+staged version, update cycle, recorded error, and one line for each registered tenant with its
+version, health, work state, and the reason it blocks maintenance. `--json` gives the same report
+for scripts. `sudo openbot-host watch [--interval <seconds>]` repeats the snapshot, default every
+five seconds. Both commands only read `config.json`, `state.json`, and each tenant status file.
+They never write host state, never open a tenant home, and never start or stop maintenance.
+
+While the host waits, each idle tenant shows the remaining five-minute grace. This value is the
+earliest possible time, not a promise: the host counts from its own first observation of that idle
+report, and new work resets the grace. In the `idle` phase there is no countdown, because the host
+keeps its next release check in memory; a check occurs at most every four minutes.
+
+Only the `waiting` and `stopping` phases rewrite `state.json` at every poll, so only those phases
+can show a stalled daemon through the state age. Use the reported daemon state in the other phases.
+
 ## State and recovery
 
 Read `state.json` as the administrator. Phases are `idle`, `downloading`, `waiting`, `stopping`,
