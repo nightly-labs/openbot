@@ -888,6 +888,43 @@ fi
     await client.stop();
   });
 
+  it("keeps the answer when a message fills in the rest of a thinking block", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "14141414-1414-4141-8141-141414141414";
+    await startTurn(client, threadId, turnId);
+
+    output.push(thinkingStreamDelta(threadId, "phase-1", "Think"));
+    output.push(streamDelta(threadId, turnId, "Done."));
+    // The message supplies the rest of the thinking that already started. No step closes here.
+    output.push(thinkingMessage(threadId, "phase-1", "Thinking."));
+    output.push(assistantMessage(threadId, "answer-message", "Done."));
+    output.push(resultMessage(threadId, turnId, "Done."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications)).toEqual([]);
+    expect(answerText(notifications)).toBe("Done.");
+    await client.stop();
+  });
+
+  it("closes a step for each thinking block a turn begins", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "15151515-1515-4151-8151-151515151515";
+    await startTurn(client, threadId, turnId);
+
+    output.push(streamDelta(threadId, turnId, "Plan."));
+    output.push(thinkingStreamDelta(threadId, "phase-1", "First"));
+    output.push(streamDelta(threadId, turnId, "Then this."));
+    output.push(thinkingStreamDelta(threadId, "phase-2", "Second"));
+    output.push(streamDelta(threadId, turnId, "Done."));
+    output.push(assistantMessage(threadId, "answer-message", "Plan.Then this.Done."));
+    output.push(resultMessage(threadId, turnId, "Plan.Then this.Done."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications)).toEqual(["Plan.", "Then this."]);
+    expect(answerText(notifications)).toBe("Done.");
+    await client.stop();
+  });
+
   it("corrects narration a thinking boundary already published", async () => {
     const { client, notifications, output, threadId } = await createHarness();
     const turnId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";

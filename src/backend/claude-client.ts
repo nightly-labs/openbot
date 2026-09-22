@@ -679,7 +679,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #appendThinkingDelta(runtime: ThreadRuntime, delta: string, streamId?: string): void {
     const turn = runtime.activeTurn;
     if (!turn || !delta) return;
-    this.#flushNarration(runtime);
+    /* A thinking block beginning closes the step. Filling in the rest of one that already began
+       does not, and a message carries that backfill with no stream of its own: flushing there
+       would publish text the turn holds for its answer as narration and end with no answer. */
+    if (streamId !== undefined && streamId !== turn.thinkingStreamId) this.#flushNarration(runtime);
     if (!turn.thinkingStarted) {
       turn.thinkingStarted = true;
       this.emit("notification", {
