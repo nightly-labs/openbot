@@ -66,11 +66,14 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       queues: queues(),
       unreadReplies: unreadReplies(),
       recentReplies: recentReplies(),
+      pendingPrompts: pendingPrompts(),
+      pendingApprovals: pendingApprovals(),
+      failedTurns: failedTurns(),
     }),
   );
 
-  /* The badge says what an agent is doing; the face says how it is going. They read the same
-   * signals, and `isAgentWorking` is shared between them, so the two cannot disagree. */
+  /* The badge says what an agent is doing; the face says how it is going. `isAgentWorking` is
+   * shared, and a routine mark only replaces the badge for that same agent. */
   const agentMoods = createMemo(() =>
     computeAgentAvatarMoods({
       agentIds: agentList().map((agent) => agent.id),

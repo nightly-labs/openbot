@@ -56,7 +56,7 @@ const Turns = createSimpleContext({
   init: () => {
     const { activeServerId } = useServers();
     const { dynamicIslandCoordinator } = useDynamicIsland();
-    const { activeAgent, activeAgentId, agentStatus, appendUiError } = useAgents();
+    const { activeAgent, activeAgentId, agentList, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
 
     // The layer-2 seed: what this server was doing the last time it was open.
@@ -107,21 +107,48 @@ const Turns = createSimpleContext({
       },
     );
 
+    function loadQueue(agentId: string, serverId: string): void {
+      const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
+      queueSnapshotRequests.set(agentId, queueRequest);
+      void window.openbot.agent
+        .listQueue(agentId)
+        .then((queue) => {
+          if (!scopeIsCurrent() || queueSnapshotRequests.get(agentId) !== queueRequest) return;
+          setQueues((current) => ({ ...current, [agentId]: queue }));
+        })
+        .catch((error) => {
+          if (scopeIsCurrent()) appendUiError(agentId, error, "Queue load failed", serverId);
+        });
+    }
+
     createEffect(
       () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
       ({ agentId, serverId }) => {
-        if (!agentId) return;
-        const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
-        queueSnapshotRequests.set(agentId, queueRequest);
-        void window.openbot.agent
-          .listQueue(agentId)
-          .then((queue) => {
-            if (!scopeIsCurrent() || queueSnapshotRequests.get(agentId) !== queueRequest) return;
-            setQueues((current) => ({ ...current, [agentId]: queue }));
-          })
-          .catch((error) => {
-            if (scopeIsCurrent()) appendUiError(agentId, error, "Queue load failed", serverId);
-          });
+        if (agentId) loadQueue(agentId, serverId);
+      },
+    );
+
+    // The active-agent load above misses everyone else. A routine mark needs each agent's real
+    // queue sender, which a runtime snapshot does not carry.
+    createEffect(
+      () => ({
+        agentIds: agentList()
+          .map((agent) => agent.id)
+          .join("\0"),
+        agentPhase: agentStatus().phase,
+        serverId: activeServerId(),
+      }),
+      (next, previous) => {
+        if (
+          previous &&
+          next.agentIds === previous.agentIds &&
+          next.agentPhase === previous.agentPhase &&
+          next.serverId === previous.serverId
+        ) {
+          return;
+        }
+        if (!next.agentIds) return;
+        for (const agentId of next.agentIds.split("\0")) loadQueue(agentId, next.serverId);
       },
     );
 
