@@ -207,6 +207,7 @@ function describeTenant(
   state: HostUpdateState | null,
   processes: HostStatusInput["processes"],
   now: number,
+  stale: boolean,
 ): HostTenantReport {
   const { status } = entry;
   // Waiting mirrors the host's main-process check; stopping waits for every bundle process to exit.
@@ -250,8 +251,9 @@ function describeTenant(
       : state?.phase === "waiting"
         ? waitingBlocker(status, state, processMatch, now)
         : null;
+  // A stalled daemon honours no countdown: it reads neither the grace period nor the process list.
   const readyInMs =
-    state?.phase === "waiting" && idleForMs !== null && blocker === null
+    !stale && state?.phase === "waiting" && idleForMs !== null && blocker === null
       ? Math.max(0, HOST_IDLE_GRACE_MS - idleForMs)
       : null;
   return { ...report, readyInMs, blocker };
@@ -262,7 +264,12 @@ function summarize(report: Omit<HostStatusReport, "summary">): string {
   const names = blocked.map((tenant) => `${tenant.name ?? tenant.uid} (${tenant.blocker})`).join(", ");
   if (!report.managed) return "Host management is off. Tenants keep their own desktop update controls.";
   if (!report.daemonRunning) return "Host management is on, but the LaunchDaemon is not running. No update can run.";
-  if (report.unregisteredProcesses.length && report.phase !== "released") {
+  if (report.stateStale) {
+    return `The host state has not advanced for ${formatDuration(report.stateAgeMs ?? 0)} while ${report.phase}. The daemon is not polling, so neither shutdown nor installation can continue.`;
+  }
+  // HostManager.#waitForIdle clears the idle map for an unregistered main process. No other phase
+  // reads it that way, and this text must not hide an installation warning or a failure reason.
+  if (report.unregisteredProcesses.length && report.phase === "waiting") {
     return `OpenBot runs under unregistered UID ${report.unregisteredProcesses.join(", ")}. The host cannot start maintenance until it quits.`;
   }
   switch (report.phase) {
@@ -300,9 +307,13 @@ function summarize(report: Omit<HostStatusReport, "summary">): string {
 
 export function describeHostStatus(input: HostStatusInput): HostStatusReport {
   const { config, state, now } = input;
-  const tenants = input.tenants.map((entry) => describeTenant(entry, state, input.processes, now));
   const registered = config?.tenants ?? [];
   const stateAgeMs = state ? now - state.updatedAt : null;
+  const stateStale =
+    (state?.phase === "waiting" || state?.phase === "stopping") &&
+    stateAgeMs !== null &&
+    stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS;
+  const tenants = input.tenants.map((entry) => describeTenant(entry, state, input.processes, now, stateStale));
   const partial = {
     managed: config?.managed === true,
     daemonRunning: input.daemonRunning,
@@ -313,10 +324,7 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     pendingVersion: state && ["waiting", "stopping", "installing"].includes(state.phase) ? state.version : null,
     error: state?.error ?? null,
     stateAgeMs,
-    stateStale:
-      (state?.phase === "waiting" || state?.phase === "stopping") &&
-      stateAgeMs !== null &&
-      stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS,
+    stateStale,
     unregisteredProcesses: [
       ...new Set(
         input.processes
@@ -362,7 +370,8 @@ export function formatHostStatus(report: HostStatusReport): string {
     const blocker = tenant.blocker && tenant.blocker !== "working" ? `  blocks: ${tenant.blocker}` : "";
     lines.push(`  ${label} ${(tenant.version ?? "-").padEnd(9)} ${activity}${ready}${blocker}`);
   }
-  if (report.phase === "waiting") lines.push("", "Countdowns are the earliest possible time, not a promise.");
+  if (report.phase === "waiting" && !report.stateStale)
+    lines.push("", "Countdowns are the earliest possible time, not a promise.");
   return `${lines.join("\n")}\n`;
 }
 

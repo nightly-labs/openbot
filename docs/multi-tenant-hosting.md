@@ -209,7 +209,10 @@ status in that phase; the tenant report is still read there for the version and 
 A staged version is named only while one is pending, because the host keeps its version field after
 a finished update. A failed process scan makes `status` fail and `watch` report the reading as
 unavailable; it never becomes an empty process list. An OpenBot process under an
-unregistered UID is reported separately, because it stops maintenance before any tenant is asked.
+unregistered UID is always listed on its own line, and it becomes the summary only in `waiting`,
+the one phase where the host treats it as a blocker. When a `waiting` or `stopping` state stops
+advancing, the summary reports the stalled daemon and gives no countdown, because a daemon that
+does not poll can start neither the shutdown nor the installation.
 
 While the host waits, each idle tenant shows the remaining five-minute grace. This value is the
 earliest possible time, not a promise: the host counts from its own first observation of that idle

@@ -269,6 +269,37 @@ describe("host status reporting", () => {
     expect(report.summary).toContain("unregistered UID 700");
   });
 
+  it("keeps the phase summary when an unregistered process cannot block that phase", () => {
+    const input = statusInput();
+    const processes = [...input.processes, { uid: 700, pid: 70, main: true }];
+    const installing = describeHostStatus({
+      ...input,
+      processes,
+      state: { phase: "installing", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null },
+    });
+    expect(installing.unregisteredProcesses).toEqual([700]);
+    expect(installing.summary).toContain("Do not interrupt");
+    const failed = describeHostStatus({
+      ...input,
+      processes,
+      state: { phase: "failed", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: "Disk is full." },
+    });
+    expect(failed.summary).toContain("Disk is full.");
+  });
+
+  it("reports a stalled daemon instead of a shutdown countdown", () => {
+    const input = statusInput();
+    const report = describeHostStatus({
+      ...input,
+      state: { phase: "waiting", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW - 90_000, error: null },
+    });
+    expect(report.stateStale).toBe(true);
+    expect(report.tenants[0]?.readyInMs).toBeNull();
+    expect(report.summary).toContain("The daemon is not polling");
+    expect(report.summary).not.toContain("Shutdown starts");
+    expect(formatHostStatus(report)).not.toContain("earliest possible time");
+  });
+
   it("uses health, version and cycle as the blockers after release", () => {
     const input = statusInput();
     const state = { phase: "released", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
