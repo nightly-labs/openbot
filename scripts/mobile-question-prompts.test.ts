@@ -113,7 +113,15 @@ describe("mobile question forms", () => {
       read: latestReadableMessage(snapshot.messages)?.id,
     }).toEqual({
       projected: [
-        { id: "file-message", kind: "message", author: "user", body: "", streaming: false, attachments: [attachment] },
+        {
+          id: "file-message",
+          kind: "message",
+          author: "user",
+          body: "",
+          streaming: false,
+          status: "completed",
+          attachments: [attachment],
+        },
       ],
       read: "file-message",
     });

@@ -2,6 +2,8 @@ import { Typography } from "heroui-native";
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { TextStyle } from "react-native";
 import Animated, {
+  cancelAnimation,
+  Easing,
   interpolateColor,
   ReduceMotion,
   useAnimatedStyle,
@@ -13,6 +15,11 @@ import { createStreamRevealPool, streamRevealWindow } from "../model/stream-reve
 
 const AnimatedTypography = Animated.createAnimatedComponent(Typography);
 const RevealContext = createContext<ReturnType<typeof createStreamRevealPool> | null>(null);
+const REVEAL_TIMING = {
+  duration: 150,
+  easing: Easing.bezier(0.23, 1, 0.32, 1),
+  reduceMotion: ReduceMotion.System,
+};
 
 export function StreamRevealProvider({ children }: PropsWithChildren) {
   const [pool] = useState(() => createStreamRevealPool());
@@ -31,14 +38,20 @@ function FadingWord({ text, type, style, onDone }: TextProps & { onDone: () => v
   const color = String(style.color);
   useEffect(() => {
     progress.set(
-      withTiming(1, { duration: 500, reduceMotion: ReduceMotion.System }, (finished) => {
+      withTiming(1, REVEAL_TIMING, (finished) => {
         if (finished) scheduleOnRN(onDone);
       }),
     );
+    return () => cancelAnimation(progress);
   }, [onDone, progress]);
   // Nested native text uses color; view opacity would break inline text layout.
   const revealStyle = useAnimatedStyle(() => ({
     color: interpolateColor(progress.get(), [0, 1], ["transparent", color]),
+    // A zero-offset text shadow supplies a small soft edge without wrapping
+    // inline text in views or blurring the already readable paragraph.
+    textShadowColor: interpolateColor(progress.get(), [0, 0.2, 1], ["transparent", color, "transparent"]),
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 2 * (1 - progress.get()),
   }));
   return (
     <AnimatedTypography type={type} style={[style, revealStyle]}>
@@ -97,13 +110,14 @@ export function StreamingBlock({ children, enabled }: PropsWithChildren<{ enable
   useEffect(() => {
     if (phase === "active") {
       opacity.set(
-        withTiming(1, { duration: 500, reduceMotion: ReduceMotion.System }, (finished) => {
+        withTiming(1, REVEAL_TIMING, (finished) => {
           if (finished) scheduleOnRN(onDone);
         }),
       );
     } else {
       opacity.set(phase === "done" ? 1 : 0);
     }
+    return () => cancelAnimation(opacity);
   }, [phase, opacity, onDone]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
   // Keep native scroll views mounted when the reveal finishes or streaming stops.
