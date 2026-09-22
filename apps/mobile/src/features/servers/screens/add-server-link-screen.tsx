@@ -8,6 +8,8 @@ export function AddServerLinkScreen() {
   return <Invitation key={request ?? "manual"} request={request} />;
 }
 
+// A deep link and the scanner both hand over the invitation through the request store, so its
+// one-use token never enters navigation params.
 function Invitation({ request }: { request?: string }) {
   const [link] = useState(() => readIncomingLink(request));
   useEffect(() => {
@@ -16,8 +18,7 @@ function Invitation({ request }: { request?: string }) {
   return (
     <AddServerScreen
       initialInvite={link.kind === "invite" ? link.url : ""}
-      onJoined={request ? () => router.dismissTo("/connected") : undefined}
-      onCancel={request ? () => router.dismissTo("/connected") : undefined}
+      onJoined={() => router.dismissTo("/connected")}
     />
   );
 }

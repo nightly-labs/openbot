@@ -2,7 +2,7 @@ import { createInviteUrl, PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contra
 import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
 import type { RemoteInvitePreview } from "@openbot/team-client/remote-directory";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
-import { act, type PropsWithChildren } from "react";
+import { act, type PropsWithChildren, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
@@ -21,6 +21,7 @@ const state = vi.hoisted(() => {
     redeem: vi.fn<(url: string) => Promise<MobileSession>>(),
     replace: vi.fn(),
     dismiss: vi.fn(),
+    push: vi.fn(),
     openBrowser: vi.fn(),
     preview: vi.fn<(url: string) => Promise<RemoteInvitePreview>>(),
     join: vi.fn<(input: { inviteUrl: string }) => Promise<string>>(),
@@ -33,8 +34,22 @@ vi.mock("@/features/auth/api/mobile-auth", () => ({ redeemMobileConnectUrl: stat
 vi.mock("@/features/auth/screens/sign-in-screen", () => ({ SignInScreen: () => <p>Desktop sign-in</p> }));
 vi.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ request: state.request }),
-  router: { replace: state.replace, dismissTo: state.dismiss, back: state.dismiss },
-  Stack: { Screen: () => null },
+  router: { replace: state.replace, dismissTo: state.dismiss, back: state.dismiss, push: state.push },
+  Stack: {
+    Screen: () => null,
+    Toolbar: Object.assign(({ children }: PropsWithChildren) => <div>{children}</div>, {
+      Button: ({
+        children,
+        accessibilityLabel,
+        disabled,
+        onPress,
+      }: PropsWithChildren<{ accessibilityLabel?: string; disabled?: boolean; onPress?: () => void }>) => (
+        <button type="button" aria-label={accessibilityLabel} disabled={disabled} onClick={onPress}>
+          {children}
+        </button>
+      ),
+    }),
+  },
   Redirect: ({ href }: { href: { pathname: string; params?: { request?: string } } }) => (
     <a href={`${href.pathname}?request=${href.params?.request}`}>Continue to invitation</a>
   ),
@@ -47,8 +62,13 @@ vi.mock("heroui-native", () => ({
     Paragraph: ({ children }: PropsWithChildren) => <p>{children}</p>,
   },
   Button: Object.assign(
-    ({ children, onPress, isDisabled }: PropsWithChildren<{ onPress?: () => void; isDisabled?: boolean }>) => (
-      <button type="button" disabled={isDisabled} onClick={onPress}>
+    ({
+      children,
+      onPress,
+      isDisabled,
+      accessibilityLabel,
+    }: PropsWithChildren<{ onPress?: () => void; isDisabled?: boolean; accessibilityLabel?: string }>) => (
+      <button type="button" aria-label={accessibilityLabel} disabled={isDisabled} onClick={onPress}>
         {children}
       </button>
     ),
@@ -71,8 +91,19 @@ vi.mock("@/shared/components/sheet-scroll-view", () => ({
   SheetScrollView: ({ children }: PropsWithChildren) => <div>{children}</div>,
 }));
 vi.mock("@/shared/components/sheet-form-field", () => ({
-  SheetFormField: ({ value, onChangeText }: { value: string; onChangeText: (value: string) => void }) => (
-    <input aria-label="Invite link" value={value} onChange={(event) => onChangeText(event.target.value)} />
+  SheetFormField: ({
+    value,
+    onChangeText,
+    trailing,
+  }: {
+    value: string;
+    onChangeText: (value: string) => void;
+    trailing?: ReactNode;
+  }) => (
+    <>
+      <input aria-label="Invite link" value={value} onChange={(event) => onChangeText(event.target.value)} />
+      {trailing}
+    </>
   ),
 }));
 vi.mock("@/features/workspace/context/mobile-workspace-context", () => {
@@ -233,4 +264,27 @@ it("shows a shared redemption error without attaching a session", async () => {
   expect(state.replace).not.toHaveBeenCalled();
   await act(() => fireEvent.click(screen.getByRole("button", { name: "Connect" })));
   expect(state.connect).toHaveBeenCalledExactlyOnceWith(session);
+});
+
+it("verifies a pasted invitation without a separate review step", async () => {
+  await act(() => root.render(<AddServerScreen />));
+  expect(state.preview).not.toHaveBeenCalled();
+  await act(() => fireEvent.change(screen.getByLabelText("Invite link"), { target: { value: invite } }));
+  expect(state.preview).toHaveBeenCalledExactlyOnceWith(invite);
+  expect(screen.getByText("Studio")).toBeTruthy();
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Join server" })));
+  expect(state.join).toHaveBeenCalledExactlyOnceWith({ inviteUrl: invite });
+});
+
+it("keeps an incomplete link out of verification", async () => {
+  await act(() => root.render(<AddServerScreen />));
+  await act(() => fireEvent.change(screen.getByLabelText("Invite link"), { target: { value: invite.slice(0, 30) } }));
+  expect(state.preview).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Join server" })).toHaveProperty("disabled", true);
+});
+
+it("scans inside the open sheet instead of a separate modal", async () => {
+  await act(() => root.render(<AddServerScreen />));
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Scan invitation QR code" })));
+  expect(state.push).toHaveBeenCalledExactlyOnceWith("/add-server/scan");
 });
