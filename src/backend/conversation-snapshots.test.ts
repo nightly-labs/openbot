@@ -186,6 +186,30 @@ describe("provider conversation history", () => {
     expect(mergeProviderHistory(stored, imported, "claude").messages).toEqual(stored.messages);
   });
 
+  it("leaves one visible answer when a turn's split rows are already stored", () => {
+    /* A database can hold the aggregate and the canonical rows together. None of them is removed,
+       because each can carry saved references, but only one may still read as an answer. */
+    const aggregate = {
+      ...message("turn-1:assistant", "assistant", "Before.After.", "agentMessage"),
+      reaction: "\u{1f44d}" as const,
+    };
+    const stored = snapshot([
+      aggregate,
+      message("part-1", "assistant", "Before.", "agentMessage"),
+      message("part-2", "assistant", "After.", "agentMessage"),
+    ]);
+    const imported = snapshot([
+      message("part-1", "assistant", "Before.", "commentary"),
+      message("part-2", "assistant", "After.", "agentMessage"),
+    ]);
+    const merged = mergeProviderHistory(stored, imported, "claude");
+    expect(merged.messages.filter((item) => item.itemType !== "commentary")).toEqual([
+      { ...aggregate, text: "After." },
+    ]);
+    expect(merged.messages.map((item) => item.id).toSorted()).toEqual(["part-1", "part-2", "turn-1:assistant"]);
+    expect(mergeProviderHistory(merged, imported, "claude").messages).toEqual(merged.messages);
+  });
+
   it("retains repeated canonical Claude replies and imports history without a live answer", () => {
     const imported = snapshot([
       message("part-1", "assistant", "Again.", "agentMessage"),

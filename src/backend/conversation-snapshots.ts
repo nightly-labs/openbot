@@ -168,12 +168,12 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
   }
   const replacements = new Map<string, ConversationMessage>();
   const omitted = new Set<string>();
+  /** Stored rows this has to rewrite that the import carries no entry of its own for. */
+  const appended: ConversationMessage[] = [];
   for (const [turnId, parts] of turns) {
     // Live Claude output combines SDK replies under one ID. Keep that ID and its metadata.
     const answer = storedMessages.get(`${turnId}:assistant`);
     if (answer?.author !== "assistant" || answer.itemType !== "agentMessage" || answer.turnId !== turnId) continue;
-    // Existing split records can have saved references. Never remove or combine them.
-    if (parts.some((part) => storedMessages.has(part.id))) continue;
     const text = parts.map((part) => part.text).join("");
     const narration = importedNarration.get(turnId) ?? [];
     /* A turn released before narration rode the thinking disclosure stored the narration and the
@@ -181,6 +181,19 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
        neither half on its own: match it whole, and keep only the answer as its text. Without this
        the backfill leaves the aggregate bubble in place and stores the split copy beside it. */
     const aggregate = narration.length > 0 && answer.text === `${narration.map((part) => part.text).join("")}${text}`;
+    /* Existing split records can have saved references. Never remove or combine them - but a
+       database holding the aggregate and its canonical rows together must still read as one
+       answer, so the aggregate keeps only the answer and the rows repeating it stop being
+       bubbles. A row already demoted stays demoted, whatever the import calls it. */
+    if (parts.some((part) => storedMessages.has(part.id))) {
+      for (const part of parts) {
+        const existing = storedMessages.get(part.id);
+        if (!existing || !(aggregate || existing.itemType === "commentary")) continue;
+        replacements.set(part.id, { ...existing, ...part, itemType: "commentary" });
+      }
+      if (aggregate && answer.text) appended.push({ ...answer, text });
+      continue;
+    }
     if (!answer.text || !(aggregate || text.startsWith(answer.text))) continue;
     const first = parts[0];
     const last = parts.at(-1);
@@ -218,9 +231,12 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
   }
   return {
     ...imported,
-    messages: imported.messages
-      .filter((message) => !omitted.has(message.id))
-      .map((message) => replacements.get(message.id) ?? message),
+    messages: [
+      ...imported.messages
+        .filter((message) => !omitted.has(message.id))
+        .map((message) => replacements.get(message.id) ?? message),
+      ...appended,
+    ],
   };
 }
 
