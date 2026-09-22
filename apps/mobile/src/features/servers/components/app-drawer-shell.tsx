@@ -42,7 +42,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { session } = useMobileSession();
-  const { activeServer, selectServer, servers } = useMobileWorkspace();
+  const { activeServer, checkServerDirectory, selectServer, servers } = useMobileWorkspace();
   const [muted] = useThemeColor(["muted"]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerProgress = useSharedValue(0);
@@ -78,6 +78,13 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     setDrawerOpen(false);
     drawerProgress.set(0);
   }, [drawerProgress, session]);
+
+  // Opening this list is the moment the user looks for a server they joined on the desktop, and
+  // nothing tells this phone about that membership. The check is throttled, so a drawer opened
+  // again and again still asks the account service at most once in the foreground interval.
+  useEffect(() => {
+    if (drawerOpen) void checkServerDirectory().catch(() => undefined);
+  }, [checkServerDirectory, drawerOpen]);
 
   const openingGesture = useMemo(
     () =>

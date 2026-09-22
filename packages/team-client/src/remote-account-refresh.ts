@@ -1,4 +1,4 @@
-import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "./remote-directory";
+import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS, REMOTE_ACCOUNT_FOREGROUND_INTERVAL_MS } from "./remote-directory";
 
 const ACCOUNT_RETRY_INTERVAL_MS = 60_000;
 
@@ -8,6 +8,7 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
   let disposed = false;
   let pending: Promise<void> | null = null;
   let dueAt = Number.NEGATIVE_INFINITY;
+  let lastAttemptAt = Number.NEGATIVE_INFINITY;
   let revision = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -33,6 +34,7 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
       .then(() => {
         if (!active || disposed) return;
         started = true;
+        lastAttemptAt = now();
         return load();
       })
       .then(
@@ -54,8 +56,26 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
     return operation;
   }
 
+  /**
+   * A user action that asks for a fresh answer: a return to the foreground, or a list the user
+   * opened to look for a server they joined on another device. Nothing pushes that membership
+   * here, so this checks sooner than the account interval and no sooner than the foreground floor.
+   * One asked for too soon is not dropped: it moves the next check to that floor, where the timer
+   * this already owns runs it without another foreground entry - and stops it on background entry.
+   */
+  function foreground(): Promise<void> {
+    const due = lastAttemptAt + REMOTE_ACCOUNT_FOREGROUND_INTERVAL_MS;
+    if (now() >= due) return refresh(true);
+    if (due < dueAt) {
+      dueAt = due;
+      schedule();
+    }
+    return Promise.resolve();
+  }
+
   return {
     refresh,
+    foreground,
     invalidate() {
       revision += 1;
       dueAt = Number.NEGATIVE_INFINITY;
@@ -66,7 +86,7 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
       active = value;
       cancelTimer();
       if (active) {
-        void refresh().catch(() => undefined);
+        void foreground().catch(() => undefined);
         schedule();
       }
     },

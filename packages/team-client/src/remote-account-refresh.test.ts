@@ -47,6 +47,28 @@ it("retains failed account checks and bounds retry requests across foreground re
   expect(load).toHaveBeenCalledTimes(3);
 });
 
+it("looks for a server joined on another device when the app returns to the foreground", async () => {
+  vi.useFakeTimers();
+  const load = vi.fn(async () => {});
+  const refresh = createRemoteAccountRefresh(load);
+  refresh.setActive(true);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(load).toHaveBeenCalledTimes(1);
+  // A second return within the minute waits for the floor rather than asking again, and is not
+  // dropped: the app in front checks once that floor passes.
+  refresh.setActive(false);
+  refresh.setActive(true);
+  await vi.advanceTimersByTimeAsync(59_999);
+  expect(load).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(load).toHaveBeenCalledTimes(2);
+  // A phone in a pocket asks for nothing.
+  refresh.setActive(false);
+  await vi.advanceTimersByTimeAsync(15 * 60_000);
+  expect(load).toHaveBeenCalledTimes(2);
+  refresh.dispose();
+});
+
 it("does not start queued account work after background entry", async () => {
   vi.useFakeTimers();
   const load = vi.fn(async () => {});

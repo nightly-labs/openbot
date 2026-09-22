@@ -692,9 +692,13 @@ if (!hasSingleInstanceLock) {
         return remoteAccountSync;
       });
       app.on("browser-window-focus", (_event, window) => {
-        if (window === windowHolder.current) {
-          startDirectoryWatch();
-        }
+        if (window !== windowHolder.current) return;
+        // Restarting the watch alone moved the next check fifteen minutes away on every focus, so
+        // a user who joined a server on another device saw it only after leaving this window alone
+        // for that long. The check itself is what the return to the window asks for; the watch is
+        // for the app left in front.
+        startDirectoryWatch();
+        void directoryRefresh.foreground();
       });
       const refreshMemberships = () => void directoryRefresh.refresh(true);
       remoteServers.on("directoryInvalidated", refreshMemberships);

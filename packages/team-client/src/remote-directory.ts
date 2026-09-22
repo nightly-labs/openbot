@@ -409,6 +409,20 @@ function decodeInvite(value: unknown): RemoteTeamInvite {
 
 export const REMOTE_ACCOUNT_CHECK_INTERVAL_MS = 15 * 60_000;
 
+/**
+ * How soon a return to the foreground may check the account again.
+ *
+ * A membership this user accepted on another device reaches this one through nothing but a
+ * directory check: the account service has no channel to a client, and the host's auth epoch event
+ * goes to the host. Fifteen minutes is the right interval for an app left open, and the wrong one
+ * for a user who joins a server on the desktop and picks up the phone to look for it.
+ *
+ * A minute is the floor rather than the delay: a foreground entry that arrives too soon is
+ * deferred to this deadline instead of dropped, so coming back still shows the new server without
+ * a second focus, and a user moving between windows all day costs at most one check a minute.
+ */
+export const REMOTE_ACCOUNT_FOREGROUND_INTERVAL_MS = 60_000;
+
 /** The caller starts this watcher in the foreground and stops it on background entry. */
 export function watchRemoteDirectory(refresh: () => Promise<void>): () => void {
   const timer = setInterval(() => void refresh().catch(() => undefined), REMOTE_ACCOUNT_CHECK_INTERVAL_MS);
@@ -419,19 +433,36 @@ export function watchRemoteDirectory(refresh: () => Promise<void>): () => void {
 export function createRemoteDirectoryRefresh(load: () => Promise<void>, now = Date.now) {
   let pending: Promise<void> | null = null;
   let lastAttempt = Number.NEGATIVE_INFINITY;
+  let deferred: ReturnType<typeof setTimeout> | null = null;
+  function refresh(force = false): Promise<void> {
+    if (pending) return pending;
+    if (!force && now() - lastAttempt < REMOTE_ACCOUNT_CHECK_INTERVAL_MS) return Promise.resolve();
+    lastAttempt = now();
+    const operation = load();
+    pending = operation;
+    void operation
+      .finally(() => {
+        if (pending === operation) pending = null;
+      })
+      .catch(() => undefined);
+    return operation;
+  }
   return {
-    refresh(force = false): Promise<void> {
-      if (pending) return pending;
-      if (!force && now() - lastAttempt < REMOTE_ACCOUNT_CHECK_INTERVAL_MS) return Promise.resolve();
-      lastAttempt = now();
-      const operation = load();
-      pending = operation;
-      void operation
-        .finally(() => {
-          if (pending === operation) pending = null;
-        })
-        .catch(() => undefined);
-      return operation;
+    refresh,
+    /** The window came to the front: check for a server the user joined on another device. */
+    foreground(): Promise<void> {
+      const due = lastAttempt + REMOTE_ACCOUNT_FOREGROUND_INTERVAL_MS;
+      if (now() >= due) return refresh(true);
+      // Asked too soon. Dropping it would leave the window on an old list until the poll a quarter
+      // of an hour away, and a user who moves between windows never focuses at the right moment.
+      // One deferred check answers every focus in this interval, so the rate stays bounded.
+      if (deferred === null) {
+        deferred = setTimeout(() => {
+          deferred = null;
+          void refresh(true).catch(() => undefined);
+        }, due - now());
+      }
+      return Promise.resolve();
     },
     invalidate(): void {
       pending = null;
