@@ -139,6 +139,20 @@ jobs:
       EVENT_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
       EVENT_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
       STATUS_CONTEXT: NorbiAI review
+      # What a pull request gets when it asks for nothing. Every other run is this pair
+      # plus whatever the pull request or the review request overrode, and the override is
+      # scoped to that one run: nothing here is written back, so the next pull request
+      # starts from these values again.
+      DEFAULT_MODEL: chatgpt-web/high
+      DEFAULT_EFFORT: xhigh
+      # An override is untrusted free text, and it reaches a command line. Membership in
+      # these lists is the whole validation: anything else is refused and the default runs
+      # instead, so a typo reviews at full strength rather than silently at none. Extend a
+      # list here to offer a new choice — space separated, exact match.
+      ALLOWED_MODELS: >-
+        chatgpt-web/extra-high chatgpt-web/high chatgpt-web/medium chatgpt-web/pro
+        gpt-6-astra
+      ALLOWED_EFFORTS: minimal low medium high xhigh
 
     steps:
       - name: Checkout repository
@@ -199,11 +213,97 @@ jobs:
           gh api "$api" --jq '.title' > "$title_file"
           gh api "$api" --jq '.body // ""' > "$body_file"
 
+          # Whether the description may steer this run, decided below. Fails closed: a
+          # lookup error leaves this false, and a false answer only costs an override.
+          same_repo=false
+          if [ "$(gh api "$api" --jq '.head.repo.full_name // ""')" = "$GITHUB_REPOSITORY" ]; then
+            same_repo=true
+          fi
+
           {
             echo "base_sha=$base_sha"
             echo "head_sha=$head_sha"
             echo "title_file=$title_file"
             echo "body_file=$body_file"
+            echo "same_repo=$same_repo"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve reviewer model
+        id: reviewer
+        shell: bash
+        env:
+          # Free text, both of them, so neither is interpolated into this script: they
+          # arrive as environment content and leave as one of the allowlisted words above.
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_BODY_FILE: ${{ steps.pr.outputs.body_file }}
+          SAME_REPO: ${{ steps.pr.outputs.same_repo }}
+        run: |
+          set -euo pipefail
+
+          # `NorbiAI-Model: <model>` and `NorbiAI-Effort: <effort>`, each on a line of its
+          # own, optionally wrapped in an HTML comment so the pull request description does
+          # not have to show it. The last one wins, so an edit appended to the description
+          # replaces an earlier choice rather than losing to it. The value charset stops
+          # here at what a model slug can contain; membership decides the rest.
+          directive() {
+            grep -oiE "^[[:space:]]*(<!--[[:space:]]*)?norbiai-$1:[[:space:]]*[A-Za-z0-9._/-]+" |
+              tail -1 | sed -E 's/.*:[[:space:]]*//' || true
+          }
+
+          comment_model=$(printf '%s\n' "${COMMENT_BODY:-}" | directive model)
+          comment_effort=$(printf '%s\n' "${COMMENT_BODY:-}" | directive effort)
+
+          # The description is the pull request author's, and on a fork that is whoever
+          # opened it — someone who cannot merge here and who would have an interest in
+          # being reviewed by the weakest model on the list. A fork reaches this job only
+          # because a maintainer asked, so the maintainer's own request comment is the
+          # channel that still works there, and it is already permission-checked.
+          pr_model=""
+          pr_effort=""
+          if [ "$SAME_REPO" = "true" ]; then
+            pr_model=$(directive model < "$PR_BODY_FILE")
+            pr_effort=$(directive effort < "$PR_BODY_FILE")
+          elif grep -qiE '^[[:space:]]*(<!--[[:space:]]*)?norbiai-(model|effort):' "$PR_BODY_FILE"; then
+            echo "::warning title=NorbiAI ignored a fork's reviewer override::The description of a pull request from a fork cannot choose the model. Put the directive in the /norbiai review comment instead."
+          fi
+
+          resolved=""
+          choose() {
+            local label=$1 requested="" origin=""
+
+            if [ -n "$2" ]; then
+              requested=$2
+              origin="the review request comment"
+            elif [ -n "$3" ]; then
+              requested=$3
+              origin="the pull request description"
+            fi
+
+            if [ -z "$requested" ]; then
+              resolved=$4
+              return
+            fi
+
+            case " $5 " in
+              *" $requested "*)
+                resolved=$requested
+                echo "Using ${label} ${requested} from ${origin}."
+                return
+                ;;
+            esac
+
+            echo "::warning title=NorbiAI ignored an unknown ${label}::\`${requested}\` in ${origin} is not one of: ${5}. Reviewing with \`${4}\` instead."
+            resolved=$4
+          }
+
+          choose model "$comment_model" "$pr_model" "$DEFAULT_MODEL" "$ALLOWED_MODELS"
+          model=$resolved
+          choose "reasoning effort" "$comment_effort" "$pr_effort" "$DEFAULT_EFFORT" "$ALLOWED_EFFORTS"
+          effort=$resolved
+
+          {
+            echo "model=$model"
+            echo "effort=$effort"
           } >> "$GITHUB_OUTPUT"
 
       - name: Load previous findings and author responses
@@ -394,6 +494,8 @@ jobs:
           PREVIOUS_FILE: ${{ steps.previous.outputs.previous_file }}
           WITHDRAWN_FILE: ${{ steps.previous.outputs.withdrawn_file }}
           RESPONSES_FILE: ${{ steps.previous.outputs.responses_file }}
+          MODEL: ${{ steps.reviewer.outputs.model }}
+          EFFORT: ${{ steps.reviewer.outputs.effort }}
         run: |
           set -euo pipefail
 
@@ -497,8 +599,8 @@ jobs:
           timeout 900 codex exec \
             --ephemeral \
             --sandbox danger-full-access \
-            --model chatgpt-web/extra-high \
-            --config 'model_reasoning_effort="xhigh"' \
+            --model "$MODEL" \
+            --config "model_reasoning_effort=\"${EFFORT}\"" \
             --color never \
             --output-last-message "$last_message_file" \
             - < "$prompt_file" 2>&1 | tee "$live_file"
@@ -577,6 +679,8 @@ jobs:
           LINES_REMOVED: ${{ steps.review.outputs.lines_removed }}
           DIFF_BYTES: ${{ steps.review.outputs.diff_bytes }}
           LARGE_PR: ${{ steps.review.outputs.large_pr }}
+          MODEL: ${{ steps.reviewer.outputs.model }}
+          EFFORT: ${{ steps.reviewer.outputs.effort }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set +e
@@ -632,6 +736,7 @@ jobs:
             - Files changed: ${FILES_CHANGED:-unknown}
             - Lines: +${LINES_ADDED:-unknown} / -${LINES_REMOVED:-unknown}
             - Diff size: ${DIFF_BYTES:-unknown} bytes
+            - Reviewer: ${MODEL:-unknown}, reasoning effort ${EFFORT:-unknown}
             - Status: success
             - [Workflow run](${run_url})
 
