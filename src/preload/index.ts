@@ -10,7 +10,13 @@ import {
   type AppLanguagePreference,
   type AttachmentImportEvent,
   type BrowserPreview,
-  type ComputerUseMacSetupState,
+  COMPUTER_USE_STATUSES,
+  type ComputerUseCoveredArea,
+  type ComputerUseCursorPoint,
+  type ComputerUseHighlightPlacement,
+  type ComputerUsePermission,
+  type ComputerUsePermissionApp,
+  type ComputerUseState,
   type ConversationMessage,
   type ConversationPage,
   type ConversationReadState,
@@ -66,6 +72,8 @@ import {
   isFilePreviewKind,
   isQueuedMessageReceipt,
   isQueueSnapshot,
+  isRemoteDesktopSetupStatus,
+  isRemoteDesktopTestStatus,
   isRoutine,
   isRoutineRun,
   isRoutineSchedule,
@@ -83,6 +91,8 @@ import {
   type ProviderCodeLoginStart,
   type QueuedMessageReceipt,
   type QueueSnapshot,
+  type RemoteDesktopSetupStatus,
+  type RemoteDesktopTestStatus,
   type ScopedAgentEvent,
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
@@ -130,22 +140,89 @@ function invokeAgentForServer<TResult>(
   return ipcRenderer.invoke(channel, request).then(decoder);
 }
 
-function decodeComputerUseMacSetupState(value: unknown): ComputerUseMacSetupState {
+function decodeComputerUseState(value: unknown): ComputerUseState {
   if (
     !isDynamicRecord(value) ||
-    !isOneOf(["available", "unavailable", "unsupported"] as const, value.status) ||
-    !isString(value.helperName) ||
-    (value.helperIconDataUrl !== null && !isString(value.helperIconDataUrl)) ||
+    !isOneOf(COMPUTER_USE_STATUSES, value.status) ||
+    !Array.isArray(value.permissions) ||
     (value.message !== null && !isString(value.message))
   ) {
-    throw new Error("Invalid Computer Use macOS setup state.");
+    throw new Error("Invalid Computer Use state.");
   }
   return {
     status: value.status,
-    helperName: value.helperName,
-    helperIconDataUrl: value.helperIconDataUrl,
+    permissions: value.permissions.map(decodeComputerUsePermission),
     message: value.message,
   };
+}
+
+function decodeComputerUseCursorPoint(value: unknown): ComputerUseCursorPoint | null {
+  if (value === null || value === undefined) return null;
+  if (!isDynamicRecord(value) || typeof value.x !== "number" || typeof value.y !== "number") {
+    throw new Error("Invalid Computer Use highlight placement.");
+  }
+  return { x: value.x, y: value.y };
+}
+
+function decodeComputerUseHighlightPlacement(value: unknown): ComputerUseHighlightPlacement {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.x !== "number" ||
+    typeof value.y !== "number" ||
+    typeof value.width !== "number" ||
+    typeof value.height !== "number" ||
+    typeof value.cornerRadius !== "number" ||
+    typeof value.windowTitle !== "string" ||
+    !Array.isArray(value.covered)
+  ) {
+    throw new Error("Invalid Computer Use highlight placement.");
+  }
+  return {
+    x: value.x,
+    y: value.y,
+    width: value.width,
+    height: value.height,
+    cornerRadius: value.cornerRadius,
+    windowTitle: value.windowTitle,
+    cursor: decodeComputerUseCursorPoint(value.cursor),
+    covered: value.covered.map(decodeComputerUseCoveredArea),
+  };
+}
+
+function decodeComputerUseCoveredArea(value: unknown): ComputerUseCoveredArea {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.x !== "number" ||
+    typeof value.y !== "number" ||
+    typeof value.width !== "number" ||
+    typeof value.height !== "number"
+  ) {
+    throw new Error("Invalid Computer Use highlight placement.");
+  }
+  return { x: value.x, y: value.y, width: value.width, height: value.height };
+}
+
+function decodeComputerUsePermissionApp(value: unknown): ComputerUsePermissionApp | null {
+  if (value === null) return null;
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.name) ||
+    (value.iconDataUrl !== null && !isString(value.iconDataUrl))
+  ) {
+    throw new Error("Invalid Computer Use application.");
+  }
+  return { name: value.name, iconDataUrl: value.iconDataUrl };
+}
+
+function decodeComputerUsePermission(value: unknown): ComputerUsePermission {
+  if (
+    !isDynamicRecord(value) ||
+    !isOneOf(["screen-recording", "accessibility"] as const, value.id) ||
+    typeof value.granted !== "boolean"
+  ) {
+    throw new Error("Invalid Computer Use permission.");
+  }
+  return { id: value.id, granted: value.granted };
 }
 
 function rememberActiveServer<T extends { id: string; active: boolean }[]>(servers: T): T {
@@ -846,14 +923,23 @@ const openbotApi: OpenBotDesktopApi = {
     },
     setInteractive: (input) => ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandSetInteractive, input).then(decodeVoid),
   },
-  getComputerUseMacSetupState: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseGetMacSetupState).then(decodeComputerUseMacSetupState),
-  openComputerUsePermissionSetup: (permission) =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseOpenMacPermissionSetup, permission).then(decodeComputerUseMacSetupState),
-  startComputerUseHelperDrag: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseStartHelperDrag).then(decodeVoid),
-  revealComputerUseHelper: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseRevealHelper).then(decodeVoid),
-  closeComputerUsePermissionSetup: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseCloseMacPermissionSetup).then(decodeVoid),
+  getComputerUseState: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseGetState).then(decodeComputerUseState),
+  openComputerUsePermissionPane: (permission) =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseOpenPermissionPane, permission).then(decodeComputerUseState),
+  closeComputerUsePermissionHelp: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseClosePermissionHelp).then(decodeVoid),
+  getComputerUsePermissionApp: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseGetPermissionApp).then(decodeComputerUsePermissionApp),
+  startComputerUsePermissionAppDrag: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseStartPermissionAppDrag).then(decodeVoid),
+  revealComputerUsePermissionApp: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.computerUseRevealPermissionApp).then(decodeVoid),
+  onComputerUseHighlightPlacement: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, placement: unknown) =>
+      listener(decodeComputerUseHighlightPlacement(placement));
+    ipcRenderer.on(IPC_CHANNELS.computerUseHighlightPlacement, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.computerUseHighlightPlacement, handler);
+  },
   openExternal: (destination) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, destination),
   connectProvider: (provider) => ipcRenderer.invoke(IPC_CHANNELS.connectProvider, provider),
   // Decoded, unlike its two neighbours: this reply is read straight after the user's own CLI was
@@ -1243,6 +1329,10 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   remoteDesktop: {
+    checkSetup: (serverId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopCheckSetup, serverId).then(decodeRemoteDesktopSetupFromMain),
+    openSetup: (action) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopOpenSetup, action).then(decodeVoid),
+    test: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopTest, input).then(decodeRemoteDesktopTestFromMain),
     list: () => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopList),
     connect: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopConnect, input),
     selectDisplay: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopSelectDisplay, input),
@@ -1264,4 +1354,13 @@ function decodeAgentAnalyticsFromMain(value: unknown) {
 
 function decodeHostAnalyticsFromMain(value: unknown) {
   return decodeOptionalHostAnalytics(value);
+}
+
+function decodeRemoteDesktopSetupFromMain(value: unknown): RemoteDesktopSetupStatus {
+  if (!isRemoteDesktopSetupStatus(value)) throw new Error("Invalid remote desktop setup response.");
+  return { ...value };
+}
+function decodeRemoteDesktopTestFromMain(value: unknown): RemoteDesktopTestStatus {
+  if (!isRemoteDesktopTestStatus(value)) throw new Error("Invalid remote desktop test response.");
+  return { ...value };
 }

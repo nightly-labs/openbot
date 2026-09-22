@@ -68,6 +68,7 @@ import { errorMessage } from "../../error-message";
 import { SaveBarDock, SettingsDialogShell } from "../settings/SettingsDialogShell";
 import { teamMemberName } from "../team/TeamPersonAvatar";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
+import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { serverSupportsCapability } from "./server-capabilities";
 
@@ -176,6 +177,7 @@ interface MembersPanel {
  * only what read that field.
  */
 interface ServerSettingsPanels {
+  offerRemoteDesktopSetup: boolean;
   identity: ServerIdentityDraft;
   invite: InvitePanel;
   members: MembersPanel;
@@ -183,6 +185,7 @@ interface ServerSettingsPanels {
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const [panels, setPanels] = createStore<ServerSettingsPanels>({
+    offerRemoteDesktopSetup: false,
     identity: {
       editing: false,
       logo: undefined,
@@ -333,6 +336,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         syncedServerId = id;
         setSection("general");
         setPanels((state) => {
+          state.offerRemoteDesktopSetup = false;
           state.identity.editing = false;
           state.identity.nameTouched = false;
           state.identity.nameShaking = false;
@@ -435,6 +439,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     } finally {
       setBusy(null);
     }
+  }
+
+  async function setPublished(value: boolean): Promise<void> {
+    const serverId = props.server.id;
+    const succeeded = await run("publish", () => props.onSetPublished(value));
+    if (!succeeded || props.server.id !== serverId) return;
+    setPanels((state) => {
+      state.offerRemoteDesktopSetup = value && local() && props.platform === "darwin";
+    });
+  }
+
+  function dismissRemoteDesktopSetup(): void {
+    setPanels((state) => {
+      state.offerRemoteDesktopSetup = false;
+    });
   }
 
   async function chooseLogo(file: File | undefined): Promise<void> {
@@ -608,7 +627,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => setModalElement(element)}
         floatingContent={
-          <Show when={props.loadError}>
+          <Show when={props.loadError && (section() === "general" || section() === "members")}>
             <Alert
               ref={measureToast}
               class="server-settings-error-toast"
@@ -988,7 +1007,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               size="default"
               checked={published()}
               disabled={!local() || !configured() || Boolean(busy())}
-              onChange={(value) => void run("publish", () => props.onSetPublished(value))}
+              onChange={(value) => void setPublished(value)}
               label={local() ? "Publish this server" : "Server is published"}
               description={accessDescription()}
             />
@@ -1020,6 +1039,30 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Item>
           </ItemGroup>
         </SettingsSection>
+        <Show when={panels.offerRemoteDesktopSetup}>
+          <ItemGroup class="settings-modal-card">
+            <Item>
+              <ItemContent>
+                <ItemTitle>Set up remote desktop</ItemTitle>
+                <ItemDescription>View and control this Mac from another computer.</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button size="sm" variant="ghost" onClick={dismissRemoteDesktopSetup}>
+                  Later
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    dismissRemoteDesktopSetup();
+                    setSection("desktop");
+                  }}
+                >
+                  Set up
+                </Button>
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+        </Show>
         <SettingsSection title="Notifications">
           <ItemGroup class="settings-modal-card">
             <SwitchField
@@ -1408,40 +1451,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function DesktopPanel() {
     return (
       <SettingsSection title="Remote desktop access">
-        <Show when={props.hostStatus?.remoteDesktopScreenRecordingDenied}>
-          <Alert tone="warning" role="status">
-            <AlertIcon>
-              <Monitor />
-            </AlertIcon>
-            <AlertContent>
-              <AlertTitle>OpenBot may not record this screen</AlertTitle>
-              <AlertDescription>
-                A member asked for this desktop and got nothing to look at. Open System Settings → Privacy &amp;
-                Security → Screen Recording, turn on OpenBot, then check again.
-              </AlertDescription>
-            </AlertContent>
-            <AlertActions>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                loading={busy() === "screen-recording"}
-                onClick={() => void run("screen-recording", props.onOpenScreenRecordingSettings)}
-              >
-                Open System Settings
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                loading={busy() === "screen-recording-recheck"}
-                onClick={() => void run("screen-recording-recheck", props.onRecheckScreenRecording)}
-              >
-                Check again
-              </Button>
-            </AlertActions>
-          </Alert>
-        </Show>
+        <RemoteDesktopSetup server={props.server} platform={props.platform} />
         <ItemGroup class="settings-modal-card server-settings-desktop-card">
           <Show when={local()} fallback={remoteDesktopConnection()}>
             <Item size="spacious">
@@ -1456,7 +1466,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               </ItemContent>
               <ItemActions class="server-settings-desktop-meta">
                 <Badge tone={props.hostStatus?.remoteDesktopReady ? "success" : "warning"} shape="pill">
-                  {props.hostStatus?.remoteDesktopReady ? "Service ready" : "Host component not installed"}
+                  {props.hostStatus?.remoteDesktopReady ? "Host component installed" : "Host component not installed"}
                 </Badge>
                 <Text as="span" variant="caption" tone="muted">
                   Unattended: {props.hostStatus?.remoteDesktopUnattended ? "enabled" : "not available"} · Active

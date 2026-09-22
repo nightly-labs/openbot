@@ -38,7 +38,7 @@ import type {
   TeamRealtimeEvent,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import { LOCAL_SERVER_ID, REMOTE_DESKTOP_SETUP_CAPABILITY, type RemoteDesktopTestInput } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
@@ -56,6 +56,7 @@ import {
   decodeDirectMessage,
   decodeDirectThreadSummaries,
 } from "./remote-conversation-decoding";
+import { decodeRemoteDesktopSetupFromHost, decodeRemoteDesktopTestFromHost } from "./remote-desktop-setup-decoding";
 import { decodeRemoteDesktopSession } from "./remote-device-decoding";
 import { decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
 import { type RemoteRequestInit, RemoteServerClient } from "./remote-server-client";
@@ -775,6 +776,24 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       type: "team-direct-typing",
       recipientMemberId: input.memberId,
       typing: input.typing,
+    });
+  }
+
+  checkRemoteDesktopSetup(serverId: string) {
+    if (!this.supportsCapability(serverId, REMOTE_DESKTOP_SETUP_CAPABILITY))
+      throw new Error("Update OpenBot on the host to check remote desktop setup.");
+    return this.request(serverId, TEAM_API_ROUTES.remoteScreen.setup, decodeRemoteDesktopSetupFromHost, {
+      method: "POST",
+      body: {},
+    });
+  }
+
+  testRemoteDesktop(input: RemoteDesktopTestInput) {
+    if (!this.supportsCapability(input.serverId, REMOTE_DESKTOP_SETUP_CAPABILITY))
+      throw new Error("Update OpenBot on the host to test remote desktop setup.");
+    return this.request(input.serverId, TEAM_API_ROUTES.remoteScreen.test, decodeRemoteDesktopTestFromHost, {
+      method: "POST",
+      body: { sessionId: input.sessionId, action: input.action },
     });
   }
 

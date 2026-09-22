@@ -9,7 +9,7 @@
  * same categories the rest of the marketplace already offers.
  */
 
-import type { McpTransport, SkillCategory } from "@openbot/contracts/ipc";
+import type { McpServerConfig, McpTransport, SkillCategory } from "@openbot/contracts/ipc";
 import type { McpAuth } from "./mcp-connect-auth";
 
 /**
@@ -58,6 +58,27 @@ interface MarketplacePluginServerBase {
    * granted in the browser, so nothing secret is catalog data.
    */
   auth?: McpAuth | null;
+}
+
+/**
+ * Whether a row the host holds is the one this app installs.
+ *
+ * The name alone cannot say so. `McpServerStore` keeps names unique, so a server the user wrote by
+ * hand can own a catalog name while pointing somewhere else entirely; treating that row as the
+ * plugin's would delete the user's own configuration on uninstall and forget the sign-in kept for
+ * it. The address - or the command and its words - is compared as well, and nothing else: the
+ * connect step adds the credential the user typed to the row that is saved, so headers, environment
+ * and enabled state all differ legitimately from what the listing states.
+ */
+export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): boolean {
+  const server = app.server;
+  if (config.name !== server.name || config.transport !== server.transport) return false;
+  if (server.transport === "http") return config.url === server.url;
+  return (
+    config.command === server.command &&
+    config.args.length === server.args.length &&
+    config.args.every((arg, index) => arg === server.args[index])
+  );
 }
 
 /** An MCP server the plugin publishes. The listing calls it an app, because that is what it is to the user. */

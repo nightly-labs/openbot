@@ -13,7 +13,7 @@ import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
 import { Button, Dialog, Textarea } from "../../components/ui";
 import { errorMessage } from "../../error-message";
-import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
+import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { InvitePreviewCard } from "../servers/JoinServerDialog";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
@@ -264,7 +264,7 @@ export function InitialSetup(props: InitialSetupProps) {
                 onChange={setSelectedProvider}
               />
 
-              <ComputerUseMacSetup platform={props.platform} variant="compact" />
+              <ComputerUseSetup variant="compact" />
             </div>
           </Show>
 

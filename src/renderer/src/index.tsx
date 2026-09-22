@@ -1,6 +1,7 @@
 import { render } from "@solidjs/web";
 import { App } from "./App";
-import { ComputerUseSetupSurface } from "./features/computer-use/ComputerUseSetupSurface";
+import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUseHighlightSurface";
+import { ComputerUsePermissionHelp, permissionFromQuery } from "./features/computer-use/ComputerUsePermissionHelp";
 import { DynamicIslandSurface } from "./features/dynamic-island/DynamicIslandSurface";
 import "./styles.css";
 
@@ -11,14 +12,15 @@ if (!root) {
 }
 
 const surface = new URLSearchParams(window.location.search).get("surface");
-render(
-  () =>
-    surface === "dynamic-island" ? (
-      <DynamicIslandSurface />
-    ) : surface === "computer-use-setup" ? (
-      <ComputerUseSetupSurface />
-    ) : (
-      <App />
-    ),
-  root,
-);
+render(() => {
+  if (surface === "dynamic-island") return <DynamicIslandSurface />;
+  if (surface === "computer-use-highlight") return <ComputerUseHighlightSurface />;
+  if (surface === "computer-use-permission-help")
+    return (
+      <ComputerUsePermissionHelp
+        permission={permissionFromQuery(window.location.search)}
+        sunshine={new URLSearchParams(window.location.search).get("application") === "sunshine"}
+      />
+    );
+  return <App />;
+}, root);

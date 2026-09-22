@@ -23,6 +23,7 @@ import type {
   BrowserTab,
   CentralAuthState,
   CentralAuthUser,
+  ComputerUseState,
   ConfigureHostInput,
   ConversationMessage,
   ConversationSnapshot,
@@ -41,6 +42,7 @@ import type {
   InstalledSkill,
   InviteSummary,
   JoinServerInput,
+  MacPermissionId,
   MarketplaceSkillDetail,
   OpenAttachmentInput,
   OpenBotDesktopApi,
@@ -234,6 +236,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let setupState = clone<AppSetupState>(
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
   );
+  const grantedComputerUsePermissions = new Set<MacPermissionId>();
+  const computerUseState = (): ComputerUseState => {
+    const permissions = (["screen-recording", "accessibility"] as const).map((id) => ({
+      id,
+      granted: grantedComputerUsePermissions.has(id),
+    }));
+    return {
+      status: permissions.every(({ granted }) => granted) ? "ready" : "permissions-required",
+      permissions,
+      message: null,
+    };
+  };
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
@@ -627,21 +641,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
     },
-    getComputerUseMacSetupState: async () => ({
-      status: "available",
-      helperName: "Codex Computer Use",
-      helperIconDataUrl: null,
-      message: null,
-    }),
-    openComputerUsePermissionSetup: async () => ({
-      status: "available",
-      helperName: "Codex Computer Use",
-      helperIconDataUrl: null,
-      message: null,
-    }),
-    startComputerUseHelperDrag: async () => undefined,
-    revealComputerUseHelper: async () => undefined,
-    closeComputerUsePermissionSetup: async () => undefined,
+    getComputerUseState: async () => computerUseState(),
+    // The preview grants the permission the pane was opened for, because the panel's whole job is
+    // to show the answer changing. A mock that always reported the same state would make every
+    // story of this panel look identical.
+    openComputerUsePermissionPane: async (permission) => {
+      grantedComputerUsePermissions.add(permission);
+      return computerUseState();
+    },
+    // The help window belongs to the desktop app. The preview has no second window to close, and
+    // the panel never waits on the answer.
+    closeComputerUsePermissionHelp: async () => undefined,
+    // No bundle to drag in a browser, so the window draws its steps and nothing else.
+    getComputerUsePermissionApp: async () => null,
+    startComputerUsePermissionAppDrag: async () => undefined,
+    revealComputerUsePermissionApp: async () => undefined,
+    // The rim is drawn over another application's window, which the preview has none of, so this
+    // subscribes to a stream that never carries anything.
+    onComputerUseHighlightPlacement: () => () => undefined,
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
@@ -2134,6 +2151,22 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     remoteDesktop: {
+      checkSetup: async () => ({
+        platform: "darwin",
+        hostName: "Mac mini",
+        username: "openbot",
+        checkedAt: new Date().toISOString(),
+        screenRecording: hostStatus.remoteDesktopScreenRecordingDenied ? "blocked" : "allowed",
+        accessibility: "blocked",
+        service: "allowed",
+        displays: "allowed",
+        guiSession: "allowed",
+        restartRequired: false,
+        activeSessions: remoteDesktopSessions.length,
+        message: null,
+      }),
+      openSetup: async () => undefined,
+      test: async (input) => ({ active: input.action !== "stop", mouse: false, keyboard: false, code: "1234" }),
       list: async () => clone(remoteDesktopSessions),
       connect: async (input) => {
         const session: RemoteDesktopSession = {

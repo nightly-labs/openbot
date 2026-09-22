@@ -268,8 +268,27 @@ give an agent a task you would not allow a local command-line tool to perform.
 On first launch, OpenBot explains this access and does not start the agent services until you
 explicitly accept it. The acceptance record stays in OpenBot's local application-support directory.
 
-Computer Use is provided by a separately installed local Codex plugin. macOS permission prompts and
-any plugin safety hand-offs remain controlled by macOS and that plugin.
+Computer Use is provided by `cua-driver`, a local binary that OpenBot ships and starts as its own
+child process. It starts only when you open the Computer Use panel or an agent uses the function, and
+it stops when OpenBot stops. Because OpenBot starts it directly, macOS attributes the Screen Recording
+and Accessibility grants to OpenBot, and macOS keeps control of the prompts. Windows and Linux ask for
+no such grant. Screen contents and accessibility trees that an agent reads through the driver go to
+that agent's provider, the same as any other message content.
+
+The driver is third-party software with its own product analytics, which its vendor turns on by
+default and which are not OpenBot's. They would send the driver version, the operating system, a
+random installation identifier, and a bucketed record of each tool call to that vendor. They never
+send screen contents, window or application names, typed text, or the content of a tool result.
+
+On its own the driver also asks GitHub for a newer release each time it starts.
+
+**OpenBot stops both calls, always.** Every copy of the driver OpenBot starts gets
+`CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and `CUA_DRIVER_RS_UPDATE_CHECK=0`, so it sends the vendor
+nothing and asks GitHub nothing. OpenBot pins the driver version it packages, so a release check
+could only offer you an update OpenBot would refuse. The driver reads the environment before its own
+configuration, and OpenBot sets both variables last, so nothing can turn them back on for a driver
+OpenBot started. OpenBot writes no file, so a driver you run yourself keeps the settings you gave
+it.
 
 Auto approve also permits that agent to publish, update and delete public hosted sites without
 another confirmation. Turbo mode extends this permission to every agent on that host. Publishing
@@ -373,6 +392,14 @@ include them in logs. The installed administrator CLI shows each password once o
 then removes the recovery file. A failed setup retains that root-only file for administrator recovery.
 The administrator controls secure password delivery. Host verification reads home metadata only
 and tests cross-user access using harmless temporary files outside tenant homes.
+
+### Remote desktop setup diagnostics
+
+When an authenticated server member checks remote desktop setup, the host sends its computer name,
+macOS account name, permission and service results, active session count, and check time to that member.
+A live test also sends a temporary four-digit code and mouse and keyboard test results. These results
+stay in memory and are not sent to analytics. Screen video uses the existing remote desktop connection.
+Permission approval remains in macOS System Settings on the host.
 
 ## Secure browser authentication
 

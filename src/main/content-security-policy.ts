@@ -5,7 +5,6 @@ export function buildContentSecurityPolicy(packaged: boolean, developmentSignalU
     ? ""
     : ` http://localhost:* ws://localhost:*${developmentSignalSource(developmentSignalUrl)}`;
   const developmentImageSources = packaged ? "" : " http://127.0.0.1:* http://localhost:*";
-  const developmentFrameSources = packaged ? "" : " http://127.0.0.1:* http://localhost:*";
 
   return [
     "default-src 'self'",
@@ -18,7 +17,8 @@ export function buildContentSecurityPolicy(packaged: boolean, developmentSignalU
     "media-src 'self' blob: openbot-attachment: openbot-remote-attachment:",
     `connect-src 'self' openbot-attachment: openbot-remote-attachment: https://analytics.openbot.run ws://127.0.0.1:* wss://*.openbot.run${developmentSources}`,
     "object-src 'none'",
-    `frame-src 'self' openbot-attachment: openbot-remote-attachment: https://*.openbot.run${developmentFrameSources}`,
+    // The remote desktop viewer uses a loopback proxy in packaged apps too.
+    "frame-src 'self' openbot-attachment: openbot-remote-attachment: https://*.openbot.run http://127.0.0.1:* http://localhost:*",
     "base-uri 'none'",
   ].join("; ");
 }

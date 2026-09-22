@@ -16,6 +16,8 @@ import {
   parseReadDirectConversationPage,
   parseRemoteDesktopConnect,
   parseRemoteDesktopDisplay,
+  parseRemoteDesktopSetupAction,
+  parseRemoteDesktopTest,
   parseReorderServers,
   parseSendDirectMessage,
   parseSetServerMuted,
@@ -143,6 +145,19 @@ export function teamIpcHandlers({
       createInvite: payloadHandler(parseCreateTeamInvite, (invite) => host.createInvite(invite)),
     },
     remoteDesktop: {
+      checkSetup: payloadHandler(stringPayload("serverId"), (serverId) =>
+        routeToServer(serverId, {
+          local: () => host.checkRemoteDesktopSetup(),
+          remote: (target) => remoteServers.checkRemoteDesktopSetup(target),
+        }),
+      ),
+      openSetup: payloadHandler(parseRemoteDesktopSetupAction, (action) => host.openRemoteDesktopSetup(action)),
+      test: payloadHandler(parseRemoteDesktopTest, (input) =>
+        routeToServer(input.serverId, {
+          local: () => host.testLocalRemoteDesktop(input.sessionId, input.action),
+          remote: () => remoteServers.testRemoteDesktop(input),
+        }),
+      ),
       list: handler(() => remoteDesktop.list()),
       connect: payloadHandler(parseRemoteDesktopConnect, (request) => remoteDesktop.connect(request)),
       selectDisplay: payloadHandler(parseRemoteDesktopDisplay, (request) =>

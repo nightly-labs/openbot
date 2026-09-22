@@ -11,7 +11,8 @@ export function serverSupportsCapability(
   capability: TeamCurrentCapability,
 ): boolean {
   if (
-    (capability === "channel-chats-v1" ||
+    (capability === "remote-desktop-setup" ||
+      capability === "channel-chats-v1" ||
       capability === "channel-delete-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||

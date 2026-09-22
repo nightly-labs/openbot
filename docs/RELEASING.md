@@ -43,9 +43,9 @@ checksum, SBOM, and provenance checks.
 
 ## Build the remote desktop runtime
 
-`native-runtime.lock.json` pins the OpenBot forks of Sunshine `v2026.516.143833` and Moonlight Web
-`v2.10.0` by full commit and source archive SHA-256. Each entry also records its exact upstream base
-commit and the reviewable OpenBot patch. Build on the target platform:
+`native-runtime.lock.json` pins the upstream source for Sunshine `v2026.516.143833` and Moonlight Web
+`v2.10.0` by full commit and source archive SHA-256. Each entry also records the reviewable OpenBot
+patch applied to that source. Build on the target platform:
 
 ```bash
 bun run build:remote-desktop-runtime
@@ -64,6 +64,11 @@ recipe or a pinned input changes. It publishes an immutable GitHub prerelease na
 SBOMs, build provenance, and `remote-desktop-runtime-manifest.json`. It is not an OpenBot application
 update and it must never contain `latest.yml`.
 
+PR pushes do not cancel an active runtime build. The next run reuses a successful native build
+from the same PR and platform when its native inputs and build tools are unchanged. It still runs
+verification and the macOS smoke test against the current checkout. A cache miss rebuilds the
+runtime. Pushes to `main` and manual dispatches do not use the PR build cache.
+
 After publication, the workflow opens a draft PR that adds the release tag and SHA-256 values to
 `native-runtime.lock.json`. That job runs only from `main`, because it pins against the lock it checks
 out: the input digest is derived from the recipe on disk, and a manifest built from a different recipe
@@ -81,6 +86,11 @@ gh release download remote-desktop-runtime-<input-digest> --pattern remote-deskt
 bun scripts/pin-remote-desktop-runtime.ts remote-desktop-runtime-manifest.json
 ```
 
+To repeat verification after a download or CI setup failure, without replacing the published
+artifacts, run `gh workflow run remote-desktop-runtime.yml --ref <branch> -f verify_only=true`.
+This mode requires an existing release for the current input digest and runs installation, runtime
+verification, the macOS smoke test, and application packaging. It does not build or publish.
+
 Commit the rewritten `native-runtime.lock.json` to the branch and merge it with the recipe, so `main`
 never sees the two apart. The pin does not change the input digest -- it covers `recipeVersion`, both
 source entries and `targets`, not the artifacts -- so it cannot invalidate the release it just pinned.
@@ -95,6 +105,29 @@ bun run verify:remote-desktop-runtime
 The installer accepts only the exact prerelease and assets in the lock file. It rejects a changed
 manifest, a changed archive, an unsafe archive path, and a mismatched source manifest. Do not replace
 assets in an existing runtime prerelease. Increase `recipeVersion` when the build process changes.
+
+### Sunshine security backports (runtime recipe 12)
+
+The Sunshine upstream base remains `v2026.516.143833` to keep the tested macOS input backend.
+The OpenBot patch includes these upstream security changes and regression tests:
+
+- `1583e7c4a7e99538c7700315a1d2a2101c6d2812`: validate input packets before queueing and
+  dispatch (GHSA-26q2-58j6-qmvv and GHSA-6w33-pjh7-p77c).
+- `82bccdf69894ee03ac422cc787f1ac9654da359d`: reject short ENet control packets
+  (GHSA-c428-87f8-rrv5).
+- `ccf97e38796be6cfcbff0ef248a684d39e181eba`: bind pairing approval to an explicit,
+  expiring request ID (GHSA-36ff-frg7-492f).
+- `4d768847fcd88cc94ac745c4611715c67d7d67e1`: require the exact enabled client
+  certificate and canonicalize stored certificate identities (GHSA-6jvv-jqr7-m6m3).
+
+Backport adaptations retain the older platform APIs and test fixtures. Native CI builds and runs
+only the relevant packet, pairing, REST authorization, and certificate regression tests. The local
+Moonlight client uses a random pairing name and approves only its matching loopback request ID.
+Moonlight now builds from the same upstream commit with the existing OpenBot patch and a fix
+that sends the configured pairing name instead of the upstream hard-coded name.
+The published runtime uses a new recipe/input digest; no existing release assets are replaced.
+The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
+on Linux.
 
 ## Pin the OpenCode CLI
 
@@ -121,6 +154,37 @@ Run it on a version bump only. A bump also needs the Windows checks in
 [the OpenCode notes](ARCHITECTURE.md#opencode-and-acp): the `win32-x64` values come from the
 published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
 before release.
+
+## Pin the Computer Use driver
+
+`native-runtime.lock.json` pins `cua-driver`, the third-party binary that gives every provider
+Computer Use, by release tag, asset SHA-256, and one SHA-256 for each file OpenBot ships. Unlike the
+provider CLIs, the driver is packaged rather than downloaded on demand, so the release carries it and
+the user installs nothing.
+
+```bash
+bun run pin:cua-driver 0.28.2
+```
+
+The script downloads all three `-binary` release assets, hashes each shipped file, and refuses a
+release that renamed an asset or dropped a file. It prints the block for review instead of rewriting
+the lock, so paste it over the `cuaDriver` entry. Use the versioned `cua-driver-rs-v*` tags; the
+`nightly-cua-driver-rs-v*` tags are rebuilt daily and are not a pin.
+
+`bun run prepare:cua-driver` then writes `build/cua-driver/<platform>/<arch>` from the pin, verifying
+every digest before and after it installs, and `electron-builder.yml` copies that directory to
+`resources/cua-driver/<platform>/<arch>`. Every `package`, `package:*`, `dist:*` and `dist:release`
+run does this first. Each installer carries only its own target's driver, and the package verifiers
+check both that the driver is present and that no other platform's is. The macOS release job calls
+`electron-builder` directly rather than through `dist:mac`, so it installs the driver in its own
+`Install and verify native runtimes` step; the Windows and Linux jobs get it from `dist:win` and
+`dist:linux`.
+
+On macOS the driver arrives signed by Cua AI with the hardened runtime, a secure timestamp, and the
+Automation entitlement. `mac.signIgnore` keeps that signature: re-signing it under OpenBot's
+inherited entitlements would drop the entitlement and break the driver's Automation route.
+Notarization accepts a nested binary signed by another Developer ID team, and
+`verify-macos-package.ts` fails if the Cua AI authority or the hardened runtime flag is ever lost.
 
 ## Pin the Bun tool runtime
 
