@@ -68,7 +68,11 @@ interface ActiveTurn {
   id: string;
   itemId: string;
   reasoningItemId: string;
+  /** Text held back from the reader until a step boundary or the end of the turn classifies it. */
   text: string;
+  /** Every assistant character this turn has produced, which is what a repeat is measured against. */
+  seenText: string;
+  narrationCount: number;
   thinking: string;
   thinkingStarted: boolean;
   thinkingStreamId: string | null;
@@ -494,6 +498,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       itemId: `${turnId}:assistant`,
       reasoningItemId: `${turnId}:reasoning`,
       text: "",
+      seenText: "",
+      narrationCount: 0,
       thinking: "",
       thinkingStarted: false,
       thinkingStreamId: null,
@@ -560,7 +566,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
       if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
-        if (delta.type === "text_delta" && isString(delta.text)) this.#appendDelta(runtime, delta.text);
+        if (delta.type === "text_delta" && isString(delta.text)) this.#bufferText(runtime, delta.text);
         else if (delta.type === "thinking_delta" && isString(delta.thinking)) {
           this.#appendThinkingDelta(runtime, delta.thinking, message.uuid);
         }
@@ -581,7 +587,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           this.#appendThinkingDelta(runtime, completeThinking.slice(turn.thinking.length));
         }
       }
-      for (const toolCall of messageToolCalls(message.message)) {
+      const toolCalls = messageToolCalls(message.message);
+      // A tool call closes the step, which makes the text before it narration rather than an answer.
+      if (toolCalls.length > 0) this.#flushNarration(runtime);
+      for (const toolCall of toolCalls) {
         if (turn.toolCalls.has(toolCall.id)) continue;
         turn.toolCalls.set(toolCall.id, toolCall.name);
         this.#emitToolCall(runtime, toolCall.id, toolCall.name, false);
@@ -589,8 +598,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (!text) return;
       turn.assistantMessages.set(message.uuid, text);
       const completeText = [...turn.assistantMessages.values()].join("");
-      if (completeText.startsWith(turn.text)) {
-        this.#appendDelta(runtime, completeText.slice(turn.text.length));
+      if (completeText.startsWith(turn.seenText)) {
+        this.#bufferText(runtime, completeText.slice(turn.seenText.length));
       }
       return;
     }
@@ -635,8 +644,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       turn.toolCalls.clear();
       const completeText = [...turn.assistantMessages.values()].join("");
-      if (completeText) turn.text = completeText;
-      else if (!turn.text && fallback) this.#appendDelta(runtime, fallback);
+      if (completeText.startsWith(turn.seenText)) {
+        this.#bufferText(runtime, completeText.slice(turn.seenText.length));
+      } else if (completeText && turn.narrationCount === 0) {
+        // The stream and the complete messages disagree. Nothing is published yet, so the complete
+        // messages win, as they did before any of this turn's text could be held back.
+        turn.text = completeText;
+        turn.seenText = completeText;
+      }
+      if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
     }
     const interrupted =
       message.terminal_reason === "aborted_streaming" ||
@@ -664,6 +680,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #appendThinkingDelta(runtime: ThreadRuntime, delta: string, streamId?: string): void {
     const turn = runtime.activeTurn;
     if (!turn || !delta) return;
+    this.#flushNarration(runtime);
     if (!turn.thinkingStarted) {
       turn.thinkingStarted = true;
       this.emit("notification", {
@@ -689,19 +706,35 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  #appendDelta(runtime: ThreadRuntime, delta: string): void {
+  /* Claude cannot say which text is its answer while the text arrives: the narration before a tool
+     call reads the same as the reply that ends the turn. Hold it here instead of streaming it into
+     the answer item, where every word of it drew a chat bubble that the end of the turn rewrote. */
+  #bufferText(runtime: ThreadRuntime, delta: string): void {
     const turn = runtime.activeTurn;
     if (!turn || !delta) return;
     turn.text += delta;
+    turn.seenText += delta;
+  }
+
+  /** Publish held text as the thinking disclosure, which is what a step boundary proves it was. */
+  #flushNarration(runtime: ThreadRuntime): void {
+    const turn = runtime.activeTurn;
+    if (!turn?.text) return;
     this.emit("notification", {
-      method: "item/agentMessage/delta",
+      method: "item/completed",
       params: {
         threadId: runtime.id,
         turnId: turn.id,
-        itemId: turn.itemId,
-        delta,
+        item: {
+          id: `${turn.id}:narration:${turn.narrationCount}`,
+          type: "agentMessage",
+          phase: "commentary",
+          text: turn.text,
+        },
       },
     });
+    turn.narrationCount += 1;
+    turn.text = "";
   }
 
   #completeTurn(runtime: ThreadRuntime, status: string, error: unknown): void {
@@ -747,6 +780,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const turns: NonNullable<ThreadResponse["thread"]["turns"]> = [];
     let current: (typeof turns)[number] | null = null;
     let currentThinking: ThreadItem | null = null;
+    /* Only a turn's last answer is an answer. Every earlier one was narration between tool calls,
+       so it is demoted as soon as the next one proves it was not the end of the turn. A restored
+       thread otherwise reopens with the chat bubbles a live turn no longer draws. */
+    let currentAnswer: ThreadItem | null = null;
     for (const message of messages) {
       if (message.parent_tool_use_id) continue;
       const text = messageText(message.message);
@@ -766,6 +803,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         };
         turns.push(current);
         currentThinking = null;
+        currentAnswer = null;
       } else if (message.type === "assistant") {
         const thinking = messageThinking(message.message);
         if (!thinking && !text) continue;
@@ -773,6 +811,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           current = { id: message.uuid, status: "completed", items: [] };
           turns.push(current);
           currentThinking = null;
+          currentAnswer = null;
         }
         if (thinking) {
           if (currentThinking) {
@@ -787,7 +826,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             current.items?.push(currentThinking);
           }
         }
-        if (text) current.items?.push({ id: message.uuid, type: "agentMessage", text });
+        if (text) {
+          if (currentAnswer) currentAnswer.phase = "commentary";
+          currentAnswer = { id: message.uuid, type: "agentMessage", text };
+          current.items?.push(currentAnswer);
+        }
       }
     }
     return { thread: { id: threadId, turns } };

@@ -145,6 +145,21 @@ export function mergeProviderHistory(
 function reconcileClaudeHistory(stored: ConversationSnapshot, imported: ConversationSnapshot): ConversationSnapshot {
   const storedMessages = new Map(stored.messages.map((message) => [message.id, message]));
   const turns = new Map<string, ConversationMessage[]>();
+  /* A turn's narration is imported under the session's own message IDs, which never match the IDs a
+     live turn published it under. A turn this app already holds therefore keeps the narration it
+     recorded, and the imported copy is dropped rather than stored a second time on every restart. */
+  const storedNarrationTurns = new Set<string>();
+  for (const message of stored.messages) {
+    if (message.author !== "assistant" || message.itemType !== "commentary" || !message.turnId) continue;
+    storedNarrationTurns.add(message.turnId);
+  }
+  const importedNarration = new Map<string, ConversationMessage[]>();
+  for (const message of imported.messages) {
+    if (message.author !== "assistant" || message.itemType !== "commentary" || !message.turnId) continue;
+    const parts = importedNarration.get(message.turnId) ?? [];
+    parts.push(message);
+    importedNarration.set(message.turnId, parts);
+  }
   for (const message of imported.messages) {
     if (message.author !== "assistant" || message.itemType !== "agentMessage" || !message.turnId) continue;
     const parts = turns.get(message.turnId) ?? [];
@@ -166,6 +181,10 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
     if (!first || !last) continue;
     replacements.set(first.id, { ...answer, text, status: last.status });
     for (const part of parts.slice(1)) omitted.add(part.id);
+    if (!storedNarrationTurns.has(turnId)) continue;
+    for (const narration of importedNarration.get(turnId) ?? []) {
+      if (!storedMessages.has(narration.id)) omitted.add(narration.id);
+    }
   }
   return {
     ...imported,

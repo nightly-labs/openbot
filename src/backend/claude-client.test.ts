@@ -331,9 +331,19 @@ fi
     expect(notifications).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ method: "turn/started" }),
+        // Answer text is held rather than streamed, and the thinking that follows it proves it was
+        // narration: it is published as commentary instead of a chat bubble.
         expect.objectContaining({
-          method: "item/agentMessage/delta",
-          params: expect.objectContaining({ turnId: deliveryId, delta: "Hi" }),
+          method: "item/completed",
+          params: expect.objectContaining({
+            turnId: deliveryId,
+            item: {
+              id: `${deliveryId}:narration:0`,
+              type: "agentMessage",
+              phase: "commentary",
+              text: "Hi",
+            },
+          }),
         }),
         expect.objectContaining({
           method: "item/started",
@@ -707,8 +717,8 @@ fi
     output.push(resultMessage(threadId, turnId, ""));
     await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
 
-    expect(notificationDeltas(notifications)).toEqual(["Visible without a refresh"]);
-    expect(completedText(notifications)).toBe("Visible without a refresh");
+    expect(answerText(notifications)).toBe("Visible without a refresh");
+    expect(narrationTexts(notifications)).toEqual([]);
     expect(JSON.stringify(notifications)).not.toContain("Hidden child response");
     await client.stop();
   });
@@ -751,8 +761,9 @@ fi
     output.push(resultMessage(threadId, turnId, "Hello"));
     await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
 
-    expect(notificationDeltas(notifications)).toEqual(["Hel", "lo"]);
-    expect(completedText(notifications)).toBe("Hello");
+    // The suffix is added to the held buffer, so the answer reads once rather than as "HelHello".
+    expect(answerText(notifications)).toBe("Hello");
+    expect(narrationTexts(notifications)).toEqual([]);
     await client.stop();
   });
 
@@ -807,13 +818,13 @@ fi
       });
       output.push(resultMessage(threadId, turnId, parts.join("")));
       await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
-      const completed = notifications.find(
-        (event) =>
-          event.method === "item/completed" && getString(getRecord(event.params, "item"), "type") === "agentMessage",
-      );
-      const finalText = getString(getRecord(completed?.params, "item"), "text") ?? "";
-      expect(finalText).toBe(parts.join(""));
-      const itemId = getString(getRecord(completed?.params, "item"), "id");
+      // Only the last part ends the turn. Everything before it was narration between tool calls,
+      // and rides the thinking disclosure rather than a chat bubble.
+      const narration = parts.slice(0, -1);
+      const finalText = parts.at(-1) ?? "";
+      expect(answerText(notifications)).toBe(finalText);
+      expect(narrationTexts(notifications)).toEqual(narration);
+      const itemId = getString(answerItem(notifications), "id");
       if (!itemId || !root) throw new Error("Missing completed message or test database directory.");
       const store = new AgentStore(join(root, "data"), join(root, "home"));
       const database = store.database;
@@ -831,7 +842,15 @@ fi
           threadId: publicThreadId,
           activeTurnId: null,
           revision: 0,
-          messages: [{ ...newAssistantMessage(itemId, turnId), text: finalText, status: "completed" as const }],
+          messages: [
+            ...narration.map((text, index) => ({
+              ...newAssistantMessage(`${turnId}:narration:${index}`, turnId),
+              text,
+              itemType: "commentary",
+              status: "completed" as const,
+            })),
+            { ...newAssistantMessage(itemId, turnId), text: finalText, status: "completed" as const },
+          ],
         };
         database.persistConversation(live, "test.live-completed");
         const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
@@ -839,17 +858,98 @@ fi
         imported.threadId = publicThreadId;
         const merged = mergeProviderHistory(database.readConversation(agent.id, publicThreadId), imported, "claude");
         database.persistConversation(merged, "provider-history.backfilled");
-        const visible = database
+        const assistant = database
           .readConversation(agent.id, publicThreadId)
           .messages.filter((message) => message.author === "assistant");
-        expect(visible.map((message) => message.text).join("")).toBe(parts.join(""));
-        expect(visible.map((message) => message.id)).toEqual([itemId]);
+        const answers = assistant.filter((message) => message.itemType !== "commentary");
+        expect(answers.map((message) => message.text)).toEqual([finalText]);
+        expect(answers.map((message) => message.id)).toEqual([itemId]);
+        // The backfill keeps the narration this app recorded and adds no second copy of it.
+        const thinking = assistant.filter((message) => message.itemType === "commentary");
+        expect(thinking.map((message) => message.text)).toEqual(narration);
       } finally {
         database.close();
         await client.stop();
       }
     },
   );
+
+  it("answers with streamed text that no complete assistant message repeats", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "88888888-8888-4888-8888-888888888888";
+    await startTurn(client, threadId, turnId);
+
+    output.push(streamDelta(threadId, turnId, "Streamed only."));
+    output.push(resultMessage(threadId, turnId, ""));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(answerText(notifications)).toBe("Streamed only.");
+    expect(narrationTexts(notifications)).toEqual([]);
+    await client.stop();
+  });
+
+  it("keeps the text before a tool call out of the answer bubble", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "66666666-6666-4666-8666-666666666666";
+    await startTurn(client, threadId, turnId);
+
+    output.push(streamDelta(threadId, turnId, "Let me read the file."));
+    output.push(assistantMessage(threadId, "narration-message", "Let me read the file."));
+    output.push(toolUseMessage(threadId, "tool-message", "tool-use-1", "Read"));
+    output.push(toolResultMessage(threadId, "tool-result", "tool-use-1"));
+    output.push(streamDelta(threadId, turnId, "The file sets the timeout."));
+    output.push(assistantMessage(threadId, "answer-message", "Let me read the file.The file sets the timeout."));
+    output.push(resultMessage(threadId, turnId, "Let me read the file.The file sets the timeout."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications)).toEqual(["Let me read the file."]);
+    expect(answerItem(notifications)).toMatchObject({
+      id: `${turnId}:assistant`,
+      type: "agentMessage",
+      text: "The file sets the timeout.",
+    });
+    await client.stop();
+  });
+
+  it("restores a turn's earlier answers as commentary", async () => {
+    const turnId = "77777777-7777-4777-8777-777777777777";
+    const history: SessionMessage[] = [];
+    const { client, threadId } = await createHarness(history);
+    history.push(
+      {
+        type: "user",
+        uuid: turnId,
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: "Check the timeout." },
+      },
+      {
+        type: "assistant",
+        uuid: "restored-narration",
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "text", text: "Let me read the file." }] },
+      },
+      {
+        type: "assistant",
+        uuid: "restored-answer",
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "text", text: "The file sets the timeout." }] },
+      },
+    );
+
+    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
+    expect(items.filter((item) => item.type === "agentMessage").map((item) => [item.id, item.phase])).toEqual([
+      ["restored-narration", "commentary"],
+      ["restored-answer", undefined],
+    ]);
+    await client.stop();
+  });
 
   it("does not duplicate a fully streamed assistant message", async () => {
     const { client, notifications, output, threadId } = await createHarness();
@@ -861,8 +961,8 @@ fi
     output.push(resultMessage(threadId, turnId, "Hello"));
     await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
 
-    expect(notificationDeltas(notifications)).toEqual(["Hello"]);
-    expect(completedText(notifications)).toBe("Hello");
+    expect(answerText(notifications)).toBe("Hello");
+    expect(narrationTexts(notifications)).toEqual([]);
     await client.stop();
   });
 });
@@ -992,16 +1092,25 @@ function resultMessage(threadId: string, turnId: string, result: string): TestSt
   };
 }
 
-function notificationDeltas(notifications: Array<{ method: string; params: unknown }>): string[] {
-  return notifications
-    .filter((event) => event.method === "item/agentMessage/delta")
-    .map((event) => getString(event.params, "delta") ?? "");
+function answerItem(notifications: Array<{ method: string; params: unknown }>): DynamicRecord | null {
+  const completed = notifications.find((event) => {
+    const item = getRecord(event.params, "item");
+    return event.method === "item/completed" && getString(item, "type") === "agentMessage" && !getString(item, "phase");
+  });
+  return getRecord(completed?.params, "item");
 }
 
-function completedText(notifications: Array<{ method: string; params: unknown }>): string {
-  const completed = notifications.find((event) => event.method === "item/completed");
-  const item = getRecord(completed?.params, "item");
-  return getString(item, "text") ?? "";
+function answerText(notifications: Array<{ method: string; params: unknown }>): string {
+  return getString(answerItem(notifications), "text") ?? "";
+}
+
+function narrationTexts(notifications: Array<{ method: string; params: unknown }>): string[] {
+  return notifications
+    .filter((event) => {
+      const item = getRecord(event.params, "item");
+      return event.method === "item/completed" && getString(item, "id")?.includes(":narration:");
+    })
+    .map((event) => getString(getRecord(event.params, "item"), "text") ?? "");
 }
 
 class TestQueue<T> implements AsyncIterable<T> {
