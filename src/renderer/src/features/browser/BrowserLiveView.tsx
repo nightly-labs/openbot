@@ -141,6 +141,16 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     void window.openbot.browser.sendLiveViewInput(input).catch(() => undefined);
   };
 
+  // A view nobody clicks still has to say which frame is on screen. The host otherwise keeps
+  // every frame it sent for the whole session.
+  createEffect(
+    () => frame(),
+    (drawn) => {
+      if (!drawn) return;
+      send({ type: "ack", sequence: drawn.sequence });
+    },
+  );
+
   /**
    * Where on the frame the pointer is, which is not where on the canvas it is. The canvas fills the
    * panel and draws the frame with `object-fit: contain`, so a frame of a different shape sits

@@ -83,7 +83,9 @@ export class BrowserViewClient {
       view.serverId,
       TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
     );
-    view.socket.send(encodeBrowserViewInput(browserViewInputForHost(input, namesFrames)));
+    const wire = browserViewInputForHost(input, namesFrames);
+    if (!wire) return;
+    view.socket.send(encodeBrowserViewInput(wire));
   }
 
   #queue<T>(operation: () => Promise<T>): Promise<T> {

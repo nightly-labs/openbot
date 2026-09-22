@@ -238,6 +238,62 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
+  it("forgets frames older than the one the member has drawn, without a click", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    for (let sequence = 2; sequence <= 4; sequence += 1) {
+      send?.({ sequence, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    }
+    await vi.waitFor(() => expect(frames).toHaveLength(4));
+
+    const point = {
+      type: "pointer" as const,
+      action: "down" as const,
+      x: 0.5,
+      y: 0.25,
+      button: "left" as const,
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    // The member is watching frame 3 and has not touched the page. Frame 4 is still on its way.
+    socket.send(encodeBrowserViewInput({ type: "ack", sequence: 3 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 3 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 4 }));
+    await vi.waitFor(() =>
+      expect(dispatched).toEqual([
+        expect.objectContaining({ x: 200, y: 75 }),
+        expect.objectContaining({ x: 200, y: 75 }),
+      ]),
+    );
+    socket.close();
+    await gateway.stop();
+  });
+
   it("closes invalidated views and rejects reuse of their session", async () => {
     let invalidate: (() => void) | undefined;
     const stop = vi.fn(async () => undefined);

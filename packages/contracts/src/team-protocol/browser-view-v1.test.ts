@@ -90,8 +90,14 @@ describe("the browser view wire format", () => {
     expect(TEAM_CURRENT_CAPABILITIES).toContain(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY);
     expect(browserViewInputForHost(click, true)).toEqual(click);
     const released = browserViewInputForHost(click, false);
+    if (!released) throw new Error("A point with no frame name is still a released payload.");
     expect(released).not.toHaveProperty("sequence");
     expect(JSON.parse(encodeBrowserViewInput(released))).not.toHaveProperty("sequence");
+    const ack = { type: "ack" as const, sequence: 7 };
+    expect(decodeBrowserViewInput(encodeBrowserViewInput(ack))).toEqual(ack);
+    expect(browserViewInputForHost(ack, true)).toEqual(ack);
+    // An older host closes the socket on an input it does not know, so the acknowledgement stays here.
+    expect(browserViewInputForHost(ack, false)).toBeNull();
   });
 
   it("refuses input that a host would dispatch somewhere it cannot see", () => {

@@ -19,9 +19,9 @@ import { isDynamicRecord, isNumber, isString } from "../runtime-values";
 
 export const TEAM_BROWSER_VIEW_CAPABILITY = "browser-view";
 /**
- * A host that expands a pointer fraction against the frame the point names. Older hosts drop an
- * unknown `sequence` and expand with the newest frame, so a client sends the field only when the
- * host advertises this.
+ * A host that expands a pointer fraction against the frame the point names, and that forgets a
+ * frame once the client says a newer one is on screen. Older hosts reject an unknown input, so a
+ * client sends the sequence and the drawn-frame acknowledgement only when the host advertises this.
  */
 export const TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY = "browser-view-frame-point";
 
@@ -68,7 +68,8 @@ export type BrowserViewInput =
       deltaY: number;
       modifiers: number;
     }
-  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number };
+  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number }
+  | { type: "ack"; sequence: number };
 
 export function isBrowserViewSessionsRoute(method: string, path: string): boolean {
   return method === "POST" && pathname(path) === "/v1/browser/view/sessions";
@@ -143,10 +144,12 @@ export function encodeBrowserViewInput(input: BrowserViewInput): string {
 }
 
 /**
- * The pointer a host of this capability is sent. A host that does not name frames still accepts
- * the released payload, and it expands every point with its newest frame.
+ * The input a host of this capability is sent. A host that does not name frames still accepts the
+ * released payload, and it expands every point with its newest frame. An acknowledgement is not
+ * part of that payload: an older host closes the view on an input it does not know.
  */
-export function browserViewInputForHost(input: BrowserViewInput, namesFrames: boolean): BrowserViewInput {
+export function browserViewInputForHost(input: BrowserViewInput, namesFrames: boolean): BrowserViewInput | null {
+  if (!namesFrames && input.type === "ack") return null;
   if (input.type !== "pointer" || input.sequence === undefined || namesFrames) return input;
   const { sequence: _sequence, ...released } = input;
   return released;
@@ -163,6 +166,8 @@ export function decodeBrowserViewInput(value: string): BrowserViewInput {
 /** The same bounds for a value that never was text: what a renderer sends its own main process. */
 export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput {
   if (!isDynamicRecord(message)) throw new Error("Invalid browser view input.");
+  // The client says which frame it has drawn. There is no page event in it.
+  if (message.type === "ack") return { type: "ack", sequence: sequenceNumber(message.sequence) };
   const modifiers = isNumber(message.modifiers) ? message.modifiers : 0;
   if (!Number.isInteger(modifiers) || modifiers < 0 || modifiers > 15) throw new Error("Invalid browser view input.");
   if (message.type === "pointer") {

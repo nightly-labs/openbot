@@ -353,6 +353,8 @@ describe("OpenBot connected desktop shell", () => {
     emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
     const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
     await vi.waitFor(() => expect(drawn).toHaveBeenCalled());
+    // Drawing the frame tells the host which one is on screen, even when the member never clicks.
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith({ type: "ack", sequence: 1 });
     // The panel is a different size from the host's viewport, so the click is sent as the point on
     // the frame rather than the pixel it landed on here. jsdom has no layout to measure.
     //

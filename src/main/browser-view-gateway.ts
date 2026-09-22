@@ -30,6 +30,13 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
  * behind must show the page as it is now, not replay the seconds the link was slow.
  */
 const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
+
+/** Frames older than the one on the member's screen. The named frame itself stays, so a click on it still expands. */
+function forgetFramesBefore(sizes: Map<number, { width: number; height: number }>, drawn: number): void {
+  for (const sequence of sizes.keys()) {
+    if (sequence < drawn) sizes.delete(sequence);
+  }
+}
 const MAX_SESSIONS = 4;
 const MAX_INPUT_MESSAGE_BYTES = 4 * 1024;
 
@@ -189,6 +196,13 @@ export class BrowserViewGateway {
       session.socket?.close(1008, "Invalid browser view input.");
       return;
     }
+    // The client has drawn this frame. Older ones are no longer on screen, including when the
+    // member never moves the pointer. A frame this session did not send is not a frame to trust.
+    if (input.type === "ack") {
+      if (!session.frameSizes.has(input.sequence)) return;
+      forgetFramesBefore(session.frameSizes, input.sequence);
+      return;
+    }
     // Input that arrives before the first frame has no frame to be a fraction of.
     let frame = { width: session.frameWidth, height: session.frameHeight };
     if (input.type === "pointer") {
@@ -201,11 +215,7 @@ export class BrowserViewGateway {
         const named = session.frameSizes.get(input.sequence);
         if (!named) return;
         frame = named;
-        // This point is the client saying which frame is on screen. Anything older cannot be
-        // drawn any more, and a later point must not land on it.
-        for (const sequence of session.frameSizes.keys()) {
-          if (sequence < input.sequence) session.frameSizes.delete(sequence);
-        }
+        forgetFramesBefore(session.frameSizes, input.sequence);
       }
     }
     // The sequence names a frame on this socket. The page is dispatched pixels, and knows nothing
