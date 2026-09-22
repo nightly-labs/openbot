@@ -28,6 +28,7 @@ export interface HostAdminOperations {
   /** Read-only status reads. A missing, stale or malformed tenant report gives null, never an error. */
   readState: () => Promise<HostUpdateState | null>;
   readTenantStatus: (uid: number) => Promise<HostTenantStatus | null>;
+  runningTenants: () => Promise<Array<{ uid: number; pid: number }>>;
   verifyState: () => Promise<void>;
   verifyDaemon: () => Promise<void>;
   verifyIsolation: (tenants: HostTenant[]) => Promise<void>;
@@ -128,7 +129,7 @@ export async function verifyHost(ops: HostAdminOperations): Promise<HostVerifica
 export interface HostTenantReport {
   uid: number;
   name: string | null;
-  /** A fresh status report. A logged-out, quit or stale tenant is not running for the host. */
+  /** A fresh report and one matching process, which is what the host itself requires. */
   running: boolean;
   pid: number | null;
   version: string | null;
@@ -150,6 +151,8 @@ export interface HostStatusReport {
   stateAgeMs: number | null;
   /** Only `waiting` and `stopping` rewrite state on every poll, so only they prove daemon progress. */
   stateStale: boolean;
+  /** OpenBot processes outside the registered set. Each one stops the host from starting maintenance. */
+  unregisteredProcesses: number[];
   summary: string;
   tenants: HostTenantReport[];
 }
@@ -159,6 +162,7 @@ export interface HostStatusInput {
   state: HostUpdateState | null;
   daemonRunning: boolean;
   tenants: Array<{ uid: number; name: string | null; status: HostTenantStatus | null }>;
+  processes: Array<{ uid: number; pid: number }>;
   now: number;
 }
 
@@ -173,40 +177,62 @@ export function formatDuration(ms: number): string {
 function describeTenant(
   entry: HostStatusInput["tenants"][number],
   state: HostUpdateState | null,
+  processes: HostStatusInput["processes"],
   now: number,
 ): HostTenantReport {
   const { status } = entry;
+  const matching = processes.filter((process) => process.uid === entry.uid);
   const base = { uid: entry.uid, name: entry.name, running: false, pid: null, version: null, healthy: false };
   if (!status) {
-    return { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null, blocker: "no status report" };
+    const blocker = matching.length ? "runs without a status report" : "no status report";
+    return { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null, blocker };
   }
   const heartbeatAgeMs = now - status.heartbeatAt;
-  const idleForMs = status.idleSince === null ? null : Math.max(0, now - status.idleSince);
   const fresh = heartbeatAgeMs >= 0 && heartbeatAgeMs <= HOST_HEARTBEAT_TIMEOUT_MS;
+  const idleForMs = status.idleSince === null ? null : Math.max(0, now - status.idleSince);
+  // The host accepts exactly one registered process whose PID matches the reported one.
+  const processMatch = matching.length === 1 && matching[0]?.pid === status.pid;
   const report = {
     uid: entry.uid,
     name: entry.name,
-    running: fresh,
+    running: fresh && processMatch,
     pid: status.pid,
     version: status.currentVersion,
     healthy: status.healthy,
     heartbeatAgeMs,
     idleForMs,
   };
-  const waiting = state?.phase === "waiting";
+  const cycleMismatch = state !== null && status.cycle !== state.cycle;
+  // Each phase mirrors the predicate the host itself applies in that phase.
   const blocker = !fresh
     ? "stale status report"
-    : !status.safeToRestart
-      ? "not safe to restart"
-      : idleForMs === null
-        ? "working"
-        : // A cycle mismatch only blocks maintenance while the host waits for this cycle.
-          waiting && status.cycle !== state.cycle
-          ? "has not acknowledged this update cycle"
+    : state?.phase === "released"
+      ? !status.healthy
+        ? "not healthy after restart"
+        : status.currentVersion !== state.version
+          ? `still runs ${status.currentVersion}`
+          : cycleMismatch
+            ? "has not acknowledged this update cycle"
+            : null
+      : state?.phase === "waiting"
+        ? !status.safeToRestart
+          ? "not safe to restart"
+          : idleForMs === null
+            ? "working"
+            : cycleMismatch
+              ? "has not acknowledged this update cycle"
+              : processMatch
+                ? null
+                : "reported PID is not in the process list"
+        : state?.phase === "stopping"
+          ? matching.length
+            ? "still running"
+            : null
           : null;
   const readyInMs =
-    waiting && idleForMs !== null && blocker === null ? Math.max(0, HOST_IDLE_GRACE_MS - idleForMs) : null;
-  // A tenant inside the idle grace is not a blocker. Its remaining countdown carries that meaning.
+    state?.phase === "waiting" && idleForMs !== null && blocker === null
+      ? Math.max(0, HOST_IDLE_GRACE_MS - idleForMs)
+      : null;
   return { ...report, readyInMs, blocker };
 }
 
@@ -215,6 +241,9 @@ function summarize(report: Omit<HostStatusReport, "summary">): string {
   const names = blocked.map((tenant) => `${tenant.name ?? tenant.uid} (${tenant.blocker})`).join(", ");
   if (!report.managed) return "Host management is off. Tenants keep their own desktop update controls.";
   if (!report.daemonRunning) return "Host management is on, but the LaunchDaemon is not running. No update can run.";
+  if (report.unregisteredProcesses.length && report.phase !== "released") {
+    return `OpenBot runs under unregistered UID ${report.unregisteredProcesses.join(", ")}. The host cannot start maintenance until it quits.`;
+  }
   switch (report.phase) {
     case null:
       return "No host state yet. The daemon writes state at its first poll.";
@@ -250,7 +279,8 @@ function summarize(report: Omit<HostStatusReport, "summary">): string {
 
 export function describeHostStatus(input: HostStatusInput): HostStatusReport {
   const { config, state, now } = input;
-  const tenants = input.tenants.map((entry) => describeTenant(entry, state, now));
+  const tenants = input.tenants.map((entry) => describeTenant(entry, state, input.processes, now));
+  const registered = config?.tenants ?? [];
   const stateAgeMs = state ? now - state.updatedAt : null;
   const partial = {
     managed: config?.managed === true,
@@ -264,6 +294,9 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
       (state?.phase === "waiting" || state?.phase === "stopping") &&
       stateAgeMs !== null &&
       stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS,
+    unregisteredProcesses: [
+      ...new Set(input.processes.filter((process) => !registered.includes(process.uid)).map((process) => process.uid)),
+    ],
     tenants,
   };
   return { ...partial, summary: summarize(partial) };
@@ -277,11 +310,15 @@ export function formatHostStatus(report: HostStatusReport): string {
   ];
   if (report.stateAgeMs !== null) lines.push(`State age   ${formatDuration(report.stateAgeMs)}`);
   if (report.error) lines.push(`Error       ${report.error}`);
+  if (report.unregisteredProcesses.length)
+    lines.push(`Unregistered OpenBot processes under UID ${report.unregisteredProcesses.join(", ")}`);
   lines.push("", report.summary, "", "Tenants");
   for (const tenant of report.tenants) {
     const label = `${tenant.name ?? "unknown"} (${tenant.uid})`.padEnd(24);
     const activity = !tenant.running
-      ? "not running"
+      ? tenant.pid === null
+        ? "not running"
+        : "report and process list disagree"
       : `${(tenant.healthy ? "healthy" : "unhealthy").padEnd(10)} ${
           tenant.idleForMs === null ? "working" : `idle ${formatDuration(tenant.idleForMs)}`
         }`;
@@ -297,12 +334,13 @@ export function formatHostStatus(report: HostStatusReport): string {
 
 export async function collectHostStatus(ops: HostAdminOperations, now = Date.now()): Promise<HostStatusReport> {
   const config = await ops.readConfig();
-  const [state, daemonRunning, tenants] = await Promise.all([
+  const [state, daemonRunning, processes, tenants] = await Promise.all([
     ops.readState(),
     ops.verifyDaemon().then(
       () => true,
       () => false,
     ),
+    ops.runningTenants().catch(() => []),
     Promise.all(
       (config?.tenants ?? []).map(async (uid) => ({
         uid,
@@ -314,7 +352,7 @@ export async function collectHostStatus(ops: HostAdminOperations, now = Date.now
       })),
     ),
   ]);
-  return describeHostStatus({ config, state, daemonRunning, tenants, now });
+  return describeHostStatus({ config, state, daemonRunning, processes, tenants, now });
 }
 
 export function parseHostWatch(args: string[]): number {

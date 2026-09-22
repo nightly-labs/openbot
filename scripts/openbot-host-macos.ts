@@ -27,6 +27,7 @@ import {
   hostCommand,
   isNewerRelease,
   macHostOperations,
+  runningOpenBotProcesses,
   SHARED_APP,
   verifyBundleTree,
   verifyHostPath,
@@ -289,6 +290,7 @@ export function macHostAdminOperations(): HostAdminOperations {
       }
     },
     tenantForUid: async (uid) => ({ uid, name: await hostCommand("/usr/bin/id", ["-un", String(uid)]) }),
+    runningTenants: runningOpenBotProcesses,
     readState: async () => {
       try {
         await verifyHostDirectory(ROOT);
@@ -302,7 +304,9 @@ export function macHostAdminOperations(): HostAdminOperations {
       // A logged-out, stopped or malformed tenant is a normal reading, not a command failure.
       try {
         const directory = await verifyTenantDirectory(ROOT, uid);
-        return await readOwnedJson(join(directory, "status.json"), uid, tenantStatusSchema);
+        const status = await readOwnedJson(join(directory, "status.json"), uid, tenantStatusSchema);
+        // The host ignores a report that claims another UID. Never show it as that tenant's state.
+        return status.uid === uid ? status : null;
       } catch {
         return null;
       }

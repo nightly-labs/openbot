@@ -46,6 +46,7 @@ function fixture() {
     verifyIsolation: vi.fn(async () => undefined),
     readState: vi.fn(async () => null),
     readTenantStatus: vi.fn(async () => null),
+    runningTenants: vi.fn(async () => []),
   };
   return { ops, events };
 }
@@ -179,6 +180,10 @@ function statusInput(overrides: Partial<HostStatusInput> = {}): HostStatusInput 
     config: { managed: true, tenants: [501, 502] },
     state: { phase: "waiting", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW - 2_000, error: null },
     daemonRunning: true,
+    processes: [
+      { uid: 501, pid: 11 },
+      { uid: 502, pid: 12 },
+    ],
     now: NOW,
     tenants: [
       {
@@ -248,6 +253,47 @@ describe("host status reporting", () => {
       "has not acknowledged this update cycle",
       "no status report",
     ]);
+  });
+
+  it("does not promise a countdown when the process list disagrees with the report", () => {
+    const report = describeHostStatus({ ...statusInput(), processes: [{ uid: 501, pid: 99 }] });
+    expect(report.tenants[0]?.running).toBe(false);
+    expect(report.tenants[0]?.readyInMs).toBeNull();
+    expect(report.tenants[0]?.blocker).toBe("reported PID is not in the process list");
+  });
+
+  it("reports an unregistered OpenBot process that stops the host from starting maintenance", () => {
+    const input = statusInput();
+    const report = describeHostStatus({ ...input, processes: [...input.processes, { uid: 700, pid: 70 }] });
+    expect(report.unregisteredProcesses).toEqual([700]);
+    expect(report.summary).toContain("unregistered UID 700");
+  });
+
+  it("uses health, version and cycle as the blockers after release", () => {
+    const input = statusInput();
+    const state = { phase: "released", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
+    const acme = input.tenants[0];
+    if (acme?.status) acme.status = { ...acme.status, idleSince: null, currentVersion: "0.18.0", healthy: true };
+    const bravo = input.tenants[1];
+    if (bravo?.status) bravo.status = { ...bravo.status, currentVersion: "0.17.0", healthy: true };
+    const report = describeHostStatus({ ...input, state });
+    expect(report.tenants[0]?.blocker).toBeNull();
+    expect(report.tenants[1]?.blocker).toBe("still runs 0.17.0");
+  });
+
+  it("reports a tenant that still runs while the host waits for shutdown", () => {
+    const state = { phase: "stopping", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
+    const report = describeHostStatus({ ...statusInput(), state, processes: [{ uid: 502, pid: 12 }] });
+    expect(report.tenants[0]?.blocker).toBeNull();
+    expect(report.tenants[1]?.blocker).toBe("still running");
+  });
+
+  it("reports a running tenant that publishes no status", () => {
+    const report = describeHostStatus({
+      ...statusInput(),
+      tenants: [{ uid: 501, name: "client-acme", status: null }],
+    });
+    expect(report.tenants[0]?.blocker).toBe("runs without a status report");
   });
 
   it("reports a stopped daemon and an unmanaged host before any update text", () => {

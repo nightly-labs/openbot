@@ -196,8 +196,15 @@ manifest, standalone launch checks without Bun/Node in PATH, and the expected so
 staged version, update cycle, recorded error, and one line for each registered tenant with its
 version, health, work state, and the reason it blocks maintenance. `--json` gives the same report
 for scripts. `sudo openbot-host watch [--interval <seconds>]` repeats the snapshot, default every
-five seconds. Both commands only read `config.json`, `state.json`, and each tenant status file.
-They never write host state, never open a tenant home, and never start or stop maintenance.
+five seconds. Both commands read `config.json`, `state.json`, each tenant status file, and the same
+executable paths and UIDs from `ps` that the daemon uses. A status file that claims another UID is
+ignored, exactly as the daemon ignores it. The commands never write host state, never read process
+arguments, never open a tenant home, and never start or stop maintenance.
+
+Each reported blocker mirrors the rule the host applies in that phase: `waiting` uses restart
+safety, idle state, cycle, and one matching process; `stopping` uses the process list; `released`
+uses the health report, the installed version, and the cycle. An OpenBot process under an
+unregistered UID is reported separately, because it stops maintenance before any tenant is asked.
 
 While the host waits, each idle tenant shows the remaining five-minute grace. This value is the
 earliest possible time, not a promise: the host counts from its own first observation of that idle
