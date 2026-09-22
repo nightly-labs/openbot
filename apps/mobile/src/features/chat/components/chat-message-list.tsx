@@ -505,7 +505,7 @@ export function ChatMessageList({
             ? thinkingDetail
             : activity?.phase === "responding"
               ? "Responding…"
-              : activity?.detail || "Thinking…";
+              : activity?.detail || (replying ? "Responding…" : "Thinking…");
     const activityAgent = activity?.agentId
       ? agentsById.get(activity.agentId)
       : target.kind === "agent"

@@ -26,10 +26,32 @@ function hasChildren(token: Token): token is Token & { tokens: Token[] } {
   return "tokens" in token && Array.isArray(token.tokens);
 }
 
+/** Read the reveal words in order. History renders never need a clipped copy of the tree. */
+function collectWords(entries: Token[], words: string[]): void {
+  for (const token of entries) {
+    if (isList(token)) {
+      for (const item of token.items) collectWords(item.tokens, words);
+    } else if (isTable(token)) {
+      for (const cell of token.header) collectWords(cell.tokens, words);
+      for (const row of token.rows) {
+        for (const cell of row) collectWords(cell.tokens, words);
+      }
+    } else if (token.type === "agentMention" || token.type === "code") {
+      words.push(token.type === "code" ? token.text : token.raw);
+    } else if (hasChildren(token)) {
+      collectWords(token.tokens, words);
+    } else if (token.type !== "space" && token.type !== "def" && token.type !== "br" && token.type !== "hr") {
+      const text = "text" in token && typeof token.text === "string" ? token.text : token.raw;
+      for (const part of text.matchAll(/\S+\s*/gu)) words.push(part[0]);
+    }
+  }
+}
+
 /** Reveal parsed leaves without reparsing Markdown at every animation step. */
 export function createReplyReveal(tokens: Token[]) {
   const words: string[] = [];
-  function clip(limit: number, collect = false): Token[] {
+  collectWords(tokens, words);
+  function clip(limit: number): Token[] {
     let remaining = limit;
     function visit(entries: Token[]): Token[] {
       const result: Token[] = [];
@@ -54,7 +76,6 @@ export function createReplyReveal(tokens: Token[]) {
         } else if (token.type === "agentMention" || token.type === "code") {
           // Code uses StreamingBlock's entrance. Keep its source intact so Copy
           // never receives a prefix produced only by the playback animation.
-          if (collect) words.push(token.type === "code" ? token.text : token.raw);
           remaining -= 1;
           result.push(token);
         } else if (hasChildren(token)) {
@@ -64,7 +85,6 @@ export function createReplyReveal(tokens: Token[]) {
         } else {
           const text = "text" in token && typeof token.text === "string" ? token.text : token.raw;
           const parts = Array.from(text.matchAll(/\S+\s*/gu));
-          if (collect) words.push(...parts.map((part) => part[0]));
           const count = Math.min(remaining, parts.length);
           remaining -= count;
           const last = parts[count - 1];
@@ -78,6 +98,5 @@ export function createReplyReveal(tokens: Token[]) {
     }
     return visit(tokens);
   }
-  clip(Number.POSITIVE_INFINITY, true);
   return { words, at: (count: number) => (count >= words.length ? tokens : clip(count)) };
 }
