@@ -37,6 +37,11 @@ export type ChatActionMarkerStatus =
 
 export type AgentDeliveryMarkerStatus = Exclude<ChatActionMarkerStatus, "needs-attention">;
 
+export interface RoutineRunMarkerTransition {
+  status: "queued" | RoutineRunConversationEvent["status"];
+  timestamp: string;
+}
+
 export type ChatActionMarkerModel =
   | (SkillConversationEvent & { kind: "skill-lifecycle"; timestamp: string })
   | {
@@ -68,6 +73,7 @@ export type ChatActionMarkerModel =
       routineName: string;
       status: "queued" | RoutineRunConversationEvent["status"];
       timestamp: string;
+      previousTransitions?: RoutineRunMarkerTransition[];
     }
   | {
       kind: "hosted-site";

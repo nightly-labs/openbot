@@ -1,10 +1,11 @@
 import type { QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import { Dynamic } from "@solidjs/web";
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import {
   Button,
   CalendarClock,
+  ChevronDown,
   CircleCheck,
   CirclePause,
   Clock3,
@@ -15,11 +16,17 @@ import {
   MarkerContent,
   MarkerIcon,
   MessageCircle,
+  Play,
   Puzzle,
   TriangleAlert,
   X,
 } from "../../components/ui";
-import type { AgentProfile, ChatActionMarkerModel, ChatActionMarkerStatus } from "../../data";
+import type {
+  AgentProfile,
+  ChatActionMarkerModel,
+  ChatActionMarkerStatus,
+  RoutineRunMarkerTransition,
+} from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { formatChatTimestamp } from "./chat-timestamp";
 
@@ -48,6 +55,10 @@ const STATUS_LABELS: Record<ChatActionMarkerStatus, string> = {
 
 export function ChatActionMarker(props: ChatActionMarkerProps) {
   const label = () => markerLabel(props.marker);
+  const [historyExpanded, setHistoryExpanded] = createSignal(false);
+  const routineHistory = () => (props.marker.kind === "routine-run" ? props.marker.previousTransitions : undefined);
+  const historyId = () =>
+    props.marker.kind === "routine-run" ? `routine-run-history-${props.marker.runId}` : undefined;
   return (
     <Marker
       class={`chat-action-marker chat-action-marker-${props.marker.kind}`}
@@ -55,61 +66,104 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
       aria-live={props.announce ? "polite" : "off"}
       aria-label={markerAccessibleLabel(props.marker, props.agents)}
     >
-      <MarkerContent class="chat-action-marker-content">
-        <span class="chat-action-marker-label">{label()}</span>
-        <Show when={props.marker.kind === "agent-message" && props.marker}>
-          {(marker) => <AgentTarget marker={marker()} agents={props.agents} onSelectAgent={props.onSelectAgent} />}
+      <div class="chat-action-marker-summary">
+        <MarkerContent class="chat-action-marker-content">
+          <span class="chat-action-marker-label">{label()}</span>
+          <Show when={props.marker.kind === "agent-message" && props.marker}>
+            {(marker) => <AgentTarget marker={marker()} agents={props.agents} onSelectAgent={props.onSelectAgent} />}
+          </Show>
+          <Show when={props.marker.kind === "routine-lifecycle" && props.marker}>
+            {(marker) => (
+              <RoutineTarget
+                routineId={marker().routineId}
+                routineName={marker().routineName}
+                available={marker().action !== "deleted" && props.routineAvailable !== false}
+                onOpenRoutine={props.onOpenRoutine}
+              />
+            )}
+          </Show>
+          <Show when={props.marker.kind === "routine-run" && props.marker}>
+            {(marker) => (
+              <RoutineTarget
+                routineId={marker().routineId}
+                routineName={marker().routineName}
+                icon={statusIcon(routineMarkerStatus(marker().status))}
+                status={routineMarkerStatus(marker().status)}
+                available={props.routineAvailable !== false}
+                onOpenRoutine={props.onOpenRoutine}
+              />
+            )}
+          </Show>
+          <Show when={props.marker.kind === "channel-routing" && props.marker}>
+            {(marker) => (
+              <AgentButton
+                agent={props.agents.find((agent) => agent.id === marker().agentId)}
+                fallbackId={marker().agentId}
+                onSelectAgent={props.onSelectAgent}
+              />
+            )}
+          </Show>
+          <Show when={props.marker.kind === "hosted-site" && props.marker}>
+            {(marker) => <HostedSiteTarget marker={marker()} onOpenHostedSite={props.onOpenHostedSite} />}
+          </Show>
+          <Show when={props.marker.kind === "skill-lifecycle" && props.marker}>
+            {(marker) => (
+              <ActionTarget
+                available={Boolean(props.onOpenSkill)}
+                actionLabel={`Open skill ${marker().skillName}`}
+                name={marker().skillName}
+                icon={Puzzle}
+                onOpen={props.onOpenSkill ? () => props.onOpenSkill?.({ skillId: marker().skillId }) : undefined}
+              />
+            )}
+          </Show>
+          <time class="chat-action-marker-time" datetime={props.marker.timestamp}>
+            {formatMarkerTime(props.marker.timestamp)}
+          </time>
+          <Show when={(routineHistory()?.length ?? 0) > 0}>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              class="chat-action-history-toggle"
+              type="button"
+              aria-expanded={historyExpanded() ? "true" : "false"}
+              aria-controls={historyId()}
+              aria-label={`${historyExpanded() ? "Hide" : "Show"} history for ${
+                props.marker.kind === "routine-run" ? props.marker.routineName : "routine"
+              }`}
+              onClick={() => setHistoryExpanded((expanded) => !expanded)}
+            >
+              <ChevronDown aria-hidden="true" />
+            </Button>
+          </Show>
+        </MarkerContent>
+        <Show when={historyExpanded() && routineHistory()}>
+          {(transitions) => <RoutineRunHistory id={historyId()} transitions={transitions()} />}
         </Show>
-        <Show when={props.marker.kind === "routine-lifecycle" && props.marker}>
-          {(marker) => (
-            <RoutineTarget
-              routineId={marker().routineId}
-              routineName={marker().routineName}
-              available={marker().action !== "deleted" && props.routineAvailable !== false}
-              onOpenRoutine={props.onOpenRoutine}
-            />
-          )}
-        </Show>
-        <Show when={props.marker.kind === "routine-run" && props.marker}>
-          {(marker) => (
-            <RoutineTarget
-              routineId={marker().routineId}
-              routineName={marker().routineName}
-              icon={statusIcon(routineMarkerStatus(marker().status))}
-              status={routineMarkerStatus(marker().status)}
-              available={props.routineAvailable !== false}
-              onOpenRoutine={props.onOpenRoutine}
-            />
-          )}
-        </Show>
-        <Show when={props.marker.kind === "channel-routing" && props.marker}>
-          {(marker) => (
-            <AgentButton
-              agent={props.agents.find((agent) => agent.id === marker().agentId)}
-              fallbackId={marker().agentId}
-              onSelectAgent={props.onSelectAgent}
-            />
-          )}
-        </Show>
-        <Show when={props.marker.kind === "hosted-site" && props.marker}>
-          {(marker) => <HostedSiteTarget marker={marker()} onOpenHostedSite={props.onOpenHostedSite} />}
-        </Show>
-        <Show when={props.marker.kind === "skill-lifecycle" && props.marker}>
-          {(marker) => (
-            <ActionTarget
-              available={Boolean(props.onOpenSkill)}
-              actionLabel={`Open skill ${marker().skillName}`}
-              name={marker().skillName}
-              icon={Puzzle}
-              onOpen={props.onOpenSkill ? () => props.onOpenSkill?.({ skillId: marker().skillId }) : undefined}
-            />
-          )}
-        </Show>
-        <time class="chat-action-marker-time" datetime={props.marker.timestamp}>
-          {formatMarkerTime(props.marker.timestamp)}
-        </time>
-      </MarkerContent>
+      </div>
     </Marker>
+  );
+}
+
+function RoutineRunHistory(props: { id: string | undefined; transitions: RoutineRunMarkerTransition[] }) {
+  return (
+    <ol id={props.id} class="chat-action-history" aria-label="Earlier routine states">
+      <For each={props.transitions}>
+        {(transition, index) => {
+          const previous = () => props.transitions[index() - 1];
+          const status = () => routineMarkerStatus(transition.status);
+          return (
+            <li class={`chat-action-history-entry chat-action-history-status-${status()}`}>
+              <MarkerIcon class="chat-action-history-icon">
+                <Dynamic component={routineHistoryIcon(transition.status)} aria-hidden="true" />
+              </MarkerIcon>
+              <span>{routineHistoryLabel(transition.status, previous()?.status)}</span>
+              <time datetime={transition.timestamp}>{formatMarkerTime(transition.timestamp)}</time>
+            </li>
+          );
+        }}
+      </For>
+    </ol>
   );
 }
 
@@ -422,6 +476,28 @@ function routineMarkerStatus(
   if (status === "running") return "in-progress";
   if (status === "succeeded") return "completed";
   return status;
+}
+
+function routineHistoryLabel(
+  status: RoutineRunMarkerTransition["status"],
+  previousStatus: RoutineRunMarkerTransition["status"] | undefined,
+) {
+  if (status === "queued") return "Invoked";
+  if (status === "running") return previousStatus === "needs-attention" ? "Resumed" : "Started";
+  if (status === "needs-attention") return "Needed attention";
+  if (status === "succeeded") return "Completed";
+  if (status === "failed") return "Failed";
+  if (status === "interrupted") return "Interrupted";
+  return "Cancelled";
+}
+
+function routineHistoryIcon(status: RoutineRunMarkerTransition["status"]) {
+  if (status === "queued") return Clock3;
+  if (status === "running") return Play;
+  if (status === "needs-attention") return TriangleAlert;
+  if (status === "succeeded") return CircleCheck;
+  if (status === "failed") return X;
+  return CirclePause;
 }
 
 function deliveryStatusLabel(status: QueueDeliveryStatus): string {
