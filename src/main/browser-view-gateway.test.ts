@@ -69,6 +69,66 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
+  it("keeps a click on the last frame the member saw when a newer frame is dropped", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+
+    // A member who stops reading is the case the drop exists for. These fillers are the shape the
+    // member is already watching, so whether each one arrives changes nothing; they are here to put
+    // the socket over its buffer.
+    socket.pause();
+    const filler = new Uint8Array(1_500_000);
+    filler.set([0xff, 0xd8, 0xff]);
+    for (let sequence = 2; sequence <= 13; sequence += 1) {
+      send?.({ sequence, width: 1200, height: 800, image: filler });
+    }
+    // The page resized behind the backpressure. This frame is dropped, so the member never sees it.
+    send?.({ sequence: 14, width: 400, height: 300, image: filler });
+
+    socket.send(
+      encodeBrowserViewInput({
+        type: "pointer",
+        action: "down",
+        x: 0.5,
+        y: 0.25,
+        button: "left",
+        clickCount: 1,
+        deltaX: 0,
+        deltaY: 0,
+        modifiers: 0,
+      }),
+    );
+    // The point is a fraction of the frame on the member's screen, which is still the 1200x800 one.
+    // Expanding it with the dropped frame would put the click at (200, 75) on a page nobody saw.
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
+    socket.resume();
+    socket.close();
+    await gateway.stop();
+  });
+
   it("closes invalidated views and rejects reuse of their session", async () => {
     let invalidate: (() => void) | undefined;
     const stop = vi.fn(async () => undefined);

@@ -151,10 +151,13 @@ export class BrowserViewGateway {
         session.tabId,
         (frame) => {
           if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
-          session.frameWidth = frame.width;
-          session.frameHeight = frame.height;
+          // A dropped frame is one the client never sees, so it cannot be the frame a fraction is a
+          // fraction of. Recording its shape here would expand the client's next point with a size
+          // only this side knows about, and the click would land somewhere the user never pointed.
           if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
           client.send(encodeBrowserViewFrame(frame), { binary: true });
+          session.frameWidth = frame.width;
+          session.frameHeight = frame.height;
         },
         () => {
           void this.#closeSession(session, "Authentication changed the browser view. Open a new view to continue.");
