@@ -32,20 +32,35 @@ CI does not build that image. `scripts/dependency-catalog.test.ts` checks that t
 cover the workspace dependency graph; keep that check when changing workspace dependencies.
 
 The source of truth for CI is [.github/workflows/ci.yml](../.github/workflows/ci.yml).
+Every run starts with a `changes` job that flags which areas the diff touches, so
+jobs that cannot be affected never reserve a runner. The map lives in that job:
+`packages/contracts` fans out to everything because every surface consumes the IPC
+contract, `packages/brand` reaches desktop, mobile, the account API landing and
+Storybook, and `packages/team-client` reaches desktop and mobile. Docs-only changes
+run nothing. The diff is fail-open: when the base cannot be fetched or compared, all
+flags go true and the run costs what it costs today, never less coverage.
+Skipped jobs report `skipped`, which branch protection treats as passing.
+
 Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
+| Detect changes | `ubuntu-latest` | diff against the PR base or push `before` SHA |
+| Lint | `ubuntu-latest` | `bun run lint` (only when `src/` is untouched; otherwise `check` lints) |
 | Check | `ubuntu-latest` | `bun run check:desktop:static` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
-| Tests | `ubuntu-latest` | `bun run test:desktop`, `bun run test:sites`, `bun run test:remote` |
-| Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run remote:check:compose` |
+| Tests | `ubuntu-latest` | `bun run test:desktop` (2 shards), `tests-small` (sites and remote concurrently) |
+| Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run remote:check:compose` (concurrently) |
 | API | `ubuntu-latest` | `bun run check:api` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
 
-All six gate Cloudflare production deployment on `main`. Surfaces was previously missing from
-that dependency list, which allowed deployment despite a failed mobile or remote check.
-These long suites belong in CI; local desktop runs can reach their time limits under load.
+Only `api` and `surfaces` gate Cloudflare production deployment on `main`: the Worker
+it ships lives in `apps/auth-api`, which `api` covers, and mobile, the site router,
+the team client and the remote stack all consume the account API, which `surfaces`
+covers. Desktop checks, the browser smoke test and the Storybook build still run on
+the pull request, but a red Storybook is no reason to hold back an account-API
+deploy. Skipped jobs report `skipped` rather than failing the gate, so
+path-filtered runs still deploy. These long suites belong in CI; local desktop runs can reach their time limits under load.
 
 `bun run check:desktop` still runs everything: it is `check:desktop:static`, which holds the UI
 check, the lint, the desktop typecheck and the build, followed by the browser smoke test. CI is
@@ -80,6 +95,15 @@ share module-level store state, so without a per-file registry they pass only in
 happens to pick: `--sequence.shuffle.files` fails eight files under `isolate: false` and passes
 under both `vmThreads` and the previous `forks` default. Use that flag when changing pool settings;
 a green run in the default order proves nothing here.
+
+Vitest still schedules by file inside a shard, so one 60s file holds a worker while the
+others drain. The largest suites are therefore split into parts of about 20s each
+(`agent-service.providers-1/2/3`, `agent-service.queue-1/2/3`, and the same shape for
+provider-runtime, grok-client, routines, restart, the runtime manager, and one file per
+top-level describe in `acp-client`). Keep a new test file under roughly 25s of recorded
+duration; split it when it grows past that. Each part keeps the header its tests use,
+pruned so `noUnusedLocals` stays green, and `test-durations.json` carries a share of the
+original duration until `bun run test:durations` remeasures it.
 
 The `node` project stays on isolated `forks`. Its files register IPC handlers and read
 per-process globals, so they fail on `threads` whether or not isolation is on, and on `vmForks`

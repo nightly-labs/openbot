@@ -20,6 +20,135 @@ env:
   GIT_CONFIG_VALUE_0: main
 
 jobs:
+  changes:
+    # Every run starts by asking which areas the diff touches, so jobs that
+    # cannot be affected never reserve a runner. Skipped jobs report `skipped`,
+    # which branch protection treats as passing, and `deploy-production` runs
+    # when every needed job succeeded or skipped. The dependency map lives
+    # here, in one place: `packages/contracts` fans out to everything because
+    # every surface consumes the IPC contract, while `packages/brand` reaches
+    # desktop, mobile, the account API landing and Storybook, and
+    # `packages/team-client` reaches desktop and mobile.
+    #
+    # The diff is fail-open: when the base cannot be fetched or compared, all
+    # flags go true and the run costs what it costs today, never less coverage.
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      desktop: ${{ steps.flags.outputs.desktop }}
+      mobile: ${{ steps.flags.outputs.mobile }}
+      api: ${{ steps.flags.outputs.api }}
+      sites: ${{ steps.flags.outputs.sites }}
+      remote: ${{ steps.flags.outputs.remote }}
+      storybook: ${{ steps.flags.outputs.storybook }}
+      code: ${{ steps.flags.outputs.code }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Flag affected areas
+        id: flags
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          fail_all() {
+            for name in desktop mobile api sites remote storybook code; do
+              echo "${name}=true" >> "$GITHUB_OUTPUT"
+            done
+          }
+
+          list_files() {
+            if [[ "$EVENT_NAME" == "pull_request" ]]; then
+              git fetch --no-tags --depth=200 origin "$BASE_REF" || return 1
+              local base
+              base="$(git merge-base "origin/$BASE_REF" HEAD)" || return 1
+              git diff --name-only "$base" HEAD || return 1
+            elif [[ "$EVENT_NAME" == "push" ]]; then
+              if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+                return 1
+              fi
+              git fetch --no-tags --depth=1 origin "$BEFORE_SHA" || return 1
+              git diff --name-only "$BEFORE_SHA" HEAD || return 1
+            else
+              return 1
+            fi
+          }
+
+          files="$(list_files)" || {
+            echo "Could not diff the change; running every job." >&2
+            fail_all
+            exit 0
+          }
+
+          desktop=false
+          mobile=false
+          api=false
+          sites=false
+          remote=false
+          storybook=false
+          code=false
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              *.md|docs/*|.github/ISSUE_TEMPLATE/*|.github/issue-assets/*|plans/*) continue ;;
+            esac
+            code=true
+            case "$f" in
+              .github/*|package.json|bun.lock|bunfig.toml|.nvmrc|tsconfig*.json|vitest.config.ts|tools/vitest/*|packages/contracts/*)
+                desktop=true; mobile=true; api=true; sites=true; remote=true; storybook=true ;;
+              src/renderer/*|.storybook/*) desktop=true; storybook=true ;;
+              src/*|resources/*|electron.vite.config.ts|electron-builder.yml|scripts/*|tools/*|packages/logging/*|packages/i18n/*)
+                desktop=true ;;
+              packages/user-errors/*) desktop=true; mobile=true ;;
+              packages/brand/*) desktop=true; mobile=true; api=true; storybook=true ;;
+              packages/team-client/*) desktop=true; mobile=true ;;
+              apps/mobile/*) mobile=true ;;
+              apps/auth-api/*) api=true ;;
+              apps/site-router/*) sites=true ;;
+              remote/*) remote=true ;;
+              *) desktop=true; mobile=true; api=true; sites=true; remote=true; storybook=true ;;
+            esac
+          done <<< "$files"
+
+          echo "desktop=$desktop" >> "$GITHUB_OUTPUT"
+          echo "mobile=$mobile" >> "$GITHUB_OUTPUT"
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "sites=$sites" >> "$GITHUB_OUTPUT"
+          echo "remote=$remote" >> "$GITHUB_OUTPUT"
+          echo "storybook=$storybook" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+  lint:
+    # Whole-repo Biome lint for changes outside `src/`: the `check` job lints
+    # as part of `check:desktop:static`, so a desktop change would lint twice
+    # if this job also ran. Mobile, API, site-router and remote sources are all
+    # covered by `biome check .`, so their PRs still get lint without paying
+    # for the desktop typechecks and build.
+    name: Lint
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.desktop != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Lint the repository
+        run: bun run lint
+
   check:
     # `check:desktop` is this job and `browser` together, in that order. The
     # browser smoke test starts the real Electron binary under xvfb on another
@@ -27,11 +156,15 @@ jobs:
     # one: this job builds with electron-vite, which resolves the `electron`
     # package.
     name: Check
+    needs: [changes]
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -47,20 +180,26 @@ jobs:
     # starts, which `development-checks.md` measures as faster than restoring
     # a binary cache.
     name: Browser smoke
+    needs: [changes]
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
-      - name: Install a virtual display
+      - name: Install a virtual display if missing
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes xvfb
+          command -v xvfb-run >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends --yes xvfb
+          }
 
       - name: Run the browser smoke test
         run: xvfb-run -a bun run test:browser
@@ -75,7 +214,13 @@ jobs:
     # duration rather than vitest's own file-size one - see
     # tools/vitest/balanced-sequencer.ts for why, and run `bun run
     # test:durations` when the two shards below stop finishing together.
+    #
+    # Mobile sources are included: the `mobile-ui` vitest project lives in this
+    # suite, so an `apps/mobile` change runs its tests here and its typecheck
+    # in `surfaces`.
     name: Tests (desktop ${{ matrix.shard }}/2)
+    needs: [changes]
+    if: needs.changes.outputs.desktop == 'true' || needs.changes.outputs.mobile == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -85,6 +230,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -94,37 +241,49 @@ jobs:
       - name: Run desktop tests
         run: bun run test:desktop -- --shard=${{ matrix.shard }}/2
 
-  tests-sites:
-    name: Tests (sites)
+  tests-small:
+    # The site-router and remote suites are each minutes of tests behind a full
+    # checkout and install, so they share one runner and run concurrently
+    # instead of paying that setup twice. Each suite still runs only when its
+    # own area changed; the other side is skipped, not run empty.
+    name: Tests (sites, remote)
+    needs: [changes]
+    if: needs.changes.outputs.sites == 'true' || needs.changes.outputs.remote == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
         with:
           install: ignore-scripts
 
-      - name: Run site router tests
-        run: bun run test:sites
-
-  tests-remote:
-    name: Tests (remote)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Bun
-        uses: ./.github/actions/setup-bun
-        with:
-          install: ignore-scripts
-
-      - name: Run remote API tests
-        run: bun run test:remote
+      - name: Run site router and remote API tests
+        shell: bash
+        env:
+          RUN_SITES: ${{ needs.changes.outputs.sites }}
+          RUN_REMOTE: ${{ needs.changes.outputs.remote }}
+        run: |
+          pids=()
+          names=()
+          if [[ "$RUN_SITES" == "true" ]]; then
+            bun run test:sites & pids+=($!); names+=("sites")
+          fi
+          if [[ "$RUN_REMOTE" == "true" ]]; then
+            bun run test:remote & pids+=($!); names+=("remote")
+          fi
+          status=0
+          for i in "${!pids[@]}"; do
+            if ! wait "${pids[$i]}"; then
+              echo "The ${names[$i]} suite failed." >&2
+              status=1
+            fi
+          done
+          exit "$status"
 
   surfaces:
     # `desktop:typecheck` covers only the desktop projects, so without this job
@@ -139,40 +298,39 @@ jobs:
     # `remote:check`: `docker compose config` interpolates client-side and never
     # opens a socket, so it validates both Compose files on a runner with no
     # daemon.
+    #
+    # The five checks touch disjoint projects, so they run concurrently in one
+    # job: one checkout and install instead of five, without waiting in line.
     name: Surfaces
+    needs: [changes]
+    if: needs.changes.outputs.mobile == 'true' || needs.changes.outputs.sites == 'true' || needs.changes.outputs.remote == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
         with:
           install: ignore-scripts
 
-      - name: Typecheck mobile
-        run: bun run mobile:typecheck
-
-      - name: Typecheck site router
-        run: bun run typecheck:sites
-
-      - name: Typecheck team client
-        run: bun run typecheck:team-client
-
-      - name: Typecheck remote API
-        run: bun run typecheck:remote
-
-      - name: Validate the remote Compose files
-        run: bun run remote:check:compose
+      - name: Typecheck surfaces and validate Compose
+        run: bun run --parallel mobile:typecheck typecheck:sites typecheck:team-client typecheck:remote remote:check:compose
 
   api:
     name: API
+    needs: [changes]
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -184,11 +342,15 @@ jobs:
 
   storybook:
     name: Storybook build
+    needs: [changes]
+    if: needs.changes.outputs.storybook == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -203,7 +365,8 @@ jobs:
 
   preview:
     name: Cloudflare preview
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [changes]
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-preview
@@ -213,6 +376,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -269,12 +434,15 @@ jobs:
 
   deploy-production:
     name: Deploy Cloudflare production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # `surfaces` gates the deploy even though the Worker it ships lives in
-    # `apps/auth-api`, which `api` already covers: mobile, the site router, the
-    # team client and the remote stack all consume the account API, so a red
-    # Surfaces is the signal that this deploy is the thing about to break them.
-    needs: [check, browser, tests-desktop, tests-sites, tests-remote, api, storybook, surfaces]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !(contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    # Only the jobs that can break the Worker gate the deploy: the Worker it
+    # ships lives in `apps/auth-api`, which `api` covers, and mobile, the site
+    # router, the team client and the remote stack all consume the account API,
+    # which `surfaces` covers. Desktop checks, the browser smoke test and the
+    # Storybook build still run on the pull request, but a red Storybook is no
+    # reason to hold back an account-API deploy. Skipped jobs report `skipped`
+    # rather than failing the gate, so path-filtered runs still deploy.
+    needs: [changes, lint, check, browser, tests-desktop, tests-small, api, storybook, surfaces]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production
@@ -283,6 +451,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
