@@ -217,7 +217,8 @@ the one case the host treats as a blocker. When a `waiting` or `stopping` state 
 advancing, the summary reports the stalled daemon and gives no countdown, because a daemon that
 does not poll can start neither the shutdown nor the installation. An unregistered main process is
 the exception: the host stops publishing while it waits for that process, so the state is old and
-the daemon is alive. The countdowns still go, because the host counts no grace in that condition.
+the daemon is alive. An unmanaged host is the other exception, for the same reason: it keeps its
+last state and publishes nothing. The countdowns still go, because the host counts no grace in that condition.
 
 While the host waits, each idle tenant shows the remaining five-minute grace. This value is the
 earliest possible time, not a promise: the host counts from its own first observation of that idle

@@ -509,6 +509,21 @@ describe("host status reporting", () => {
     expect(report.tenants.map((tenant) => tenant.readyInMs)).toEqual([null, null]);
   });
 
+  it("keeps an old state quiet when management is off", () => {
+    const input = statusInput();
+    const report = describeHostStatus({
+      ...input,
+      config: { managed: false, tenants: [501, 502] },
+      state: { phase: "waiting", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW - 90_000, error: null },
+    });
+    // The host stops publishing with the update, so the old state says nothing about the daemon.
+    expect(report.stateStale).toBe(false);
+    expect(report.tenants.map((tenant) => tenant.readyInMs)).toEqual([null, null]);
+    const text = formatHostStatus(report);
+    expect(text).not.toContain("not polling");
+    expect(text).toContain("Host management is off");
+  });
+
   it("identifies an unregistered helper that holds the bundle during stopping", () => {
     const input = statusInput();
     const report = describeHostStatus({

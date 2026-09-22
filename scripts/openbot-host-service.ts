@@ -326,16 +326,20 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
   // main process runs. A state that stops advancing then is not proof of a stopped daemon, but the
   // host counts no grace either, so the countdowns still go.
   const waitingOnUnregistered = state?.phase === "waiting" && unregisteredMain.length > 0;
+  // An unmanaged host keeps its last state and publishes nothing, by the same early return in #tick
+  // that stops the update. The state is old because the work stopped, not because the daemon died.
+  const managed = config?.managed === true;
   const stateStale =
+    managed &&
     (state?.phase === "waiting" || state?.phase === "stopping") &&
     stateAgeMs !== null &&
     stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS &&
     !waitingOnUnregistered;
   const tenants = input.tenants.map((entry) =>
-    describeTenant(entry, state, input.processes, now, stateStale || waitingOnUnregistered),
+    describeTenant(entry, state, input.processes, now, !managed || stateStale || waitingOnUnregistered),
   );
   const partial = {
-    managed: config?.managed === true,
+    managed,
     daemonRunning: input.daemonRunning,
     phase: state?.phase ?? null,
     cycle: state?.cycle ?? "",
