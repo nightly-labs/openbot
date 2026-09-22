@@ -150,12 +150,12 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
      recorded, and the imported copy is dropped rather than stored a second time on every restart. */
   const storedNarrationTurns = new Set<string>();
   for (const message of stored.messages) {
-    if (message.author !== "assistant" || message.itemType !== "commentary" || !message.turnId) continue;
+    if (!isClaudeNarration(message) || !message.turnId) continue;
     storedNarrationTurns.add(message.turnId);
   }
   const importedNarration = new Map<string, ConversationMessage[]>();
   for (const message of imported.messages) {
-    if (message.author !== "assistant" || message.itemType !== "commentary" || !message.turnId) continue;
+    if (!isClaudeNarration(message) || !message.turnId) continue;
     const parts = importedNarration.get(message.turnId) ?? [];
     parts.push(message);
     importedNarration.set(message.turnId, parts);
@@ -198,6 +198,24 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
       .filter((message) => !omitted.has(message.id))
       .map((message) => replacements.get(message.id) ?? message),
   };
+}
+
+/**
+ * The narration of a turn, which is the text it said between its tool calls.
+ *
+ * Thinking is commentary too, and has been stored under `${turnId}:reasoning` since long before
+ * narration was. Counting it as narration breaks this both ways: the reasoning text joins the
+ * comparison that recognises a released turn's combined answer, and a turn that only ever had
+ * thinking looks like one whose narration is already stored, so the imported narration is dropped
+ * as a repeat and the text is lost.
+ */
+function isClaudeNarration(message: ConversationMessage): boolean {
+  return (
+    message.author === "assistant" &&
+    message.itemType === "commentary" &&
+    Boolean(message.turnId) &&
+    message.id !== `${message.turnId}:reasoning`
+  );
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {

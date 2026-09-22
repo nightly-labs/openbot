@@ -137,6 +137,36 @@ describe("provider conversation history", () => {
     expect(mergeProviderHistory(merged, imported, "claude").messages).toEqual(merged.messages);
   });
 
+  it("splits a released Claude turn that also stored its thinking", () => {
+    /* Thinking has always been stored as commentary under `${turnId}:reasoning`, so a turn's
+       reasoning must not be mistaken for its narration in either direction. */
+    const reasoning = {
+      ...message("turn-1:reasoning", "assistant", "Weighing it.", "commentary"),
+      createdAt: "2026-08-25T08:00:00.000Z",
+    };
+    const aggregate = message(
+      "turn-1:assistant",
+      "assistant",
+      "Let me read it.The file sets the timeout.",
+      "agentMessage",
+    );
+    const imported = snapshot([
+      reasoning,
+      { ...message("part-1", "assistant", "Let me read it.", "commentary"), createdAt: "2026-08-25T08:00:01.000Z" },
+      {
+        ...message("part-2", "assistant", "The file sets the timeout.", "agentMessage"),
+        createdAt: "2026-08-25T08:00:02.000Z",
+      },
+    ]);
+    const merged = mergeProviderHistory(snapshot([reasoning, aggregate]), imported, "claude");
+    expect(merged.messages).toEqual([
+      reasoning,
+      expect.objectContaining({ id: "part-1", itemType: "commentary", text: "Let me read it." }),
+      { ...aggregate, text: "The file sets the timeout." },
+    ]);
+    expect(mergeProviderHistory(merged, imported, "claude").messages).toEqual(merged.messages);
+  });
+
   it("retains repeated canonical Claude replies and imports history without a live answer", () => {
     const imported = snapshot([
       message("part-1", "assistant", "Again.", "agentMessage"),
