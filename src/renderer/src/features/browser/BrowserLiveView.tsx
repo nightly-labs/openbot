@@ -37,12 +37,31 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
    */
   const [frameSize, setFrameSize] = createSignal<{ width: number; height: number }>();
   let pendingFrame: Promise<void> | undefined;
+  /** Which stream the frames belong to. Another tab, or the same tab again, is a new one. */
+  let stream = 0;
+
+  /**
+   * Forget the stream that just ended, including the frame still decoding in it. That frame is a
+   * page nobody is watching any more: drawn late it would put stale pixels and stale geometry under
+   * a pointer that now belongs somewhere else, and left pending it would drop the new stream's
+   * frames until it finished.
+   */
+  const abandonStream = () => {
+    stream += 1;
+    pendingFrame = undefined;
+    setFrameSize(undefined);
+  };
 
   const draw = async (frame: { width: number; height: number; image: Uint8Array }) => {
     const element = canvas();
     const context = element?.getContext("2d");
     if (!element || !context) return;
+    const drawnFor = stream;
     const bitmap = await createImageBitmap(new Blob([new Uint8Array(frame.image)], { type: "image/jpeg" }));
+    if (drawnFor !== stream) {
+      bitmap.close();
+      return;
+    }
     if (element.width !== frame.width || element.height !== frame.height) {
       element.width = frame.width;
       element.height = frame.height;
@@ -55,7 +74,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   const stopListening = window.openbot.browser.onLiveViewEvent((event) => {
     if (event.tabId !== props.tabId) return;
     if (event.type === "stopped") {
-      setFrameSize(undefined);
+      abandonStream();
       setState(() => ({ live: false, message: event.reason }));
       return;
     }
@@ -75,7 +94,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     () => ({ tabId: props.tabId, active: props.active }),
     ({ tabId, active }) => {
       if (!active) return;
-      setFrameSize(undefined);
+      abandonStream();
       setState(() => ({ live: false, message: "Connecting to the page on the host…" }));
       void window.openbot.browser
         .startLiveView(tabId)

@@ -69,7 +69,7 @@ function listHostThatStreamsItsBrowser(): void {
  * draws a frame, and its pointer geometry - which follows the drawn frame - never becomes available.
  * `holdDecodes` leaves a frame arrived but undrawn, the state a host viewport resize passes through.
  */
-function stubCanvasDrawing(): { drawn: Mock; decodes: Mock; holdDecodes: () => () => void } {
+function stubCanvasDrawing(): { drawn: Mock; decodes: Mock; closes: Mock; holdDecodes: () => () => void } {
   const drawn = vi.fn();
   // Only the live view's own canvas draws through this. Every other canvas keeps the null context
   // jsdom gives it, so `drawn` counts the frames on the panel and nothing else.
@@ -81,14 +81,17 @@ function stubCanvasDrawing(): { drawn: Mock; decodes: Mock; holdDecodes: () => (
     }),
   });
   let held: Promise<void> | undefined;
+  // Every decoded frame is closed, drawn or not, so `closes` is where a decode ends.
+  const closes = vi.fn();
   const decodes = vi.fn(async () => {
     await held;
-    return { close: vi.fn() };
+    return { close: closes };
   });
   vi.stubGlobal("createImageBitmap", decodes);
   return {
     drawn,
     decodes,
+    closes,
     holdDecodes() {
       let release = (): void => undefined;
       held = new Promise<void>((resolve) => {
@@ -470,6 +473,33 @@ describe("OpenBot connected desktop shell", () => {
       expect.objectContaining({ type: "pointer", action: "down", x: 0.25, y: 0.25 }),
     );
     decode();
+  });
+
+  it("throws away a frame that finishes decoding after the live view stops", async () => {
+    listHostThatStreamsItsBrowser();
+    const tab = browserTab("remote-live-tab", "Remote live page");
+    const { drawn, closes, holdDecodes } = stubCanvasDrawing();
+    const decode = holdDecodes();
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Remote live page");
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
+    const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
+    view.getBoundingClientRect = () => domRect(0, 0, 400, 400);
+
+    // The stream ends while that frame is still decoding. Its page is gone, so drawing it late would
+    // show pixels of somewhere nobody is watching and aim the pointer at them.
+    emitBrowserLiveView?.({ type: "stopped", tabId: tab.id, reason: "The host stopped the live view." });
+    decode();
+    await vi.waitFor(() => expect(closes).toHaveBeenCalled());
+
+    expect(drawn).not.toHaveBeenCalled();
+    await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
+    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalled();
+    expect(await screen.findByText("The host stopped the live view.")).toBeInTheDocument();
   });
 
   it("keeps existing previews when a new tab is added", async () => {

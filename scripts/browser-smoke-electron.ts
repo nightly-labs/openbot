@@ -518,17 +518,26 @@ async function main(): Promise<void> {
       ref: input.ref,
       text: "runs locally",
     });
-    const currentSave = typed.elements.find((element) => element.name === "Save");
-    if (!currentSave) throw new Error("Save control disappeared after typing.");
-    await browser.act(tab.id, typed.revision, { type: "click", ref: currentSave.ref });
     // A native click travels the input pipeline, not the snapshot channel, so the page can still be
     // running the handler when the act call returns. Wait for the text the handler writes; a click
     // that was not native never writes it, so the check keeps its meaning.
-    const clickDeadline = Date.now() + 5_000;
-    let result = await browser.snapshot(tab.id);
+    //
+    // The pipeline can also swallow the first click outright: on a fresh view under a virtual
+    // display the page has recorded no pointer event at all when this fails. Click again while the
+    // deadline lasts rather than call a lost input a broken one. The page records the click as a
+    // flag, so an extra one says the same thing.
+    const clickDeadline = Date.now() + 15_000;
+    let result = typed;
     while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < clickDeadline) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      const currentSave = result.elements.find((element) => element.name === "Save");
+      if (!currentSave) throw new Error("Save control disappeared after typing.");
+      await browser.act(tab.id, result.revision, { type: "click", ref: currentSave.ref });
+      const settleDeadline = Date.now() + 2_000;
       result = await browser.snapshot(tab.id);
+      while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < settleDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        result = await browser.snapshot(tab.id);
+      }
     }
     if (!result.text.includes("runs locally|input:true|click:true")) {
       const contents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
