@@ -323,6 +323,34 @@ describe("host status reporting", () => {
     expect(report.summary).toContain("1 remaining bundle processes");
   });
 
+  it("keeps tenant status out of the stopping phase, as the host does", () => {
+    const state = { phase: "stopping", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
+    const input = statusInput();
+    const acme = input.tenants[0];
+    if (acme?.status) acme.status = { ...acme.status, heartbeatAt: NOW - 600_000 };
+    const report = describeHostStatus({ ...input, state, processes: [] });
+    expect(report.remainingProcesses).toBe(0);
+    expect(report.tenants.map((tenant) => tenant.blocker)).toEqual([null, null]);
+  });
+
+  it("gives no countdown for an idle time in the future", () => {
+    const input = statusInput();
+    const acme = input.tenants[0];
+    if (acme?.status) acme.status = { ...acme.status, idleSince: NOW + 60_000 };
+    const report = describeHostStatus(input);
+    expect(report.tenants[0]?.readyInMs).toBeNull();
+    expect(report.tenants[0]?.blocker).toBe("idle time is in the future");
+  });
+
+  it("fails the status reading instead of reporting an empty process list", async () => {
+    const f = fixture();
+    f.ops.readConfig = async () => ({ managed: true, tenants: [501] });
+    f.ops.bundleProcesses = async () => {
+      throw new Error("Process scan returned no processes.");
+    };
+    await expect(collectHostStatus(f.ops, NOW)).rejects.toThrow();
+  });
+
   it("reports a stopped daemon and an unmanaged host before any update text", () => {
     expect(describeHostStatus({ ...statusInput(), daemonRunning: false }).summary).toContain("LaunchDaemon is not");
     const unmanaged = describeHostStatus({

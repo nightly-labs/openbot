@@ -179,6 +179,27 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}m`;
 }
 
+function waitingBlocker(
+  status: HostTenantStatus,
+  state: HostUpdateState,
+  processMatch: boolean,
+  now: number,
+): string | null {
+  // Mirrors HostManager.#waitForIdle, including its rejection of an idle time in the future.
+  if (!status.safeToRestart) return "not safe to restart";
+  if (status.idleSince === null) return "working";
+  if (status.idleSince > now) return "idle time is in the future";
+  if (status.cycle !== state.cycle) return "has not acknowledged this update cycle";
+  return processMatch ? null : "reported PID is not in the process list";
+}
+
+function releasedBlocker(status: HostTenantStatus, state: HostUpdateState): string | null {
+  // Mirrors HostManager.#checkHealth: a fresh report with health, the installed version and the cycle.
+  if (!status.healthy) return "not healthy after restart";
+  if (status.currentVersion !== state.version) return `still runs ${status.currentVersion}`;
+  return status.cycle === state.cycle ? null : "has not acknowledged this update cycle";
+}
+
 function describeTenant(
   entry: HostStatusInput["tenants"][number],
   state: HostUpdateState | null,
@@ -189,11 +210,12 @@ function describeTenant(
   // Waiting mirrors the host's main-process check; stopping waits for every bundle process to exit.
   const matching = processes.filter((process) => process.uid === entry.uid && process.main);
   const anyProcess = processes.some((process) => process.uid === entry.uid);
+  // HostManager.#waitForExit reads the process list only, so tenant status cannot block this phase.
+  const stopping = state?.phase === "stopping";
   const base = { uid: entry.uid, name: entry.name, running: false, pid: null, version: null, healthy: false };
-  if (!status) {
-    const blocker = anyProcess ? "runs without a status report" : "no status report";
-    return { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null, blocker };
-  }
+  const empty = { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null };
+  if (stopping && !status) return { ...empty, blocker: anyProcess ? "still running" : null };
+  if (!status) return { ...empty, blocker: anyProcess ? "runs without a status report" : "no status report" };
   const heartbeatAgeMs = now - status.heartbeatAt;
   const fresh = heartbeatAgeMs >= 0 && heartbeatAgeMs <= HOST_HEARTBEAT_TIMEOUT_MS;
   const idleForMs = status.idleSince === null ? null : Math.max(0, now - status.idleSince);
@@ -209,33 +231,14 @@ function describeTenant(
     heartbeatAgeMs,
     idleForMs,
   };
-  const cycleMismatch = state !== null && status.cycle !== state.cycle;
-  // Each phase mirrors the predicate the host itself applies in that phase.
+  if (stopping) return { ...report, readyInMs: null, blocker: anyProcess ? "still running" : null };
   const blocker = !fresh
     ? "stale status report"
     : state?.phase === "released"
-      ? !status.healthy
-        ? "not healthy after restart"
-        : status.currentVersion !== state.version
-          ? `still runs ${status.currentVersion}`
-          : cycleMismatch
-            ? "has not acknowledged this update cycle"
-            : null
+      ? releasedBlocker(status, state)
       : state?.phase === "waiting"
-        ? !status.safeToRestart
-          ? "not safe to restart"
-          : idleForMs === null
-            ? "working"
-            : cycleMismatch
-              ? "has not acknowledged this update cycle"
-              : processMatch
-                ? null
-                : "reported PID is not in the process list"
-        : state?.phase === "stopping"
-          ? anyProcess
-            ? "still running"
-            : null
-          : null;
+        ? waitingBlocker(status, state, processMatch, now)
+        : null;
   const readyInMs =
     state?.phase === "waiting" && idleForMs !== null && blocker === null
       ? Math.max(0, HOST_IDLE_GRACE_MS - idleForMs)
@@ -360,7 +363,8 @@ export async function collectHostStatus(ops: HostAdminOperations, now = Date.now
       () => true,
       () => false,
     ),
-    ops.bundleProcesses().catch(() => []),
+    // A failed scan must not become an empty process list: the daemon cannot advance without it either.
+    ops.bundleProcesses(),
     Promise.all(
       (config?.tenants ?? []).map(async (uid) => ({
         uid,

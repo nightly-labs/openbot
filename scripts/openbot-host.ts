@@ -18,9 +18,13 @@ async function showStatus(operations: HostAdminOperations, json: boolean): Promi
 async function watchStatus(operations: HostAdminOperations, intervalMs: number): Promise<void> {
   const repaint = process.stdout.isTTY;
   for (;;) {
-    const report = await collectHostStatus(operations);
+    // A reading can fail while the host is unhealthy. Report that and keep watching, without error text.
+    const view = await collectHostStatus(operations).then(
+      (report) => formatHostStatus(report),
+      () => "Host status is unavailable. Check the host directory, the daemon and the process list.\n",
+    );
     if (repaint) process.stdout.write("\u001B[H\u001B[2J");
-    process.stdout.write(`${formatHostStatus(report)}${repaint ? "\nPress Control-C to stop.\n" : "\n"}`);
+    process.stdout.write(`${view}${repaint ? "\nPress Control-C to stop.\n" : "\n"}`);
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }
