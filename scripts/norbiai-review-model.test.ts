@@ -44,6 +44,8 @@ function resolve({ description = "", comment = "", fork = false }: Request) {
       DEFAULT_EFFORT: job.env.DEFAULT_EFFORT,
       ALLOWED_MODELS: job.env.ALLOWED_MODELS,
       ALLOWED_EFFORTS: job.env.ALLOWED_EFFORTS,
+      CAPPED_MODEL: job.env.CAPPED_MODEL,
+      CAPPED_MODEL_EFFORT: job.env.CAPPED_MODEL_EFFORT,
       PR_BODY_FILE: bodyPath,
       SAME_REPO: fork ? "false" : "true",
       COMMENT_BODY: comment,
@@ -69,11 +71,11 @@ describe("NorbiAI reviewer selection", () => {
   });
 
   it("takes both directives from the description, written plainly or hidden in a comment", () => {
-    const plain = resolve({ description: "Fixes a bug.\nNorbiAI-Model: gpt-6-astra\nNorbiAI-Effort: high" });
-    const hidden = resolve({ description: "<!-- NorbiAI-Model: gpt-6-astra -->\n<!-- NorbiAI-Effort: high -->" });
+    const plain = resolve({ description: "Fixes a bug.\nNorbiAI-Model: chatgpt-web/pro\nNorbiAI-Effort: high" });
+    const hidden = resolve({ description: "<!-- NorbiAI-Model: chatgpt-web/pro -->\n<!-- NorbiAI-Effort: high -->" });
 
-    expect(plain).toMatchObject({ model: "gpt-6-astra", effort: "high" });
-    expect(hidden).toMatchObject({ model: "gpt-6-astra", effort: "high" });
+    expect(plain).toMatchObject({ model: "chatgpt-web/pro", effort: "high" });
+    expect(hidden).toMatchObject({ model: "chatgpt-web/pro", effort: "high" });
   });
 
   it("keeps the default for the half the pull request did not ask about", () => {
@@ -151,6 +153,32 @@ describe("NorbiAI reviewer selection", () => {
     });
 
     expect(model).toBe("chatgpt-web/medium");
+  });
+
+  // A ceiling, not a default: gpt-6-astra never runs above `low`, so neither channel may
+  // raise it and the test says so for both. `it.each` over the two sources rather than one
+  // case, because a cap applied to the description alone would leave the comment - the more
+  // convenient channel - able to lift it.
+  it.each([
+    ["the description", { description: "NorbiAI-Model: gpt-6-astra\nNorbiAI-Effort: xhigh" }],
+    ["the request comment", { comment: "/norbiai review\nNorbiAI-Model: gpt-6-astra\nNorbiAI-Effort: ultra" }],
+  ])("caps gpt-6-astra at low however %s asks", (_source, request) => {
+    const { model, effort, log } = resolve(request);
+
+    expect({ model, effort }).toEqual({ model: "gpt-6-astra", effort: "low" });
+    expect(log).toContain("::warning title=NorbiAI capped the reasoning effort");
+  });
+
+  it("leaves a model that is not capped free to use the whole range", () => {
+    const { model, effort, log } = resolve({ description: "NorbiAI-Model: chatgpt-web/medium\nNorbiAI-Effort: xhigh" });
+
+    expect({ model, effort }).toEqual({ model: "chatgpt-web/medium", effort: "xhigh" });
+    expect(log).not.toContain("capped the reasoning effort");
+  });
+
+  it("pins the cap to gpt-6-astra at low", () => {
+    expect(job.env.CAPPED_MODEL).toBe("gpt-6-astra");
+    expect(job.env.CAPPED_MODEL_EFFORT).toBe("low");
   });
 
   // The effort only reaches gpt-6-astra: a chatgpt-web slug carries its own level, and the

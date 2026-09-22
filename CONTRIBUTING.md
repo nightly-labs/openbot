@@ -90,7 +90,8 @@ written back, so the next one starts from the defaults again — and the review 
 
 `NorbiAI-Effort` reaches `gpt-6-astra` only. A `chatgpt-web/*` slug carries its own level — the
 `high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair the effort with
-`gpt-6-astra` or it changes nothing.
+`gpt-6-astra` or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking for more is
+answered with a warning and the run goes ahead at `low`.
 
 The same two directives work in a `/norbiai review` comment, where they override the description for
 that one run. On a pull request from a fork only the comment is read: the description belongs to

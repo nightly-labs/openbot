@@ -159,6 +159,12 @@ jobs:
       # What `gpt-6-astra` accepts, which is the only model the effort reaches. `minimal` is
       # not on its list, so offering it would only buy a refused run.
       ALLOWED_EFFORTS: low medium high xhigh max ultra
+      # `gpt-6-astra` never runs above `low`, by an explicit decision. Held as a ceiling
+      # applied after the override rather than as a shorter `ALLOWED_EFFORTS`, so the cap
+      # stays attached to this one model and a request for more is answered with a warning
+      # that says why, not a silent substitution.
+      CAPPED_MODEL: gpt-6-astra
+      CAPPED_MODEL_EFFORT: low
 
     steps:
       - name: Checkout repository
@@ -315,6 +321,15 @@ jobs:
           model=$resolved
           choose "reasoning effort" "$comment_effort" "$pr_effort" "$DEFAULT_EFFORT" "$ALLOWED_EFFORTS"
           effort=$resolved
+
+          # A ceiling, not a default, and the reason it is applied here rather than by
+          # shortening `ALLOWED_EFFORTS`: the cap belongs to this model, so a later entry
+          # that does read the effort keeps the full range. Nothing upstream can lift it —
+          # the description and the request comment both land here first.
+          if [ "$model" = "$CAPPED_MODEL" ] && [ "$effort" != "$CAPPED_MODEL_EFFORT" ]; then
+            echo "::warning title=NorbiAI capped the reasoning effort::\`${CAPPED_MODEL}\` runs at \`${CAPPED_MODEL_EFFORT}\` reasoning effort only. Ignoring the requested \`${effort}\`."
+            effort=$CAPPED_MODEL_EFFORT
+          fi
 
           {
             echo "model=$model"
