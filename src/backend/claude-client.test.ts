@@ -888,6 +888,25 @@ fi
     await client.stop();
   });
 
+  it("corrects narration before publishing it, so the answer still lands", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    await startTurn(client, threadId, turnId);
+
+    // The narration stream dropped a letter, and the answer arrives only as a complete message.
+    output.push(streamDelta(threadId, turnId, "Pln."));
+    output.push(assistantMessage(threadId, "narration-message", "Plan."));
+    output.push(toolUseMessage(threadId, "tool-message", "tool-use-1", "Read"));
+    output.push(toolResultMessage(threadId, "tool-result", "tool-use-1"));
+    output.push(assistantMessage(threadId, "answer-message", "Done."));
+    output.push(resultMessage(threadId, turnId, "Plan.Done."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications)).toEqual(["Plan."]);
+    expect(answerText(notifications)).toBe("Done.");
+    await client.stop();
+  });
+
   it("corrects an answer the stream truncated after narration was published", async () => {
     const { client, notifications, output, threadId } = await createHarness();
     const turnId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";

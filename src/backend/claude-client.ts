@@ -595,10 +595,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
          the text was held would see an empty buffer and leave that narration for the answer. */
       if (text) {
         turn.assistantMessages.set(message.uuid, text);
-        const completeText = [...turn.assistantMessages.values()].join("");
-        if (completeText.startsWith(turn.seenText)) {
-          this.#bufferText(runtime, completeText.slice(turn.seenText.length));
-        }
+        this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
       }
       const toolCalls = messageToolCalls(message.message);
       // A tool call closes the step, which makes the text before it narration rather than an answer.
@@ -650,16 +647,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
-      const completeText = [...turn.assistantMessages.values()].join("");
-      if (completeText.startsWith(turn.seenText)) {
-        this.#bufferText(runtime, completeText.slice(turn.seenText.length));
-      } else if (completeText.length > 0 && completeText.startsWith(turn.publishedText)) {
-        /* The stream and the complete messages disagree, and the complete messages are the ones
-           Claude stands behind. They can only rewrite what no step boundary has published yet, so
-           the narration is left alone and the answer takes the rest. */
-        turn.text = completeText.slice(turn.publishedText.length);
-        turn.seenText = completeText;
-      }
+      this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
       if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
     }
     const interrupted =
@@ -722,6 +710,26 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (!turn || !delta) return;
     turn.text += delta;
     turn.seenText += delta;
+  }
+
+  /**
+   * Let the complete assistant messages correct what the stream delivered.
+   *
+   * A delta can go missing, and the complete messages are the ones Claude stands behind. They can
+   * only rewrite what no step boundary has published yet, so this has to run before every flush
+   * while the current step can still be corrected: publishing a stale step would strand every
+   * later comparison behind text Claude never sent, and the answer would be dropped with it.
+   */
+  #reconcileText(runtime: ThreadRuntime, completeText: string): void {
+    const turn = runtime.activeTurn;
+    if (!turn) return;
+    if (completeText.startsWith(turn.seenText)) {
+      this.#bufferText(runtime, completeText.slice(turn.seenText.length));
+      return;
+    }
+    if (completeText.length === 0 || !completeText.startsWith(turn.publishedText)) return;
+    turn.text = completeText.slice(turn.publishedText.length);
+    turn.seenText = completeText;
   }
 
   /** Publish held text as the thinking disclosure, which is what a step boundary proves it was. */
