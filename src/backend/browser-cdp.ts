@@ -252,6 +252,7 @@ export class BrowserCdpEngine {
   }
   #retainDebugger = false;
   #ownsDebugger = false;
+  #closing = false;
   /**
    * How many leases are running. A lease detaches on the way out, and until this counter existed it
    * detached whenever it was the one that had attached -- which is wrong as soon as two overlap. An
@@ -267,6 +268,11 @@ export class BrowserCdpEngine {
 
   constructor(contents: WebContents) {
     this.#contents = contents;
+    contents.once("close", () => {
+      // Native teardown can start before isDestroyed() becomes true. Detaching a debugger
+      // during that interval can crash Electron; Chromium will dispose it with the page.
+      this.#closing = true;
+    });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
       this.#targets.clear();
@@ -946,13 +952,20 @@ export class BrowserCdpEngine {
     return this.#lease(async (send) => {
       const fill = !this.#environment || this.#environment.viewport.mode === "fill";
       if (fill) {
-        // A hidden fill-mode view needs an explicit viewport to paint a capture surface.
-        const metrics = await send("Page.getLayoutMetrics");
-        const viewport = recordValue(metrics.cssLayoutViewport);
+        // Hidden views need a capture surface. Preserve the page's full viewport,
+        // including scrollbars: layoutViewport.clientWidth would shrink it and
+        // can dispose a responsive page's OAuth callback during preview capture.
+        const contextId = await automationContextId(send);
+        const result = await send("Runtime.evaluate", {
+          expression: "({ width: innerWidth, height: innerHeight, scale: devicePixelRatio })",
+          contextId,
+          returnByValue: true,
+        });
+        const viewport = recordValue(recordValue(result.result)?.value);
         await send("Emulation.setDeviceMetricsOverride", {
-          width: numberValue(viewport?.clientWidth),
-          height: numberValue(viewport?.clientHeight),
-          deviceScaleFactor: 1,
+          width: numberValue(viewport?.width),
+          height: numberValue(viewport?.height),
+          deviceScaleFactor: numberValue(viewport?.scale),
           mobile: false,
         });
       }
@@ -1582,7 +1595,7 @@ export class BrowserCdpEngine {
   }
 
   async #lease<T>(operation: (send: SendCommand) => Promise<T>, attachFrames = true): Promise<T> {
-    if (this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
+    if (this.#closing || this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
     if (!this.#contents.debugger.isAttached()) {
       this.#contents.debugger.attach("1.3");
       this.#ownsDebugger = true;
@@ -1615,7 +1628,7 @@ export class BrowserCdpEngine {
     if (!this.#ownsDebugger) return;
     this.#ownsDebugger = false;
     this.#clearDebuggerSessions();
-    if (this.#contents.isDestroyed() || !this.#contents.debugger.isAttached()) return;
+    if (this.#closing || this.#contents.isDestroyed() || !this.#contents.debugger.isAttached()) return;
     this.#contents.debugger.detach();
   }
 
@@ -2553,18 +2566,39 @@ async function isNodeOrDescendant(
   target: number,
   sessionId?: string,
 ): Promise<boolean> {
-  let current = candidate;
-  for (let depth = 0; depth < 50; depth++) {
-    if (current === target) return true;
-    const result = await send("DOM.describeNode", { backendNodeId: current, depth: 0 }, sessionId);
-    const node = recordValue(result.node);
-    const parentId = numberValue(node?.parentId);
-    if (!parentId) return false;
-    const parent = await send("DOM.describeNode", { nodeId: parentId, depth: 0 }, sessionId);
-    current = numberValue(recordValue(parent.node)?.backendNodeId);
-    if (!current) return false;
+  if (candidate === target) return true;
+  const executionContextId = await automationContextId(send, sessionId);
+  const objectIds: string[] = [];
+  try {
+    // describeNode does not reliably include parentId. Resolve both nodes in
+    // our isolated world so a button's own child is not treated as an overlay.
+    for (const backendNodeId of [target, candidate]) {
+      const resolved = await send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
+      const objectId = stringValue(recordValue(resolved.object)?.objectId);
+      if (!objectId) return false;
+      objectIds.push(objectId);
+    }
+    const result = await send(
+      "Runtime.callFunctionOn",
+      {
+        objectId: objectIds[0],
+        functionDeclaration: `function(candidate) {
+          for (let node = candidate; node; node = node.parentNode || node.host) {
+            if (node === this) return true;
+          }
+          return false;
+        }`,
+        arguments: [{ objectId: objectIds[1] }],
+        returnByValue: true,
+      },
+      sessionId,
+    );
+    return recordValue(result.result)?.value === true;
+  } finally {
+    await Promise.all(
+      objectIds.map((objectId) => send("Runtime.releaseObject", { objectId }, sessionId).catch(() => undefined)),
+    );
   }
-  return false;
 }
 
 function waitForLoading(contents: WebContents, timeoutMs: number): Promise<void> {

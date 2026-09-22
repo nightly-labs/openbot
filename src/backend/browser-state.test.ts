@@ -9,6 +9,18 @@ describe("persistentBrowserUrl", () => {
     );
   });
 
+  it("removes callback credentials from saved popup URLs while keeping ordinary navigation", () => {
+    expect(
+      persistentBrowserUrl(
+        "https://user:password@example.com/callback?code=secret&state=private&view=home#access_token=token&id_token=id",
+        { popup: true },
+      ),
+    ).toBe("https://example.com/callback?view=home");
+    expect(persistentBrowserUrl("https://example.com/search?q=hello#/saved-view", { popup: true })).toBe(
+      "https://example.com/search?q=hello#/saved-view",
+    );
+  });
+
   it("keeps ordinary browser URLs and hashes", () => {
     expect(persistentBrowserUrl("https://x.com/home")).toBe("https://x.com/home");
     expect(persistentBrowserUrl("https://example.com/app#/saved-view")).toBe("https://example.com/app#/saved-view");
