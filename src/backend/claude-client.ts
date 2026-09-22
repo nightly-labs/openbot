@@ -587,6 +587,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           this.#appendThinkingDelta(runtime, completeThinking.slice(turn.thinking.length));
         }
       }
+      /* Hold this message's own text first. Claude can omit the stream deltas and send one message
+         carrying the narration together with the call it introduces, and a flush that ran before
+         the text was held would see an empty buffer and leave that narration for the answer. */
+      if (text) {
+        turn.assistantMessages.set(message.uuid, text);
+        const completeText = [...turn.assistantMessages.values()].join("");
+        if (completeText.startsWith(turn.seenText)) {
+          this.#bufferText(runtime, completeText.slice(turn.seenText.length));
+        }
+      }
       const toolCalls = messageToolCalls(message.message);
       // A tool call closes the step, which makes the text before it narration rather than an answer.
       if (toolCalls.length > 0) this.#flushNarration(runtime);
@@ -594,12 +604,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         if (turn.toolCalls.has(toolCall.id)) continue;
         turn.toolCalls.set(toolCall.id, toolCall.name);
         this.#emitToolCall(runtime, toolCall.id, toolCall.name, false);
-      }
-      if (!text) return;
-      turn.assistantMessages.set(message.uuid, text);
-      const completeText = [...turn.assistantMessages.values()].join("");
-      if (completeText.startsWith(turn.seenText)) {
-        this.#bufferText(runtime, completeText.slice(turn.seenText.length));
       }
       return;
     }
@@ -806,13 +810,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         currentAnswer = null;
       } else if (message.type === "assistant") {
         const thinking = messageThinking(message.message);
-        if (!thinking && !text) continue;
-        if (!current) {
+        const endsStep = messageToolCalls(message.message).length > 0;
+        if (!thinking && !text && !endsStep) continue;
+        if (!current && (thinking || text)) {
           current = { id: message.uuid, status: "completed", items: [] };
           turns.push(current);
           currentThinking = null;
           currentAnswer = null;
         }
+        if (!current) continue;
         if (thinking) {
           if (currentThinking) {
             currentThinking.text = `${currentThinking.text ?? ""}\n${thinking}`;
@@ -830,6 +836,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           if (currentAnswer) currentAnswer.phase = "commentary";
           currentAnswer = { id: message.uuid, type: "agentMessage", text };
           current.items?.push(currentAnswer);
+        }
+        /* A tool call closes the step here too, including one the same message introduced. Without
+           this, a turn that stopped on its tool call keeps the narration that led to it as the
+           answer, and restores the bubble the live path removed. */
+        if (endsStep && currentAnswer) {
+          currentAnswer.phase = "commentary";
+          currentAnswer = null;
         }
       }
     }

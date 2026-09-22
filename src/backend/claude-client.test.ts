@@ -888,6 +888,63 @@ fi
     await client.stop();
   });
 
+  it("keeps narration out of the answer when Claude omits stream deltas", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    await startTurn(client, threadId, turnId);
+
+    // One message carries the narration and the call it introduces, and no delta announced it.
+    output.push(narratedToolUseMessage(threadId, "narrating-call", "tool-use-1", "Read", "Let me read the file."));
+    output.push(toolResultMessage(threadId, "tool-result", "tool-use-1"));
+    output.push(assistantMessage(threadId, "answer-message", "The file sets the timeout."));
+    output.push(resultMessage(threadId, turnId, "Let me read the file.The file sets the timeout."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications)).toEqual(["Let me read the file."]);
+    expect(answerText(notifications)).toBe("The file sets the timeout.");
+    await client.stop();
+  });
+
+  it("restores a turn whose last text introduced a tool call as commentary", async () => {
+    const turnId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const history: SessionMessage[] = [];
+    const { client, threadId } = await createHarness(history);
+    history.push(
+      {
+        type: "user",
+        uuid: turnId,
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: "Fix the timeout." },
+      },
+      {
+        type: "assistant",
+        uuid: "restored-narration",
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "text", text: "Let me fix it." }] },
+      },
+      // The turn stopped on the tool call, so no later text proves the narration was not the answer.
+      {
+        type: "assistant",
+        uuid: "restored-call",
+        session_id: threadId,
+        parent_tool_use_id: null,
+        parent_agent_id: null,
+        message: { content: [{ type: "tool_use", id: "tool-use-1", name: "Edit" }] },
+      },
+    );
+
+    const restored = await client.request("thread/read", { threadId }, decodeThreadResponse);
+    const items = (restored.thread.turns ?? []).flatMap((turn) => turn.items ?? []);
+    expect(items.filter((item) => item.type === "agentMessage").map((item) => [item.id, item.phase])).toEqual([
+      ["restored-narration", "commentary"],
+    ]);
+    await client.stop();
+  });
+
   it("keeps the text before a tool call out of the answer bubble", async () => {
     const { client, notifications, output, threadId } = await createHarness();
     const turnId = "66666666-6666-4666-8666-666666666666";
@@ -898,7 +955,7 @@ fi
     output.push(toolUseMessage(threadId, "tool-message", "tool-use-1", "Read"));
     output.push(toolResultMessage(threadId, "tool-result", "tool-use-1"));
     output.push(streamDelta(threadId, turnId, "The file sets the timeout."));
-    output.push(assistantMessage(threadId, "answer-message", "Let me read the file.The file sets the timeout."));
+    output.push(assistantMessage(threadId, "answer-message", "The file sets the timeout."));
     output.push(resultMessage(threadId, turnId, "Let me read the file.The file sets the timeout."));
     await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
 
@@ -1057,6 +1114,27 @@ function assistantMessage(
     session_id: threadId,
     uuid: messageId,
     message: { content: [{ type: "text", text }] },
+  };
+}
+
+function narratedToolUseMessage(
+  threadId: string,
+  messageId: string,
+  toolUseId: string,
+  name: string,
+  text: string,
+): TestStreamMessage {
+  return {
+    type: "assistant",
+    parent_tool_use_id: null,
+    session_id: threadId,
+    uuid: messageId,
+    message: {
+      content: [
+        { type: "text", text },
+        { type: "tool_use", id: toolUseId, name },
+      ],
+    },
   };
 }
 

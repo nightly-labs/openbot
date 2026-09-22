@@ -116,6 +116,27 @@ describe("provider conversation history", () => {
     expect(mergeProviderHistory(stored, snapshot(parts), "claude").messages).toEqual(stored.messages);
   });
 
+  it("splits a released Claude turn that stored narration and the answer together", () => {
+    /* A turn released before narration rode the thinking disclosure kept both in one message. The
+       import now splits them, so the aggregate has to be matched whole or the backfill leaves the
+       old bubble in place and adds the split copy beside it. */
+    const aggregate = {
+      ...message("turn-1:assistant", "assistant", "Let me read it.The file sets the timeout.", "agentMessage"),
+      reaction: "\u{1f44d}" as const,
+    };
+    const imported = snapshot([
+      message("part-1", "assistant", "Let me read it.", "commentary"),
+      message("part-2", "assistant", "The file sets the timeout.", "agentMessage"),
+    ]);
+    const merged = mergeProviderHistory(snapshot([aggregate]), imported, "claude");
+    expect(merged.messages).toEqual([
+      expect.objectContaining({ id: "part-1", itemType: "commentary", text: "Let me read it." }),
+      { ...aggregate, text: "The file sets the timeout." },
+    ]);
+    // A second startup finds the split shape already stored and changes nothing more.
+    expect(mergeProviderHistory(merged, imported, "claude").messages).toEqual(merged.messages);
+  });
+
   it("retains repeated canonical Claude replies and imports history without a live answer", () => {
     const imported = snapshot([
       message("part-1", "assistant", "Again.", "agentMessage"),

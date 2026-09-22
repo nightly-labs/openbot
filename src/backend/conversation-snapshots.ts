@@ -175,15 +175,21 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
     // Existing split records can have saved references. Never remove or combine them.
     if (parts.some((part) => storedMessages.has(part.id))) continue;
     const text = parts.map((part) => part.text).join("");
-    if (!answer.text || !text.startsWith(answer.text)) continue;
+    const narration = importedNarration.get(turnId) ?? [];
+    /* A turn released before narration rode the thinking disclosure stored the narration and the
+       answer together under this one ID. The import now splits the two, so the aggregate matches
+       neither half on its own: match it whole, and keep only the answer as its text. Without this
+       the backfill leaves the aggregate bubble in place and stores the split copy beside it. */
+    const aggregate = narration.length > 0 && answer.text === `${narration.map((part) => part.text).join("")}${text}`;
+    if (!answer.text || !(aggregate || text.startsWith(answer.text))) continue;
     const first = parts[0];
     const last = parts.at(-1);
     if (!first || !last) continue;
     replacements.set(first.id, { ...answer, text, status: last.status });
     for (const part of parts.slice(1)) omitted.add(part.id);
     if (!storedNarrationTurns.has(turnId)) continue;
-    for (const narration of importedNarration.get(turnId) ?? []) {
-      if (!storedMessages.has(narration.id)) omitted.add(narration.id);
+    for (const part of narration) {
+      if (!storedMessages.has(part.id)) omitted.add(part.id);
     }
   }
   return {
