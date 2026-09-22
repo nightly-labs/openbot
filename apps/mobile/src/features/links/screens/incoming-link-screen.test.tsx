@@ -223,22 +223,14 @@ it("discards a late preview after switching to another invitation", async () => 
   expect(state.join).toHaveBeenCalledWith({ inviteUrl: second });
 });
 
-it("does not redeem a second link while the first connection is still pending", async () => {
-  let finish: (value: MobileSession) => void = () => {};
-  state.redeem.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-  );
+it("shows a shared redemption error without attaching a session", async () => {
+  state.redeem.mockRejectedValueOnce(new Error("Another connection is in progress. Wait for it to finish."));
   receive(pairing);
   await act(() => root.render(<IncomingLinkScreen />));
   await act(() => fireEvent.click(screen.getByRole("button", { name: "Connect" })));
-  receive(createMobileConnectUrl({ apiUrl: session.apiUrl, ticket: "d".repeat(32), host: session.host }));
-  await act(() => root.render(<IncomingLinkScreen />));
-  await act(() => fireEvent.click(screen.getByRole("button", { name: "Connect" })));
-  expect(state.redeem).toHaveBeenCalledTimes(1);
   expect(screen.getByText("Another connection is in progress. Wait for it to finish.")).toBeTruthy();
-  await act(() => finish(session));
+  expect(state.connect).not.toHaveBeenCalled();
+  expect(state.replace).not.toHaveBeenCalled();
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Connect" })));
   expect(state.connect).toHaveBeenCalledExactlyOnceWith(session);
 });

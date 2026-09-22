@@ -5,9 +5,16 @@ import { JoinPage } from "../src/components/landing/JoinPage";
 const INVITE_URL =
   "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
+const platformDescriptor = Object.getOwnPropertyDescriptor(navigator, "platform");
+const touchDescriptor = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  if (platformDescriptor) Object.defineProperty(navigator, "platform", platformDescriptor);
+  else Reflect.deleteProperty(navigator, "platform");
+  if (touchDescriptor) Object.defineProperty(navigator, "maxTouchPoints", touchDescriptor);
+  else Reflect.deleteProperty(navigator, "maxTouchPoints");
 });
 
 describe("invitation landing page", () => {
@@ -34,7 +41,7 @@ describe("invitation landing page", () => {
     { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)", platform: "MacIntel", maxTouchPoints: 5 },
   ])("does not offer a desktop installer on a phone or iPad", async (device) => {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue(device.userAgent);
-    vi.spyOn(navigator, "platform", "get").mockReturnValue(device.platform);
+    Object.defineProperty(navigator, "platform", { configurable: true, value: device.platform });
     Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: device.maxTouchPoints });
     window.history.replaceState({}, "", INVITE_URL);
     render(() => <JoinPage />);

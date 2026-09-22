@@ -8,13 +8,7 @@ import { View } from "react-native";
 import { redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SignInScreen } from "@/features/auth/screens/sign-in-screen";
-import {
-  beginIncomingPairing,
-  endIncomingPairing,
-  forgetIncomingLink,
-  pendingInvitationId,
-  readIncomingLink,
-} from "../model/incoming-links";
+import { forgetIncomingLink, pendingInvitationId, readIncomingLink } from "../model/incoming-links";
 
 export function IncomingLinkScreen() {
   const { request } = useLocalSearchParams<{ request?: string }>();
@@ -52,10 +46,6 @@ function IncomingLinkContent({ request }: { request?: string }) {
 
   async function pair() {
     if (link.kind !== "pairing" || session || locked.current) return;
-    if (!beginIncomingPairing()) {
-      setError("Another connection is in progress. Wait for it to finish.");
-      return;
-    }
     locked.current = true;
     setBusy(true);
     setError(null);
@@ -67,7 +57,6 @@ function IncomingLinkContent({ request }: { request?: string }) {
     } catch (cause) {
       if (mounted.current) setError(userErrorMessage(cause, "OpenBot could not connect. Try again."));
     } finally {
-      endIncomingPairing();
       locked.current = false;
       if (mounted.current) setBusy(false);
     }

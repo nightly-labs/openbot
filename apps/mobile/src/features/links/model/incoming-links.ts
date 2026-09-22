@@ -31,18 +31,6 @@ export function parseIncomingLink(value: string): IncomingLink {
 // The bounded memory store also keeps an invitation through the QR sign-in flow.
 const requests = new Map<string, IncomingLink>();
 let sequence = 0;
-let pairingInFlight = false;
-
-export function beginIncomingPairing(): boolean {
-  if (pairingInFlight) return false;
-  pairingInFlight = true;
-  return true;
-}
-
-export function endIncomingPairing(): void {
-  pairingInFlight = false;
-}
-
 export function rememberIncomingLink(link: IncomingLink): string {
   if (link.kind !== "invalid") {
     for (const [id, pending] of requests) {
