@@ -952,13 +952,20 @@ export class BrowserCdpEngine {
     return this.#lease(async (send) => {
       const fill = !this.#environment || this.#environment.viewport.mode === "fill";
       if (fill) {
-        // A hidden fill-mode view needs an explicit viewport to paint a capture surface.
-        const metrics = await send("Page.getLayoutMetrics");
-        const viewport = recordValue(metrics.cssLayoutViewport);
+        // Hidden views need a capture surface. Preserve the page's full viewport,
+        // including scrollbars: layoutViewport.clientWidth would shrink it and
+        // can dispose a responsive page's OAuth callback during preview capture.
+        const contextId = await automationContextId(send);
+        const result = await send("Runtime.evaluate", {
+          expression: "({ width: innerWidth, height: innerHeight, scale: devicePixelRatio })",
+          contextId,
+          returnByValue: true,
+        });
+        const viewport = recordValue(recordValue(result.result)?.value);
         await send("Emulation.setDeviceMetricsOverride", {
-          width: numberValue(viewport?.clientWidth),
-          height: numberValue(viewport?.clientHeight),
-          deviceScaleFactor: 1,
+          width: numberValue(viewport?.width),
+          height: numberValue(viewport?.height),
+          deviceScaleFactor: numberValue(viewport?.scale),
           mobile: false,
         });
       }

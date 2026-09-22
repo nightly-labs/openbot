@@ -26,7 +26,11 @@ const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   if (url.pathname === "/popup-parent") {
     response.setHeader("content-type", "text/html; charset=utf-8");
-    response.end(`<h1>Sign in</h1>
+    response.end(`<style>
+      html { overflow-y: scroll; }
+      body { min-height: 120vh; }
+      ::-webkit-scrollbar { width: 16px; }
+      </style><h1>Sign in</h1>
       <button onclick="window.auth = window.open('/popup-login', 'auth')">Sign in with account</button>
       <button onclick="window.auth = window.open('', 'auth'); auth.location.href='/popup-login'">Blank popup</button>
       <button onclick="window.open('http://localhost:' + location.port + '/popup-login', 'cross-auth')">Cross-origin sign-in</button>
@@ -34,8 +38,14 @@ const server = createServer((request, response) => {
       <form action="/popup-post" method="POST" target="_blank"><input name="state" value="local-state"><button>Post sign-in</button></form>
       <p id="result">Signed out</p><script>
       document.cookie='popup_session=shared; Path=/';
+      addEventListener('resize', () => {
+        const expected = window.callbackViewport;
+        if (expected && (innerWidth !== expected.width || innerHeight !== expected.height || devicePixelRatio !== expected.scale)) {
+          window.callbackExpired = true;
+        }
+      });
       addEventListener('message', event => {
-        if (event.origin === location.origin && event.data === 'signed-in') document.querySelector('#result').textContent = 'Signed in';
+        if (event.origin === location.origin && event.data === 'signed-in') document.querySelector('#result').textContent = window.callbackExpired ? 'Sign-in expired after resize' : 'Signed in';
       });
       </script>`);
     return;
@@ -2680,6 +2690,11 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
         throw new Error("Duplicate named popup.");
       await browser.reload(parent.id);
       if (!browser.listTabs().some((tab) => tab.id === popup.id)) throw new Error("Parent reload closed popup.");
+      // Background preview capture must not resize the opener and dispose its login callback.
+      await contents.executeJavaScript(
+        "window.callbackViewport = { width: innerWidth, height: innerHeight, scale: devicePixelRatio }; void 0",
+      );
+      await browser.capturePreview(parent.id);
       await click(popup.id, "button", "Use test account");
       await waitFor(async () => !browser.listTabs().some((tab) => tab.id === popup.id), "OAuth popup closure");
       await waitFor(
