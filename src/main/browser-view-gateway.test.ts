@@ -5,7 +5,11 @@ import { createServer, type IncomingMessage } from "node:http";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
-import { decodeBrowserViewFrame, encodeBrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  BROWSER_VIEW_FRAME_ACK_QUERY,
+  decodeBrowserViewFrame,
+  encodeBrowserViewInput,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
@@ -15,6 +19,13 @@ import { BrowserViewGateway } from "./browser-view-gateway";
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const TEAM_SESSION = "team-session-1";
+
+/** A client that will name the frame it has drawn. The host keeps sizes only for this socket. */
+function acknowledgingViewUrl(origin: string, streamPath: string): string {
+  const url = new URL(`${origin}${streamPath}`);
+  url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
+  return url.toString();
+}
 const closers: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
@@ -147,7 +158,7 @@ describe("the live browser view on a host", () => {
     const origin = await serve(gateway);
     const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
 
-    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
       headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
     });
     const frames = collect(socket);
@@ -196,7 +207,7 @@ describe("the live browser view on a host", () => {
     const origin = await serve(gateway);
     const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
 
-    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
       headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
     });
     const frames = collect(socket);
@@ -256,7 +267,7 @@ describe("the live browser view on a host", () => {
     const origin = await serve(gateway);
     const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
 
-    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
       headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
     });
     const frames = collect(socket);
@@ -290,6 +301,55 @@ describe("the live browser view on a host", () => {
         expect.objectContaining({ x: 200, y: 75 }),
       ]),
     );
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("does not keep a frame size for a client that never acknowledges frames", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    send?.({ sequence: 2, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    await vi.waitFor(() => expect(frames).toHaveLength(2));
+
+    const point = {
+      type: "pointer" as const,
+      action: "down" as const,
+      x: 0.5,
+      y: 0.25,
+      button: "left" as const,
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    // This client did not ask the host to remember frames. A named point has no size to use, and
+    // the point every released client sends still lands on the newest frame.
+    socket.send(encodeBrowserViewInput({ type: "ack", sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point }));
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 200, y: 75 })]));
     socket.close();
     await gateway.stop();
   });

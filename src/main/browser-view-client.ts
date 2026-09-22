@@ -6,6 +6,7 @@
 
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
+  BROWSER_VIEW_FRAME_ACK_QUERY,
   type BrowserViewInput,
   browserViewInputForHost,
   decodeBrowserViewFrame,
@@ -49,7 +50,13 @@ export class BrowserViewClient {
       }
       await this.#closeView();
       const stream = await this.#options.servers.openBrowserViewStream(serverId, tabId);
-      const socket = new WebSocket(stream.url, stream.protocols);
+      const url = new URL(stream.url);
+      // The host keeps a frame's size only for a client that will say when that frame is on screen.
+      // An older client never does, and the host must not retain every frame for the whole session.
+      if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
+      }
+      const socket = new WebSocket(url, stream.protocols);
       socket.binaryType = "arraybuffer";
       const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, socket };
       this.#view = view;

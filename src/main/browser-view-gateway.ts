@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   type BrowserViewSessionResponse,
+  browserViewClientAcksFrames,
   browserViewStreamPath,
   browserViewStreamSessionId,
   decodeBrowserViewInput,
@@ -59,11 +60,11 @@ interface ManagedViewSession {
   frameHeight: number;
   /**
    * The shape of each frame this session sent and the client may still be drawing, by sequence.
-   * A point names the frame on the member's screen. Frames older than that one are no longer
-   * reachable, so they go. Frames the client has not named yet stay: decoding is slower than
-   * the socket, and a fixed count of sent frames forgets the one still on screen.
+   * Only a client that acknowledged frames at connect fills this. An older client names no frame,
+   * so there is nothing to look up, and keeping one entry per frame would grow for the whole view.
    */
   frameSizes: Map<number, { width: number; height: number }>;
+  rememberFrames: boolean;
 }
 
 export class BrowserViewGateway {
@@ -90,6 +91,7 @@ export class BrowserViewGateway {
       frameWidth: 0,
       frameHeight: 0,
       frameSizes: new Map(),
+      rememberFrames: false,
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
   }
@@ -133,6 +135,11 @@ export class BrowserViewGateway {
       socket.destroy();
       return;
     }
+    // A new socket is a new stream. Sizes from the previous one name frames this client never saw.
+    session.frameWidth = 0;
+    session.frameHeight = 0;
+    session.frameSizes.clear();
+    session.rememberFrames = browserViewClientAcksFrames(url);
     this.#webSockets.handleUpgrade(request, socket, head, (client) => void this.#connect(session, client));
   }
 
@@ -173,7 +180,9 @@ export class BrowserViewGateway {
           client.send(encodeBrowserViewFrame(frame), { binary: true });
           session.frameWidth = frame.width;
           session.frameHeight = frame.height;
-          session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+          if (session.rememberFrames) {
+            session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+          }
         },
         () => {
           void this.#closeSession(session, "Authentication changed the browser view. Open a new view to continue.");

@@ -24,6 +24,12 @@ export const TEAM_BROWSER_VIEW_CAPABILITY = "browser-view";
  * client sends the sequence and the drawn-frame acknowledgement only when the host advertises this.
  */
 export const TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY = "browser-view-frame-point";
+/** Present on the view socket when this client will acknowledge the frame it has drawn. */
+export const BROWSER_VIEW_FRAME_ACK_QUERY = "frameAck";
+
+export function browserViewClientAcksFrames(url: URL): boolean {
+  return url.searchParams.get(BROWSER_VIEW_FRAME_ACK_QUERY) === "1";
+}
 
 /** A frame is one JPEG. The cap is generous for a photograph and refuses a stream that is not one. */
 export const BROWSER_VIEW_MAX_FRAME_BYTES = 2 * 1024 * 1024;
