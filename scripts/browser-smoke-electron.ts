@@ -31,16 +31,17 @@ const server = createServer((request, response) => {
       body { min-height: 120vh; }
       ::-webkit-scrollbar { width: 16px; }
       </style><h1>Sign in</h1>
-      <button onclick="window.auth = window.open('/popup-login', 'auth')">Sign in with account</button>
+      <button onclick="window.auth = window.open('/popup-login', 'auth')"><span style="display:block">Sign in with account</span></button>
       <button onclick="window.auth = window.open('', 'auth'); auth.location.href='/popup-login'">Blank popup</button>
       <button onclick="window.open('http://localhost:' + location.port + '/popup-login', 'cross-auth')">Cross-origin sign-in</button>
+      <iframe title="Embedded sign-in" src="http://localhost:${request.headers.host?.split(":").at(-1)}/popup-launcher"></iframe>
       <a href="/popup-login" target="_blank">Independent tab</a>
       <form action="/popup-post" method="POST" target="_blank"><input name="state" value="local-state"><button>Post sign-in</button></form>
       <p id="result">Signed out</p><script>
       document.cookie='popup_session=shared; Path=/';
       addEventListener('resize', () => {
         const expected = window.callbackViewport;
-        if (expected && (innerWidth !== expected.width || innerHeight !== expected.height || devicePixelRatio !== expected.scale)) {
+        if (expected) {
           window.callbackExpired = true;
         }
       });
@@ -50,16 +51,25 @@ const server = createServer((request, response) => {
       </script>`);
     return;
   }
+  if (url.pathname === "/popup-launcher") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<button onclick="window.open('/popup-login', 'frame-auth')"><span style="display:block">Iframe sign-in</span></button>
+      <div style="position:relative;width:max-content">
+        <button onclick="window.open('/popup-login', 'blocked-auth')"><span>Blocked frame sign-in</span></button>
+        <div style="position:absolute;inset:0">Covering layer</div>
+      </div>`);
+    return;
+  }
   if (url.pathname === "/popup-login") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(
-      `<h1>Choose account</h1><button onclick="location.href='http://127.0.0.1:' + location.port + '/popup-callback'">Use test account</button>`,
+      `<h1>Choose account</h1><button onclick="location.href='http://127.0.0.1:' + location.port + '/popup-callback'"><span style="display:block">Use test account</span></button>`,
     );
     return;
   }
   if (url.pathname === "/popup-callback") {
     response.setHeader("content-type", "text/html; charset=utf-8");
-    response.end(`<script>opener.postMessage('signed-in', location.origin); window.close();</script>`);
+    response.end(`<script>opener.parent.postMessage('signed-in', location.origin); window.close();</script>`);
     return;
   }
   if (url.pathname === "/popup-post") {
@@ -2664,7 +2674,7 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
     if (!result.success) throw new Error(`Popup click failed: ${toolError(result)}`);
   };
   try {
-    for (const button of ["Sign in with account", "Blank popup", "Cross-origin sign-in"]) {
+    for (const button of ["Sign in with account", "Blank popup", "Cross-origin sign-in", "Iframe sign-in"]) {
       await click(parent.id, "button", button);
       const popup = await waitForValue(() => browser.listTabs().find((tab) => tab.openerTabId === parent.id));
       const listed = await callBrowserTool(browser, "list_tabs", {});
@@ -2679,7 +2689,7 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
       );
       if (!shared) throw new Error("Popup lost session, opener, or isolation.");
       // Named-window reuse must not register another view or lose the live relationship on reload.
-      if (button !== "Cross-origin sign-in")
+      if (button !== "Cross-origin sign-in" && button !== "Iframe sign-in")
         await contents.executeJavaScript("window.open('/popup-login', 'auth'); void 0", true);
       if (popupContents.session !== contents.session) throw new Error("Popup session changed.");
       if (popupContents.getOwnerBrowserWindow() !== contents.getOwnerBrowserWindow())
@@ -2688,21 +2698,31 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
       await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
       if (browser.listTabs().filter((tab) => tab.openerTabId === parent.id).length !== 1)
         throw new Error("Duplicate named popup.");
-      await browser.reload(parent.id);
+      // Reloading a top-level opener preserves it; reloading removes an iframe opener.
+      if (button !== "Iframe sign-in") await browser.reload(parent.id);
       if (!browser.listTabs().some((tab) => tab.id === popup.id)) throw new Error("Parent reload closed popup.");
       // Background preview capture must not resize the opener and dispose its login callback.
       await contents.executeJavaScript(
-        "window.callbackViewport = { width: innerWidth, height: innerHeight, scale: devicePixelRatio }; void 0",
+        "window.callbackExpired = false; window.callbackViewport = { width: innerWidth, height: innerHeight, scale: devicePixelRatio }; void 0",
       );
       await browser.capturePreview(parent.id);
       await click(popup.id, "button", "Use test account");
-      await waitFor(async () => !browser.listTabs().some((tab) => tab.id === popup.id), "OAuth popup closure");
+      await waitFor(
+        async () => !browser.listTabs().some((tab) => tab.id === popup.id),
+        `${button}: OAuth popup closure`,
+      );
       await waitFor(
         async () => (await contents.executeJavaScript("document.querySelector('#result').textContent")) === "Signed in",
         "OAuth callback",
       );
       if (browser.activeTabId !== parent.id) throw new Error("Popup did not return to opener.");
     }
+    const blocked = await callBrowserTool(browser, "click", {
+      tabId: parent.id,
+      target: { kind: "role", role: "button", name: "Blocked frame sign-in", exact: true },
+    });
+    if (blocked.success || !toolError(blocked).includes("covered"))
+      throw new Error("A real covering layer did not block the iframe click.");
     await click(parent.id, "link", "Independent tab");
     const independent = await waitForValue(() =>
       browser.listTabs().find((tab) => tab.id !== parent.id && tab.url === `${origin}/popup-login`),

@@ -2566,18 +2566,39 @@ async function isNodeOrDescendant(
   target: number,
   sessionId?: string,
 ): Promise<boolean> {
-  let current = candidate;
-  for (let depth = 0; depth < 50; depth++) {
-    if (current === target) return true;
-    const result = await send("DOM.describeNode", { backendNodeId: current, depth: 0 }, sessionId);
-    const node = recordValue(result.node);
-    const parentId = numberValue(node?.parentId);
-    if (!parentId) return false;
-    const parent = await send("DOM.describeNode", { nodeId: parentId, depth: 0 }, sessionId);
-    current = numberValue(recordValue(parent.node)?.backendNodeId);
-    if (!current) return false;
+  if (candidate === target) return true;
+  const executionContextId = await automationContextId(send, sessionId);
+  const objectIds: string[] = [];
+  try {
+    // describeNode does not reliably include parentId. Resolve both nodes in
+    // our isolated world so a button's own child is not treated as an overlay.
+    for (const backendNodeId of [target, candidate]) {
+      const resolved = await send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
+      const objectId = stringValue(recordValue(resolved.object)?.objectId);
+      if (!objectId) return false;
+      objectIds.push(objectId);
+    }
+    const result = await send(
+      "Runtime.callFunctionOn",
+      {
+        objectId: objectIds[0],
+        functionDeclaration: `function(candidate) {
+          for (let node = candidate; node; node = node.parentNode || node.host) {
+            if (node === this) return true;
+          }
+          return false;
+        }`,
+        arguments: [{ objectId: objectIds[1] }],
+        returnByValue: true,
+      },
+      sessionId,
+    );
+    return recordValue(result.result)?.value === true;
+  } finally {
+    await Promise.all(
+      objectIds.map((objectId) => send("Runtime.releaseObject", { objectId }, sessionId).catch(() => undefined)),
+    );
   }
-  return false;
 }
 
 function waitForLoading(contents: WebContents, timeoutMs: number): Promise<void> {
