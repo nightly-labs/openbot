@@ -30,7 +30,6 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
  * behind must show the page as it is now, not replay the seconds the link was slow.
  */
 const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
-const REMEMBERED_FRAME_SIZES = 8;
 const MAX_SESSIONS = 4;
 const MAX_INPUT_MESSAGE_BYTES = 4 * 1024;
 
@@ -52,9 +51,10 @@ interface ManagedViewSession {
   frameWidth: number;
   frameHeight: number;
   /**
-   * The shape of each of the last few frames this session sent, by sequence. A client names the
-   * frame its point belongs to, and a frame sent since then must not be what the point is expanded
-   * with: the user aimed at pixels that were on their screen, not at pixels in transit.
+   * The shape of each frame this session sent and the client may still be drawing, by sequence.
+   * A point names the frame on the member's screen. Frames older than that one are no longer
+   * reachable, so they go. Frames the client has not named yet stay: decoding is slower than
+   * the socket, and a fixed count of sent frames forgets the one still on screen.
    */
   frameSizes: Map<number, { width: number; height: number }>;
 }
@@ -167,11 +167,6 @@ export class BrowserViewGateway {
           session.frameWidth = frame.width;
           session.frameHeight = frame.height;
           session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
-          // A point names a frame the user was looking at, so only the recent ones are worth keeping.
-          for (const sequence of session.frameSizes.keys()) {
-            if (session.frameSizes.size <= REMEMBERED_FRAME_SIZES) break;
-            session.frameSizes.delete(sequence);
-          }
         },
         () => {
           void this.#closeSession(session, "Authentication changed the browser view. Open a new view to continue.");
@@ -199,13 +194,18 @@ export class BrowserViewGateway {
     if (input.type === "pointer") {
       if (frame.width === 0 || frame.height === 0) return;
       // A client from before the sequence field names no frame and gets the newest one: that is
-      // what every client got before a point could name its own. A named frame that has aged out of
-      // the remembered window is not that client. Expanding it with a newer size clicks a page the
-      // user was not looking at, so the point is dropped.
+      // what every client got before a point could name its own. A named frame this session did
+      // not send, or one the client has already moved past, is not that client. Expanding it with
+      // a newer size clicks a page the user was not looking at, so the point is dropped.
       if (input.sequence !== undefined) {
         const named = session.frameSizes.get(input.sequence);
         if (!named) return;
         frame = named;
+        // This point is the client saying which frame is on screen. Anything older cannot be
+        // drawn any more, and a later point must not land on it.
+        for (const sequence of session.frameSizes.keys()) {
+          if (sequence < input.sequence) session.frameSizes.delete(sequence);
+        }
       }
     }
     // The sequence names a frame on this socket. The page is dispatched pixels, and knows nothing

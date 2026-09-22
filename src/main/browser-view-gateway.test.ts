@@ -178,7 +178,7 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
-  it("drops a point that names a frame the host no longer remembers", async () => {
+  it("keeps a point on the frame still showing, and drops it once a newer frame is named", async () => {
     const dispatched: BrowserViewportInput[] = [];
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
     const gateway = new BrowserViewGateway({
@@ -203,7 +203,8 @@ describe("the live browser view on a host", () => {
     await new Promise((resolve) => socket.once("open", resolve));
     await vi.waitFor(() => expect(send).toBeDefined());
     send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
-    // Eight newer frames is the whole window, so the frame the member is still looking at is gone.
+    // More frames than any fixed window. The member is still looking at the first: nothing has
+    // said otherwise, so a click there is a click on that page, not one to throw away.
     for (let sequence = 2; sequence <= 9; sequence += 1) {
       send?.({ sequence, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
     }
@@ -221,10 +222,18 @@ describe("the live browser view on a host", () => {
       modifiers: 0,
     };
     socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
-    // The frame still on screen. Its arrival is the barrier: the forgotten point would already
-    // have been dispatched ahead of it, at (200, 75) if it had been expanded with the newest size.
+    // Naming frame 9 says that frame is on screen now. The next click on frame 1 is a frame the
+    // member has left, and it must not be expanded with frame 9's size either.
     socket.send(encodeBrowserViewInput({ ...point, sequence: 9 }));
-    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 200, y: 75 })]));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point, action: "up", sequence: 9 }));
+    await vi.waitFor(() =>
+      expect(dispatched).toEqual([
+        expect.objectContaining({ action: "down", x: 600, y: 200 }),
+        expect.objectContaining({ action: "down", x: 200, y: 75 }),
+        expect.objectContaining({ action: "up", x: 200, y: 75 }),
+      ]),
+    );
     socket.close();
     await gateway.stop();
   });
