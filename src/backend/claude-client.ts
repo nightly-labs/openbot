@@ -586,6 +586,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const text = messageText(message.message);
       if (!turn || !message.uuid) return;
       const thinking = messageThinking(message.message);
+      /* The deltas never announced this block, so its own order is all there is to say what came
+         before it. Text the message placed there is narration, and only that much may go. */
+      if (thinking && message.uuid !== turn.thinkingStreamId) {
+        const before = textBeforeThinking(message.message);
+        if (before) {
+          turn.assistantMessages.set(message.uuid, before);
+          const upToBoundary = [...turn.assistantMessages.values()].join("");
+          this.#reconcileText(runtime, upToBoundary);
+          this.#flushNarration(runtime);
+        }
+      }
       if (thinking) {
         turn.thinkingMessages.set(message.uuid, thinking);
         const completeThinking = [...turn.thinkingMessages.values()].join("\n");
@@ -778,19 +789,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #flushNarration(runtime: ThreadRuntime): void {
     const turn = runtime.activeTurn;
     if (!turn?.text) return;
+    const text = turn.text;
     const id = `${turn.id}:narration:${turn.narrationCount}`;
     this.emit("notification", {
       method: "item/completed",
       params: {
         threadId: runtime.id,
         turnId: turn.id,
-        item: { id, type: "agentMessage", phase: "commentary", text: turn.text },
+        item: { id, type: "agentMessage", phase: "commentary", text },
       },
     });
-    turn.lastNarration = { id, text: turn.text };
+    turn.lastNarration = { id, text };
     turn.narrationCount += 1;
-    turn.publishedText += turn.text;
-    turn.text = "";
+    turn.publishedText += text;
+    turn.text = turn.text.slice(text.length);
   }
 
   #completeTurn(runtime: ThreadRuntime, status: string, error: unknown): void {
@@ -1132,6 +1144,21 @@ function messageText(message: unknown): string {
     .filter((block) => block.type === "text" && isString(block.text))
     .map((block) => block.text)
     .join("\n");
+}
+
+/** The text a message placed before its first thinking block, with the break that follows it. */
+function textBeforeThinking(message: unknown): string {
+  if (!isRecord(message) || !Array.isArray(message.content)) return "";
+  const blocks = message.content.filter(isRecord);
+  const boundary = blocks.findIndex((block) => block.type === "thinking");
+  if (boundary < 0) return "";
+  const before = blocks
+    .slice(0, boundary)
+    .filter((block) => block.type === "text" && isString(block.text))
+    .map((block) => String(block.text));
+  if (before.length === 0) return "";
+  const follows = blocks.slice(boundary + 1).some((block) => block.type === "text" && isString(block.text));
+  return `${before.join("\n")}${follows ? "\n" : ""}`;
 }
 
 function messageThinking(message: unknown): string {

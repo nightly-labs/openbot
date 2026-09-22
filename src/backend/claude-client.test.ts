@@ -906,6 +906,63 @@ fi
     await client.stop();
   });
 
+  it("closes a step at a thinking block a message carries with no deltas of its own", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "16161616-1616-4161-8161-161616161616";
+    await startTurn(client, threadId, turnId);
+
+    // No deltas at all, so block order is the only thing that says what came before the thinking.
+    output.push({
+      type: "assistant",
+      parent_tool_use_id: null,
+      session_id: threadId,
+      uuid: "whole-message",
+      message: {
+        content: [
+          { type: "text", text: "Let me weigh it." },
+          { type: "thinking", thinking: "Weighing it." },
+          { type: "text", text: "Done." },
+        ],
+      },
+    });
+    output.push(resultMessage(threadId, turnId, "Let me weigh it.\nDone."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    // The break between the two blocks goes with the part that ends, so the answer reads clean.
+    expect(narrationTexts(notifications)).toEqual(["Let me weigh it.\n"]);
+    expect(answerText(notifications)).toBe("Done.");
+    await client.stop();
+  });
+
+  it("closes the step once when a message repeats a thinking block its deltas announced", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "17171717-1717-4171-8171-171717171717";
+    await startTurn(client, threadId, turnId);
+
+    output.push(streamDelta(threadId, turnId, "Let me weigh it."));
+    output.push(thinkingStreamDelta(threadId, "whole-message", "Weighing it."));
+    output.push(streamDelta(threadId, turnId, "Done."));
+    // The message carries the block the deltas already announced, so it closes no second step.
+    output.push({
+      type: "assistant",
+      parent_tool_use_id: null,
+      session_id: threadId,
+      uuid: "whole-message",
+      message: {
+        content: [
+          { type: "text", text: "Let me weigh it." },
+          { type: "thinking", thinking: "Weighing it." },
+          { type: "text", text: "Done." },
+        ],
+      },
+    });
+    output.push(resultMessage(threadId, turnId, "Let me weigh it.\nDone."));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications)).toEqual(["Let me weigh it."]);
+    await client.stop();
+  });
+
   it("closes a step for each thinking block a turn begins", async () => {
     const { client, notifications, output, threadId } = await createHarness();
     const turnId = "15151515-1515-4151-8151-151515151515";
