@@ -366,7 +366,7 @@ export function formatHostStatus(report: HostStatusReport): string {
   return `${lines.join("\n")}\n`;
 }
 
-export async function collectHostStatus(ops: HostAdminOperations, now = Date.now()): Promise<HostStatusReport> {
+export async function collectHostStatus(ops: HostAdminOperations, now?: number): Promise<HostStatusReport> {
   const config = await ops.readConfig();
   const [state, daemonRunning, processes, tenants] = await Promise.all([
     ops.readState(),
@@ -387,7 +387,8 @@ export async function collectHostStatus(ops: HostAdminOperations, now = Date.now
       })),
     ),
   ]);
-  return describeHostStatus({ config, state, daemonRunning, processes, tenants, now });
+  // Read the clock after the files, so a heartbeat written during these reads is not called stale.
+  return describeHostStatus({ config, state, daemonRunning, processes, tenants, now: now ?? Date.now() });
 }
 
 export function parseHostWatch(args: string[]): number {

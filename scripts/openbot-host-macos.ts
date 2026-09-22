@@ -204,6 +204,8 @@ async function verifyIsolation(tenants: HostTenant[]): Promise<void> {
 
 export function macHostAdminOperations(): HostAdminOperations {
   let credentialFile: string | null = null;
+  // Account names do not change while one command runs, and watch would otherwise rescan on each refresh.
+  const names = new Map<number, string>();
   return {
     verifyInstallation,
     verifyApplication,
@@ -289,7 +291,13 @@ export function macHostAdminOperations(): HostAdminOperations {
         await unlink(credentialFile);
       }
     },
-    tenantForUid: async (uid) => ({ uid, name: await hostCommand("/usr/bin/id", ["-un", String(uid)]) }),
+    tenantForUid: async (uid) => {
+      const cached = names.get(uid);
+      if (cached !== undefined) return { uid, name: cached };
+      const name = await hostCommand("/usr/bin/id", ["-un", String(uid)]);
+      names.set(uid, name);
+      return { uid, name };
+    },
     bundleProcesses,
     readState: async () => {
       try {

@@ -378,6 +378,25 @@ describe("host status reporting", () => {
     expect(text).not.toContain("process list disagree");
   });
 
+  it("reads the clock after the files, not before them", async () => {
+    const f = fixture();
+    f.ops.readConfig = async () => ({ managed: true, tenants: [501] });
+    f.ops.readState = async () => ({ phase: "idle", cycle: "", version: null, updatedAt: 1_000, error: null });
+    let clock = 1_000;
+    const clockSpy = vi.spyOn(Date, "now").mockImplementation(() => clock);
+    // A reading that takes time, as the process scan and the account lookups do.
+    f.ops.bundleProcesses = async () => {
+      clock = 3_000;
+      return [];
+    };
+    try {
+      const report = await collectHostStatus(f.ops);
+      expect(report.stateAgeMs).toBe(2_000);
+    } finally {
+      clockSpy.mockRestore();
+    }
+  });
+
   it("reports a stopped daemon and an unmanaged host before any update text", () => {
     expect(describeHostStatus({ ...statusInput(), daemonRunning: false }).summary).toContain("LaunchDaemon is not");
     const unmanaged = describeHostStatus({

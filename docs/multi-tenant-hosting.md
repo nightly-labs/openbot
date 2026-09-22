@@ -204,7 +204,8 @@ arguments, never open a tenant home, and never start or stop maintenance.
 Each reported blocker mirrors the rule the host applies in that phase: `waiting` uses restart
 safety, idle state, cycle, and one matching main process; `stopping` waits for every process inside
 the bundle, helpers included; `released` uses the health report, the installed version, and the
-cycle. `stopping` reads no tenant status at all, because the host does not read it there either.
+cycle. A `stopping` blocker comes from the process list alone, because the host reads no tenant
+status in that phase; the tenant report is still read there for the version and health columns.
 A staged version is named only while one is pending, because the host keeps its version field after
 a finished update. A failed process scan makes `status` fail and `watch` report the reading as
 unavailable; it never becomes an empty process list. An OpenBot process under an
