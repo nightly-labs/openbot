@@ -435,6 +435,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       conversationStore.flush();
     }
     directoryRefresh.setActive(foreground);
+    // A server joined on another device is not pushed here, so a return to the app looks for one.
+    if (foreground) void directoryRefresh.foreground().catch(() => undefined);
   }, [foreground, directoryRefresh, conversationStore]);
 
   const loadConversation = useCallback(

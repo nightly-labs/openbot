@@ -62,6 +62,9 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
    * here, so this checks sooner than the account interval and no sooner than the foreground floor.
    * One asked for too soon is not dropped: it moves the next check to that floor, where the timer
    * this already owns runs it without another foreground entry - and stops it on background entry.
+   *
+   * Only a caller that wants that sooner answer calls this. `setActive` keeps the account interval,
+   * because session validation shares this controller and must not check on every return.
    */
   function foreground(): Promise<void> {
     const due = lastAttemptAt + REMOTE_ACCOUNT_FOREGROUND_INTERVAL_MS;
@@ -86,7 +89,7 @@ export function createRemoteAccountRefresh(load: () => Promise<void>, now = Date
       active = value;
       cancelTimer();
       if (active) {
-        void foreground().catch(() => undefined);
+        void refresh().catch(() => undefined);
         schedule();
       }
     },
