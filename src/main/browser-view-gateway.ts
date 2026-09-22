@@ -31,6 +31,13 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
  * behind must show the page as it is now, not replay the seconds the link was slow.
  */
 const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
+/**
+ * Frames kept after the one the client has drawn. A client that asked to name frames and then
+ * stops saying which one is on screen would otherwise keep one entry per frame for the whole
+ * view. Past this the view is closed. The drawn frame is not dropped in place: that is what made
+ * a click land on the wrong page.
+ */
+const MAX_UNACKNOWLEDGED_FRAMES = 120;
 
 /** Frames older than the one on the member's screen. The named frame itself stays, so a click on it still expands. */
 function forgetFramesBefore(sizes: Map<number, { width: number; height: number }>, drawn: number): void {
@@ -182,6 +189,9 @@ export class BrowserViewGateway {
           session.frameHeight = frame.height;
           if (session.rememberFrames) {
             session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+            if (session.frameSizes.size > MAX_UNACKNOWLEDGED_FRAMES) {
+              void this.#closeSession(session, "The live view fell too far behind.");
+            }
           }
         },
         () => {

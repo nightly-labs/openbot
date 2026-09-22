@@ -354,6 +354,89 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
+  it("closes a view whose client stops acknowledging frames", async () => {
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    const closed = new Promise((resolve) => socket.once("close", resolve));
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    // One past the host's unacknowledged-frame cap. A client that keeps up never reaches it.
+    for (let sequence = 1; sequence <= 121; sequence += 1) {
+      send?.({ sequence, width: 800, height: 600, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    }
+    await closed;
+    expect(frames.length).toBeLessThanOrEqual(121);
+    expect(gateway.activeViewCount()).toBe(0);
+    await gateway.stop();
+  });
+
+  it("keeps the view open while drawn frames are acknowledged inside the backlog", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    let seen = 0;
+    for (let sequence = 1; sequence <= 200; sequence += 1) {
+      send?.({ sequence, width: 800, height: 600, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+      if (sequence % 30 !== 0) continue;
+      // The acknowledgement has to be applied before the next burst, which is what a live
+      // socket does between frames. Sending the whole stream in one turn would close a view
+      // that is keeping up.
+      socket.send(encodeBrowserViewInput({ type: "ack", sequence }));
+      socket.send(
+        encodeBrowserViewInput({
+          type: "pointer",
+          action: "down",
+          x: 0.5,
+          y: 0.25,
+          sequence,
+          button: "left",
+          clickCount: 1,
+          deltaX: 0,
+          deltaY: 0,
+          modifiers: 0,
+        }),
+      );
+      seen += 1;
+      await vi.waitFor(() => expect(dispatched).toHaveLength(seen));
+    }
+    expect(socket.readyState).toBe(webSockets.WebSocket.OPEN);
+    socket.close();
+    await gateway.stop();
+  });
+
   it("closes invalidated views and rejects reuse of their session", async () => {
     let invalidate: (() => void) | undefined;
     const stop = vi.fn(async () => undefined);
