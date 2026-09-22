@@ -167,6 +167,25 @@ describe("provider conversation history", () => {
     expect(mergeProviderHistory(merged, imported, "claude").messages).toEqual(merged.messages);
   });
 
+  it("takes the bubble off a released Claude turn that ended on its tool call", () => {
+    /* Such a turn has narration and no answer at all, so nothing imports as an `agentMessage` and
+       the turn is never reached by the reconciliation that walks those. */
+    const bubble = {
+      ...message("turn-1:assistant", "assistant", "Let me fix it.", "agentMessage"),
+      reaction: "\u{1f44d}" as const,
+    };
+    const imported = snapshot([message("part-1", "assistant", "Let me fix it.", "commentary")]);
+    const merged = mergeProviderHistory(snapshot([bubble]), imported, "claude");
+    expect(merged.messages).toEqual([{ ...bubble, itemType: "commentary", text: "Let me fix it." }]);
+    expect(mergeProviderHistory(merged, imported, "claude").messages).toEqual(merged.messages);
+  });
+
+  it("adds no second copy of narration a turn without an answer already stored", () => {
+    const stored = snapshot([message("turn-1:narration:0", "assistant", "Let me fix it.", "commentary")]);
+    const imported = snapshot([message("part-1", "assistant", "Let me fix it.", "commentary")]);
+    expect(mergeProviderHistory(stored, imported, "claude").messages).toEqual(stored.messages);
+  });
+
   it("retains repeated canonical Claude replies and imports history without a live answer", () => {
     const imported = snapshot([
       message("part-1", "assistant", "Again.", "agentMessage"),

@@ -192,6 +192,30 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
       if (!storedMessages.has(part.id)) omitted.add(part.id);
     }
   }
+  /* A turn that ended on its tool call said something and then answered nothing, so it imports as
+     narration with no `agentMessage` and the loop above never reaches it. Left there, a released
+     build's narration keeps the bubble the upgrade was meant to take away, and a turn this app
+     recorded itself gains a second copy of its narration on every restart. */
+  for (const [turnId, narration] of importedNarration) {
+    if (turns.has(turnId)) continue;
+    if (storedNarrationTurns.has(turnId)) {
+      for (const part of narration) {
+        if (!storedMessages.has(part.id)) omitted.add(part.id);
+      }
+      continue;
+    }
+    const answer = storedMessages.get(`${turnId}:assistant`);
+    if (answer?.author !== "assistant" || answer.itemType !== "agentMessage" || answer.turnId !== turnId) continue;
+    if (narration.some((part) => storedMessages.has(part.id))) continue;
+    const text = narration.map((part) => part.text).join("");
+    if (!answer.text || answer.text !== text) continue;
+    const first = narration[0];
+    const last = narration.at(-1);
+    if (!first || !last) continue;
+    // Keep the ID and what is saved against it, and let the narration stop being an answer.
+    replacements.set(first.id, { ...answer, itemType: "commentary", text, status: last.status });
+    for (const part of narration.slice(1)) omitted.add(part.id);
+  }
   return {
     ...imported,
     messages: imported.messages
