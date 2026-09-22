@@ -36,6 +36,11 @@ import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } 
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeProfileV4Request, decodeProfileV4Response } from "./profile-v4";
 import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
+import {
+  decodeRemoteDesktopSetupRequest,
+  decodeRemoteDesktopSetupResponse,
+  isRemoteDesktopSetupRoute,
+} from "./remote-desktop-setup-v1";
 import { decodeTeamProtocolV4HttpRequest, decodeTeamProtocolV4HttpResponse } from "./v4";
 import type { TeamProtocolV4BaseJsonObject, TeamProtocolV4BaseJsonValue } from "./v4-base";
 import {
@@ -127,6 +132,7 @@ export function encodeTeamProtocolV4CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): string {
+  if (isRemoteDesktopSetupRoute(method, path)) return JSON.stringify(decodeRemoteDesktopSetupRequest(path, value));
   if (method === "POST" && path === BROWSER_SECRET_RESPONSE_PATH)
     return JSON.stringify(parseBrowserSecretResponse(value));
   if (isBrowserLoadRoute(method, path)) return JSON.stringify(decodeBrowserLoadRequest(value));
@@ -163,6 +169,7 @@ export function decodeTeamProtocolV4CurrentHttpRequest(
   value: unknown,
   options: { preserveSemanticTags?: boolean; agentCreateModel?: boolean } = {},
 ): TeamProtocolV4BaseJsonObject {
+  if (isRemoteDesktopSetupRoute(method, path)) return decodeRemoteDesktopSetupRequest(path, value);
   if (method === "POST" && path === BROWSER_SECRET_RESPONSE_PATH) return { ...parseBrowserSecretResponse(value) };
   if (isBrowserLoadRoute(method, path)) return { ...decodeBrowserLoadRequest(value) };
   if (isBrowserViewSessionsRoute(method, path)) return { ...decodeBrowserViewSessionRequest(value) };
@@ -203,6 +210,8 @@ export function encodeTeamProtocolV4CurrentHttpResponse(
   value: unknown,
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
+  if (isRemoteDesktopSetupRoute(method, path) && status < 400)
+    return JSON.stringify(decodeRemoteDesktopSetupResponse(path, value));
   if (isHostAnalyticsRoute(method, path) && status < 400)
     return JSON.stringify(decodeHostAnalyticsV1Response(decodeHostAnalytics(value)));
   if (isAgentAnalyticsRoute(method, path) && status < 400)
@@ -254,6 +263,7 @@ export function decodeTeamProtocolV4CurrentHttpResponse(
   status: number,
   value: unknown,
 ): TeamProtocolV4BaseJsonValue {
+  if (isRemoteDesktopSetupRoute(method, path) && status < 400) return decodeRemoteDesktopSetupResponse(path, value);
   if (isHostAnalyticsRoute(method, path) && status < 400)
     return JSON.parse(JSON.stringify(decodeHostAnalytics(decodeHostAnalyticsV1Response(value))));
   if (isAgentAnalyticsRoute(method, path) && status < 400)

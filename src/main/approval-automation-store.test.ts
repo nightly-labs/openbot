@@ -22,6 +22,31 @@ describe("approval automation store", () => {
     });
   });
 
+  it("preserves the released file and gives the new settings precedence after migration", async () => {
+    const root = await temporaryRoot();
+    const legacyPath = join(root, "openbot-approval-automation-v1.json");
+    const path = join(root, "openbot-approval-automation-v2.json");
+    const legacy = JSON.stringify({ version: 1, turbo: true, autoApproveAgentIds: ["agent-1"] });
+    await writeFile(legacyPath, legacy);
+    const initial = await readApprovalAutomation(path, ["agent-1", "agent-2"], legacyPath);
+    expect(initial).toEqual({
+      turbo: true,
+      defaultAutoApprove: true,
+      autoApproveOverrides: { "agent-1": true, "agent-2": false },
+    });
+    expect(await readFile(legacyPath, "utf8")).toBe(legacy);
+    const changed = { ...initial, turbo: false, autoApproveOverrides: { "agent-1": false, "agent-2": false } };
+    await writeApprovalAutomation(path, changed);
+    await expect(readApprovalAutomation(path, ["agent-1", "agent-2"], legacyPath)).resolves.toEqual(changed);
+    expect(await readFile(legacyPath, "utf8")).toBe(legacy);
+    await writeFile(path, "{");
+    await expect(readApprovalAutomation(path, ["agent-1"], legacyPath)).resolves.toEqual({
+      turbo: false,
+      defaultAutoApprove: false,
+      autoApproveOverrides: {},
+    });
+  });
+
   // Every unreadable shape has to fail the same way. A file that grants standing consent must not
   // be able to grant it by being corrupt.
   it.each([

@@ -7,51 +7,20 @@
   overflow: hidden;
 }
 
-.computer-use-helper-media,
 .computer-use-permission-icon {
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-}
-
-.computer-use-helper-media {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-control);
-}
-
-.computer-use-helper-media img {
-  width: 30px;
-  height: 30px;
-  object-fit: contain;
-}
-
-.computer-use-fallback-icon,
-.computer-use-permission-icon svg {
-  width: 16px;
-  height: 16px;
-  color: var(--openbot-text-secondary);
-}
-
-.computer-use-permission-icon {
-  width: 30px;
-  height: 30px;
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-accent-soft);
 }
 
 .computer-use-permission-icon svg {
+  width: 16px;
+  height: 16px;
   color: var(--openbot-accent-text);
-}
-
-.computer-use-helper-row .z-badge {
-  gap: var(--openbot-space-1);
-}
-
-.computer-use-helper-row .z-badge svg {
-  width: 13px;
-  height: 13px;
 }
 
 .computer-use-alert {
@@ -84,8 +53,13 @@
   margin-top: var(--openbot-space-2);
 }
 
+/*
+ * Wide enough that nothing here wraps or is cut: the header sentence beside "Check again", and each
+ * permission description beside its badge and button. `.ui-item-description` ends in an ellipsis
+ * rather than a second line, so a card too narrow loses the words instead of folding them.
+ */
 .computer-use-compact {
-  width: min(100%, 430px);
+  width: min(100%, 520px);
   margin-top: var(--openbot-space-4);
   text-align: left;
 }
@@ -113,11 +87,12 @@
   line-height: var(--openbot-leading-sm);
 }
 
-.computer-use-compact-header > span {
+/*
+ * "Check again" sits on the same line as the heading, not under the rows: the grant it asks about is
+ * given outside this window, so the button belongs to the card and not to any one permission.
+ */
+.computer-use-compact-header > .ui-button {
   flex: 0 0 auto;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-md);
 }
 
 .computer-use-compact .computer-use-card {
@@ -145,56 +120,233 @@
   font-size: var(--openbot-text-sm);
 }
 
-.computer-use-setup-surface {
-  min-height: 300px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: var(--openbot-space-3);
-  box-sizing: border-box;
-  padding: 44px var(--openbot-space-4) var(--openbot-space-4);
-  background: var(--openbot-bg-sidebar);
-  color: var(--openbot-text-primary);
-  -webkit-app-region: drag;
+@media (max-width: 640px) {
+  .computer-use-row.ui-item {
+    align-items: flex-start;
+  }
+
+  .computer-use-row .ui-item-actions {
+    width: auto;
+    padding-top: var(--openbot-space-1);
+  }
 }
 
-.computer-use-setup-header {
+.computer-use-recheck {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--openbot-space-2);
+}
+
+/* A label-and-icon button carries no size of its own for the mark beside the word, and a 24px icon
+   dwarfs a two-word label. */
+.computer-use-recheck .ui-button > svg,
+.computer-use-compact-header .ui-button > svg,
+.computer-use-alert .ui-button > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+/*
+ * The hue over the window an agent works in: one even rim of the accent around the whole border,
+ * with a short fall inward. The middle of the window keeps no paint at all, because the agent may
+ * hold the window for minutes and what it types has to stay as readable as before.
+ *
+ * Nothing here moves. A turning or breathing edge is movement at the side of the eye for the whole
+ * length of the task, which costs more attention than it returns.
+ */
+.computer-use-window-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--computer-use-window-radius);
+  /*
+   * The rim, then two falls inward from every edge: a near one that carries most of the hue and a
+   * far one that takes it out slowly, so the window reads as tinted rather than outlined. All three
+   * are even the whole way round.
+   */
+  box-shadow:
+    inset 0 0 0 2px var(--openbot-accent),
+    inset 0 0 44px -4px var(--openbot-accent-strong),
+    inset 0 0 120px -8px var(--openbot-accent-soft);
+  /* The surface itself is click-through; this keeps a stray pointer rule from undoing that. */
+  pointer-events: none;
+}
+
+/*
+ * The overlay window that carries the rim. It covers the whole desktop and paints nothing of its
+ * own: every pixel outside the rim stays transparent, so the applications below are seen and
+ * clicked exactly as before. The frame inside it is what main places over one window.
+ */
+html:has(.computer-use-highlight-surface),
+body:has(.computer-use-highlight-surface),
+#root:has(.computer-use-highlight-surface) {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.computer-use-highlight-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  pointer-events: none;
+}
+
+.computer-use-highlight-surface-frame {
+  position: absolute;
+  pointer-events: none;
+}
+
+/*
+ * The agent cursor OpenBot draws when the driver draws none, which is every desktop of more than
+ * one display. The same dart as the driver theme, at about the size the driver renders it.
+ *
+ * The tip sits on the origin of the drawing, so the point main sends is the point the cursor holds
+ * without any offset. `overflow: visible` keeps the outline, which is half outside the path, from
+ * being cut at the edge of the box.
+ */
+.computer-use-agent-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 24px;
+  overflow: visible;
+  fill: var(--openbot-accent);
+  /* The colour the accent carries text in, so the outline holds over any wallpaper. */
+  stroke: var(--openbot-text-on-accent);
+  stroke-width: 5;
+  /* Under the fill, so the outline reads as an edge rather than as a second, thicker dart. */
+  paint-order: stroke fill;
+  filter: drop-shadow(0 0 6px var(--openbot-accent-strong));
+  /*
+   * One step between two points the agent asked for. The cursor has to move - that is the whole of
+   * what it says - and a jump of a thousand pixels tells the eye nothing about where it came from.
+   * The shortest token, because a slower cursor would still be travelling when the click lands.
+   */
+  transition: translate var(--openbot-duration-fast) linear;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .computer-use-agent-cursor {
+    transition: none;
+  }
+}
+
+/*
+ * The accent on the one row that still needs the user. `--openbot-accent` is the colour of an
+ * action here, and a panel of two rows says at a glance which one is left when only the ungranted
+ * one carries it.
+ */
+.computer-use-grant:is(.ui-button) {
+  border-color: transparent;
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 601px) {
+  .computer-use-grant:is(.ui-button):hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-accent-hover);
+  }
+}
+
+/*
+ * The window that stands beside the System Settings pane. It is small, it is the only thing in its
+ * own window, and the user reads it while looking at another application - so it carries the steps
+ * and nothing else.
+ */
+.computer-use-help {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  /* Clear of the traffic lights, which sit over this surface on macOS. */
+  padding: 44px var(--openbot-space-4) var(--openbot-space-4);
+  background: var(--openbot-bg-canvas);
+  text-align: left;
+}
+
+.computer-use-help-header {
   display: flex;
   align-items: flex-start;
   gap: var(--openbot-space-3);
 }
 
-.computer-use-setup-permission-icon {
-  width: 32px;
-  height: 32px;
+.computer-use-help-icon {
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-accent-soft);
+}
+
+.computer-use-help-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   color: var(--openbot-accent-text);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
-.computer-use-setup-permission-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.computer-use-setup-header h1 {
+.computer-use-help h1 {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xl);
+  font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-xl);
+  line-height: var(--openbot-leading-md);
 }
 
-.computer-use-setup-header p,
-.computer-use-setup-footer p {
+.computer-use-help-header p {
   margin: var(--openbot-space-0-5) 0 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
 
+.computer-use-help-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding-left: var(--openbot-space-4);
+  /* The order of the two steps is the whole of the instruction, so the numbers have to be drawn. */
+  list-style: decimal;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.computer-use-help-status {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.computer-use-help-status svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  color: var(--openbot-success);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.computer-use-help-status.is-error {
+  color: var(--openbot-danger);
+}
+
+/*
+ * The bundle the user drags onto the list in System Settings. The list offers no way to browse for
+ * an application, so this card is the only way in, and it has to read as something to pick up.
+ */
 .computer-use-drag-card {
   position: relative;
   width: 210px;
@@ -204,7 +356,6 @@
   align-content: center;
   gap: var(--openbot-space-1);
   align-self: center;
-  justify-self: center;
   box-sizing: border-box;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-lg);
@@ -212,22 +363,16 @@
   color: var(--openbot-text-primary);
   cursor: grab;
   -webkit-app-region: no-drag;
-  transition:
-    background var(--openbot-duration-fast) var(--openbot-ease-out),
-    border-color var(--openbot-duration-fast) var(--openbot-ease-out),
-    transform var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
 .computer-use-drag-card:hover {
   border-color: var(--openbot-accent-strong);
   background: var(--openbot-bg-control-hover);
-  transform: translateY(-1px);
 }
 
 .computer-use-drag-card:active,
 .computer-use-drag-card.is-dragging {
   cursor: grabbing;
-  transform: translateY(0) scale(0.98);
 }
 
 .computer-use-drag-handle {
@@ -238,8 +383,8 @@
 }
 
 .computer-use-drag-handle svg {
-  width: 15px;
-  height: 15px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }
 
 .computer-use-drag-icon {
@@ -256,8 +401,8 @@
 }
 
 .computer-use-drag-icon svg {
-  width: 24px;
-  height: 24px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   color: var(--openbot-text-secondary);
 }
 
@@ -271,54 +416,8 @@
   font-size: var(--openbot-text-sm);
 }
 
-.computer-use-setup-footer {
-  display: grid;
-  gap: var(--openbot-space-2);
-}
-
-.computer-use-setup-footer > div {
+.computer-use-help-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--openbot-space-2);
-}
-
-.computer-use-setup-footer .ui-button,
-.computer-use-drag-card,
-.computer-use-setup-unavailable {
-  -webkit-app-region: no-drag;
-}
-
-.computer-use-setup-unavailable {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--openbot-space-2);
-  color: var(--openbot-warning);
-  font-size: var(--openbot-text-sm);
-  text-align: center;
-}
-
-.computer-use-setup-unavailable svg {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-}
-
-.computer-use-setup-error {
-  margin: 0;
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-  text-align: center;
-}
-
-@media (max-width: 640px) {
-  .computer-use-row.ui-item {
-    align-items: flex-start;
-  }
-
-  .computer-use-row .ui-item-actions {
-    width: auto;
-    padding-top: var(--openbot-space-1);
-  }
 }

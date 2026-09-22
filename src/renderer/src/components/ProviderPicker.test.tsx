@@ -189,4 +189,33 @@ describe("ProviderPicker", () => {
     expect(downloading.view.queryByText("Free")).toBeNull();
     expect(downloading.view.queryByText("Connecting")).toBeNull();
   });
+
+  it("keeps the managed download reachable while the providers are being checked", async () => {
+    const onDownloadProvider = vi.fn();
+    const view = render(() => (
+      <ProviderPicker
+        value="opencode"
+        options={[
+          { ...claude, runtimeStatus: runtime({ phase: "not-downloaded", version: null }) },
+          { ...openCode, state: "available", runtimeStatus: runtime({}) },
+        ]}
+        ariaLabel="AI providers"
+        allowUnavailableSelection
+        refreshingProviders
+        onChange={vi.fn()}
+        onDownloadProvider={onDownloadProvider}
+        onConnectProvider={vi.fn()}
+      />
+    ));
+
+    // The download is a file transfer main's runtime store owns, so a provider check that has not
+    // finished - or never will - must not take it away: it is what ends the check.
+    const download = view.getByRole("button", { name: "Download Claude" });
+    expect(download).toBeEnabled();
+    await fireEvent.click(download);
+    expect(onDownloadProvider).toHaveBeenCalledWith("claude");
+
+    // The CLI is what a reconnect asks, so that one still waits.
+    expect(view.getByRole("button", { name: "Reconnect OpenCode" })).toBeDisabled();
+  });
 });

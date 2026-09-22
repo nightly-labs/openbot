@@ -93,11 +93,13 @@ export const IPC_ENDPOINTS = {
     setInteractive: request(IPC_CHANNELS.dynamicIslandSetInteractive),
   },
   computerUse: {
-    getMacSetupState: request(IPC_CHANNELS.computerUseGetMacSetupState),
-    openMacPermissionSetup: request(IPC_CHANNELS.computerUseOpenMacPermissionSetup),
-    startHelperDrag: request(IPC_CHANNELS.computerUseStartHelperDrag),
-    revealHelper: request(IPC_CHANNELS.computerUseRevealHelper),
-    closeMacPermissionSetup: request(IPC_CHANNELS.computerUseCloseMacPermissionSetup),
+    getState: request(IPC_CHANNELS.computerUseGetState),
+    openPermissionPane: request(IPC_CHANNELS.computerUseOpenPermissionPane),
+    closePermissionHelp: request(IPC_CHANNELS.computerUseClosePermissionHelp),
+    getPermissionApp: request(IPC_CHANNELS.computerUseGetPermissionApp),
+    startPermissionAppDrag: request(IPC_CHANNELS.computerUseStartPermissionAppDrag),
+    revealPermissionApp: request(IPC_CHANNELS.computerUseRevealPermissionApp),
+    highlightPlacement: event(IPC_CHANNELS.computerUseHighlightPlacement),
   },
   skills: {
     localList: request(IPC_CHANNELS.skillsLocalList),
@@ -339,6 +341,9 @@ export const IPC_ENDPOINTS = {
     event: event(IPC_CHANNELS.hostEvent),
   },
   remoteDesktop: {
+    checkSetup: request(IPC_CHANNELS.remoteDesktopCheckSetup),
+    openSetup: request(IPC_CHANNELS.remoteDesktopOpenSetup),
+    test: request(IPC_CHANNELS.remoteDesktopTest),
     list: request(IPC_CHANNELS.remoteDesktopList),
     connect: request(IPC_CHANNELS.remoteDesktopConnect),
     selectDisplay: request(IPC_CHANNELS.remoteDesktopSelectDisplay),

@@ -14,10 +14,16 @@ import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime
 export async function readApprovalAutomation(
   path: string,
   knownAgentIds: Iterable<string>,
+  legacyPath?: string,
 ): Promise<ApprovalAutomationPreference> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await readFile(path, "utf8"));
+    const contents = await readFile(path, "utf8").catch((error) => {
+      // Keep the released file readable by older installations. Never write a migration to it.
+      if (isMissing(error) && legacyPath) return readFile(legacyPath, "utf8");
+      throw error;
+    });
+    parsed = JSON.parse(contents);
   } catch (error) {
     if (isMissing(error)) return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
     if (error instanceof SyntaxError) return { turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} };

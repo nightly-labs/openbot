@@ -199,6 +199,7 @@ function requiredSunshineSubmodules(targetPlatform: "darwin" | "win32"): string[
   const common = [
     "third-party/Simple-Web-Server",
     "third-party/build-deps",
+    "third-party/googletest",
     "third-party/libdisplaydevice",
     "third-party/moonlight-common-c",
     "third-party/moonlight-common-c/enet",
@@ -233,7 +234,8 @@ function buildSunshine(source: string, version: string, commit: string): void {
       generator,
       "-DCMAKE_BUILD_TYPE=Release",
       "-DBUILD_DOCS=OFF",
-      "-DBUILD_TESTS=OFF",
+      "-DBUILD_TESTS=ON",
+      "-DOPENBOT_SECURITY_TESTS=ON",
       "-DBUILD_WERROR=OFF",
     ],
     { env: buildEnvironment, stdio: "inherit" },
@@ -244,6 +246,26 @@ function buildSunshine(source: string, version: string, commit: string): void {
   execFileSync("cmake", ["--build", build, "--config", "Release", "--parallel", "--target", "sunshine"], {
     stdio: "inherit",
   });
+  execFileSync("cmake", ["--build", build, "--config", "Release", "--parallel", "--target", "test_sunshine"], {
+    stdio: "inherit",
+  });
+  const securityTests = join(build, "tests", platform === "win32" ? "test_sunshine.exe" : "test_sunshine");
+  execFileSync(
+    securityTests,
+    [
+      "--gtest_filter=InputPacketValidationTest.*:ControlPacketTests.*:CryptoTest.*:ClientAuthorizationTest.*:PairingSessionRegistryTest.*:ConfigHttpTest.Pairing*:PairingTest.*",
+    ],
+    {
+      cwd: join(build, "tests"),
+      stdio: "inherit",
+    },
+  );
+  if (platform === "darwin") {
+    execFileSync("cmake", ["--build", build, "--config", "Release", "--target", "openbot-setup-test"], {
+      stdio: "inherit",
+    });
+    execFileSync(join(build, "openbot-setup-test"), [], { stdio: "inherit" });
+  }
 }
 
 function buildMoonlight(source: string): void {

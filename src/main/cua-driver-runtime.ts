@@ -1,0 +1,864 @@
+// The Computer Use driver: one long-lived daemon this process owns, and the MCP entry the
+// providers spawn against it.
+
+import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { connect } from "node:net";
+import { dirname, isAbsolute, join } from "node:path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
+  type ComputerUsePermission,
+  type ComputerUseState,
+  type MacPermissionId,
+  type McpServerConfig,
+} from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
+import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
+import { stopRemoteProcess } from "./remote-diagnostics";
+
+const SOCKET_FILE = "driver.sock";
+/** The address OpenBot listens on itself, between the agents' proxies and the daemon. */
+const TAP_SOCKET_FILE = "tap.sock";
+/** Where the Windows pipe name is kept, below the profile directory. */
+const PIPE_NAME_FILE = ["cua-driver", "pipe-name"] as const;
+/**
+ * The most a Unix socket path may hold, per platform.
+ *
+ * `sockaddr_un.sun_path` is 104 bytes on macOS and 108 on Linux, the last of them the terminator,
+ * and the kernel answers a longer path with `EINVAL` rather than anything that names the real
+ * cause. The user data directory is far too deep to hold the socket: an isolated development
+ * profile alone spends 64 characters on the worktree hash. So the socket lives in a per-user
+ * runtime directory, and the length is checked before the daemon is started.
+ *
+ * Windows has no such limit. A named pipe is a name in a kernel namespace rather than a path on
+ * disk, so nothing there is measured.
+ */
+const MAX_SOCKET_PATH_LENGTH: Readonly<Partial<Record<NodeJS.Platform, number>>> = {
+  darwin: 103,
+  linux: 107,
+};
+const READY_TIMEOUT_MS = 20_000;
+const READY_POLL_MS = 200;
+const PERMISSION_TIMEOUT_MS = 10_000;
+
+/**
+ * Embedded mode, which is what makes the grant OpenBot's own.
+ *
+ * macOS attributes a permission to the responsible process, which it finds by walking up the
+ * launch chain. Spawning the daemon directly from this process puts OpenBot at the top of that
+ * chain, so the user grants Accessibility and Screen Recording to OpenBot rather than to a helper
+ * signed by somebody else. Launching it through `open(1)` or `NSWorkspace` would hand the chain to
+ * `launchd` instead and break the attribution, so nothing here may do that.
+ *
+ * Windows and Linux have no equivalent to grant, so there the variable only tells the driver that
+ * its lifetime belongs to this process.
+ *
+ * The driver reads this variable as the exact string `1`.
+ */
+const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
+const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
+const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
+
+/**
+ * The grants the driver needs, in the order the panel lists them.
+ *
+ * Only macOS has any. Windows and Linux put no permission between a program and the desktop it is
+ * already running on, so there the list is empty and a driver that answers is a driver that is
+ * ready. An empty list must never read as "nothing granted yet": the panel shows rows only when
+ * this list has entries.
+ */
+const REQUIRED_PERMISSIONS: Readonly<Partial<Record<NodeJS.Platform, readonly MacPermissionId[]>>> = {
+  darwin: ["screen-recording", "accessibility"],
+};
+
+/**
+ * Exactly the spawn this class performs, rather than every overload `child_process` carries.
+ *
+ * Narrow on purpose: a test supplies its own, and a wider type would make it write an assertion to
+ * satisfy overloads this code never uses.
+ */
+export interface SpawnDriverOptions {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  stdio: ["ignore", "pipe", "pipe"];
+  windowsHide: boolean;
+}
+
+export type SpawnDriverProcess = (
+  command: string,
+  args: readonly string[],
+  options: SpawnDriverOptions,
+) => ChildProcess;
+
+/**
+ * The variables the proxy inherits from this machine, named per desktop.
+ *
+ * The proxy is a short-lived client of the daemon, so it needs only enough to start and to find a
+ * temporary directory. Windows needs `SystemRoot`: a process started without it cannot load the
+ * system libraries it links against. A name this machine does not hold is skipped, so nothing here
+ * invents a value.
+ */
+const ENVIRONMENT_PASSTHROUGH: Readonly<Partial<Record<NodeJS.Platform, readonly string[]>>> = {
+  win32: ["SystemRoot", "windir", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "TEMP", "TMP"],
+};
+
+/** The POSIX set, which macOS and Linux share. */
+const POSIX_ENVIRONMENT_PASSTHROUGH: readonly string[] = ["HOME", "USER", "TMPDIR"];
+
+function environmentPassthrough(platform: NodeJS.Platform): readonly string[] {
+  return ENVIRONMENT_PASSTHROUGH[platform] ?? POSIX_ENVIRONMENT_PASSTHROUGH;
+}
+
+/**
+ * Where the daemon listens, which is a different kind of thing on each desktop.
+ *
+ * Both forms are passed to the driver as `--socket`, and both are what `net.connect` takes, so the
+ * only code that cares about the difference is the code that creates and removes them.
+ */
+export type CuaDriverEndpoint =
+  | {
+      /**
+       * A Unix domain socket in a directory private to this user.
+       *
+       * Private, because the socket is a control channel to a process that can drive the whole
+       * desktop. Short, because of `MAX_SOCKET_PATH_LENGTH`.
+       */
+      kind: "unix-socket";
+      directory: string;
+    }
+  | {
+      /**
+       * A Windows named pipe.
+       *
+       * Windows gives a pipe a security descriptor rather than a directory mode, and the default
+       * one already denies every other user, so there is nothing here to create or to remove.
+       */
+      kind: "windows-pipe";
+      name: string;
+    };
+
+export interface CuaDriverEndpointInput {
+  platform: NodeJS.Platform;
+  /** This profile's directory. Windows keeps the pipe name below it; the rest name a socket after it. */
+  userDataPath: string;
+  temporaryDirectory: string;
+  /** `XDG_RUNTIME_DIR`, read on Linux alone. */
+  runtimeDirectory?: string | null;
+}
+
+/**
+ * Where the daemon listens, which is a different kind of thing on each desktop.
+ *
+ * The endpoint is a control channel to a process that can drive the whole desktop, so where it sits
+ * decides who may reach it. It also has to be the same across restarts: it is passed to each proxy
+ * as an argument, the arguments are folded into the stored Codex tool fingerprint, and a fingerprint
+ * that moves replaces every session, which loses what each provider held privately.
+ *
+ * On macOS the temporary directory is already private per user (`/var/folders/…`, mode `0700`). On
+ * Linux `os.tmpdir()` is usually the shared, world-writable `/tmp`, where another local user can
+ * create our directory before we do, so `XDG_RUNTIME_DIR` is used first: the login session owns it,
+ * it is mode `0700`, and it is removed at logout. The temporary directory stays as the fallback for
+ * a session that has none, and this runtime refuses a directory this user does not own either way.
+ * The digest of the profile path keeps two profiles on one computer apart and keeps the name the
+ * same, so a socket left by a crashed run is found and removed rather than accumulating.
+ *
+ * The user data directory cannot hold the socket: a socket path may hold about a hundred characters,
+ * and an isolated development profile spends 64 of them on a worktree hash alone.
+ *
+ * On Windows it is a named pipe, a name in a kernel namespace rather than a path, so it has no
+ * length limit and no directory to protect. The name is random, because Windows lets a second
+ * process add an instance to an existing pipe name, so a name another local process can guess could
+ * be taken before the driver starts. It is kept in the profile so that it is random once rather than
+ * once per launch: only a process that can already read this user's profile can read it back.
+ */
+export async function resolveCuaDriverEndpoint(input: CuaDriverEndpointInput): Promise<CuaDriverEndpoint> {
+  if (input.platform === "win32") return { kind: "windows-pipe", name: await windowsPipeName(input.userDataPath) };
+  const runtimeDirectory = input.runtimeDirectory?.trim();
+  const parent =
+    input.platform === "linux" && runtimeDirectory && isAbsolute(runtimeDirectory)
+      ? runtimeDirectory
+      : input.temporaryDirectory;
+  const digest = createHash("sha256").update(input.userDataPath).digest("hex").slice(0, 12);
+  return { kind: "unix-socket", directory: join(parent, `openbot-cua-${digest}`) };
+}
+
+/** Only this shape is read back, so a truncated or edited file is replaced rather than served. */
+const WINDOWS_PIPE_NAME = /^\\\\\.\\pipe\\openbot-cua-[0-9a-f-]{36}$/;
+
+async function windowsPipeName(userDataPath: string): Promise<string> {
+  const file = join(userDataPath, ...PIPE_NAME_FILE);
+  const stored = await readFile(file, "utf8")
+    .then((text) => text.trim())
+    .catch(() => "");
+  if (WINDOWS_PIPE_NAME.test(stored)) return stored;
+  const name = `\\\\.\\pipe\\openbot-cua-${randomUUID()}`;
+  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+  await writeFile(file, name, { mode: 0o600 });
+  return name;
+}
+
+export interface CuaDriverCommandAliasInput {
+  platform: NodeJS.Platform;
+  isPackaged: boolean;
+  /** `APPIMAGE`, which only an AppImage run sets. */
+  appImagePath?: string | null;
+  userDataPath: string;
+}
+
+/**
+ * A path that holds still for the MCP command, for the one build whose own files do not.
+ *
+ * An AppImage mounts its resources in a new temporary directory at each launch, so the packaged
+ * driver sits somewhere else every time. That path reaches each proxy as the command, the command is
+ * folded into the stored Codex tool fingerprint, and a fingerprint that moves replaces every session
+ * after a restart, which loses what the provider held privately. The path also dies with the mount,
+ * so a session that kept the old one could not start a proxy at all.
+ *
+ * The runtime links this path to the driver at each start, so the command stays the same and always
+ * names the mount this run uses. Every other build has a path that already stays, and gets none.
+ */
+export function cuaDriverCommandAlias(input: CuaDriverCommandAliasInput): string | null {
+  if (input.platform !== "linux" || !input.isPackaged || !input.appImagePath?.trim()) return null;
+  return join(input.userDataPath, "cua-driver", "cua-driver");
+}
+
+export interface CuaDriverRuntimeOptions {
+  /** The resolved executable, or `null` when this computer has none. */
+  executable: string | null;
+  /**
+   * Looks for the executable again, for a computer that had none when OpenBot started.
+   *
+   * The panel tells such a user to install the driver and then check again, and the check has to
+   * read the filesystem rather than the answer from startup: otherwise the only way to finish the
+   * installation is to restart OpenBot.
+   */
+  resolveExecutable?: () => Promise<string | null>;
+  /**
+   * Where to link the executable, so the MCP command is the same at each launch.
+   *
+   * Null for a build whose driver path already stays. See `cuaDriverCommandAlias`.
+   */
+  commandAlias?: string | null;
+  endpoint: CuaDriverEndpoint;
+  /**
+   * Whether the driver is published for this computer at all, which is not whether it is installed.
+   *
+   * Separate from `executable`, because the two mean different things to the user: an unsupported
+   * computer has nothing to install, and a supported one without a binary has an install command.
+   */
+  supported: boolean;
+  /** Advisory only. The driver logs it; it is not a trust signal, so nothing may treat it as one. */
+  hostBundleId: string;
+  platform: NodeJS.Platform;
+  spawnProcess?: SpawnDriverProcess;
+  onDiagnostic?: (message: string) => void;
+  /** Injected by the test, which has no driver to ask. */
+  readPermissions?: (config: McpServerConfig, platform: NodeJS.Platform) => Promise<readonly ComputerUsePermission[]>;
+  waitForSocket?: (path: string) => Promise<void>;
+  /** Injected by the test, which listens on no address of its own. */
+  actionTap?: CuaDriverActionTap;
+}
+
+export class CuaDriverRuntime {
+  readonly #options: CuaDriverRuntimeOptions;
+  readonly #spawn: SpawnDriverProcess;
+  readonly #listeners = new Set<(state: ComputerUseState) => void>();
+  readonly #mcpListeners = new Set<() => void>();
+  /** What the providers were last told to spawn, `""` for "nothing". */
+  #announcedMcpServer = "";
+  /** True while the entry is allowed to move without the providers being told. See `warmUp`. */
+  #quiet = false;
+  /** What the proxies are told to run: the alias once it is linked, the executable otherwise. */
+  #command: string | null = null;
+  #child: ChildProcess | null = null;
+  #starting: Promise<void> | null = null;
+  #stopping: Promise<void> | null = null;
+  #state: ComputerUseState;
+  /** Mutable, because a user may install the driver while OpenBot runs. */
+  #executable: string | null;
+  readonly #tap: CuaDriverActionTap;
+
+  constructor(options: CuaDriverRuntimeOptions) {
+    this.#options = options;
+    this.#spawn = options.spawnProcess ?? nodeSpawn;
+    this.#executable = options.executable;
+    this.#tap = options.actionTap ?? new CuaDriverActionTap();
+    this.#state = initialState(options.platform, options.supported, options.executable);
+  }
+
+  get lastState(): ComputerUseState {
+    return this.#state;
+  }
+
+  running(): boolean {
+    return this.#child !== null && this.#child.exitCode === null;
+  }
+
+  /** The address the daemon listens on and every client connects to. */
+  socketPath(): string {
+    const endpoint = this.#options.endpoint;
+    return endpoint.kind === "windows-pipe" ? endpoint.name : join(endpoint.directory, SOCKET_FILE);
+  }
+
+  /**
+   * The address the agents are handed: OpenBot's own while it listens, the daemon's own otherwise.
+   *
+   * The tap forwards every byte unchanged, so an agent cannot tell the two apart - and a tap that
+   * failed to listen costs the rim its answer, never the agent its tools.
+   */
+  tapAddress(): string {
+    return this.#tap.address ?? this.socketPath();
+  }
+
+  /**
+   * Where an agent last asked the daemon to act, as far as the window is concerned.
+   *
+   * This is the only answer OpenBot has to "which window is the agent working in": it comes from
+   * the request the agent's own proxy sent, not from which window happens to be in front.
+   */
+  lastAction(maxAgeMs: number): ObservedAction | null {
+    return this.#tap.lastAction(maxAgeMs);
+  }
+
+  /**
+   * Where an agent last aimed the pointer, which is where OpenBot draws its own agent cursor.
+   */
+  lastPointer(maxAgeMs: number): ObservedPointer | null {
+    return this.#tap.lastPointer(maxAgeMs);
+  }
+
+  /**
+   * How to reach the running daemon over MCP, or `null` while there is nothing to reach.
+   *
+   * This is the address, not the decision of who may have it: the panel asks the daemon what it may
+   * do through this entry, before any grant exists. `mcpServerForProviders` decides what an agent
+   * is given.
+   *
+   * The command is absolute, so `resolveMcpCommand` accepts it without a login shell. The working
+   * directory stays empty on purpose: ACP has no field for one and Codex accepts none, so both
+   * would drop this entry with no error if it carried one.
+   */
+  mcpServerConfig(): McpServerConfig | null {
+    const command = this.#command ?? this.#executable;
+    if (!command || !this.running()) return null;
+    return {
+      id: COMPUTER_USE_MCP_SERVER_ID,
+      name: COMPUTER_USE_MCP_SERVER_NAME,
+      transport: "stdio",
+      enabled: true,
+      command,
+      args: ["mcp", "--socket", this.tapAddress()],
+      env: [
+        { key: EMBEDDED_ENV, value: "1" },
+        ...Object.entries(CUA_DRIVER_VENDOR_CALLS_OFF).map(([key, value]) => ({ key, value })),
+      ],
+      envPassthrough: [...environmentPassthrough(this.#options.platform)],
+      workingDirectory: "",
+      url: "",
+      headers: [],
+    };
+  }
+
+  /**
+   * What an agent's provider is handed, which is nothing until the grants are in place.
+   *
+   * Tools an ungranted daemon would refuse are worth nothing to an agent, and handing them over has
+   * a cost: the entry enters the tool fingerprint of every session spawned while the panel keeps an
+   * ungranted daemon alive, and the warm-up stops that daemon at the next start, so each of those
+   * sessions would be replaced although the user changed nothing. Reading the state instead of the
+   * process makes the panel and the warm-up agree: below `ready` there is no entry either way.
+   */
+  mcpServerForProviders(): McpServerConfig | null {
+    return this.#state.status === "ready" ? this.mcpServerConfig() : null;
+  }
+
+  onStateChanged(listener: (state: ComputerUseState) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  /**
+   * Told when the entry the providers are handed appears or the daemon dies under OpenBot, and at
+   * no other time.
+   *
+   * Separate from the state, because the two ask for different work. A state change updates the
+   * capability, which costs nothing. An entry change deactivates every agent's stored provider
+   * session, because the tool set is decided at each spawn, and a deactivated session is gone: the
+   * next turn starts a new one, which keeps the public thread and loses what the provider held
+   * privately. So this reports only the two moments that leave a live session holding a tool set
+   * that is not the one it would be given now.
+   *
+   * Two things it is quiet for. The warm-up at startup settles the entry the stored sessions were
+   * already using. A stop this process asked for happens at teardown, where the sessions are being
+   * left for the next run. A state that moves below `ready` and back while the daemon keeps serving
+   * is not quiet, because the entry goes with it.
+   */
+  onMcpServerChanged(listener: () => void): () => void {
+    this.#mcpListeners.add(listener);
+    return () => this.#mcpListeners.delete(listener);
+  }
+
+  /**
+   * The daemon, started once however many callers ask at the same time.
+   *
+   * Starting is what makes macOS ask for the grants, so nothing starts it except the panel, an
+   * agent that reaches for the tools, and `warmUp`, which keeps it only for a user who granted
+   * them already.
+   */
+  async start(): Promise<void> {
+    // After a stop that is still running. Both own the socket path: a start that overtook a stop
+    // would have its own socket removed by it, and the daemon would then serve an address no client
+    // can reach, with nothing to say it had happened.
+    if (this.#stopping) await this.#stopping.catch(() => undefined);
+    if (this.#starting) return this.#starting;
+    if (this.running()) return;
+    this.#starting = this.#start();
+    try {
+      await this.#starting;
+      this.#announceMcpServer();
+    } finally {
+      this.#starting = null;
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (this.#starting) await this.#starting.catch(() => undefined);
+    if (this.#stopping) return this.#stopping;
+    this.#stopping = this.#stop();
+    try {
+      await this.#stopping;
+    } finally {
+      this.#stopping = null;
+    }
+  }
+
+  /** The panel's answer: starts the daemon if it is not running, then asks it what it may do. */
+  async state(): Promise<ComputerUseState> {
+    if (!this.#options.supported) return this.#publish(this.#initialState());
+    // Read the filesystem again when there was nothing at startup, so that "Check again" finishes
+    // an installation the user has just made.
+    if (!this.#executable) this.#executable = (await this.#options.resolveExecutable?.()) ?? null;
+    if (!this.#executable) return this.#publish(this.#initialState());
+
+    try {
+      await this.start();
+    } catch (error) {
+      return this.#publish({
+        status: "error",
+        permissions: ungranted(this.#options.platform),
+        message: `The Computer Use driver did not start. ${describe(error)}`,
+      });
+    }
+
+    const config = this.mcpServerConfig();
+    if (!config) {
+      return this.#publish({
+        status: "error",
+        permissions: ungranted(this.#options.platform),
+        message: "The Computer Use driver stopped before it could answer.",
+      });
+    }
+
+    try {
+      const required = requiredPermissions(this.#options.platform);
+      const permissions = await (this.#options.readPermissions ?? readPermissionsOverMcp)(
+        config,
+        this.#options.platform,
+      );
+      const granted = required.every((id) => permissions.some((p) => p.id === id && p.granted));
+      return this.#publish({
+        status: granted ? "ready" : "permissions-required",
+        permissions,
+        message: null,
+      });
+    } catch (error) {
+      return this.#publish({
+        status: "error",
+        permissions: ungranted(this.#options.platform),
+        message: `The Computer Use driver did not answer. ${describe(error)}`,
+      });
+    }
+  }
+
+  /**
+   * Starts the daemon at startup for a user who granted the permissions already, and stops it again
+   * for one who did not.
+   *
+   * The providers are handed the MCP entry at each spawn, and there is no entry while the daemon is
+   * stopped. Waiting for the panel would therefore leave a fully granted user without the tools
+   * after every restart, and would leave a remote request or a scheduled task — neither of which
+   * opens a window — without them at all. Asking the driver what it may do raises no prompt, so a
+   * user who never granted anything sees nothing and keeps no process.
+   */
+  async warmUp(): Promise<void> {
+    if (!this.#options.supported) return;
+    this.#quiet = true;
+    try {
+      const state = await this.state();
+      if (state.status !== "ready") await this.stop().catch(() => undefined);
+    } finally {
+      this.#quiet = false;
+    }
+  }
+
+  async #stop(): Promise<void> {
+    const child = this.#child;
+    this.#child = null;
+    await this.#tap.close();
+    if (child) await stopRemoteProcess(child);
+    await this.#removeSocket();
+    // No announcement: a stop this process asked for is the teardown, and telling the providers
+    // there would deactivate the very sessions the next run resumes.
+    this.#announcedMcpServer = "";
+  }
+
+  async #start(): Promise<void> {
+    const executable = this.#executable;
+    if (!executable) throw new Error("This computer has no Computer Use driver.");
+
+    const socketPath = this.socketPath();
+    const endpoint = this.#options.endpoint;
+    if (endpoint.kind === "unix-socket") {
+      const limit = MAX_SOCKET_PATH_LENGTH[this.#options.platform];
+      if (limit !== undefined && socketPath.length > limit) {
+        throw new Error(
+          `The Computer Use socket path is ${socketPath.length} characters, and this system allows ${limit}.`,
+        );
+      }
+
+      // `0o700`, because the socket inside is a control channel to a process that can drive the
+      // whole desktop. The per-user runtime directory is already private; this keeps it private if
+      // the caller ever names somewhere else. The mode applies only to a directory this call
+      // creates, which is why what is already there is inspected below rather than trusted.
+      await mkdir(endpoint.directory, { recursive: true, mode: 0o700 });
+      await assertPrivateDirectory(endpoint.directory);
+      await this.#removeSocket();
+    }
+    this.#command = await this.#linkCommandAlias(executable);
+    // OpenBot owns the cursor on every display, including displays connected after startup.
+    const child = this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
+      cwd: dirname(executable),
+      env: {
+        ...process.env,
+        [EMBEDDED_ENV]: "1",
+        ...CUA_DRIVER_VENDOR_CALLS_OFF,
+        [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
+        ...waylandEnvironment(this.#options.platform),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    this.#child = child;
+    this.#pipeDiagnostics(child);
+    // `spawn` reports a missing or unreadable executable through this event, after it returns. An
+    // unhandled `error` event on a child process throws in the main process, and Computer Use is
+    // an optional function, so it is caught here and reported as a state instead.
+    const spawnFailure = new Promise<never>((_resolve, reject) => {
+      child.once("error", (error: Error) => {
+        if (this.#child === child) this.#child = null;
+        this.#options.onDiagnostic?.(`OpenBot: the Computer Use driver could not start. ${error.message}\n`);
+        reject(error);
+      });
+    });
+    // The race below drops the loser, and the child may still report an error after the daemon is
+    // up. This keeps that late rejection handled rather than an unhandled one.
+    spawnFailure.catch(() => undefined);
+    child.once("exit", (code) => {
+      if (this.#child !== child) return;
+      this.#child = null;
+      this.#options.onDiagnostic?.(`OpenBot: the Computer Use driver stopped with code ${code ?? "unknown"}.\n`);
+      this.#announceMcpServer();
+      this.#publish({
+        status: "error",
+        permissions: ungranted(this.#options.platform),
+        message: "The Computer Use driver stopped.",
+      });
+    });
+
+    try {
+      await Promise.race([(this.#options.waitForSocket ?? waitForSocket)(socketPath), spawnFailure]);
+    } catch (error) {
+      // `#stop`, not `stop`: this runs inside the start that `stop()` waits for.
+      await this.#stop();
+      throw error;
+    }
+    await this.#startTap(socketPath);
+  }
+
+  /**
+   * The address the agents are handed, once the daemon answers on its own.
+   *
+   * A failure here is reported and then left: Computer Use works without the tap, and the rim is
+   * worth less than the tools. The address is only ever inside the private state directory, which
+   * the daemon's own socket already proved is private.
+   */
+  async #startTap(socketPath: string): Promise<void> {
+    const endpoint = this.#options.endpoint;
+    const address =
+      endpoint.kind === "windows-pipe" ? `${endpoint.name}-tap` : join(endpoint.directory, TAP_SOCKET_FILE);
+    // A daemon that stops on its own leaves the tap listening, and `listen` returns at once while it
+    // does. Without this, the restart would unlink the address below and then hand the providers a
+    // path nothing answers on, with no way back except restarting OpenBot.
+    await this.#tap.close();
+    if (endpoint.kind === "unix-socket") await rm(address, { force: true }).catch(() => undefined);
+    try {
+      await this.#tap.listen({ upstream: socketPath, tap: address });
+    } catch (error) {
+      this.#options.onDiagnostic?.(`OpenBot: the Computer Use tap could not listen. ${describe(error)}\n`);
+    }
+  }
+
+  async #removeSocket(): Promise<void> {
+    // A socket file left by a previous run refuses the bind, so it goes before the daemon starts.
+    // A Windows pipe has no file: it is released when the process that owns it exits.
+    if (this.#options.endpoint.kind !== "unix-socket") return;
+    await rm(this.socketPath(), { force: true }).catch(() => undefined);
+  }
+
+  #pipeDiagnostics(child: ChildProcess): void {
+    for (const stream of [child.stdout, child.stderr]) {
+      stream?.on("data", (chunk: Buffer) => this.#options.onDiagnostic?.(chunk.toString("utf8")));
+    }
+  }
+
+  /**
+   * Points the alias at this run's executable, and reports the path the proxies should run.
+   *
+   * A link that cannot be made is not fatal: a driver reachable by its real path is better than no
+   * Computer Use at all, and the cost is the replacement session this alias exists to avoid.
+   */
+  async #linkCommandAlias(executable: string): Promise<string> {
+    const alias = this.#options.commandAlias;
+    if (!alias) return executable;
+    try {
+      await mkdir(dirname(alias), { recursive: true, mode: 0o700 });
+      await rm(alias, { force: true });
+      await symlink(executable, alias);
+      return alias;
+    } catch (error) {
+      this.#options.onDiagnostic?.(
+        `OpenBot: the Computer Use driver link could not be written. ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      return executable;
+    }
+  }
+
+  #announceMcpServer(): void {
+    const config = this.mcpServerForProviders();
+    const announced = config ? [config.command, ...config.args].join(" ") : "";
+    if (announced === this.#announcedMcpServer) return;
+    this.#announcedMcpServer = announced;
+    if (this.#quiet) return;
+    for (const listener of this.#mcpListeners) listener();
+  }
+
+  #initialState(): ComputerUseState {
+    return initialState(this.#options.platform, this.#options.supported, this.#executable);
+  }
+
+  /**
+   * Tells the listeners, and only when the answer is not the one they hold already.
+   *
+   * Reopening the panel asks the driver the same question again, and repeating an unchanged answer
+   * would update the capability and reconsider the entry for nothing.
+   *
+   * The entry is announced from here, after the state listeners, because it follows the state: a
+   * grant is what puts the tools in an agent's hands, and losing one takes them back.
+   */
+  #publish(state: ComputerUseState): ComputerUseState {
+    if (sameState(this.#state, state)) return this.#state;
+    this.#state = state;
+    for (const listener of this.#listeners) listener(state);
+    this.#announceMcpServer();
+    return state;
+  }
+}
+
+function sameState(left: ComputerUseState, right: ComputerUseState): boolean {
+  return (
+    left.status === right.status &&
+    left.message === right.message &&
+    left.permissions.length === right.permissions.length &&
+    left.permissions.every((permission, index) => {
+      const other = right.permissions[index];
+      return other !== undefined && other.id === permission.id && other.granted === permission.granted;
+    })
+  );
+}
+
+function initialState(platform: NodeJS.Platform, supported: boolean, executable: string | null): ComputerUseState {
+  if (!supported) {
+    return {
+      status: "unsupported",
+      permissions: ungranted(platform),
+      message: "Computer Use is available on macOS, Windows and Linux.",
+    };
+  }
+  if (!executable) {
+    return {
+      status: "driver-missing",
+      permissions: ungranted(platform),
+      // Never an instruction to install one: every release carries the driver, so a build without
+      // it is a broken build. The message says what is wrong and leaves the fix to the developer.
+      message: "This build of OpenBot carries no Computer Use driver.",
+    };
+  }
+  return { status: "permissions-required", permissions: ungranted(platform), message: null };
+}
+
+function requiredPermissions(platform: NodeJS.Platform): readonly MacPermissionId[] {
+  return REQUIRED_PERMISSIONS[platform] ?? [];
+}
+
+function ungranted(platform: NodeJS.Platform): ComputerUsePermission[] {
+  return requiredPermissions(platform).map((id) => ({ id, granted: false }));
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Turns on the driver's Wayland backend, on a Wayland session that has not decided already.
+ *
+ * The driver treats X11 as its supported Linux desktop and keeps the native Wayland backend behind
+ * this variable. Without it a Wayland session falls back to XWayland, where the driver sees only the
+ * XWayland clients and misses every native application on the screen. OpenBot starts the daemon, so
+ * OpenBot is what has to say which desktop it woke up on.
+ *
+ * A value the user set already is left alone, so the fallback stays reachable when a compositor
+ * handles the native backend badly.
+ */
+function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
+  if (platform !== "linux" || process.env[WAYLAND_ENV] !== undefined) return {};
+  return process.env.XDG_SESSION_TYPE === "wayland" ? { [WAYLAND_ENV]: "1" } : {};
+}
+
+/**
+ * Refuses a socket directory this user does not privately own.
+ *
+ * `mkdir` succeeds without complaint when the directory is already there, and applies its mode only
+ * to one it creates. On a shared temporary directory another local user can therefore put ours in
+ * place first, and then read or replace the socket a process that drives the whole desktop listens
+ * on. Anything not owned by this user, or writable by anyone else, is refused rather than used.
+ *
+ * Windows reaches none of this: a named pipe has a security descriptor rather than a directory.
+ */
+async function assertPrivateDirectory(directory: string): Promise<void> {
+  const stats = await lstat(directory);
+  if (!stats.isDirectory()) {
+    throw new Error(`The Computer Use socket directory ${directory} is not a directory.`);
+  }
+  // `getuid` is absent on Windows, which never calls this.
+  const uid = process.getuid?.();
+  if (uid !== undefined && stats.uid !== uid) {
+    throw new Error(`The Computer Use socket directory ${directory} belongs to another user.`);
+  }
+  if ((stats.mode & 0o077) !== 0) {
+    throw new Error(`The Computer Use socket directory ${directory} is open to other users.`);
+  }
+}
+
+/**
+ * Waits until the daemon accepts on its socket.
+ *
+ * The file appearing is not enough: the driver creates it and then binds, so a client that connects
+ * between the two is refused. Connecting is the only condition that means "ready".
+ */
+async function waitForSocket(path: string): Promise<void> {
+  const deadline = Date.now() + READY_TIMEOUT_MS;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const socket = connect(path);
+        socket.once("connect", () => {
+          socket.end();
+          resolve();
+        });
+        socket.once("error", reject);
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, READY_POLL_MS));
+    }
+  }
+  throw new Error(`It did not accept a connection in ${READY_TIMEOUT_MS / 1000} seconds. ${describe(lastError)}`);
+}
+
+/**
+ * Asks the driver what it may do, over one short-lived MCP connection.
+ *
+ * Only macOS has a grant to report. Elsewhere the question is simply whether the daemon answers, so
+ * the tool list is the probe: it proves the same connection without assuming a tool that a
+ * non-macOS build may not publish.
+ */
+async function readPermissionsOverMcp(
+  config: McpServerConfig,
+  platform: NodeJS.Platform,
+): Promise<readonly ComputerUsePermission[]> {
+  const client = new Client({ name: "openbot-computer-use", version: "1" }, { capabilities: {} });
+  const transport = new StdioClientTransport({
+    command: config.command,
+    args: config.args,
+    env: {
+      ...getDefaultEnvironment(),
+      [EMBEDDED_ENV]: "1",
+      ...CUA_DRIVER_VENDOR_CALLS_OFF,
+    },
+    stderr: "ignore",
+  });
+  const timer = new AbortController();
+  const deadline = setTimeout(() => timer.abort(), PERMISSION_TIMEOUT_MS);
+  try {
+    // The handshake is inside the deadline, not before it. A proxy that starts and then never
+    // answers `initialize` would otherwise wait for nothing, and the warm-up holds the agents back
+    // until this returns, so a driver that never speaks would keep every agent down.
+    await client.connect(transport, { signal: timer.signal });
+    if (requiredPermissions(platform).length === 0) {
+      await client.listTools(undefined, { signal: timer.signal });
+      return [];
+    }
+    const result = await client.callTool({ name: "check_permissions", arguments: {} }, undefined, {
+      signal: timer.signal,
+    });
+    return readPermissionResult(result, platform);
+  } finally {
+    clearTimeout(deadline);
+    await client.close().catch(() => undefined);
+    await transport.close().catch(() => undefined);
+  }
+}
+
+/**
+ * The grants inside a `check_permissions` answer.
+ *
+ * The driver reports its own names for the two, so this reads both what macOS calls them and what
+ * the driver does. Anything it does not recognise counts as not granted, which keeps a driver
+ * release that renames a field from reporting a permission the user never gave.
+ */
+export function readPermissionResult(result: unknown, platform: NodeJS.Platform): ComputerUsePermission[] {
+  const structured = isDynamicRecord(result) ? result.structuredContent : undefined;
+  const source: DynamicRecord = isDynamicRecord(structured) ? structured : isDynamicRecord(result) ? result : {};
+  return requiredPermissions(platform).map((id) => ({ id, granted: grantedIn(source, id) }));
+}
+
+function grantedIn(source: DynamicRecord, id: MacPermissionId): boolean {
+  const keys =
+    id === "screen-recording"
+      ? ["screen_recording", "screenRecording", "screen_capture", "screenCapture"]
+      : ["accessibility"];
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value === "granted" || value === "authorized";
+    if (isDynamicRecord(value) && typeof value.granted === "boolean") return value.granted;
+  }
+  return false;
+}

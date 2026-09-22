@@ -25,7 +25,7 @@ messaging in one desktop app.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
 - Shared desktop channel chats with one task owner, explicit delegation, shared history, and Stop, Resume, Reassign, Archive, and Restore controls.
 - A persistent embedded browser that agents can open, inspect, and control.
-- Optional Computer Use integration for macOS through a locally installed Codex plugin.
+- Optional Computer Use on macOS, Windows and Linux through the `cua-driver` binary in the release, which OpenBot starts as its own child process and gives to every provider.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.
 - Local data and privacy-safe diagnostics exports from the account menu.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
@@ -113,8 +113,9 @@ show these agents.
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
 
-Bun and Node.js are not required when using an installed release. Screen Recording and Accessibility
-permissions are needed only for the optional Computer Use plugin.
+Bun and Node.js are not required when using an installed release. Optional Computer Use works on
+macOS, Windows and Linux, and the release carries the driver, so there is nothing to install. Only
+macOS asks for a permission for it: Screen Recording and Accessibility.
 
 OpenBot uses the existing local CLI login. It does not copy provider credentials. Grok's
 `XAI_API_KEY` and per-session MCP bearer tokens are never persisted or logged.
@@ -148,8 +149,8 @@ bun run codex:doctor
 bun run dev
 ```
 
-`codex:doctor` checks the CLI version, App Server handshake, ChatGPT login, and Computer Use plugin
-without starting a model turn.
+`codex:doctor` checks the CLI version, App Server handshake, and ChatGPT login without starting a
+model turn. `bun run cua-driver:doctor` reports the Computer Use driver separately.
 
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
@@ -240,6 +241,9 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
+| `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary in a checkout; an installed application runs only the driver it was released with. |
+| `bun run prepare:cua-driver` | Write the pinned Computer Use driver to `build/cua-driver/<platform>/<arch>`, verifying every SHA-256 in `native-runtime.lock.json`. Name another target with `bun scripts/install-cua-driver.ts <platform> <arch>`. Every packaging command runs this first. |
+| `bun run pin:cua-driver <version>` | Print a new `cuaDriver` block for `native-runtime.lock.json` from a published `cua-driver` release. Downloads all three targets and hashes each shipped file. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |
@@ -303,6 +307,31 @@ persistent `~/OpenBot/Agents/<agent-id>` workspace and also receives `~/OpenBot/
 and filesystem work in both locations runs without OpenBot adding another permission boundary.
 Because these modes are intentionally unrestricted, they also permit host access outside those
 directories when the provider and operating system allow it.
+
+### macOS remote desktop permissions
+
+For each macOS account, log in to its GUI session and open **Server Settings → Remote desktop access**.
+Select **Check again** to read Sunshine's Screen Recording and Accessibility permissions, display availability,
+and GUI session status. The panel names the Mac and the account that runs Sunshine. Grant permissions in
+that account, including when the account was created with the tenant setup script.
+
+After you publish a server on a Mac, an optional **Set up remote desktop** prompt opens this panel. Select **Later** to keep using the published server without remote desktop setup.
+
+Use the permission buttons to open **System Settings → Privacy & Security** on the host. If Sunshine is
+missing from a list, select **Show Sunshine in Finder** and add the bundled `Sunshine.app` with the **+** button.
+macOS can attribute access to the application that starts Sunshine; enable the application named by the
+system prompt. Return to OpenBot to check again. If a restart is required, end remote sessions first.
+A check never restarts an active session.
+
+Select **Test on this Mac** for a local test. If native checks are unavailable, it tests video only and disables viewer input. After the checks pass, it can test mouse and keyboard too. Select **Test remote desktop** from another computer for a remote test.
+The test requires an otherwise unused remote desktop host. It opens a temporary host panel, keeps remote
+input inside that panel, and asks you to click a target and type a four-digit code. Confirm that the picture
+is visible, then select **Finish test**. Local input does not pass the mouse or keyboard test. The panel
+expires after two minutes. Older hosts or native runtimes require an update before these checks are available.
+
+The native runtime source change invalidates prior artifact pins. The **Remote desktop runtime** CI workflow
+builds and tests the new source, then publishes and pins verified artifacts through its existing release flow.
+Do not reuse old artifact hashes with the new source digest.
 
 ## Architecture
 

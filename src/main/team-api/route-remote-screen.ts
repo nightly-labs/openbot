@@ -1,3 +1,4 @@
+import { parseRemoteDesktopTest } from "../ipc/server-inputs";
 // Remote control of this machine's screen: capabilities, a session, and the display it shows.
 //
 // Every failure here is a `RemoteScreenError`, not an `HttpError`, because the codes it carries
@@ -15,7 +16,10 @@ import { pathIdentifier, publicHttpBaseUrl, readJson, stringField } from "./requ
 
 export interface RemoteScreenRouteDependencies {
   store: Pick<TeamStore, "getIdentity">;
-  remoteScreen?: Pick<TeamApiRemoteScreen, "capabilities" | "createSession" | "selectDisplay" | "closeMemberSession">;
+  remoteScreen?: Pick<
+    TeamApiRemoteScreen,
+    "capabilities" | "createSession" | "selectDisplay" | "closeMemberSession" | "checkSetup" | "test"
+  >;
 }
 
 export async function routeRemoteScreen(
@@ -23,6 +27,29 @@ export async function routeRemoteScreen(
   { store, remoteScreen }: RemoteScreenRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, member, sessionId, sessionExpiresAt, json, empty } = context;
+
+  if (
+    method === "POST" &&
+    (url.pathname === TEAM_API_ROUTES.remoteScreen.setup || url.pathname === TEAM_API_ROUTES.remoteScreen.test) &&
+    context.protocol < 4
+  ) {
+    throw new RemoteScreenError(426, "protocol_mismatch", "Update the client to use remote desktop setup.");
+  }
+  if (method === "POST" && url.pathname === TEAM_API_ROUTES.remoteScreen.setup) {
+    if (!remoteScreen?.checkSetup)
+      throw new RemoteScreenError(503, "host_unavailable", "Remote desktop setup is unavailable.");
+    const body = await readJson(request);
+    if (Object.keys(body).length !== 0)
+      throw new RemoteScreenError(400, "protocol_mismatch", "Invalid remote desktop setup request.");
+    return json(200, await remoteScreen.checkSetup());
+  }
+  if (method === "POST" && url.pathname === TEAM_API_ROUTES.remoteScreen.test) {
+    if (!remoteScreen?.test)
+      throw new RemoteScreenError(503, "host_unavailable", "Remote desktop testing is unavailable.");
+    const body = await readJson(request);
+    const input = parseRemoteDesktopTest({ ...body, serverId: "host" });
+    return json(200, await remoteScreen.test(input.sessionId, member.id, input.action));
+  }
 
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.remoteScreen.capabilities) {
     if (!remoteScreen) throw new RemoteScreenError(503, "host_unavailable", "Remote control is unavailable.");

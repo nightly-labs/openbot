@@ -268,12 +268,6 @@ export class TurnLifecycle {
           this.#conversation.unloadThread(threadId);
         return;
       }
-      case "mcpServer/startupStatus/updated": {
-        if (getString(params, "name") !== "computer-use") return;
-        const status = getString(params, "status");
-        this.#providers.setComputerUseCapability(status === "ready" ? "ready" : "setup-required");
-        return;
-      }
       case "account/rateLimits/updated": {
         this.#providers.refreshCodexUsage();
         return;
