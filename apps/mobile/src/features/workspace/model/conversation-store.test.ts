@@ -116,6 +116,7 @@ describe("mobile conversation windows", () => {
         author: "agent",
         body: "Referenced outside the window",
         streaming: false,
+        status: "completed",
       },
     });
   });
@@ -160,7 +161,14 @@ describe("mobile conversation windows", () => {
       updates: 1,
       unrelatedUpdates: 0,
       oldRetained: true,
-      reply: { id: "reply", kind: "message", author: "agent", body: "reply one two", streaming: true },
+      reply: {
+        id: "reply",
+        kind: "message",
+        author: "agent",
+        body: "reply one two",
+        streaming: true,
+        status: "streaming",
+      },
     });
   });
 
