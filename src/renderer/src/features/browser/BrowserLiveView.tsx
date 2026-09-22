@@ -27,6 +27,12 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     message: "Connecting to the page on the host…",
   });
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
+  /**
+   * The size of the last frame, kept beside the canvas rather than read from it: the canvas only
+   * takes the frame's size once the JPEG has decoded, and a pointer event that arrives first would
+   * otherwise be a fraction of the wrong shape.
+   */
+  const [frameSize, setFrameSize] = createSignal<{ width: number; height: number }>();
   let pendingFrame: Promise<void> | undefined;
 
   const draw = async (frame: { width: number; height: number; image: Uint8Array }) => {
@@ -45,9 +51,11 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   const stopListening = window.openbot.browser.onLiveViewEvent((event) => {
     if (event.tabId !== props.tabId) return;
     if (event.type === "stopped") {
+      setFrameSize(undefined);
       setState(() => ({ live: false, message: event.reason }));
       return;
     }
+    setFrameSize({ width: event.width, height: event.height });
     if (!state.live) setState(() => ({ live: true, message: "" }));
     // One frame decodes at a time. The next frame is the page as it is now, so a frame that arrives
     // while one is decoding is dropped rather than queued behind it.
@@ -64,6 +72,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     () => ({ tabId: props.tabId, active: props.active }),
     ({ tabId, active }) => {
       if (!active) return;
+      setFrameSize(undefined);
       setState(() => ({ live: false, message: "Connecting to the page on the host…" }));
       void window.openbot.browser
         .startLiveView(tabId)
@@ -76,12 +85,24 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     void window.openbot.browser.sendLiveViewInput(input).catch(() => undefined);
   };
 
+  /**
+   * Where on the frame the pointer is, which is not where on the canvas it is. The canvas fills the
+   * panel and draws the frame with `object-fit: contain`, so a frame of a different shape sits
+   * letterboxed inside it - a wide page in a narrow panel is a band with most of the panel above and
+   * below it. A fraction of the canvas box would put every click that many bars away from the point
+   * the user aimed at.
+   */
   const point = (event: MouseEvent): { x: number; y: number } | null => {
     const bounds = canvas()?.getBoundingClientRect();
-    if (!bounds || bounds.width === 0 || bounds.height === 0) return null;
+    const size = frameSize();
+    if (!bounds || !size || bounds.width === 0 || bounds.height === 0) return null;
+    if (size.width === 0 || size.height === 0) return null;
+    const scale = Math.min(bounds.width / size.width, bounds.height / size.height);
+    const width = size.width * scale;
+    const height = size.height * scale;
     return {
-      x: clampFraction((event.clientX - bounds.left) / bounds.width),
-      y: clampFraction((event.clientY - bounds.top) / bounds.height),
+      x: clampFraction((event.clientX - bounds.left - (bounds.width - width) / 2) / width),
+      y: clampFraction((event.clientY - bounds.top - (bounds.height - height) / 2) / height),
     };
   };
 

@@ -27,6 +27,21 @@ async function openComputer(): Promise<void> {
   await fireEvent.click(screen.getByRole("button", { name: "Open computer" }));
 }
 
+/** jsdom lays nothing out, so a live view's panel is the rectangle the test says it is. */
+function domRect(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    x: left,
+    y: top,
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+    toJSON: () => ({}),
+  };
+}
+
 /** The two clicks that reach a live browser: the computer panel, then the preview card in it. */
 async function openComputerAndCard(title: string): Promise<void> {
   await openComputer();
@@ -286,19 +301,12 @@ describe("OpenBot connected desktop shell", () => {
     const view = await screen.findByRole("img", { name: "Live view of the page on the host" });
     // The panel is a different size from the host's viewport, so the click is sent as the point on
     // the frame rather than the pixel it landed on here. jsdom has no layout to measure.
-    const rect: DOMRect = {
-      x: 100,
-      y: 50,
-      left: 100,
-      top: 50,
-      right: 500,
-      bottom: 250,
-      width: 400,
-      height: 200,
-      toJSON: () => ({}),
-    };
-    view.getBoundingClientRect = () => rect;
-    await fireEvent.mouseDown(view, { clientX: 300, clientY: 150, button: 0, detail: 1 });
+    //
+    // The panel is 400x400 and the frame is 800x600, so `object-fit: contain` draws the frame as a
+    // 400x300 band with a 50 bar above and below it. The centre of the panel is still the centre of
+    // the frame; a point anywhere else is not the point the panel's own fraction would name.
+    view.getBoundingClientRect = () => domRect(100, 50, 400, 400);
+    await fireEvent.mouseDown(view, { clientX: 300, clientY: 250, button: 0, detail: 1 });
 
     expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith({
       type: "pointer",
@@ -309,6 +317,58 @@ describe("OpenBot connected desktop shell", () => {
       clickCount: 1,
       modifiers: 0,
     });
+
+    // A quarter into the drawn band, not a quarter into the panel: the panel's own fraction would
+    // call this point y 0.3125 and click 45 rows lower on the page than the user aimed.
+    vi.mocked(window.openbot.browser.sendLiveViewInput).mockClear();
+    await fireEvent.mouseDown(view, { clientX: 200, clientY: 175, button: 0, detail: 1 });
+
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pointer", action: "down", x: 0.25, y: 0.25 }),
+    );
+  });
+
+  it("sends a click on a live view that is letterboxed top and bottom as a point on the frame", async () => {
+    const studio = testServer("remote-1", true);
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
+      testServer("local", false),
+      {
+        ...studio,
+        compatibility: {
+          localAppVersion: "0.0.0",
+          hostAppVersion: "0.0.0",
+          localProtocol: { minimum: 1, maximum: 4 },
+          hostProtocol: { minimum: 1, maximum: 4 },
+          negotiatedProtocol: 4,
+          capabilities: ["browser-control", TEAM_BROWSER_VIEW_CAPABILITY],
+        },
+      },
+    ]);
+    const tab = browserTab("remote-live-tab", "Remote live page");
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Remote live page");
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+
+    // The shape the browser panel actually has: a wide page in a tall, narrow panel. The frame is
+    // drawn as a 380x237.5 band in the middle of a 380x800 panel, so all but a third of the panel
+    // is bar, and a fraction of the panel would miss the page by most of its height.
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 1280, height: 800, image: IMAGE });
+    const view = await screen.findByRole("img", { name: "Live view of the page on the host" });
+    view.getBoundingClientRect = () => domRect(0, 0, 380, 800);
+
+    await fireEvent.mouseDown(view, { clientX: 190, clientY: 400, button: 0, detail: 1 });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pointer", action: "down", x: 0.5, y: 0.5 }),
+    );
+
+    // The top bar is not the top of the page: every point above the band clamps to its first row.
+    vi.mocked(window.openbot.browser.sendLiveViewInput).mockClear();
+    await fireEvent.mouseDown(view, { clientX: 190, clientY: 10, button: 0, detail: 1 });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pointer", action: "down", x: 0.5, y: 0 }),
+    );
   });
 
   it("keeps existing previews when a new tab is added", async () => {
