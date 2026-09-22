@@ -436,9 +436,7 @@ describe("browser auth popups", () => {
 
   it("explains unsupported popup types", async () => {
     await popupRequest();
-    expect(windowOpenHandlers.at(-1)?.({ url: "https://example.com", disposition: "save-to-disk" }).action).toBe(
-      "deny",
-    );
+    expect(windowOpenHandlers.at(-1)?.({ url: "https://example.com", disposition: "other" }).action).toBe("deny");
     expect(host.listTabs()[0].popupFailure?.message).toContain("popup type");
   });
 

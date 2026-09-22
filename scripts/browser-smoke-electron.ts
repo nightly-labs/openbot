@@ -2710,7 +2710,7 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
       if (button !== "Cross-origin sign-in" && button !== "Iframe sign-in")
         await contents.executeJavaScript("window.open('/popup-login', 'auth'); void 0", true);
       if (popupContents.session !== contents.session) throw new Error("Popup session changed.");
-      if (popupContents.getOwnerBrowserWindow() !== contents.getOwnerBrowserWindow())
+      if (BrowserWindow.fromWebContents(popupContents) !== BrowserWindow.fromWebContents(contents))
         throw new Error("Unmanaged popup window.");
       await browser.setVisible({ visible: false });
       await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
