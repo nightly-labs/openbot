@@ -130,8 +130,10 @@ export async function verifyHost(ops: HostAdminOperations): Promise<HostVerifica
 export interface HostTenantReport {
   uid: number;
   name: string | null;
-  /** A fresh report and one matching process, which is what the host itself requires. */
-  running: boolean;
+  /** A fresh status report. Kept apart from the process list, which is a separate observation. */
+  reporting: boolean;
+  /** Any process inside the shared bundle under this UID, main process or helper. */
+  processRunning: boolean;
   pid: number | null;
   version: string | null;
   healthy: boolean;
@@ -212,7 +214,15 @@ function describeTenant(
   const anyProcess = processes.some((process) => process.uid === entry.uid);
   // HostManager.#waitForExit reads the process list only, so tenant status cannot block this phase.
   const stopping = state?.phase === "stopping";
-  const base = { uid: entry.uid, name: entry.name, running: false, pid: null, version: null, healthy: false };
+  const base = {
+    uid: entry.uid,
+    name: entry.name,
+    reporting: false,
+    processRunning: anyProcess,
+    pid: null,
+    version: null,
+    healthy: false,
+  };
   const empty = { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null };
   if (stopping && !status) return { ...empty, blocker: anyProcess ? "still running" : null };
   if (!status) return { ...empty, blocker: anyProcess ? "runs without a status report" : "no status report" };
@@ -224,7 +234,8 @@ function describeTenant(
   const report = {
     uid: entry.uid,
     name: entry.name,
-    running: fresh && processMatch,
+    reporting: fresh,
+    processRunning: anyProcess,
     pid: status.pid,
     version: status.currentVersion,
     healthy: status.healthy,
@@ -338,17 +349,17 @@ export function formatHostStatus(report: HostStatusReport): string {
   lines.push("", report.summary, "", "Tenants");
   for (const tenant of report.tenants) {
     const label = `${tenant.name ?? "unknown"} (${tenant.uid})`.padEnd(24);
-    const activity = !tenant.running
-      ? tenant.pid === null
-        ? "not running"
-        : "report and process list disagree"
+    // The report and the process list are separate observations. Never present one as the other.
+    const activity = !tenant.reporting
+      ? tenant.processRunning
+        ? "runs without a fresh report"
+        : "not running"
       : `${(tenant.healthy ? "healthy" : "unhealthy").padEnd(10)} ${
-          tenant.idleForMs === null ? "working" : `idle ${formatDuration(tenant.idleForMs)}`
-        }`;
+          tenant.processRunning ? "" : "no process, "
+        }${tenant.idleForMs === null ? "working" : `idle ${formatDuration(tenant.idleForMs)}`}`;
     const ready = tenant.readyInMs === null ? "" : `  ready in ~${formatDuration(tenant.readyInMs)}`;
-    // "working" and a missing report already appear in the activity column.
-    const blocker =
-      tenant.running && tenant.blocker && tenant.blocker !== "working" ? `  blocks: ${tenant.blocker}` : "";
+    // "working" already appears in the activity column; every other reason is shown as it is.
+    const blocker = tenant.blocker && tenant.blocker !== "working" ? `  blocks: ${tenant.blocker}` : "";
     lines.push(`  ${label} ${(tenant.version ?? "-").padEnd(9)} ${activity}${ready}${blocker}`);
   }
   if (report.phase === "waiting") lines.push("", "Countdowns are the earliest possible time, not a promise.");

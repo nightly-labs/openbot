@@ -257,7 +257,7 @@ describe("host status reporting", () => {
 
   it("does not promise a countdown when the process list disagrees with the report", () => {
     const report = describeHostStatus({ ...statusInput(), processes: [{ uid: 501, pid: 99, main: true }] });
-    expect(report.tenants[0]?.running).toBe(false);
+    expect(report.tenants[0]?.reporting).toBe(true);
     expect(report.tenants[0]?.readyInMs).toBeNull();
     expect(report.tenants[0]?.blocker).toBe("reported PID is not in the process list");
   });
@@ -349,6 +349,33 @@ describe("host status reporting", () => {
       throw new Error("Process scan returned no processes.");
     };
     await expect(collectHostStatus(f.ops, NOW)).rejects.toThrow();
+  });
+
+  it("shows a helper process that keeps the host in the stopping phase", () => {
+    const state = { phase: "stopping", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null } as const;
+    const report = describeHostStatus({
+      ...statusInput(),
+      state,
+      tenants: [{ uid: 501, name: "client-acme", status: null }],
+      processes: [{ uid: 501, pid: 44, main: false }],
+    });
+    expect(report.tenants[0]?.processRunning).toBe(true);
+    const text = formatHostStatus(report);
+    expect(text).toContain("runs without a fresh report");
+    expect(text).toContain("blocks: still running");
+    expect(text).not.toContain("not running");
+  });
+
+  it("calls a stale report stale, even when its PID matches the process list", () => {
+    const input = statusInput();
+    const acme = input.tenants[0];
+    if (acme?.status) acme.status = { ...acme.status, heartbeatAt: NOW - 600_000 };
+    const report = describeHostStatus(input);
+    expect(report.tenants[0]?.reporting).toBe(false);
+    expect(report.tenants[0]?.processRunning).toBe(true);
+    const text = formatHostStatus(report);
+    expect(text).toContain("blocks: stale status report");
+    expect(text).not.toContain("process list disagree");
   });
 
   it("reports a stopped daemon and an unmanaged host before any update text", () => {
