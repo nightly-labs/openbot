@@ -7,6 +7,14 @@ const CONTROL = 2;
 const META = 4;
 const SHIFT = 8;
 
+/** One frame of the host's screencast, as the renderer receives it. */
+interface LiveViewFrame {
+  sequence: number;
+  width: number;
+  height: number;
+  image: Uint8Array;
+}
+
 interface BrowserLiveViewProps {
   tabId: string;
   /** False while the panel is closed: a view nobody is looking at still costs the host a screencast. */
@@ -28,17 +36,21 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   });
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   /**
-   * The size of the frame the canvas is showing, which is not the size of the last frame to arrive.
-   * Decoding is asynchronous and a frame that arrives mid-decode is dropped, so while the host
-   * resizes its viewport the newest frame's shape and the drawn pixels disagree. `object-fit`
-   * letterboxes what is drawn, so a pointer placed with the newer shape would miss by the
-   * difference between the two bands. It stays unset until the first frame is drawn, which is what
-   * holds input back while there is nothing on the canvas to aim at.
+   * The frame the canvas is showing, which is not the last frame to arrive. Decoding is
+   * asynchronous, so while the host resizes its viewport the newest frame's shape and the drawn
+   * pixels disagree. `object-fit` letterboxes what is drawn, so a pointer placed with the newer
+   * shape would miss by the difference between the two bands. Its sequence goes back with every
+   * point, so the host expands the fraction against these pixels and not a frame still in transit.
+   * It stays unset until the first frame is drawn, which is what holds input back while there is
+   * nothing on the canvas to aim at.
    */
-  const [frameSize, setFrameSize] = createSignal<{ width: number; height: number }>();
+  const [frame, setFrame] = createSignal<{ sequence: number; width: number; height: number }>();
   let pendingFrame: Promise<void> | undefined;
-  /** The newest frame's shape, drawn or not. The host expands a fraction with this one. */
-  let hostSize: { width: number; height: number } | undefined;
+  /**
+   * The newest frame to arrive while another was decoding. Only the newest is worth keeping: it is
+   * the page as it is now, and the ones behind it are a page nobody can still act on.
+   */
+  let queuedFrame: LiveViewFrame | undefined;
   /** Which stream the frames belong to. Another tab, or the same tab again, is a new one. */
   let stream = 0;
 
@@ -51,27 +63,48 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   const abandonStream = () => {
     stream += 1;
     pendingFrame = undefined;
-    hostSize = undefined;
-    setFrameSize(undefined);
+    queuedFrame = undefined;
+    setFrame(undefined);
   };
 
-  const draw = async (frame: { width: number; height: number; image: Uint8Array }) => {
+  const draw = async (next: LiveViewFrame) => {
     const element = canvas();
     const context = element?.getContext("2d");
     if (!element || !context) return;
     const drawnFor = stream;
-    const bitmap = await createImageBitmap(new Blob([new Uint8Array(frame.image)], { type: "image/jpeg" }));
+    const bitmap = await createImageBitmap(new Blob([new Uint8Array(next.image)], { type: "image/jpeg" }));
     if (drawnFor !== stream) {
       bitmap.close();
       return;
     }
-    if (element.width !== frame.width || element.height !== frame.height) {
-      element.width = frame.width;
-      element.height = frame.height;
+    if (element.width !== next.width || element.height !== next.height) {
+      element.width = next.width;
+      element.height = next.height;
     }
     context.drawImage(bitmap, 0, 0);
     bitmap.close();
-    setFrameSize({ width: frame.width, height: frame.height });
+    setFrame({ sequence: next.sequence, width: next.width, height: next.height });
+  };
+
+  /**
+   * Decode one frame, then whichever frame arrived last while it was decoding. Dropping a frame and
+   * waiting for the next one is wrong for a page that has stopped changing: the host sends nothing
+   * more, and the canvas would keep the frame before the last resize for as long as the user looks
+   * at it.
+   */
+  const decode = (next: LiveViewFrame) => {
+    const drawing: Promise<void> = draw(next)
+      .catch(() => undefined)
+      .finally(() => {
+        // An abandoned stream leaves its decode running, so only the promise that is still the
+        // pending one may clear it or start the frame behind it.
+        if (pendingFrame !== drawing) return;
+        pendingFrame = undefined;
+        const queued = queuedFrame;
+        queuedFrame = undefined;
+        if (queued) decode(queued);
+      });
+    pendingFrame = drawing;
   };
 
   const stopListening = window.openbot.browser.onLiveViewEvent((event) => {
@@ -82,18 +115,12 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       return;
     }
     if (!state.live) setState(() => ({ live: true, message: "" }));
-    hostSize = { width: event.width, height: event.height };
-    // One frame decodes at a time. The next frame is the page as it is now, so a frame that arrives
-    // while one is decoding is dropped rather than queued behind it.
-    if (pendingFrame) return;
-    // An abandoned stream leaves its decode running, so only the promise that is still the pending
-    // one may clear it. The old decode finishing must not let a second frame of the new stream in.
-    const frame: Promise<void> = draw(event)
-      .catch(() => undefined)
-      .finally(() => {
-        if (pendingFrame === frame) pendingFrame = undefined;
-      });
-    pendingFrame = frame;
+    // One frame decodes at a time, and the newest of the rest waits behind it.
+    if (pendingFrame) {
+      queuedFrame = event;
+      return;
+    }
+    decode(event);
   });
   onCleanup(stopListening);
 
@@ -122,24 +149,21 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
    * the user aimed at.
    *
    * Null means there is no point to send. The bars are not the page, and a point on one clamped to
-   * the edge of the frame would work the first or last row of a page the user never pointed at. A
-   * frame of a new shape that has not been drawn yet is the same answer for the other side: the host
-   * expands a fraction with the newest frame it sent, so until that frame is the drawn one the two
-   * sides would name different places.
+   * the edge of the frame would work the first or last row of a page the user never pointed at.
+   * Nothing drawn yet is the same answer: there is no frame to be a fraction of.
    */
-  const point = (event: MouseEvent): { x: number; y: number } | null => {
+  const point = (event: MouseEvent): { x: number; y: number; sequence: number } | null => {
     const bounds = canvas()?.getBoundingClientRect();
-    const size = frameSize();
+    const size = frame();
     if (!bounds || !size || bounds.width === 0 || bounds.height === 0) return null;
     if (size.width === 0 || size.height === 0) return null;
-    if (hostSize?.width !== size.width || hostSize.height !== size.height) return null;
     const scale = Math.min(bounds.width / size.width, bounds.height / size.height);
     const width = size.width * scale;
     const height = size.height * scale;
     const x = (event.clientX - bounds.left - (bounds.width - width) / 2) / width;
     const y = (event.clientY - bounds.top - (bounds.height - height) / 2) / height;
     if (x < 0 || x > 1 || y < 0 || y > 1) return null;
-    return { x, y };
+    return { x, y, sequence: size.sequence };
   };
 
   const pointer = (event: MouseEvent, action: "move" | "down" | "up") => {

@@ -518,14 +518,12 @@ async function main(): Promise<void> {
       ref: input.ref,
       text: "runs locally",
     });
-    // Only the typing is checked here. A key event goes to the focused renderer, but a mouse event
-    // needs the view to be producing compositor frames, and under the virtual display CI runs on the
-    // view is never guaranteed to draw - an animation frame does not run there at all. Chromium then
-    // drops every mouse event silently, so a click check fails for the display rather than for the
-    // product. Native clicks are covered by the renderer tests instead.
     if (!typed.text.includes("runs locally|input:true")) {
       throw new Error(`Browser input was not native: ${typed.text}`);
     }
+    const pageContents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
+    if (!pageContents) throw new Error("The local tab's web contents were not available.");
+    await waitForMouseInput(browser, tab.id, pageContents);
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 
     await runDoubleClickScenario(browser, origin);
@@ -2042,6 +2040,48 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   })()`,
     true,
   );
+}
+
+/**
+ * Wait until the view actually delivers a mouse event to the page.
+ *
+ * A key event goes to the focused renderer, but a mouse event needs the view to be producing
+ * compositor frames, and under a virtual display it can take seconds to get there - an animation
+ * frame does not run at all until it does. Chromium drops every mouse event in the meantime and
+ * reports nothing: no error, no pointer event, just a click that never happened. Every scenario
+ * after this one clicks once and means it, so the waiting belongs here rather than in each of them.
+ *
+ * The probe is thrown away, so retrying it costs nothing and proves nothing about the product.
+ */
+async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  await contents.executeJavaScript(
+    `(() => {
+    const probe = document.createElement('button');
+    probe.id = 'smoke-input-probe';
+    probe.textContent = 'Input probe';
+    probe.style.cssText = 'position:fixed;left:8px;top:8px;z-index:2147483647';
+    probe.addEventListener('click', event => {
+      if (event.isTrusted) probe.dataset.clicked = 'true';
+    });
+    document.body.prepend(probe);
+  })()`,
+    true,
+  );
+  const deadline = Date.now() + 60_000;
+  let landed = false;
+  while (!landed && Date.now() < deadline) {
+    await callBrowserTool(browser, "click", {
+      tabId,
+      target: { kind: "role", role: "button", name: "Input probe", exact: true },
+    });
+    landed =
+      (await contents.executeJavaScript(
+        "document.getElementById('smoke-input-probe').dataset.clicked === 'true'",
+        true,
+      )) === true;
+  }
+  await contents.executeJavaScript("document.getElementById('smoke-input-probe').remove()", true);
+  if (!landed) throw new Error("The view never delivered a native mouse event to the page.");
 }
 
 async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {

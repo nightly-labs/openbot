@@ -367,6 +367,7 @@ describe("OpenBot connected desktop shell", () => {
       action: "down",
       x: 0.5,
       y: 0.5,
+      sequence: 1,
       button: "left",
       clickCount: 1,
       modifiers: 0,
@@ -439,7 +440,7 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
-  it("sends no click while a frame of a new shape is still decoding", async () => {
+  it("names the drawn frame when a click is made while a newer frame decodes", async () => {
     listHostThatStreamsItsBrowser();
     const tab = browserTab("remote-live-tab", "Remote live page");
     const { drawn, decodes, holdDecodes } = stubCanvasDrawing();
@@ -455,27 +456,65 @@ describe("OpenBot connected desktop shell", () => {
     view.getBoundingClientRect = () => domRect(0, 0, 400, 400);
 
     // The host's viewport changed shape, so the next frame is 400x800 where the drawn one is 800x600.
-    // The panel still shows the wide frame, but the host expands a fraction with the frame it sent
-    // last, so the drawn frame's (0.25, 0.25) would land where the tall frame's (0, 0.3125) is. The
-    // two sides name the same place again once the new frame is drawn.
+    // The panel still shows the wide frame, and the click belongs to that frame: the point goes back
+    // named with its sequence, so the host expands it against the pixels the user aimed at rather
+    // than against the frame that has not arrived on this side yet.
     const decode = holdDecodes();
-    // A screencast repeats the page until something changes, and the view drops a frame that arrives
-    // while another one decodes. Offer the resized frame until it is the one being decoded; the hold
-    // keeps it there, so no third decode can start behind it.
+    // A screencast repeats the page until something changes, and a frame that arrives while another
+    // one decodes waits behind it. Offer the resized frame until it is the one being decoded; the
+    // hold keeps it there, so no third decode can start behind it.
     await vi.waitFor(() => {
       emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 2, width: 400, height: 800, image: IMAGE });
       expect(decodes).toHaveBeenCalledTimes(2);
     });
 
     await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
-    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalled();
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pointer", action: "down", x: 0.25, y: 0.25, sequence: 1 }),
+    );
 
-    // The new frame is drawn, so the panel and the host agree on the page again.
+    // Once the resized frame is drawn, a point names that frame instead. The screencast repeated
+    // the resized frame while the first one decoded, so wait for the click rather than count draws.
+    vi.mocked(window.openbot.browser.sendLiveViewInput).mockClear();
     decode();
-    await vi.waitFor(() => expect(drawn).toHaveBeenCalledTimes(2));
+    await vi.waitFor(async () => {
+      await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
+      expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "pointer", action: "down", x: 0, y: 0.3125, sequence: 2 }),
+      );
+    });
+  });
+
+  it("draws the frame that arrived last while another was decoding", async () => {
+    listHostThatStreamsItsBrowser();
+    const tab = browserTab("remote-live-tab", "Remote live page");
+    const { drawn, decodes, holdDecodes } = stubCanvasDrawing();
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Remote live page");
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
+    const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
+    await vi.waitFor(() => expect(drawn).toHaveBeenCalled());
+    view.getBoundingClientRect = () => domRect(0, 0, 400, 400);
+
+    // The page resized and then stopped changing, so the host has no reason to send anything more.
+    // A view that only dropped the frames behind the one it was decoding would show the page from
+    // before the resize for as long as the user keeps watching it.
+    const decode = holdDecodes();
+    await vi.waitFor(() => {
+      emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 2, width: 800, height: 600, image: IMAGE });
+      expect(decodes).toHaveBeenCalledTimes(2);
+    });
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 3, width: 400, height: 800, image: IMAGE });
+    decode();
+
+    await vi.waitFor(() => expect(drawn).toHaveBeenCalledTimes(3));
     await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
     expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "pointer", action: "down", x: 0, y: 0.3125 }),
+      expect.objectContaining({ type: "pointer", action: "down", x: 0, y: 0.3125, sequence: 3 }),
     );
   });
 

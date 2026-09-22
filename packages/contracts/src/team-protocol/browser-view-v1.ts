@@ -50,6 +50,12 @@ export type BrowserViewInput =
       action: "move" | "down" | "up" | "wheel";
       x: number;
       y: number;
+      /**
+       * The frame the fraction is a fraction of, when the client knows it. Optional because it was
+       * added after this protocol shipped: a client that omits it gets the newest frame the host
+       * sent, which is what every client used to get.
+       */
+      sequence?: number;
       button: "left" | "middle" | "right";
       clickCount: number;
       deltaX: number;
@@ -159,6 +165,7 @@ export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput 
       action,
       x: fraction(message.x),
       y: fraction(message.y),
+      ...(message.sequence === undefined ? {} : { sequence: sequenceNumber(message.sequence) }),
       button,
       clickCount,
       deltaX: scrollDelta(message.deltaX),
@@ -182,6 +189,13 @@ export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput 
 
 function fraction(value: unknown): number {
   if (!isNumber(value) || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error("Invalid browser view input.");
+  }
+  return value;
+}
+
+function sequenceNumber(value: unknown): number {
+  if (!isNumber(value) || !Number.isInteger(value) || value < 1 || value > 0xff_ff_ff_ff) {
     throw new Error("Invalid browser view input.");
   }
   return value;

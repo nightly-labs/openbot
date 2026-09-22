@@ -129,6 +129,55 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
+  it("expands a point with the frame the member named, not the newest one", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    // The page resized. This frame is on its way to the member, who is still looking at the first.
+    send?.({ sequence: 2, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    await vi.waitFor(() => expect(frames).toHaveLength(2));
+
+    socket.send(
+      encodeBrowserViewInput({
+        type: "pointer",
+        action: "down",
+        x: 0.5,
+        y: 0.25,
+        sequence: 1,
+        button: "left",
+        clickCount: 1,
+        deltaX: 0,
+        deltaY: 0,
+        modifiers: 0,
+      }),
+    );
+    // The frame the member named, not the newest one: expanding with frame 2 puts this at (200, 75).
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
+    socket.close();
+    await gateway.stop();
+  });
+
   it("closes invalidated views and rejects reuse of their session", async () => {
     let invalidate: (() => void) | undefined;
     const stop = vi.fn(async () => undefined);

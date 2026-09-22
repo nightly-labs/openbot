@@ -30,6 +30,7 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
  * behind must show the page as it is now, not replay the seconds the link was slow.
  */
 const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
+const REMEMBERED_FRAME_SIZES = 8;
 const MAX_SESSIONS = 4;
 const MAX_INPUT_MESSAGE_BYTES = 4 * 1024;
 
@@ -50,6 +51,12 @@ interface ManagedViewSession {
   /** The size of the last frame sent, which is what a fractional input coordinate refers to. */
   frameWidth: number;
   frameHeight: number;
+  /**
+   * The shape of each of the last few frames this session sent, by sequence. A client names the
+   * frame its point belongs to, and a frame sent since then must not be what the point is expanded
+   * with: the user aimed at pixels that were on their screen, not at pixels in transit.
+   */
+  frameSizes: Map<number, { width: number; height: number }>;
 }
 
 export class BrowserViewGateway {
@@ -75,6 +82,7 @@ export class BrowserViewGateway {
       stopView: null,
       frameWidth: 0,
       frameHeight: 0,
+      frameSizes: new Map(),
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
   }
@@ -158,6 +166,12 @@ export class BrowserViewGateway {
           client.send(encodeBrowserViewFrame(frame), { binary: true });
           session.frameWidth = frame.width;
           session.frameHeight = frame.height;
+          session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+          // A point names a frame the user was looking at, so only the recent ones are worth keeping.
+          for (const sequence of session.frameSizes.keys()) {
+            if (session.frameSizes.size <= REMEMBERED_FRAME_SIZES) break;
+            session.frameSizes.delete(sequence);
+          }
         },
         () => {
           void this.#closeSession(session, "Authentication changed the browser view. Open a new view to continue.");
@@ -182,14 +196,18 @@ export class BrowserViewGateway {
     }
     // Input that arrives before the first frame has no frame to be a fraction of.
     if (input.type === "pointer" && (session.frameWidth === 0 || session.frameHeight === 0)) return;
-    await this.#options.browser
-      .dispatchViewInput(
-        session.tabId,
-        input.type === "pointer"
-          ? { ...input, x: input.x * session.frameWidth, y: input.y * session.frameHeight }
-          : input,
-      )
-      .catch(() => undefined);
+    // A client from before the sequence field, or one naming a frame too old to be remembered, gets
+    // the newest frame: that is what every client got before a point could name its own frame.
+    const frame = (input.type === "pointer" && input.sequence !== undefined
+      ? session.frameSizes.get(input.sequence)
+      : undefined) ?? { width: session.frameWidth, height: session.frameHeight };
+    // The sequence names a frame on this socket. The page is dispatched pixels, and knows nothing
+    // about how they were carried here.
+    const dispatched =
+      input.type === "pointer"
+        ? { ...input, sequence: undefined, x: input.x * frame.width, y: input.y * frame.height }
+        : input;
+    await this.#options.browser.dispatchViewInput(session.tabId, dispatched).catch(() => undefined);
   }
 
   async #detach(session: ManagedViewSession, client: Ws.WebSocket): Promise<void> {

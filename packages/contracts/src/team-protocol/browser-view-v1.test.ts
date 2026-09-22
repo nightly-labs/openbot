@@ -50,6 +50,27 @@ describe("the browser view wire format", () => {
     expect(decodeBrowserViewInput(encodeBrowserViewInput(key))).toEqual(key);
   });
 
+  it("carries the frame a point belongs to, and reads a client that names none", () => {
+    const click: BrowserViewInput = {
+      type: "pointer",
+      action: "down",
+      x: 0.25,
+      y: 0.5,
+      sequence: 7,
+      button: "left",
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    expect(decodeBrowserViewInput(encodeBrowserViewInput(click))).toEqual(click);
+    // The field was added after this protocol shipped. A client from before it names no frame, and
+    // the decoded input must not invent one: the host reads that as the newest frame it sent.
+    const { sequence: _sequence, ...beforeTheField } = click;
+    expect(decodeBrowserViewInput(JSON.stringify(beforeTheField))).toEqual(beforeTheField);
+    expect(decodeBrowserViewInput(JSON.stringify(beforeTheField))).not.toHaveProperty("sequence");
+  });
+
   it("refuses input that a host would dispatch somewhere it cannot see", () => {
     const click = { type: "pointer", action: "down", x: 0.5, y: 0.5, button: "left", modifiers: 0 };
     // A fraction is the whole agreement about where the click lands: outside 0..1 the host would
@@ -61,6 +82,8 @@ describe("the browser view wire format", () => {
       { ...click, button: "back" },
       { ...click, clickCount: 40 },
       { ...click, modifiers: 999 },
+      { ...click, sequence: 0 },
+      { ...click, sequence: 1.5 },
       { type: "key", action: "char", key: "a", code: "KeyA", text: "a whole pasted paragraph" },
       { type: "clipboard", data: "secret" },
     ]) {

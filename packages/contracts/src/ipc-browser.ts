@@ -224,6 +224,8 @@ export type BrowserLiveViewInput =
       action: "move" | "down" | "up" | "wheel";
       x: number;
       y: number;
+      /** The frame the fraction belongs to, so the host expands it against that frame and no other. */
+      sequence?: number;
       button: "left" | "middle" | "right";
       clickCount?: number;
       deltaX?: number;
