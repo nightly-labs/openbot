@@ -888,6 +888,26 @@ fi
     await client.stop();
   });
 
+  it("corrects an answer the stream truncated after narration was published", async () => {
+    const { client, notifications, output, threadId } = await createHarness();
+    const turnId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    await startTurn(client, threadId, turnId);
+
+    output.push(streamDelta(threadId, turnId, "Plan."));
+    output.push(assistantMessage(threadId, "narration-message", "Plan."));
+    output.push(toolUseMessage(threadId, "tool-message", "tool-use-1", "Read"));
+    output.push(toolResultMessage(threadId, "tool-result", "tool-use-1"));
+    // The stream dropped a letter; the complete message is what Claude actually said.
+    output.push(streamDelta(threadId, turnId, "Helo"));
+    output.push(assistantMessage(threadId, "answer-message", "Hello"));
+    output.push(resultMessage(threadId, turnId, "Plan.Hello"));
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+
+    expect(narrationTexts(notifications)).toEqual(["Plan."]);
+    expect(answerText(notifications)).toBe("Hello");
+    await client.stop();
+  });
+
   it("keeps narration out of the answer when Claude omits stream deltas", async () => {
     const { client, notifications, output, threadId } = await createHarness();
     const turnId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

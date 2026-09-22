@@ -72,6 +72,8 @@ interface ActiveTurn {
   text: string;
   /** Every assistant character this turn has produced, which is what a repeat is measured against. */
   seenText: string;
+  /** What the narration already took, which the answer can no longer be rewritten over. */
+  publishedText: string;
   narrationCount: number;
   thinking: string;
   thinkingStarted: boolean;
@@ -499,6 +501,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       reasoningItemId: `${turnId}:reasoning`,
       text: "",
       seenText: "",
+      publishedText: "",
       narrationCount: 0,
       thinking: "",
       thinkingStarted: false,
@@ -650,10 +653,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const completeText = [...turn.assistantMessages.values()].join("");
       if (completeText.startsWith(turn.seenText)) {
         this.#bufferText(runtime, completeText.slice(turn.seenText.length));
-      } else if (completeText && turn.narrationCount === 0) {
-        // The stream and the complete messages disagree. Nothing is published yet, so the complete
-        // messages win, as they did before any of this turn's text could be held back.
-        turn.text = completeText;
+      } else if (completeText.length > 0 && completeText.startsWith(turn.publishedText)) {
+        /* The stream and the complete messages disagree, and the complete messages are the ones
+           Claude stands behind. They can only rewrite what no step boundary has published yet, so
+           the narration is left alone and the answer takes the rest. */
+        turn.text = completeText.slice(turn.publishedText.length);
         turn.seenText = completeText;
       }
       if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
@@ -738,6 +742,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       },
     });
     turn.narrationCount += 1;
+    turn.publishedText += turn.text;
     turn.text = "";
   }
 
