@@ -87,6 +87,10 @@ one out and that half keeps the default. The choice applies to this pull request
 written back, so the next one starts from the defaults again — and the review comment records under
 `Review details` which reviewer actually ran.
 
+`NorbiAI-Effort` reaches `gpt-6-astra` only. A `chatgpt-web/*` slug carries its own level — the
+`high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair the effort with
+`gpt-6-astra` or it changes nothing.
+
 The same two directives work in a `/norbiai review` comment, where they override the description for
 that one run. On a pull request from a fork only the comment is read: the description belongs to
 whoever opened the pull request, and choosing your own reviewer is not theirs to do.

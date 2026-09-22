@@ -144,7 +144,11 @@ jobs:
       # scoped to that one run: nothing here is written back, so the next pull request
       # starts from these values again.
       DEFAULT_MODEL: chatgpt-web/high
-      DEFAULT_EFFORT: xhigh
+      # Only `gpt-6-astra` reads this. A `chatgpt-web/*` slug carries its own level — the
+      # `high` in `chatgpt-web/high` is the reasoning level, already chosen — so the effort
+      # passed alongside it is ignored, and the default stays at the cheapest value rather
+      # than implying a depth the bridge models never got.
+      DEFAULT_EFFORT: low
       # An override is untrusted free text, and it reaches a command line. Membership in
       # these lists is the whole validation: anything else is refused and the default runs
       # instead, so a typo reviews at full strength rather than silently at none. Extend a
@@ -152,7 +156,9 @@ jobs:
       ALLOWED_MODELS: >-
         chatgpt-web/extra-high chatgpt-web/high chatgpt-web/medium chatgpt-web/pro
         gpt-6-astra
-      ALLOWED_EFFORTS: minimal low medium high xhigh
+      # What `gpt-6-astra` accepts, which is the only model the effort reaches. `minimal` is
+      # not on its list, so offering it would only buy a refused run.
+      ALLOWED_EFFORTS: low medium high xhigh max ultra
 
     steps:
       - name: Checkout repository
