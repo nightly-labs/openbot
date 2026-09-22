@@ -209,7 +209,7 @@ function describeTenant(
   state: HostUpdateState | null,
   processes: HostStatusInput["processes"],
   now: number,
-  stale: boolean,
+  suppressCountdown: boolean,
 ): HostTenantReport {
   const { status } = entry;
   // Waiting mirrors the host's main-process check; stopping waits for every bundle process to exit.
@@ -259,9 +259,9 @@ function describeTenant(
       : state?.phase === "released"
         ? releasedBlocker(status, state)
         : waitingBlocker(status, state, processMatch, now);
-  // A stalled daemon honours no countdown: it reads neither the grace period nor the process list.
+  // A stalled daemon honours no countdown, and an unregistered process empties the host's idle map.
   const readyInMs =
-    !stale && state?.phase === "waiting" && idleForMs !== null && blocker === null
+    !suppressCountdown && state?.phase === "waiting" && idleForMs !== null && blocker === null
       ? Math.max(0, HOST_IDLE_GRACE_MS - idleForMs)
       : null;
   return { ...report, readyInMs, blocker };
@@ -317,11 +317,23 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
   const { config, state, now } = input;
   const registered = config?.tenants ?? [];
   const stateAgeMs = state ? now - state.updatedAt : null;
+  const unregisteredMain = [
+    ...new Set(
+      input.processes.filter((process) => process.main && !registered.includes(process.uid)).map((p) => p.uid),
+    ),
+  ];
+  // HostManager.#waitForIdle clears its idle map and returns without publishing while an unregistered
+  // main process runs. A state that stops advancing then is not proof of a stopped daemon, but the
+  // host counts no grace either, so the countdowns still go.
+  const waitingOnUnregistered = state?.phase === "waiting" && unregisteredMain.length > 0;
   const stateStale =
     (state?.phase === "waiting" || state?.phase === "stopping") &&
     stateAgeMs !== null &&
-    stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS;
-  const tenants = input.tenants.map((entry) => describeTenant(entry, state, input.processes, now, stateStale));
+    stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS &&
+    !waitingOnUnregistered;
+  const tenants = input.tenants.map((entry) =>
+    describeTenant(entry, state, input.processes, now, stateStale || waitingOnUnregistered),
+  );
   const partial = {
     managed: config?.managed === true,
     daemonRunning: input.daemonRunning,
@@ -336,13 +348,7 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     unregisteredProcesses: [
       ...new Set(input.processes.filter((process) => !registered.includes(process.uid)).map((p) => p.uid)),
     ],
-    unregisteredMain: [
-      ...new Set(
-        input.processes
-          .filter((process) => process.main && !registered.includes(process.uid))
-          .map((process) => process.uid),
-      ),
-    ],
+    unregisteredMain,
     remainingProcesses: input.processes.length,
     tenants,
   };

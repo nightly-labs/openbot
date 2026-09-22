@@ -496,6 +496,19 @@ describe("host status reporting", () => {
     expect(idle.summary).toContain("No update is staged");
   });
 
+  it("does not call a live daemon stalled while an unregistered process holds the idle map", () => {
+    const input = statusInput();
+    const report = describeHostStatus({
+      ...input,
+      processes: [...input.processes, { uid: 700, pid: 70, main: true }],
+      state: { phase: "waiting", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW - 90_000, error: null },
+    });
+    // The host stops publishing in this condition, so an old state proves nothing about the daemon.
+    expect(report.stateStale).toBe(false);
+    expect(report.summary).toContain("unregistered UID 700");
+    expect(report.tenants.map((tenant) => tenant.readyInMs)).toEqual([null, null]);
+  });
+
   it("identifies an unregistered helper that holds the bundle during stopping", () => {
     const input = statusInput();
     const report = describeHostStatus({
