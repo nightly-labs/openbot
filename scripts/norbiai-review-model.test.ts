@@ -132,6 +132,27 @@ describe("NorbiAI reviewer selection", () => {
     expect(model).toBe(defaults.model);
   });
 
+  // Found on the pull request that added this feature: its description documented the
+  // directive in a fenced example, the example sat below the real one, and `tail -1` handed
+  // the review to the documentation. A quoted line is not a request.
+  it("does not read a directive quoted in a fenced example", () => {
+    const { model } = resolve({
+      description: ["<!-- NorbiAI-Model: chatgpt-web/medium -->", "", "```", "NorbiAI-Model: gpt-6-astra", "```"].join(
+        "\n",
+      ),
+    });
+
+    expect(model).toBe("chatgpt-web/medium");
+  });
+
+  it("reads a directive that follows a fenced example, so the fence does not swallow the rest", () => {
+    const { model } = resolve({
+      description: ["```", "NorbiAI-Model: gpt-6-astra", "```", "", "NorbiAI-Model: chatgpt-web/medium"].join("\n"),
+    });
+
+    expect(model).toBe("chatgpt-web/medium");
+  });
+
   // The effort only reaches gpt-6-astra: a chatgpt-web slug carries its own level, and the
   // list has to stay the one that model accepts or an allowed value buys a refused run.
   it("offers exactly the reasoning levels gpt-6-astra supports", () => {

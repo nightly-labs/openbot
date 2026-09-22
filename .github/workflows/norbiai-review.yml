@@ -246,13 +246,22 @@ jobs:
         run: |
           set -euo pipefail
 
+          # A fenced block is quoted text, not a request. A pull request that documents this
+          # feature shows the directive in an example, and without this the example wins the
+          # `tail -1` below and the pull request silently reviews on whatever its own
+          # documentation happens to name — which is how this guard was found.
+          prose() {
+            awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; next } !fenced'
+          }
+
           # `NorbiAI-Model: <model>` and `NorbiAI-Effort: <effort>`, each on a line of its
           # own, optionally wrapped in an HTML comment so the pull request description does
           # not have to show it. The last one wins, so an edit appended to the description
           # replaces an earlier choice rather than losing to it. The value charset stops
           # here at what a model slug can contain; membership decides the rest.
           directive() {
-            grep -oiE "^[[:space:]]*(<!--[[:space:]]*)?norbiai-$1:[[:space:]]*[A-Za-z0-9._/-]+" |
+            prose |
+              grep -oiE "^[[:space:]]*(<!--[[:space:]]*)?norbiai-$1:[[:space:]]*[A-Za-z0-9._/-]+" |
               tail -1 | sed -E 's/.*:[[:space:]]*//' || true
           }
 
@@ -269,7 +278,7 @@ jobs:
           if [ "$SAME_REPO" = "true" ]; then
             pr_model=$(directive model < "$PR_BODY_FILE")
             pr_effort=$(directive effort < "$PR_BODY_FILE")
-          elif grep -qiE '^[[:space:]]*(<!--[[:space:]]*)?norbiai-(model|effort):' "$PR_BODY_FILE"; then
+          elif prose < "$PR_BODY_FILE" | grep -qiE '^[[:space:]]*(<!--[[:space:]]*)?norbiai-(model|effort):'; then
             echo "::warning title=NorbiAI ignored a fork's reviewer override::The description of a pull request from a fork cannot choose the model. Put the directive in the /norbiai review comment instead."
           fi
 

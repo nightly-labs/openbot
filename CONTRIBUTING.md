@@ -82,8 +82,9 @@ NorbiAI-Model: chatgpt-web/pro
 NorbiAI-Effort: high
 ```
 
-Wrap a directive in `<!-- -->` to keep it out of the rendered description. Each is optional: leave
-one out and that half keeps the default. The choice applies to this pull request only — nothing is
+Wrap a directive in `<!-- -->` to keep it out of the rendered description. A directive inside a
+fenced code block is an example and is not read, so a pull request may show one without changing its
+own review. Each is optional: leave one out and that half keeps the default. The choice applies to this pull request only — nothing is
 written back, so the next one starts from the defaults again — and the review comment records under
 `Review details` which reviewer actually ran.
 
