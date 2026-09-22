@@ -114,6 +114,7 @@ describe("NorbiAI reviewer selection", () => {
     ["model", "NorbiAI-Model: evil; rm -rf /"],
     ["model", "NorbiAI-Model: gpt-9-nonexistent"],
     ["reasoning effort", "NorbiAI-Effort: minimal"],
+    ["reasoning effort", "NorbiAI-Effort: ultra"],
   ])("refuses an unlisted %s and reviews on the default", (label, description) => {
     const { model, effort, log } = resolve({ description });
 
@@ -162,7 +163,7 @@ describe("NorbiAI reviewer selection", () => {
   // convenient channel - able to lift it.
   it.each([
     ["the description", { description: "NorbiAI-Model: gpt-6-astra\nNorbiAI-Effort: xhigh" }],
-    ["the request comment", { comment: "/norbiai review\nNorbiAI-Model: gpt-6-astra\nNorbiAI-Effort: ultra" }],
+    ["the request comment", { comment: "/norbiai review\nNorbiAI-Model: gpt-6-astra\nNorbiAI-Effort: xhigh" }],
   ])("caps gpt-6-astra at low however %s asks", (_source, request) => {
     const { model, effort, log } = resolve(request);
 
@@ -281,10 +282,12 @@ describe("NorbiAI reviewer selection", () => {
     expect(job.env.EFFORT_MODELS.split(" ")).toContain(job.env.CAPPED_MODEL);
   });
 
-  // The effort only reaches gpt-6-astra: a chatgpt-web slug carries its own level, and the
-  // list has to stay the one that model accepts or an allowed value buys a refused run.
+  // The effort only reaches gpt-6-astra: a chatgpt-web slug carries its own level. The list
+  // is what that model accepts, less `max` and `ultra`, which are withheld on purpose — so
+  // the assertion is exact rather than a subset check, and putting one back has to be a
+  // decision made here too.
   it("offers exactly the reasoning levels gpt-6-astra supports", () => {
-    expect(job.env.ALLOWED_EFFORTS.split(" ")).toEqual(["low", "medium", "high", "xhigh", "max", "ultra"]);
+    expect(job.env.ALLOWED_EFFORTS.split(" ")).toEqual(["low", "medium", "high", "xhigh"]);
     expect(job.env.ALLOWED_MODELS.split(" ")).toContain("gpt-6-astra");
     expect(job.env.ALLOWED_MODELS.split(" ")).toContain(job.env.DEFAULT_MODEL);
     expect(job.env.ALLOWED_EFFORTS.split(" ")).toContain(job.env.DEFAULT_EFFORT);

@@ -156,9 +156,11 @@ jobs:
       ALLOWED_MODELS: >-
         chatgpt-web/extra-high chatgpt-web/high chatgpt-web/medium chatgpt-web/pro
         gpt-6-astra
-      # What `gpt-6-astra` accepts, which is the only model the effort reaches. `minimal` is
-      # not on its list, so offering it would only buy a refused run.
-      ALLOWED_EFFORTS: low medium high xhigh max ultra
+      # What `gpt-6-astra` accepts, less the two longest. `minimal` is not on the model's own
+      # list, so offering it would only buy a refused run; `max` and `ultra` are on it and are
+      # withheld by an explicit decision. Offering a level nobody should pick invites the run
+      # that holds a merge for a quarter of an hour.
+      ALLOWED_EFFORTS: low medium high xhigh
       # `gpt-6-astra` never runs above `low`, by an explicit decision. Held as a ceiling
       # applied after the override rather than as a shorter `ALLOWED_EFFORTS`, so the cap
       # stays attached to this one model and a request for more is answered with a warning
