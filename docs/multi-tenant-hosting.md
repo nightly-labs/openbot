@@ -208,9 +208,12 @@ cycle. A `stopping` blocker comes from the process list alone, because the host 
 status in that phase; the tenant report is still read there for the version and health columns.
 A staged version is named only while one is pending, because the host keeps its version field after
 a finished update. A failed process scan makes `status` fail and `watch` report the reading as
-unavailable; it never becomes an empty process list. An OpenBot process under an
-unregistered UID is always listed on its own line, and it becomes the summary only in `waiting`,
-the one phase where the host treats it as a blocker. When a `waiting` or `stopping` state stops
+unavailable; it never becomes an empty process list. A tenant gets a blocker only in `waiting`,
+`stopping`, and `released`, the phases whose rules read that information; in every other phase its
+report is still shown, but it blocks nothing. An OpenBot process under an unregistered UID is always
+listed on its own line, helpers included, because a helper alone still holds the bundle during
+`stopping`. That process becomes the summary only in `waiting`, and only for a main process,
+the one case the host treats as a blocker. When a `waiting` or `stopping` state stops
 advancing, the summary reports the stalled daemon and gives no countdown, because a daemon that
 does not poll can start neither the shutdown nor the installation.
 

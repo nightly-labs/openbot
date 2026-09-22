@@ -156,8 +156,10 @@ export interface HostStatusReport {
   stateStale: boolean;
   /** Registered version field of the host state. Its meaning depends on the phase. */
   stateVersion: string | null;
-  /** Main OpenBot processes outside the registered set. Each one stops the host from starting maintenance. */
+  /** Every UID outside the registered set with a bundle process. A helper alone still blocks `stopping`. */
   unregisteredProcesses: number[];
+  /** Unregistered main processes. Only these clear the host's idle map while it waits. */
+  unregisteredMain: number[];
   /** Bundle processes that still keep the host from replacing the application. */
   remainingProcesses: number;
   summary: string;
@@ -225,8 +227,14 @@ function describeTenant(
     healthy: false,
   };
   const empty = { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null };
+  // Only these phases read tenant status. In any other phase a missing or stale report blocks nothing,
+  // so the activity columns still show it, but it is never named as a blocker.
+  const usesStatus = state?.phase === "waiting" || state?.phase === "released";
   if (stopping && !status) return { ...empty, blocker: anyProcess ? "still running" : null };
-  if (!status) return { ...empty, blocker: anyProcess ? "runs without a status report" : "no status report" };
+  if (!status) {
+    if (!usesStatus) return { ...empty, blocker: null };
+    return { ...empty, blocker: anyProcess ? "runs without a status report" : "no status report" };
+  }
   const heartbeatAgeMs = now - status.heartbeatAt;
   const fresh = heartbeatAgeMs >= 0 && heartbeatAgeMs <= HOST_HEARTBEAT_TIMEOUT_MS;
   const idleForMs = status.idleSince === null ? null : Math.max(0, now - status.idleSince);
@@ -244,13 +252,13 @@ function describeTenant(
     idleForMs,
   };
   if (stopping) return { ...report, readyInMs: null, blocker: anyProcess ? "still running" : null };
-  const blocker = !fresh
-    ? "stale status report"
-    : state?.phase === "released"
-      ? releasedBlocker(status, state)
-      : state?.phase === "waiting"
-        ? waitingBlocker(status, state, processMatch, now)
-        : null;
+  const blocker = !usesStatus
+    ? null
+    : !fresh
+      ? "stale status report"
+      : state?.phase === "released"
+        ? releasedBlocker(status, state)
+        : waitingBlocker(status, state, processMatch, now);
   // A stalled daemon honours no countdown: it reads neither the grace period nor the process list.
   const readyInMs =
     !stale && state?.phase === "waiting" && idleForMs !== null && blocker === null
@@ -269,8 +277,8 @@ function summarize(report: Omit<HostStatusReport, "summary">): string {
   }
   // HostManager.#waitForIdle clears the idle map for an unregistered main process. No other phase
   // reads it that way, and this text must not hide an installation warning or a failure reason.
-  if (report.unregisteredProcesses.length && report.phase === "waiting") {
-    return `OpenBot runs under unregistered UID ${report.unregisteredProcesses.join(", ")}. The host cannot start maintenance until it quits.`;
+  if (report.unregisteredMain.length && report.phase === "waiting") {
+    return `OpenBot runs under unregistered UID ${report.unregisteredMain.join(", ")}. The host cannot start maintenance until it quits.`;
   }
   switch (report.phase) {
     case null:
@@ -326,6 +334,9 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     stateAgeMs,
     stateStale,
     unregisteredProcesses: [
+      ...new Set(input.processes.filter((process) => !registered.includes(process.uid)).map((p) => p.uid)),
+    ],
+    unregisteredMain: [
       ...new Set(
         input.processes
           .filter((process) => process.main && !registered.includes(process.uid))

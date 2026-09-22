@@ -475,7 +475,38 @@ describe("host status reporting", () => {
     };
     const report = await collectHostStatus(f.ops, NOW);
     expect(report.daemonRunning).toBe(false);
-    expect(report.tenants).toEqual([expect.objectContaining({ uid: 501, name: null, blocker: "no status report" })]);
+    // No host state means no phase reads tenant status, so a missing report blocks nothing.
+    expect(report.tenants).toEqual([
+      expect.objectContaining({ uid: 501, name: null, reporting: false, blocker: null }),
+    ]);
+    f.ops.readState = async () => ({ phase: "waiting", cycle: "c", version: "0.18.0", updatedAt: NOW, error: null });
+    const waiting = await collectHostStatus(f.ops, NOW);
+    expect(waiting.tenants[0]?.blocker).toBe("no status report");
+  });
+
+  it("names no blocker in a phase whose rules never read tenant status", () => {
+    const input = statusInput();
+    const idle = describeHostStatus({
+      ...input,
+      processes: [],
+      tenants: input.tenants.map((tenant) => ({ ...tenant, status: null })),
+      state: { phase: "idle", cycle: "", version: null, updatedAt: NOW, error: null },
+    });
+    expect(idle.tenants.map((tenant) => tenant.blocker)).toEqual([null, null]);
+    expect(idle.summary).toContain("No update is staged");
+  });
+
+  it("identifies an unregistered helper that holds the bundle during stopping", () => {
+    const input = statusInput();
+    const report = describeHostStatus({
+      ...input,
+      processes: [{ uid: 700, pid: 71, main: false }],
+      state: { phase: "stopping", cycle: "cycle-one", version: "0.18.0", updatedAt: NOW, error: null },
+    });
+    expect(report.unregisteredProcesses).toEqual([700]);
+    // A helper alone never clears the host's idle map, so it is not the waiting summary.
+    expect(report.unregisteredMain).toEqual([]);
+    expect(formatHostStatus(report)).toContain("Unregistered OpenBot processes under UID 700");
   });
 
   it.each<{ args: string[]; ms: number }>([
