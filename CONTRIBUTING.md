@@ -99,7 +99,9 @@ whoever opened the pull request, and choosing your own reviewer is not theirs to
 
 `ALLOWED_MODELS` and `ALLOWED_EFFORTS` in the workflow file are the accepted values. Anything else
 is refused with a warning and the default runs instead, so a typo reviews at full strength rather
-than at none. The review still has to finish inside the job's own time limit, whichever model runs.
+than at none. The value is the whole rest of the line, so keep the directive on its own: a trailing
+note makes the line unrecognised rather than being trimmed off it. The review still has to finish
+inside the job's own time limit, whichever model runs.
 
 ## Security-sensitive changes
 

@@ -46,6 +46,7 @@ function resolve({ description = "", comment = "", fork = false }: Request) {
       ALLOWED_EFFORTS: job.env.ALLOWED_EFFORTS,
       CAPPED_MODEL: job.env.CAPPED_MODEL,
       CAPPED_MODEL_EFFORT: job.env.CAPPED_MODEL_EFFORT,
+      EFFORT_MODELS: job.env.EFFORT_MODELS,
       PR_BODY_FILE: bodyPath,
       SAME_REPO: fork ? "false" : "true",
       COMMENT_BODY: comment,
@@ -58,7 +59,7 @@ function resolve({ description = "", comment = "", fork = false }: Request) {
     const separator = line.indexOf("=");
     chosen.set(line.slice(0, separator), line.slice(separator + 1));
   }
-  return { model: chosen.get("model"), effort: chosen.get("effort"), log };
+  return { model: chosen.get("model"), effort: chosen.get("effort"), reviewer: chosen.get("reviewer"), log };
 }
 
 const defaults = { model: job.env.DEFAULT_MODEL, effort: job.env.DEFAULT_EFFORT };
@@ -176,9 +177,37 @@ describe("NorbiAI reviewer selection", () => {
     expect(log).not.toContain("capped the reasoning effort");
   });
 
+  // Membership is the only validation, so it has to see the whole value. Both of these
+  // answered a request nobody made: the first read a prefix as a clean slug, the second
+  // refused a directive that is valid but written without a space after `<!--`.
+  it("refuses a value the author did not finish cleanly, rather than reading its prefix", () => {
+    const { model, log } = resolve({ description: "NorbiAI-Model: chatgpt-web/medium; typo" });
+
+    expect(model).toBe(defaults.model);
+    expect(log).toContain("::warning title=NorbiAI ignored an unknown model");
+  });
+
+  it("reads a directive in an HTML comment written without spaces", () => {
+    const { model } = resolve({ description: "<!--NorbiAI-Model: chatgpt-web/medium-->" });
+
+    expect(model).toBe("chatgpt-web/medium");
+  });
+
+  // The published review says what ran. Naming an effort beside a chatgpt-web slug described
+  // a setting that model never read, and a reader asking why a review was shallow would have
+  // blamed the wrong knob.
+  it("reports the effort only for a model that reads it", () => {
+    expect(resolve({ description: "NorbiAI-Model: gpt-6-astra" }).reviewer).toBe("gpt-6-astra, reasoning effort low");
+    expect(resolve({ description: "NorbiAI-Model: chatgpt-web/pro\nNorbiAI-Effort: xhigh" }).reviewer).toBe(
+      "chatgpt-web/pro",
+    );
+  });
+
   it("pins the cap to gpt-6-astra at low", () => {
     expect(job.env.CAPPED_MODEL).toBe("gpt-6-astra");
     expect(job.env.CAPPED_MODEL_EFFORT).toBe("low");
+    // Capping a model that never reads the effort would cap nothing.
+    expect(job.env.EFFORT_MODELS.split(" ")).toContain(job.env.CAPPED_MODEL);
   });
 
   // The effort only reaches gpt-6-astra: a chatgpt-web slug carries its own level, and the

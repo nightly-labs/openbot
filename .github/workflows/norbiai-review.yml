@@ -165,6 +165,11 @@ jobs:
       # that says why, not a silent substitution.
       CAPPED_MODEL: gpt-6-astra
       CAPPED_MODEL_EFFORT: low
+      # Which models read the effort at all. A `chatgpt-web/*` slug carries its own level, so
+      # naming an effort beside one describes a setting that did nothing — which is what the
+      # published review used to report. The list decides what that review says, and a model
+      # added here has to be one that really takes the setting.
+      EFFORT_MODELS: gpt-6-astra
 
     steps:
       - name: Checkout repository
@@ -263,12 +268,19 @@ jobs:
           # `NorbiAI-Model: <model>` and `NorbiAI-Effort: <effort>`, each on a line of its
           # own, optionally wrapped in an HTML comment so the pull request description does
           # not have to show it. The last one wins, so an edit appended to the description
-          # replaces an earlier choice rather than losing to it. The value charset stops
-          # here at what a model slug can contain; membership decides the rest.
+          # replaces an earlier choice rather than losing to it.
+          #
+          # The value is the whole rest of the line, closing `-->` aside, because membership
+          # is the only validation and it can only be trusted if it sees everything that was
+          # written. Matching a slug charset instead read a prefix: `chatgpt-web/medium; typo`
+          # passed as a clean `chatgpt-web/medium`, and an unspaced `<!--NorbiAI-Model:
+          # gpt-6-astra-->` kept its `--` and was refused while being perfectly valid. Both
+          # answered a request nobody made.
           directive() {
             prose |
-              grep -oiE "^[[:space:]]*(<!--[[:space:]]*)?norbiai-$1:[[:space:]]*[A-Za-z0-9._/-]+" |
-              tail -1 | sed -E 's/.*:[[:space:]]*//' || true
+              grep -iE "^[[:space:]]*(<!--[[:space:]]*)?norbiai-$1:" |
+              tail -1 |
+              sed -E 's/^[^:]*:[[:space:]]*//; s/[[:space:]]*(-->)?[[:space:]]*$//' || true
           }
 
           comment_model=$(printf '%s\n' "${COMMENT_BODY:-}" | directive model)
@@ -331,9 +343,19 @@ jobs:
             effort=$CAPPED_MODEL_EFFORT
           fi
 
+          # What the published review says ran. The effort is named only where it reached
+          # something: reporting `chatgpt-web/high, reasoning effort low` would describe a
+          # setting that model never read, and a reader checking why a review was shallow
+          # would blame the wrong knob.
+          reviewer=$model
+          case " $EFFORT_MODELS " in
+            *" $model "*) reviewer="$model, reasoning effort $effort" ;;
+          esac
+
           {
             echo "model=$model"
             echo "effort=$effort"
+            echo "reviewer=$reviewer"
           } >> "$GITHUB_OUTPUT"
 
       - name: Load previous findings and author responses
@@ -709,8 +731,7 @@ jobs:
           LINES_REMOVED: ${{ steps.review.outputs.lines_removed }}
           DIFF_BYTES: ${{ steps.review.outputs.diff_bytes }}
           LARGE_PR: ${{ steps.review.outputs.large_pr }}
-          MODEL: ${{ steps.reviewer.outputs.model }}
-          EFFORT: ${{ steps.reviewer.outputs.effort }}
+          REVIEWER: ${{ steps.reviewer.outputs.reviewer }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set +e
@@ -766,7 +787,7 @@ jobs:
             - Files changed: ${FILES_CHANGED:-unknown}
             - Lines: +${LINES_ADDED:-unknown} / -${LINES_REMOVED:-unknown}
             - Diff size: ${DIFF_BYTES:-unknown} bytes
-            - Reviewer: ${MODEL:-unknown}, reasoning effort ${EFFORT:-unknown}
+            - Reviewer: ${REVIEWER:-unknown}
             - Status: success
             - [Workflow run](${run_url})
 
