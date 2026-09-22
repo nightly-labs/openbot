@@ -82,10 +82,26 @@ export function browserEnvironment(value: unknown): BrowserEnvironment | null {
 const X_HOSTS = new Set(["x.com", "www.x.com"]);
 export const X_LANDING_URL = "https://x.com/";
 
-export function persistentBrowserUrl(value: string): string {
+export function persistentBrowserUrl(value: string, options: { popup?: boolean } = {}): string {
   const url = new URL(value);
   if (X_HOSTS.has(url.hostname) && url.pathname === "/i/jf/onboarding/web") {
     return X_LANDING_URL;
+  }
+  if (options.popup) {
+    // A restart cannot resume the popup's live authorization exchange. Keep ordinary
+    // query parameters, but do not save or replay callback credentials.
+    url.username = "";
+    url.password = "";
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    let changedFragment = false;
+    for (const key of ["code", "state", "access_token", "id_token", "refresh_token", "oauth_token", "oauth_verifier"]) {
+      url.searchParams.delete(key);
+      if (fragment.has(key)) {
+        fragment.delete(key);
+        changedFragment = true;
+      }
+    }
+    if (changedFragment) url.hash = fragment.toString();
   }
   return url.toString();
 }
