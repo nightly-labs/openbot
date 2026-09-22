@@ -21,6 +21,7 @@ export interface AppLanguageOption {
 const LABELS: Record<AppLanguage, AppLanguageOption> = {
   system: { id: "system", label: "System default" },
   en: { id: "en", label: "English", lang: "en" },
+  fr: { id: "fr", label: "Français", lang: "fr" },
   ja: { id: "ja", label: "日本語", lang: "ja" },
 };
 
