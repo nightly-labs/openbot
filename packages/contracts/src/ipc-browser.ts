@@ -9,6 +9,10 @@ export interface BrowserTab {
   environment?: BrowserEnvironment;
   recording?: boolean;
   diagnosticErrorCount?: number;
+  /** Live local popup relationship; not restored after an app restart. */
+  openerTabId?: string;
+  /** Local popup failure, without authentication URLs or request data. */
+  popupFailure?: { id: string; message: string };
 }
 
 export type BrowserImageMode = "auto" | "always" | "never";
