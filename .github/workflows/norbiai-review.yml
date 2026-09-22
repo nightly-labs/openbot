@@ -261,8 +261,29 @@ jobs:
           # feature shows the directive in an example, and without this the example wins the
           # `tail -1` below and the pull request silently reviews on whatever its own
           # documentation happens to name — which is how this guard was found.
+          # The fence that opens a block is the one that closes it: a longer fence quotes a
+          # shorter one, which is how a Markdown example of a fenced block is written. A plain
+          # toggle let the inner ``` of a ````-quoted example end the exclusion, and the
+          # directive below it went back to being a request. Intervals like `{3,}` are avoided
+          # because not every awk on a runner has them.
           prose() {
-            awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; next } !fenced'
+            awk '
+              {
+                marker = $0
+                sub(/^[[:space:]]+/, "", marker)
+                char = substr(marker, 1, 1)
+                if (char == "`" || char == "~") {
+                  len = 0
+                  while (substr(marker, len + 1, 1) == char) len++
+                  if (len >= 3) {
+                    if (!fenced) { fenced = 1; fence_char = char; fence_len = len }
+                    else if (char == fence_char && len >= fence_len) { fenced = 0 }
+                    next
+                  }
+                }
+                if (!fenced) print
+              }
+            '
           }
 
           # `NorbiAI-Model: <model>` and `NorbiAI-Effort: <effort>`, each on a line of its
@@ -300,6 +321,20 @@ jobs:
             echo "::warning title=NorbiAI ignored a fork's reviewer override::The description of a pull request from a fork cannot choose the model. Put the directive in the /norbiai review comment instead."
           fi
 
+          # Exact membership, one entry at a time. `case " $list " in *" $value "*)` reads as
+          # the same test and is not one: two allowed words joined by a space are a substring
+          # of the list, so `chatgpt-web/high chatgpt-web/medium` passed as a single model name
+          # and reached the command line as one.
+          listed() {
+            local entry
+            for entry in $2; do
+              if [ "$1" = "$entry" ]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
           resolved=""
           choose() {
             local label=$1 requested="" origin=""
@@ -317,13 +352,11 @@ jobs:
               return
             fi
 
-            case " $5 " in
-              *" $requested "*)
-                resolved=$requested
-                echo "Using ${label} ${requested} from ${origin}."
-                return
-                ;;
-            esac
+            if listed "$requested" "$5"; then
+              resolved=$requested
+              echo "Using ${label} ${requested} from ${origin}."
+              return
+            fi
 
             echo "::warning title=NorbiAI ignored an unknown ${label}::\`${requested}\` in ${origin} is not one of: ${5}. Reviewing with \`${4}\` instead."
             resolved=$4
@@ -348,9 +381,9 @@ jobs:
           # setting that model never read, and a reader checking why a review was shallow
           # would blame the wrong knob.
           reviewer=$model
-          case " $EFFORT_MODELS " in
-            *" $model "*) reviewer="$model, reasoning effort $effort" ;;
-          esac
+          if listed "$model" "$EFFORT_MODELS"; then
+            reviewer="$model, reasoning effort $effort"
+          fi
 
           {
             echo "model=$model"

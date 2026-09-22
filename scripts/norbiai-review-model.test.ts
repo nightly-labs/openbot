@@ -193,6 +193,52 @@ describe("NorbiAI reviewer selection", () => {
     expect(model).toBe("chatgpt-web/medium");
   });
 
+  // Two allowed words joined by a space are a substring of the allowlist, so a membership
+  // test written as a substring test accepted them and put both on one command line.
+  it.each([
+    ["model", "NorbiAI-Model: chatgpt-web/high chatgpt-web/medium"],
+    ["reasoning effort", "NorbiAI-Effort: low medium"],
+  ])("refuses two allowed %s values given as one", (label, description) => {
+    const { model, effort, log } = resolve({ description });
+
+    expect({ model, effort }).toEqual(defaults);
+    expect(log).toContain(`::warning title=NorbiAI ignored an unknown ${label}`);
+  });
+
+  // A longer fence quotes a shorter one, which is how a Markdown example of a fenced block is
+  // written. Toggling on every fence let the inner one end the exclusion and handed the review
+  // back to the example.
+  it("keeps a directive quoted by a longer fence out of the choice", () => {
+    const { model } = resolve({
+      description: [
+        "<!-- NorbiAI-Model: chatgpt-web/medium -->",
+        "",
+        "````",
+        "```",
+        "NorbiAI-Model: gpt-6-astra",
+        "```",
+        "````",
+      ].join("\n"),
+    });
+
+    expect(model).toBe("chatgpt-web/medium");
+  });
+
+  it("does not let a fence of the other character close an open block", () => {
+    const { model } = resolve({
+      description: [
+        "<!-- NorbiAI-Model: chatgpt-web/medium -->",
+        "",
+        "```",
+        "~~~",
+        "NorbiAI-Model: gpt-6-astra",
+        "```",
+      ].join("\n"),
+    });
+
+    expect(model).toBe("chatgpt-web/medium");
+  });
+
   // The published review says what ran. Naming an effort beside a chatgpt-web slug described
   // a setting that model never read, and a reader asking why a review was shallow would have
   // blamed the wrong knob.
