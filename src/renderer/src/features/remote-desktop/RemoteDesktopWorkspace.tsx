@@ -1,6 +1,6 @@
 import type { RemoteDesktopErrorCode, RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
-import { Portal } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { type JSX, Portal } from "@solidjs/web";
+import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { z } from "zod";
 import {
   ArrowLeft,
@@ -16,6 +16,10 @@ import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
 interface RemoteDesktopWorkspaceProps {
+  mount?: HTMLElement;
+  testControls?: JSX.Element;
+  viewOnly?: boolean;
+  onViewerState?: (state: ViewerState) => void;
   visible: boolean;
   platform: "darwin" | "win32" | "linux";
   server: ServerSummary;
@@ -106,14 +110,17 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     const parsed = viewerMessageSchema.safeParse(event.data);
     if (!parsed.success || parsed.data.sessionId !== session.id) return;
     setViewerState(parsed.data.state);
+    props.onViewerState?.(parsed.data.state);
     setViewerError(
       parsed.data.state === "error"
         ? errorMessage(parsed.data.message, "Remote control failed. Reconnect and try again.")
         : null,
     );
   };
-  window.addEventListener("message", receiveViewerState);
-  onCleanup(() => window.removeEventListener("message", receiveViewerState));
+  onSettled(() => {
+    window.addEventListener("message", receiveViewerState);
+    return () => window.removeEventListener("message", receiveViewerState);
+  });
 
   async function retry() {
     if (actionBusy()) return;
@@ -159,7 +166,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
   }
 
   return (
-    <Portal>
+    <Portal mount={props.mount}>
       <main
         ref={(element) => (workspaceElement = element)}
         class={[
@@ -172,46 +179,50 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
         tabindex={-1}
       >
         <header class="window-drag remote-desktop-header">
-          <Show when={displays().length > 1}>
-            <div class="no-drag remote-desktop-display-controls">
-              <Select<RemoteDisplay>
-                class="remote-desktop-display-select"
-                options={displays()}
-                optionValue="id"
-                optionTextValue="label"
-                value={selectedDisplay()}
+          <Show when={!props.testControls}>
+            <Show when={displays().length > 1}>
+              <div class="no-drag remote-desktop-display-controls">
+                <Select<RemoteDisplay>
+                  class="remote-desktop-display-select"
+                  options={displays()}
+                  optionValue="id"
+                  optionTextValue="label"
+                  value={selectedDisplay()}
+                  disabled={actionBusy() !== null}
+                  onChange={(display) => display && void selectDisplay(display.id)}
+                  itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.label}</SelectItem>}
+                >
+                  <SelectTrigger size="sm" aria-label="Remote display">
+                    <SelectValue<RemoteDisplay>>
+                      {(state) => state.selectedOption()?.label ?? "Select display"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent class="remote-desktop-display-select-content" />
+                </Select>
+              </div>
+            </Show>
+            <div class="no-drag remote-desktop-actions">
+              <Button type="button" class="remote-desktop-back-button" size="sm" variant="ghost" onClick={props.onHide}>
+                <ArrowLeft size={14} aria-hidden="true" />
+                Back to OpenBot
+              </Button>
+              <Button
+                type="button"
+                class="remote-desktop-disconnect-button"
+                size="sm"
+                variant="ghost"
                 disabled={actionBusy() !== null}
-                onChange={(display) => display && void selectDisplay(display.id)}
-                itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.label}</SelectItem>}
+                loading={actionBusy() === "disconnect"}
+                onClick={() => void disconnect()}
               >
-                <SelectTrigger size="sm" aria-label="Remote display">
-                  <SelectValue<RemoteDisplay>>
-                    {(state) => state.selectedOption()?.label ?? "Select display"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent class="remote-desktop-display-select-content" />
-              </Select>
+                Disconnect
+              </Button>
             </div>
           </Show>
-          <div class="no-drag remote-desktop-actions">
-            <Button type="button" class="remote-desktop-back-button" size="sm" variant="ghost" onClick={props.onHide}>
-              <ArrowLeft size={14} aria-hidden="true" />
-              Back to OpenBot
-            </Button>
-            <Button
-              type="button"
-              class="remote-desktop-disconnect-button"
-              size="sm"
-              variant="ghost"
-              disabled={actionBusy() !== null}
-              loading={actionBusy() === "disconnect"}
-              onClick={() => void disconnect()}
-            >
-              Disconnect
-            </Button>
-          </div>
+          <Show when={props.testControls}>
+            <div class="no-drag remote-desktop-actions">{props.testControls}</div>
+          </Show>
         </header>
-
         <div class="remote-desktop-stage">
           <Show when={viewerSource()}>
             {(source) => (
@@ -219,6 +230,8 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                 ref={(element) => (viewerFrame = element)}
                 class="remote-desktop-viewer"
                 title="Sunshine remote desktop"
+                inert={props.viewOnly}
+                tabindex={props.viewOnly ? -1 : undefined}
                 src={source()}
                 sandbox="allow-scripts allow-forms allow-same-origin allow-pointer-lock"
                 allow="fullscreen; keyboard-map"
@@ -226,6 +239,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                 onError={() => {
                   setViewerState("error");
                   setViewerError("The Moonlight viewer could not load.");
+                  props.onViewerState?.("error");
                 }}
               />
             )}
@@ -238,7 +252,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
               <AgentAvatar
                 seed={`${props.server.id}:remote-desktop-connecting`}
                 hue={215}
-                motion="connecting"
+                mood="connecting"
                 class="remote-desktop-connecting-avatar"
               />
               <strong>Connecting…</strong>

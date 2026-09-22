@@ -10,6 +10,7 @@ import {
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { restartActivityGeneration } from "../backend/restart-activity";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
@@ -103,6 +104,31 @@ describe("TeamWebRtcFileTransfer", () => {
     await transfers.stop();
   });
 
+  it("reports a moving transfer and goes quiet after pickup", async () => {
+    const bridge = new FakeBridge();
+    const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
+    expect(transfers.hasActiveTransfers()).toBe(false);
+    transfers.setPeerAuthenticated("host-1", true);
+    const bytes = new TextEncoder().encode("hello-world");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const before = restartActivityGeneration();
+    const complete = transfers.receive("host-1", "transfer-1");
+    bridge.emit("data", "host-1", "files", fileOpen("transfer-1", bytes.byteLength, sha256));
+    await vi.waitFor(() => expect(transfers.hasActiveTransfers()).toBe(true));
+    bridge.emit("data", "host-1", "files", chunk("transfer-1", 0, bytes));
+    bridge.emit(
+      "data",
+      "host-1",
+      "files",
+      encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId: "transfer-1" }),
+    );
+    await expect(complete).resolves.toMatchObject({ transferId: "transfer-1" });
+    await transfers.consume("host-1", "transfer-1");
+    expect(transfers.hasActiveTransfers()).toBe(false);
+    expect(restartActivityGeneration()).toBeGreaterThan(before);
+    await transfers.stop();
+  });
+
   it("disconnects an authenticated peer after an unidentifiable file frame", async () => {
     const bridge = new FakeBridge();
     const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory());
@@ -180,8 +206,15 @@ describe("TeamWebRtcFileTransfer", () => {
   });
 
   it("uses the last acknowledged progress instead of a fixed whole-transfer deadline", async () => {
+    // The bridge acknowledges each chunk after CHUNK_ACK_DELAY_MS and the last
+    // one a further FINAL_ACK_DELAY_MS on. The resume window has to sit between
+    // the longest single gap (CHUNK_ACK_DELAY_MS + FINAL_ACK_DELAY_MS) and the
+    // whole transfer (3 * CHUNK_ACK_DELAY_MS + FINAL_ACK_DELAY_MS): below the
+    // gap a correct implementation times out, above the total a fixed
+    // whole-transfer deadline would pass and prove nothing. Keep the margin on
+    // both sides wide, because a loaded CI machine adds latency to each step.
     const bridge = new SlowFinalAcknowledgementBridge();
-    const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory(), 20);
+    const transfers = new TeamWebRtcFileTransfer(bridge, await temporaryDirectory(), 250);
     transfers.setPeerAuthenticated("host-1", true);
     const bytes = new Uint8Array(2 * 60 * 1024 + 1);
 
@@ -302,6 +335,9 @@ class ResumingBridge extends TeamWebRtcBridge {
   }
 }
 
+const CHUNK_ACK_DELAY_MS = 100;
+const FINAL_ACK_DELAY_MS = 50;
+
 class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
   transferId = "";
   #received = 0;
@@ -330,7 +366,7 @@ class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
     }
     const chunk = decodeTeamProtocolV2FileChunk(data);
     this.#received = chunk.offset + chunk.bytes.byteLength;
-    await new Promise((resolve) => setTimeout(resolve, 12));
+    await new Promise((resolve) => setTimeout(resolve, CHUNK_ACK_DELAY_MS));
     if (chunk.bytes.byteLength === 60 * 1024) {
       this.emit(
         "data",
@@ -357,7 +393,7 @@ class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
               receivedThrough: this.#received,
             }),
           ),
-        5,
+        FINAL_ACK_DELAY_MS,
       );
     }
   }

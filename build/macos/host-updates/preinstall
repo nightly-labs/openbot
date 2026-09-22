@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin LC_ALL=C
+[ "${3:-/}" = / ] || { echo 'Install the Host package on the running startup volume.' >&2; exit 1; }
+ROOT='/Library/Application Support/OpenBot/HostManager'
+check_existing() {
+  [ ! -L "$1" ] || exit 1
+  if [ -e "$1" ]; then
+    [ "$(stat -f %u "$1")" = 0 ] || { echo 'Host installation path is not root-owned.' >&2; exit 1; }
+    mode=$(stat -f %Lp "$1")
+    [ "$((0$mode & 0022))" -eq 0 ] || exit 1
+    if ls -lde "$1" | grep -Eq '[0-9]+:.*allow.*(write|append|add_file|add_subdirectory|delete|chown)'; then exit 1; fi
+  fi
+}
+for path in / /Library '/Library/Application Support' '/Library/Application Support/OpenBot' "$ROOT" \
+  /Library/LaunchAgents /Library/LaunchDaemons /usr /usr/local /usr/local/bin; do
+  check_existing "$path"
+  [ ! -e "$path" ] || [ -d "$path" ] || exit 1
+done
+for path in "$ROOT/host-manager" "$ROOT/openbot-host" "$ROOT/create-tenants" "$ROOT/openbot-relaunch.sh" \
+  "$ROOT/host-release.json" "$ROOT/config.json" "$ROOT/state.json" \
+  /Library/LaunchAgents/app.openbot.desktop.relaunch.plist \
+  /Library/LaunchDaemons/app.openbot.host-manager.plist /usr/local/bin/openbot-host; do
+  check_existing "$path"
+  [ ! -e "$path" ] || { [ -f "$path" ] && [ "$(stat -f %l "$path")" = 1 ]; } || exit 1
+done
+[ ! -e "$ROOT/setup-in-progress" ] && [ ! -L "$ROOT/setup-in-progress" ] || exit 1
+if [ -e "$ROOT/config.json" ]; then
+  phase=$(plutil -extract phase raw "$ROOT/state.json")
+  case "$phase" in idle|aborted) ;; *) echo 'Wait for host maintenance to finish before upgrading the package.' >&2; exit 1;; esac
+fi
+if launchctl print system/app.openbot.host-manager >/dev/null 2>&1; then
+  launchctl bootout system/app.openbot.host-manager
+fi

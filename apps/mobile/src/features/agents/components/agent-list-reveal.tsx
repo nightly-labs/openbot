@@ -1,6 +1,4 @@
-import { BlurTargetView, BlurView } from "expo-blur";
-import { type PropsWithChildren, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, type View } from "react-native";
+import { type PropsWithChildren, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -24,22 +22,29 @@ export interface AgentListRevealState {
   elapsed: SharedValue<number>;
   finished: boolean;
   reducedMotion: boolean;
-  stagger: number;
+  onLayout: () => void;
 }
 
-export function useAgentListReveal(ready: boolean, itemCount: number): AgentListRevealState {
+export function useAgentListReveal(ready: boolean, scope: string): AgentListRevealState {
   const elapsed = useSharedValue(0);
   const reducedMotion = useReducedMotion();
-  const [finished, setFinished] = useState(false);
-  const stagger = Math.min(ROW_STAGGER, MAX_DELAY / Math.max(1, itemCount - 1));
+  const [finishedScope, setFinishedScope] = useState<string | null>(null);
+  const finished = finishedScope === scope;
+  const [laidOutScope, setLaidOutScope] = useState<string | null>(null);
+  const onLayout = useCallback(() => setLaidOutScope(scope), [scope]);
 
   useLayoutEffect(() => {
     elapsed.set(0);
-    setFinished(false);
-    if (!ready) return;
+    setFinishedScope(null);
+    if (!ready) {
+      setLaidOutScope(null);
+      return;
+    }
+    // Start after native layout, so loading and first layout do not consume the reveal.
+    if (laidOutScope !== scope) return;
     let active = true;
     const finish = () => {
-      if (active) setFinished(true);
+      if (active) setFinishedScope(scope);
     };
     const duration = reducedMotion ? REDUCED_DURATION : ROW_DURATION + MAX_DELAY;
     elapsed.set(
@@ -51,9 +56,9 @@ export function useAgentListReveal(ready: boolean, itemCount: number): AgentList
       active = false;
       cancelAnimation(elapsed);
     };
-  }, [elapsed, ready, reducedMotion]);
+  }, [elapsed, laidOutScope, ready, reducedMotion, scope]);
 
-  return useMemo(() => ({ elapsed, finished, reducedMotion, stagger }), [elapsed, finished, reducedMotion, stagger]);
+  return useMemo(() => ({ elapsed, finished, reducedMotion, onLayout }), [elapsed, finished, reducedMotion, onLayout]);
 }
 
 export function AgentListRowReveal({
@@ -62,11 +67,12 @@ export function AgentListRowReveal({
   reveal,
   skip = false,
 }: PropsWithChildren<{ index: number; reveal: AgentListRevealState; skip?: boolean }>) {
-  const target = useRef<View | null>(null);
-  const { elapsed, finished, reducedMotion, stagger } = reveal;
+  // Keep a mounted row's place in the reveal when a live update inserts a section.
+  const initialIndex = useRef(index).current;
+  const { elapsed, finished, reducedMotion } = reveal;
   const progress = useDerivedValue(() => {
     if (finished || skip) return 1;
-    const delay = reducedMotion ? 0 : Math.min(index * stagger, MAX_DELAY);
+    const delay = reducedMotion ? 0 : Math.min(initialIndex * ROW_STAGGER, MAX_DELAY);
     const duration = reducedMotion ? REDUCED_DURATION : ROW_DURATION;
     return EASE_OUT(Math.min(1, Math.max(0, (elapsed.get() - delay) / duration)));
   });
@@ -74,27 +80,5 @@ export function AgentListRowReveal({
     opacity: progress.get(),
     transform: [{ translateX: reducedMotion ? 0 : -18 * (1 - progress.get()) }],
   }));
-  const blurStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.get() }));
-
-  return (
-    <Animated.View style={contentStyle}>
-      <BlurTargetView ref={target}>{children}</BlurTargetView>
-      {!finished && !reducedMotion && !skip ? (
-        <Animated.View
-          pointerEvents="none"
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={[StyleSheet.absoluteFill, blurStyle]}
-        >
-          <BlurView
-            blurTarget={target}
-            blurMethod="dimezisBlurViewSdk31Plus"
-            intensity={16}
-            tint="default"
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      ) : null}
-    </Animated.View>
-  );
+  return <Animated.View style={contentStyle}>{children}</Animated.View>;
 }

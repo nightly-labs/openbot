@@ -24,6 +24,8 @@ import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { TeamChatStore } from "../../backend/team-chat-store";
+import type { BrowserViewGateway } from "../browser-view-gateway";
+import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
 import type { RemoteScreenGateway } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 
@@ -92,6 +94,7 @@ type TeamApiAgentMethods = Pick<
   | "interrupt"
   | "respondToPrompt"
   | "respondToApproval"
+  | "respondToBrowserSecret"
   | "respondToBrowserTakeover"
 >;
 
@@ -128,6 +131,16 @@ export type TeamApiBrowser = Pick<
   | "close"
   | "capturePreview"
   | "setVisible"
+  | "getDisplayState"
+  | "loadUrl"
+  // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
+  // cannot, because frames outlive the request that asked for them.
+  | "startView"
+  | "dispatchViewInput"
+>;
+export type TeamApiBrowserView = Pick<
+  BrowserViewGateway,
+  "handlesUpgrade" | "handleUpgrade" | "stop" | "createSession" | "closeMemberSession" | "revokeTeamSession"
 >;
 export type TeamApiRemoteScreen = Pick<
   RemoteScreenGateway,
@@ -142,11 +155,14 @@ export type TeamApiRemoteScreen = Pick<
   | "closeMemberSession"
   | "revokeTeamSession"
   | "revokeMember"
->;
+> &
+  Partial<Pick<RemoteScreenGateway, "checkSetup" | "test">>;
 
 export interface TeamApiOptions {
   channels?: ChannelService;
   mcpServers?: TeamApiMcpServers;
+  /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
+  mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;
@@ -154,6 +170,7 @@ export interface TeamApiOptions {
   sidebarLayout?: TeamApiSidebarLayout;
   mailbox: TeamApiMailbox;
   browser: TeamApiBrowser;
+  browserView?: TeamApiBrowserView;
   remoteScreen?: TeamApiRemoteScreen;
   redeemCentralTicket?: (ticket: string, serverId: string) => Promise<CentralAuthUser | null>;
   onPresence?: (snapshot: TeamPresenceSnapshot) => void;

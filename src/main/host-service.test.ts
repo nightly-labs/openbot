@@ -25,6 +25,7 @@ async function createHostService(
   remote: Partial<
     Pick<
       HostOptions,
+      | "openRemoteDesktopSetup"
       | "listRemoteInvites"
       | "registerRemoteHost"
       | "updateRemoteHostLogo"
@@ -81,13 +82,14 @@ async function createHostService(
       ? {
           platform: "darwin" as const,
           remoteDesktopRuntimePaths: {
-            sunshine: "/sunshine",
+            sunshine: "/runtime/Sunshine.app/Contents/MacOS/Sunshine",
             moonlightWebServer: "/web",
             moonlightStreamer: "/stream",
           },
           createRemoteDesktopRuntime: () => ({
             start: async () => ({
               baseUrl: "http://127.0.0.1:9",
+              authHeader: "X-Test-Remote",
               hostId: 1,
               hostIds: [1],
               desktopAppId: 1,
@@ -127,6 +129,15 @@ type RemoteInvite = Awaited<ReturnType<NonNullable<HostOptions["createRemoteInvi
 
 // The gateway holds the refusal, and this status is the only way it reaches the host owner's screen.
 // A member who is refused cannot grant anything: they are on the other computer.
+describe.runIf(process.platform === "darwin")("HostService permission setup", () => {
+  it.each(["accessibility", "screen-recording", "reveal"] as const)("opens Sunshine setup for %s", async (action) => {
+    const openRemoteDesktopSetup = vi.fn(async () => undefined);
+    const { service } = await createHostService({ openRemoteDesktopSetup }, () => false);
+    await service.openRemoteDesktopSetup(action);
+    expect(openRemoteDesktopSetup).toHaveBeenCalledWith(action, "/runtime/Sunshine.app");
+  });
+});
+
 describe("HostService screen recording", () => {
   it("reports the refusal the gateway holds, and says the status changed", async () => {
     let denied = true;
@@ -240,6 +251,8 @@ describe("HostService account binding", () => {
         expiresAt: Date.now() + 60_000,
         usedAt: null,
         revokedAt: null,
+        permanent: false,
+        useCount: 0,
       },
     ]);
 
@@ -398,6 +411,8 @@ describe("HostService account binding", () => {
       inviteId: "invite-1",
       token: "invite-token-that-is-long-enough-for-a-link",
       expiresAt: Date.now() + 60_000,
+      permanent: false,
+      useCount: 0,
     });
     await settled;
 

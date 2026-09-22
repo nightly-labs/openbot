@@ -25,7 +25,7 @@ messaging in one desktop app.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
 - Shared desktop channel chats with one task owner, explicit delegation, shared history, and Stop, Resume, Reassign, Archive, and Restore controls.
 - A persistent embedded browser that agents can open, inspect, and control.
-- Optional Computer Use integration for macOS through a locally installed Codex plugin.
+- Optional Computer Use on macOS, Windows and Linux through the `cua-driver` binary in the release, which OpenBot starts as its own child process and gives to every provider.
 - Per-agent model, reasoning, profile, notification, browser, and panel state.
 - Local data and privacy-safe diagnostics exports from the account menu.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
@@ -67,8 +67,8 @@ path in the profile if you keep the AppImage outside the usual locations. Do not
 `--no-sandbox`: that removes the boundary between a renderer and the rest of the computer.
 
 On the first start from an AppImage, OpenBot writes `~/.local/share/applications/openbot.desktop`
-and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` invitation link open the
-app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
+and `~/.local/share/icons/openbot.png`, which is what lets an `openbot://` link - an invitation, or
+a plugin listing - open the app and gives the launcher an icon that stays after the app exits. Delete the two files to undo it.
 
 Voice prompts and remote desktop are not available on Linux.
 
@@ -113,8 +113,9 @@ show these agents.
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
 
-Bun and Node.js are not required when using an installed release. Screen Recording and Accessibility
-permissions are needed only for the optional Computer Use plugin.
+Bun and Node.js are not required when using an installed release. Optional Computer Use works on
+macOS, Windows and Linux, and the release carries the driver, so there is nothing to install. Only
+macOS asks for a permission for it: Screen Recording and Accessibility.
 
 OpenBot uses the existing local CLI login. It does not copy provider credentials. Grok's
 `XAI_API_KEY` and per-session MCP bearer tokens are never persisted or logged.
@@ -148,8 +149,8 @@ bun run codex:doctor
 bun run dev
 ```
 
-`codex:doctor` checks the CLI version, App Server handshake, ChatGPT login, and Computer Use plugin
-without starting a model turn.
+`codex:doctor` checks the CLI version, App Server handshake, and ChatGPT login without starting a
+model turn. `bun run cua-driver:doctor` reports the Computer Use driver separately.
 
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
@@ -237,8 +238,12 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run typecheck` | Check all 11 projects in parallel with a separate incremental cache for each project in this worktree. |
 | `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
 | `bun run test:backend` | Run backend tests only. |
-| `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, or `--scenario=wait-deadlines` for one isolated scenario. |
+| `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
+| `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
+| `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary in a checkout; an installed application runs only the driver it was released with. |
+| `bun run prepare:cua-driver` | Write the pinned Computer Use driver to `build/cua-driver/<platform>/<arch>`, verifying every SHA-256 in `native-runtime.lock.json`. Name another target with `bun scripts/install-cua-driver.ts <platform> <arch>`. Every packaging command runs this first. |
+| `bun run pin:cua-driver <version>` | Print a new `cuaDriver` block for `native-runtime.lock.json` from a published `cua-driver` release. Downloads all three targets and hashes each shipped file. |
 | `bun run package` | Build an unpacked local ARM64 application. |
 | `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |
@@ -303,6 +308,31 @@ and filesystem work in both locations runs without OpenBot adding another permis
 Because these modes are intentionally unrestricted, they also permit host access outside those
 directories when the provider and operating system allow it.
 
+### macOS remote desktop permissions
+
+For each macOS account, log in to its GUI session and open **Server Settings → Remote desktop access**.
+Select **Check again** to read Sunshine's Screen Recording and Accessibility permissions, display availability,
+and GUI session status. The panel names the Mac and the account that runs Sunshine. Grant permissions in
+that account, including when the account was created with the tenant setup script.
+
+After you publish a server on a Mac, an optional **Set up remote desktop** prompt opens this panel. Select **Later** to keep using the published server without remote desktop setup.
+
+Use the permission buttons to open **System Settings → Privacy & Security** on the host. If Sunshine is
+missing from a list, select **Show Sunshine in Finder** and add the bundled `Sunshine.app` with the **+** button.
+macOS can attribute access to the application that starts Sunshine; enable the application named by the
+system prompt. Return to OpenBot to check again. If a restart is required, end remote sessions first.
+A check never restarts an active session.
+
+Select **Test on this Mac** for a local test. If native checks are unavailable, it tests video only and disables viewer input. After the checks pass, it can test mouse and keyboard too. Select **Test remote desktop** from another computer for a remote test.
+The test requires an otherwise unused remote desktop host. It opens a temporary host panel, keeps remote
+input inside that panel, and asks you to click a target and type a four-digit code. Confirm that the picture
+is visible, then select **Finish test**. Local input does not pass the mouse or keyboard test. The panel
+expires after two minutes. Older hosts or native runtimes require an update before these checks are available.
+
+The native runtime source change invalidates prior artifact pins. The **Remote desktop runtime** CI workflow
+builds and tests the new source, then publishes and pins verified artifacts through its existing release flow.
+Do not reuse old artifact hashes with the new source digest.
+
 ## Architecture
 
 ```text
@@ -325,7 +355,7 @@ Cloudflare Workers
 - `src/backend` owns provider adapters, persistence, message scheduling, transfers, and the browser host.
 - `src/preload` exposes only the typed `window.openbot` API.
 - `src/renderer` contains the SolidJS interface.
-- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations.
+- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the plugin pages at `/plugins` and `/plugins/<slug>`.
 - `packages/contracts` contains process-boundary contracts, shared limits, and pure validation.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency direction, state ownership, and
@@ -415,3 +445,12 @@ See [NOTICE](NOTICE) for attribution and third-party notices.
 OpenBot is an independent source-available project and is not affiliated with, endorsed by, or
 sponsored by OpenAI. OpenAI, ChatGPT, and Codex are used only to describe compatibility with their
 respective products and services.
+
+### Shared macOS hosts
+
+For one native Standard user per tenant, install the normal OpenBot DMG and the optional
+`OpenBot-Host-<VERSION>-arm64.pkg` from the same release. The Host package provides
+`sudo openbot-host setup --create-user client-acme --create-user client-bravo` and
+`sudo openbot-host verify`. No Git checkout, Bun, or compilation is required on the host.
+Normal desktop users need only the DMG. See the [host deployment guide](docs/multi-tenant-hosting.md)
+for existing-user enrollment, password handling, package upgrades, and required target-host checks.

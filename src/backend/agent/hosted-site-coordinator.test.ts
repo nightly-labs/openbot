@@ -30,6 +30,113 @@ afterEach(async () => {
 });
 
 describe.sequential("HostedSiteCoordinator: approval, mutation and markers", () => {
+  it.each(["publish", "replace", "delete"] as const)(
+    "requires Turbo to auto-approve site %s and asks again after Turbo is disabled",
+    async (action) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "", false);
+      const site = {
+        id: "site-1",
+        hostname: "approval-test.openbot.site",
+        url: "https://approval-test.openbot.site/",
+        title: "Approval test",
+        description: "Test content",
+        framework: "vanilla" as const,
+        status: "active" as const,
+        fileCount: 1,
+        size: 20,
+        expiresAt: "2026-09-30T12:00:00.000Z",
+        updatedAt: "2026-09-01T12:00:00.000Z",
+      };
+      const hostedSites = {
+        list: vi.fn(async () => [site]),
+        publish: vi.fn(async () => site),
+        replace: vi.fn(async () => site),
+        delete: vi.fn(async () => undefined),
+      };
+      let granted = true;
+      let turbo = false;
+      service = createTestService({
+        store,
+        mailbox,
+        preferredProvider: "codex",
+        clientFactory: () => client,
+        hostedSites,
+        approvalAutomation: {
+          turboEnabled: () => turbo,
+          autoApproves: (agentId) => (turbo || granted) && agentId === "chief",
+        },
+      });
+      const events: AgentEvent[] = [];
+      service.on("event", (event) => events.push(event));
+      await service.initialize();
+      const agent = await store.getOrCreate("chief");
+      await service.sendMessage({ agentId: agent.id, text: "Change my site." });
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!threadId || !turnId) throw new Error("The site test turn did not start.");
+      const params = {
+        threadId,
+        turnId,
+        namespace: "openbot",
+        tool: `${action}_site`,
+        arguments: {
+          siteId: site.id,
+          sourcePath: agent.workspacePath,
+          title: site.title,
+          description: site.description,
+        },
+      };
+      client.emit("request", {
+        method: "item/tool/call",
+        id: "declined-site",
+        params: { ...params, callId: "declined-site" },
+      });
+      await waitFor(() =>
+        events.some((event) => event.type === "approval" && event.approval.requestId === "declined-site"),
+      );
+      expect(hostedSites[action]).not.toHaveBeenCalled();
+      await service.respondToApproval({ requestId: "declined-site", decision: "decline" });
+      expect(hostedSites[action]).not.toHaveBeenCalled();
+      // Turbo overrides even a disabled per-agent preference.
+      turbo = true;
+      granted = false;
+      events.length = 0;
+      client.emit("request", {
+        method: "item/tool/call",
+        id: "automatic-site",
+        params: { ...params, callId: "automatic-site" },
+      });
+      await waitFor(() => client.responses.some((response) => response.id === "automatic-site"));
+      expect(hostedSites[action]).toHaveBeenCalledTimes(1);
+      expect(events.some((event) => event.type === "approval")).toBe(false);
+      expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
+      expect(
+        (await service.readConversation(agent.id)).messages
+          .flatMap((message) => hostedSiteConversationEvent(message) ?? [])
+          .filter((event) => event.status !== "cancelled"),
+      ).toEqual([
+        expect.objectContaining({ action, status: "running" }),
+        expect.objectContaining({ action, status: "succeeded" }),
+      ]);
+
+      turbo = false;
+      granted = true;
+      client.emit("request", {
+        method: "item/tool/call",
+        id: "manual-site",
+        params: { ...params, callId: "manual-site" },
+      });
+      await waitFor(() => events.some((event) => event.type === "approval"));
+      expect(hostedSites[action]).toHaveBeenCalledTimes(1);
+      expect(client.responses.some((response) => response.id === "manual-site")).toBe(false);
+      await service.respondToApproval({ requestId: "manual-site", decision: "accept" });
+      await waitFor(() => client.responses.some((response) => response.id === "manual-site"));
+      expect(hostedSites[action]).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("requires user approval before an agent mutates hosted sites", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

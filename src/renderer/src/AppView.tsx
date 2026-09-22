@@ -43,8 +43,8 @@ export function AppAccessGate() {
     refreshingProviders,
     connectProvider,
     openProviderInstallGuide,
-    openProviderSignInGuide,
     refreshAgentProviders,
+    codeLogin,
   } = useProviders();
   // Onboarding is ungated: it only ever runs against this computer, so there is no remote server to
   // hide the endpoints from. Settings gates on `activeServer()`; see `WorkspaceOverlays.tsx`.
@@ -94,7 +94,8 @@ export function AppAccessGate() {
                       }
                       onConnectProvider={connectProvider}
                       onInstallProvider={openProviderInstallGuide}
-                      onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : openProviderSignInGuide}
+                      onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : connectProvider}
+                      codeLogin={codeLogin}
                       onRefreshProviders={providerRuntimeDownloadsAvailable() ? undefined : refreshAgentProviders}
                       onSave={setup.saveSetup}
                       customProviders={customProviders()}

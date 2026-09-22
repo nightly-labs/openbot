@@ -8,6 +8,7 @@
 
 import { decodeMcpServerConfigs, decodeMcpTestResult, type McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
+import { NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
 import { McpServerError } from "../backend/mcp-server-store";
 import { createTeamApiFixture, stopTeamApiFixtures, type TeamApiOptions } from "./team-api-server-test-harness";
 
@@ -30,13 +31,16 @@ const config: McpServerConfig = {
 function createMcpServers(): NonNullable<TeamApiOptions["mcpServers"]> & {
   saved: McpServerConfig[];
   tested: McpServerConfig[];
+  testOptions: unknown[];
 } {
   const stored: McpServerConfig[] = [];
   const saved: McpServerConfig[] = [];
   const tested: McpServerConfig[] = [];
+  const testOptions: unknown[] = [];
   return {
     saved,
     tested,
+    testOptions,
     listMcpServers: () => stored,
     saveMcpServer: (input) => {
       saved.push(input.config);
@@ -48,8 +52,9 @@ function createMcpServers(): NonNullable<TeamApiOptions["mcpServers"]> & {
       for (const config of stored) if (config.id === input.mcpServerId) config.enabled = input.enabled;
       return stored;
     },
-    testMcpServer: async (input) => {
+    testMcpServer: async (input, options) => {
       tested.push(input.config);
+      testOptions.push(options);
       return { toolCount: 3, error: null };
     },
   };
@@ -104,6 +109,8 @@ describe("Team API MCP server access", () => {
     });
     expect(decodeMcpTestResult(await tested.json())).toEqual({ toolCount: 3, error: null });
     expect(mcpServers.tested).toEqual([draft]);
+    // The host spends its stored sign-ins for the administrator's test, and opens no browser.
+    expect(mcpServers.testOptions).toEqual([{ storedCredentials: true }]);
     expect(
       (
         await fetch(`${base}/v1/mcp-servers/test`, {
@@ -169,6 +176,62 @@ describe("Team API MCP server access", () => {
     });
     expect(removed.status).toBe(500);
     expect(await removed.json()).toEqual({ error: "Request failed." });
+  });
+
+  // The host's routes share the local branches' runtime preparation: a first server saved,
+  // enabled, or tested remotely must start and await the managed download like a local one.
+  it("starts the runtime download behind the remote save, enable, and test routes", async () => {
+    const mcpServers = createMcpServers();
+    const started: string[] = [];
+    let ensured = 0;
+    const fixture = await createTeamApiFixture("mcp-runtimes", { configure: true });
+    const { base } = await fixture.start({
+      mcpServers,
+      mcpToolRuntimePreparation: {
+        startToolRuntimes: () => {
+          started.push("start");
+        },
+        ensureToolRuntimesReady: async () => {
+          ensured += 1;
+        },
+        toolRuntimes: () => NO_MCP_TOOL_RUNTIMES,
+      },
+    });
+    const headers = {
+      Authorization: `Bearer ${await fixture.signIn()}`,
+      "OpenBot-Protocol-Version": "3",
+      "OpenBot-Capabilities": "mcp-servers-v1",
+      "Content-Type": "application/json",
+    };
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}/v1/mcp-servers/${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+
+    // A command nothing names waits for the download, then still probes.
+    const missing = { ...config, id: "", name: "Missing", command: "openbot-no-such-command" };
+    expect(decodeMcpTestResult(await (await post("test", { config: missing })).json())).toEqual({
+      toolCount: 3,
+      error: null,
+    });
+    expect(ensured).toBe(1);
+    expect(mcpServers.tested).toEqual([missing]);
+
+    // An installed command probes at once.
+    const installed = { ...config, id: "", name: "Installed", command: "/bin/echo" };
+    expect((await post("test", { config: installed })).status).toBe(200);
+    expect(ensured).toBe(1);
+
+    // Saving and enabling start the download without waiting for it.
+    expect((await post("save", { config })).status).toBe(200);
+    expect(started).toEqual(["start"]);
+    expect(
+      (
+        await post("toggle", {
+          mcpServerId: "mcp-1",
+          enabled: true,
+        })
+      ).status,
+    ).toBe(200);
+    expect(started).toEqual(["start", "start"]);
   });
 
   it("advertises nothing when the host has no MCP service", async () => {

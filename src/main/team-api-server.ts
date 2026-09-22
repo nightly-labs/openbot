@@ -175,6 +175,12 @@ export class TeamApiServer {
         this.#options.remoteScreen.handleUpgrade(request, socket, head, url);
         return;
       }
+      // Like the remote screen, and above the token check for the same reason: a tunneled view
+      // socket carries the WebRTC session this host opened it for rather than a member's token.
+      if (this.#options.browserView?.handlesUpgrade(url)) {
+        this.#options.browserView.handleUpgrade(request, socket, head, url);
+        return;
+      }
       const protocols = (request.headers["sec-websocket-protocol"] ?? "").split(",").map((value) => value.trim());
       if (
         this.#options.appVersion &&
@@ -257,6 +263,7 @@ export class TeamApiServer {
     this.#localTypingAgentId = null;
     try {
       await this.#options.remoteScreen?.stop();
+      await this.#options.browserView?.stop();
     } finally {
       // The heartbeat and the event listeners are already gone. Leaving the socket open
       // would let the next `start()` hand back its port unchanged, so the previous account
@@ -527,7 +534,11 @@ export class TeamApiServer {
       if ((await this.#routeBrowser(context)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents)) === "handled") return;
-      if ((await routeMcpServers(context, this.#options.mcpServers)) === "handled") return;
+      if (
+        (await routeMcpServers(context, this.#options.mcpServers, this.#options.mcpToolRuntimePreparation)) ===
+        "handled"
+      )
+        return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -583,7 +594,7 @@ export class TeamApiServer {
   }
 
   #routeBrowser(context: TeamApiRequestContext): Promise<RouteOutcome> {
-    return routeBrowser(context, { browser: this.#options.browser });
+    return routeBrowser(context, { browser: this.#options.browser, browserView: this.#options.browserView });
   }
 
   #routeFiles(context: TeamApiRequestContext): Promise<RouteOutcome> {
@@ -630,7 +641,11 @@ export class TeamApiServer {
     capabilities: ReadonlySet<string>,
     options: { preserveSemanticTags?: boolean } = {},
   ): string | null {
-    if (capabilities.has("opencode")) return encodeTeamProtocolV4BaseCurrentEvent(event, options);
+    if (capabilities.has("opencode"))
+      return encodeTeamProtocolV4BaseCurrentEvent(event, {
+        ...options,
+        preserveBrowserSecrets: capabilities.has("browser-secret-handoff"),
+      });
     const visible = legacyProviderView(event, hiddenProviderAgentIds(this.#options.agents.listAgents()));
     return isAgentEvent(visible) || isTeamRealtimeEvent(visible)
       ? encodeTeamProtocolV1CurrentEvent(visible, options)
@@ -1060,6 +1075,8 @@ export class TeamApiServer {
           return this.#options.channels !== undefined;
         // Advertised only when this host can serve it: a client that negotiated it gets a route,
         // and one that did not never shows the panel.
+        if (capability === "remote-desktop-setup")
+          return this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined;
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
         return true;
       }),

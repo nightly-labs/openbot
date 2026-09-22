@@ -4,6 +4,7 @@ import { AgentTables } from "../backend/agent-data/agent-tables";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
+import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 /**
  * The composition root. Every long-lived service the desktop app owns is built here, in one
  * function, in dependency order, and handed back as a single record.
@@ -26,36 +27,52 @@ import { localSkillTools } from "./local-skill-tools";
  */
 
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { homedir } from "node:os";
+import { readdir, rm } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type {
   AgentStatus,
   AppVariant,
   BrowserDisplayState,
+  CapabilityState,
   CentralAuthState,
+  ComputerUseState,
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS } from "@openbot/contracts/ipc";
-import { createOpenBotLogger } from "@openbot/logging";
+import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import { app, type BrowserWindow, safeStorage, screen, shell } from "electron";
+import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { MailboxStore } from "../backend/mailbox-store";
+import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { TeamChatStore } from "../backend/team-chat-store";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { HostAnalytics } from "./analytics";
 import { readAnalyticsPreference } from "./analytics-preference-store";
+import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
+import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
-import { ComputerUseMacSetupService } from "./computer-use-mac-setup";
-import { ComputerUseMacSetupWindowController } from "./computer-use-mac-setup-window";
+import { ComputerUseHighlightController } from "./computer-use-highlight-window";
+import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
+import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
+import {
+  COMPUTER_USE_ACTION_MAX_AGE_MS,
+  COMPUTER_USE_CURSOR_MAX_AGE_MS,
+  chooseTarget,
+  liveSession,
+} from "./computer-use-target-window";
+import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
+import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
+import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
 import { CustomProviderStore } from "./custom-provider-store";
+import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
 import {
   applyDevelopmentRemoteAccount,
   type DevelopmentRemoteRole,
@@ -64,22 +81,31 @@ import {
 import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
+import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
+  computerUseDisplays,
+  createComputerUseHighlightWindow,
+  createComputerUsePermissionHelpWindow,
   createDynamicIslandWindow,
-  loadComputerUseMacSetupRenderer,
+  loadComputerUseHighlightRenderer,
+  loadComputerUsePermissionHelpRenderer,
   loadDynamicIslandRenderer,
   type MainWindowController,
+  sendComputerUseHighlightPlacement,
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
+import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
+import { McpOAuthStore } from "./mcp-oauth-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
 import { loadOrCreateRemoteDesktopCredentials } from "./remote-desktop-secret-store";
+import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { decodeVoid } from "./remote-host-decoding";
 import { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
@@ -95,6 +121,7 @@ import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { readUpdatePreference } from "./update-preference-store";
+import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
   createDisabledUpdateAdapter,
   isValidSemver,
@@ -102,12 +129,15 @@ import {
   type UpdateAdapter,
   UpdateService,
 } from "./update-service";
+import { listSiblingOpenBotInstances } from "./update-sibling-instances";
 import { WHISPER_MODEL_NAME, WHISPER_MODEL_URL } from "./voice-model-service";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
+const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
+const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
@@ -122,22 +152,41 @@ const LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE = "openbot-remote-desktop-credential
 const REMOTE_DESKTOP_RUNTIME_SECRET_FILE = "openbot-remote-desktop-runtime-v1.json";
 const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
+/** The MCP sign-ins. Separate from the keys above: a key is typed by the user, a token is not. */
+const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 
 /**
  * Where each service stops, as a position in the shutdown sequence rather than a position in the
  * construction sequence. The gaps leave room to insert one without renumbering.
  */
+/**
+ * What the Computer Use driver is told to record as its host, for its own logs.
+ *
+ * Advisory only: `cua-driver` does not treat it as a trust signal, and it cannot, because any
+ * process can set the variable. The development value is honest about the fact that a dev run is
+ * the Electron binary - which is also the name macOS shows in the Privacy & Security panes, and the
+ * reason a dev grant does not carry over to a packaged build.
+ */
+const PACKAGED_BUNDLE_IDENTIFIER = "app.openbot.desktop";
+const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
+
 const TEARDOWN_ORDER = {
   updater: 10,
+  hostUpdateCoordinator: 12,
+  computerUseHighlight: 18,
+  computerUsePermissionHelp: 19,
   dynamicIsland: 20,
   browser: 30,
   browserPictureInPicture: 40,
+  browserView: 45,
   providerRuntimes: 50,
+  cuaDriver: 55,
   remoteServers: 60,
   voice: 70,
   remoteDesktop: 80,
   host: 90,
   teamWebRtcBridge: 100,
+  mcpOAuthRedirect: 105,
   service: 110,
 } as const;
 
@@ -167,13 +216,20 @@ export interface ApplicationServices {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
+  /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
+  mcpOAuth: McpOAuth;
   mailbox: MailboxStore;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
+  browserView: BrowserViewClient;
   updater: UpdateService;
+  /** Point-in-time restart safety for host-managed updates. Nothing holds the instance when empty. */
+  describeRestartReadiness: () => RestartReadiness;
+  hostUpdateCoordinator: HostUpdateCoordinator;
   setupFile: string;
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
+  approvalAutomation: ApprovalAutomation;
   language: LanguageService;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
@@ -187,7 +243,9 @@ export interface ApplicationServices {
   marketplaceAgents: AgentMarketplaceService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
-  computerUseMacSetup: ComputerUseMacSetupWindowController;
+  cuaDriver: CuaDriverRuntime;
+  computerUseHighlight: ComputerUseHighlightController;
+  computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
   teamStore: TeamStore;
   /**
@@ -198,6 +256,13 @@ export interface ApplicationServices {
   appliedAccount: CentralAuthState;
   /** Left un-awaited on purpose: the account settles in the background while the app opens. */
   centralAuthInitialization: Promise<CentralAuthState>;
+}
+
+/** How the driver's own state reads as the capability the Team API projects. */
+function computerUseCapability(state: ComputerUseState): CapabilityState {
+  if (state.status === "ready") return "ready";
+  if (state.status === "permissions-required") return "setup-required";
+  return "unavailable";
 }
 
 export async function createApplicationServices({
@@ -215,17 +280,6 @@ export async function createApplicationServices({
   forwardVoiceModelStatus,
   prepareForUpdateInstall,
 }: ApplicationServiceContext): Promise<ApplicationServices> {
-  const computerUseMacSetupService = new ComputerUseMacSetupService({
-    getIconDataUrl: async (path) => (await app.getFileIcon(path, { size: "normal" })).toDataURL(),
-  });
-  const computerUseMacSetup = new ComputerUseMacSetupWindowController({
-    service: computerUseMacSetupService,
-    createWindow: windows.createComputerUseMacSetupWindow,
-    loadWindow: loadComputerUseMacSetupRenderer,
-    openExternal: (url) => shell.openExternal(url),
-    revealPath: (path) => shell.showItemInFolder(path),
-    loadDragIcon: (path) => app.getFileIcon(path, { size: "normal" }),
-  });
   // The one forward reference left in this function: the controller is built at the top of
   // startup because its window must be able to appear immediately, but the two services its
   // critical actions drive are built hundreds of lines below. A single named local rather than
@@ -380,6 +434,16 @@ export async function createApplicationServices({
   });
   await language.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
+  const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
+  const approvalAutomation = new ApprovalAutomation({
+    path: approvalAutomationFile,
+    initial: await readApprovalAutomation(
+      approvalAutomationFile,
+      store.list().map((agent) => agent.id),
+      join(app.getPath("userData"), LEGACY_APPROVAL_AUTOMATION_FILE),
+    ),
+    knownAgentIds: () => store.list().map((agent) => agent.id),
+  });
   /*
    * The installed CLIs are the computer's, the partial downloads are this profile's.
    *
@@ -396,8 +460,14 @@ export async function createApplicationServices({
       userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
     }),
     downloadRoot: join(app.getPath("userData"), "provider-runtimes", ".downloads"),
-    updateRuntime: async (provider, install) => {
-      await service.updateProviderCli(provider, install);
+    updateRuntime: async (runtime, install) => {
+      // A tool runtime has no client to swap: the MCP servers are started per thread and read the
+      // managed path at the next spawn, so installing it is the whole of the update.
+      if (isManagedToolRuntime(runtime)) {
+        await install();
+        return;
+      }
+      await service.updateProviderCli(runtime, install);
     },
   });
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
@@ -436,9 +506,166 @@ export async function createApplicationServices({
   if (credentialLoadError) {
     logger.warn(`OpenBot could not read the provider key file (${credentialLoadError.name}). It was left unchanged.`);
   }
+  /*
+   * The MCP sign-ins, in their own file with the same cipher. `mcp-remote` used to keep these where
+   * OpenBot could not redact them; here they are covered by the same rule as every other secret.
+   *
+   * Unreadable is not fatal, for the same reason as the keys above: every signed-in server asks for
+   * a sign-in again, and nothing else on this machine stops working.
+   */
+  const mcpOAuthStore = new McpOAuthStore(join(app.getPath("userData"), MCP_OAUTH_FILE), {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value) => safeStorage.decryptString(value),
+  });
+  const mcpOAuthLoadError = await mcpOAuthStore.load();
+  if (mcpOAuthLoadError) {
+    logger.warn(`OpenBot could not read the MCP sign-in file (${mcpOAuthLoadError.name}). It was left unchanged.`);
+  }
+  /*
+   * Where a returning grant lands. The loopback listener is the address RFC 8252 gives a native
+   * app and the only one some authorization servers accept - Canva refuses `openbot://mcp-auth`
+   * on its own authorization page, where OpenBot cannot see the failure or explain it.
+   *
+   * A port that cannot be bound is not fatal: the deep link is still registered with the
+   * operating system, and the servers that accept it keep working. It is logged because it
+   * decides which address every later sign-in registers, and a sign-in that a server then
+   * refuses is otherwise a mystery in a support thread.
+   */
+  // The listener is bound before the authority that answers it exists, and a request can arrive
+  // in between - a browser tab left open on a previous run reaches this port on its own. It is
+  // held rather than closed over, so that request is refused instead of raising in the listener.
+  let mcpOAuthAuthority: McpOAuth | null = null;
+  const mcpOAuthRedirect = await startMcpOAuthRedirectServer({
+    deliver: (state, code) => {
+      if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code)) return false;
+      const current = windows.getMainWindow();
+      if (current && !current.isDestroyed()) showMainWindow(current);
+      return true;
+    },
+  }).catch((error: unknown) => {
+    logger.warn(
+      "OpenBot could not listen for MCP sign-ins on this machine, so the openbot:// link is used instead. Servers that refuse it cannot be signed in to:",
+      toLogValue(error),
+    );
+    return null;
+  });
+  if (mcpOAuthRedirect) {
+    teardown.push(TEARDOWN_ORDER.mcpOAuthRedirect, "the MCP sign-in listener", () => mcpOAuthRedirect.close());
+  }
+  const mcpOAuth = new McpOAuth({
+    storage: mcpOAuthStore,
+    openExternal: (url) => shell.openExternal(url),
+    redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
+  });
+  mcpOAuthAuthority = mcpOAuth;
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
+  });
+  // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
+  // panel's "Check again" has to see it.
+  const resolveCuaDriverExecutable = (): Promise<string | null> =>
+    resolveCuaDriver({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      sourceRoot: resolve(__dirname, "../.."),
+      platform: process.platform,
+      architecture: process.arch,
+      homeDirectory: homedir(),
+      pathVariable: process.env.PATH ?? null,
+      overrides: [process.env.OPENBOT_CUA_DRIVER_PATH, process.env.CUA_DRIVER_PATH],
+      installDirectory: process.env.CUA_DRIVER_RS_INSTALL_DIR ?? process.env.CUA_DRIVER_BIN_DIR,
+      localAppDataDirectory: process.env.LOCALAPPDATA,
+      applicationsDirectory: "/Applications",
+    });
+  const cuaDriver = new CuaDriverRuntime({
+    executable: await resolveCuaDriverExecutable(),
+    resolveExecutable: resolveCuaDriverExecutable,
+    // Linux ships as an AppImage, whose mount is somewhere else at each launch, so the command the
+    // proxies are given is a link below the profile rather than the path inside the mount.
+    commandAlias: cuaDriverCommandAlias({
+      platform: process.platform,
+      isPackaged: app.isPackaged,
+      appImagePath: process.env.APPIMAGE,
+      userDataPath: app.getPath("userData"),
+    }),
+    endpoint: await resolveCuaDriverEndpoint({
+      platform: process.platform,
+      userDataPath: app.getPath("userData"),
+      temporaryDirectory: tmpdir(),
+      runtimeDirectory: process.env.XDG_RUNTIME_DIR,
+    }),
+    supported: isSupportedCuaDriverTarget(process.platform, process.arch),
+    hostBundleId: app.isPackaged ? PACKAGED_BUNDLE_IDENTIFIER : DEVELOPMENT_BUNDLE_IDENTIFIER,
+    platform: process.platform,
+    onDiagnostic: (message) => {
+      void appendRemoteDiagnosticLog(join(app.getPath("userData"), "logs", "remote"), "cua-driver", message);
+    },
+  });
+  // After the provider runtimes, which hold the `cua-driver mcp` children that talk to this
+  // daemon: stopping it first would leave them reading a socket nothing answers.
+  teardown.push(TEARDOWN_ORDER.cuaDriver, "the Computer Use driver", () => cuaDriver.stop());
+  /*
+   * The rim OpenBot draws over the window an agent works in.
+   *
+   * It asks the daemon two read-only questions over a connection of its own: whether any agent
+   * holds a live session, and where every window is. Both answers come from the daemon's own view,
+   * which an MCP client of OpenBot's could not see: the tools report only the sessions of the lease
+   * that asks, and the agent's lease is its own.
+   */
+  const computerUseReads = new CuaDriverDaemonClient(() =>
+    cuaDriver.mcpServerForProviders() ? cuaDriver.socketPath() : null,
+  );
+  const computerUseHighlight = new ComputerUseHighlightController({
+    createWindow: createComputerUseHighlightWindow,
+    loadWindow: loadComputerUseHighlightRenderer,
+    place: sendComputerUseHighlightPlacement,
+    displays: computerUseDisplays,
+    // The driver's own cursor on one screen, OpenBot's inside this overlay on more than one. The
+    // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
+    readPointer: () => cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS),
+    readTarget: async (previous) => {
+      if (!cuaDriver.mcpServerForProviders()) return null;
+      const session = liveSession(await computerUseReads.sessions());
+      if (!session) return null;
+      const windows = await computerUseReads.listWindows();
+      const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
+      return chooseTarget({ windows, session, action, ownPid: process.pid, previous });
+    },
+  });
+  // Before the daemon stops, so the rim is gone rather than left over a window nothing drives, and
+  // so the read connection lets its lease go while there is still a daemon to tell.
+  teardown.push(TEARDOWN_ORDER.computerUseHighlight, "the Computer Use highlight", async () => {
+    computerUseHighlight.destroy();
+    await computerUseReads.close();
+  });
+  const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
+    createWindow: createComputerUsePermissionHelpWindow,
+    loadWindow: loadComputerUsePermissionHelpRenderer,
+    // The bundle that owns this process, which is the one macOS attributes every click and capture
+    // to. In a development build that is Electron itself, and the window says so.
+    bundlePath: () => applicationBundlePath(app.getPath("exe"), process.platform),
+    // `large` is 32 points, which is the size a drag image is drawn at.
+    // Read out of the bundle rather than asked of macOS: `app.getFileIcon` ends the main process
+    // on this Electron. The app's own icon stands in for a bundle that carries none, because a drag
+    // with no image is refused and would leave the user with a card that does nothing.
+    bundleIcon: async (path) => {
+      const resources = join(path, "Contents", "Resources");
+      const names: string[] = await readdir(resources).catch(() => []);
+      const iconName = applicationIconName(path, names);
+      const icon = iconName ? nativeImage.createFromPath(join(resources, iconName)) : nativeImage.createEmpty();
+      // A bundle icon is drawn at up to 1024 points, and a drag carries the image at its own size:
+      // unresized it covers the pane the user is dragging onto.
+      return (icon.isEmpty() ? nativeImage.createFromPath(appIconPath) : icon).resize({ width: 32, height: 32 });
+    },
+    revealPath: (path) => shell.showItemInFolder(path),
+  });
+  // An always-on-top window that outlived the quit would be the last thing on the desktop.
+  teardown.push(TEARDOWN_ORDER.computerUsePermissionHelp, "the Computer Use permission help", () => {
+    computerUsePermissionHelp.close();
   });
   const service: AgentService = new AgentService({
     store,
@@ -466,11 +693,68 @@ export async function createApplicationServices({
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
       // into the object being constructed; nothing calls it before the constructor returns.
       mcpServers: () => service.enabledMcpServers(),
+      // The floor under those servers: the `bin` of every managed tool runtime, appended after the
+      // user's own `PATH`, so a machine with no Node can still start `npx some-server` and a machine
+      // that has one keeps the build it installed.
+      mcpToolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+      // The bearer token for an http server, minted here and spent by the provider process. The
+      // service asks for one at each hand-off; only a test the user pressed may open a browser.
+      mcpOAuth,
     },
+    // Appended to the stored servers at each spawn, so the same tools reach Codex, Claude and the
+    // ACP providers. Null until the daemon runs, which is what keeps a machine with no driver from
+    // handing every provider a command it cannot start.
+    computerUseMcpServer: () => cuaDriver.mcpServerForProviders(),
     localSkillTools: () => localSkillTools(skills),
+    approvalAutomation,
+    deleteWithRevokedApproval: (agentId, remove) => approvalAutomation.deleteAgent(agentId, remove),
     tables,
   });
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => service.stop());
+  // The capability and the tool list both follow the daemon, and nothing else can tell them: no
+  // provider probe reaches the driver, because the driver is this process's child.
+  // The held state first: the providers start at `unavailable`, and a listener hears only what
+  // changes, so a computer that has the driver and neither grant would keep reporting a driver it
+  // has until a grant moved.
+  service.setComputerUseCapability(computerUseCapability(cuaDriver.lastState));
+  cuaDriver.onStateChanged((state) => service.setComputerUseCapability(computerUseCapability(state)));
+  // Only when a live session would hold the wrong tool set: this deactivates every agent's stored
+  // provider session, so the driver stays quiet for a grant, for the warm-up below, and for the
+  // stop at teardown, where the sessions are being left for the next run.
+  cuaDriver.onMcpServerChanged(() => service.notifyComputerUseChanged());
+  // The rim follows the daemon: it can show nothing while the agents hold no tools, and polling a
+  // socket nothing answers would only log failures.
+  cuaDriver.onMcpServerChanged(() => {
+    if (cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+    else {
+      computerUseHighlight.stop();
+      // The daemon this connection was opened to is gone, so the socket behind it is too.
+      void computerUseReads.close();
+    }
+  });
+  // A user who granted the permissions expects the tools after a restart without opening the panel,
+  // and a remote request or a scheduled task opens no window at all. This starts the daemon once and
+  // keeps it only when the grants are there; it raises no prompt, so a user who granted nothing sees
+  // nothing. It also tells no listener, because the sessions read back from the database were
+  // written by a run that had this same entry.
+  const computerUseWarmUp = cuaDriver.warmUp();
+  computerUseWarmUp.catch(() => undefined);
+  // The warm-up tells no listener on purpose, so the rim has to read the result itself: a user who
+  // granted the permissions has a running daemon from here on, and nothing else would start it.
+  void computerUseWarmUp
+    .then(() => {
+      if (cuaDriver.mcpServerForProviders()) computerUseHighlight.start();
+    })
+    .catch(() => undefined);
+  /*
+   * Where the decision put the download: onboarding, which is the screen this start is about to
+   * show. A user who finished onboarding before OpenBot downloaded a runtime at all is asked for
+   * one here too, but only when this machine already has an MCP server to start.
+   *
+   * Nothing waits for it and nothing reports it. MCP is optional, so a failed download must not
+   * reach onboarding; a server that cannot start is reported at hand-off like any other.
+   */
+  if (!setupState.completed || service.enabledMcpServers().length > 0) providerRuntimes.ensureToolRuntimes();
   // After `new AgentService`, which owns the channels: the layout files channels beside agents, and
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   await sidebarLayout.reconcileAgents(service.sidebarChatIds());
@@ -492,6 +776,13 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
+  // A tool runtime that becomes ready changes what the MCP servers resolve to, for every
+  // provider: sessions that dropped their stdio servers before it finished downloading are
+  // marked for refresh, and the deferred mechanism spends the mark before each agent's next
+  // turn. Provider CLI updates change no MCP resolution, so only tool runtimes refresh.
+  providerRuntimes.on("ready", (runtime) => {
+    if (isManagedToolRuntime(runtime)) service.refreshAllAgentRuntimes();
+  });
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),
@@ -536,6 +827,13 @@ export async function createApplicationServices({
     channels: service.channels,
     // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
     mcpServers: service,
+    // The host's Team API routes share the IPC handlers' runtime preparation: a first server
+    // saved, enabled, or tested remotely must start and await the managed download like a local one.
+    mcpToolRuntimePreparation: {
+      startToolRuntimes: () => providerRuntimes.ensureToolRuntimes(),
+      ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
+      toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
+    },
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),
@@ -564,6 +862,13 @@ export async function createApplicationServices({
     platform: process.platform === "darwin" || process.platform === "win32" ? process.platform : "linux",
     unattended: false,
     remoteDesktopRuntimePaths: remoteDesktopRuntime,
+    openRemoteDesktopSetup: async (action, appPath) => {
+      if (action === "reveal") shell.showItemInFolder(appPath);
+      else {
+        await shell.openExternal(MAC_PERMISSION_URLS[action]);
+        await computerUsePermissionHelp.show(action, appPath);
+      }
+    },
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => {
       if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
@@ -686,7 +991,30 @@ export async function createApplicationServices({
   }
   configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
   configureServerLogoProtocols({ teamStore, remoteServers });
-  const remoteDesktop = new RemoteDesktopManager(remoteServers);
+  // After the servers: the view it opens belongs to one of them, and it has to stop before they do.
+  const browserView = new BrowserViewClient({
+    servers: remoteServers,
+    onEvent: (event) => {
+      const window = windows.getMainWindow();
+      if (!window || window.isDestroyed()) return;
+      sendToRenderer(window, IPC_CHANNELS.browserLiveViewEvent, event);
+    },
+  });
+  teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => browserView.stop());
+  const remoteDesktop = new RemoteDesktopManager({
+    createRemoteDesktopSession: (serverId) =>
+      serverId === "local"
+        ? host.createLocalRemoteDesktopTestSession()
+        : remoteServers.createRemoteDesktopSession(serverId),
+    closeRemoteDesktopSession: (serverId, sessionId) =>
+      serverId === "local"
+        ? host.closeLocalRemoteDesktopTestSession(sessionId)
+        : remoteServers.closeRemoteDesktopSession(serverId, sessionId),
+    selectRemoteDesktopDisplay: (serverId, displayId) => {
+      if (serverId === "local") return Promise.reject(new Error("Finish the local test before switching displays."));
+      return remoteServers.selectRemoteDesktopDisplay(serverId, displayId);
+    },
+  });
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => remoteDesktop.stop());
   const voice = new VoiceTranscriptionService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "whisper") : resolve(".openbot-build/whisper"),
@@ -730,6 +1058,18 @@ export async function createApplicationServices({
     enabled: updaterEnabled,
     autoDownload: updatePreference.autoDownload,
     beforeInstall: prepareForUpdateInstall,
+    // Packaged runs share one application bundle across macOS users. Installing while another
+    // login session runs OpenBot from that bundle would replace it underneath that session, so
+    // the service refuses the install until every sibling session stopped. Unpackaged runs never
+    // enable updates, so there is nothing to guard there.
+    checkSiblingInstances: app.isPackaged
+      ? () =>
+          listSiblingOpenBotInstances({
+            executablePath: app.getPath("exe"),
+            currentPid: process.pid,
+            platform: process.platform,
+          })
+      : undefined,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
     // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
@@ -737,20 +1077,65 @@ export async function createApplicationServices({
       process.platform === "darwin" ? join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt") : undefined,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => updater.stop());
+  const agentInitialization = new AgentInitializationGate(async () => {
+    // The warm-up first: it decides whether the entry is there, and a session created while it
+    // still probes would hold a command the warm-up may stop a moment later, silently. It runs
+    // from the moment the runtime exists, so this waits only for what is left of it, and a
+    // failure here must not keep the agents down.
+    await computerUseWarmUp.catch(() => undefined);
+    await service.initialize();
+  });
+  const describeRestartReadiness = (): RestartReadiness =>
+    checkRestartReadiness({
+      agentWork: service.hasActiveWork(),
+      hostBlockers: host.describeRestartBlockers(),
+      activeBrowserControls: browser.getControlState().sessions.length,
+      activeFileTransfers: remoteServers.hasActiveTransfers(),
+      updaterBusy: !updater.getStatus().managedByHost && isUpdateBusyPhase(updater.getStatus().phase),
+      initializationPending: !agentInitialization.succeeded,
+    });
+  const hostUpdateCoordinator = new HostUpdateCoordinator({
+    uid: typeof process.getuid === "function" ? process.getuid() : 0,
+    pid: process.pid,
+    currentVersion,
+    describeReadiness: describeRestartReadiness,
+    setManagedByHost: (managed) => updater.setManagedByHost(managed),
+    setHostState: (state) => updater.setHostState(state),
+    onDiagnostic: (message) => logger.warn(message),
+    checkHealth: async () => {
+      if (!agentInitialization.succeeded) return { ok: false, checks: ["initialization-not-ready"] };
+      try {
+        service.listAgents();
+      } catch {
+        return { ok: false, checks: ["agent-list-failed"] };
+      }
+      return { ok: true, checks: ["initialization-succeeded", "agent-list"] };
+    },
+  });
+  await hostUpdateCoordinator.tick();
+  hostUpdateCoordinator.start();
+  teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
+    hostUpdateCoordinator.stop(),
+  );
 
   return {
     service,
     providerRuntimes,
     providerCredentials,
+    mcpOAuth,
     mailbox,
     browser,
     browserPictureInPicture,
+    browserView,
     updater,
     setupFile,
     analyticsPreferenceFile,
     updatePreferenceFile,
+    approvalAutomation,
     language,
-    agentInitialization: new AgentInitializationGate(() => service.initialize()),
+    agentInitialization,
+    hostUpdateCoordinator,
+    describeRestartReadiness,
     sidebarLayout,
     host,
     remoteDesktop,
@@ -762,7 +1147,9 @@ export async function createApplicationServices({
     marketplaceAgents,
     voice,
     dynamicIsland,
-    computerUseMacSetup,
+    cuaDriver,
+    computerUseHighlight,
+    computerUsePermissionHelp,
     analytics,
     teamStore,
     appliedAccount: signedInState,

@@ -68,6 +68,17 @@ export const en = {
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Default browser",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.autonomy.title": "Agent autonomy",
+  "settings.turbo.title": "Turbo mode",
+  "settings.turbo.description":
+    "Let every agent run commands, change files, widen its own filesystem and network access, and publish, update or delete public sites without asking.",
+  "settings.turbo.confirmTitle": "Turn on Turbo mode?",
+  "settings.turbo.confirmDescription":
+    "Agents will run commands, change files, widen their own access on this computer, and publish, update or delete public sites without asking you first. Turn this off here at any time.",
+  "settings.turbo.confirmCancel": "Cancel",
+  "settings.turbo.confirmAccept": "Turn on",
+  "settings.autoApprove.revokeFailed":
+    "Could not revoke the standing approval for {name}. It is still active. Try again.",
   "settings.notifications.title": "Notifications",
   "settings.desktopNotifications.title": "Desktop notifications",
   "settings.desktopNotifications.description": "Show a notification when an agent needs attention.",
@@ -90,7 +101,7 @@ export const en = {
   "settings.tab.general.title": "General",
   "settings.tab.general.description": "Control how OpenBot behaves on this computer.",
   "settings.tab.computerUse.title": "Computer Use",
-  "settings.tab.computerUse.description": "Allow OpenBot to see and interact with apps on this Mac.",
+  "settings.tab.computerUse.description": "Allow OpenBot to see and interact with apps on this computer.",
   "settings.tab.profile.title": "Profile",
   "settings.tab.profile.description": "Manage how you appear in OpenBot.",
   "settings.tab.mobileConnect.title": "Mobile Connect",
@@ -148,6 +159,7 @@ export const en = {
   "provider.action.update": "Update",
   "provider.action.install": "Install",
   "provider.action.signIn": "Sign in",
+  "provider.action.signInWithCode": "Log in with code",
   "provider.action.add": "Add",
   "provider.aria.download": "Download {name}",
   "provider.aria.cancel": "Cancel {name}",
@@ -158,6 +170,8 @@ export const en = {
   "provider.aria.update": "Update {name} to {version}",
   "provider.aria.install": "Install {name}",
   "provider.aria.signIn": "Sign in to {name}",
+  "provider.aria.moreSignIn": "More ways to log in to {name}",
+  "provider.aria.signInWithCode": "Log in to {name} with a code on another device",
 } as const satisfies MessageCatalog;
 
 export type AppMessages = typeof en;

@@ -2,11 +2,37 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { BrowserWindow, type WebContents, WebContentsView, webContents } from "electron";
+import { isBrowserSecretRequest } from "@openbot/contracts/ipc";
+import {
+  BrowserWindow,
+  type HandlerDetails,
+  type WebContents,
+  WebContentsView,
+  type WindowOpenHandlerResponse,
+  webContents,
+} from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
+import type { BrowserContextMenuParams } from "./browser-shortcuts";
+import type { DynamicToolResult } from "./protocol";
 
-const windowOpenHandlers = vi.hoisted((): Array<(details: { url: string }) => { action: string }> => []);
+const windowOpenHandlers = vi.hoisted(
+  (): Array<(details: { url: string; disposition?: HandlerDetails["disposition"] }) => WindowOpenHandlerResponse> => [],
+);
+type PermissionRequestHandler = (contents: unknown, permission: string, allow: (granted: boolean) => void) => void;
+type PermissionCheckHandler = (contents: unknown, permission: string) => boolean;
+interface PermissionPolicy {
+  request: PermissionRequestHandler | undefined;
+  check: PermissionCheckHandler | undefined;
+}
+const permissionPolicy = vi.hoisted((): PermissionPolicy => ({ request: undefined, check: undefined }));
+interface MenuEntry {
+  label?: string;
+  type?: string;
+  click?: () => void;
+}
+const menuTemplates = vi.hoisted((): MenuEntry[][] => []);
+const clipboardWrites = vi.hoisted((): string[] => []);
 
 vi.mock("electron", async () => {
   const { EventEmitter } = await import("node:events");
@@ -38,10 +64,16 @@ vi.mock("electron", async () => {
     }
     close() {}
     focus() {}
+    cut() {}
+    copy() {}
+    paste() {}
+    selectAll() {}
     setAudioMuted() {}
     invalidate() {}
-    setWindowOpenHandler(handler: (details: { url: string }) => { action: string }) {
-      windowOpenHandlers.push(handler);
+    setWindowOpenHandler(handler: (details: HandlerDetails) => WindowOpenHandlerResponse) {
+      windowOpenHandlers.push(({ url, disposition = "new-window" }) =>
+        handler({ url, disposition, features: "", frameName: "", referrer: { url: "", policy: "default" } }),
+      );
     }
     async executeJavaScript() {
       return null;
@@ -59,6 +91,17 @@ vi.mock("electron", async () => {
   }
   return {
     app: { getPreferredSystemLanguages: () => ["en-US"] },
+    clipboard: {
+      writeText(text: string) {
+        clipboardWrites.push(text);
+      },
+    },
+    Menu: {
+      buildFromTemplate(template: MenuEntry[]) {
+        menuTemplates.push(template);
+        return { popup() {} };
+      },
+    },
     BrowserWindow: class {
       webContents = { getZoomFactor: () => 1, focus() {}, sendInputEvent() {} };
       contentView = { addChildView() {}, removeChildView() {} };
@@ -67,9 +110,10 @@ vi.mock("electron", async () => {
       }
     },
     WebContentsView: class {
-      webContents = new FakeContents();
-      constructor() {
-        contents.push(this.webContents);
+      webContents: FakeContents;
+      constructor(options?: { webContents?: FakeContents }) {
+        this.webContents = options?.webContents ?? new FakeContents();
+        if (!contents.includes(this.webContents)) contents.push(this.webContents);
       }
       setBackgroundColor() {}
       setVisible() {}
@@ -88,8 +132,12 @@ vi.mock("electron", async () => {
         getUserAgent: () => "Chrome/144.0.0.0",
         setUserAgent() {},
         webRequest: { onBeforeSendHeaders() {}, onCompleted() {}, onErrorOccurred() {} },
-        setPermissionRequestHandler() {},
-        setPermissionCheckHandler() {},
+        setPermissionRequestHandler(handler: PermissionRequestHandler) {
+          permissionPolicy.request = handler;
+        },
+        setPermissionCheckHandler(handler: PermissionCheckHandler) {
+          permissionPolicy.check = handler;
+        },
         on() {},
         flushStorageData() {},
         cookies: { async flushStore() {} },
@@ -98,10 +146,23 @@ vi.mock("electron", async () => {
   };
 });
 
+import type { BrowserScreencastFrame, BrowserScreencastOptions } from "./browser-cdp";
+
+const viewFrames = vi.hoisted((): Array<(frame: BrowserScreencastFrame) => void> => []);
+const secretEntry = vi.hoisted(() => vi.fn<(secret: string) => Promise<void>>());
+
 vi.mock("./browser-cdp", () => ({
   BrowserCdpEngine: class {
     constructor(private readonly contents: WebContents) {}
     destroy() {}
+    invalidateReferences() {}
+    async prepareSecret() {
+      return secretEntry;
+    }
+    async startScreencast(_options: BrowserScreencastOptions, onFrame: (frame: BrowserScreencastFrame) => void) {
+      viewFrames.push(onFrame);
+      return async () => undefined;
+    }
     async setEnvironment() {}
     async navigate(url: string) {
       await this.contents.loadURL(url);
@@ -114,7 +175,12 @@ let host: BrowserHost;
 let browserWindow: BrowserWindow;
 let statePath: string;
 beforeEach(async () => {
+  viewFrames.length = 0;
+  secretEntry.mockReset();
+  secretEntry.mockResolvedValue(undefined);
   windowOpenHandlers.length = 0;
+  menuTemplates.length = 0;
+  clipboardWrites.length = 0;
   directory = await mkdtemp(join(tmpdir(), "openbot-browser-limit-"));
   statePath = join(directory, "browser-tabs.json");
   browserWindow = new BrowserWindow();
@@ -259,36 +325,149 @@ describe("browser address navigation", () => {
 });
 
 describe("browser auth popups", () => {
-  it("opens an allowed popup as a focused tab with the same owner", async () => {
+  function listTabsFor(ownerAgentId: string, threadId: string) {
+    return host.handleDynamicTool({
+      namespace: "openbot_browser",
+      tool: "list_tabs",
+      arguments: {},
+      ownerAgentId,
+      threadId,
+      turnId: "popup-turn",
+      callId: "popup-call",
+    });
+  }
+  async function popupRequest(url = "https://accounts.example.com/auth") {
     const opener = await host.open("https://example.com/start", "thread-a", "agent-a");
     const handler = windowOpenHandlers.at(-1);
     if (!handler) throw new Error("Window open handler was not set.");
-    const openSpy = vi.spyOn(host, "open");
-    const outcome = handler({ url: "https://accounts.google.com/o/oauth2/auth?client_id=test" });
-    expect(outcome).toEqual({ action: "deny" });
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://accounts.google.com/o/oauth2/auth?client_id=test",
-      "thread-a",
-      "agent-a",
-      true,
-    );
-    await vi.waitFor(() => expect(host.listTabs()).toHaveLength(2));
-    const popup = host.listTabs().find((tab) => tab.id !== opener.id);
-    expect(popup).toMatchObject({
-      url: "https://accounts.google.com/o/oauth2/auth?client_id=test",
-      ownerThreadId: "thread-a",
-      ownerAgentId: "agent-a",
+    return { opener, outcome: handler({ url }) };
+  }
+
+  it("adopts the native popup once, with its owner and opener, without replaying navigation", async () => {
+    const { opener, outcome } = await popupRequest();
+    expect(outcome.action).toBe("allow");
+    expect(outcome.overrideBrowserWindowOptions?.webPreferences).toMatchObject({
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
     });
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", {
+      value: webContents.getAllWebContents().find((item) => item.getURL() === opener.url)?.mainFrame,
+    });
+    const load = vi.spyOn(native, "loadURL");
+    expect(outcome.createWindow?.({ webContents: native })).toBe(native);
+    expect(outcome.createWindow?.({ webContents: native })).toBe(native);
+    expect(load).not.toHaveBeenCalled();
+    const popup = host.listTabs().find((tab) => tab.id !== opener.id);
+    expect(host.listTabs()).toHaveLength(2);
+    expect(popup).toMatchObject({ ownerThreadId: "thread-a", ownerAgentId: "agent-a", openerTabId: opener.id });
     expect(host.activeTabId).toBe(popup?.id);
+    const listed = await listTabsFor("agent-a", "thread-a");
+    expect(JSON.stringify(listed)).toContain(opener.id);
+    const other = await listTabsFor("agent-b", "thread-b");
+    expect(JSON.stringify(other)).not.toContain(popup?.id);
+    native.emit("destroyed");
+    await vi.waitFor(() => expect(host.listTabs()).toHaveLength(1));
+    expect(host.activeTabId).toBe(opener.id);
   });
 
-  it("ignores a popup to a disallowed URL", async () => {
-    await host.open("https://example.com/start", "thread-a", "agent-a");
+  it("requires takeover for connected tabs even after the popup closes", async () => {
+    const { opener, outcome } = await popupRequest();
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", { value: {} });
+    outcome.createWindow?.({ webContents: native });
+    const popup = host.listTabs().find((tab) => tab.openerTabId === opener.id);
+    if (!popup) throw new Error("Missing popup.");
+    const prepare = (tabId: string) =>
+      host.prepareSecret({
+        namespace: "openbot_browser",
+        tool: "submit_secret",
+        threadId: "thread-a",
+        ownerAgentId: "agent-a",
+        turnId: "turn",
+        callId: "secret",
+        arguments: { tabId, method: "password", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
+      });
+    await expect(prepare(popup.id)).rejects.toThrow("Use takeover");
+    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    await host.close(popup.id);
+    await host.reload(opener.id);
+    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    expect(secretEntry).not.toHaveBeenCalled();
+    const independent = await host.open("https://example.com/independent-secret", "thread-a", "agent-a");
+    const prepared = await prepare(independent.id);
+    prepared.cancel();
+  });
+
+  it("keeps independent tabs when the opener closes and cleans up dependent popups", async () => {
+    const { opener, outcome } = await popupRequest();
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", { value: {} });
+    outcome.createWindow?.({ webContents: native });
+    const dependent = host.activeTabId;
+    const handler = windowOpenHandlers[windowOpenHandlers.length - 2];
+    handler?.({ url: "https://example.com/independent" }).createWindow?.({});
+    const independent = host.activeTabId;
+    await host.close(opener.id);
+    expect(host.listTabs().map((tab) => tab.id)).toEqual([independent]);
+    expect(host.listTabs().some((tab) => tab.id === dependent)).toBe(false);
+  });
+
+  it("allows separate same-URL requests and an initially blank popup", async () => {
+    const { outcome } = await popupRequest("about:blank");
     const handler = windowOpenHandlers.at(-1);
-    if (!handler) throw new Error("Window open handler was not set.");
-    handler({ url: "file:///etc/passwd" });
-    await Promise.resolve();
+    outcome.createWindow?.({});
+    handler?.({ url: "about:blank" }).createWindow?.({});
+    expect(host.listTabs()).toHaveLength(3);
+  });
+
+  it("reports blocked URLs without exposing their contents", async () => {
+    const { opener, outcome } = await popupRequest("file:///private/secret-token");
+    expect(outcome.action).toBe("deny");
     expect(host.listTabs()).toHaveLength(1);
+    expect(host.listTabs()[0]).toMatchObject({
+      id: opener.id,
+      popupFailure: { message: expect.stringContaining("unsupported address") },
+    });
+    expect(JSON.stringify(host.listTabs())).not.toContain("secret-token");
+  });
+
+  it("explains unsupported popup types", async () => {
+    await popupRequest();
+    expect(windowOpenHandlers.at(-1)?.({ url: "https://example.com", disposition: "other" }).action).toBe("deny");
+    expect(host.listTabs()[0].popupFailure?.message).toContain("popup type");
+  });
+
+  it("restores safe URLs without claiming to restore live opener relationships", async () => {
+    const { opener, outcome } = await popupRequest();
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", { value: {} });
+    outcome.createWindow?.({ webContents: native });
+    await native.loadURL("https://example.com/callback?code=private-code");
+    const popupId = host.activeTabId;
+    await host.activate(opener.id);
+    const state = await readFile(statePath, "utf8");
+    expect(state).not.toContain("private-code");
+    expect(state).not.toContain("openerTabId");
+    await host.destroy();
+    host = new BrowserHost(browserWindow, directory, statePath);
+    await host.restore();
+    expect(host.listTabs().find((tab) => tab.id === popupId)).toMatchObject({ url: "https://example.com/callback" });
+    expect(host.listTabs().every((tab) => tab.openerTabId === undefined)).toBe(true);
+  });
+
+  it("reports capacity and permits retry after a tab closes", async () => {
+    await fill("thread-a", "agent-a");
+    const handler = windowOpenHandlers.at(-1);
+    expect(handler?.({ url: "https://example.com/auth" }).action).toBe("deny");
+    expect(host.listTabs().at(-1)?.popupFailure?.message).toContain("tab limit");
+    await host.close(host.listTabs()[0].id);
+    const outcome = handler?.({ url: "https://example.com/auth" });
+    expect(outcome?.action).toBe("allow");
+    outcome?.createWindow?.({});
+    expect(host.listTabs()).toHaveLength(INPUT_LIMITS.browserTabs);
   });
 });
 
@@ -415,4 +594,349 @@ describe("browser tab capacity", () => {
     expect(host.getDisplayState()).toEqual({ tabs: [], activeTabId: null });
     expect(changed).toHaveBeenLastCalledWith([], null);
   });
+});
+
+describe("browser clipboard", () => {
+  const contentsFor = (url: string): WebContents => {
+    const found = webContents.getAllWebContents().find((candidate) => candidate.getURL() === url);
+    if (!found) throw new Error("Browser contents were not created.");
+    return found;
+  };
+  let nextPage = 0;
+  const openMenu = async (
+    params: Partial<BrowserContextMenuParams>,
+  ): Promise<{ items: MenuEntry[]; page: WebContents }> => {
+    nextPage += 1;
+    const tab = await host.open(`https://example.com/menu-${nextPage}`);
+    await host.setVisible({ visible: true, target: "main", bounds: pageBounds });
+    const page = contentsFor(tab.url);
+    page.emit(
+      "context-menu",
+      { preventDefault: () => undefined },
+      { selectionText: "", isEditable: false, linkURL: "", srcURL: "", mediaType: "none", ...params },
+    );
+    return { items: menuTemplates.at(-1) ?? [], page };
+  };
+
+  it("lets a page write to the clipboard but never read it", () => {
+    const granted: boolean[] = [];
+    permissionPolicy.request?.({}, "clipboard-sanitized-write", (allowed) => granted.push(allowed));
+    permissionPolicy.request?.({}, "clipboard-read", (allowed) => granted.push(allowed));
+    permissionPolicy.request?.({}, "media", (allowed) => granted.push(allowed));
+
+    expect(granted).toEqual([true, false, false]);
+    expect(permissionPolicy.check?.({}, "clipboard-sanitized-write")).toBe(true);
+    expect(permissionPolicy.check?.({}, "clipboard-read")).toBe(false);
+    expect(permissionPolicy.check?.({}, "geolocation")).toBe(false);
+  });
+
+  it("copies the whole link target, not the label the page truncates", async () => {
+    const linkURL = "https://www.ubereats.com/pl/store/example/abcdefghijklmnop?utm_source=share";
+    const { items } = await openMenu({ linkURL, selectionText: "ubereats.com/pl/store/exa…" });
+
+    items.find((item) => item.label === "Copy Link")?.click?.();
+
+    expect(clipboardWrites).toEqual([linkURL]);
+  });
+
+  it("copies selected page text through the page, not the focused view", async () => {
+    const { items, page } = await openMenu({ selectionText: "Zamów ponownie" });
+    const copy = vi.spyOn(page, "copy");
+
+    expect(items.map((item) => item.label)).toEqual(["Copy", "Select All"]);
+    items[0]?.click?.();
+    expect(copy).toHaveBeenCalledOnce();
+  });
+
+  it("keeps no menu where the page offers nothing to copy", async () => {
+    await openMenu({});
+
+    expect(menuTemplates).toHaveLength(0);
+  });
+});
+
+describe("agent tab cleanup", () => {
+  // Every browser tool under test names its tab, or names nothing at all.
+  function toolCall(tool: string, args: { tabId?: string }, agentId = "agent-a", threadId = "thread-a") {
+    return {
+      threadId,
+      turnId: "turn-1",
+      callId: `call-${tool}`,
+      ownerAgentId: agentId,
+      namespace: "openbot_browser",
+      tool,
+      arguments: args,
+    };
+  }
+
+  function resultText(result: DynamicToolResult): string {
+    return result.contentItems.map((item) => ("text" in item ? item.text : "")).join("");
+  }
+
+  it("closes a tab the calling agent owns and frees its capacity", async () => {
+    const tab = await host.open("https://example.com/one", "thread-a", "agent-a");
+
+    const result = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }));
+
+    expect(result.success).toBe(true);
+    expect(resultText(result)).toContain('"closed":true');
+    expect(host.listTabs()).toEqual([]);
+  });
+
+  it("refuses to close a tab owned by a different agent", async () => {
+    const tab = await host.open("https://example.com/one", "thread-a", "agent-a");
+
+    const result = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }, "agent-b", "thread-b"));
+
+    expect(result.success).toBe(false);
+    expect(resultText(result)).toContain("Unknown browser tab");
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: tab.id })]);
+  });
+
+  it("leaves a concurrent agent's tabs open when one agent closes its own", async () => {
+    const mine = await host.open("https://example.com/mine", "thread-a", "agent-a");
+    const theirs = await host.open("https://example.com/theirs", "thread-b", "agent-b");
+
+    await host.handleDynamicTool(toolCall("close_tab", { tabId: mine.id }));
+
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: theirs.id })]);
+    const listed = await host.handleDynamicTool(toolCall("list_tabs", {}, "agent-b", "thread-b"));
+    expect(resultText(listed)).toContain(theirs.id);
+  });
+
+  it("blocks the owning agent from closing a tab the user has taken over, and releases it again", async () => {
+    const tab = await host.open("https://example.com/login", "thread-a", "agent-a");
+    await host.beginTakeover(tab.id);
+
+    const blocked = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }));
+
+    expect(blocked.success).toBe(false);
+    expect(resultText(blocked)).toContain("under user takeover");
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: tab.id })]);
+
+    host.endTakeover(tab.id);
+    const allowed = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }));
+
+    expect(allowed.success).toBe(true);
+    expect(host.listTabs()).toEqual([]);
+  });
+
+  it("blocks every tab tool during a takeover, not only the close", async () => {
+    const tab = await host.open("https://example.com/login", "thread-a", "agent-a");
+    await host.beginTakeover(tab.id);
+
+    const result = await host.handleDynamicTool(toolCall("screenshot", { tabId: tab.id }));
+
+    expect(result.success).toBe(false);
+    expect(resultText(result)).toContain("under user takeover");
+  });
+
+  it("still lets the user close a tab they have taken over", async () => {
+    const tab = await host.open("https://example.com/login", "thread-a", "agent-a");
+    await host.beginTakeover(tab.id);
+
+    await host.close(tab.id);
+
+    expect(host.listTabs()).toEqual([]);
+  });
+
+  it("treats a repeated close and an unknown tab as an idempotent success", async () => {
+    const tab = await host.open("https://example.com/one", "thread-a", "agent-a");
+
+    const first = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }));
+    const second = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }));
+    const missing = await host.handleDynamicTool(
+      toolCall("close_tab", { tabId: "11111111-2222-3333-4444-555555555555" }),
+    );
+
+    for (const result of [first, second, missing]) {
+      expect(result.success).toBe(true);
+      expect(resultText(result)).toContain('"closed":true');
+    }
+    expect(host.listTabs()).toEqual([]);
+  });
+
+  it("closes a tab whose navigation never settles, so an interrupted run leaves nothing behind", async () => {
+    const tab = await host.open("https://example.com/interrupted", "thread-a", "agent-a");
+    const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+    if (!contents) throw new Error("Browser contents were not created.");
+    let signalStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    vi.spyOn(contents, "loadURL").mockImplementationOnce((url) => {
+      contents.emit("did-start-navigation", {}, url, false, true);
+      signalStarted?.();
+      // Never settles: the run is interrupted part-way through a load.
+      return new Promise<void>(() => undefined);
+    });
+    // The load stays pending for the rest of the test, so take its rejection now.
+    // The close drains the tab queue, so it waits out the navigation timeout the stuck load owns.
+    vi.useFakeTimers();
+    const pending = host.loadUrl(tab.id, "https://example.com/never-settles").catch(() => undefined);
+    await started;
+
+    const closing = host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(closing).resolves.toMatchObject({ success: true });
+    expect(host.listTabs()).toEqual([]);
+    await pending;
+  });
+
+  it("drops a tab whose teardown fails, so the agent is never told to retry a tab that is gone", async () => {
+    // A URL no other test uses: the electron mock keeps every contents it ever made, so looking one up
+    // by URL would otherwise find a closed tab from an earlier test instead of this one.
+    const tab = await host.open("https://example.com/teardown-failure", "thread-a", "agent-a");
+    const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+    if (!contents) throw new Error("Browser contents were not created.");
+    vi.spyOn(contents, "close").mockImplementation(() => {
+      throw new Error("teardown failed");
+    });
+
+    await expect(host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }))).resolves.toMatchObject({
+      success: false,
+    });
+
+    expect(host.listTabs()).toEqual([]);
+    // The persist runs beside the teardown, and the failure skips the await that would join it, so the
+    // file catches up a moment later. It still has to catch up: a tab left in it would come back.
+    await vi.waitFor(async () => expect(JSON.parse(await readFile(statePath, "utf8")).tabs).toEqual([]));
+  });
+});
+
+describe("secure browser handoff", () => {
+  async function prepare(method: "password" | "otp" | "authenticator" = "otp", digits?: number) {
+    const tab = await host.open("https://example.com/secure", "thread", "agent");
+    const prepared = await host.prepareSecret({
+      namespace: "openbot_browser",
+      tool: "submit_secret",
+      threadId: "thread",
+      ownerAgentId: "agent",
+      turnId: "turn",
+      callId: "secret",
+      arguments: {
+        tabId: tab.id,
+        method,
+        ...(digits === undefined ? {} : { digits }),
+        targets: [{ kind: "css", selector: "input" }],
+        submission: "on_input",
+      },
+    });
+    const contents = webContents.getAllWebContents().findLast((item) => item.getURL() === tab.url);
+    if (!contents) throw new Error("Missing browser tab.");
+    return { tab, prepared, contents };
+  }
+
+  it("prepares a password card when the provider supplies zero unused digits", async () => {
+    const { prepared } = await prepare("password", 0);
+    expect(prepared.request.method).toBe("password");
+    expect(isBrowserSecretRequest(prepared.request)).toBe(true);
+    expect(secretEntry).not.toHaveBeenCalled();
+    prepared.cancel();
+  });
+
+  it.each(["otp", "authenticator"] as const)("rejects zero digits for %s", async (method) => {
+    await expect(prepare(method, 0)).rejects.toThrow();
+    expect(secretEntry).not.toHaveBeenCalled();
+  });
+
+  it("blocks every capture endpoint after entry, even if the request is cancelled", async () => {
+    const { tab, prepared, contents } = await prepare();
+    vi.spyOn(contents, "loadURL").mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    const submitted = prepared.submit("123456");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalled());
+    await vi.advanceTimersByTimeAsync(5_000);
+    await submitted;
+    await expect(host.snapshot(tab.id)).rejects.toThrow("protected");
+    await expect(host.screenshot(tab.id)).rejects.toThrow("protected");
+    await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    expect(host.listTabs()[0]?.url).toBe("https://example.com");
+    prepared.cancel();
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    expect(secretEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("submits once and resumes only after document replacement", async () => {
+    const { tab, prepared, contents } = await prepare();
+    const submitted = prepared.submit("123456");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("123456"));
+    await expect(prepared.submit("123456")).rejects.toThrow("expired");
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    contents.emit("did-navigate", {}, "https://example.com/account");
+    await expect(submitted).resolves.toBe("submitted");
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+    expect(secretEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("automatically loads a new document after same-page submission without replaying the secret", async () => {
+    const { tab, prepared, contents } = await prepare("password", 0);
+    const load = vi.spyOn(contents, "loadURL");
+    vi.useFakeTimers();
+    const submitted = prepared.submit("fixture-password");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("fixture-password"));
+    contents.emit("did-navigate-in-page", {}, tab.url);
+    await expect(host.startView(tab.id, () => undefined)).rejects.toThrow("protected");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(submitted).resolves.toBe("submitted");
+    expect(load).toHaveBeenCalledOnce();
+    expect(load.mock.calls[0]?.[0]).toBe(tab.url);
+    expect(secretEntry).toHaveBeenCalledOnce();
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+
+  it("keeps protection when automatic navigation does not replace the document", async () => {
+    const { tab, prepared, contents } = await prepare();
+    vi.spyOn(contents, "loadURL").mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    const submitted = prepared.submit("123456");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalled());
+    contents.emit("did-navigate-in-page", {}, "https://example.com/secure#done");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(submitted).resolves.toBe("takeover");
+    prepared.cancel();
+    host.endTakeover(tab.id);
+    await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
+    await host.reload(tab.id);
+    await expect(host.capturePreview(tab.id)).rejects.toThrow("protected");
+    contents.emit("did-navigate", {}, "https://example.com/account");
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+
+  it("does not enter a value with the wrong code length", async () => {
+    const { tab, prepared } = await prepare();
+    await expect(prepared.submit("123")).rejects.toThrow("digits");
+    expect(secretEntry).not.toHaveBeenCalled();
+    prepared.cancel();
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+});
+
+it("does not resume an existing stream after a secure handoff", async () => {
+  const tab = await host.open("https://example.com/stream", "thread", "agent");
+  const receive = vi.fn();
+  const invalidated = vi.fn();
+  await host.startView(tab.id, receive, invalidated);
+  const frame = { sequence: 1, width: 1, height: 1, image: new Uint8Array([1]) };
+  viewFrames[0]?.(frame);
+  expect(receive).toHaveBeenCalledTimes(1);
+  const prepared = await host.prepareSecret({
+    namespace: "openbot_browser",
+    tool: "submit_secret",
+    threadId: "thread",
+    ownerAgentId: "agent",
+    turnId: "turn",
+    callId: "secret",
+    arguments: { tabId: tab.id, method: "otp", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
+  });
+  expect(invalidated).toHaveBeenCalledOnce();
+  viewFrames[0]?.(frame);
+  prepared.cancel();
+  viewFrames[0]?.(frame);
+  expect(receive).toHaveBeenCalledTimes(1);
+  await host.startView(tab.id, receive);
+  viewFrames[1]?.(frame);
+  expect(receive).toHaveBeenCalledTimes(2);
 });

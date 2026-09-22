@@ -86,7 +86,12 @@ export const BROWSER_TOOL_DEFINITIONS = [
     description: "Open an HTTP(S) URL in a new persistent private-browser tab.",
     shape: { url: requiredString(INPUT_LIMITS.browserUrl) },
   }),
-  browserTool({ name: "list_tabs", description: "List browser tabs owned by this agent.", shape: {} }),
+  browserTool({
+    name: "list_tabs",
+    description:
+      "List browser tabs owned by this agent, including popup openerTabId and blocked-popup feedback. After a sign-in click, check for a new tab, take a fresh snapshot there, and continue the sign-in. When it closes, return to the opener and verify sign-in succeeded.",
+    shape: {},
+  }),
   browserTool({
     name: "status",
     description: "Get tabs, active control state, environments, recordings, and diagnostic error counts.",
@@ -99,9 +104,49 @@ export const BROWSER_TOOL_DEFINITIONS = [
     shape: { tabId, image },
   }),
   browserTool({
+    name: "submit_secret",
+    description:
+      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payments.",
+    shape: {
+      tabId,
+      method: z
+        .enum(["password", "otp", "authenticator"])
+        .describe(
+          "Selects the card: password for an account password; otp for a numeric email/SMS code; authenticator for a numeric authenticator-app code. Generic 2FA labels or masked inputs do not establish the method.",
+        ),
+      targets: z
+        .array(browserTargetSchema)
+        .min(1)
+        .max(12)
+        .describe(
+          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
+        ),
+      digits: z
+        .number()
+        .int()
+        .min(4)
+        .max(12)
+        .or(z.literal(0))
+        .default(6)
+        .describe(
+          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",
+        ),
+      submission: z
+        .enum(["click", "enter", "on_input"])
+        .describe(
+          "Use click with submitTarget when the page has a Continue, Verify, Next, or Sign in button, even if disabled before entry. OpenBot fills the fields then clicks that button. Use enter only for a form submitted by Enter. on_input ONLY fills fields; use it only when the site explicitly submits on the final digit without a button. It does not find or click a button.",
+        ),
+      submitTarget: browserTargetSchema
+        .optional()
+        .describe(
+          "Required with click: the active step’s Continue, Verify, Next, or Sign in button from the same fresh snapshot. A currently disabled button can become enabled after entry.",
+        ),
+    },
+  }),
+  browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for an authorization step you cannot complete yourself, such as a hardware passkey, a prompt on another device, or a secret you cannot find.",
+      "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, payment confirmation, or when secure password/code handoff is unavailable.",
     shape: { tabId },
   }),
   browserTool({

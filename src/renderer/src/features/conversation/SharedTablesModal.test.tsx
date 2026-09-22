@@ -38,7 +38,7 @@ describe("SharedTablesModal", () => {
     const onCountChange = vi.fn();
     render(() => <SharedTablesModal agents={agents} open onOpenChange={vi.fn()} onCountChange={onCountChange} />);
 
-    expect(await screen.findByRole("dialog", { name: "Saved data" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Tables" })).toBeInTheDocument();
     expect(await screen.findByText("people")).toBeInTheDocument();
     expect(screen.getByText("214 records · Kept by Chief")).toBeInTheDocument();
     expect(screen.getByText(/not counted · Made outside OpenBot/)).toBeInTheDocument();

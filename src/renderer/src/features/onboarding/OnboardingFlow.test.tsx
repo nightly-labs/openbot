@@ -10,6 +10,7 @@ import type {
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ProviderCodeLoginState } from "../../components/ProviderCodeLoginDialog";
 import { Toaster, toast } from "../../components/ui";
 import { STORY_AGENT_STATUS } from "../../preview/fixtures";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
@@ -84,14 +85,14 @@ describe("OnboardingFlow", () => {
 
   it("requests optional macOS permissions before continuing", async () => {
     const view = renderFlow();
-    const openPermission = vi.spyOn(activeMock?.api ?? window.openbot, "openComputerUsePermissionSetup");
+    const openPermission = vi.spyOn(activeMock?.api ?? window.openbot, "openComputerUsePermissionPane");
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     expect(await view.findByRole("heading", { name: "OpenBot might control your computer" })).toBeInTheDocument();
-    await waitFor(() => expect(view.getAllByRole("button", { name: "Set up" })).toHaveLength(2));
+    await waitFor(() => expect(view.getByRole("button", { name: "Grant Screen Recording" })).toBeInTheDocument());
+    expect(view.getByRole("button", { name: "Grant Accessibility" })).toBeInTheDocument();
 
-    await fireEvent.click(view.getAllByRole("button", { name: "Set up" })[0]);
+    await fireEvent.click(view.getByRole("button", { name: "Grant Screen Recording" }));
     await waitFor(() => expect(openPermission).toHaveBeenCalledWith("screen-recording"));
-    expect(await view.findByText("System Settings opened")).toBeInTheDocument();
 
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     expect(await view.findByRole("heading", { name: "Give each agent a job" })).toBeInTheDocument();
@@ -335,6 +336,115 @@ describe("OnboardingFlow", () => {
     expect(onConnectProvider).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the downloads reachable while the local providers are still being checked", async () => {
+    activeMock = createMockOpenBot();
+    window.openbot = activeMock.api;
+    // What a first run looks like before main answers: nothing downloaded, no provider checked yet,
+    // and the agent runtime still starting. Every action on the screen used to be disabled here,
+    // with nothing to press and nothing said, which is the state reported in issue #643.
+    const agentStatus: AgentStatus = {
+      ...STORY_AGENT_STATUS,
+      phase: "starting",
+      providers: (STORY_AGENT_STATUS.providers ?? []).map((provider) => ({
+        ...provider,
+        state: "not-started",
+        version: null,
+        email: null,
+        message: null,
+      })),
+    };
+    const runtimeStatuses: Record<ManagedProviderId, ProviderRuntimeStatus> = {
+      codex: { phase: "not-downloaded", progress: null, message: null, version: null },
+      claude: { phase: "not-downloaded", progress: null, message: null, version: null },
+      grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
+    };
+    const onDownloadProvider = vi.fn();
+    const view = render(() => (
+      <OnboardingFlow
+        state={{ completed: false, preferredProvider: null, preferredModel: null }}
+        agentStatus={agentStatus}
+        platform="darwin"
+        refreshingProviders
+        providerRuntimeStatuses={runtimeStatuses}
+        onDownloadProvider={onDownloadProvider}
+        onCancelProviderDownload={vi.fn()}
+        onConnectProvider={vi.fn()}
+        onSave={async () => undefined}
+      />
+    ));
+
+    const download = view.getByRole("button", { name: "Download ChatGPT" });
+    expect(download).toBeEnabled();
+    await fireEvent.click(download);
+    expect(onDownloadProvider).toHaveBeenCalledWith("codex");
+
+    // The refused button says what it is waiting for, rather than leaving the screen to be read as
+    // broken.
+    expect(view.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(view.getByText("Download ChatGPT to continue.")).toBeInTheDocument();
+  });
+
+  it("names the step Next is waiting for as the selected provider moves through it", async () => {
+    activeMock = createMockOpenBot();
+    window.openbot = activeMock.api;
+    const agentStatus: AgentStatus = {
+      ...STORY_AGENT_STATUS,
+      providers: (STORY_AGENT_STATUS.providers ?? []).map((provider) => ({
+        ...provider,
+        state: "not-installed",
+        version: null,
+        email: null,
+        message: null,
+      })),
+    };
+    const [runtimeStatuses, setRuntimeStatuses] = createSignal<Record<ManagedProviderId, ProviderRuntimeStatus>>({
+      codex: { phase: "not-downloaded", progress: null, message: null, version: null },
+      claude: { phase: "not-downloaded", progress: null, message: null, version: null },
+      grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
+    });
+    const view = render(() => (
+      <OnboardingFlow
+        state={{ completed: false, preferredProvider: null, preferredModel: null }}
+        agentStatus={agentStatus}
+        platform="darwin"
+        providerRuntimeStatuses={runtimeStatuses()}
+        onDownloadProvider={vi.fn()}
+        onCancelProviderDownload={vi.fn()}
+        onConnectProvider={vi.fn()}
+        onSave={async () => undefined}
+      />
+    ));
+
+    // Nothing is connected, so nothing is chosen for the user, and the reason says that first.
+    expect(view.getByText("Select a provider to continue.")).toBeInTheDocument();
+    await fireEvent.click(
+      within(view.getByRole("radiogroup", { name: "Default provider" })).getByRole("radio", { name: /ChatGPT/ }),
+    );
+
+    setRuntimeStatuses((current) => ({
+      ...current,
+      codex: { phase: "downloading", progress: 40, message: null, version: null },
+    }));
+    expect(await view.findByText("ChatGPT is still downloading.")).toBeInTheDocument();
+
+    setRuntimeStatuses((current) => ({
+      ...current,
+      codex: { phase: "download-error", progress: null, message: "Network error", version: null },
+    }));
+    expect(
+      await view.findByText("ChatGPT could not be downloaded. Retry the download to continue."),
+    ).toBeInTheDocument();
+    expect(view.getByRole("button", { name: "Retry ChatGPT" })).toBeEnabled();
+
+    setRuntimeStatuses((current) => ({
+      ...current,
+      codex: { phase: "ready", progress: 100, message: null, version: "0.145.0" },
+    }));
+    expect(await view.findByText("Connect ChatGPT to continue.")).toBeInTheDocument();
+  });
+
   it("offers no OpenCode download to a user who installed the CLI already", () => {
     activeMock = createMockOpenBot();
     window.openbot = activeMock.api;
@@ -373,5 +483,53 @@ describe("OnboardingFlow", () => {
     expect(view.queryByRole("button", { name: "Download OpenCode" })).toBeNull();
     // The version the user's own CLI reports, which is the one the row must show.
     expect(view.getByText("v1.18.27")).toBeInTheDocument();
+  });
+
+  it("offers the code sign-in on the first-run provider step and shows the code to type", async () => {
+    const agentStatus: AgentStatus = {
+      ...STORY_AGENT_STATUS,
+      providers: (STORY_AGENT_STATUS.providers ?? []).map((provider) =>
+        provider.id === "codex" ? { ...provider, state: "sign-in-required" as const, email: null } : provider,
+      ),
+    };
+    const [state, setState] = createSignal<ProviderCodeLoginState>({ phase: "starting" });
+    const [provider, setProvider] = createSignal<AgentProviderId | null>(null);
+    const codeLogin = {
+      provider,
+      state,
+      start: vi.fn((id: AgentProviderId) => {
+        setProvider(id);
+        setState({
+          phase: "waiting",
+          userCode: "KTQ4-B62MX",
+          verificationUrl: "https://auth.openai.com/codex/device",
+          expiresAt: Date.now() + 600_000,
+        });
+      }),
+      cancel: vi.fn(() => setProvider(null)),
+      openVerificationUrl: vi.fn(),
+    };
+    const view = render(() => (
+      <OnboardingFlow
+        state={{ completed: false, preferredProvider: null, preferredModel: null }}
+        agentStatus={agentStatus}
+        platform="darwin"
+        codeLogin={codeLogin}
+        onSave={async () => undefined}
+      />
+    ));
+
+    // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
+    const moreActions = view.getByRole("button", { name: "More ways to log in to ChatGPT" });
+    await fireEvent.pointerDown(moreActions, { button: 0 });
+    await fireEvent.click(moreActions);
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Log in with code" }), { button: 0 });
+
+    await waitFor(() => expect(codeLogin.start).toHaveBeenCalledWith("codex"));
+    expect(await screen.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Close log in to ChatGPT" }));
+    await waitFor(() => expect(codeLogin.cancel).toHaveBeenCalledTimes(1));
+    expect(screen.queryByLabelText("Login code K T Q 4 - B 6 2 M X")).toBeNull();
   });
 });

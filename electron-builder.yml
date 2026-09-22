@@ -35,6 +35,8 @@ asarUnpack:
 extraResources:
   - from: resources/managed-skills
     to: managed-skills
+  - from: resources/plugin-catalog
+    to: plugin-catalog
   - from: build/icon-production.png
     to: icons/icon-production.png
   - from: build/icon-dev.png
@@ -49,9 +51,10 @@ extraResources:
     to: licenses/OpenAI-Whisper-LICENSE
   - from: build/licenses/whisper.cpp-LICENSE
     to: licenses/whisper.cpp-LICENSE
-# Voice and remote desktop are prepared for macOS and Windows only, so their resources are listed
-# under each of those platforms instead of here. electron-builder merges the root and platform
-# lists, so both still get them, while the Linux build has no missing `from` to fail on.
+# Voice and remote desktop are prepared for macOS and Windows only, and each Computer Use driver
+# is built for one target, so their resources are listed under each platform instead of here.
+# electron-builder merges the root and platform lists, so every build still gets its own, while a
+# build has no missing `from` to fail on and no other platform's driver to carry.
 directories:
   output: dist
 mac:
@@ -71,12 +74,24 @@ mac:
       to: whisper/bin
     - from: build/remote-desktop-runtime
       to: remote-desktop-runtime
+    - from: build/cua-driver/darwin/arm64
+      to: cua-driver/darwin/arm64
+  # The Computer Use driver arrives signed by Cua AI with the hardened runtime, a secure timestamp
+  # and `com.apple.security.automation.apple-events`. Re-signing it with OpenBot's inherited
+  # entitlements would drop that entitlement and break the driver's Automation route, so its own
+  # Developer ID signature is kept. Notarization accepts a nested binary signed by another team.
+  signIgnore:
+    - Contents/Resources/cua-driver/
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   darkModeSupport: true
   extendInfo:
     ElectronTeamID: ZTRDTUL87R
     NSMicrophoneUsageDescription: OpenBot uses the microphone to transcribe voice prompts locally on this Mac.
+    # Computer Use runs the driver as a child process, so macOS asks for both grants in OpenBot's
+    # name and shows these sentences.
+    NSScreenCaptureUsageDescription: OpenBot captures the screen so an agent can see the app windows you ask it to control.
+    NSAppleEventsUsageDescription: OpenBot sends Automation events so an agent can control the apps you ask it to control.
     NSUserActivityTypes:
       - NSUserActivityTypeBrowsingWeb
   target:
@@ -93,6 +108,8 @@ win:
       to: whisper/bin
     - from: build/remote-desktop-runtime
       to: remote-desktop-runtime
+    - from: build/cua-driver/win32/x64
+      to: cua-driver/win32/x64
   target:
     - target: nsis
       arch:
@@ -104,6 +121,8 @@ linux:
   extraResources:
     - from: build/linux/openbot.apparmor
       to: linux/openbot.apparmor
+    - from: build/cua-driver/linux/x64
+      to: cua-driver/linux/x64
   # Electron takes its Linux app id from `desktopName` in package.json, and the window manager
   # matches a running window to the launcher through `StartupWMClass`. Syncing the two from one
   # value is what makes the taskbar icon group with the window it belongs to.

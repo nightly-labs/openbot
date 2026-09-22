@@ -27,7 +27,9 @@ Create the `release` environment in `nightly-labs/openbot`, then add these envir
 - `CSC_LINK` — a base64-encoded Developer ID Application `.p12` file.
 - `MAC_PROVISIONING_PROFILE` — the base64-encoded Developer ID provisioning profile for
   `app.openbot.desktop`, with the `applinks:openbot.run` entitlement.
-- `CSC_KEY_PASSWORD` — the `.p12` export password.
+- `CSC_KEY_PASSWORD` — the application `.p12` export password.
+- `CSC_INSTALLER_LINK` — a base64-encoded **Developer ID Installer** `.p12` file for team `ZTRDTUL87R`.
+- `CSC_INSTALLER_KEY_PASSWORD` — the installer `.p12` export password.
 - `APPLE_ID` — the Apple Account used for notarization.
 - `APPLE_APP_SPECIFIC_PASSWORD` — a dedicated app-specific password for `notarytool`.
 - `APPLE_TEAM_ID` — the Apple Developer team ID.
@@ -41,9 +43,9 @@ checksum, SBOM, and provenance checks.
 
 ## Build the remote desktop runtime
 
-`native-runtime.lock.json` pins the OpenBot forks of Sunshine `v2026.516.143833` and Moonlight Web
-`v2.10.0` by full commit and source archive SHA-256. Each entry also records its exact upstream base
-commit and the reviewable OpenBot patch. Build on the target platform:
+`native-runtime.lock.json` pins the upstream source for Sunshine `v2026.516.143833` and Moonlight Web
+`v2.10.0` by full commit and source archive SHA-256. Each entry also records the reviewable OpenBot
+patch applied to that source. Build on the target platform:
 
 ```bash
 bun run build:remote-desktop-runtime
@@ -62,6 +64,11 @@ recipe or a pinned input changes. It publishes an immutable GitHub prerelease na
 SBOMs, build provenance, and `remote-desktop-runtime-manifest.json`. It is not an OpenBot application
 update and it must never contain `latest.yml`.
 
+PR pushes do not cancel an active runtime build. The next run reuses a successful native build
+from the same PR and platform when its native inputs and build tools are unchanged. It still runs
+verification and the macOS smoke test against the current checkout. A cache miss rebuilds the
+runtime. Pushes to `main` and manual dispatches do not use the PR build cache.
+
 After publication, the workflow opens a draft PR that adds the release tag and SHA-256 values to
 `native-runtime.lock.json`. That job runs only from `main`, because it pins against the lock it checks
 out: the input digest is derived from the recipe on disk, and a manifest built from a different recipe
@@ -79,6 +86,11 @@ gh release download remote-desktop-runtime-<input-digest> --pattern remote-deskt
 bun scripts/pin-remote-desktop-runtime.ts remote-desktop-runtime-manifest.json
 ```
 
+To repeat verification after a download or CI setup failure, without replacing the published
+artifacts, run `gh workflow run remote-desktop-runtime.yml --ref <branch> -f verify_only=true`.
+This mode requires an existing release for the current input digest and runs installation, runtime
+verification, the macOS smoke test, and application packaging. It does not build or publish.
+
 Commit the rewritten `native-runtime.lock.json` to the branch and merge it with the recipe, so `main`
 never sees the two apart. The pin does not change the input digest -- it covers `recipeVersion`, both
 source entries and `targets`, not the artifacts -- so it cannot invalidate the release it just pinned.
@@ -93,6 +105,29 @@ bun run verify:remote-desktop-runtime
 The installer accepts only the exact prerelease and assets in the lock file. It rejects a changed
 manifest, a changed archive, an unsafe archive path, and a mismatched source manifest. Do not replace
 assets in an existing runtime prerelease. Increase `recipeVersion` when the build process changes.
+
+### Sunshine security backports (runtime recipe 12)
+
+The Sunshine upstream base remains `v2026.516.143833` to keep the tested macOS input backend.
+The OpenBot patch includes these upstream security changes and regression tests:
+
+- `1583e7c4a7e99538c7700315a1d2a2101c6d2812`: validate input packets before queueing and
+  dispatch (GHSA-26q2-58j6-qmvv and GHSA-6w33-pjh7-p77c).
+- `82bccdf69894ee03ac422cc787f1ac9654da359d`: reject short ENet control packets
+  (GHSA-c428-87f8-rrv5).
+- `ccf97e38796be6cfcbff0ef248a684d39e181eba`: bind pairing approval to an explicit,
+  expiring request ID (GHSA-36ff-frg7-492f).
+- `4d768847fcd88cc94ac745c4611715c67d7d67e1`: require the exact enabled client
+  certificate and canonicalize stored certificate identities (GHSA-6jvv-jqr7-m6m3).
+
+Backport adaptations retain the older platform APIs and test fixtures. Native CI builds and runs
+only the relevant packet, pairing, REST authorization, and certificate regression tests. The local
+Moonlight client uses a random pairing name and approves only its matching loopback request ID.
+Moonlight now builds from the same upstream commit with the existing OpenBot patch and a fix
+that sends the configured pairing name instead of the upstream hard-coded name.
+The published runtime uses a new recipe/input digest; no existing release assets are replaced.
+The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
+on Linux.
 
 ## Pin the OpenCode CLI
 
@@ -119,6 +154,64 @@ Run it on a version bump only. A bump also needs the Windows checks in
 [the OpenCode notes](ARCHITECTURE.md#opencode-and-acp): the `win32-x64` values come from the
 published tarball read on macOS, so a staged `opencode.exe --version` must be confirmed on Windows
 before release.
+
+## Pin the Computer Use driver
+
+`native-runtime.lock.json` pins `cua-driver`, the third-party binary that gives every provider
+Computer Use, by release tag, asset SHA-256, and one SHA-256 for each file OpenBot ships. Unlike the
+provider CLIs, the driver is packaged rather than downloaded on demand, so the release carries it and
+the user installs nothing.
+
+```bash
+bun run pin:cua-driver 0.28.2
+```
+
+The script downloads all three `-binary` release assets, hashes each shipped file, and refuses a
+release that renamed an asset or dropped a file. It prints the block for review instead of rewriting
+the lock, so paste it over the `cuaDriver` entry. Use the versioned `cua-driver-rs-v*` tags; the
+`nightly-cua-driver-rs-v*` tags are rebuilt daily and are not a pin.
+
+`bun run prepare:cua-driver` then writes `build/cua-driver/<platform>/<arch>` from the pin, verifying
+every digest before and after it installs, and `electron-builder.yml` copies that directory to
+`resources/cua-driver/<platform>/<arch>`. Every `package`, `package:*`, `dist:*` and `dist:release`
+run does this first. Each installer carries only its own target's driver, and the package verifiers
+check both that the driver is present and that no other platform's is. The macOS release job calls
+`electron-builder` directly rather than through `dist:mac`, so it installs the driver in its own
+`Install and verify native runtimes` step; the Windows and Linux jobs get it from `dist:win` and
+`dist:linux`.
+
+On macOS the driver arrives signed by Cua AI with the hardened runtime, a secure timestamp, and the
+Automation entitlement. `mac.signIgnore` keeps that signature: re-signing it under OpenBot's
+inherited entitlements would drop the entitlement and break the driver's Automation route.
+Notarization accepts a nested binary signed by another Developer ID team, and
+`verify-macos-package.ts` fails if the Cua AI authority or the hardened runtime flag is ever lost.
+
+## Pin the Bun tool runtime
+
+`native-runtime.lock.json` also pins Bun, which is not a provider CLI: it is the runtime a STDIO MCP
+server is started with on a computer that has no Node, and the staged layout puts a second name
+`bunx` beside it so that `npx -y <package>` has something to answer it. The pin has its own script
+for the same reason OpenCode does - the version, three platform packages, and the MIT license have
+to agree:
+
+```bash
+bun run pin:bun-runtime         # the newest published release
+bun run pin:bun-runtime 1.4.2   # one exact version
+```
+
+It works like the OpenCode script: it downloads all three platform tarballs, checks
+`package/package.json` against the registry metadata, hashes the extracted binary and
+`LICENSE.md`, runs `--version` on the target that matches the host, and prints the block for review
+instead of rewriting the lock. Paste it over the `bun` entry and re-run it with that exact version
+to get `already pins Bun <version>`.
+
+The x64 entries are the `baseline` builds. Bun's plain x64 build needs AVX2 and answers a spawn on
+an older machine with an illegal instruction and no message, which would reach the user as an MCP
+server that never starts.
+
+Move this pin at release preparation, with the release-upgrade-safety audit, and not on a schedule:
+a pinned runtime is OpenBot's supply chain, and a Bun security release only reaches users through an
+OpenBot release. One reviewed commit per release.
 
 ## Publish a version
 
@@ -160,7 +253,7 @@ The workflow:
 1. verifies the tag matches `package.json`;
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
 3. runs the complete offline repository check;
-4. builds signed and notarized ARM64 DMG and ZIP artifacts on a GitHub macOS runner;
+4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on the same GitHub macOS runner;
 5. builds an unsigned Windows x64 NSIS installer on a GitHub Windows runner;
 6. builds an unsigned Linux x64 AppImage on a GitHub Ubuntu 24.04 runner, with the launch check under
    `xvfb-run`;
@@ -207,7 +300,7 @@ Before creating the first tag or any later release:
 0. run the Team API compatibility matrix for every protocol that remains in the adapter registry. The matrix must cover an older client with the new host, the new client with an older host, matching versions, no shared protocol, capability omission, unknown optional events, and malformed known events. Do not reduce this matrix because a protocol is old or because many application versions separate the peers. Confirm that each supported protocol still has unchanged client and host fixtures;
 
 1. run `bun run release:preflight` and resolve every reported release-secret or repository gate;
-2. confirm the `release` environment contains all six macOS secrets above; Windows and Linux remain
+2. confirm the `release` environment contains all eight macOS secrets above; Windows and Linux remain
    unsigned;
 3. confirm the production `/join` page and Apple association file pass the deployment checks in CI;
 4. run `bun install --frozen-lockfile` and `bun run check` from a clean clone;
@@ -248,3 +341,62 @@ After publishing `v0.1.0`, keep one installed copy and use the first signed patc
 end-to-end updater acceptance test: check, download, restart, and confirm the version changed without
 losing local agents or queues. This cannot be proven with an unsigned development build because macOS
 updaters require both versions to share a valid Developer ID signature.
+
+## Managed-host release package
+
+The normal DMG remains the desktop application. The optional Host PKG installs managed-host
+infrastructure only. Both use the validated `v<VERSION>` tag and the exact same source commit.
+The macOS job fails if Host compilation, signing, payload verification, notarization, stapling,
+or checksum generation fails; it never publishes a release with the Host package silently omitted.
+
+Expected macOS assets:
+
+```text
+OpenBot-<VERSION>-arm64.dmg
+OpenBot-<VERSION>-arm64.zip
+OpenBot-Host-<VERSION>-arm64.pkg
+latest-mac.yml
+SHA256SUMS-macos.txt
+OpenBot-<VERSION>-macos.spdx.json
+OpenBot-Host-<VERSION>-macos.spdx.json
+OpenBot-<VERSION>-macos.sigstore.json
+```
+
+The macOS checksum file covers the DMG, ZIP, and Host PKG. The existing provenance step consumes
+that file, so all three artifacts are attested against the same tag, commit, and release run.
+The existing publish job downloads `release-macos` and publishes the PKG with the other assets.
+`latest-mac.yml` still describes only Electron application updates; a `.pkg` reference is rejected.
+
+After verifying OpenBot.app, the macOS job:
+
+1. runs native account tests without creating users;
+2. imports the application and installer certificates into a temporary, isolated keychain;
+3. compiles standalone ARM64 `host-manager` and `openbot-host` executables with Bun, and the native
+   account helper with Swift; no target-machine runtime or compiler is required;
+4. signs all executables with **Developer ID Application**, hardened runtime and timestamp, and
+   checks their fixed identifiers and team `ZTRDTUL87R`;
+5. creates the fixed root:wheel package payload and signs the PKG with **Developer ID Installer**;
+6. expands it and rejects extra files, symlinks, unsafe modes/owners, version mismatches, changed
+   installer scripts, unexpected destinations, or non-system dynamic runtime dependencies;
+7. submits the PKG through `notarytool`, waits for `Accepted`, staples it, then requires successful
+   `pkgutil --check-signature`, `spctl --assess --type install`, and `stapler validate`;
+8. generates checksums and the Host payload SBOM, attests provenance, and uploads the PKG.
+
+The Bun executables need only `com.apple.security.cs.allow-jit` for JavaScriptCore's ARM64 JIT.
+The native account helper has no special entitlements. Library validation, executable-page
+protection, and the hardened runtime remain enabled. CI launches the signed standalone binaries
+with a system-only PATH and exercises a hot JavaScript loop before publication. Do not copy broad
+example Bun entitlements that disable these protections. If the pinned Bun version cannot pass
+these checks, stop the release and investigate; do not weaken the flags to obtain a signature.
+
+The release keychain and imported `.p12` files are deleted at step exit. The installer identity is
+mandatory and distinct from the application identity; add both new secrets before tagging. Never
+publish an unsigned Host package. The test fixture package is temporary, unsigned, never installed,
+and never uploaded as a release asset.
+
+CI does not install the root daemon or create tenant accounts on the runner. Package expansion,
+BOM ownership/mode verification, plist/signature checks, standalone smoke checks, and mocked CLI
+checks run there. Actual signed PKG installation/upgrade, new-account login, private-home isolation,
+and two-user Aqua relaunch remain the [target-host acceptance gate](multi-tenant-hosting.md#target-host-acceptance-required-before-paying-client-use).
+No tenant-data backup is made. Infrastructure updates require administrator installation of a
+newer signed Host PKG; the daemon never replaces itself.

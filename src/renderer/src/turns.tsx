@@ -348,6 +348,7 @@ const Turns = createSimpleContext({
       refreshRoutineIds,
       answerPrompt,
       respondToApproval,
+      respondToApprovalRequest,
       respondToBrowserTakeover,
       cancelQueuedMessage,
       steerQueuedMessage,

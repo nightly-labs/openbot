@@ -3,12 +3,15 @@ import type {
   InstalledSkill,
   MarketplaceAgentDetail,
   MarketplaceSkillPage,
+  McpServerConfig,
   OpenBotDesktopApi,
   SkillSubmission,
 } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { type ComponentProps, createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "../../analytics";
+import type { MarketplacePluginDetail } from "./marketplace-plugins";
 import { SkillsMarketplaceModal } from "./SkillsMarketplaceModal";
 
 /** The install target is a listbox control, so a choice is a click on the trigger and on the option. */
@@ -26,6 +29,38 @@ async function chooseInstallTarget(name: string) {
 }
 
 const nativeCanvasGetContext = HTMLCanvasElement.prototype.getContext;
+
+type MarketplaceProps = Partial<ComponentProps<typeof SkillsMarketplaceModal>>;
+
+/**
+ * The modal as the marketplace tests open it: no agents chosen, so every install picks a target.
+ *
+ * A case that drives a prop from a signal passes a function, so the read stays inside the render and
+ * the prop stays reactive. Passing the object form there would freeze the signal at its first value.
+ */
+function renderMarketplace(props: MarketplaceProps | (() => MarketplaceProps) = {}) {
+  const resolve = typeof props === "function" ? props : () => props;
+  return render(() => (
+    <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} {...resolve()} />
+  ));
+}
+
+function openSkillsTab(): void {
+  screen.getByRole("tab", { name: "Skills" }).click();
+}
+
+function installedSkill(skillId: string, name: string, overrides: Partial<InstalledSkill> = {}): InstalledSkill {
+  return {
+    skillId,
+    slug: skillId,
+    name,
+    installedVersion: 2,
+    availableVersion: 2,
+    state: "installed",
+    enabled: true,
+    ...overrides,
+  };
+}
 const trackMarketplaceAnalytics = vi.fn();
 
 function trackScopedMarketplaceAnalytics<Name extends AnalyticsEventName>(
@@ -106,15 +141,7 @@ describe("SkillsMarketplaceModal", () => {
   });
 
   it.each([1, 2])("tries only a matching installed version %s for the selected agent", async (version) => {
-    const installed: InstalledSkill = {
-      skillId: "release-notes",
-      slug: "release-notes",
-      name: "Release Notes",
-      installedVersion: version,
-      availableVersion: 2,
-      state: "installed",
-      enabled: true,
-    };
+    const installed = installedSkill("release-notes", "Release Notes", { installedVersion: version });
     let finishResearch: ((skills: InstalledSkill[]) => void) | undefined;
     vi.spyOn(window.openbot.skills, "listInstalled").mockImplementation((agentId) =>
       agentId === "writer"
@@ -124,18 +151,16 @@ describe("SkillsMarketplaceModal", () => {
           }),
     );
     const onTrySkill = vi.fn();
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[
-          { id: "writer", name: "Writer" },
-          { id: "research", name: "Research" },
-        ]}
-        activeAgentId="writer"
-        onOpenChange={vi.fn()}
-        onTrySkill={onTrySkill}
-      />
-    ));
+    renderMarketplace({
+      open: true,
+      agents: [
+        { id: "writer", name: "Writer" },
+        { id: "research", name: "Research" },
+      ],
+      activeAgentId: "writer",
+      onOpenChange: vi.fn(),
+      onTrySkill: onTrySkill,
+    });
     fireEvent.click(screen.getByRole("tab", { name: "Skills" }));
     fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
     if (version !== 2) {
@@ -164,15 +189,13 @@ describe("SkillsMarketplaceModal", () => {
           failRead = reject;
         }),
     );
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[{ id: "writer", name: "Writer" }]}
-        activeAgentId="writer"
-        onOpenChange={vi.fn()}
-        onTrySkill={vi.fn()}
-      />
-    ));
+    renderMarketplace({
+      open: true,
+      agents: [{ id: "writer", name: "Writer" }],
+      activeAgentId: "writer",
+      onOpenChange: vi.fn(),
+      onTrySkill: vi.fn(),
+    });
     fireEvent.click(screen.getByRole("tab", { name: "Skills" }));
     fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
 
@@ -187,15 +210,7 @@ describe("SkillsMarketplaceModal", () => {
   });
 
   it("keeps a failed skills read after an install instead of asking for the install again", async () => {
-    const installed: InstalledSkill = {
-      skillId: "release-notes",
-      slug: "release-notes",
-      name: "Release Notes",
-      installedVersion: 2,
-      availableVersion: 2,
-      state: "installed",
-      enabled: true,
-    };
+    const installed = installedSkill("release-notes", "Release Notes");
     let failRefresh: ((error: Error) => void) | undefined;
     let reads = 0;
     vi.spyOn(window.openbot.skills, "listInstalled").mockImplementation(() => {
@@ -206,15 +221,13 @@ describe("SkillsMarketplaceModal", () => {
       });
     });
     vi.spyOn(window.openbot.skills, "install").mockResolvedValue(installed);
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[{ id: "writer", name: "Writer" }]}
-        activeAgentId="writer"
-        onOpenChange={vi.fn()}
-        onTrySkill={vi.fn()}
-      />
-    ));
+    renderMarketplace({
+      open: true,
+      agents: [{ id: "writer", name: "Writer" }],
+      activeAgentId: "writer",
+      onOpenChange: vi.fn(),
+      onTrySkill: vi.fn(),
+    });
     fireEvent.click(screen.getByRole("tab", { name: "Skills" }));
     fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
     expect(await screen.findByText("Install this skill for an agent to try it.")).toBeInTheDocument();
@@ -229,15 +242,13 @@ describe("SkillsMarketplaceModal", () => {
   });
 
   it("opens the approved skill instructions inside the marketplace modal", async () => {
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[{ id: "writer", name: "Writer" }]}
-        activeAgentId="writer"
-        onOpenChange={() => undefined}
-      />
-    ));
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace({
+      open: true,
+      agents: [{ id: "writer", name: "Writer" }],
+      activeAgentId: "writer",
+      onOpenChange: () => undefined,
+    });
+    openSkillsTab();
     const listing = await screen.findByRole("button", { name: "View Release Notes details" });
     listing.click();
     const details = await screen.findByRole("region", { name: "Release Notes details" });
@@ -308,27 +319,25 @@ describe("SkillsMarketplaceModal", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const onInstalled = vi.fn();
 
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        activeAgentId=""
-        onOpenChange={() => undefined}
-        onAgentInstalled={onInstalled}
-        agents={[
-          {
-            id: "existing-research-agent",
-            name: detail.name,
-            marketplaceSource: {
-              listingId: detail.id,
-              versionId: detail.versionId,
-              version: detail.version,
-              skillIds: [],
-              routineIds: [],
-            },
+    renderMarketplace({
+      open: true,
+      activeAgentId: "",
+      onOpenChange: () => undefined,
+      onAgentInstalled: onInstalled,
+      agents: [
+        {
+          id: "existing-research-agent",
+          name: detail.name,
+          marketplaceSource: {
+            listingId: detail.id,
+            versionId: detail.versionId,
+            version: detail.version,
+            skillIds: [],
+            routineIds: [],
           },
-        ]}
-      />
-    ));
+        },
+      ],
+    });
     expect(screen.getByRole("tab", { name: "Agents" })).toHaveAttribute("aria-selected", "true");
     (await screen.findByRole("button", { name: "View Research Agent details" })).click();
     (await screen.findByRole("button", { name: "Install agent" })).click();
@@ -383,7 +392,7 @@ describe("SkillsMarketplaceModal", () => {
       .mockReturnValueOnce(pending.promise)
       .mockRejectedValue(new Error("private response"));
 
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
+    renderMarketplace();
     const research = await screen.findByRole("button", { name: "View Research Agent details" });
     const writer = await screen.findByRole("button", { name: "View Writer Agent details" });
     fireEvent.click(research);
@@ -440,48 +449,46 @@ describe("SkillsMarketplaceModal", () => {
       skills: [],
       routines: [],
     }));
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[
-          {
-            id: "research-local",
-            name: "Research Agent",
-            marketplaceSource: {
-              listingId: "research-agent",
-              versionId: "research-v1",
-              version: 1,
-              skillIds: [],
-              routineIds: [],
-            },
+    renderMarketplace({
+      open: true,
+      agents: [
+        {
+          id: "research-local",
+          name: "Research Agent",
+          marketplaceSource: {
+            listingId: "research-agent",
+            versionId: "research-v1",
+            version: 1,
+            skillIds: [],
+            routineIds: [],
           },
-          {
-            id: "writer-local",
-            name: "Writer Agent",
-            marketplaceSource: {
-              listingId: "writer-agent",
-              versionId: "writer-v1",
-              version: 1,
-              skillIds: [],
-              routineIds: [],
-            },
+        },
+        {
+          id: "writer-local",
+          name: "Writer Agent",
+          marketplaceSource: {
+            listingId: "writer-agent",
+            versionId: "writer-v1",
+            version: 1,
+            skillIds: [],
+            routineIds: [],
           },
-          {
-            id: "research-current-copy",
-            name: "Research Agent",
-            marketplaceSource: {
-              listingId: "research-agent",
-              versionId: "research-v2",
-              version: 2,
-              skillIds: [],
-              routineIds: [],
-            },
+        },
+        {
+          id: "research-current-copy",
+          name: "Research Agent",
+          marketplaceSource: {
+            listingId: "research-agent",
+            versionId: "research-v2",
+            version: 2,
+            skillIds: [],
+            routineIds: [],
           },
-        ]}
-        activeAgentId="research-local"
-        onOpenChange={() => undefined}
-      />
-    ));
+        },
+      ],
+      activeAgentId: "research-local",
+      onOpenChange: () => undefined,
+    });
 
     fireEvent.click(await screen.findByRole("button", { name: "View Research Agent details" }));
     expect(await screen.findByRole("button", { name: "Update agent" })).toBeEnabled();
@@ -538,7 +545,7 @@ describe("SkillsMarketplaceModal", () => {
               },
             ],
     }));
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
+    renderMarketplace();
 
     fireEvent.click(await screen.findByRole("button", { name: "View Research Agent details" }));
     expect(await screen.findByRole("button", { name: /^Skills/ })).toBeInTheDocument();
@@ -559,8 +566,8 @@ describe("SkillsMarketplaceModal", () => {
           : [],
       nextCursor: query?.category === "documents" && !query.cursor ? "next-page" : null,
     }));
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
     fireEvent.click(await screen.findByRole("button", { name: "View all Documents skills" }));
     fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
     expect(await screen.findByRole("button", { name: "View Second skill details" })).toBeInTheDocument();
@@ -586,8 +593,8 @@ describe("SkillsMarketplaceModal", () => {
         };
       return { skills: [], nextCursor: null };
     });
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
 
     await screen.findByRole("button", { name: "View all Design skills" });
     expect(screen.getByRole("heading", { name: "Documents" })).toBeInTheDocument();
@@ -607,8 +614,8 @@ describe("SkillsMarketplaceModal", () => {
         nextCursor: query?.category === "design" ? "next-page" : null,
       };
     });
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
     fireEvent.click(await screen.findByRole("button", { name: "View all Design skills" }));
     fireEvent.click(await screen.findByRole("button", { name: "All skills" }));
     await screen.findByRole("button", { name: "View Overview design details" });
@@ -621,8 +628,8 @@ describe("SkillsMarketplaceModal", () => {
 
   it("collects the keystrokes of a word into one search request", async () => {
     vi.useFakeTimers();
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
     await Promise.resolve();
     await Promise.resolve();
     const list = vi.mocked(window.openbot.skills.list);
@@ -662,8 +669,8 @@ describe("SkillsMarketplaceModal", () => {
       if (query?.query) return new Promise<MarketplaceSkillPage>(() => undefined);
       return query?.category === "documents" ? loaded : { skills: [], nextCursor: null };
     });
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
     await screen.findByRole("button", { name: "View Standup Digest details" });
 
     fireEvent.input(screen.getByLabelText("Search skills"), { target: { value: "standup" } });
@@ -680,15 +687,13 @@ describe("SkillsMarketplaceModal", () => {
     });
     window.openbot.skills.list = vi.fn(() => pendingPage);
 
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[{ id: "writer", name: "Writer" }]}
-        activeAgentId="writer"
-        onOpenChange={() => undefined}
-      />
-    ));
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace({
+      open: true,
+      agents: [{ id: "writer", name: "Writer" }],
+      activeAgentId: "writer",
+      onOpenChange: () => undefined,
+    });
+    openSkillsTab();
 
     expect(await screen.findByRole("status", { name: "Loading skills" })).toBeInTheDocument();
 
@@ -708,15 +713,13 @@ describe("SkillsMarketplaceModal", () => {
       },
     ];
     window.openbot.skills.listInstalled = vi.fn(async () => installed);
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[{ id: "writer", name: "Writer" }]}
-        activeAgentId="writer"
-        onOpenChange={() => undefined}
-      />
-    ));
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace({
+      open: true,
+      agents: [{ id: "writer", name: "Writer" }],
+      activeAgentId: "writer",
+      onOpenChange: () => undefined,
+    });
+    openSkillsTab();
 
     // aria-selected marks which marketplace section is showing
     // (SkillsMarketplaceModal.tsx:413,423); nothing else asserts it.
@@ -748,15 +751,13 @@ describe("SkillsMarketplaceModal", () => {
         }),
     );
 
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[{ id: "writer", name: "Writer" }]}
-        activeAgentId="writer"
-        onOpenChange={() => undefined}
-      />
-    ));
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace({
+      open: true,
+      agents: [{ id: "writer", name: "Writer" }],
+      activeAgentId: "writer",
+      onOpenChange: () => undefined,
+    });
+    openSkillsTab();
     const listing = await screen.findByRole("button", { name: "View Release Notes details" });
     listing.click();
 
@@ -786,14 +787,12 @@ describe("SkillsMarketplaceModal", () => {
       skills: [],
       routines: [],
     }));
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[{ id: "research", name: "Research" }]}
-        activeAgentId="research"
-        onOpenChange={() => undefined}
-      />
-    ));
+    renderMarketplace({
+      open: true,
+      agents: [{ id: "research", name: "Research" }],
+      activeAgentId: "research",
+      onOpenChange: () => undefined,
+    });
     if (kind === "skills") fireEvent.click(screen.getByRole("tab", { name: "Skills" }));
     await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
       pointerType: "mouse",
@@ -830,17 +829,15 @@ describe("SkillsMarketplaceModal", () => {
       resolveFirst = resolve;
     });
     window.openbot.marketplaceAgents.preview = vi.fn((id) => (id === "first" ? first : Promise.resolve(preview(id))));
-    render(() => (
-      <SkillsMarketplaceModal
-        open
-        agents={[
-          { id: "first", name: "First" },
-          { id: "second", name: "Second" },
-        ]}
-        activeAgentId="first"
-        onOpenChange={() => undefined}
-      />
-    ));
+    renderMarketplace({
+      open: true,
+      agents: [
+        { id: "first", name: "First" },
+        { id: "second", name: "Second" },
+      ],
+      activeAgentId: "first",
+      onOpenChange: () => undefined,
+    });
     await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
       pointerType: "mouse",
       button: 0,
@@ -887,8 +884,8 @@ describe("SkillsMarketplaceModal", () => {
       },
     ];
     window.openbot.skills.listMine = vi.fn(async () => submissions);
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
 
     await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
       pointerType: "mouse",
@@ -928,8 +925,8 @@ describe("SkillsMarketplaceModal", () => {
       files: ["SKILL.md"],
       size: 1024,
     }));
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
 
     await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
       pointerType: "mouse",
@@ -964,8 +961,8 @@ describe("SkillsMarketplaceModal", () => {
     window.openbot.skills.submit = vi.fn(async () => {
       throw new Error("Error invoking remote method 'skills:submit': Error: A skill with this name already exists.");
     });
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
 
     await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
       pointerType: "mouse",
@@ -983,8 +980,8 @@ describe("SkillsMarketplaceModal", () => {
     const detail = await window.openbot.skills.get("release-notes");
     const pending = Promise.withResolvers<typeof detail>();
     window.openbot.skills.get = vi.fn(() => pending.promise);
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
     fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Marketplace" }));
@@ -1029,7 +1026,7 @@ describe("SkillsMarketplaceModal", () => {
       nextCursor: null,
     }));
     window.openbot.marketplaceAgents.get = vi.fn(async () => detail);
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
+    renderMarketplace();
     fireEvent.click(await screen.findByRole("button", { name: "View Research Agent details" }));
     await screen.findByRole("button", { name: "Marketplace" });
 
@@ -1064,8 +1061,8 @@ describe("SkillsMarketplaceModal", () => {
         ? { skills: [listed], nextCursor: "next-page" }
         : { skills: [], nextCursor: null };
     });
-    render(() => <SkillsMarketplaceModal open agents={[]} activeAgentId="" onOpenChange={() => undefined} />);
-    screen.getByRole("tab", { name: "Skills" }).click();
+    renderMarketplace();
+    openSkillsTab();
     fireEvent.click(await screen.findByRole("button", { name: "View all Documents skills" }));
     await screen.findByRole("button", { name: "Load more" });
 
@@ -1081,5 +1078,599 @@ describe("SkillsMarketplaceModal", () => {
         expect.objectContaining({ query: "release", cursor: "search-page" }),
       ),
     );
+  });
+
+  /**
+   * A plugin's app is an MCP server, which the host holds rather than one agent. The install must
+   * therefore reach the server the modal was given, and a plugin whose app is already on that host
+   * must not offer the install a second time.
+   */
+  describe("plugins", () => {
+    const plugin: MarketplacePluginDetail = {
+      id: "plugin-aave",
+      slug: "aave",
+      name: "Aave",
+      tagline: "Aave data and transactions",
+      description: "Live markets, positions and prepared transactions.",
+      category: "data-analytics",
+      creatorName: "avara.xyz",
+      creatorAvatarUrl: null,
+      iconUrl: null,
+      version: "1.0.0",
+      installs: 0,
+      featured: true,
+      updatedAt: "2026-09-18T00:00:00.000Z",
+      shareUrl: "https://openbot.run/plugins/aave",
+      prompts: [],
+      apps: [
+        {
+          id: "app-aave-mcp",
+          name: "Aave",
+          description: "Markets and prepared transactions, over one MCP server.",
+          iconUrl: null,
+          server: { name: "aave", transport: "http", url: "https://mcp.aave.com/mcp" },
+        },
+      ],
+      skills: [],
+      websiteUrl: null,
+      privacyPolicyUrl: null,
+      termsUrl: null,
+    };
+    const installedYield = installedSkill("skill-yield", "Yield analysis", {
+      slug: "yield-analysis",
+      installedVersion: 3,
+      availableVersion: 3,
+    });
+    const app = plugin.apps[0];
+    if (app?.server.transport !== "http") throw new Error("The plugin under test must publish one http app.");
+    const appUrl = app.server.url;
+
+    async function openPluginPage() {
+      fireEvent.click(screen.getByRole("tab", { name: "Plugins" }));
+      fireEvent.click(await screen.findByRole("button", { name: "View Aave details" }));
+    }
+
+    it("installs the app on the host it was given", async () => {
+      const saved: McpServerConfig[] = [];
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => {
+        saved.push(input.config);
+        return saved;
+      });
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []), saveMcpServer };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      await waitFor(() => expect(saveMcpServer).toHaveBeenCalled());
+      // The id is empty because the store mints one. An id it does not hold reads as an edit of a
+      // removed row, and the save is refused.
+      expect(saveMcpServer).toHaveBeenCalledWith(
+        { config: expect.objectContaining({ id: "", name: app.server.name, transport: "http", url: appUrl }) },
+        "local",
+      );
+      // The one control turns into the way back out, which is how the page says it is installed.
+      expect(await screen.findByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
+    });
+
+    /**
+     * A listing that declares a way in is connected before it is installed, and what is saved is
+     * what connected. A key that never reached the server would be stored as a working app, and the
+     * failure would arrive inside an agent's next answer instead of here.
+     */
+    const withKey: MarketplacePluginDetail = {
+      ...plugin,
+      apps: [
+        {
+          ...app,
+          server: {
+            ...app.server,
+            auth: [
+              {
+                id: "api-key",
+                kind: "key",
+                label: "API key",
+                fields: [{ id: "token", label: "API key", header: "Authorization", prefix: "Bearer " }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    it("saves the configuration the connect dialog proved", async () => {
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => [input.config]);
+      const testMcpServer: OpenBotDesktopApi["agent"]["testMcpServer"] = vi.fn(async () => ({
+        toolCount: 4,
+        error: null,
+      }));
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer,
+        testMcpServer,
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withKey],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      const key = await screen.findByLabelText(/API key/);
+      fireEvent.input(key, { target: { value: "live-key" } });
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+
+      await waitFor(() => expect(saveMcpServer).toHaveBeenCalled());
+      const sent = { key: "Authorization", value: "Bearer live-key" };
+      expect(testMcpServer).toHaveBeenCalledWith({ config: expect.objectContaining({ headers: [sent] }) }, "local");
+      expect(saveMcpServer).toHaveBeenCalledWith({ config: expect.objectContaining({ headers: [sent] }) }, "local");
+    });
+
+    it("saves nothing when the connect dialog is closed", async () => {
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => [input.config]);
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []), saveMcpServer };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withKey],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Close connect Aave" }));
+
+      // Closing the dialog is a decision, not a failure: the install stops and can be started again.
+      await waitFor(() => expect(screen.getByRole("button", { name: "Install plugin" })).toBeEnabled());
+      expect(saveMcpServer).not.toHaveBeenCalled();
+    });
+
+    it("stops the connect step when the marketplace itself is closed", async () => {
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => [input.config]);
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []), saveMcpServer };
+      const [open, setOpen] = createSignal(true);
+      renderMarketplace(() => ({
+        open: open(),
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: setOpen,
+        plugins: [withKey],
+        pluginServerId: "local",
+      }));
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+      await screen.findByRole("dialog", { name: "Connect Aave" });
+
+      // The connect dialog is a sibling of the marketplace, so it has to be told the page it was
+      // started from is gone. Otherwise it stays on screen over nothing.
+      setOpen(false);
+
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Connect Aave" })).toBeNull());
+      expect(saveMcpServer).not.toHaveBeenCalled();
+    });
+
+    it("sends an example question to the chosen agent", async () => {
+      const onRunPluginPrompt = vi.fn();
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []) };
+      const asked = { id: "prompt-yield", text: "Where can I earn the most on stablecoins?" };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [{ ...plugin, prompts: [asked] }],
+        pluginServerId: "local",
+        onRunPluginPrompt: onRunPluginPrompt,
+      });
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: `Ask Aave: ${asked.text}` }));
+
+      expect(onRunPluginPrompt).toHaveBeenCalledWith("writer", asked);
+    });
+
+    /** A plugin with skills: the two halves land in different places, and in this order. */
+    const withSkill: MarketplacePluginDetail = {
+      ...plugin,
+      skills: [
+        {
+          id: "skill-yield",
+          versionId: "skill-yield-v3",
+          slug: "yield-analysis",
+          description: "Compare Aave yields and rates.",
+        },
+      ],
+    };
+
+    it("installs the pinned skill into the agent before the app reaches the host", async () => {
+      const order: string[] = [];
+      const install = vi.fn(async () => {
+        order.push("skill");
+        return installedYield;
+      });
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => {
+        order.push("app");
+        return [input.config];
+      });
+      window.openbot.skills = { ...window.openbot.skills, install };
+      window.openbot.agent = { ...window.openbot.agent, listMcpServers: vi.fn(async () => []), saveMcpServer };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      await waitFor(() => expect(saveMcpServer).toHaveBeenCalled());
+      expect(install).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield", versionId: "skill-yield-v3" });
+      // The skills go first, so a failure never leaves a server that nothing knows how to drive.
+      expect(order).toEqual(["skill", "app"]);
+    });
+
+    it("removes the skill it installed when the app cannot be saved", async () => {
+      const install = vi.fn(async () => installedYield);
+      const uninstall = vi.fn(async () => undefined);
+      window.openbot.skills = { ...window.openbot.skills, install, uninstall };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(async () => {
+          throw new Error("This MCP server no longer exists.");
+        }),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("This MCP server no longer exists.");
+      expect(screen.getByRole("button", { name: "Install plugin" })).toBeEnabled();
+    });
+
+    it("reports a plugin whose app the host already holds as installed", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [
+          {
+            id: "mcp-1",
+            name: app.server.name,
+            transport: "http" as const,
+            enabled: true,
+            command: "",
+            args: [],
+            env: [],
+            envPassthrough: [],
+            workingDirectory: "",
+            url: appUrl,
+            headers: [],
+          },
+        ]),
+        saveMcpServer: vi.fn(),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+
+      expect(await screen.findByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
+      expect(window.openbot.agent.saveMcpServer).not.toHaveBeenCalled();
+    });
+
+    /** The host row an installed app leaves behind, as `listMcpServers` answers it. */
+    function hostApp(): McpServerConfig {
+      return {
+        id: "mcp-1",
+        name: app.server.name,
+        transport: "http" as const,
+        enabled: true,
+        command: "",
+        args: [],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: appUrl,
+        headers: [],
+      };
+    }
+
+    /** Opens the listing of an installed plugin and presses Uninstall, stopping at the confirmation. */
+    async function askToUninstall() {
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Uninstall plugin" }));
+      return screen.findByRole("alertdialog");
+    }
+
+    it("names the app and the skill it is about to remove before removing either", async () => {
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => [installedYield]) };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [hostApp()]),
+        removeMcpServer: vi.fn(async () => []),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+
+      expect(within(confirm).getByRole("heading", { name: "Uninstall Aave?" })).toBeInTheDocument();
+      expect(within(confirm).getByText(app.server.name)).toBeInTheDocument();
+      expect(within(confirm).getByText("yield-analysis")).toBeInTheDocument();
+      // The question is asked before anything goes: nothing is removed by opening it.
+      expect(window.openbot.agent.removeMcpServer).not.toHaveBeenCalled();
+      expect(window.openbot.skills.uninstall).not.toHaveBeenCalled();
+    });
+
+    it("removes the host's app row and the agent's skill when the uninstall is confirmed", async () => {
+      const order: string[] = [];
+      const removeMcpServer: OpenBotDesktopApi["agent"]["removeMcpServer"] = vi.fn(async () => {
+        order.push("app");
+        return [];
+      });
+      const uninstall = vi.fn(async () => {
+        order.push("skill");
+      });
+      let held: InstalledSkill[] = [installedYield];
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => held), uninstall };
+      let hostRows: McpServerConfig[] = [hostApp()];
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => hostRows),
+        removeMcpServer,
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+      hostRows = [];
+      held = [];
+      fireEvent.click(within(confirm).getByRole("button", { name: "Uninstall" }));
+
+      await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
+      expect(removeMcpServer).toHaveBeenCalledWith({ mcpServerId: "mcp-1" }, "local");
+      // The app stops answering before the instructions that drive it are taken away.
+      expect(order).toEqual(["app", "skill"]);
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+    });
+
+    it("removes nothing when the confirmation is cancelled", async () => {
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => [installedYield]) };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [hostApp()]),
+        removeMcpServer: vi.fn(async () => []),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+      fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(window.openbot.agent.removeMcpServer).not.toHaveBeenCalled();
+      expect(window.openbot.skills.uninstall).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
+    });
+
+    /**
+     * A cleanup that half works. The skill must still be taken even though the app row refused, and
+     * the failure must name what stayed rather than leave the user to find it.
+     */
+    it("reports what could not be removed and still removes the rest", async () => {
+      const uninstall = vi.fn(async () => undefined);
+      let held: InstalledSkill[] = [installedYield];
+      window.openbot.skills = { ...window.openbot.skills, listInstalled: vi.fn(async () => held), uninstall };
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [hostApp()]),
+        removeMcpServer: vi.fn(async () => {
+          throw new Error("This MCP server no longer exists.");
+        }),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [withSkill],
+        pluginServerId: "local",
+      });
+      const confirm = await askToUninstall();
+      held = [];
+      fireEvent.click(within(confirm).getByRole("button", { name: "Uninstall" }));
+
+      await waitFor(() => expect(uninstall).toHaveBeenCalledWith({ agentId: "writer", skillId: "skill-yield" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("This MCP server no longer exists.");
+      // Half a plugin is not installed, but what stayed must still have a way out: the retry.
+      expect(screen.getByRole("button", { name: "Uninstall plugin" })).toBeInTheDocument();
+    });
+
+    /**
+     * Names are unique on a host, so a server the user wrote by hand can own a catalog name while
+     * pointing somewhere else. That row is not the plugin's, and an uninstall must never offer to
+     * take it: the listing reads as not installed and there is nothing to confirm.
+     */
+    it("leaves a server that only shares the app's name alone", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => [{ ...hostApp(), url: "https://mcp.example.test/mine" }]),
+        removeMcpServer: vi.fn(async () => []),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Uninstall plugin" })).toBeNull();
+    });
+
+    /**
+     * The deep link. A web page can name a listing, and that is all it can do: the page it opens
+     * still asks the user to install, against an agent they pick.
+     */
+    it("opens the listing a link names without installing it", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(),
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+        initialPluginSlug: "aave",
+      });
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      expect(screen.getByText(plugin.description)).toBeInTheDocument();
+      expect(window.openbot.agent.saveMcpServer).not.toHaveBeenCalled();
+    });
+
+    it("says a link names no listing this catalog holds, and offers the list", async () => {
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+        initialPluginSlug: "not-a-plugin",
+      });
+
+      expect(await screen.findByText("This plugin is not in the OpenBot catalog.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Browse plugins" }));
+
+      expect(await screen.findByRole("button", { name: "View Aave details" })).toBeInTheDocument();
+    });
+
+    it("reopens the same listing when its link arrives again after leaving it", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(),
+      };
+      const [slug, setSlug] = createSignal<string | null>("aave");
+      const consumed = vi.fn();
+      renderMarketplace(() => ({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+        initialPluginSlug: slug() ?? undefined,
+        onInitialPluginSlugConsumed: () => {
+          consumed();
+          setSlug(null);
+        },
+      }));
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      await waitFor(() => expect(consumed).toHaveBeenCalled());
+      await waitFor(() => expect(slug()).toBeNull());
+
+      fireEvent.click(screen.getByRole("button", { name: "Marketplace" }));
+      expect(await screen.findByRole("button", { name: "View Aave details" })).toBeInTheDocument();
+
+      setSlug("aave");
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+      expect(screen.getByText(plugin.description)).toBeInTheDocument();
+    });
+
+    it("forgets the open page when a link names no listing, so browsing returns to the list", async () => {
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer: vi.fn(),
+      };
+      const [slug, setSlug] = createSignal<string | null>("aave");
+      renderMarketplace(() => ({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+        initialPluginSlug: slug() ?? undefined,
+        onInitialPluginSlugConsumed: () => setSlug(null),
+      }));
+
+      expect(await screen.findByRole("button", { name: "Install plugin" })).toBeInTheDocument();
+
+      setSlug("not-a-plugin");
+      expect(await screen.findByText("This plugin is not in the OpenBot catalog.")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Browse plugins" }));
+
+      expect(await screen.findByRole("button", { name: "View Aave details" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Install plugin" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Marketplace" })).toBeNull();
+    });
+
+    it("copies the address the public page answers on", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [plugin],
+        pluginServerId: "local",
+      });
+      await openPluginPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith("https://openbot.run/plugins/aave"));
+    });
   });
 });

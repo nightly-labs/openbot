@@ -39,7 +39,7 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
       setTables(next);
       props.onCountChange(next.length);
     } catch (caught) {
-      setError(errorMessage(caught, "Could not load the saved data."));
+      setError(errorMessage(caught, "Could not load the tables."));
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -88,13 +88,13 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
         >
           <header class="agent-memories-header">
             <div class="agent-memories-heading">
-              <Dialog.Title>Saved data</Dialog.Title>
+              <Dialog.Title>Tables</Dialog.Title>
               <Dialog.Description class="sr-only">
                 What the agents keep between tasks, with the agent that started each set of records
               </Dialog.Description>
             </div>
             <div class="agent-memories-header-actions">
-              <IconButton label="Close saved data" variant="ghost" onClick={() => props.onOpenChange(false)}>
+              <IconButton label="Close tables" variant="ghost" onClick={() => props.onOpenChange(false)}>
                 <X />
               </IconButton>
             </div>
@@ -109,13 +109,13 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
               )}
             </Show>
 
-            <Show when={!loading()} fallback={<p class="agent-memory-state">Loading saved data…</p>}>
+            <Show when={!loading()} fallback={<p class="agent-memory-state">Loading tables…</p>}>
               <Show
                 when={tables().length > 0}
                 fallback={
                   <p class="agent-memory-state">
-                    Nothing saved yet. An agent starts keeping records itself when a task needs them between turns, and
-                    every agent can use them.
+                    No tables yet. An agent makes one itself when a task needs records between turns, and every agent
+                    can use it.
                   </p>
                 }
               >

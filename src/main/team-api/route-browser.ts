@@ -7,23 +7,29 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import type { TeamApiBrowser } from "./dependencies";
+import type { TeamApiBrowser, TeamApiBrowserView } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { nullableString, parseBrowserBounds, readJson, stringField } from "./request-helpers";
+import { nullableString, parseBrowserBounds, pathIdentifier, readJson, stringField } from "./request-helpers";
 
 export interface BrowserRouteDependencies {
   browser: TeamApiBrowser;
+  browserView?: TeamApiBrowserView;
 }
 
 export async function routeBrowser(
   context: TeamApiRequestContext,
-  { browser }: BrowserRouteDependencies,
+  { browser, browserView }: BrowserRouteDependencies,
 ): Promise<RouteOutcome> {
-  const { method, url, request, json, empty } = context;
+  const { method, url, request, member, sessionId, json, empty } = context;
 
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.browser.tabs) {
     return json(200, browser.listTabs());
+  }
+  // Behind `browser-navigation`. A client without it reads the tab list and has to guess which tab
+  // is active until the first `browser-changed` event arrives.
+  if (method === "GET" && url.pathname === TEAM_API_ROUTES.browser.display) {
+    return json(200, browser.getDisplayState());
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.browser.control) {
     return json(200, browser.getControlState());
@@ -56,6 +62,13 @@ export async function routeBrowser(
     await browser.navigate(stringField(body, "tabId"), direction);
     return empty(204);
   }
+  // Behind `browser-navigation`: the released navigate route carries a direction only, so a client
+  // without it opens a new tab for an address instead of moving the one the user is looking at.
+  if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.load) {
+    const body = await readJson(request);
+    await browser.loadUrl(stringField(body, "tabId"), stringField(body, "url", false, INPUT_LIMITS.browserUrl));
+    return empty(204);
+  }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.reload) {
     const body = await readJson(request);
     await browser.reload(stringField(body, "tabId"));
@@ -77,6 +90,30 @@ export async function routeBrowser(
       visible: body.visible,
       bounds: body.bounds === undefined ? undefined : parseBrowserBounds(body.bounds),
     });
+    return empty(204);
+  }
+
+  // Behind `browser-view`. The session is only the agreement about which tab and who is watching;
+  // the frames and the input are on the socket it answers with, which `browser-view-gateway.ts`
+  // serves. A host with the view switched off answers 404, the same as a host too old to know it.
+  if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.viewSessions) {
+    if (!browserView) throw new HttpError(404, "The live browser view is unavailable.");
+    const body = await readJson(request);
+    return json(
+      201,
+      browserView.createSession({
+        memberId: member.id,
+        teamSessionId: sessionId,
+        tabId: stringField(body, "tabId"),
+      }),
+    );
+  }
+  const viewSessionMatch = /^\/v1\/browser\/view\/sessions\/([^/]+)$/u.exec(url.pathname);
+  if (method === "DELETE" && viewSessionMatch) {
+    if (!browserView) throw new HttpError(404, "The live browser view is unavailable.");
+    if (!(await browserView.closeMemberSession(pathIdentifier(viewSessionMatch[1], "sessionId"), member.id))) {
+      throw new HttpError(404, "Browser view session not found.");
+    }
     return empty(204);
   }
 

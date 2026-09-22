@@ -114,25 +114,57 @@ describe("ProviderPicker", () => {
     expect(downloading.view.getByRole("button", { name: "Cancel OpenCode" })).toBeTruthy();
   });
 
-  it("badges the OpenCode row with the free tier, and only while keyless", () => {
-    // A saved key leaves the runtime "Connected" to speak for the row: no second chip.
-    const saved = renderPicker([{ ...openCode, keyStatus: "saved" }]);
-    expect(saved.view.queryByText("Free")).toBeNull();
+  it("offers the code sign-in on a connected row, and not while the runtime is still downloading", () => {
+    const onSignInWithCodeProvider = vi.fn();
+    const codex: ProviderPickerOption = { id: "codex", name: "ChatGPT", state: "available", message: null };
+    const menu = (option: ProviderPickerOption) =>
+      render(() => (
+        <ProviderPicker
+          value="codex"
+          options={[option]}
+          ariaLabel="AI providers"
+          allowUnavailableSelection
+          onChange={vi.fn()}
+          onSignInProvider={vi.fn()}
+          onSignInWithCodeProvider={onSignInWithCodeProvider}
+        />
+      )).queryByRole("button", { name: "More ways to log in to ChatGPT" });
 
-    const missing = renderPicker([{ ...openCode, keyStatus: "missing" }]);
-    expect(missing.view.getByText("Free")).toBeTruthy();
-
-    // An unreadable key runs keyless, so it reads as free as well.
-    const unreadable = renderPicker([{ ...openCode, keyStatus: "unreadable" }]);
-    expect(unreadable.view.getByText("Free")).toBeTruthy();
-
-    // Unknown until the first read: no badge rather than a wrong one, and never on another row.
-    const unknown = renderPicker([openCode, { ...claude, keyStatus: "saved" }]);
-    expect(unknown.view.queryByText("Free")).toBeNull();
+    // Signed in is not a reason to hide it: this is the way to a second account.
+    expect(menu(codex)).toBeTruthy();
+    expect(menu({ ...codex, state: "sign-in-required" })).toBeTruthy();
+    // Nothing to ask for a code with until the CLI is on the computer.
+    expect(
+      menu({ ...codex, runtimeStatus: runtime({ phase: "downloading", progress: 40, version: null }) }),
+    ).toBeNull();
+    // Claude has no code sign-in, so its row has no menu to hold one.
+    expect(
+      render(() => (
+        <ProviderPicker
+          value="claude"
+          options={[{ ...claude, state: "available" }]}
+          ariaLabel="AI providers"
+          allowUnavailableSelection
+          onChange={vi.fn()}
+          onSignInProvider={vi.fn()}
+          onSignInWithCodeProvider={onSignInWithCodeProvider}
+        />
+      )).queryByRole("button", { name: "More ways to log in to Claude" }),
+    ).toBeNull();
   });
 
-  it("prints Connected once on a signed-in OpenCode row, and keeps busy states reporting", () => {
-    // Steady and signed in: the runtime badge alone, no key chip beside it.
+  it("badges the tier and connection state without doubling them", () => {
+    // A saved key leaves the runtime "Connected" to speak for the row: no second chip.
+    expect(renderPicker([{ ...openCode, keyStatus: "saved" }]).view.queryByText("Free")).toBeNull();
+
+    // Keyless rows read as free, including when the key is unreadable.
+    expect(renderPicker([{ ...openCode, keyStatus: "missing" }]).view.getByText("Free")).toBeTruthy();
+    expect(renderPicker([{ ...openCode, keyStatus: "unreadable" }]).view.getByText("Free")).toBeTruthy();
+
+    // Unknown until the first read: no badge rather than a wrong one, and never on another row.
+    expect(renderPicker([openCode, { ...claude, keyStatus: "saved" }]).view.queryByText("Free")).toBeNull();
+
+    // Steady and signed in: the runtime badge alone, printed once.
     const steady = renderPicker([{ ...openCode, state: "available", runtimeStatus: runtime({}), keyStatus: "saved" }]);
     expect(steady.view.getAllByText("Connected")).toHaveLength(1);
 
@@ -143,15 +175,47 @@ describe("ProviderPicker", () => {
     expect(keyless.view.getByText("Free")).toBeTruthy();
     expect(keyless.view.getByText("Connected")).toBeTruthy();
 
-    // Busy states still report, with no tier chip beside them once signed in.
+    // Busy states still report, with no tier chip beside them once signed in. Main holds the
+    // provider "connecting" for the whole install, so the row reports the download, not the word.
     const downloading = renderPicker([
       {
         ...openCode,
+        connectionState: "connecting",
         runtimeStatus: runtime({ phase: "downloading", progress: 40, version: null }),
         keyStatus: "saved",
       },
     ]);
     expect(downloading.view.getByText("40%")).toBeTruthy();
     expect(downloading.view.queryByText("Free")).toBeNull();
+    expect(downloading.view.queryByText("Connecting")).toBeNull();
+  });
+
+  it("keeps the managed download reachable while the providers are being checked", async () => {
+    const onDownloadProvider = vi.fn();
+    const view = render(() => (
+      <ProviderPicker
+        value="opencode"
+        options={[
+          { ...claude, runtimeStatus: runtime({ phase: "not-downloaded", version: null }) },
+          { ...openCode, state: "available", runtimeStatus: runtime({}) },
+        ]}
+        ariaLabel="AI providers"
+        allowUnavailableSelection
+        refreshingProviders
+        onChange={vi.fn()}
+        onDownloadProvider={onDownloadProvider}
+        onConnectProvider={vi.fn()}
+      />
+    ));
+
+    // The download is a file transfer main's runtime store owns, so a provider check that has not
+    // finished - or never will - must not take it away: it is what ends the check.
+    const download = view.getByRole("button", { name: "Download Claude" });
+    expect(download).toBeEnabled();
+    await fireEvent.click(download);
+    expect(onDownloadProvider).toHaveBeenCalledWith("claude");
+
+    // The CLI is what a reconnect asks, so that one still waits.
+    expect(view.getByRole("button", { name: "Reconnect OpenCode" })).toBeDisabled();
   });
 });

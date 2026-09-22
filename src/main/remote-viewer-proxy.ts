@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
 import {
   decodeRemoteDesktopSignalBinary,
@@ -82,7 +83,11 @@ export class RemoteViewerProxy {
       const server = createServer((request, response) => void this.#handleHttp(request, response));
       server.on("upgrade", (request, socket, head) => {
         const route = this.#route(request.url ?? "/");
-        if (!route || !/^\/v1\/remote-screen\/sessions\/[A-Za-z0-9-]+\/stream$/u.test(route.upstreamPath)) {
+        const tunneled =
+          route &&
+          (/^\/v1\/remote-screen\/sessions\/[A-Za-z0-9-]+\/stream$/u.test(route.upstreamPath) ||
+            browserViewStreamSessionId(route.upstreamPath) !== null);
+        if (!route || !tunneled) {
           socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
           socket.destroy();
           return;

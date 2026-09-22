@@ -12,15 +12,18 @@ import type {
   AnalyticsPreference,
   AppInfo,
   AppLanguagePreference,
+  ApprovalAutomationPreference,
   AppSetupState,
   AttachmentImportEvent,
   BrowserControlState,
+  BrowserLiveViewEvent,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
   CentralAuthState,
   CentralAuthUser,
+  ComputerUseState,
   ConfigureHostInput,
   ConversationMessage,
   ConversationSnapshot,
@@ -39,6 +42,7 @@ import type {
   InstalledSkill,
   InviteSummary,
   JoinServerInput,
+  MacPermissionId,
   MarketplaceSkillDetail,
   OpenAttachmentInput,
   OpenBotDesktopApi,
@@ -76,6 +80,7 @@ import type {
 import {
   composedCustomModelId,
   createMcpServerId,
+  DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   normalizeMcpConfig,
   SIDEBAR_PEOPLE_SECTION_ID,
@@ -155,14 +160,7 @@ export interface MockOpenBotOptions {
   customProviders?: CustomProviderSummary[];
 }
 
-/**
- * What the OpenCode CLI would report for one endpoint, read from the endpoint itself. Preview
- * composes these into `listModels()` instead of putting them in `STORY_MODELS`, which several
- * stories read directly as their whole catalogue.
- *
- * OpenCode names a custom model `<provider name>/<model name>` and ids it
- * `<provider id>/<model id>`.
- */
+/** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): AgentModelOption[] {
   return provider.models.map((model) => ({
     provider: "opencode",
@@ -203,11 +201,7 @@ export interface MockOpenBotControls {
   dispose: () => void;
 }
 
-/**
- * The preview build has no main process to read a file, so it answers with the same fixtures that
- * the file preview stories use. A path with no fixture keeps the unsupported shape, which is what
- * the panel shows for a kind it cannot render.
- */
+/** Preview file fixtures; a path with no fixture keeps the unsupported shape. */
 function mockFilePreview(path: string, fallbackName: string): FilePreview {
   return (
     filePreviewForPath(path) ?? {
@@ -242,7 +236,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let setupState = clone<AppSetupState>(
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
   );
+  const grantedComputerUsePermissions = new Set<MacPermissionId>();
+  const computerUseState = (): ComputerUseState => {
+    const permissions = (["screen-recording", "accessibility"] as const).map((id) => ({
+      id,
+      granted: grantedComputerUsePermissions.has(id),
+    }));
+    return {
+      status: permissions.every(({ granted }) => granted) ? "ready" : "permissions-required",
+      permissions,
+      message: null,
+    };
+  };
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
+  let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
@@ -360,6 +367,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         grok: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         opencode: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
+      // No `availableVersion`: a tool runtime is downloaded once and replaced by a release, so the
+      // preview never offers an update for one.
+      toolRuntimes: { bun: { phase: "not-downloaded", progress: null, message: null, version: null } },
     },
   );
   let failRuntimeDownload = options.providerRuntimeFailure ?? false;
@@ -372,6 +382,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   };
   const agentListeners = new Set<Listener<AgentEvent>>();
   const browserDisplayListeners = new Set<Listener<{ tabs: BrowserTab[]; activeTabId: string | null }>>();
+  const browserLiveViewListeners = new Set<Listener<BrowserLiveViewEvent>>();
   const browserPictureInPictureListeners = new Set<Listener<BrowserPictureInPictureEvent>>();
   const authListeners = new Set<Listener<CentralAuthState>>();
   const presenceListeners = new Set<Listener<TeamPresenceSnapshot>>();
@@ -587,6 +598,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       analyticsPreference = { enabled };
       return clone(analyticsPreference);
     },
+    getApprovalAutomation: async () => clone(approvalAutomation),
+    setApprovalAutomation: async ({ turbo, agentId, autoApprove }) => {
+      approvalAutomation = {
+        ...approvalAutomation,
+        turbo: turbo ?? approvalAutomation.turbo,
+        autoApproveOverrides:
+          agentId !== undefined && autoApprove !== undefined
+            ? { ...approvalAutomation.autoApproveOverrides, [agentId]: autoApprove }
+            : approvalAutomation.autoApproveOverrides,
+      };
+      return clone(approvalAutomation);
+    },
     getAppLanguagePreference: async () => clone(languagePreference),
     setAppLanguagePreference: async ({ language }) => {
       languagePreference = { language };
@@ -618,25 +641,37 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
     },
-    getComputerUseMacSetupState: async () => ({
-      status: "available",
-      helperName: "Codex Computer Use",
-      helperIconDataUrl: null,
-      message: null,
-    }),
-    openComputerUsePermissionSetup: async () => ({
-      status: "available",
-      helperName: "Codex Computer Use",
-      helperIconDataUrl: null,
-      message: null,
-    }),
-    startComputerUseHelperDrag: async () => undefined,
-    revealComputerUseHelper: async () => undefined,
-    closeComputerUsePermissionSetup: async () => undefined,
+    getComputerUseState: async () => computerUseState(),
+    // The preview grants the permission the pane was opened for, because the panel's whole job is
+    // to show the answer changing. A mock that always reported the same state would make every
+    // story of this panel look identical.
+    openComputerUsePermissionPane: async (permission) => {
+      grantedComputerUsePermissions.add(permission);
+      return computerUseState();
+    },
+    // The help window belongs to the desktop app. The preview has no second window to close, and
+    // the panel never waits on the answer.
+    closeComputerUsePermissionHelp: async () => undefined,
+    // No bundle to drag in a browser, so the window draws its steps and nothing else.
+    getComputerUsePermissionApp: async () => null,
+    startComputerUsePermissionAppDrag: async () => undefined,
+    revealComputerUsePermissionApp: async () => undefined,
+    // The rim is drawn over another application's window, which the preview has none of, so this
+    // subscribes to a stream that never carries anything.
+    onComputerUseHighlightPlacement: () => () => undefined,
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
     refreshAgentProviders: async () => clone(agentStatus),
+    // A code that never completes: the preview has no provider to finish the sign-in, so this shows
+    // the waiting screen and leaves it there.
+    startProviderCodeLogin: async () => ({
+      kind: "code",
+      userCode: "KTQ4-B62MX",
+      verificationUrl: "https://auth.openai.com/codex/device",
+      expiresAt: Date.now() + 10 * 60_000,
+    }),
+    cancelProviderCodeLogin: async () => clone(agentStatus),
     setProviderApiKey: async ({ provider, key }) => {
       if (!key.trim()) throw new Error("A provider key is required.");
       providerApiKeys.add(provider);
@@ -1698,6 +1733,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       respondToPrompt: async (_input: RespondToPromptInput) => undefined,
       respondToApproval: async () => undefined,
+      respondToBrowserSecret: async (input) => {
+        for (const listener of agentListeners)
+          listener({ type: "browser-takeover-resolved", requestId: input.requestId, agentId: input.agentId });
+      },
       respondToBrowserTakeover: async () => undefined,
       onEvent: (listener) => {
         agentListeners.add(listener);
@@ -1750,8 +1789,16 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       reload: async () => undefined,
       close: async (tabId) => {
-        browserTabs = browserTabs.filter((tab) => tab.id !== tabId);
-        activeBrowserTabId = browserTabs[0]?.id ?? null;
+        const closedTab = browserTabs.find((tab) => tab.id === tabId);
+        const closedIds = new Set([tabId]);
+        for (const tab of browserTabs) {
+          if (tab.openerTabId && closedIds.has(tab.openerTabId)) closedIds.add(tab.id);
+        }
+        browserTabs = browserTabs.filter((tab) => !closedIds.has(tab.id));
+        if (activeBrowserTabId && closedIds.has(activeBrowserTabId)) {
+          activeBrowserTabId =
+            browserTabs.find((tab) => tab.id === closedTab?.openerTabId)?.id ?? browserTabs[0]?.id ?? null;
+        }
         emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
         emitAgentEvent({
           type: "browser-changed",
@@ -1769,6 +1816,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(preview);
       },
       setVisible: async () => undefined,
+      // The preview has no host, so it answers the one thing that is true: there is nothing live to
+      // show. The panel draws its own message for that rather than an empty rectangle.
+      startLiveView: async (tabId) => {
+        emit(browserLiveViewListeners, { type: "stopped", tabId, reason: "The preview has no host to watch." });
+      },
+      stopLiveView: async () => undefined,
+      sendLiveViewInput: async () => undefined,
+      onLiveViewEvent: (listener) => {
+        browserLiveViewListeners.add(listener);
+        return () => browserLiveViewListeners.delete(listener);
+      },
       onDisplayState: (listener) => {
         browserDisplayListeners.add(listener);
         return () => browserDisplayListeners.delete(listener);
@@ -1871,6 +1929,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: "member",
         expiresAt: "2026-09-19T10:00:00.000Z",
         emailBound: false,
+        permanent: false,
       }),
       takePendingInvite: async () => null,
       login: async (input) => {
@@ -1915,6 +1974,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         role: input.role,
         usedAt: null,
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       setTyping: async (_input: SetTeamTypingInput) => undefined,
       onPresence: (listener, serverId) => {
@@ -2010,6 +2071,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => inviteListeners.delete(listener);
       },
     },
+    plugins: {
+      // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
     host: {
       getStatus: async () => clone(hostStatus),
       configure: async (input: ConfigureHostInput) => {
@@ -2073,6 +2142,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         usedAt: null,
         inviteUrl: "https://openbot.run/join?invite=mock-invite",
         email: input.email ?? null,
+        permanent: input.permanent ?? false,
+        useCount: 0,
       }),
       onEvent: (listener) => {
         hostListeners.add(listener);
@@ -2080,6 +2151,22 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     remoteDesktop: {
+      checkSetup: async () => ({
+        platform: "darwin",
+        hostName: "Mac mini",
+        username: "openbot",
+        checkedAt: new Date().toISOString(),
+        screenRecording: hostStatus.remoteDesktopScreenRecordingDenied ? "blocked" : "allowed",
+        accessibility: "blocked",
+        service: "allowed",
+        displays: "allowed",
+        guiSession: "allowed",
+        restartRequired: false,
+        activeSessions: remoteDesktopSessions.length,
+        message: null,
+      }),
+      openSetup: async () => undefined,
+      test: async (input) => ({ active: input.action !== "stop", mouse: false, keyboard: false, code: "1234" }),
       list: async () => clone(remoteDesktopSessions),
       connect: async (input) => {
         const session: RemoteDesktopSession = {

@@ -165,24 +165,61 @@
       }
     }
   },
+  "cuaDriver": {
+    "repository": "https://github.com/trycua/cua",
+    "tag": "cua-driver-rs-v0.28.2",
+    "version": "0.28.2",
+    "license": "MIT",
+    "licenseSha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
+    "artifacts": {
+      "darwin-arm64": {
+        "asset": "cua-driver-rs-0.28.2-darwin-universal-binary.tar.gz",
+        "assetSha256": "386db225a3080714a0f9f935525e61efaf46709587ef8b94dd2df81aeb2f6daa",
+        "downloadBytes": 43629843,
+        "files": {
+          "cua-driver": "af30d29cf33bd3bbda1330be7225b18881ea4c5af6df374e08627914b5ac334d"
+        }
+      },
+      "linux-x64": {
+        "asset": "cua-driver-rs-0.28.2-linux-x86_64-binary.tar.gz",
+        "assetSha256": "a1d99fd04bb4927ef5ffdbe60eb91ed8b51a2bab60e10fc604a75bd59ce69c3e",
+        "downloadBytes": 30603028,
+        "files": {
+          "cua-driver": "3739101d072bdfdd83b7e70b3a16d9271f6eb124e7c5e69b3406f20f0910a4ca",
+          "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
+          "wayland-helper/README.md": "0c38155388bdb5b3a276c4d434fbc5311ed7bb775ae6b04969f50de81c8c2703",
+          "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
+          "wayland-helper/winrects@cua/extension.js": "27aac56799574ecd201e810d32772d3695d8b6ace5ab4a68d026648009004eed"
+        }
+      },
+      "win32-x64": {
+        "asset": "cua-driver-rs-0.28.2-windows-x86_64-binary.zip",
+        "assetSha256": "1f4bfceeab64cb7f56be7aad774c3dc2d2910d1427e4be1d79939c706e8029ba",
+        "downloadBytes": 29085823,
+        "files": {
+          "cua-driver.exe": "dbbd52d75759900155fbf3d5f0a13c759a12d06ef17338b88b3f2b8b9c1ef8dc"
+        }
+      }
+    }
+  },
   "remoteDesktop": {
-    "recipeVersion": 9,
+    "recipeVersion": 12,
     "sunshine": {
-      "sourceMode": "openbot-fork",
-      "repository": "https://github.com/NorbertBodziony/Sunshine.git",
+      "sourceMode": "upstream-with-patch",
+      "repository": "https://github.com/LizardByte/Sunshine.git",
       "version": "v2026.516.143833",
-      "commit": "cde2ca692b9002c2d0a5418c6e077eba02e6c483",
+      "commit": "14ffa6fdaa53f7b51512be2b3d24f3939695403c",
       "upstream": {
         "repository": "https://github.com/LizardByte/Sunshine.git",
         "commit": "14ffa6fdaa53f7b51512be2b3d24f3939695403c"
       },
-      "sourceArchive": "https://github.com/NorbertBodziony/Sunshine/archive/cde2ca692b9002c2d0a5418c6e077eba02e6c483.tar.gz",
-      "sourceSha256": "55a5df4a75f8c7eb4d7b77dbc6d4312b9f647bbb043b11852d2e9032dce13cc3",
+      "sourceArchive": "https://github.com/LizardByte/Sunshine/archive/14ffa6fdaa53f7b51512be2b3d24f3939695403c.tar.gz",
+      "sourceSha256": "4e9501d4758f0cde4d37425aad26e22d5691667c4aa7fbe419a42e11bd68b369",
       "license": "GPL-3.0",
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "ba2d7bba1f17f1d5f8c054edd3de8a60a7a3f890205f7db1a67d6d3829c4deec"
+        "sha256": "bbb7a990994f948a2dc51c3b7ff35be4752a0f2890f082af0311fc423ef1f003"
       },
       "overrides": [],
       "submodules": {
@@ -210,45 +247,82 @@
       }
     },
     "moonlightWeb": {
-      "sourceMode": "openbot-fork",
-      "repository": "https://github.com/NorbertBodziony/moonlight-web-stream.git",
+      "sourceMode": "upstream-with-patch",
+      "repository": "https://github.com/MrCreativ3001/moonlight-web-stream.git",
       "version": "v2.10.0",
-      "commit": "f1d20ab348978e39c80734a7302db2646e2231d7",
+      "commit": "cd9d03cbf9a42b394f7b72a733a2f39cb5f0edd8",
       "upstream": {
         "repository": "https://github.com/MrCreativ3001/moonlight-web-stream.git",
         "commit": "cd9d03cbf9a42b394f7b72a733a2f39cb5f0edd8"
       },
-      "sourceArchive": "https://github.com/NorbertBodziony/moonlight-web-stream/archive/f1d20ab348978e39c80734a7302db2646e2231d7.tar.gz",
-      "sourceSha256": "7b7ac01b7b7e995ec352415eca3338997882af3d7e49ede5b113ce207b1e28f1",
+      "sourceArchive": "https://github.com/MrCreativ3001/moonlight-web-stream/archive/cd9d03cbf9a42b394f7b72a733a2f39cb5f0edd8.tar.gz",
+      "sourceSha256": "ff4800657812eb7c7e56f62cae8c9f859aac19b196fe47df255ae8792ec970ec",
       "license": "GPL-3.0",
       "licenseSha256": "8b1ba204bb69a0ade2bfcf65ef294a920f6bb361b317dba43c7ef29d96332b9b",
       "patch": {
         "path": "vendor/remote-desktop/patches/moonlight-web-stream-v2.10.0-openbot.patch",
-        "sha256": "977e5974ba7281006de533575aef16535e3744fbbd1bbbafb559728785ce7057"
+        "sha256": "916fcf57ec3f3d5a7517d488d106d698dbc7f4c8c2d12acc6be9982510a05444"
       },
       "overrides": [],
       "submodules": {}
-    },
-    "releaseArtifacts": {
-      "darwin-arm64": {
-        "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "bb8d66f4f87dedc193c760de4a04cdd9ff2e037aa6252947f7544ff9700aa85e"
-      },
-      "win32-x64": {
-        "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "4c0330eef1560cc846a7d902b545cfa905b01b93e8ae641529737a0b10edf713"
-      }
     },
     "targets": {
       "darwin-arm64": ["Sunshine.app/Contents/MacOS/Sunshine", "web-server", "streamer"],
       "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"]
     },
+    "releaseArtifacts": {
+      "darwin-arm64": {
+        "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
+        "sha256": "e741eb66cc43094a146f595dcf3af5299912396bb42ed08789d2ec31af65b6cd"
+      },
+      "win32-x64": {
+        "asset": "remote-desktop-runtime-win32-x64.tar.gz",
+        "sha256": "670ac2db0e56888bd76cc58f0cb8492f9f3ec6a580add7ba3b5ff6f13fe92531"
+      }
+    },
     "artifactRelease": {
       "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-a6e49e7ac064584df4e4bc3dd9531b98e99fcfa1bf0f690ee1557ac351d60ab9",
-      "inputDigest": "a6e49e7ac064584df4e4bc3dd9531b98e99fcfa1bf0f690ee1557ac351d60ab9",
+      "tag": "remote-desktop-runtime-25fa8888cc02cc67e42fb0c496955f2f7790ee19349b01aea792c2963def6d93",
+      "inputDigest": "25fa8888cc02cc67e42fb0c496955f2f7790ee19349b01aea792c2963def6d93",
       "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "1a618320fed986c37444776a0fb47411f6ffb123e4886cfbb9fcb251c74c0e40"
+      "manifestSha256": "9250997b739dba859760e52b6b78f269df4b0418f9e0573ea0157a8cbac412c2"
+    }
+  },
+  "bun": {
+    "registry": "https://registry.npmjs.org",
+    "repository": "https://github.com/oven-sh/bun",
+    "version": "1.4.2",
+    "tag": "bun-v1.4.2",
+    "license": "MIT",
+    "licenseSha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a",
+    "artifacts": {
+      "darwin-arm64": {
+        "package": "@oven/bun-darwin-aarch64",
+        "asset": "bun-darwin-aarch64-1.4.2.tgz",
+        "assetSha256": "a9df486eaf7e9db9bdebb1fa425e8c9809abd783b1c518d1dbc5096a53b861ed",
+        "binarySha256": "35d20dd0263e5c950194434b925454fdfa9ba6e4467da960410fa05b08a7a5b5",
+        "downloadBytes": 26145119,
+        "installedBytes": 130000000,
+        "executable": "bun"
+      },
+      "linux-x64": {
+        "package": "@oven/bun-linux-x64-baseline",
+        "asset": "bun-linux-x64-baseline-1.4.2.tgz",
+        "assetSha256": "129ae8dfaca565e8008735e3d6adae7515421c5b226d6f1f90c4bcb35803a647",
+        "binarySha256": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c",
+        "downloadBytes": 37119716,
+        "installedBytes": 170000000,
+        "executable": "bun"
+      },
+      "win32-x64": {
+        "package": "@oven/bun-windows-x64-baseline",
+        "asset": "bun-windows-x64-baseline-1.4.2.tgz",
+        "assetSha256": "3a4f6d0453afcc1ed1f736e3a4356306ff359efe75fa11c9a0d82c59f76d4801",
+        "binarySha256": "15277c59ccd6c6c20f8dc9716c2b59c1776320d606b6a8658f70be8799519ca4",
+        "downloadBytes": 40496025,
+        "installedBytes": 190000000,
+        "executable": "bun.exe"
+      }
     }
   }
 }

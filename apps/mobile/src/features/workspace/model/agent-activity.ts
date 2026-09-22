@@ -1,3 +1,4 @@
+import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 
 export interface MobileAgentActivity {
@@ -8,6 +9,16 @@ export interface MobileAgentActivity {
 }
 
 export type MobileAgentActivities = Record<string, MobileAgentActivity>;
+
+/**
+ * The face an avatar wears for an activity. An agent that waits on an answer holds its resting
+ * face and stops moving; anything else it does is work. The mood table itself is shared with the
+ * desktop, so the two cannot drift.
+ */
+export function agentActivityMood(activity: MobileAgentActivity | undefined): AvatarMood {
+  if (!activity) return "idle";
+  return activity.phase === "waiting" ? "waiting" : "working";
+}
 
 export function reduceAgentActivity(
   current: MobileAgentActivities,

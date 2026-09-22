@@ -5,7 +5,7 @@ import { createSignal } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ComposerEditor } from "../src/features/conversation/ComposerEditor";
-import { STORY_AGENTS } from "./fixtures";
+import { STORY_AGENTS, STORY_MCP_SERVERS } from "./fixtures";
 
 const args: Parameters<typeof ComposerEditor>[0] = {
   agentId: "chief",
@@ -205,13 +205,30 @@ export const SkillPicker: Story = {
     const editor = canvas.getByRole("textbox", { name: "Message Chief" });
     await userEvent.click(editor);
     typePickerTrigger(editor, "$");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
+    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
     await expect(picker).toBeInTheDocument();
     await expect(within(document.body).getByRole("option", { name: /^Release Notes/ })).toBeInTheDocument();
     await userEvent.keyboard("{Enter}");
     await expect(editor.querySelector('[data-skill-id="skill-release-notes"]')).not.toBeNull();
     await expect(editor).toHaveTextContent("Release Notes");
     await expect(storyArgs.onSubmit).not.toHaveBeenCalled();
+  },
+};
+
+export const McpServerPicker: Story = {
+  args: {
+    skills: installedSkills,
+    mcpServers: STORY_MCP_SERVERS,
+  },
+  render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
+  play: async ({ canvas, userEvent }) => {
+    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
+    await userEvent.click(editor);
+    typePickerTrigger(editor, "$Lin");
+    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
+    await expect(within(picker).getByRole("option", { name: /^Linear MCP server/ })).toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    await expect(editor.querySelector('[data-mcp-id="mcp-linear"]')).not.toBeNull();
   },
 };
 
@@ -224,7 +241,7 @@ export const SkillPickerLongDescription: Story = {
     const editor = canvas.getByRole("textbox", { name: "Message Chief" });
     await userEvent.click(editor);
     typePickerTrigger(editor, "$");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
+    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
     await expect(within(picker).getByRole("option", { name: /^Incident Review/ })).toBeInTheDocument();
   },
 };
@@ -238,7 +255,7 @@ export const CompactComposerPicker: Story = {
     const editor = canvas.getByRole("textbox", { name: "Message Chief" });
     await userEvent.click(editor);
     typePickerTrigger(editor, "$");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill" });
+    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
     await expect(within(picker).getByRole("option", { name: /^Site Hosting/ })).toBeInTheDocument();
   },
 };

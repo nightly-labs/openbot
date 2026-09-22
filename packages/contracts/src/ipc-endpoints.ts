@@ -38,6 +38,8 @@ export const IPC_ENDPOINTS = {
     saveSetup: request(IPC_CHANNELS.saveSetup),
     getAnalyticsPreference: request(IPC_CHANNELS.getAnalyticsPreference),
     setAnalyticsPreference: request(IPC_CHANNELS.setAnalyticsPreference),
+    getApprovalAutomation: request(IPC_CHANNELS.getApprovalAutomation),
+    setApprovalAutomation: request(IPC_CHANNELS.setApprovalAutomation),
     getAppLanguagePreference: request(IPC_CHANNELS.getAppLanguagePreference),
     setAppLanguagePreference: request(IPC_CHANNELS.setAppLanguagePreference),
     // Every window draws its own text, so the choice is broadcast rather than returned: the
@@ -62,6 +64,8 @@ export const IPC_ENDPOINTS = {
     setProviderApiKey: request(IPC_CHANNELS.setProviderApiKey),
     clearProviderApiKey: request(IPC_CHANNELS.clearProviderApiKey),
     getProviderApiKeyState: request(IPC_CHANNELS.getProviderApiKeyState),
+    startProviderCodeLogin: request(IPC_CHANNELS.startProviderCodeLogin),
+    cancelProviderCodeLogin: request(IPC_CHANNELS.cancelProviderCodeLogin),
   },
   providerRuntimes: {
     getStatus: request(IPC_CHANNELS.providerRuntimesGetStatus),
@@ -89,11 +93,13 @@ export const IPC_ENDPOINTS = {
     setInteractive: request(IPC_CHANNELS.dynamicIslandSetInteractive),
   },
   computerUse: {
-    getMacSetupState: request(IPC_CHANNELS.computerUseGetMacSetupState),
-    openMacPermissionSetup: request(IPC_CHANNELS.computerUseOpenMacPermissionSetup),
-    startHelperDrag: request(IPC_CHANNELS.computerUseStartHelperDrag),
-    revealHelper: request(IPC_CHANNELS.computerUseRevealHelper),
-    closeMacPermissionSetup: request(IPC_CHANNELS.computerUseCloseMacPermissionSetup),
+    getState: request(IPC_CHANNELS.computerUseGetState),
+    openPermissionPane: request(IPC_CHANNELS.computerUseOpenPermissionPane),
+    closePermissionHelp: request(IPC_CHANNELS.computerUseClosePermissionHelp),
+    getPermissionApp: request(IPC_CHANNELS.computerUseGetPermissionApp),
+    startPermissionAppDrag: request(IPC_CHANNELS.computerUseStartPermissionAppDrag),
+    revealPermissionApp: request(IPC_CHANNELS.computerUseRevealPermissionApp),
+    highlightPlacement: event(IPC_CHANNELS.computerUseHighlightPlacement),
   },
   skills: {
     localList: request(IPC_CHANNELS.skillsLocalList),
@@ -196,6 +202,7 @@ export const IPC_ENDPOINTS = {
     interrupt: request(IPC_CHANNELS.agentInterrupt),
     respondToPrompt: request(IPC_CHANNELS.agentRespondToPrompt),
     respondToApproval: request(IPC_CHANNELS.agentRespondToApproval),
+    respondToBrowserSecret: request(IPC_CHANNELS.agentRespondToBrowserSecret),
     respondToBrowserTakeover: request(IPC_CHANNELS.agentRespondToBrowserTakeover),
     event: event(IPC_CHANNELS.agentEvent),
   },
@@ -255,6 +262,10 @@ export const IPC_ENDPOINTS = {
     getControlState: request(IPC_CHANNELS.browserGetControlState),
     capturePreview: request(IPC_CHANNELS.browserCapturePreview),
     setVisible: request(IPC_CHANNELS.browserSetVisible),
+    startLiveView: request(IPC_CHANNELS.browserStartLiveView),
+    stopLiveView: request(IPC_CHANNELS.browserStopLiveView),
+    sendLiveViewInput: request(IPC_CHANNELS.browserSendLiveViewInput),
+    liveViewEvent: event(IPC_CHANNELS.browserLiveViewEvent),
     displayStateEvent: event(IPC_CHANNELS.browserDisplayStateEvent),
     pictureInPictureOpen: request(IPC_CHANNELS.browserPictureInPictureOpen),
     pictureInPictureClose: request(IPC_CHANNELS.browserPictureInPictureClose),
@@ -304,6 +315,13 @@ export const IPC_ENDPOINTS = {
     setEnabled: request(IPC_CHANNELS.serversSetMcpServerEnabled),
     test: request(IPC_CHANNELS.serversTestMcpServer),
   },
+  // The plugin deep link, its own group because its registrar holds the pending link rather than a
+  // service. `takePendingListing` is what a window that finished loading after the link arrived
+  // asks for; `openListing` is the same slug pushed to a window that was already there.
+  plugins: {
+    takePendingListing: request(IPC_CHANNELS.pluginsTakePendingListing),
+    openListing: event(IPC_CHANNELS.pluginsOpenListing),
+  },
   host: {
     getStatus: request(IPC_CHANNELS.hostGetStatus),
     configure: request(IPC_CHANNELS.hostConfigure),
@@ -323,6 +341,9 @@ export const IPC_ENDPOINTS = {
     event: event(IPC_CHANNELS.hostEvent),
   },
   remoteDesktop: {
+    checkSetup: request(IPC_CHANNELS.remoteDesktopCheckSetup),
+    openSetup: request(IPC_CHANNELS.remoteDesktopOpenSetup),
+    test: request(IPC_CHANNELS.remoteDesktopTest),
     list: request(IPC_CHANNELS.remoteDesktopList),
     connect: request(IPC_CHANNELS.remoteDesktopConnect),
     selectDisplay: request(IPC_CHANNELS.remoteDesktopSelectDisplay),

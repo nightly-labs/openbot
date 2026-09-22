@@ -87,6 +87,39 @@ the recheck whatever its timestamp says. That one is passed to the reviewer whol
 responses share a size budget and are dropped from the oldest end. A label carries no argument of
 its own, so write the rebuttal as a comment first and label afterwards.
 
+### Choosing the reviewer for one pull request
+
+The reviewer runs on a default model and reasoning effort set in
+[`.github/workflows/norbiai-review.yml`](.github/workflows/norbiai-review.yml). A pull request that
+needs a closer read, or one small enough not to need the slowest one, can pick its own with two
+directives, each on a line of its own in the pull request description:
+
+```
+NorbiAI-Model: chatgpt-web/pro
+NorbiAI-Effort: high
+```
+
+Wrap a directive in `<!-- -->` to keep it out of the rendered description. A directive inside a
+fenced code block is an example and is not read, so a pull request may show one without changing its
+own review. Each is optional: leave one out and that half keeps the default. The choice applies to this pull request only — nothing is
+written back, so the next one starts from the defaults again — and the review comment records under
+`Review details` which reviewer actually ran.
+
+`NorbiAI-Effort` reaches `gpt-6-astra` only. A `chatgpt-web/*` slug carries its own level — the
+`high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair the effort with
+`gpt-6-astra` or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking for more is
+answered with a warning and the run goes ahead at `low`.
+
+The same two directives work in a `/norbiai review` comment, where they override the description for
+that one run. On a pull request from a fork only the comment is read: the description belongs to
+whoever opened the pull request, and choosing your own reviewer is not theirs to do.
+
+`ALLOWED_MODELS` and `ALLOWED_EFFORTS` in the workflow file are the accepted values. Anything else
+is refused with a warning and the default runs instead, so a typo reviews at full strength rather
+than at none. The value is the whole rest of the line, so keep the directive on its own: a trailing
+note makes the line unrecognised rather than being trimmed off it. The review still has to finish
+inside the job's own time limit, whichever model runs.
+
 ## Security-sensitive changes
 
 Preserve the following boundaries and their tests:

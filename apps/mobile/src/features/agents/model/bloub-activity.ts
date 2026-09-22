@@ -1,11 +1,19 @@
 import { BotEngine, type BotFrame, blendExpression, EXPRESSION_BY_ID, SHAPE_BY_ID } from "@norbert_bodziony/bloub";
 import { bloubAvatarProfile } from "@openbot/brand/bloub-avatar";
+import { type AvatarMood, avatarMoodPresentation } from "@openbot/brand/bloub-avatar-motion";
+
+/**
+ * The pose the working cycle holds. It is shape-safe by type, so the cycle can never hand back a
+ * different creature than the one the agent is recognised by. The working face arrives with the
+ * geometry instead: `bloubActivityGeometry` reads it from the same mood table the desktop uses.
+ */
+const WORKING_STATE = avatarMoodPresentation("working").state;
 
 export const FPS = 60;
-const IDLE = 1.2;
-const THINKING = 1.7;
+const LEAD = 1.2;
+const FOCUS = 1.7;
 const WIDE = 1;
-const CYCLE = IDLE + THINKING + WIDE;
+const CYCLE = LEAD + FOCUS + WIDE;
 export const FRAME_COUNT = Math.round(CYCLE * FPS);
 export const SETTLE = 0.45;
 export const IDLE_FPS = 30;
@@ -38,13 +46,21 @@ export function nativeFrame(frame: BotFrame) {
 
 export type BloubActivityFrame = ReturnType<typeof nativeFrame>;
 
-// Color and agent identity do not change the sampled geometry.
-export function bloubActivityGeometry(seed: string) {
+/**
+ * The shape and face to sample for an agent. Color and agent identity do not change it.
+ *
+ * The silhouette comes from the seed and never from the mood, so it is fixed for the life of the
+ * agent. The mood only chooses the face, and a mood with no face of its own keeps the seeded one.
+ * Because the key carries the expression, a mood change looks like any other appearance change to
+ * the player above, which already glides between two geometries over `BotEngine.SHAPE_MORPH`.
+ */
+export function bloubActivityGeometry(seed: string, mood: AvatarMood = "idle") {
   const profile = bloubAvatarProfile(seed, null);
+  const expressionId = avatarMoodPresentation(mood).expression ?? profile.expression;
   const silhouette = SHAPE_BY_ID.get(profile.shape);
-  const expression = EXPRESSION_BY_ID.get(profile.expression);
+  const expression = EXPRESSION_BY_ID.get(expressionId);
   if (!silhouette || !expression) throw new Error("Bloub avatar profile is invalid.");
-  return { key: `${profile.shape}:${profile.expression}`, radii: silhouette.radii, expression };
+  return { key: `${profile.shape}:${expressionId}`, radii: silhouette.radii, expression };
 }
 
 type Geometry = ReturnType<typeof bloubActivityGeometry>;
@@ -105,12 +121,17 @@ function scheduleIdle(callback: () => void) {
   return () => cancelIdleCallback(id);
 }
 
+/**
+ * The working loop: the agent holds its working face, opens its eyes wide, and settles back.
+ *
+ * It used to open on `thinking`, which draws its own body, so a working agent on the phone turned
+ * into a column of dots for most of the cycle. Both poses here keep the agent's silhouette.
+ */
 export function cycleEngine(geometry: Geometry, seconds: number, looping: boolean) {
-  const engine = new BotEngine(100, "idle", geometry.radii, geometry.expression);
-  if (looping) engine.reset("idle", -IDLE);
-  engine.setState("thinking", 0);
-  if (seconds >= THINKING) engine.setState("wide", THINKING);
-  if (seconds >= THINKING + WIDE) engine.setState("idle", THINKING + WIDE);
+  const engine = new BotEngine(100, WORKING_STATE, geometry.radii, geometry.expression);
+  if (looping) engine.reset(WORKING_STATE, -LEAD);
+  if (seconds >= FOCUS) engine.setState("wide", FOCUS);
+  if (seconds >= FOCUS + WIDE) engine.setState(WORKING_STATE, FOCUS + WIDE);
   return engine;
 }
 
@@ -118,8 +139,8 @@ function* activityFrames(geometry: Geometry): Generator<BloubActivityFrame> {
   for (const looping of [false, true]) {
     const engine = cycleEngine(geometry, 0, looping);
     for (let index = 0; index < FRAME_COUNT; index += 1) {
-      if (index === Math.round(THINKING * FPS)) engine.setState("wide", THINKING);
-      if (index === Math.round((THINKING + WIDE) * FPS)) engine.setState("idle", THINKING + WIDE);
+      if (index === Math.round(FOCUS * FPS)) engine.setState("wide", FOCUS);
+      if (index === Math.round((FOCUS + WIDE) * FPS)) engine.setState(WORKING_STATE, FOCUS + WIDE);
       yield nativeFrame(engine.sample(index / FPS));
     }
   }

@@ -446,16 +446,6 @@
   min-width: 0;
 }
 
-.markdown-file-preview-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding-bottom: var(--openbot-space-3);
-}
-
-.markdown-file-preview-source-action {
-  flex: 0 0 auto;
-}
-
 .file-preview-markdown {
   max-width: 760px;
   margin: 0 auto;
@@ -469,7 +459,6 @@
   line-height: 1.6;
 }
 
-.file-preview-markdown-source,
 .file-preview-markdown-status {
   min-width: 0;
   margin: 0;
@@ -1209,6 +1198,19 @@
   flex: 1;
   overflow: hidden;
   background: var(--openbot-bg-canvas);
+}
+
+/* The live view of a host's tab. It fills the surface the native view would have covered. */
+.browser-live-view {
+  position: absolute;
+  inset: 0;
+}
+
+.browser-live-view canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .browser-empty-state {
@@ -2778,6 +2780,35 @@
   padding: 9px 7px;
 }
 
+.provider-model-rail-tooltip-trigger {
+  display: flex;
+}
+
+.provider-model-rail-tooltip {
+  z-index: var(--openbot-layer-popover);
+  display: flex;
+  max-width: min(240px, calc(100vw - 16px));
+  flex-direction: column;
+  gap: var(--openbot-space-0-5);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.provider-model-rail-tooltip small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+}
+
 .provider-model-rail-button {
   display: grid;
   width: 36px;
@@ -4007,14 +4038,24 @@ button.chat-action-target:active,
   margin-left: -6px;
 }
 
-.chat-action-agent-menu {
+/* The shared .ui-action-menu item rule outranks a single class, so the grid template and the
+ * truncation below have to be compounded to reach the row. */
+.ui-action-menu.chat-action-agent-menu {
   min-width: 220px;
+  max-width: min(320px, calc(100vw - var(--openbot-space-4)));
 }
 
-.chat-action-agent-menu-item {
+.ui-action-menu.chat-action-agent-menu .chat-action-agent-menu-item[role="menuitem"] {
   display: grid;
+  align-items: center;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: var(--openbot-space-2);
+}
+
+.chat-action-agent-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-action-agent-menu-item .chat-action-agent-avatar {
@@ -4026,6 +4067,7 @@ button.chat-action-target:active,
 .chat-action-agent-menu-status {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+  white-space: nowrap;
 }
 
 .chat-action-attachments {
@@ -7572,50 +7614,6 @@ button.chat-action-target:active,
   }
 }
 
-.agent-setup-card {
-  display: flex;
-  width: min(100%, 560px);
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin: 8px 0 18px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--surface);
-}
-
-.agent-setup-card div {
-  min-width: 0;
-}
-
-.agent-setup-card strong {
-  color: var(--text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: 600;
-}
-
-.agent-setup-card p {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: var(--openbot-text-sm);
-  line-height: 16px;
-}
-
-.agent-setup-card button {
-  flex: 0 0 auto;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-border);
-  padding: 7px 10px;
-  color: var(--text-primary);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-setup-card button:hover {
-  background: var(--openbot-border);
-}
-
 .conversation-interaction-card {
   box-sizing: border-box;
   min-width: 0;
@@ -8304,8 +8302,12 @@ button.chat-action-target:active,
 .approval-card-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--openbot-space-2);
+}
+
+.approval-card-footer > :last-child {
+  margin-inline-start: auto;
 }
 
 .approval-button {
@@ -8757,4 +8759,72 @@ body:has(.browser-panel-expanded) .app-frame {
 .browser-panel-expanded .browser-tabs {
   min-width: 0;
   flex: 1;
+}
+
+.browser-secret-card {
+  display: grid;
+  gap: var(--openbot-space-4);
+}
+
+.browser-secret-card > p {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-lg);
+}
+
+.browser-secret-card strong {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.browser-secret-card .browser-takeover-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+
+.browser-secret-password,
+.browser-secret-code {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.browser-secret-label {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.browser-secret-code .otp-input {
+  container-type: inline-size;
+  justify-items: start;
+}
+
+.browser-secret-code .otp-input-slots {
+  --otp-slot-size: min(
+    34px,
+    calc((100cqw - (var(--otp-length) - 1) * var(--otp-slot-gap) - var(--otp-group-gap)) / var(--otp-length))
+  );
+}
+
+.browser-secret-code .otp-input-message {
+  text-align: start;
+  justify-content: flex-start;
+}
+
+.browser-secret-card > .browser-secret-error {
+  color: var(--openbot-danger);
+}
+
+.browser-secret-card .browser-takeover-preview-viewport {
+  width: 100%;
+  max-height: 280px;
+}
+
+.browser-secret-card .browser-takeover-preview-viewport img {
+  min-height: 0;
+  object-fit: contain;
 }

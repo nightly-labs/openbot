@@ -15,6 +15,7 @@ const TICKET_TTL_SECONDS = 180;
 const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
 const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
+const MAX_PERMANENT_INVITES_PER_HOST = 5;
 
 export type { RemoteMemberRole };
 
@@ -69,6 +70,9 @@ interface RemoteInviteRow {
   expires_at: number;
   used_at: number | null;
   revoked_at: number | null;
+  // NULL means unlimited. Rows written before 0020 carry the migration default of 1.
+  max_uses: number | null;
+  use_count: number;
 }
 
 interface TicketSignerConfig {
@@ -337,15 +341,67 @@ export class RemoteControlPlane {
       role: Exclude<RemoteMemberRole, "owner">;
       email?: string | null;
       expiresInSeconds?: number;
+      permanent?: boolean;
     },
   ) {
     await this.#requireRole(input.hostId, user.id, ["owner", "admin"]);
     if (input.role !== "admin" && input.role !== "member") throw invalid("invite role");
+    const permanent = input.permanent ?? false;
+    // A permanent link is a shareable URL, never an addressed message: binding it to an
+    // email would promise a restriction the token cannot enforce.
+    if (permanent && input.email?.trim()) throw invalid("permanent invite email");
+    if (permanent && input.expiresInSeconds !== undefined) throw invalid("permanent invite lifetime");
     const now = this.#now();
+    const ttl = input.expiresInSeconds ?? 7 * 24 * 60 * 60;
+    if (!permanent && (!Number.isSafeInteger(ttl) || ttl < 300 || ttl > 30 * 24 * 60 * 60)) {
+      throw invalid("invite lifetime");
+    }
+    const email = input.email?.trim().toLowerCase() || null;
+    const inviteId = crypto.randomUUID();
+    const token = randomToken();
+    const expiresAt = permanent ? PERSISTENT_SESSION_EXPIRES_AT : now + ttl * 1_000;
+    if (permanent) {
+      // The count and the insert are one statement: two concurrent requests cannot both
+      // read below the cap and then both insert.
+      const created = await this.#database
+        .prepare(
+          `INSERT INTO remote_invites(
+             invite_id, host_id, token_hash, email, role, created_by_user_id, expires_at, created_at,
+             max_uses, use_count
+           )
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0
+           WHERE (
+             SELECT COUNT(*) FROM remote_invites
+             WHERE host_id = ? AND max_uses IS NULL AND revoked_at IS NULL
+           ) < ?`,
+        )
+        .bind(
+          inviteId,
+          input.hostId,
+          await sha256(token),
+          email,
+          input.role,
+          user.id,
+          expiresAt,
+          now,
+          input.hostId,
+          MAX_PERMANENT_INVITES_PER_HOST,
+        )
+        .run();
+      if ((created.meta.changes ?? 0) !== 1) {
+        throw new RemoteControlPlaneError(
+          429,
+          "invite_limit_reached",
+          "Revoke a permanent invitation link before creating another one.",
+        );
+      }
+      return { inviteId, token, expiresAt, permanent, useCount: 0 };
+    }
     const outstanding = await this.#database
       .prepare(
         `SELECT COUNT(*) AS count FROM remote_invites
-         WHERE host_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`,
+         WHERE host_id = ? AND max_uses IS NOT NULL
+           AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`,
       )
       .bind(input.hostId, now)
       .first<{ count: number }>();
@@ -356,27 +412,23 @@ export class RemoteControlPlane {
         "Revoke or use an active invitation before creating another one.",
       );
     }
-    const ttl = input.expiresInSeconds ?? 7 * 24 * 60 * 60;
-    if (!Number.isSafeInteger(ttl) || ttl < 300 || ttl > 30 * 24 * 60 * 60) throw invalid("invite lifetime");
-    const email = input.email?.trim().toLowerCase() || null;
-    const inviteId = crypto.randomUUID();
-    const token = randomToken();
     await this.#database
       .prepare(
         `INSERT INTO remote_invites(
-           invite_id, host_id, token_hash, email, role, created_by_user_id, expires_at, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           invite_id, host_id, token_hash, email, role, created_by_user_id, expires_at, created_at,
+           max_uses, use_count
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)`,
       )
-      .bind(inviteId, input.hostId, await sha256(token), email, input.role, user.id, now + ttl * 1_000, now)
+      .bind(inviteId, input.hostId, await sha256(token), email, input.role, user.id, expiresAt, now)
       .run();
-    return { inviteId, token, expiresAt: now + ttl * 1_000 };
+    return { inviteId, token, expiresAt, permanent, useCount: 0 };
   }
 
   async listInvites(userId: string, hostId: string) {
     await this.#requireRole(hostId, userId, ["owner", "admin"]);
     const result = await this.#database
       .prepare(
-        `SELECT invite_id, email, role, expires_at, used_at, revoked_at
+        `SELECT invite_id, email, role, expires_at, used_at, revoked_at, max_uses, use_count
          FROM remote_invites WHERE host_id = ? ORDER BY created_at DESC`,
       )
       .bind(hostId)
@@ -387,15 +439,24 @@ export class RemoteControlPlane {
         expires_at: number;
         used_at: number | null;
         revoked_at: number | null;
+        max_uses: number | null;
+        use_count: number;
       }>();
-    return (result.results ?? []).map((invite) => ({
-      inviteId: invite.invite_id,
-      email: invite.email,
-      role: invite.role,
-      expiresAt: invite.expires_at,
-      usedAt: invite.used_at,
-      revokedAt: invite.revoked_at,
-    }));
+    return (result.results ?? []).map((invite) => {
+      // A permanent link stays listed after joins; a Worker from the deploy gap may have
+      // stamped used_at on one, which carries no meaning here.
+      const permanent = invite.max_uses === null;
+      return {
+        inviteId: invite.invite_id,
+        email: invite.email,
+        role: invite.role,
+        expiresAt: invite.expires_at,
+        usedAt: permanent ? null : invite.used_at,
+        revokedAt: invite.revoked_at,
+        permanent,
+        useCount: invite.use_count ?? 0,
+      };
+    });
   }
 
   async listMembers(userId: string, hostId: string) {
@@ -457,13 +518,13 @@ export class RemoteControlPlane {
     const invite = await this.#database
       .prepare(
         `SELECT i.invite_id, i.host_id, i.email, i.role, i.expires_at, i.used_at, i.revoked_at,
-                h.name, h.device_public_key
+                i.max_uses, i.use_count, h.name, h.device_public_key
          FROM remote_invites i JOIN remote_hosts h ON h.host_id = i.host_id
          WHERE i.token_hash = ? LIMIT 1`,
       )
       .bind(await sha256(requiredText(token, 512, "invite token")))
       .first<RemoteInviteRow & { name: string; device_public_key: string | null }>();
-    if (!invite || invite.used_at || invite.revoked_at || invite.expires_at <= now) {
+    if (!invite || invite.revoked_at || invite.expires_at <= now || (invite.used_at && invite.max_uses !== null)) {
       throw new RemoteControlPlaneError(404, "invite_invalid", "The invitation is invalid or expired.");
     }
     return {
@@ -473,6 +534,7 @@ export class RemoteControlPlane {
       role: invite.role,
       expiresAt: invite.expires_at,
       emailBound: Boolean(invite.email),
+      permanent: invite.max_uses === null,
       devicePublicKey: invite.device_public_key,
     };
   }
@@ -482,12 +544,13 @@ export class RemoteControlPlane {
     const tokenHash = await sha256(requiredText(token, 512, "invite token"));
     const invite = await this.#database
       .prepare(
-        `SELECT invite_id, host_id, email, role, expires_at, used_at, revoked_at
+        `SELECT invite_id, host_id, email, role, expires_at, used_at, revoked_at, max_uses, use_count
          FROM remote_invites WHERE token_hash = ? LIMIT 1`,
       )
       .bind(tokenHash)
       .first<RemoteInviteRow>();
-    if (!invite || invite.used_at || invite.revoked_at || invite.expires_at <= now) {
+    const permanent = invite?.max_uses === null;
+    if (!invite || invite.revoked_at || invite.expires_at <= now || (!permanent && invite.used_at)) {
       throw new RemoteControlPlaneError(404, "invite_invalid", "The invitation is invalid or expired.");
     }
     if (invite.email && invite.email !== user.email.trim().toLowerCase()) {
@@ -518,21 +581,37 @@ export class RemoteControlPlane {
       this.#authEpochEventStatement(invite.host_id, now),
       this.#database
         .prepare(
-          `INSERT INTO remote_memberships(
-             membership_id, host_id, user_id, role, status, created_at, updated_at
-           ) SELECT ?, ?, ?, ?, 'active', ?, ?
-             FROM remote_invites
-            WHERE invite_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?
-           ON CONFLICT(host_id, user_id) DO UPDATE SET
-             role = CASE WHEN remote_memberships.role = 'owner' THEN 'owner' ELSE excluded.role END,
-             status = 'active', updated_at = excluded.updated_at`,
+          permanent
+            ? `INSERT INTO remote_memberships(
+                 membership_id, host_id, user_id, role, status, created_at, updated_at
+               ) SELECT ?, ?, ?, ?, 'active', ?, ?
+                 FROM remote_invites
+                WHERE invite_id = ? AND revoked_at IS NULL AND expires_at > ?
+               ON CONFLICT(host_id, user_id) DO UPDATE SET
+                 role = CASE WHEN remote_memberships.role = 'owner' THEN 'owner' ELSE excluded.role END,
+                 status = 'active', updated_at = excluded.updated_at`
+            : `INSERT INTO remote_memberships(
+                 membership_id, host_id, user_id, role, status, created_at, updated_at
+               ) SELECT ?, ?, ?, ?, 'active', ?, ?
+                 FROM remote_invites
+                WHERE invite_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?
+               ON CONFLICT(host_id, user_id) DO UPDATE SET
+                 role = CASE WHEN remote_memberships.role = 'owner' THEN 'owner' ELSE excluded.role END,
+                 status = 'active', updated_at = excluded.updated_at`,
         )
         .bind(membershipId, invite.host_id, user.id, invite.role, now, now, invite.invite_id, now),
-      this.#database
-        .prepare(
-          "UPDATE remote_invites SET used_at = ? WHERE invite_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
-        )
-        .bind(now, invite.invite_id, now),
+      // A permanent link counts the join and stays live; a single-use link burns.
+      permanent
+        ? this.#database
+            .prepare(
+              "UPDATE remote_invites SET use_count = use_count + 1 WHERE invite_id = ? AND revoked_at IS NULL AND expires_at > ?",
+            )
+            .bind(invite.invite_id, now)
+        : this.#database
+            .prepare(
+              "UPDATE remote_invites SET used_at = ? WHERE invite_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
+            )
+            .bind(now, invite.invite_id, now),
       this.#database
         .prepare("UPDATE remote_sessions SET ended_at = ? WHERE host_id = ? AND user_id = ? AND ended_at IS NULL")
         .bind(now, invite.host_id, user.id),
@@ -560,8 +639,10 @@ export class RemoteControlPlane {
       .first<{ host_id: string }>();
     if (!invite) throw new RemoteControlPlaneError(404, "invite_not_found", "The invitation does not exist.");
     await this.#requireRole(invite.host_id, userId, ["owner", "admin"]);
+    // The `max_uses IS NULL` arm covers a permanent link a pre-permanent Worker stamped
+    // used_at on during the migration/deploy gap; its joins never meant "consumed".
     await this.#database
-      .prepare("UPDATE remote_invites SET revoked_at = ? WHERE invite_id = ? AND used_at IS NULL")
+      .prepare("UPDATE remote_invites SET revoked_at = ? WHERE invite_id = ? AND (used_at IS NULL OR max_uses IS NULL)")
       .bind(this.#now(), inviteId)
       .run();
   }

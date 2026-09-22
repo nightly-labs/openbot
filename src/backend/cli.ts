@@ -283,6 +283,16 @@ export function parseOpencodeVersion(output: string): string {
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
+/**
+ * Bun prints a bare `1.4.2` and nothing else. It is not a provider CLI, so no discovery step reads
+ * this; only `verifyInstalledRuntime` does, to confirm the binary in the store is the pinned one.
+ */
+export function parseBunVersion(output: string): string {
+  const match = output.trim().match(/^v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/);
+  if (!match) throw new CodexCliError("Unable to read the Bun runtime version.", "invalid");
+  return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
+}
+
 function isMinimumVersion(version: string, minimum: readonly number[]): boolean {
   const parts = version.split(".").map(Number);
   for (let index = 0; index < minimum.length; index += 1) {

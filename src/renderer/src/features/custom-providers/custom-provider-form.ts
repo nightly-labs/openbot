@@ -1,10 +1,6 @@
-// The form side of the endpoint the user names. Its field names are the form's own
-// (`providerId`, `displayName`), because they label inputs and index error messages; `SaveCustomProviderInput`
-// from the contract is what submit produces, so the dialog's payload is literally the wire payload.
-//
-// Every bound and pattern comes from the contract rather than from here: the main parser checks the
-// same input again, and a copy that drifted would show the user a form that passes and a save that
-// fails, or the reverse.
+// Form side of the user-named endpoint: field names are the form's own (labels/error index),
+// submit produces the contract `SaveCustomProviderInput` verbatim. Every bound/pattern comes
+// from the contract; main rechecks on save, so a drifted copy would pass the form and fail save.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { SaveCustomProviderInput } from "@openbot/contracts/ipc";

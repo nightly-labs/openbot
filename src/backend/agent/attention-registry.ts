@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   AgentApproval,
   AgentApprovalKind,
@@ -8,11 +9,13 @@ import type {
   BrowserTab,
   BrowserTakeoverRequest,
   RespondToApprovalInput,
+  RespondToBrowserSecretInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
 import type { AgentClient } from "../agent-client";
+import type { PreparedBrowserSecret } from "../browser-host";
 import {
   type AppServerRequest,
   type DynamicToolCallParams,
@@ -21,6 +24,7 @@ import {
   getString,
   type RequestId,
 } from "../protocol";
+import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   HOSTED_SITE_APPROVAL_METHOD,
@@ -34,7 +38,7 @@ import {
   browserTakeoverResult,
   commandText,
   dynamicPromptResult,
-  mcpElicitationQuestion,
+  mcpElicitationQuestions,
   mcpElicitationResult,
   promptQuestions,
   promptResolution,
@@ -66,6 +70,8 @@ interface PendingApproval {
 }
 
 interface PendingBrowserTakeover {
+  secret?: PreparedBrowserSecret;
+  submitting?: boolean;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -103,6 +109,7 @@ export interface RoutineAttention {
  * names, and the pair of calls that suspend and resume agent control of it. `BrowserHost` satisfies it.
  */
 export interface AttentionBrowserHost {
+  prepareSecret?(params: DynamicToolCallParams): Promise<PreparedBrowserSecret>;
   listTabs(): BrowserTab[];
   beginTakeover(tabId: string): Promise<void>;
   endTakeover(tabId: string): void;
@@ -113,6 +120,8 @@ export interface AttentionRegistryOptions {
   browser: AttentionBrowserHost;
   hostedSites: HostedSiteApprovals;
   routines: RoutineAttention;
+  /** Read at each approval, so a grant the user gives now applies to the next request. */
+  approvalAutomation?: ApprovalAutomationPolicy;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
@@ -138,6 +147,7 @@ export class AttentionRegistry {
   readonly #browser: AttentionBrowserHost;
   readonly #hostedSites: HostedSiteApprovals;
   readonly #routines: RoutineAttention;
+  readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
@@ -150,6 +160,7 @@ export class AttentionRegistry {
     this.#browser = options.browser;
     this.#hostedSites = options.hostedSites;
     this.#routines = options.routines;
+    this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
@@ -264,8 +275,71 @@ export class AttentionRegistry {
   async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {
     const pending = this.#takeovers.get(input.requestId);
     if (!pending) throw new Error("This browser takeover is no longer active.");
+    if (pending.submitting) throw new Error("Authentication submission is already in progress.");
+    pending.secret?.cancel();
     this.#routines.markRunningForTurn(pending.request.turnId);
     this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
+  }
+
+  async respondToBrowserSecret(input: RespondToBrowserSecretInput): Promise<void> {
+    const pending = this.#takeovers.get(input.requestId);
+    if (!pending?.secret || pending.request.agentId !== input.agentId || pending.submitting)
+      throw new Error("This secure authentication request is no longer active.");
+    if (input.decision === "cancel") {
+      pending.secret.cancel();
+      this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
+      return;
+    }
+    if (input.decision === "takeover") {
+      pending.secret.cancel();
+    } else {
+      pending.submitting = true;
+      let outcome: "submitted" | "takeover";
+      try {
+        outcome = await pending.secret.submit(input.secret);
+      } catch {
+        outcome = "takeover";
+      } finally {
+        pending.submitting = false;
+      }
+      if (this.#takeovers.get(input.requestId) !== pending) return;
+      if (outcome === "submitted") {
+        this.#resolveBrowserTakeover(input.requestId, pending, "complete");
+        return;
+      }
+    }
+    pending.secret.cancel();
+    pending.secret = undefined;
+    if (input.decision === "submit" && pending.request.secret)
+      pending.request.secret = { ...pending.request.secret, requiresReload: true };
+    else delete pending.request.secret;
+    await this.#browser.beginTakeover(pending.request.tabId);
+    this.#emit({ type: "browser-takeover-requested", request: pending.request });
+    this.#emitRuntimeSnapshot();
+  }
+
+  /**
+   * Answers an approval the user has already consented to, and reports whether it did.
+   *
+   * Nothing is registered and no `approval` event is emitted on this path, which is the whole point:
+   * an emitted approval opens a card, raises an operating-system notification and lights the
+   * Dynamic Island, and an automated grant that did all three before resolving itself a moment
+   * later would be worse than the prompt it replaced. What the agent then does is still visible -
+   * the command and the file change are ordinary timeline items either way.
+   *
+   * The response shapes are the ones `respondToApproval` uses for an accepted request; they are
+   * what the provider on the other end of each method understands.
+   */
+  #answerWithoutAsking(client: AgentClient, request: AppServerRequest, approval: AgentApproval): boolean {
+    if (!shouldAutoApprove(this.#approvalAutomation, approval)) return false;
+    if (approval.kind === "permissions") {
+      client.respond(request.id, { permissions: getRecord(request.params, "permissions") ?? {}, scope: "turn" });
+    } else if (request.method === "applyPatchApproval" || request.method === "execCommandApproval") {
+      client.respond(request.id, { decision: "approved" });
+    } else {
+      client.respond(request.id, { decision: "accept" });
+    }
+    return true;
   }
 
   surfaceApproval(client: AgentClient, request: AppServerRequest, kind: AgentApprovalKind): void {
@@ -289,6 +363,7 @@ export class AttentionRegistry {
       grantRoot: getString(request.params, "grantRoot"),
       permissions: kind === "permissions" ? approvalPermissions(request.params) : null,
     };
+    if (this.#answerWithoutAsking(client, request, approval)) return;
     this.#approvals.set(request.id, {
       client,
       id: request.id,
@@ -308,6 +383,14 @@ export class AttentionRegistry {
   ): Promise<void> {
     const prepared = await this.#hostedSites.prepareApproval(client, request, params, tool);
     if (!prepared) return;
+    if (shouldAutoApprove(this.#approvalAutomation, prepared.approval) && this.#approvalAutomation.turboEnabled()) {
+      await this.#hostedSites.resolveApproval(
+        prepared.mutation,
+        { client, id: request.id, agentId: prepared.approval.agentId },
+        "accept",
+      );
+      return;
+    }
     this.#approvals.set(request.id, {
       client,
       id: request.id,
@@ -341,6 +424,7 @@ export class AttentionRegistry {
       grantRoot: getString(request.params, "grantRoot"),
       permissions: null,
     };
+    if (this.#answerWithoutAsking(client, request, approval)) return;
     this.#approvals.set(request.id, {
       client,
       id: request.id,
@@ -376,8 +460,9 @@ export class AttentionRegistry {
       return Promise.resolve(browserTakeoverError());
     }
 
+    const requestId = params.tool === "submit_secret" ? randomUUID() : request.id;
     const takeover: BrowserTakeoverRequest = {
-      requestId: request.id,
+      requestId,
       agentId,
       threadId: publicThreadId,
       turnId,
@@ -385,19 +470,35 @@ export class AttentionRegistry {
     };
     return new Promise((resolve) => {
       const pending: PendingBrowserTakeover = { params, request: takeover, resolve };
-      this.#takeovers.set(request.id, pending);
+      this.#takeovers.set(requestId, pending);
       // The card is only shown once the tab has actually been handed over -- references invalidated,
       // diagnostics cleared, any recording stopped. Asking the user for control OpenBot then failed to
       // give them would leave the agent acting on the page underneath them.
-      void this.#browser.beginTakeover(takeover.tabId).then(
+      const prepare = async () => {
+        if (params.tool === "submit_secret") {
+          if (!this.#browser.prepareSecret) throw new Error("Secure authentication is unavailable.");
+          const secret = await this.#browser.prepareSecret({
+            ...params,
+            threadId: publicThreadId,
+            ownerAgentId: agentId,
+          });
+          if (this.#takeovers.get(requestId) !== pending) {
+            secret.cancel();
+            return;
+          }
+          pending.secret = secret;
+          pending.request.secret = secret.request;
+        } else await this.#browser.beginTakeover(takeover.tabId);
+      };
+      void prepare().then(
         () => {
-          if (this.#takeovers.get(request.id) !== pending) return;
+          if (this.#takeovers.get(requestId) !== pending) return;
           this.#routines.markNeedsAttention(turnId);
           this.#emit({ type: "browser-takeover-requested", request: takeover });
         },
         () => {
-          if (this.#takeovers.get(request.id) !== pending) return;
-          this.#takeovers.delete(request.id);
+          if (this.#takeovers.get(requestId) !== pending) return;
+          this.#takeovers.delete(requestId);
           resolve(browserTakeoverError());
           this.#emitRuntimeSnapshot();
         },
@@ -491,8 +592,8 @@ export class AttentionRegistry {
     const turnId = getString(request.params, "turnId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
     const publicThreadId = threadId && agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
-    const question = mcpElicitationQuestion(request.params);
-    if (!threadId || !turnId || !agentId || !publicThreadId || !question) {
+    const questions = mcpElicitationQuestions(request.params);
+    if (!threadId || !turnId || !agentId || !publicThreadId || !questions) {
       client.respond(request.id, { action: "decline", content: null, _meta: null });
       this.#emitError(
         "mcp_safety_handoff",
@@ -502,7 +603,6 @@ export class AttentionRegistry {
       return;
     }
 
-    const questions = [question];
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
     this.#prompts.set(request.id, {
       client,
@@ -596,6 +696,8 @@ export class AttentionRegistry {
     pending: PendingBrowserTakeover,
     decision: RespondToBrowserTakeoverInput["decision"],
   ): void {
+    pending.secret?.cancel();
+    this.#routines.markRunningForTurn(pending.request.turnId);
     this.#takeovers.delete(requestId);
     // `surfaceBrowserTakeover` refuses a second request for the same tab, so this is belt and braces --
     // but returning control while another request still waits on the tab would be the worse mistake.

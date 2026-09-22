@@ -69,6 +69,13 @@ the `media-attachments` capability; released protocol adapters keep their existi
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
 - A local team host owns conversations, files, agents, and the local member projection used by Team API.
+- `openbot-approval-automation-v1.json` holds Turbo mode and the agents granted "Always allow". It
+  belongs to the computer that runs the agent and never crosses the Team API, whose released
+  adapters freeze an approval response to `accept` or `decline`: a remote host that has automation
+  on answers its own approvals, so they never reach a client, and a client cannot grant one on a
+  remote host's behalf. `AttentionRegistry` reads it at each approval, including hosted-site
+  publishing, replacement and deletion. Site validation, ownership checks and activity markers
+  still apply. Questions and browser takeovers remain interactive.
 - `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
   migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
   carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.
@@ -99,8 +106,141 @@ the `media-attachments` capability; released protocol adapters keep their existi
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
+hook. Native guests retain their opener, request body, and shared browser session. Local tab and
+agent tool results expose `openerTabId` while that relationship is live. Independent `noopener`
+tabs survive parent closure; dependent popups close with the parent. Closing a popup returns to its
+opener. Saved popup URLs omit OAuth callback credentials. Popup state is not restored as a live
+JavaScript relationship after an app restart.
+Secure input cards are unavailable in both sides of a native opener connection; those tabs require
+human takeover for passwords and codes. This restriction lasts for the tab lifetime, including after
+popup closure or navigation, because connected pages can retain document references. Independent
+tabs remain eligible for secure input. Account selection without secret entry remains automated.
+Agents use `list_tabs` after sign-in actions and inspect the new tab before continuing. Secure input
+and takeover still handle passwords, codes, CAPTCHA, and passkeys. Blocked requests produce a
+reason without including authentication URLs or request data.
+Agent instructions keep the viewport stable during sign-in and require fresh targets after page
+changes or covered-target errors. X Google sign-in starts on the landing page after cookie consent.
+X can retain a Google callback for a removed login dialog and report `Input2SSO: Unsupported provider`.
+For that error in the current attempt, agents may reload the signed-out landing page and retry once,
+then verify authenticated navigation. This recovery does not run during secure handoff or discard
+non-login work. The host does not rewrite site scripts or weaken cross-origin security policies.
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
+
+### Tab lifetime
+
+The agent decides when a tab closes. Nothing closes a tab when a turn ends: `close_tab` is the only
+cleanup path, and the prompt asks the agent to use it once a task no longer needs the tab. A tab
+therefore outlives its turn by design, which is what lets the next turn in the same thread carry on in
+the page the last one left, and what lets the user read the result afterwards.
+
+There is no user-owned tab. A tab carries `ownerThreadId` and `ownerAgentId`, and an agent may read
+and close any tab in its own thread, including one the user opened there. The one hard block is a
+takeover: while the user holds a tab, no agent tool touches it. That is enforced in
+`BrowserHost.#requireToolTab`, which is the lowest point every tab-bearing tool passes through, so it
+holds for callers that never reach `AgentService` -- the view gateway and remote hosts. The agent-wide
+refusal in `AgentService` stays beside it rather than being folded in: it also covers `open` and
+`list_tabs`, which name no tab, and it answers with a refusal instead of an error.
+
+| Event | Tabs |
+| --- | --- |
+| Turn succeeds | Stay open unless the agent called `close_tab`. |
+| Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
+| Retry | Same thread and agent, so the same tabs are still reachable. |
+| Restart | Restored from the browser's own state file. |
+| Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. |
+| Takeover held | No agent tool touches that tab, `close_tab` included. |
+
+Deleting an agent is the one sweep, and it exists because those tabs are otherwise unreachable: no
+agent passes the owner check for them, and the renderer lists tabs per agent, so they would hold a
+view the user cannot see to close, across restarts. Closing is idempotent -- `close()` returns early
+on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
+can never name a tab that took its place.
+
+A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
+own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`
+streams the tab through CDP, and the gateway sends each frame as bytes and dispatches the pointer and
+key input that comes back, in fractions of the last frame, through the same access checks. Frames stay
+outside the per-tab operation queue, so watching never delays a tool call. `browser-view-client.ts` is
+the client half, and it reuses the Remote Desktop websocket tunnel rather than adding a WebRTC channel.
+The `browser-view` capability says whether a host has both.
+
+## Computer Use
+
+Computer Use is `cua-driver`, a third-party MIT binary, and OpenBot owns how it runs.
+`cua-driver-runtime.ts` in the main process starts one long-lived `serve` daemon and holds it; each
+provider CLI spawns its own short-lived `cua-driver mcp --socket` proxy against that daemon. All
+screen capture, accessibility reads, and input posting happen inside the daemon, so the proxy's own
+identity does not matter.
+
+The daemon is spawned directly, and never through `open(1)` or `NSWorkspace`. macOS finds the
+responsible process by walking up the launch chain, so a direct spawn puts OpenBot at the top of it
+and the user grants Screen Recording and Accessibility to OpenBot rather than to somebody else's
+helper. `CUA_DRIVER_EMBEDDED=1` tells the driver to stay on that path instead of relaunching itself
+as its own application. Anything that launches the daemon another way breaks the attribution, which
+is the reason the earlier Codex helper was replaced.
+
+Startup calls `warmUp()`, which reads the state once and keeps the daemon only when both grants are
+there. A user who granted them keeps the tools after a restart, and a remote request or a scheduled
+task — neither of which opens a window — reaches them too. A user who granted nothing keeps no
+process, and no prompt is raised either way: only using the driver asks for a grant. Every other
+start is lazy, on a state read from the panel.
+
+The control socket lives in the private per-user runtime directory, mode `0o700`, not in `/tmp`:
+whoever reaches it can drive the whole desktop. It cannot live under `userData`, because
+`sockaddr_un.sun_path` holds 104 bytes on macOS and an isolated development profile spends most of
+them on the worktree hash. Windows uses a named pipe, which has no such limit; its name is random,
+because Windows lets a second process add an instance to a name it can guess, and it is kept in the
+profile so that it is random once rather than once per launch. The endpoint has to hold still: it
+reaches each proxy as an argument, and the arguments are folded into the stored Codex tool
+fingerprint, so a name that moves at each launch replaces every session after a restart. The command
+has to hold still for the same reason: the packaged Linux build is an AppImage, whose resources are
+mounted somewhere else at each launch, so there the proxies are given a link below the profile that
+the runtime points at this run's driver.
+
+One MCP entry reaches every provider. `CuaDriverRuntime.mcpServerConfig()` returns a config only
+while the daemon runs, and `AgentService.enabledMcpServers()` appends it, which is the one function
+Codex, Claude, and ACP all read. Two properties keep it there: the name is not in
+`RESERVED_MCP_SERVER_NAMES`, which is a drop filter rather than a marker, and `workingDirectory`
+stays empty, because ACP has no field for one and Codex accepts none, so an entry with one would
+vanish for two providers with no error. Codex staleness needs no separate signal, because
+`toolFingerprint` already folds the MCP entries and a changed fingerprint forces a replacement
+session. `onMcpServerChanged` is what refreshes the agent runtimes, which deactivates every
+stored provider session: the next turn starts a new one, which keeps the public thread and loses
+what the provider held privately. So it reports two moments only — the entry appearing on a start a
+user asked for, and the daemon dying under OpenBot. It is quiet for a grant given while the daemon
+serves, which changes the state and not the tool set; for the startup warm-up, which settles the
+entry the stored sessions already had; and for the stop at teardown, which happens at order 55,
+before the agent service at 110, and would otherwise deactivate on every quit the sessions the next
+run is meant to resume.
+
+`capabilities.computerUse` is pushed by main from the daemon's own permission answer. It is no
+longer probed from Codex `plugin/list`, which is why the capability now reports the same state for
+every provider.
+
+The driver is packaged, not downloaded on demand, so it is pinned in `native-runtime.lock.json` like
+the other native runtimes rather than managed like a provider CLI. The pinned file list is an
+allowlist: `scripts/install-cua-driver.ts` copies only the named paths and checks each digest, so an
+upstream layout change fails the build instead of shipping a surprise file. Each installer carries
+only its own target. On macOS `mac.signIgnore` keeps the vendor's Developer ID signature, because
+re-signing under OpenBot's inherited entitlements would drop the Automation entitlement the driver
+needs. A packaged build reads the copy under `resources/cua-driver` and nothing else, because the release
+is pinned and signed against that build and an environment variable must not decide which program
+drives the user's desktop; a release without the binary reports no driver. In a checkout
+`resolveCuaDriver` also reads an override, an install directory and `PATH`, so a developer can point
+`OPENBOT_CUA_DRIVER_PATH` at another build.
+
+OpenBot draws the agent cursor in its own per-display overlays for every display layout. The
+runtime starts `serve` with `--no-overlay`. The driver's overlay covers only the main display and
+cannot follow a display connected after startup. Keeping cursor ownership in OpenBot lets the
+highlight controller add, resize, and remove display overlays without restarting the daemon or
+changing provider sessions.
+
+Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
+`CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something
+a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot
+would refuse.
 
 ## Provider CLI updates
 
@@ -896,3 +1036,72 @@ a file in the share sheet. The thumbnail reads the attachment through the query 
 so a file already read in a message is not fetched again. The editor changes the text, removes the
 files the message already has, and adds new ones.
 
+
+## Plugin distribution
+
+A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
+
+See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Plugins tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, the literal in `packages/contracts/src/plugin-catalog.ts`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
+
+## macOS Host Manager
+
+`scripts/macos-tenant-setup.swift` is a separate administrator command for new Standard accounts.
+It uses OpenDirectory directly, creates only new empty homes, and stores generated credentials
+in a new root-only file before account creation. It is not installed or called by the daemon.
+The Host PKG installs this as `create-tenants`, alongside the standalone `openbot-host` CLI.
+`openbot-host-service.ts` owns setup/verification sequencing; `openbot-host-macos.ts` owns OS
+operations. Passwords cross only the native helper's captured pipe and the administrator's tty,
+not the host protocol. The root-only recovery file is removed after successful presentation.
+`build-host-installer.ts` and `verify-host-installer.ts` own release packaging and the exact
+payload manifest. Package installation preserves host registration and state; only the application
+is automatically updated. A Host Manager upgrade requires an administrator-installed signed PKG.
+
+The optional standalone root helper (`scripts/host-manager.ts`) uses the lifecycle in
+`src/main/host-manager.ts` and fixed macOS operations in `scripts/host-manager-macos.ts`.
+`src/main/host-update-coordinator.ts` is the unprivileged tenant client, not an update leader.
+The local protocol types live in `packages/contracts/src/host-manager.ts`; bounded file parsing
+and owner checks live in `src/main/host-update-files.ts`. Only the helper publishes host control
+state or replaces the shared application. It has no dependency on tenant storage services.
+The tenant process owns an in-memory activity generation in `src/backend/restart-activity.ts`.
+Backend work and main-process sessions advance it, so work between status polls resets the idle
+grace. This counter contains no user data and is never sent to the host. Health and restart
+readiness remain false until agent initialization succeeds.
+See [multi-tenant hosting](multi-tenant-hosting.md) for installation, permissions, and acceptance.
+
+### Remote desktop permission checks and live tests
+
+`RemoteScreenGateway` owns setup checks and live-test session ownership. The optional
+`remote-desktop-setup` Team API capability uses separate v4 adapter routes; released codecs remain unchanged.
+Diagnostics contain host/account names and permission results and travel only to an authenticated member.
+They do not include Sunshine credentials or screen content. The renderer opens macOS settings only through
+fixed local IPC actions.
+
+Sunshine checks its own macOS permissions and hosts the temporary native test panel. During a test, native
+input is restricted to that panel and tagged for the test. The panel requires both the test tag and the
+Sunshine process ID before recording a click or keyboard result. The gateway rejects additional sessions
+and display switches during a test and closes the panel when its owning stream disconnects. It does not
+interrupt another member's session to start a test.
+
+Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishing the host or requiring an account. The same single-use viewer grant and cookie checks protect it. The gateway owns the listener and closes it with the test session; its lease expires after three minutes. Local test IPC can address only sessions created for this purpose.
+
+A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
+
+### Secure browser authentication
+
+`openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public
+secret-request metadata. The attention registry creates a fresh request ID and owns the pending
+response. The secret travels through a dedicated typed IPC endpoint or the optional
+`browser-secret-handoff` Team API capability, never a prompt answer or provider tool argument.
+Frozen protocol projections continue to show ordinary takeover to older clients. Current codecs
+carry validated metadata beside those projections. There is no database schema change.
+
+The browser host owns the protection state and serializes entry behind existing browser work. CDP
+resolves fields before consent and checks the document and origin again before entry. The host
+stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
+and invalidates existing live-view streams. Capture protection remains after same-document navigation
+or an uncertain submission. After a completed submit action without document replacement, the host
+waits up to five seconds, then loads the current URL with GET to replace the document without replaying
+a form POST. Failure retains protection and falls back to takeover. A new document releases it and
+clears navigation history; manual takeover
+completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
+unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.

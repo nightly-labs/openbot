@@ -11,10 +11,13 @@ export function serverSupportsCapability(
   capability: TeamCurrentCapability,
 ): boolean {
   if (
-    (capability === "channel-chats-v1" ||
+    (capability === "remote-desktop-setup" ||
+      capability === "channel-chats-v1" ||
       capability === "channel-delete-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||
+      capability === "browser-navigation" ||
+      capability === "browser-view" ||
       capability === "mcp-servers-v1") &&
     server?.kind === "remote"
   ) {

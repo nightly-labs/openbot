@@ -33,12 +33,18 @@ on:
       - "scripts/verify-remote-desktop-runtime.ts"
       - "vendor/remote-desktop/**"
   workflow_dispatch:
+    inputs:
+      verify_only:
+        description: Verify an existing immutable runtime release without rebuilding or publishing
+        type: boolean
+        default: false
 
 permissions: {}
 
 concurrency:
   group: remote-desktop-runtime-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Let native builds finish so the next push can reuse their successful output.
+  cancel-in-progress: false
 
 jobs:
   prepare:
@@ -122,8 +128,15 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_EXISTS: ${{ steps.release.outputs.exists }}
+          VERIFY_ONLY: ${{ inputs.verify_only == true }}
         run: |
-          if [[ "$EVENT_NAME" != "workflow_dispatch" && "$RELEASE_EXISTS" == "true" ]]; then
+          if [[ "$VERIFY_ONLY" == "true" ]]; then
+            if [[ "$RELEASE_EXISTS" != "true" ]]; then
+              echo "Verification requires a published release for the current native inputs." >&2
+              exit 1
+            fi
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" != "workflow_dispatch" && "$RELEASE_EXISTS" == "true" ]]; then
             echo "should_build=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_build=true" >> "$GITHUB_OUTPUT"
@@ -139,7 +152,7 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     needs: prepare
-    if: needs.prepare.outputs.release_exists != 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.prepare.outputs.should_build == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 75
     permissions:
@@ -164,19 +177,30 @@ jobs:
         with:
           persist-credentials: false
 
+      # PR caches stay separate from release builds. No prefix fallback: changed
+      # native inputs or build tools must compile again. Verification and smoke
+      # tests still run against the current checkout on every cache hit.
+      - name: Restore successful PR runtime build
+        if: github.event_name == 'pull_request'
+        id: runtime-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/remote-desktop-runtime
+          key: remote-desktop-pr-${{ github.event.pull_request.number }}-${{ matrix.os }}-${{ matrix.target }}-${{ needs.prepare.outputs.input_digest }}-${{ hashFiles('.github/workflows/remote-desktop-runtime.yml', 'scripts/**', 'vendor/remote-desktop/**', 'bun.lock', 'package.json', 'packages/**/package.json') }}
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.0
 
       - name: Set up Windows Node.js
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
 
       - name: Export Windows tool paths
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           "OPENBOT_BUN_DIR=$(Split-Path (Get-Command bun).Source -Parent)" >> $env:GITHUB_ENV
@@ -185,11 +209,11 @@ jobs:
           "OPENBOT_PERL_DIR=$(Split-Path (Get-Command perl).Source -Parent)" >> $env:GITHUB_ENV
 
       - name: Install macOS build dependencies
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.runtime-cache.outputs.cache-hit != 'true'
         run: brew install cmake ninja node pkgconf icu4c@78 miniupnpc openssl@3 opus
 
       - name: Set up Windows build dependencies
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
         with:
           msystem: UCRT64
@@ -215,13 +239,13 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build runtime on macOS
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.runtime-cache.outputs.cache-hit != 'true'
         env:
           CMAKE_GENERATOR: Ninja
         run: bun run build:remote-desktop-runtime
 
       - name: Build runtime on Windows
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         env:
           CMAKE_GENERATOR: Ninja
@@ -372,7 +396,7 @@ jobs:
   verify-published:
     name: Verify published ${{ matrix.target }}
     needs: [prepare, publish]
-    if: needs.publish.result == 'success'
+    if: always() && needs.prepare.result == 'success' && (needs.publish.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.verify_only == true && needs.prepare.outputs.release_exists == 'true'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:
@@ -422,6 +446,8 @@ jobs:
           bun scripts/pin-remote-desktop-runtime.ts "$RUNNER_TEMP/runtime-manifest/remote-desktop-runtime-manifest.json"
 
       - name: Install published runtime
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bun scripts/install-remote-desktop-runtime.ts ${{ matrix.platform }} ${{ matrix.architecture }}
 
       - name: Verify published runtime
@@ -433,6 +459,8 @@ jobs:
         run: bun run test:remote-desktop-runtime
 
       - name: Package OpenBot from the downloaded runtime
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: ${{ matrix.platform == 'win32' && 'bun run package:win:verify' || 'bun run package:verify' }}
 
   pin:

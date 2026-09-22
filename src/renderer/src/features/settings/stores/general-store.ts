@@ -51,9 +51,15 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
          * A CLI the user installed themselves is the one the provider runs, whatever the managed
          * runtime holds, so the row reads it as ready on the version the provider reports. An
          * update offered for it is the user's own install being newer-able, not a download.
+         *
+         * Only while that runtime is idle. The provider keeps answering on the user's own CLI for
+         * the whole of an update, so a mask that ignored the phase would report the row as ready
+         * throughout, and hide both the progress the Cancel button reverses and the failure the
+         * Retry button answers.
          */
         runtimeStatus:
           runtime &&
+          (runtime.phase === "ready" || runtime.phase === "not-downloaded") &&
           (agent?.state === "available" || agent?.state === "sign-in-required") &&
           (agent.cliSource === "system" || (runtime.phase === "not-downloaded" && !runtime.availableVersion))
             ? { ...runtime, phase: "ready", version: agent.version ?? null }

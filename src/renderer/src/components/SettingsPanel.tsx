@@ -10,14 +10,7 @@ export const SETTINGS_PANEL_MAX = 1600;
 /** What the chat under the panel keeps for itself, however far the panel is dragged. */
 const CONVERSATION_PANEL_MIN = 96;
 
-/**
- * The right-hand settings panel: the shell, its header and its scrolling body.
- *
- * The agent chat and the channel chat both open a panel in this slot, and only one of them can be
- * open at a time, so they share one shape and one remembered width. Anything that only one owner
- * has - an avatar picker, a runtime section, a member list - is the caller's, and goes in the
- * children.
- */
+/** Shared right-panel shell; caller owns per-owner sections. */
 
 /** The remembered width, read once from storage and written back when a drag ends. */
 export function createSettingsPanelWidth() {
@@ -61,11 +54,7 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
   );
 }
 
-/**
- * The two glyphs the panel header uses. They live here, and not with the caller, because a header
- * button that reads one way in the agent panel and another way in the channel panel is the drift
- * this module exists to stop: the panel closes the same way whichever chat opened it.
- */
+/** Header glyphs stay here to stop agent/channel drift. */
 export function SettingsBackIcon(): JSX.Element {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-back-icon fill-none stroke-current">
@@ -90,11 +79,7 @@ export interface SettingsPanelHeaderProps {
   closeLabel: string;
 }
 
-/**
- * Three columns of a fixed width, so the title stays centred whether or not the panel offers a way
- * back. A panel with no back action leaves the left cell empty rather than closing the gap, which
- * is what keeps the two panels the same height and the title in the same place.
- */
+/** Fixed 3-column header keeps title centred. */
 export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Element {
   return (
     <header class="settings-panel-header">
@@ -133,10 +118,7 @@ export interface SettingsFieldProps {
   children: JSX.Element;
 }
 
-/**
- * A label over its control. The control is the caller's, so any `Input` or `Textarea` fits; the
- * shared field context gives it an id, so the label points at it as well as wraps it.
- */
+/** Label over caller control via shared field id. */
 export function SettingsField(props: SettingsFieldProps): JSX.Element {
   const controlId = `${createUniqueId()}-control`;
   return (

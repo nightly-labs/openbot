@@ -142,7 +142,13 @@ export function ArticleGradient(props: ArticleGradientProps) {
    */
   const captureFrame = (): string | undefined => {
     try {
-      const url = mount?.canvasElement.toDataURL("image/webp", 0.92);
+      const canvas = mount?.canvasElement;
+      // A canvas the mount has not sized yet holds no picture, and an empty one
+      // still encodes to more than the length below rejects. A pointer that
+      // leaves in the frames between the mount and its first draw would
+      // otherwise leave the card holding a blank rectangle for good.
+      if (!canvas?.width) return undefined;
+      const url = canvas.toDataURL("image/webp", 0.92);
       return url && url.length > 512 ? url : undefined;
     } catch {
       // A lost context has nothing to read back. The layer below is still the
@@ -151,9 +157,16 @@ export function ArticleGradient(props: ArticleGradientProps) {
     }
   };
 
-  const disposeShader = () => {
+  /**
+   * Let the context go. `keepFrame` is what separates a pointer leaving from the
+   * element itself leaving: a card that a filter removes is disposing this
+   * component, and a write to a signal inside a scope being torn down is an error
+   * in Solid rather than a no-op. Nothing would read those signals afterwards
+   * anyway, so the detach path frees the context and writes nothing.
+   */
+  const disposeShader = (keepFrame = true) => {
     generation += 1;
-    if (mount) {
+    if (mount && keepFrame) {
       resumeFrame = mount.getCurrentFrame();
       const captured = captureFrame();
       // Set before the canvas goes away, so the picture under it is already the
@@ -162,7 +175,7 @@ export function ArticleGradient(props: ArticleGradientProps) {
     }
     mount?.dispose();
     mount = undefined;
-    setShaderReady(false);
+    if (keepFrame) setShaderReady(false);
   };
 
   const mountShader = async (speed = ANIMATION_SPEED, reveal = true): Promise<ShaderMount | undefined> => {
@@ -278,7 +291,7 @@ export function ArticleGradient(props: ArticleGradientProps) {
       });
       return () => {
         detached = true;
-        disposeShader();
+        disposeShader(false);
         stopWatching?.();
       };
     }
@@ -318,7 +331,7 @@ export function ArticleGradient(props: ArticleGradientProps) {
       element.removeEventListener("pointercancel", leave);
       hovered = false;
       detached = true;
-      disposeShader();
+      disposeShader(false);
       stopWatching?.();
     };
   });

@@ -68,6 +68,8 @@ describe("TeamApiServer team", () => {
       });
       expect(previewResponse.status).toBe(200);
       expect(previewResponse.headers.get("Cache-Control")).toBe("no-store");
+      // The frozen Team API projection strips fields released builds never sent, so the
+      // wire preview keeps its released shape even though the store knows more.
       await expect(previewResponse.json()).resolves.toEqual({
         role: "member",
         expiresAt: invite.expiresAt,
@@ -236,7 +238,7 @@ describe("TeamApiServer team", () => {
     const { base } = await start({
       agents,
       createInvite: async (input) => {
-        const created = await store.createInvite(input.role, input.email);
+        const created = await store.createInvite(input.role, input.email, { permanent: input.permanent });
         return {
           id: created.id,
           role: created.role,
@@ -244,6 +246,8 @@ describe("TeamApiServer team", () => {
           usedAt: null,
           inviteUrl: `https://openbot.run/join?token=${created.token}`,
           email: created.email,
+          permanent: created.permanent,
+          useCount: created.useCount,
         };
       },
     });

@@ -5,6 +5,7 @@ import {
   AGENT_RUNTIME_TEXT_LIMIT,
   type AgentEvent,
   type BrowserTab,
+  COMPUTER_USE_MCP_SERVER_NAME,
   isAgentEvent,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -151,7 +152,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       params: {
         threadId,
         turnId,
-        serverName: "computer-use",
+        serverName: COMPUTER_USE_MCP_SERVER_NAME,
         mode: "openai/form",
         _meta: { persist: ["always"] },
         message: "Allow ChatGPT to use Telegram?",
@@ -194,7 +195,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       params: {
         threadId,
         turnId,
-        serverName: "computer-use",
+        serverName: COMPUTER_USE_MCP_SERVER_NAME,
         mode: "form",
         _meta: { persist: ["always"] },
         message: "Allow ChatGPT to use Preview?",
@@ -213,14 +214,150 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
 
     client.emit("request", {
       method: "mcpServer/elicitation/request",
+      id: "plugin-api-key",
+      params: {
+        threadId,
+        turnId,
+        serverName: "posthog",
+        mode: "form",
+        _meta: null,
+        message: "Connect PostHog.",
+        requestedSchema: {
+          type: "object",
+          required: ["apiKey"],
+          properties: {
+            apiKey: {
+              type: "string",
+              title: "Personal API key",
+              description: "Paste the PostHog personal API key.",
+            },
+            region: { type: "string", title: "Region", enum: ["us", "eu"], description: "Which region?" },
+          },
+        },
+      },
+    });
+    await waitFor(() => events.filter((event) => event.type === "prompt").length === 3);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "prompt",
+        requestId: "plugin-api-key",
+        questions: [
+          expect.objectContaining({
+            id: "apiKey",
+            header: "Personal API key",
+            question: "Paste the PostHog personal API key.",
+            isSecret: true,
+            options: null,
+          }),
+          expect.objectContaining({
+            id: "region",
+            isSecret: false,
+            options: [expect.objectContaining({ label: "us" }), expect.objectContaining({ label: "eu" })],
+          }),
+        ],
+      }),
+    );
+
+    await service.respondToPrompt({
+      requestId: "plugin-api-key",
+      answers: { apiKey: ["phx_test-key"], region: ["eu"] },
+    });
+    expect(client.responses.at(-1)).toEqual({
+      id: "plugin-api-key",
+      result: { action: "accept", content: { apiKey: "phx_test-key", region: "eu" }, _meta: null },
+    });
+    const keyMessage = (await service.readConversation("chief")).messages.find(
+      (message) => message.questionPrompt?.requestId === "plugin-api-key",
+    );
+    expect(keyMessage?.text).not.toContain("phx_test-key");
+    expect(keyMessage?.questionPrompt?.resolution).toMatchObject({
+      status: "answered",
+      responses: { apiKey: { status: "answered" }, region: { status: "answered", answers: ["eu"] } },
+    });
+
+    client.emit("request", {
+      method: "mcpServer/elicitation/request",
+      id: "skipped-required-field",
+      params: {
+        threadId,
+        turnId,
+        serverName: "posthog",
+        mode: "form",
+        _meta: null,
+        message: "Connect PostHog.",
+        requestedSchema: {
+          type: "object",
+          required: ["apiKey"],
+          properties: { apiKey: { type: "string", title: "Personal API key" } },
+        },
+      },
+    });
+    await waitFor(() => events.filter((event) => event.type === "prompt").length === 4);
+    await service.respondToPrompt({ requestId: "skipped-required-field", answers: { apiKey: [] } });
+    expect(client.responses.at(-1)).toEqual({
+      id: "skipped-required-field",
+      result: { action: "decline", content: null, _meta: null },
+    });
+
+    client.emit("request", {
+      method: "mcpServer/elicitation/request",
+      id: "titled-option",
+      params: {
+        threadId,
+        turnId,
+        serverName: "posthog",
+        mode: "form",
+        _meta: null,
+        message: "Connect PostHog.",
+        requestedSchema: {
+          type: "object",
+          required: ["region"],
+          properties: {
+            region: {
+              type: "string",
+              title: "Region",
+              oneOf: [
+                { const: "us", title: "United States" },
+                { const: "eu", title: "European Union" },
+              ],
+            },
+          },
+        },
+      },
+    });
+    await waitFor(() => events.filter((event) => event.type === "prompt").length === 5);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "prompt",
+        requestId: "titled-option",
+        questions: [
+          expect.objectContaining({
+            id: "region",
+            options: [
+              expect.objectContaining({ label: "United States" }),
+              expect.objectContaining({ label: "European Union" }),
+            ],
+          }),
+        ],
+      }),
+    );
+    // The card submits the displayed label, but the schema asks for the const behind it.
+    await service.respondToPrompt({ requestId: "titled-option", answers: { region: ["European Union"] } });
+    expect(client.responses.at(-1)).toEqual({
+      id: "titled-option",
+      result: { action: "accept", content: { region: "eu" }, _meta: null },
+    });
+
+    client.emit("request", {
+      method: "mcpServer/elicitation/request",
       id: "unsupported-elicitation",
       params: {
         threadId,
         turnId,
         serverName: "other-plugin",
-        mode: "form",
+        mode: "url",
         _meta: null,
-        message: "Enter a value.",
+        message: "Open this page to continue.",
         requestedSchema: { type: "object", properties: {} },
       },
     });
@@ -756,4 +893,188 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       "This approval is no longer active.",
     );
   });
+  it("answers every one of a granted agent's approvals without surfacing them", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      approvalAutomation: { turboEnabled: () => false, autoApproves: (agentId) => agentId === "chief" },
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Need an approval" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    if (!client) throw new Error("Codex client was not created.");
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!turnId) throw new Error("Turn did not start.");
+    const externalId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!externalId) throw new Error("External thread did not start.");
+
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "granted-command",
+      params: { threadId: externalId, turnId, command: ["npm", "test"] },
+    });
+    await waitFor(() => client.responses.some((response) => response.id === "granted-command"));
+    expect(client.responses.at(-1)).toEqual({ id: "granted-command", result: { decision: "accept" } });
+    // The whole point of the grant: no card, no notification, nothing left waiting on the user.
+    expect(events.some((event) => event.type === "approval")).toBe(false);
+    expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
+
+    client.emit("request", {
+      method: "execCommandApproval",
+      id: 44,
+      params: { conversationId: externalId, command: "git status" },
+    });
+    await waitFor(() => client.responses.some((response) => response.id === 44));
+    // The legacy method takes its own word for "yes", so the grant has to speak that dialect too.
+    expect(client.responses.at(-1)).toEqual({ id: 44, result: { decision: "approved" } });
+
+    client.emit("request", {
+      method: "item/permissions/requestApproval",
+      id: "granted-permissions",
+      params: {
+        threadId: externalId,
+        turnId,
+        permissions: { fileSystem: { read: ["/tmp/openbot"], write: [] }, network: { enabled: true } },
+      },
+    });
+    await waitFor(() => client.responses.some((response) => response.id === "granted-permissions"));
+    // A widened boundary is answered in the dialect the provider expects, not with a bare decision.
+    expect(client.responses.at(-1)).toEqual({
+      id: "granted-permissions",
+      result: {
+        permissions: { fileSystem: { read: ["/tmp/openbot"], write: [] }, network: { enabled: true } },
+        scope: "turn",
+      },
+    });
+    expect(events.some((event) => event.type === "approval")).toBe(false);
+    expect(service.getRuntimeSnapshot().pendingApprovals).toEqual([]);
+  });
+  it("keeps asking for an agent that was never granted", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      approvalAutomation: { turboEnabled: () => false, autoApproves: (agentId) => agentId === "someone-else" },
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Need an approval" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    if (!client) throw new Error("Codex client was not created.");
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    const externalId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!turnId || !externalId) throw new Error("Turn did not start.");
+
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "ungranted-command",
+      params: { threadId: externalId, turnId, command: ["npm", "test"] },
+    });
+    await waitFor(() => events.some((event) => event.type === "approval"));
+    expect(client.responses).toHaveLength(0);
+  });
 });
+
+it.each(["submitted", "takeover"] as const)(
+  "keeps secure handoff values out of events and provider responses (%s)",
+  async (outcome) => {
+    const client = new FakeAgentClient("codex");
+    const tabs: BrowserTab[] = [];
+    let resolveSubmission: ((value: "submitted" | "takeover") => void) | undefined;
+    const submission = new Promise<"submitted" | "takeover">((resolve) => {
+      resolveSubmission = resolve;
+    });
+    const submit = vi.fn(() => submission);
+    const cancel = vi.fn();
+    const browser = {
+      ...fakeBrowser(tabs),
+      prepareSecret: async () => ({
+        request: { method: "otp" as const, origin: "https://example.com", digits: 6 },
+        submit,
+        cancel,
+      }),
+    };
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(structuredClone(event)));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Sign in" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const started = events.find((event) => event.type === "turn-started");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!started || !threadId) throw new Error("Turn did not start.");
+    tabs.push({
+      id: "auth-tab",
+      title: "Sign in",
+      url: "https://example.com",
+      ownerThreadId: started.threadId,
+      ownerAgentId: "chief",
+      loading: false,
+    });
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "auth-request",
+      params: {
+        namespace: "openbot_browser",
+        tool: "submit_secret",
+        threadId,
+        turnId: started.turnId,
+        callId: "auth-request",
+        arguments: { tabId: "auth-tab" },
+      },
+    });
+    await waitFor(() => events.some((event) => event.type === "browser-takeover-requested"));
+    expect(service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.secret?.method).toBe("otp");
+    const requestId = service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.requestId;
+    if (!requestId) throw new Error("Missing authentication request.");
+    await expect(
+      service.respondToBrowserSecret({ requestId, agentId: "other-agent", decision: "submit", secret: "729104" }),
+    ).rejects.toThrow("no longer active");
+    const response = service.respondToBrowserSecret({
+      requestId,
+      agentId: "chief",
+      decision: "submit",
+      secret: "729104",
+    });
+    await waitFor(() => submit.mock.calls.length === 1);
+    await expect(
+      service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+    ).rejects.toThrow("no longer active");
+    if (!resolveSubmission) throw new Error("Missing submission resolver.");
+    resolveSubmission(outcome);
+    await response;
+    expect(JSON.stringify(events)).not.toContain("729104");
+    expect(JSON.stringify(client.responses)).not.toContain("729104");
+    if (outcome === "takeover") {
+      expect(service.getRuntimeSnapshot().pendingBrowserTakeovers[0]?.secret?.requiresReload).toBe(true);
+      await service.respondToBrowserTakeover({ requestId, decision: "complete" });
+    }
+    expect(service.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
+    await expect(
+      service.respondToBrowserSecret({ requestId, agentId: "chief", decision: "submit", secret: "729104" }),
+    ).rejects.toThrow("no longer active");
+  },
+);

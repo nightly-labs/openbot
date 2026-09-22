@@ -6,7 +6,7 @@
  * in `@openbot/contracts/ipc` so that a saved row can never hold something the form never previewed.
  */
 
-import { type McpServerConfig, normalizeMcpConfig } from "@openbot/contracts/ipc";
+import { type McpServerConfig, normalizeMcpConfig, type ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 
 export type {
   McpConfigErrors,
@@ -96,4 +96,74 @@ export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
   if (test?.status === "failed") return "destructive-light";
   if (test?.status === "passed") return "success-light";
   return "secondary";
+}
+
+/**
+ * The provider limit this configuration already carries, or `null`.
+ *
+ * Not a health claim, and so not the stored state the note above rules out: it is read from the
+ * saved row alone, it needs no connection, and it is the same answer every time until the user
+ * edits the field. A server that names a working directory reaches Claude and the test and no
+ * other provider, which the user should be able to see without starting an agent to find out.
+ */
+export function mcpProviderLimitNote(config: McpServerConfig): typeof PROVIDER_LIMIT_NOTE | null {
+  if (config.transport !== "stdio" || !config.workingDirectory.trim()) return null;
+  return PROVIDER_LIMIT_NOTE;
+}
+
+const PROVIDER_LIMIT_NOTE = "Claude only: a server with a working directory is not given to the other providers.";
+
+/**
+ * What the panel says about the runtime a local stdio server is started with, or `null` when there
+ * is nothing to say.
+ *
+ * Silent while it is ready or has not started, because a working computer needs no sentence about
+ * it. It is a property of this computer, not of any row, so the caller passes it only for the local
+ * server; a remote host downloads its own.
+ */
+export function mcpToolRuntimeNote(status: ProviderRuntimeStatus | undefined): string | null {
+  if (status?.phase === "downloading" || status?.phase === "finishing") {
+    const percent = status.progress === null ? "" : ` (${Math.round(Math.max(0, Math.min(100, status.progress)))}%)`;
+    return `Downloading the runtime a STDIO server is started with${percent}. One may not start until it finishes.`;
+  }
+  // The download failed and nothing retries it on its own, so the sentence has to say what is left:
+  // a computer with its own Node keeps working, because the managed runtime is the floor under that
+  // and not a replacement for it.
+  if (status?.phase === "download-error")
+    return "The runtime a STDIO server is started with did not download. A server still starts if this computer has Node.";
+  return null;
+}
+
+const MCP_CONFIG_DOOR_NOTICE_STORAGE_KEY = "openbot:mcp-config-door-notice";
+
+/** Reads and writes the one flag below, so a test can answer twice without a browser. */
+type NoticeStorage = Pick<Storage, "getItem" | "setItem">;
+
+/**
+ * The one-time notice that OpenBot alone now decides which MCP servers an agent gets, or `null`
+ * when it is not due.
+ *
+ * Due once per computer, and only for a user who had finished onboarding before this release: a
+ * first install has no server in another file to lose. The flag is written on the call that
+ * answers, including the call that answers `null`, so the notice cannot arrive twice and cannot
+ * arrive late to somebody who started here.
+ *
+ * The caller must hold a loaded setup state. `completed` is `false` while it is still being read,
+ * and that answer would write the flag for a user who is about to lose servers.
+ */
+export function takeMcpConfigDoorNotice(setupCompleted: boolean, storage: NoticeStorage = window.localStorage) {
+  try {
+    if (storage.getItem(MCP_CONFIG_DOOR_NOTICE_STORAGE_KEY) === "shown") return null;
+    storage.setItem(MCP_CONFIG_DOOR_NOTICE_STORAGE_KEY, "shown");
+    if (!setupCompleted) return null;
+  } catch {
+    // A window that cannot keep the flag would raise the notice at every start, which is worse
+    // than never raising it.
+    return null;
+  }
+  return {
+    title: "OpenBot now decides your MCP servers",
+    description:
+      "Claude and Codex agents get only the servers in Settings, MCP. A server declared in ~/.claude/settings.json, a project .mcp.json or ~/.codex/config.toml no longer reaches an agent. Add it in OpenBot to keep it.",
+  };
 }

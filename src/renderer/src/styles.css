@@ -4,6 +4,7 @@
 @import "@openbot/brand/tokens.css";
 @import "@openbot/brand/logo.css";
 @import "./styles/primitives.css";
+@import "./styles/otp-input.css";
 @import "./styles/transitions.css";
 @import "./styles/sliding-tabs.css";
 @import "./styles/action-menu.css";
@@ -17,6 +18,7 @@
 @import "./features/account/account-update-island.css";
 @import "./features/servers/join-server-dialog.css";
 @import "./styles/settings-panel.css";
+@import "./styles/provider-code-login.css";
 @import "./features/conversation/conversation.css";
 @import "./features/channels/channels.css";
 @import "./features/usage/usage.css";
@@ -28,6 +30,7 @@
 @import "./features/servers/server-settings-modal.css";
 @import "./features/servers/server-mcp.css";
 @import "./features/settings/skills-marketplace.css";
+@import "./features/settings/mcp-connect-dialog.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "./features/custom-providers/custom-providers.css";
 @import "./styles/reference-chip.css";

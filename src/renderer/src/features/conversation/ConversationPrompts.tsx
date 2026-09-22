@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentApproval, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { AgentApproval, BrowserPreview, BrowserTab, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { StandingApprovalConfirmation } from "../../components/StandingApprovalConfirmation";
 import {
   Badge,
   Button,
@@ -10,9 +11,13 @@ import {
   Maximize2,
   Monitor,
   RadioGroup,
-  Skeleton,
+  toast,
   X,
 } from "../../components/ui";
+import { errorMessage } from "../../error-message";
+import { useServers } from "../servers/servers-context";
+import { BrowserSecretCard } from "./BrowserSecretCard";
+import { BrowserTakeoverPreview } from "./BrowserTakeoverPreview";
 
 export function ChoiceCard(props: {
   title: string;
@@ -100,13 +105,36 @@ export function ApprovalCard(props: {
   approval: AgentApproval;
   onApprove: () => Promise<boolean>;
   onReject: () => Promise<boolean>;
+  /**
+   * Grants this agent a standing approval, then accepts the request in hand. Absent where the grant
+   * cannot be given: a `permissions` request, or an agent on a remote server whose own computer
+   * owns that choice. The card then reads exactly as it did before this option existed.
+   */
+  onAlwaysAllow?: () => Promise<boolean>;
+  /** The agent this grant would cover, for the confirmation the grant deserves. */
+  agentName?: string;
 }) {
   const [submitting, setSubmitting] = createSignal(false);
+  const [confirmingAlways, setConfirmingAlways] = createSignal(false);
+  let alwaysAllowButton: HTMLButtonElement | undefined;
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
     const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
     if (!completed) setSubmitting(false);
+  };
+  const alwaysAllow = async () => {
+    const grant = props.onAlwaysAllow;
+    if (!grant || submitting()) return;
+    setConfirmingAlways(false);
+    setSubmitting(true);
+    try {
+      const completed = await grant();
+      if (!completed) setSubmitting(false);
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not save the standing approval. Try again."));
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -154,6 +182,18 @@ export function ApprovalCard(props: {
         >
           {submitting() ? "Sending…" : "Allow"}
         </Button>
+        <Show when={props.onAlwaysAllow}>
+          <Button
+            ref={alwaysAllowButton}
+            variant="secondary"
+            type="button"
+            class="approval-button"
+            disabled={submitting()}
+            onClick={() => setConfirmingAlways(true)}
+          >
+            Always allow
+          </Button>
+        </Show>
         <Button
           variant="secondary"
           type="button"
@@ -164,11 +204,19 @@ export function ApprovalCard(props: {
           {submitting() ? "Waiting…" : "Deny"}
         </Button>
       </footer>
+      <StandingApprovalConfirmation
+        open={confirmingAlways()}
+        agentName={props.agentName}
+        onCancel={() => setConfirmingAlways(false)}
+        onConfirm={() => void alwaysAllow()}
+        restoreFocusTarget={alwaysAllowButton}
+      />
     </section>
   );
 }
 
-export function BrowserTakeoverCard(props: {
+interface BrowserTakeoverCardProps {
+  request?: BrowserTakeoverRequest;
   agentName: string;
   tab: BrowserTab | undefined;
   preview: BrowserPreview | null;
@@ -177,7 +225,35 @@ export function BrowserTakeoverCard(props: {
   onOpen?: () => void;
   onComplete: () => Promise<boolean>;
   onCancel: () => Promise<boolean>;
-}) {
+}
+
+export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
+  return (
+    <Show
+      when={props.request?.secret && !props.request.secret.requiresReload && props.request}
+      fallback={<BrowserManualTakeoverCard {...props} />}
+    >
+      {(request) => <ConnectedBrowserSecretCard request={request()} onOpen={props.onOpen} />}
+    </Show>
+  );
+}
+
+function ConnectedBrowserSecretCard(props: { request: BrowserTakeoverRequest; onOpen?: () => void }) {
+  const { activeServer } = useServers();
+  const connected = () => !activeServer() || activeServer()?.id === "local" || activeServer()?.state === "online";
+  return (
+    <Show when={connected()} fallback={<p role="status">Reconnect to enter the authentication value.</p>}>
+      <BrowserSecretCard
+        request={props.request}
+        onOpen={props.onOpen}
+        loadPreview={(tabId) => window.openbot.browser.capturePreview(tabId)}
+        onRespond={(input) => window.openbot.agent.respondToBrowserSecret(input)}
+      />
+    </Show>
+  );
+}
+
+function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
   const pageDetails = createMemo(() => browserPageDetails(props.tab));
   const completed = () => props.decision === "complete";
@@ -227,6 +303,12 @@ export function BrowserTakeoverCard(props: {
           </Badge>
         </Show>
       </header>
+      <Show when={props.request?.secret?.requiresReload}>
+        <p>
+          Finish sign-in, then reload the browser page before choosing “I’m done”. Page inspection stays blocked until
+          the page reloads.
+        </p>
+      </Show>
       <div class="browser-takeover-copy">
         <p>
           {completed()
@@ -300,41 +382,6 @@ export function BrowserTakeoverCard(props: {
         </footer>
       </Show>
     </section>
-  );
-}
-
-function BrowserTakeoverPreview(props: {
-  preview: BrowserPreview | null;
-  previewStatus: "idle" | "loading" | "ready" | "failed";
-  page: { title: string; host: string };
-}) {
-  return (
-    <Show
-      when={props.previewStatus === "ready" ? props.preview : null}
-      fallback={
-        <Show
-          when={props.previewStatus === "loading" || props.previewStatus === "idle"}
-          fallback={
-            <div class="browser-takeover-preview-fallback">
-              <Monitor aria-hidden="true" />
-              <strong>{props.page.title}</strong>
-              <span>{props.page.host}</span>
-            </div>
-          }
-        >
-          <Skeleton class="browser-takeover-preview-skeleton" />
-        </Show>
-      }
-    >
-      {(preview) => (
-        <img
-          src={preview().dataUrl}
-          width={preview().width}
-          height={preview().height}
-          alt={`Preview of ${props.page.title}`}
-        />
-      )}
-    </Show>
   );
 }
 

@@ -1641,7 +1641,9 @@ textarea {
   }
 }
 
-.agent-delete-backdrop {
+/* The approval confirmation shares this modal's shape; only the copy inside it differs. */
+.agent-delete-backdrop,
+.approval-confirm-backdrop {
   position: fixed;
   z-index: 100;
   inset: 0;
@@ -1650,7 +1652,8 @@ textarea {
   animation: agent-backdrop-in var(--openbot-duration-normal) ease-out;
 }
 
-.agent-delete-dialog {
+.agent-delete-dialog,
+.approval-confirm-dialog {
   display: flex;
   width: min(390px, calc(100vw - 40px));
   flex-direction: column;
@@ -1661,7 +1664,8 @@ textarea {
   animation: agent-dialog-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.agent-delete-dialog h2 {
+.agent-delete-dialog h2,
+.approval-confirm-dialog h2 {
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-2xl);
@@ -1670,7 +1674,8 @@ textarea {
   letter-spacing: var(--openbot-tracking-tight);
 }
 
-.agent-delete-dialog > p {
+.agent-delete-dialog > p,
+.approval-confirm-dialog > p {
   max-width: 310px;
   margin: 8px 0 0;
   color: var(--openbot-text-muted);
@@ -1708,7 +1713,8 @@ textarea {
   overflow-y: auto;
 }
 
-.agent-delete-actions {
+.agent-delete-actions,
+.approval-confirm-actions {
   display: grid;
   width: 100%;
   margin-top: 22px;
@@ -1716,7 +1722,8 @@ textarea {
   gap: 9px;
 }
 
-.agent-delete-actions button {
+.agent-delete-actions button,
+.approval-confirm-actions button {
   height: 38px;
   border: 0.5px solid var(--openbot-border);
   border-radius: var(--openbot-radius-md);
@@ -1805,15 +1812,54 @@ textarea {
   object-fit: cover;
 }
 
-/* An activity state. The ring sits outside the circle, so the parent stops
+/* A mood that flies rings. They sit outside the circle, so the parent stops
    clipping and the image rounds itself instead. */
-.agent-avatar[data-avatar="image"][data-animation-state] {
+.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) {
   position: relative;
   overflow: visible;
 }
 
-.agent-avatar[data-avatar="image"][data-animation-state] > img {
+.agent-avatar[data-avatar="image"]:is([data-mood="working"], [data-mood="connecting"]) > img {
   border-radius: var(--openbot-radius-pill);
+}
+
+/* Breathing, as a scale on the whole avatar. It is deliberately not a silhouette
+   edit: the shape an agent is recognised by has to survive every mood, so the
+   only thing allowed to move here is the box the shape is drawn in. The amplitude
+   comes from the mood table, and 0 - every mood but `working` - holds still. */
+.agent-avatar[data-breathe] {
+  animation: agent-avatar-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes agent-avatar-breathe {
+  0%,
+  100% {
+    scale: calc(1 - var(--agent-avatar-breathe, 0));
+  }
+
+  50% {
+    scale: calc(1 + var(--agent-avatar-breathe, 0));
+  }
+}
+
+/* The mood glow. It reads before the face does at sidebar sizes, and it never
+   touches the Bloub's own colour, which is identity and comes from the seed. */
+.agent-avatar[data-mood="waiting"] {
+  filter: drop-shadow(0 0 3px var(--openbot-accent));
+}
+
+.agent-avatar[data-mood="failed"] {
+  filter: drop-shadow(0 0 3px var(--openbot-danger));
+}
+
+.agent-avatar[data-mood="asleep"] {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-avatar[data-breathe] {
+    animation: none;
+  }
 }
 
 /* The rings reach 1.4 ball radii, which is the margin the Bloub viewBox carries
@@ -1826,38 +1872,6 @@ textarea {
   height: auto;
   overflow: visible;
   translate: none;
-}
-
-/* The `thinking` pose: the Bloub hides its body and leaves three dots, and a
-   custom image does the same rather than sitting still through it. The surface
-   the image sat on goes with it, so the dots stand alone. */
-.agent-avatar[data-avatar="dots"] {
-  background: none;
-  box-shadow: none;
-}
-
-.agent-avatar-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.agent-avatar-dots i {
-  --typing-dot-travel: -2px;
-
-  width: 5px;
-  height: 5px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-secondary);
-  animation: typing-dot-pulse 900ms ease-in-out infinite;
-}
-
-.agent-avatar-dots i:nth-child(2) {
-  animation-delay: var(--openbot-duration-fast);
-}
-
-.agent-avatar-dots i:nth-child(3) {
-  animation-delay: var(--openbot-duration-overlay);
 }
 
 .agent-row .agent-avatar {
@@ -2581,6 +2595,9 @@ textarea {
 
 .account-usage-popover-heading {
   min-width: 0;
+  /* Match the horizontal padding of a provider row, so the gauge icon lines up
+     with the provider logos below it. */
+  padding-inline-start: var(--openbot-space-1);
   gap: var(--openbot-space-2);
 }
 
@@ -3108,11 +3125,6 @@ textarea {
   .account-dock-usage-loading i {
     animation: none;
   }
-
-  /* The rings hold a still frame of their own, drawn once by `OrbitedAvatarImage`. */
-  .agent-avatar-dots i {
-    animation: none;
-  }
 }
 
 .server-rail,
@@ -3181,7 +3193,6 @@ textarea {
 
 .agent-settings-model,
 .agent-settings-notifications,
-.agent-setup-card,
 .provider-model-panel,
 .provider-model-rail,
 .avatar-editor {

@@ -12,6 +12,30 @@ import type {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { NativeImage, WebContents } from "electron";
+import { createFramePacer } from "./browser-screencast-pacing";
+
+async function dispatchMouseClick(
+  send: SendCommand,
+  coordinates: { x: number; y: number },
+  button: "left" | "middle" | "right",
+  totalClicks: number,
+  modifiers: number,
+  sessionId?: string,
+): Promise<void> {
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
+  for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
+    await send(
+      "Input.dispatchMouseEvent",
+      { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
+      sessionId,
+    );
+    await send(
+      "Input.dispatchMouseEvent",
+      { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
+      sessionId,
+    );
+  }
+}
 
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
@@ -89,14 +113,146 @@ export interface SnapshotContext {
   actions: BrowserActionHistoryEntry[];
 }
 
+export interface BrowserScreencastOptions {
+  quality: number;
+  maxWidth: number;
+  maxHeight: number;
+}
+
+export interface BrowserScreencastFrame {
+  sequence: number;
+  width: number;
+  height: number;
+  image: Uint8Array;
+}
+
+/** Pointer and key input in the page's own CSS pixels. */
+export type BrowserViewportInput =
+  | {
+      type: "pointer";
+      action: "move" | "down" | "up" | "wheel";
+      x: number;
+      y: number;
+      button: "left" | "middle" | "right";
+      clickCount: number;
+      deltaX: number;
+      deltaY: number;
+      modifiers: number;
+    }
+  | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number };
+
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
   #targets = new Map<string, TargetRecord>();
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
   #navigationGeneration = 0;
+
+  /** Resolves nodes before consent; the returned operation never resolves a replacement target. */
+  async prepareSecret(
+    targets: BrowserTarget[],
+    origin: string,
+    submission: "on_input" | "enter" | "click",
+    submitTarget?: BrowserTarget,
+  ): Promise<(secret: string) => Promise<void>> {
+    const generation = this.#navigationGeneration;
+    const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
+    const nodes = await this.#lease(async (send) => {
+      const inputs = [];
+      for (const target of targets) inputs.push(await this.#resolveElement(send, target, Date.now() + 10_000));
+      const button = submitTarget ? await this.#resolveElement(send, submitTarget, Date.now() + 10_000) : undefined;
+      for (const node of [...inputs, ...(button ? [button] : [])]) {
+        if (node.sessionId) throw new Error("Use takeover for authentication inside a frame.");
+        const valid = await this.#callOnNode(
+          send,
+          node.backendNodeId,
+          `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
+          [origin, inputs.includes(node)],
+        );
+        if (valid !== true) throw new Error("Authentication target is unavailable.");
+      }
+      if (new Set(inputs.map((node) => node.backendNodeId)).size !== inputs.length)
+        throw new Error("Authentication fields must be distinct.");
+      const fingerprints: string[] = [];
+      for (const node of [...inputs, ...(button ? [button] : [])]) {
+        const value = await this.#callOnNode(send, node.backendNodeId, fingerprint, []);
+        if (!isString(value)) throw new Error("Authentication target is unavailable.");
+        fingerprints.push(value);
+      }
+      return { inputs, button, fingerprints };
+    });
+    if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+    return async (secret) => {
+      try {
+        await this.#lease(async (send) => {
+          if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+          for (const [index, node] of [...nodes.inputs, ...(nodes.button ? [nodes.button] : [])].entries()) {
+            if ((await this.#callOnNode(send, node.backendNodeId, fingerprint, [])) !== nodes.fingerprints[index])
+              throw new Error("Authentication target changed.");
+            const valid = await this.#callOnNode(
+              send,
+              node.backendNodeId,
+              `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (!this.disabled && !this.readOnly)); }`,
+              [origin, nodes.inputs.includes(node)],
+            );
+            if (valid !== true) throw new Error("Authentication target changed.");
+          }
+          for (const [index, node] of nodes.inputs.entries()) {
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            await send("DOM.focus", { backendNodeId: node.backendNodeId });
+            await this.#callOnNode(
+              send,
+              node.backendNodeId,
+              `function(origin) {
+                if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly) throw new Error('Authentication target changed.');
+                this.select();
+              }`,
+              [origin],
+            );
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            // Native entry emits trusted input events across shadow roots, as regular browser typing
+            // does. Synthetic value setters can leave component forms unaware of the filled field.
+            await send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
+          }
+          if (submission === "on_input" || generation !== this.#navigationGeneration) return;
+          if (submission === "click" && nodes.button) {
+            await this.#callOnNode(
+              send,
+              nodes.button.backendNodeId,
+              `function(origin, expected) {
+                return new Promise((resolve, reject) => {
+                  const finish = (error) => { observer.disconnect(); clearTimeout(timer); error ? reject(new Error(error)) : resolve(); };
+                  const check = () => {
+                    if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]) !== expected) return finish('Authentication target changed.');
+                    if (!this.disabled && this.getAttribute('aria-disabled') !== 'true') finish();
+                  };
+                  const observer = new MutationObserver(check);
+                  const timer = setTimeout(() => finish('Authentication submit button is not ready.'), 2000);
+                  observer.observe(this, { attributes: true });
+                  observer.observe(this.getRootNode(), { childList: true, subtree: true });
+                  check();
+                });
+              }`,
+              [origin, nodes.fingerprints.at(-1)],
+            );
+            const point = await this.#elementPoint(send, nodes.button.backendNodeId, true);
+            if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
+            await dispatchMouseClick(send, point, "left", 1, 0);
+          } else if (submission === "enter") {
+            const last = nodes.inputs.at(-1);
+            if (!last) throw new Error("Authentication target changed.");
+            await send("DOM.focus", { backendNodeId: last.backendNodeId });
+            await dispatchShortcut(send, "Enter");
+          }
+        });
+      } catch {
+        throw new Error("Secure authentication could not be completed. Take over to check the page.");
+      }
+    };
+  }
   #retainDebugger = false;
   #ownsDebugger = false;
+  #closing = false;
   /**
    * How many leases are running. A lease detaches on the way out, and until this counter existed it
    * detached whenever it was the one that had attached -- which is wrong as soon as two overlap. An
@@ -112,6 +268,11 @@ export class BrowserCdpEngine {
 
   constructor(contents: WebContents) {
     this.#contents = contents;
+    contents.once("close", () => {
+      // Native teardown can start before isDestroyed() becomes true. Detaching a debugger
+      // during that interval can crash Electron; Chromium will dispose it with the page.
+      this.#closing = true;
+    });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
       this.#targets.clear();
@@ -190,19 +351,7 @@ export class BrowserCdpEngine {
       const modifiers = modifierMask(options.modifiers ?? []);
       assertBeforeDeadline(deadline);
       onDispatch?.();
-      await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...coordinates, modifiers }, sessionId);
-      for (let clickCount = 1; clickCount <= totalClicks; clickCount += 1) {
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mousePressed", ...coordinates, button, clickCount, modifiers },
-          sessionId,
-        );
-        await send(
-          "Input.dispatchMouseEvent",
-          { type: "mouseReleased", ...coordinates, button, clickCount, modifiers },
-          sessionId,
-        );
-      }
+      await dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId);
     });
   }
 
@@ -803,13 +952,20 @@ export class BrowserCdpEngine {
     return this.#lease(async (send) => {
       const fill = !this.#environment || this.#environment.viewport.mode === "fill";
       if (fill) {
-        // A hidden fill-mode view needs an explicit viewport to paint a capture surface.
-        const metrics = await send("Page.getLayoutMetrics");
-        const viewport = recordValue(metrics.cssLayoutViewport);
+        // Hidden views need a capture surface. Preserve the page's full viewport,
+        // including scrollbars: layoutViewport.clientWidth would shrink it and
+        // can dispose a responsive page's OAuth callback during preview capture.
+        const contextId = await automationContextId(send);
+        const result = await send("Runtime.evaluate", {
+          expression: "({ width: innerWidth, height: innerHeight, scale: devicePixelRatio })",
+          contextId,
+          returnByValue: true,
+        });
+        const viewport = recordValue(recordValue(result.result)?.value);
         await send("Emulation.setDeviceMetricsOverride", {
-          width: numberValue(viewport?.clientWidth),
-          height: numberValue(viewport?.clientHeight),
-          deviceScaleFactor: 1,
+          width: numberValue(viewport?.width),
+          height: numberValue(viewport?.height),
+          deviceScaleFactor: numberValue(viewport?.scale),
           mobile: false,
         });
       }
@@ -819,6 +975,121 @@ export class BrowserCdpEngine {
         if (fill) await send("Emulation.clearDeviceMetricsOverride");
       }
     });
+  }
+
+  /**
+   * A live view of the page for as long as the returned stop function is not called.
+   *
+   * The lease is held open for the whole stream rather than taken per frame, so the debugger stays
+   * attached and the agent's own operations keep running beside it -- overlapping leases are what
+   * the lease counter is for. Every frame is acknowledged, which is how the page learns to send the
+   * next one: without the acknowledgement the screencast stops after the first frame. Frames are
+   * acknowledged as fast as they arrive and forwarded no faster than `createFramePacer` allows, so a
+   * page that animates cannot raise what the link and the client have to carry.
+   */
+  async startScreencast(
+    options: BrowserScreencastOptions,
+    onFrame: (frame: BrowserScreencastFrame) => void,
+  ): Promise<() => Promise<void>> {
+    let stop = (): void => undefined;
+    const stopped = new Promise<void>((resolve) => {
+      stop = () => resolve();
+    });
+    let started = (): void => undefined;
+    let failed = (_error: unknown): void => undefined;
+    const ready = new Promise<void>((resolve, reject) => {
+      started = resolve;
+      failed = reject;
+    });
+    let sequence = 0;
+    // The number counts the frames the client is given, not the ones the page drew.
+    const pacer = createFramePacer<Omit<BrowserScreencastFrame, "sequence">>((frame) => {
+      sequence += 1;
+      onFrame({ ...frame, sequence });
+    });
+    const listener = (_event: unknown, method: string, params?: DynamicRecord | unknown, sessionId?: string): void => {
+      if (method !== "Page.screencastFrame" || !isDynamicRecord(params)) return;
+      const metadata = recordValue(params.metadata);
+      const data = stringValue(params.data);
+      const frameSessionId = numberValue(params.sessionId);
+      // The page is told it may send the next frame whether or not this one could be read, so a
+      // frame the client cannot use never ends the stream.
+      // The root session is reported as an empty string, which `sendCommand` refuses: sending it
+      // would fail every acknowledgement, and the page stops after the few frames it may hold
+      // unacknowledged.
+      void this.#contents.debugger
+        .sendCommand("Page.screencastFrameAck", { sessionId: frameSessionId }, sessionId || undefined)
+        .catch(() => undefined);
+      if (!data) return;
+      pacer.offer({
+        image: Buffer.from(data, "base64"),
+        // The device size is the CSS viewport the fractional input coordinates are measured against.
+        width: Math.max(1, Math.round(numberValue(metadata?.deviceWidth))),
+        height: Math.max(1, Math.round(numberValue(metadata?.deviceHeight))),
+      });
+    };
+    const running = this.#lease(async (send) => {
+      this.#contents.debugger.on("message", listener);
+      try {
+        await send("Page.startScreencast", {
+          format: "jpeg",
+          quality: options.quality,
+          maxWidth: options.maxWidth,
+          maxHeight: options.maxHeight,
+          everyNthFrame: 1,
+        });
+        started();
+        await stopped;
+      } finally {
+        this.#contents.debugger.off("message", listener);
+        pacer.stop();
+        await send("Page.stopScreencast").catch(() => undefined);
+      }
+    }, false);
+    void running.catch((error: unknown) => failed(error));
+    await ready;
+    return async () => {
+      stop();
+      await running.catch(() => undefined);
+    };
+  }
+
+  /**
+   * Input from a person watching the live view. The coordinates are already in this page's CSS
+   * pixels: the fraction of a frame the remote client sends is turned into them by the caller, which
+   * is the only place that knows which frame the person was looking at.
+   */
+  async dispatchViewportInput(input: BrowserViewportInput): Promise<void> {
+    await this.#lease(async (send) => {
+      if (input.type === "key") {
+        await send("Input.dispatchKeyEvent", {
+          type: input.action === "char" ? "char" : input.action === "down" ? "rawKeyDown" : "keyUp",
+          modifiers: input.modifiers,
+          ...(input.action === "char" ? { text: input.text } : { key: input.key, code: input.code }),
+        });
+        return;
+      }
+      if (input.action === "wheel") {
+        await send("Input.dispatchMouseEvent", {
+          type: "mouseWheel",
+          x: input.x,
+          y: input.y,
+          deltaX: input.deltaX,
+          deltaY: input.deltaY,
+          modifiers: input.modifiers,
+        });
+        return;
+      }
+      await send("Input.dispatchMouseEvent", {
+        type: input.action === "move" ? "mouseMoved" : input.action === "down" ? "mousePressed" : "mouseReleased",
+        x: input.x,
+        y: input.y,
+        button: input.action === "move" ? "none" : input.button,
+        buttons: input.action === "down" ? buttonMask(input.button) : 0,
+        clickCount: input.action === "move" ? 0 : input.clickCount,
+        modifiers: input.modifiers,
+      });
+    }, false);
   }
 
   async navigate(url: string): Promise<void> {
@@ -1324,7 +1595,7 @@ export class BrowserCdpEngine {
   }
 
   async #lease<T>(operation: (send: SendCommand) => Promise<T>, attachFrames = true): Promise<T> {
-    if (this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
+    if (this.#closing || this.#contents.isDestroyed()) throw new Error("Browser tab was closed.");
     if (!this.#contents.debugger.isAttached()) {
       this.#contents.debugger.attach("1.3");
       this.#ownsDebugger = true;
@@ -1357,7 +1628,7 @@ export class BrowserCdpEngine {
     if (!this.#ownsDebugger) return;
     this.#ownsDebugger = false;
     this.#clearDebuggerSessions();
-    if (this.#contents.isDestroyed() || !this.#contents.debugger.isAttached()) return;
+    if (this.#closing || this.#contents.isDestroyed() || !this.#contents.debugger.isAttached()) return;
     this.#contents.debugger.detach();
   }
 
@@ -2295,18 +2566,39 @@ async function isNodeOrDescendant(
   target: number,
   sessionId?: string,
 ): Promise<boolean> {
-  let current = candidate;
-  for (let depth = 0; depth < 50; depth++) {
-    if (current === target) return true;
-    const result = await send("DOM.describeNode", { backendNodeId: current, depth: 0 }, sessionId);
-    const node = recordValue(result.node);
-    const parentId = numberValue(node?.parentId);
-    if (!parentId) return false;
-    const parent = await send("DOM.describeNode", { nodeId: parentId, depth: 0 }, sessionId);
-    current = numberValue(recordValue(parent.node)?.backendNodeId);
-    if (!current) return false;
+  if (candidate === target) return true;
+  const executionContextId = await automationContextId(send, sessionId);
+  const objectIds: string[] = [];
+  try {
+    // describeNode does not reliably include parentId. Resolve both nodes in
+    // our isolated world so a button's own child is not treated as an overlay.
+    for (const backendNodeId of [target, candidate]) {
+      const resolved = await send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
+      const objectId = stringValue(recordValue(resolved.object)?.objectId);
+      if (!objectId) return false;
+      objectIds.push(objectId);
+    }
+    const result = await send(
+      "Runtime.callFunctionOn",
+      {
+        objectId: objectIds[0],
+        functionDeclaration: `function(candidate) {
+          for (let node = candidate; node; node = node.parentNode || node.host) {
+            if (node === this) return true;
+          }
+          return false;
+        }`,
+        arguments: [{ objectId: objectIds[1] }],
+        returnByValue: true,
+      },
+      sessionId,
+    );
+    return recordValue(result.result)?.value === true;
+  } finally {
+    await Promise.all(
+      objectIds.map((objectId) => send("Runtime.releaseObject", { objectId }, sessionId).catch(() => undefined)),
+    );
   }
-  return false;
 }
 
 function waitForLoading(contents: WebContents, timeoutMs: number): Promise<void> {
@@ -2578,6 +2870,11 @@ function axValue(value: unknown): string {
   const record = recordValue(value);
   const raw = record?.value;
   return isString(raw) || isNumber(raw) || isBoolean(raw) ? String(raw) : "";
+}
+
+function buttonMask(button: "left" | "middle" | "right"): 1 | 2 | 4 {
+  if (button === "left") return 1;
+  return button === "right" ? 2 : 4;
 }
 
 function recordValue(value: unknown): CdpResult | undefined {

@@ -41,6 +41,7 @@ index-*.css
 .claude/worktrees/
 .claude/settings.local.json
 /build/cloudflared/
+/build/cua-driver/
 /build/codex/
 /build/claude/
 /build/grok/
@@ -52,3 +53,5 @@ Bots
 !apps/mobile/src/features/bots/
 !apps/mobile/src/features/bots/**
 mise.local.toml
+# Local provider credential export. Never commit.
+keys

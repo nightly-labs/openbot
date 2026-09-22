@@ -4,6 +4,7 @@ import { Link, router } from "expo-router";
 import { useRef } from "react";
 import { Alert } from "react-native";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { haptics } from "@/shared/lib/haptics";
@@ -20,6 +21,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
     unreadAgentIds,
   } = useMobileWorkspace();
   const { toggleAgentPinAnimated } = useAgentPinTransition();
+  const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const isPinned = pinnedAgentIds.includes(agent.id);
   const isUnread = unreadAgentIds.includes(agent.id);
   const actionPending = useRef(false);
@@ -89,6 +91,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
       <Link.MenuAction icon="eye.slash" onPress={handleHide}>
         Hide
       </Link.MenuAction>
+      {sectionMenu.menu}
       <Link.MenuAction icon="info.circle" onPress={handleInfo}>
         Info
       </Link.MenuAction>

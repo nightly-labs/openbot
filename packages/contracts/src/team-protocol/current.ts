@@ -1,5 +1,8 @@
+import { BROWSER_SECRET_CAPABILITY } from "../ipc-browser-secret";
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
+import { TEAM_BROWSER_VIEW_CAPABILITY } from "./browser-view-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
@@ -15,11 +18,20 @@ export const TEAM_MODEL_SCOPED_USAGE_CAPABILITY = "model-scoped-usage";
 export const TEAM_AGENT_CREATE_MODEL_CAPABILITY = "agent-create-model";
 export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
-export { CHANNEL_DELETE_CAPABILITY, MCP_SERVERS_CAPABILITY };
+export {
+  CHANNEL_DELETE_CAPABILITY,
+  MCP_SERVERS_CAPABILITY,
+  TEAM_BROWSER_NAVIGATION_CAPABILITY,
+  TEAM_BROWSER_VIEW_CAPABILITY,
+};
 
 export const TEAM_CURRENT_CAPABILITIES = [
+  BROWSER_SECRET_CAPABILITY,
   ...TEAM_PROTOCOL_V4_CAPABILITIES,
+  "remote-desktop-setup",
   TEAM_QUEUE_EDIT_CAPABILITY,
+  TEAM_BROWSER_NAVIGATION_CAPABILITY,
+  TEAM_BROWSER_VIEW_CAPABILITY,
   "agent-profile-generation",
   "agent-analytics",
   "host-analytics",

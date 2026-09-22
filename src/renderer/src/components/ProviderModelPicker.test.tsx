@@ -1,5 +1,5 @@
-import type { AgentModelOption, AgentStatus } from "@openbot/contracts/ipc";
-import { fireEvent, render, within } from "@solidjs/testing-library";
+import type { AgentModelOption, AgentProviderStatus, AgentStatus } from "@openbot/contracts/ipc";
+import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { STORY_MODELS } from "../preview/fixtures";
@@ -80,6 +80,89 @@ describe("ProviderModelPicker", () => {
     expect(dialog).toBeInTheDocument();
   });
 
+  it("offers the standing grant below Effort, and only where the caller gives one", async () => {
+    const onAutoApproveChange = vi.fn();
+    const [granted, setGranted] = createSignal(false);
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        autoApprove={granted()}
+        onAutoApproveChange={(next) => {
+          setGranted(next);
+          onAutoApproveChange(next);
+        }}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    const grant = within(dialog).getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(grant).not.toBeChecked();
+
+    await fireEvent.click(grant);
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+    let confirmation = await screen.findByRole("alertdialog");
+    expect(confirmation).toHaveTextContent("filesystem and network access");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(await view.findByRole("switch", { name: "Auto approve this agent's actions" }));
+    confirmation = await screen.findByRole("alertdialog");
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Always allow" }));
+    expect(onAutoApproveChange).toHaveBeenCalledWith(true);
+    await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const enabled = await view.findByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(enabled).toBeChecked();
+    await fireEvent.click(enabled);
+    expect(onAutoApproveChange).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("reads the grant as on and read-only while Turbo mode covers every agent", async () => {
+    const onAutoApproveChange = vi.fn();
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        autoApprove
+        autoApproveLocked
+        onAutoApproveChange={onAutoApproveChange}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    const grant = within(dialog).getByRole("switch", { name: "Auto approve this agent's actions" });
+    expect(grant).toBeChecked();
+    await fireEvent.click(grant);
+    expect(onAutoApproveChange).not.toHaveBeenCalled();
+  });
+
+  it("shows no standing grant for an agent this computer does not run", async () => {
+    const view = render(() => (
+      <ProviderModelPicker
+        provider="codex"
+        value="gpt-5.6-luna"
+        modelOptions={STORY_MODELS}
+        agentStatus={agentStatus}
+        onChange={vi.fn()}
+      />
+    ));
+
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    const dialog = view.getByRole("dialog", { name: "Choose agent model" });
+    expect(within(dialog).queryByRole("switch", { name: "Auto approve this agent's actions" })).not.toBeInTheDocument();
+  });
+
   it("shows an unavailable provider without allowing its models", async () => {
     const onChange = vi.fn();
     const view = render(() => (
@@ -150,6 +233,18 @@ const openCodeModels: AgentModelOption[] = [
   supportedReasoningEfforts: ["medium"],
 }));
 
+const openCodeBase: AgentProviderStatus = {
+  id: "opencode",
+  state: "not-installed",
+  version: "1.18.30",
+  message: null,
+  email: null,
+};
+
+function withOpenCodeProvider(overrides: Partial<AgentProviderStatus>): AgentProviderStatus[] {
+  return [...(agentStatus.providers ?? []), { ...openCodeBase, ...overrides }];
+}
+
 async function openOpenCodePicker() {
   const onChange = vi.fn();
   const [model, setModel] = createSignal("opencode/free/low");
@@ -208,16 +303,10 @@ it("shows the sign-in message and a Connect action when OpenCode lists no models
   const onConnect = vi.fn();
   const status: AgentStatus = {
     ...agentStatus,
-    providers: [
-      ...(agentStatus.providers ?? []),
-      {
-        id: "opencode",
-        state: "sign-in-required",
-        version: "1.18.30",
-        message: "OpenCode listed no model. Add an OpenCode Go key to continue.",
-        email: null,
-      },
-    ],
+    providers: withOpenCodeProvider({
+      state: "sign-in-required",
+      message: "OpenCode listed no model. Add an OpenCode Go key to continue.",
+    }),
   };
   const view = render(() => (
     <ProviderModelPicker
@@ -234,4 +323,34 @@ it("shows the sign-in message and a Connect action when OpenCode lists no models
   expect(dialog.getByRole("status")).toHaveTextContent("OpenCode listed no model.");
   await fireEvent.click(dialog.getByRole("button", { name: "Connect" }));
   expect(onConnect).toHaveBeenCalledWith("opencode");
+});
+
+// Main keeps the provider "connecting" for the whole install it wraps around a download, so this
+// is the state of every download this panel starts, and Cancel is the only way to stop one.
+it("keeps Cancel on a connecting provider while its download runs", async () => {
+  const onCancel = vi.fn();
+  const status: AgentStatus = {
+    ...agentStatus,
+    providers: withOpenCodeProvider({
+      state: "not-installed",
+      version: null,
+      connectionState: "connecting",
+    }),
+  };
+  const view = render(() => (
+    <ProviderModelPicker
+      provider="opencode"
+      value="opencode/free"
+      modelOptions={[]}
+      agentStatus={status}
+      runtimeStatuses={{ opencode: { phase: "downloading", progress: 40, message: null, version: null } }}
+      onCancelProviderDownload={onCancel}
+      onChange={vi.fn()}
+    />
+  ));
+  await fireEvent.click(view.getByRole("button", { name: /Agent model:/ }));
+  const dialog = within(view.getByRole("dialog", { name: "Choose agent model" }));
+  expect(dialog.getByRole("status")).toHaveTextContent("Downloading 40%");
+  await fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+  expect(onCancel).toHaveBeenCalledWith("opencode");
 });

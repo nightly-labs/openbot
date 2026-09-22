@@ -63,6 +63,17 @@ export const ja = {
   "settings.externalLinks.description": "会話内のリンクをどこで開くかを選びます。",
   "settings.externalLinks.defaultBrowser": "既定のブラウザ",
   "settings.externalLinks.openbot": "OpenBot",
+  "settings.autonomy.title": "エージェントの自律動作",
+  "settings.turbo.title": "ターボモード",
+  "settings.turbo.description":
+    "すべてのエージェントが確認なしでコマンドを実行し、ファイルを変更し、ファイルシステムやネットワークのアクセス範囲を広げ、公開サイトの公開・更新・削除を行います。",
+  "settings.turbo.confirmTitle": "ターボモードを有効にしますか？",
+  "settings.turbo.confirmDescription":
+    "エージェントは確認なしでこのコンピューターのコマンドを実行し、ファイルを変更し、自身のアクセス範囲を広げ、公開サイトの公開・更新・削除を行います。ここでいつでも無効にできます。",
+  "settings.turbo.confirmCancel": "キャンセル",
+  "settings.turbo.confirmAccept": "有効にする",
+  "settings.autoApprove.revokeFailed":
+    "{name} の常時許可を取り消せませんでした。許可はまだ有効です。もう一度お試しください。",
   "settings.notifications.title": "通知",
   "settings.desktopNotifications.title": "デスクトップ通知",
   "settings.desktopNotifications.description": "エージェントに対応が必要なときに通知を表示します。",
@@ -84,7 +95,7 @@ export const ja = {
   "settings.tab.general.title": "一般",
   "settings.tab.general.description": "このコンピュータでの OpenBot の動作を設定します。",
   "settings.tab.computerUse.title": "コンピュータ操作",
-  "settings.tab.computerUse.description": "この Mac のアプリを OpenBot が見て操作できるようにします。",
+  "settings.tab.computerUse.description": "このコンピュータのアプリを OpenBot が見て操作できるようにします。",
   "settings.tab.profile.title": "プロフィール",
   "settings.tab.profile.description": "OpenBot での自分の表示を設定します。",
   "settings.tab.mobileConnect.title": "モバイル接続",
@@ -136,6 +147,7 @@ export const ja = {
   "provider.action.update": "アップデート",
   "provider.action.install": "インストール",
   "provider.action.signIn": "サインイン",
+  "provider.action.signInWithCode": "コードでログイン",
   "provider.action.add": "追加",
   "provider.aria.download": "{name} をダウンロード",
   "provider.aria.cancel": "{name} をキャンセル",
@@ -146,4 +158,6 @@ export const ja = {
   "provider.aria.update": "{name} を {version} にアップデート",
   "provider.aria.install": "{name} をインストール",
   "provider.aria.signIn": "{name} にサインイン",
+  "provider.aria.moreSignIn": "{name} の他のログイン方法",
+  "provider.aria.signInWithCode": "別のデバイスのコードで {name} にログイン",
 } as const satisfies Translation<AppMessages>;

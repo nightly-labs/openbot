@@ -68,6 +68,7 @@ import { errorMessage } from "../../error-message";
 import { SaveBarDock, SettingsDialogShell } from "../settings/SettingsDialogShell";
 import { teamMemberName } from "../team/TeamPersonAvatar";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
+import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { serverSupportsCapability } from "./server-capabilities";
 
@@ -86,7 +87,7 @@ export interface ServerSettingsModalProps {
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
   onSetPublished: (published: boolean) => Promise<void>;
   onSetMuted: (muted: boolean) => Promise<void>;
-  onCreateInvite: (input: { role: "admin" | "member"; email?: string }) => Promise<InviteSummary>;
+  onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
@@ -102,6 +103,11 @@ export interface ServerSettingsModalProps {
   mcpServers?: McpServerConfig[];
   /** Why the MCP list is empty, when the read failed rather than found nothing. */
   mcpLoadError?: string | null;
+  /**
+   * What the managed runtime under a STDIO server is doing, when there is anything to say. The
+   * caller decides: it describes this computer, and this dialog also opens for a remote server.
+   */
+  mcpToolRuntimeNote?: string | null;
   onRetryMcpServers?: () => void;
   onSaveMcpServer?: (config: McpServerConfig) => Promise<void>;
   onRemoveMcpServer?: (id: string) => Promise<void>;
@@ -115,7 +121,7 @@ export interface ServerSettingsModalProps {
 }
 
 type Section = "general" | "members" | "desktop" | "mcp";
-type InviteMode = "link" | "email";
+type InviteMode = "link" | "email" | "perma";
 type InviteRole = Exclude<TeamRole, "owner">;
 
 const ROLE_OPTIONS = ["Member", "Admin"];
@@ -171,6 +177,7 @@ interface MembersPanel {
  * only what read that field.
  */
 interface ServerSettingsPanels {
+  offerRemoteDesktopSetup: boolean;
   identity: ServerIdentityDraft;
   invite: InvitePanel;
   members: MembersPanel;
@@ -178,6 +185,7 @@ interface ServerSettingsPanels {
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const [panels, setPanels] = createStore<ServerSettingsPanels>({
+    offerRemoteDesktopSetup: false,
     identity: {
       editing: false,
       logo: undefined,
@@ -189,7 +197,15 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       savedLogoUrl: null,
       savedName: "",
     },
-    invite: { email: "", emailError: null, link: "", mode: "email", result: null, showQr: false, role: "member" },
+    invite: {
+      email: "",
+      emailError: null,
+      link: "",
+      mode: "email",
+      result: null,
+      showQr: false,
+      role: "member",
+    },
     members: { removeId: null, search: "" },
   });
   const [section, setSection] = createSignal<Section>("general");
@@ -216,6 +232,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const objectUrls: string[] = [];
 
   const local = () => props.server.kind === "local";
+  /**
+   * Permanent links need a transport that carries the flag: local IPC or the account
+   * plane. The frozen Team API projections strip it on legacy HTTP, where even two
+   * updated peers would silently mint single-use, so the tab stays hidden there.
+   */
+  const permanentSupported = () => local() || props.server.apiUrl === null;
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
   const canEditIdentity = () => local();
   const canManage = () => configured() && (local() || props.server.role === "admin" || props.server.role === "owner");
@@ -264,13 +286,20 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const saveBarDocked = () =>
     (section() === "general" && identityDirty()) || (section() === "mcp" && Boolean(mcpDetail()?.saveBar()));
   const activeInvites = createMemo(() =>
-    props.invites.filter((item) => item.usedAt === null && Date.parse(item.expiresAt) > now()),
+    props.invites.filter(
+      (item) => (item.permanent || item.usedAt === null) && (item.permanent || Date.parse(item.expiresAt) > now()),
+    ),
   );
   const inviteUsed = () =>
     Boolean(
-      panels.invite.result && props.invites.some((invite) => invite.id === panels.invite.result?.id && invite.usedAt),
+      panels.invite.result &&
+        !panels.invite.result.permanent &&
+        props.invites.some((invite) => invite.id === panels.invite.result?.id && invite.usedAt),
     );
-  const inviteExpired = () => Boolean(panels.invite.result && Date.parse(panels.invite.result.expiresAt) <= now());
+  const inviteExpired = () =>
+    Boolean(
+      panels.invite.result && !panels.invite.result.permanent && Date.parse(panels.invite.result.expiresAt) <= now(),
+    );
   const activeMembers = createMemo(() => props.members.filter((member) => !member.disabled));
   const inactiveLegacyMembers = createMemo(() =>
     props.server.kind === "remote" && /^https?:\/\//u.test(props.server.apiUrl ?? "")
@@ -290,7 +319,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       canManage() &&
       published() &&
       busy() === null &&
-      (panels.invite.mode === "link" || normalizeEmailAddress(panels.invite.email) !== null),
+      (panels.invite.mode !== "email" || normalizeEmailAddress(panels.invite.email) !== null),
   );
 
   createEffect(
@@ -307,6 +336,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         syncedServerId = id;
         setSection("general");
         setPanels((state) => {
+          state.offerRemoteDesktopSetup = false;
           state.identity.editing = false;
           state.identity.nameTouched = false;
           state.identity.nameShaking = false;
@@ -345,7 +375,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     () => ({ invites: props.invites, currentTime: now() }),
     ({ invites, currentTime }) => {
       const nextExpiry = invites
-        .filter((item) => item.usedAt === null)
+        .filter((item) => !item.permanent && item.usedAt === null)
         .map((item) => Date.parse(item.expiresAt))
         .filter((value) => value > currentTime)
         .sort((left, right) => left - right)[0];
@@ -409,6 +439,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     } finally {
       setBusy(null);
     }
+  }
+
+  async function setPublished(value: boolean): Promise<void> {
+    const serverId = props.server.id;
+    const succeeded = await run("publish", () => props.onSetPublished(value));
+    if (!succeeded || props.server.id !== serverId) return;
+    setPanels((state) => {
+      state.offerRemoteDesktopSetup = value && local() && props.platform === "darwin";
+    });
+  }
+
+  function dismissRemoteDesktopSetup(): void {
+    setPanels((state) => {
+      state.offerRemoteDesktopSetup = false;
+    });
   }
 
   async function chooseLogo(file: File | undefined): Promise<void> {
@@ -516,8 +561,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     }
     let result: InviteSummary | undefined;
     const role = panels.invite.role;
+    const permanent = panels.invite.mode === "perma";
     const saved = await run("invite", async () => {
-      result = await props.onCreateInvite({ role, ...(email ? { email } : {}) });
+      result = await props.onCreateInvite({ role, ...(email ? { email } : {}), ...(permanent ? { permanent } : {}) });
     });
     if (!saved || !result) return;
     const created = result;
@@ -545,7 +591,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       return panels.invite.mode;
     },
     onChange(value: string) {
-      if (value !== "link" && value !== "email") return;
+      if (value !== "link" && value !== "email" && value !== "perma") return;
       setPanels((state) => {
         state.invite.mode = value;
         state.invite.result = null;
@@ -581,7 +627,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => setModalElement(element)}
         floatingContent={
-          <Show when={props.loadError}>
+          <Show when={props.loadError && (section() === "general" || section() === "members")}>
             <Alert
               ref={measureToast}
               class="server-settings-error-toast"
@@ -731,6 +777,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 canManage={canManageMcp()}
                 menuMount={modalElement()}
                 loadError={props.mcpLoadError}
+                toolRuntimeNote={props.mcpToolRuntimeNote}
                 onRetryLoad={props.onRetryMcpServers}
                 onDetailChange={setMcpDetail}
                 onSave={(config) => props.onSaveMcpServer?.(config) ?? Promise.resolve()}
@@ -960,7 +1007,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               size="default"
               checked={published()}
               disabled={!local() || !configured() || Boolean(busy())}
-              onChange={(value) => void run("publish", () => props.onSetPublished(value))}
+              onChange={(value) => void setPublished(value)}
               label={local() ? "Publish this server" : "Server is published"}
               description={accessDescription()}
             />
@@ -992,6 +1039,30 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Item>
           </ItemGroup>
         </SettingsSection>
+        <Show when={panels.offerRemoteDesktopSetup}>
+          <ItemGroup class="settings-modal-card">
+            <Item>
+              <ItemContent>
+                <ItemTitle>Set up remote desktop</ItemTitle>
+                <ItemDescription>View and control this Mac from another computer.</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button size="sm" variant="ghost" onClick={dismissRemoteDesktopSetup}>
+                  Later
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    dismissRemoteDesktopSetup();
+                    setSection("desktop");
+                  }}
+                >
+                  Set up
+                </Button>
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+        </Show>
         <SettingsSection title="Notifications">
           <ItemGroup class="settings-modal-card">
             <SwitchField
@@ -1083,11 +1154,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <SettingsSection
           class="server-settings-invite-section"
           title="Invite people"
-          description="Invitations can be used once and expire after 24 hours."
+          description="Single-use invitations expire after 24 hours. A permanent link never expires and works for anyone who has it."
           actions={
             <SlidingTabs.List aria-label="Invitation method">
               <SlidingTabs.Trigger value="email">Email</SlidingTabs.Trigger>
               <SlidingTabs.Trigger value="link">Invite link</SlidingTabs.Trigger>
+              <Show when={permanentSupported()}>
+                <SlidingTabs.Trigger value="perma">Perma link</SlidingTabs.Trigger>
+              </Show>
             </SlidingTabs.List>
           }
         >
@@ -1137,6 +1211,18 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     onFocus={(event) => event.currentTarget.select()}
                   />
                 </SlidingTabs.Content>
+                <SlidingTabs.Content value="perma" class="server-settings-invite-mode-panel">
+                  <Input
+                    class="server-settings-invite-link-input"
+                    size="md"
+                    readonly
+                    aria-label="Permanent invitation link"
+                    placeholder={INVITE_LINK_PLACEHOLDER}
+                    value={panels.invite.link}
+                    title={panels.invite.link || undefined}
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                </SlidingTabs.Content>
               </SlidingTabs.ContentSlot>
               <Select<string>
                 options={ROLE_OPTIONS}
@@ -1158,7 +1244,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               </Select>
               <Show
                 when={
-                  panels.invite.mode === "link" && panels.invite.result && !panels.invite.result.email
+                  panels.invite.mode !== "email" && panels.invite.result && !panels.invite.result.email
                     ? panels.invite.result
                     : null
                 }
@@ -1180,6 +1266,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     <Button
                       size="sm"
                       variant="ghost"
+                      class="server-settings-invite-new-link"
                       aria-label="Create new invitation link"
                       title="Create new link"
                       loading={busy() === "invite"}
@@ -1217,12 +1304,17 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 )}
               </Show>
             </div>
+            <Show when={panels.invite.mode === "perma"}>
+              <Text variant="caption" tone="muted" class="server-settings-perma-hint">
+                Never expires and can be used many times. Anyone with this link can join; revoke it to disable.
+              </Text>
+            </Show>
             <Show
               when={
                 panels.invite.showQr &&
                 !inviteUsed() &&
                 !inviteExpired() &&
-                panels.invite.mode === "link" &&
+                panels.invite.mode !== "email" &&
                 panels.invite.result
               }
             >
@@ -1235,7 +1327,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 </div>
               )}
             </Show>
-            <Show when={panels.invite.result}>
+            <Show when={panels.invite.result && !panels.invite.result.permanent ? panels.invite.result : null}>
               {(result) => (
                 <Alert class="server-settings-invite-result" tone="success" role="status">
                   <AlertIcon>
@@ -1326,9 +1418,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               {(invite) => (
                 <Item class="server-settings-invite-row">
                   <ItemContent>
-                    <ItemTitle>{invite.email ?? "Private invitation link"}</ItemTitle>
+                    <ItemTitle>
+                      {invite.email ?? (invite.permanent ? "Permanent invitation link" : "Private invitation link")}
+                    </ItemTitle>
                     <ItemDescription>
-                      {roleLabel(invite.role)} · Expires {formatDate(invite.expiresAt)}
+                      {roleLabel(invite.role)} ·{" "}
+                      {invite.permanent
+                        ? `Never expires · ${invite.useCount} ${invite.useCount === 1 ? "join" : "joins"}`
+                        : `Expires ${formatDate(invite.expiresAt)}`}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions>
@@ -1354,40 +1451,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function DesktopPanel() {
     return (
       <SettingsSection title="Remote desktop access">
-        <Show when={props.hostStatus?.remoteDesktopScreenRecordingDenied}>
-          <Alert tone="warning" role="status">
-            <AlertIcon>
-              <Monitor />
-            </AlertIcon>
-            <AlertContent>
-              <AlertTitle>OpenBot may not record this screen</AlertTitle>
-              <AlertDescription>
-                A member asked for this desktop and got nothing to look at. Open System Settings → Privacy &amp;
-                Security → Screen Recording, turn on OpenBot, then check again.
-              </AlertDescription>
-            </AlertContent>
-            <AlertActions>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                loading={busy() === "screen-recording"}
-                onClick={() => void run("screen-recording", props.onOpenScreenRecordingSettings)}
-              >
-                Open System Settings
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                loading={busy() === "screen-recording-recheck"}
-                onClick={() => void run("screen-recording-recheck", props.onRecheckScreenRecording)}
-              >
-                Check again
-              </Button>
-            </AlertActions>
-          </Alert>
-        </Show>
+        <RemoteDesktopSetup server={props.server} platform={props.platform} />
         <ItemGroup class="settings-modal-card server-settings-desktop-card">
           <Show when={local()} fallback={remoteDesktopConnection()}>
             <Item size="spacious">
@@ -1402,7 +1466,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               </ItemContent>
               <ItemActions class="server-settings-desktop-meta">
                 <Badge tone={props.hostStatus?.remoteDesktopReady ? "success" : "warning"} shape="pill">
-                  {props.hostStatus?.remoteDesktopReady ? "Service ready" : "Host component not installed"}
+                  {props.hostStatus?.remoteDesktopReady ? "Host component installed" : "Host component not installed"}
                 </Badge>
                 <Text as="span" variant="caption" tone="muted">
                   Unattended: {props.hostStatus?.remoteDesktopUnattended ? "enabled" : "not available"} · Active

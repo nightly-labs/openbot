@@ -15,8 +15,11 @@ import type {
   SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { createEffect, createSignal, Show } from "solid-js";
+import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
+import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import {
   Button,
   CircleArrowDown,
@@ -29,7 +32,7 @@ import {
   UserRound,
 } from "../../components/ui";
 import { useI18n } from "../../i18n-context";
-import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
+import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import type { GeneralSettingsValue } from "./app-settings";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 import { SaveBarDock, SettingsDialogShell } from "./SettingsDialogShell";
@@ -78,7 +81,14 @@ export interface SettingsModalProps {
    * computer, which is also what takes the row's sign-in button away.
    */
   providerKeys?: ProviderKeyApi;
+  /**
+   * The code sign-in, for the providers that offer one. Absent for the same reason as
+   * `providerKeys`: a remote server's provider is not signed in from this computer.
+   */
+  codeLogin?: ProviderCodeLoginApi;
   hostedSitesApi?: HostedSitesDesktopApi;
+  /** The agents granted a standing approval, so the user can see and undo each one. */
+  turboModePending?: boolean;
   restoreFocusTarget?: HTMLElement | null;
 }
 
@@ -239,18 +249,31 @@ export function SettingsModal(props: SettingsModalProps) {
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
         floatingContent={
-          <Show when={openCodeKeyOpen() && props.providerKeys}>
-            {(api) => (
-              <OpenCodeKeyDialog
-                api={api()}
-                onClose={() => {
-                  setOpenCodeKeyOpen(false);
-                  void refreshOpenCodeKeyStatus();
-                }}
-                onReconnect={props.onConnectProvider ? () => props.onConnectProvider?.("opencode") : undefined}
-              />
-            )}
-          </Show>
+          <>
+            <Show when={openCodeKeyOpen() && props.providerKeys}>
+              {(api) => (
+                <OpenCodeKeyDialog
+                  api={api()}
+                  onClose={() => {
+                    setOpenCodeKeyOpen(false);
+                    void refreshOpenCodeKeyStatus();
+                  }}
+                  onReconnect={props.onConnectProvider ? () => props.onConnectProvider?.("opencode") : undefined}
+                />
+              )}
+            </Show>
+            <Show when={props.codeLogin?.provider() ? props.codeLogin : undefined}>
+              {(api) => (
+                <ProviderCodeLoginDialog
+                  open={true}
+                  providerName={agentProviderDescriptor(api().provider() ?? "codex").displayName}
+                  state={api().state()}
+                  onOpenVerificationUrl={api().openVerificationUrl}
+                  onCancel={api().cancel}
+                />
+              )}
+            </Show>
+          </>
         }
         footer={
           <SaveBarDock value={profile.nameDirty() ? true : null}>
@@ -287,21 +310,19 @@ export function SettingsModal(props: SettingsModalProps) {
         }
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
-            {navItems
-              .filter((item) => item.value !== "computer-use" || props.appInfo?.platform === "darwin")
-              .map((item) => {
-                const NavIcon = item.icon;
-                return (
-                  <Tabs.Trigger
-                    class="settings-modal-nav-item"
-                    value={item.value}
-                    aria-current={activeTab() === item.value ? "page" : undefined}
-                  >
-                    <NavIcon aria-hidden="true" />
-                    <span>{i18n.t(item.titleKey)}</span>
-                  </Tabs.Trigger>
-                );
-              })}
+            {navItems.map((item) => {
+              const NavIcon = item.icon;
+              return (
+                <Tabs.Trigger
+                  class="settings-modal-nav-item"
+                  value={item.value}
+                  aria-current={activeTab() === item.value ? "page" : undefined}
+                >
+                  <NavIcon aria-hidden="true" />
+                  <span>{i18n.t(item.titleKey)}</span>
+                </Tabs.Trigger>
+              );
+            })}
           </Tabs.List>
         }
       >
@@ -321,11 +342,13 @@ export function SettingsModal(props: SettingsModalProps) {
             customProviders={props.customProviders}
             onDeleteCustomProvider={props.onDeleteCustomProvider}
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
+            onSignInWithCodeProvider={props.codeLogin?.start}
+            turboModePending={props.turboModePending}
           />
         </Tabs.Content>
 
         <Tabs.Content value="computer-use" class="settings-modal-tab-panel" data-tab="computer-use">
-          <ComputerUseMacSetup platform={props.appInfo?.platform ?? "darwin"} variant="settings" />
+          <ComputerUseSetup variant="settings" />
         </Tabs.Content>
 
         <Tabs.Content value="profile" class="settings-modal-tab-panel" data-tab="profile">

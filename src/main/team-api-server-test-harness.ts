@@ -131,6 +131,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     interrupt: unimplemented,
     respondToPrompt: unimplemented,
     respondToApproval: unimplemented,
+    respondToBrowserSecret: unimplemented,
     respondToBrowserTakeover: unimplemented,
     ...overrides,
   };
@@ -151,6 +152,10 @@ export function createBrowser(overrides: Partial<TeamApiBrowser> = {}): TeamApiB
     close: unimplemented,
     capturePreview: unimplemented,
     setVisible: unimplemented,
+    getDisplayState: unimplemented,
+    loadUrl: unimplemented,
+    startView: unimplemented,
+    dispatchViewInput: unimplemented,
     ...overrides,
   };
 }

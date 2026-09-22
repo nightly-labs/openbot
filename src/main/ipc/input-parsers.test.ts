@@ -1,4 +1,5 @@
 import { parseDownloadAttachments } from "./agent-inputs";
+import { parseRemoteDesktopSetupAction, parseRemoteDesktopTest } from "./server-inputs";
 // @vitest-environment node
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -39,11 +40,13 @@ import {
 } from "./agent-inputs";
 import {
   parseAnalyticsPreference,
+  parseApprovalAutomation,
   parseDynamicIslandAction,
   parseDynamicIslandInteractive,
   parseDynamicIslandPreference,
   parseDynamicIslandPresentation,
   parseExternalDestination,
+  parseInstallSkill,
   parseMacPermission,
   parseMarketplaceAgentQuery,
   parseMarketplaceSkillQuery,
@@ -87,6 +90,29 @@ describe("app IPC input parsing", () => {
     ).toThrow();
   });
 
+  /*
+   * A plugin listing pins the version of each skill it brings. The decoder is where that pin either
+   * reaches the main process or is dropped, and a caller that names no version must still parse as
+   * the install every marketplace screen has always sent.
+   */
+  it("carries a pinned skill version and rejects a version that is not a name", () => {
+    expect(parseInstallSkill({ agentId: "agent-1", skillId: "skill-1" })).toEqual({
+      agentId: "agent-1",
+      skillId: "skill-1",
+    });
+    expect(parseInstallSkill({ agentId: "agent-1", skillId: "skill-1", versionId: "version-7" })).toEqual({
+      agentId: "agent-1",
+      skillId: "skill-1",
+      versionId: "version-7",
+    });
+    expect(() => parseInstallSkill({ agentId: "agent-1", skillId: "skill-1", versionId: 7 })).toThrow(
+      "versionId is required.",
+    );
+    expect(() => parseInstallSkill({ agentId: "agent-1", skillId: "skill-1", versionId: "" })).toThrow(
+      "versionId is required.",
+    );
+  });
+
   it("parses setup and permission values", () => {
     expect(parseSetup({ preferredProvider: "codex", preferredModel: null })).toEqual({
       preferredProvider: "codex",
@@ -101,7 +127,6 @@ describe("app IPC input parsing", () => {
     expect(parseMacPermission("screen-recording")).toBe("screen-recording");
     expect(parseMacPermission("accessibility")).toBe("accessibility");
     expect(parseExternalDestination("claude-install")).toBe("claude-install");
-    expect(parseExternalDestination("claude-sign-in")).toBe("claude-sign-in");
     expect(parseAnalyticsPreference({ enabled: false })).toEqual({ enabled: false });
     expect(parseUpdatePreference({ autoDownload: false })).toEqual({ autoDownload: false });
     expect(parseUpdatePreference({ autoDownload: true })).toEqual({ autoDownload: true });
@@ -163,6 +188,31 @@ describe("app IPC input parsing", () => {
     expect(() => parseAnalyticsPreference({ enabled: "false" })).toThrowError("Analytics preference is required.");
     expect(() => parseUpdatePreference({ autoDownload: "yes" })).toThrowError("Update preference is required.");
     expect(() => parseUpdatePreference(null)).toThrowError("Update preference is required.");
+  });
+
+  it("takes an approval automation change one field at a time", () => {
+    expect(parseApprovalAutomation({ turbo: true })).toEqual({ turbo: true });
+    expect(parseApprovalAutomation({ agentId: "chief", autoApprove: true })).toEqual({
+      agentId: "chief",
+      autoApprove: true,
+    });
+    expect(parseApprovalAutomation({ turbo: false, agentId: "chief", autoApprove: false })).toEqual({
+      turbo: false,
+      agentId: "chief",
+      autoApprove: false,
+    });
+  });
+
+  it("rejects an approval automation change that says nothing, or only half of a grant", () => {
+    const message = "Approval automation preference is required.";
+    expect(() => parseApprovalAutomation({})).toThrowError(message);
+    expect(() => parseApprovalAutomation(null)).toThrowError(message);
+    expect(() => parseApprovalAutomation({ turbo: "on" })).toThrowError(message);
+    // Half a grant is the dangerous shape: an id with no decision says nothing, and a decision with
+    // no id would be a second way to write the global switch.
+    expect(() => parseApprovalAutomation({ agentId: "chief" })).toThrowError(message);
+    expect(() => parseApprovalAutomation({ autoApprove: true })).toThrowError(message);
+    expect(() => parseApprovalAutomation({ agentId: "", autoApprove: true })).toThrowError(message);
   });
 
   it("validates Dynamic Island data and actions", () => {
@@ -948,5 +998,23 @@ describe("ZIP download inputs", () => {
     { attachments: Array.from({ length: 1000 }, (_, index) => ({ id: String(index), name: "file" })) },
   ])("rejects an invalid archive request", (value) => {
     expect(() => parseDownloadAttachments(value)).toThrow();
+  });
+});
+
+describe("remote desktop setup input", () => {
+  it("accepts only named local setup actions", () => {
+    expect(parseRemoteDesktopSetupAction("accessibility")).toBe("accessibility");
+    expect(parseRemoteDesktopSetupAction("screen-recording")).toBe("screen-recording");
+    expect(parseRemoteDesktopSetupAction("reveal")).toBe("reveal");
+    expect(() => parseRemoteDesktopSetupAction("file:///private")).toThrow();
+  });
+  it("requires a server, a session, and a known test action", () => {
+    expect(parseRemoteDesktopTest({ serverId: "server-1", sessionId: "session-1", action: "start" })).toEqual({
+      serverId: "server-1",
+      sessionId: "session-1",
+      action: "start",
+    });
+    for (const input of [null, { action: "approve" }, { serverId: "server-1", action: "start" }])
+      expect(() => parseRemoteDesktopTest(input)).toThrow();
   });
 });

@@ -46,7 +46,7 @@ function SharedTablesStory(props: { tables: SharedTable[] }) {
 }
 
 const meta = {
-  title: "Settings/Saved Data",
+  title: "Settings/Tables",
   component: AgentSettingsPanel,
   args: {
     agent: STORY_AGENTS[0],
@@ -74,16 +74,16 @@ type Story = StoryObj<typeof meta>;
 export const SettingsRow: Story = {
   render: () => <SharedTablesStory tables={STORY_SHARED_TABLES} />,
   play: async ({ canvas }) => {
-    await waitFor(() => expect(canvas.getByRole("button", { name: /Saved data/ })).toHaveTextContent("6 kept"));
+    await waitFor(() => expect(canvas.getByRole("button", { name: /Tables/ })).toHaveTextContent("6 tables"));
   },
 };
 
 export const OpenModal: Story = {
   render: () => <SharedTablesStory tables={STORY_SHARED_TABLES} />,
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Saved data/ }));
+    await userEvent.click(await canvas.findByRole("button", { name: /Tables/ }));
     const body = within(document.body);
-    await expect(await body.findByRole("dialog", { name: "Saved data" })).toBeVisible();
+    await expect(await body.findByRole("dialog", { name: "Tables" })).toBeVisible();
     await expect(body.getByText("people")).toBeVisible();
     await expect(body.getByText(`214 records · Kept by ${STORY_AGENTS[0].name}`)).toBeVisible();
     await expect(body.getByText(/not counted · Made outside OpenBot/)).toBeVisible();
@@ -93,7 +93,7 @@ export const OpenModal: Story = {
 export const DeleteConfirmation: Story = {
   render: () => <SharedTablesStory tables={STORY_SHARED_TABLES} />,
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Saved data/ }));
+    await userEvent.click(await canvas.findByRole("button", { name: /Tables/ }));
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Delete people" }));
     await expect(await body.findByText("Delete this for every agent?", { exact: false })).toBeVisible();
@@ -103,8 +103,8 @@ export const DeleteConfirmation: Story = {
 export const EmptyState: Story = {
   render: () => <SharedTablesStory tables={[]} />,
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Saved data/ }));
+    await userEvent.click(await canvas.findByRole("button", { name: /Tables/ }));
     const body = within(document.body);
-    await expect(await body.findByText("Nothing saved yet", { exact: false })).toBeVisible();
+    await expect(await body.findByText("No tables yet", { exact: false })).toBeVisible();
   },
 };

@@ -2,6 +2,7 @@ import { Button } from "heroui-native";
 import { useCSSVariable } from "uniwind";
 
 import type { ScanQrButtonProps } from "@/features/auth/components/scan-qr-button.types";
+import { haptics } from "@/shared/lib/haptics";
 
 export function ScanQrButton({ onPress, width }: ScanQrButtonProps) {
   const brandColor = String(useCSSVariable("--openbot-logo-production") ?? "#cdadec");
@@ -17,7 +18,10 @@ export function ScanQrButton({ onPress, width }: ScanQrButtonProps) {
       className="min-h-13 w-full"
       accessibilityLabel="Scan QR code"
       style={{ width, backgroundColor: brandColor, borderRadius: cornerRadius }}
-      onPress={onPress}
+      onPress={() => {
+        void haptics.impact("light");
+        onPress();
+      }}
     >
       <Button.Label className="font-sans font-semibold" style={{ color: labelColor }}>
         Scan QR code

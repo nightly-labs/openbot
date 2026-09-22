@@ -1,8 +1,14 @@
 import type { ClientSideConnection, InitializeResponse } from "@agentclientprotocol/sdk";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { AcpAgentClient } from "./acp-client";
 import type { GrokCliInfo } from "./cli";
-import type { McpServerSource } from "./mcp-provider-shapes";
+import type {
+  McpAuthorizationSource,
+  McpDropReporter,
+  McpServerSource,
+  McpToolRuntimeSource,
+} from "./mcp-provider-shapes";
 import { type AccountRateLimitsReadResult, getRecord, getString } from "./protocol";
 
 export class GrokAgentClient extends AcpAgentClient {
@@ -11,12 +17,18 @@ export class GrokAgentClient extends AcpAgentClient {
     requestTimeoutMs = 30_000,
     profileGeneration = false,
     mcpServers: McpServerSource = () => [],
+    reportMcpDrops?: McpDropReporter,
+    mcpToolRuntimes?: McpToolRuntimeSource,
+    mcpAuthorization?: McpAuthorizationSource,
   ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
       profileGeneration,
       // A profile-generation client asks one question and must not act, so it is given none.
       mcpServers: profileGeneration ? () => [] : mcpServers,
+      reportMcpDrops,
+      mcpToolRuntimes,
+      mcpAuthorization,
       argv: [
         "--no-auto-update",
         ...(profileGeneration ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),
@@ -26,6 +38,7 @@ export class GrokAgentClient extends AcpAgentClient {
       env: { GROK_OAUTH2_REFERRER: "openbot" },
       signInMessage: "Run `grok login` or set XAI_API_KEY to use Grok.",
       authenticate,
+      readAccount: async (connection) => grokAccount(await connection.extMethod("_x.ai/auth/info", {})),
       readRateLimits: async (connection) => grokRateLimits(await connection.extMethod("_x.ai/billing", {})),
     });
   }
@@ -37,6 +50,11 @@ async function authenticate(connection: ClientSideConnection, initialization: In
   const selected =
     advertised.find((method) => method.id === authMethod) ?? advertised.find((method) => method.id === "cached_token");
   if (selected) await connection.authenticate({ methodId: selected.id });
+}
+
+function grokAccount(value: unknown): { email: string | null } {
+  const email = getString(value, "email");
+  return { email: email && email.length <= INPUT_LIMITS.email ? email : null };
 }
 
 function grokRateLimits(value: unknown): AccountRateLimitsReadResult {

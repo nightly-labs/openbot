@@ -1,0 +1,51 @@
+{
+  "slug": "resend",
+  "name": "Resend",
+  "tagline": "Transactional email",
+  "description": "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
+  "category": "automation",
+  "creatorName": "resend.com",
+  "iconUrl": "https://resend.com/static/favicons/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-send", "text": "Send the launch announcement draft to the beta list." },
+    { "id": "prompt-status", "text": "Did the invoice email reach the customer?" },
+    { "id": "prompt-template", "text": "Draft a password-reset email for the new flow." }
+  ],
+  "apps": [
+    {
+      "id": "app-resend-mcp",
+      "name": "Resend",
+      "description": "Email sending and delivery checks, over a local MCP server with a Resend API key.",
+      "iconUrl": "https://resend.com/static/favicons/favicon.ico",
+      "server": {
+        "name": "resend",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "resend-mcp"],
+        "auth": [
+          {
+            "id": "resend-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "token",
+                "label": "API key",
+                "env": "RESEND_API_KEY",
+                "prefix": "",
+                "hint": "Resend dashboard → API keys"
+              }
+            ],
+            "docsUrl": "https://resend.com/docs/dashboard/api-keys/introduction",
+            "docsLabel": "Get a key"
+          }
+        ]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://resend.com",
+  "privacyPolicyUrl": "https://resend.com/legal/privacy-policy",
+  "termsUrl": "https://resend.com/legal/terms"
+}

@@ -135,3 +135,15 @@ export const NarrowPanel: Story = {
     maxWidth: () => 320,
   },
 };
+
+export const PopupBlocked: Story = {
+  args: {
+    activeTab: {
+      ...tab,
+      popupFailure: {
+        id: "blocked-popup",
+        message: "The browser tab limit was reached. Close a tab, then retry from the page.",
+      },
+    },
+  },
+};

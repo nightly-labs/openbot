@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { expect, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import FilePreviewPanel from "../src/features/conversation/FilePreviewPanel";
 import {
@@ -68,15 +68,6 @@ export const Markdown: Story = {};
 export const MarkdownShort: Story = {
   name: "Markdown (short)",
   args: { preview: MARKDOWN_SHORT_PREVIEW },
-};
-
-/** The rendered Markdown view can be replaced with the original source and restored. */
-export const MarkdownSource: Story = {
-  name: "Markdown (source view)",
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "View source" }));
-    await expect(canvas.getByRole("button", { name: "View rendered Markdown" })).toBeVisible();
-  },
 };
 
 /** A plain text file in a monospace block that keeps its spacing and scrolls sideways. */

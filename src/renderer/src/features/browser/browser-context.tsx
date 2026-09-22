@@ -66,9 +66,9 @@ const BrowserTabs = createSimpleContext({
 
     function loadDisplayState(server: ServerSummary | undefined): Promise<BrowserDisplayState> {
       if (!supportsBrowser(server)) return Promise.resolve({ tabs: [], activeTabId: null });
-      return server?.kind === "remote"
-        ? window.openbot.browser.listTabs().then((tabs) => ({ tabs, activeTabId: tabs[0]?.id ?? null }))
-        : window.openbot.browser.getDisplayState();
+      // Main answers this for a remote server too, and falls back to the tab list for a host
+      // without `browser-navigation`, so the two server kinds read the same state here.
+      return window.openbot.browser.getDisplayState();
     }
 
     function loadControlState(server: ServerSummary | undefined): Promise<BrowserControlState> {

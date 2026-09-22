@@ -27,7 +27,9 @@ import type {
   AppInfo,
   AppSetupState,
   CentralAuthDesktopApi,
-  ComputerUseMacSetupState,
+  ComputerUseHighlightPlacement,
+  ComputerUsePermissionApp,
+  ComputerUseState,
   ExportResult,
   ExternalDestination,
   MacPermissionId,
@@ -37,7 +39,12 @@ import type {
   UpdatePreference,
   UpdateStatus,
 } from "./ipc-app-auth";
-import type { RespondToApprovalInput, RespondToBrowserTakeoverInput } from "./ipc-approvals";
+import type {
+  ApprovalAutomationPreference,
+  RespondToApprovalInput,
+  RespondToBrowserTakeoverInput,
+  SetApprovalAutomationInput,
+} from "./ipc-approvals";
 import type {
   AttachmentImportEvent,
   ChooseAttachmentsInput,
@@ -52,6 +59,8 @@ import type {
   BrowserBounds,
   BrowserControlState,
   BrowserDisplayState,
+  BrowserLiveViewEvent,
+  BrowserLiveViewInput,
   BrowserNavigateInput,
   BrowserOpenInput,
   BrowserPictureInPictureEvent,
@@ -59,6 +68,7 @@ import type {
   BrowserTab,
   BrowserVisibilityInput,
 } from "./ipc-browser";
+import type { RespondToBrowserSecretInput } from "./ipc-browser-secret";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -136,6 +146,12 @@ import type {
   SteerQueuedMessageInput,
   UpdateQueuedMessageInput,
 } from "./ipc-queue";
+import type {
+  RemoteDesktopSetupAction,
+  RemoteDesktopSetupStatus,
+  RemoteDesktopTestInput,
+  RemoteDesktopTestStatus,
+} from "./ipc-remote-desktop-setup";
 import type {
   CreateRoutineInput,
   DeleteRoutineInput,
@@ -281,6 +297,7 @@ export interface AgentDesktopApi {
   interrupt: (input: InterruptTurnInput) => Promise<void>;
   respondToPrompt: (input: RespondToPromptInput) => Promise<void>;
   respondToApproval: (input: RespondToApprovalInput) => Promise<void>;
+  respondToBrowserSecret: (input: RespondToBrowserSecretInput) => Promise<void>;
   respondToBrowserTakeover: (input: RespondToBrowserTakeoverInput) => Promise<void>;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
   onScopedEvent: (listener: (event: ScopedAgentEvent) => void) => () => void;
@@ -306,6 +323,11 @@ export interface BrowserDesktopApi {
   getControlState: () => Promise<BrowserControlState>;
   capturePreview: (tabId: string) => Promise<BrowserPreview>;
   setVisible: (input: BrowserVisibilityInput) => Promise<void>;
+  /** Starts a live view of a tab on the active remote server. A local tab is already on screen. */
+  startLiveView: (tabId: string) => Promise<void>;
+  stopLiveView: () => Promise<void>;
+  sendLiveViewInput: (input: BrowserLiveViewInput) => Promise<void>;
+  onLiveViewEvent: (listener: (event: BrowserLiveViewEvent) => void) => () => void;
   onDisplayState: (listener: (state: BrowserDisplayState) => void) => () => void;
   openPictureInPicture: (bounds?: BrowserBounds) => Promise<BrowserBounds>;
   closePictureInPicture: () => Promise<void>;
@@ -340,6 +362,26 @@ export interface ProviderApiKeyState {
   provider: AgentProviderId;
   status: ProviderApiKeyStatus;
 }
+
+/**
+ * What a started code sign-in gives the renderer: a code to show, or nothing left to do.
+ *
+ * `connected` is the provider that turned out to be signed in already, which the user reaches by
+ * asking for a code on a computer where the account arrived some other way. The token traded for
+ * the code never crosses this boundary; how the sign-in ends arrives as a provider status, the same
+ * way the browser sign-in's does.
+ */
+export type ProviderCodeLoginStart =
+  | {
+      kind: "code";
+      /** The one-time code the user types on the other device. Safe to show and to read out. */
+      userCode: string;
+      /** The page to type it on. Always https. */
+      verificationUrl: string;
+      /** Epoch milliseconds. When OpenBot gives up on this code, which is what the dialog counts down to. */
+      expiresAt: number;
+    }
+  | { kind: "connected" };
 
 export interface ProviderRuntimesDesktopApi {
   getStatus: () => Promise<ProviderRuntimeSnapshot>;
@@ -401,6 +443,15 @@ export interface ServersDesktopApi {
   onInvite: (listener: (inviteUrl: string) => void) => () => void;
 }
 
+/**
+ * The plugin deep link. Both carry a slug, never a listing: the catalog is already in the renderer,
+ * and a link that carried the listing itself would let the address bar describe what gets installed.
+ */
+export interface PluginsDesktopApi {
+  takePendingListing: () => Promise<string | null>;
+  onOpenListing: (listener: (slug: string) => void) => () => void;
+}
+
 export interface HostDesktopApi {
   getStatus: () => Promise<HostStatus>;
   configure: (input: ConfigureHostInput) => Promise<HostStatus>;
@@ -429,6 +480,9 @@ export interface HostDesktopApi {
 }
 
 export interface RemoteDesktopDesktopApi {
+  checkSetup: (serverId: string) => Promise<RemoteDesktopSetupStatus>;
+  openSetup: (action: RemoteDesktopSetupAction) => Promise<void>;
+  test: (input: RemoteDesktopTestInput) => Promise<RemoteDesktopTestStatus>;
   list: () => Promise<RemoteDesktopSession[]>;
   connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopConnectResult>;
   selectDisplay: (input: RemoteDesktopSelectDisplayInput) => Promise<void>;
@@ -486,16 +540,27 @@ export interface OpenBotDesktopApi {
   saveSetup: (input: SaveSetupInput) => Promise<AppSetupState>;
   getAnalyticsPreference: () => Promise<AnalyticsPreference>;
   setAnalyticsPreference: (input: SetAnalyticsPreferenceInput) => Promise<AnalyticsPreference>;
+  getApprovalAutomation: () => Promise<ApprovalAutomationPreference>;
+  setApprovalAutomation: (input: SetApprovalAutomationInput) => Promise<ApprovalAutomationPreference>;
   getAppLanguagePreference: () => Promise<AppLanguagePreference>;
   setAppLanguagePreference: (input: SetAppLanguagePreferenceInput) => Promise<AppLanguagePreference>;
   onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
   onOpenSettings: (listener: () => void) => () => void;
   dynamicIsland: DynamicIslandDesktopApi;
-  getComputerUseMacSetupState: () => Promise<ComputerUseMacSetupState>;
-  openComputerUsePermissionSetup: (permission: MacPermissionId) => Promise<ComputerUseMacSetupState>;
-  startComputerUseHelperDrag: () => Promise<void>;
-  revealComputerUseHelper: () => Promise<void>;
-  closeComputerUsePermissionSetup: () => Promise<void>;
+  getComputerUseState: () => Promise<ComputerUseState>;
+  openComputerUsePermissionPane: (permission: MacPermissionId) => Promise<ComputerUseState>;
+  closeComputerUsePermissionHelp: () => Promise<void>;
+  getComputerUsePermissionApp: () => Promise<ComputerUsePermissionApp | null>;
+  /** Starts the native drag. Only the help window may call it; every other sender is refused. */
+  startComputerUsePermissionAppDrag: () => Promise<void>;
+  revealComputerUsePermissionApp: () => Promise<void>;
+  /**
+   * Where to draw the rim over the window an agent works in. Only the overlay surface listens.
+   *
+   * It is pushed rather than asked for: the overlay carries no control and invokes nothing, so a
+   * window that floats over another application's has no channel it could be driven through.
+   */
+  onComputerUseHighlightPlacement: (listener: (placement: ComputerUseHighlightPlacement) => void) => () => void;
   openExternal: (destination: ExternalDestination) => Promise<void>;
   connectProvider: (provider: AgentProviderId) => Promise<AgentStatus>;
   refreshAgentProviders: () => Promise<AgentStatus>;
@@ -515,6 +580,14 @@ export interface OpenBotDesktopApi {
   setProviderApiKey: (input: SetProviderApiKeyInput) => Promise<AgentStatus>;
   clearProviderApiKey: (provider: AgentProviderId) => Promise<AgentStatus>;
   getProviderApiKeyState: (provider: AgentProviderId) => Promise<ProviderApiKeyState>;
+  /**
+   * Starts a sign-in the user finishes on another device, for a provider whose descriptor says
+   * `codeSignIn`. Cancel it with `cancelProviderCodeLogin`; leaving it running holds one provider
+   * process open until the code expires.
+   */
+  startProviderCodeLogin: (provider: AgentProviderId) => Promise<ProviderCodeLoginStart>;
+  /** Abandons a code sign-in: the provider is told, the code is dead, and the provider goes idle. */
+  cancelProviderCodeLogin: (provider: AgentProviderId) => Promise<AgentStatus>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;
@@ -528,6 +601,7 @@ export interface OpenBotDesktopApi {
   update: UpdateDesktopApi;
   maintenance: MaintenanceDesktopApi;
   servers: ServersDesktopApi;
+  plugins: PluginsDesktopApi;
   host: HostDesktopApi;
   remoteDesktop: RemoteDesktopDesktopApi;
 }

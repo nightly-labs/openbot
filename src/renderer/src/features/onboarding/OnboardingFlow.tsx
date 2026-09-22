@@ -11,12 +11,14 @@ import {
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
 import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
+import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { ArrowUp, Button, Plus } from "../../components/ui";
 import { errorMessage } from "../../error-message";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { ComputerUseMacSetup } from "../computer-use/ComputerUseMacSetup";
+import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -33,6 +35,11 @@ export interface OnboardingFlowProps {
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * The sign-in finished on another device. First run is where it is needed most: the browser this
+   * computer opens is the part of the hand-off that is most likely to be missing or wrong here.
+   */
+  codeLogin?: ProviderCodeLoginApi;
   onRefreshProviders?: () => void | Promise<void>;
   /**
    * Records the choice. The model is `null` for a built-in provider, which keeps its own default, and
@@ -77,6 +84,11 @@ type OnboardingAvatarVariants = {
 export function OnboardingFlow(props: OnboardingFlowProps) {
   const [step, setStep] = createSignal<OnboardingStep>("meet");
   const [direction, setDirection] = createSignal<StepDirection>("forward");
+  /**
+   * The first-run screen sits on the dialog layer, so a row menu portalled to `body` would paint
+   * behind it. Menus mount here instead.
+   */
+  const [screenElement, setScreenElement] = createSignal<HTMLElement | undefined>();
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
   /**
    * Whether the user chose their own endpoints rather than a built-in provider. `selectedProvider`
@@ -187,6 +199,33 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     return Boolean(
       selected && providerOptions().some((provider) => provider.id === selected && provider.state === "available"),
     );
+  });
+  const nextReasonId = createUniqueId();
+  /**
+   * Why `Next` refuses, in the step the user is actually in, or an empty string when it does not.
+   *
+   * The button is disabled, so a press says nothing and the sentence is the only account the screen
+   * gives. A first run whose providers are all still being checked otherwise shows a list of rows
+   * and a dead button, which reads as a broken application rather than as work left to do.
+   */
+  const nextBlockedReason = createMemo(() => {
+    if (selectedProviderConnected()) return "";
+    const option = providerOptions().find((candidate) => candidate.id === selectedProvider());
+    if (!option) return "Select a provider to continue.";
+    switch (option.runtimeStatus?.phase) {
+      case "downloading":
+        return `${option.name} is still downloading.`;
+      case "finishing":
+        return `${option.name} is still being set up.`;
+      case "download-error":
+        return `${option.name} could not be downloaded. Retry the download to continue.`;
+      case "not-downloaded":
+        return `Download ${option.name} to continue.`;
+      default:
+        break;
+    }
+    if (option.connectionState === "connecting") return `${option.name} is connecting.`;
+    return `Connect ${option.name} to continue.`;
   });
 
   createEffect(
@@ -339,7 +378,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
   function nextStep(): void {
     if (!selectedProviderConnected()) {
-      setError("Connect and select a provider to continue.");
+      setError(nextBlockedReason());
       return;
     }
     if (step() === "meet") {
@@ -375,7 +414,12 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   const stepNumber = () => (step() === "meet" ? 1 : step() === "computer" ? 2 : 3);
 
   return (
-    <main class="onboarding-screen" data-step={step()} data-direction={direction()}>
+    <main
+      class="onboarding-screen"
+      data-step={step()}
+      data-direction={direction()}
+      ref={(element) => setScreenElement(element)}
+    >
       <div class="onboarding-shell">
         <nav class="onboarding-progress" aria-label={`Onboarding step ${stepNumber()} of 3`}>
           <For each={[1, 2, 3]}>
@@ -462,6 +506,8 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         ? (provider) => openProviderGuide(provider, props.onSignInProvider, "sign-in")
                         : undefined
                     }
+                    onSignInWithCodeProvider={props.codeLogin?.start}
+                    menuMount={screenElement()}
                     onRefreshProviders={!lazyProviderMode() && props.onRefreshProviders ? refreshProviders : undefined}
                     onAddCustomProvider={props.onAddCustomProvider ? host.openForm : undefined}
                     customProviders={props.customProviders}
@@ -491,6 +537,19 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       onDelete={(provider) => void host.remove(provider)}
                       onClose={host.closeList}
                     />
+                  </Show>
+                  {/* Sits beside the picker it was started from, so the code covers the row rather
+                    than a step the user has not reached. */}
+                  <Show when={props.codeLogin?.provider() ? props.codeLogin : undefined}>
+                    {(api) => (
+                      <ProviderCodeLoginDialog
+                        open={true}
+                        providerName={PROVIDERS.find((candidate) => candidate.id === api().provider())?.name ?? ""}
+                        state={api().state()}
+                        onOpenVerificationUrl={api().openVerificationUrl}
+                        onCancel={api().cancel}
+                      />
+                    )}
                   </Show>
                 </div>
               </section>
@@ -568,7 +627,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                   </div>
                 </div>
 
-                <ComputerUseMacSetup platform={props.platform} variant="compact" />
+                <ComputerUseSetup variant="compact" />
               </section>
             </Match>
 
@@ -634,12 +693,21 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
             variant="default"
             class="onboarding-next"
             disabled={saving() || !selectedProviderConnected()}
+            aria-describedby={nextBlockedReason() ? nextReasonId : undefined}
             loading={saving()}
             loadingLabel="Opening OpenBot…"
             onClick={nextStep}
           >
             {step() === "jobs" ? "Open OpenBot" : "Next"}
           </Button>
+          {/* Named by the button above, so the reason is read out with it rather than hunted for. */}
+          <Show when={nextBlockedReason()}>
+            {(reason) => (
+              <p class="onboarding-next-reason" id={nextReasonId}>
+                {reason()}
+              </p>
+            )}
+          </Show>
         </div>
       </div>
     </main>

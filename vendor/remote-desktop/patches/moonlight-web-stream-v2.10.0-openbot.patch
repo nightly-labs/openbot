@@ -2534,6 +2534,19 @@ index 0000000..295666b
 +    }
 +  }
 +}
+diff --git a/src/app/host.rs b/src/app/host.rs
+index 35cbeb2..cc46899 100644
+--- a/src/app/host.rs
++++ b/src/app/host.rs
+@@ -390,7 +390,7 @@ impl Host {
+                 host.pair(
+                     &client_identifier,
+                     &client_secret,
+-                    "roth".to_string(),
++                    app.config.moonlight.pair_device_name.clone(),
+                     pin,
+                     OpenSSLCryptoBackend,
+                 )
 diff --git a/src/app/storage/json/versions.rs b/src/app/storage/json/versions.rs
 index 7f542fe..6d70436 100644
 --- a/src/app/storage/json/versions.rs

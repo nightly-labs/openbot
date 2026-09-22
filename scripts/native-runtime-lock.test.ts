@@ -17,8 +17,8 @@ describe("native runtime lock", () => {
 
     expect(lock.remoteDesktop.sunshine.version).toBe("v2026.516.143833");
     expect(lock.remoteDesktop.moonlightWeb.version).toBe("v2.10.0");
-    expect(lock.remoteDesktop.sunshine.sourceMode).toBe("openbot-fork");
-    expect(lock.remoteDesktop.moonlightWeb.sourceMode).toBe("openbot-fork");
+    expect(lock.remoteDesktop.sunshine.sourceMode).toBe("upstream-with-patch");
+    expect(lock.remoteDesktop.moonlightWeb.sourceMode).toBe("upstream-with-patch");
     expect(lock.remoteDesktop.sunshine.upstream.commit).toBe("14ffa6fdaa53f7b51512be2b3d24f3939695403c");
     expect(lock.remoteDesktop.moonlightWeb.upstream.commit).toBe("cd9d03cbf9a42b394f7b72a733a2f39cb5f0edd8");
   });

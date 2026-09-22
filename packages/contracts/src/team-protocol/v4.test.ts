@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isAgentSummary } from "../ipc-agents";
 import { isDynamicRecord } from "../runtime-values";
+import { TEAM_API_ROUTES } from "../team-api-routes";
+import { browserViewStreamPath } from "./browser-view-v1";
 import request from "./fixtures/v4/client-http-request.json";
 import response from "./fixtures/v4/host-http-response.json";
 import profileResponseFixture from "./fixtures/v4/profile-host-response.json";
@@ -24,6 +26,78 @@ import {
 } from "./v4-webrtc-adapter";
 
 describe("Team protocol v4", () => {
+  it("carries remote desktop setup and test results without changing released routes", () => {
+    const setup = {
+      platform: "darwin",
+      hostName: "Mac mini",
+      username: "tenant",
+      checkedAt: "2026-09-21T10:00:00.000Z",
+      screenRecording: "blocked",
+      accessibility: "allowed",
+      service: "allowed",
+      displays: "unavailable",
+      guiSession: "blocked",
+      restartRequired: false,
+      activeSessions: 0,
+      message: null,
+    };
+    const setupPath = TEAM_API_ROUTES.remoteScreen.setup;
+    const testPath = TEAM_API_ROUTES.remoteScreen.test;
+    expect(encodeTeamProtocolV4WebRtcHttpRequest("POST", setupPath, {})).toEqual({});
+    expect(
+      decodeTeamProtocolV4WebRtcHttpResponse(
+        "POST",
+        setupPath,
+        200,
+        encodeTeamProtocolV4WebRtcHttpResponse("POST", setupPath, 200, setup),
+      ),
+    ).toEqual(setup);
+    const test = { active: true, mouse: false, keyboard: false, code: "1234" };
+    expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, test))).toEqual(test);
+    expect(
+      decodeTeamProtocolV4CurrentHttpRequest("POST", testPath, { sessionId: "session-1", action: "start" }),
+    ).toEqual({ sessionId: "session-1", action: "start" });
+    expect(() =>
+      decodeTeamProtocolV4CurrentHttpRequest("POST", testPath, { sessionId: "session-1", action: "approve" }),
+    ).toThrow();
+    expect(() => decodeTeamProtocolV4CurrentHttpRequest("POST", setupPath, { username: "other-user" })).toThrow();
+    expect(() =>
+      decodeTeamProtocolV4CurrentHttpResponse("POST", setupPath, 200, { ...setup, accessibility: true }),
+    ).toThrow();
+    expect(() =>
+      decodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, { ...test, keyboard: "yes" }),
+    ).toThrow();
+    // Neither transport may publish new IPC fields or accept them as wire fields.
+    for (const [path, payload] of [
+      [setupPath, setup],
+      [testPath, test],
+    ] as const) {
+      const extended = { ...payload, internalDetail: { secret: "host-only" } };
+      expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, extended))).toEqual(payload);
+      expect(decodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, extended)).toEqual(payload);
+      expect(encodeTeamProtocolV4WebRtcHttpResponse("POST", path, 200, extended)).toEqual(payload);
+      expect(decodeTeamProtocolV4WebRtcHttpResponse("POST", path, 200, extended)).toEqual(payload);
+    }
+    for (const invalid of [
+      { platform: "future-os" },
+      { screenRecording: "future-state" },
+      { accessibility: "future-state" },
+      { service: "future-state" },
+      { displays: "future-state" },
+      { guiSession: "future-state" },
+      { activeSessions: -1 },
+      { activeSessions: 0.5 },
+      { checkedAt: "not-a-date" },
+      { hostName: "x".repeat(256) },
+      { username: "x".repeat(256) },
+      { message: "x".repeat(1001) },
+    ]) {
+      expect(() => decodeTeamProtocolV4CurrentHttpResponse("POST", setupPath, 200, { ...setup, ...invalid })).toThrow();
+    }
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("POST", testPath, 200, { ...test, code: "12345" })).toThrow();
+    expect(() => decodeTeamProtocolV3CurrentHttpResponse("POST", setupPath, 200, setup)).toThrow();
+  });
+
   it("round-trips OpenCode agent and model selection without widening v3", () => {
     expect(decodeTeamProtocolV4CurrentHttpRequest("PATCH", "/v1/agents/agent-opencode", request)).toEqual(request);
     expect(encodeTeamProtocolV4WebRtcHttpRequest("PATCH", "/v1/agents/agent-opencode", request)).toEqual(request);
@@ -33,6 +107,39 @@ describe("Team protocol v4", () => {
     expect(() =>
       decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/agents", 200, [{ ...response[0], provider: "unknown" }]),
     ).toThrow();
+  });
+
+  it("carries an address and the active tab that the frozen browser routes cannot", () => {
+    const load = { tabId: "tab-1", url: "https://example.com/next" };
+    expect(JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", load))).toEqual(load);
+    expect(decodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", load)).toEqual(load);
+
+    // The released navigate route names `direction` only, so the address the user typed is dropped
+    // on the way out - which is the whole reason the route above exists.
+    expect(
+      JSON.parse(
+        encodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/navigate", {
+          tabId: "tab-1",
+          direction: "back",
+          url: "https://example.com/next",
+        }),
+      ),
+    ).toEqual({ tabId: "tab-1", direction: "back" });
+
+    const tab = { id: "tab-2", title: "Example", url: "https://example.com", loading: false, ownerThreadId: null };
+    const current = { tabs: [{ ...tab, ownerAgentId: "chief" }], activeTabId: "tab-2" };
+    const wire = { tabs: [{ ...tab, ownerBotId: "chief" }], activeTabId: "tab-2" };
+    // The tab list keeps the released vocabulary, so the owner reaches the wire as `ownerBotId` and
+    // comes back as `ownerAgentId`, exactly as it does on `/v1/browser/tabs`.
+    expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/browser/display", 200, current))).toEqual(
+      wire,
+    );
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/browser/display", 200, wire)).toEqual(current);
+    // The display route is a GET with no body, and the frozen v2 frame cannot name a route added
+    // after it, so the WebRTC request frame is empty rather than a classification failure.
+    expect(encodeTeamProtocolV4WebRtcHttpRequest("GET", "/v1/browser/display", undefined)).toEqual({});
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/browser/display", 200, { tabs: [tab] })).toThrow();
+    expect(() => decodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", { tabId: "tab-1" })).toThrow();
   });
 
   it("carries the queue edit mark to a current client and drops it for a frozen one", () => {
@@ -357,4 +464,39 @@ it("freezes the v4 profile draft bounds independently of the current profile mod
   expect(() => decodeProfileV4Response(true, blank)).toThrow("Invalid profile v4 draft.");
   expect(() => decodeProfileV4Request(false, { operationId: "invalid", draft })).toThrow("Invalid profile v4 save.");
   expect(() => decodeProfileV4Request(true, { prompt: " ", draft })).toThrow("Invalid profile v4 prompt.");
+});
+
+it("carries a browser view session and refuses one the host did not name", () => {
+  const path = TEAM_API_ROUTES.browser.viewSessions;
+  const request = { tabId: "tab-1" };
+  expect(
+    decodeTeamProtocolV4CurrentHttpRequest(
+      "POST",
+      path,
+      JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", path, request)),
+    ),
+  ).toEqual(request);
+  const session = {
+    id: "view-1",
+    tabId: "tab-1",
+    streamPath: browserViewStreamPath("view-1"),
+  };
+  expect(
+    decodeTeamProtocolV4CurrentHttpResponse(
+      "POST",
+      path,
+      200,
+      JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, session)),
+    ),
+  ).toEqual(session);
+  // The client opens a socket at the path the host answers with, so a path for another session -- or
+  // for anything that is not a stream -- must not survive the response.
+  expect(() =>
+    encodeTeamProtocolV4CurrentHttpResponse("POST", path, 200, { ...session, streamPath: "/v1/browser/view/other" }),
+  ).toThrow("Invalid browser view response.");
+  // Ending the session is a DELETE, and the v3 frame a WebRTC request falls through to cannot learn
+  // a route added after it was frozen, so the frame it sends is empty.
+  const ended = TEAM_API_ROUTES.browser.viewSession("view-1");
+  expect(encodeTeamProtocolV4WebRtcHttpRequest("DELETE", ended, null)).toEqual({});
+  expect(decodeTeamProtocolV4WebRtcHttpRequest("DELETE", ended, {})).toEqual({});
 });

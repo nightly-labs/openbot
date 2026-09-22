@@ -15,6 +15,7 @@ import { CONTENT_COLLECTIONS } from "../../lib/content";
 import { formatArticleDate } from "../../lib/content-collection";
 import { GUIDES_COLLECTION } from "../../lib/guides";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
+import { PLUGIN_INDEX_ROUTE } from "../../lib/plugins";
 import { Button } from "../ui/button";
 import { ArticleGradient } from "./ArticleGradient";
 import { ArticleImage } from "./ArticleMedia";
@@ -48,6 +49,9 @@ function StoryHeader() {
             </a>
           )}
         </For>
+        <a class="landing-header-link" href={PLUGIN_INDEX_ROUTE}>
+          Plugins
+        </a>
         <Button
           href={OPENBOT_LINKS.contact}
           target="_blank"

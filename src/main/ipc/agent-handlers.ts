@@ -2,6 +2,7 @@ import {
   analyticsQuery,
   assertAnalyticsScope,
   assertHostAnalyticsScope,
+  BROWSER_SECRET_RESPONSE_PATH,
   CHANNEL_DELETE_CAPABILITY,
   decodeAgentProfileDraft,
   decodeChannel,
@@ -10,6 +11,7 @@ import {
   decodeSaveAgentProfileResult,
   hostAnalyticsQuery,
   parseAgentAnalyticsInput,
+  parseBrowserSecretResponse,
   parseChannelCommand,
   parseChannelRead,
   parseGenerateAgentProfile,
@@ -428,6 +430,14 @@ export function agentIpcHandlers({
               method: "POST",
               body: parsed,
             }),
+        });
+      }),
+      respondToBrowserSecret: payloadHandler(parseAgentRequest, (scoped) => {
+        const parsed = parseBrowserSecretResponse(scoped.payload);
+        return routeToServer(scoped.serverId, {
+          local: () => service.respondToBrowserSecret(parsed),
+          remote: (serverId) =>
+            remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, { method: "POST", body: parsed }),
         });
       }),
       respondToBrowserTakeover: payloadHandler(parseAgentRequest, (scoped) => {

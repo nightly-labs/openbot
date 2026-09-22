@@ -169,7 +169,13 @@ const ROUTE_METHODS: Record<string, string> = {
   "browser.control": "GET",
   "browser.preview": "POST",
   "browser.visible": "POST",
+  "browser.display": "GET",
+  "browser.load": "POST",
+  "browser.viewSessions": "POST",
+  "browser.viewSession": "DELETE",
   "remoteScreen.capabilities": "GET",
+  "remoteScreen.setup": "POST",
+  "remoteScreen.test": "POST",
   "remoteScreen.sessions": "POST",
   "remoteScreen.session": "DELETE",
   "remoteScreen.display": "PUT",
@@ -258,6 +264,17 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   // Same reason, one adapter deeper: v3 rewrites this to the `read` path before the v1 codec sees a
   // body, so v1 classifies `conversation/read` and never this spelling.
   "agent.conversationUnread",
+  // Additive `browser-navigation` routes: they ride beside the frozen codec, which classifies
+  // neither, exactly as the additive v3 routes above do.
+  "browser.display",
+  "browser.load",
+  // Behind `browser-view`, and the same again: the session body rides beside the frozen codec, and
+  // the deletion is answered with 204 and no body at all.
+  "browser.viewSessions",
+  "browser.viewSession",
+  // Optional v4 setup routes. Their separate request/response codec is tested in v4.test.ts.
+  "remoteScreen.setup",
+  "remoteScreen.test",
 ]);
 
 const ROUTE_SAMPLE_IDS = ["route-sample", "route-sample-other"];

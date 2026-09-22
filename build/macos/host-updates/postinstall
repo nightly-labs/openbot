@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin LC_ALL=C
+ROOT='/Library/Application Support/OpenBot/HostManager'
+"$ROOT/openbot-host" --verify-installation
+# Payload files have explicit root:wheel modes. Never recurse through tenant status or homes.
+if [ -f "$ROOT/config.json" ] && [ ! -L "$ROOT/config.json" ]; then
+  launchctl bootstrap system /Library/LaunchDaemons/app.openbot.host-manager.plist
+fi
+echo 'OpenBot Host installed. Run sudo openbot-host setup, then sudo openbot-host verify.'
