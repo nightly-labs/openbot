@@ -3,7 +3,7 @@ import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/b
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { expect, it, vi } from "vitest";
+import { expect, it, type Mock, vi } from "vitest";
 import { App } from "./App";
 import {
   AGENTS,
@@ -42,6 +42,63 @@ function domRect(left: number, top: number, width: number, height: number): DOMR
   };
 }
 
+const LIVE_VIEW_LABEL = "Live view of the page on the host";
+const nativeCanvasGetContext = HTMLCanvasElement.prototype.getContext;
+
+/** A server list with one host that can stream its browser, which is what a live view needs. */
+function listHostThatStreamsItsBrowser(): void {
+  const studio = testServer("remote-1", true);
+  vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
+    testServer("local", false),
+    {
+      ...studio,
+      compatibility: {
+        localAppVersion: "0.0.0",
+        hostAppVersion: "0.0.0",
+        localProtocol: { minimum: 1, maximum: 4 },
+        hostProtocol: { minimum: 1, maximum: 4 },
+        negotiatedProtocol: 4,
+        capabilities: ["browser-control", TEAM_BROWSER_VIEW_CAPABILITY],
+      },
+    },
+  ]);
+}
+
+/**
+ * The two APIs a live view draws with, which jsdom does not implement. Without them the view never
+ * draws a frame, and its pointer geometry - which follows the drawn frame - never becomes available.
+ * `holdDecodes` leaves a frame arrived but undrawn, the state a host viewport resize passes through.
+ */
+function stubCanvasDrawing(): { drawn: Mock; decodes: Mock; holdDecodes: () => () => void } {
+  const drawn = vi.fn();
+  // Only the live view's own canvas draws through this. Every other canvas keeps the null context
+  // jsdom gives it, so `drawn` counts the frames on the panel and nothing else.
+  Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+    configurable: true,
+    writable: true,
+    value: vi.fn(function (this: HTMLCanvasElement) {
+      return this.getAttribute("aria-label") === LIVE_VIEW_LABEL ? { drawImage: drawn } : null;
+    }),
+  });
+  let held: Promise<void> | undefined;
+  const decodes = vi.fn(async () => {
+    await held;
+    return { close: vi.fn() };
+  });
+  vi.stubGlobal("createImageBitmap", decodes);
+  return {
+    drawn,
+    decodes,
+    holdDecodes() {
+      let release = (): void => undefined;
+      held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return release;
+    },
+  };
+}
+
 /** The two clicks that reach a live browser: the computer panel, then the preview card in it. */
 async function openComputerAndCard(title: string): Promise<void> {
   await openComputer();
@@ -56,6 +113,12 @@ describe("OpenBot connected desktop shell", () => {
   afterEach(() => {
     toast.dismiss();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      configurable: true,
+      writable: true,
+      value: nativeCanvasGetContext,
+    });
   });
 
   it("shows a blocked popup reason and lets the user dismiss it", async () => {
@@ -275,22 +338,9 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("draws a remote host's page and sends a click back as a fraction of the frame", async () => {
-    const studio = testServer("remote-1", true);
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
-      testServer("local", false),
-      {
-        ...studio,
-        compatibility: {
-          localAppVersion: "0.0.0",
-          hostAppVersion: "0.0.0",
-          localProtocol: { minimum: 1, maximum: 4 },
-          hostProtocol: { minimum: 1, maximum: 4 },
-          negotiatedProtocol: 4,
-          capabilities: ["browser-control", TEAM_BROWSER_VIEW_CAPABILITY],
-        },
-      },
-    ]);
+    listHostThatStreamsItsBrowser();
     const tab = browserTab("remote-live-tab", "Remote live page");
+    const { drawn } = stubCanvasDrawing();
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
@@ -298,7 +348,8 @@ describe("OpenBot connected desktop shell", () => {
     await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
 
     emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
-    const view = await screen.findByRole("img", { name: "Live view of the page on the host" });
+    const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
+    await vi.waitFor(() => expect(drawn).toHaveBeenCalled());
     // The panel is a different size from the host's viewport, so the click is sent as the point on
     // the frame rather than the pixel it landed on here. jsdom has no layout to measure.
     //
@@ -329,22 +380,9 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("sends a click on a live view that is letterboxed top and bottom as a point on the frame", async () => {
-    const studio = testServer("remote-1", true);
-    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([
-      testServer("local", false),
-      {
-        ...studio,
-        compatibility: {
-          localAppVersion: "0.0.0",
-          hostAppVersion: "0.0.0",
-          localProtocol: { minimum: 1, maximum: 4 },
-          hostProtocol: { minimum: 1, maximum: 4 },
-          negotiatedProtocol: 4,
-          capabilities: ["browser-control", TEAM_BROWSER_VIEW_CAPABILITY],
-        },
-      },
-    ]);
+    listHostThatStreamsItsBrowser();
     const tab = browserTab("remote-live-tab", "Remote live page");
+    const { drawn } = stubCanvasDrawing();
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
@@ -355,7 +393,8 @@ describe("OpenBot connected desktop shell", () => {
     // drawn as a 380x237.5 band in the middle of a 380x800 panel, so all but a third of the panel
     // is bar, and a fraction of the panel would miss the page by most of its height.
     emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 1280, height: 800, image: IMAGE });
-    const view = await screen.findByRole("img", { name: "Live view of the page on the host" });
+    const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
+    await vi.waitFor(() => expect(drawn).toHaveBeenCalled());
     view.getBoundingClientRect = () => domRect(0, 0, 380, 800);
 
     await fireEvent.mouseDown(view, { clientX: 190, clientY: 400, button: 0, detail: 1 });
@@ -369,6 +408,68 @@ describe("OpenBot connected desktop shell", () => {
     expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
       expect.objectContaining({ type: "pointer", action: "down", x: 0.5, y: 0 }),
     );
+  });
+
+  it("holds a click back until a frame is drawn on the live view", async () => {
+    listHostThatStreamsItsBrowser();
+    const tab = browserTab("remote-live-tab", "Remote live page");
+    const { drawn, holdDecodes } = stubCanvasDrawing();
+    const decode = holdDecodes();
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Remote live page");
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+
+    // The frame arrived, so the panel stops saying it is connecting, but the decode has not finished
+    // and the canvas is still blank. There is no page under the pointer to aim at yet.
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
+    const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
+    view.getBoundingClientRect = () => domRect(0, 0, 400, 400);
+    await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
+    expect(window.openbot.browser.sendLiveViewInput).not.toHaveBeenCalled();
+
+    decode();
+    await vi.waitFor(() => expect(drawn).toHaveBeenCalled());
+    await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pointer", action: "down", x: 0.25, y: 0.25 }),
+    );
+  });
+
+  it("keeps a click on the drawn frame while a resized frame is still decoding", async () => {
+    listHostThatStreamsItsBrowser();
+    const tab = browserTab("remote-live-tab", "Remote live page");
+    const { drawn, decodes, holdDecodes } = stubCanvasDrawing();
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    emitAgentEvent?.({ type: "browser-changed", tabs: [tab], activeTabId: tab.id });
+    await openComputerAndCard("Remote live page");
+    await vi.waitFor(() => expect(window.openbot.browser.startLiveView).toHaveBeenCalledWith(tab.id));
+
+    emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 1, width: 800, height: 600, image: IMAGE });
+    const view = await screen.findByRole("img", { name: LIVE_VIEW_LABEL });
+    await vi.waitFor(() => expect(drawn).toHaveBeenCalled());
+    view.getBoundingClientRect = () => domRect(0, 0, 400, 400);
+
+    // The host's viewport changed shape, so the next frame is 400x800 where the drawn one is 800x600.
+    // Until it is painted the panel still shows the wide frame in a 400x300 band with 50 bars, and
+    // the tall frame's own geometry would call this point (0, 0.3125) - a different place on a page
+    // the user cannot see yet.
+    const decode = holdDecodes();
+    // A screencast repeats the page until something changes, and the view drops a frame that arrives
+    // while another one decodes. Offer the resized frame until it is the one being decoded; the hold
+    // keeps it there, so no third decode can start behind it.
+    await vi.waitFor(() => {
+      emitBrowserLiveView?.({ type: "frame", tabId: tab.id, sequence: 2, width: 400, height: 800, image: IMAGE });
+      expect(decodes).toHaveBeenCalledTimes(2);
+    });
+
+    await fireEvent.mouseDown(view, { clientX: 100, clientY: 125, button: 0, detail: 1 });
+    expect(window.openbot.browser.sendLiveViewInput).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pointer", action: "down", x: 0.25, y: 0.25 }),
+    );
+    decode();
   });
 
   it("keeps existing previews when a new tab is added", async () => {

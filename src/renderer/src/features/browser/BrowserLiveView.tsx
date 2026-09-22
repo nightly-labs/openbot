@@ -28,9 +28,12 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   });
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   /**
-   * The size of the last frame, kept beside the canvas rather than read from it: the canvas only
-   * takes the frame's size once the JPEG has decoded, and a pointer event that arrives first would
-   * otherwise be a fraction of the wrong shape.
+   * The size of the frame the canvas is showing, which is not the size of the last frame to arrive.
+   * Decoding is asynchronous and a frame that arrives mid-decode is dropped, so while the host
+   * resizes its viewport the newest frame's shape and the drawn pixels disagree. `object-fit`
+   * letterboxes what is drawn, so a pointer placed with the newer shape would miss by the
+   * difference between the two bands. It stays unset until the first frame is drawn, which is what
+   * holds input back while there is nothing on the canvas to aim at.
    */
   const [frameSize, setFrameSize] = createSignal<{ width: number; height: number }>();
   let pendingFrame: Promise<void> | undefined;
@@ -46,6 +49,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     }
     context.drawImage(bitmap, 0, 0);
     bitmap.close();
+    setFrameSize({ width: frame.width, height: frame.height });
   };
 
   const stopListening = window.openbot.browser.onLiveViewEvent((event) => {
@@ -55,7 +59,6 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       setState(() => ({ live: false, message: event.reason }));
       return;
     }
-    setFrameSize({ width: event.width, height: event.height });
     if (!state.live) setState(() => ({ live: true, message: "" }));
     // One frame decodes at a time. The next frame is the page as it is now, so a frame that arrives
     // while one is decoding is dropped rather than queued behind it.
