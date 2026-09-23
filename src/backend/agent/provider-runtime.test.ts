@@ -1008,7 +1008,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
   it("reports an updated CLI that stops at start as broken, with its reason, not as signed out", async () => {
     const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
-    const exit = new AgentProcessExitError("Claude stopped before it answered (exit code 3: Error: bad config).");
+    const exit = new AgentProcessExitError("Claude stopped before it answered (exit code 3).", "Error: bad config");
     service = createTestService({
       store,
       mailbox,
@@ -1022,7 +1022,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     await service.initialize();
 
     const message =
-      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: Error: bad config).";
+      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3). Error: bad config";
     await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(message);
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "claude", state: "error", message }),
@@ -1042,7 +1042,11 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         const replacement = provider === "claude" && ++claudeClients > 1;
         return new FakeAgentClient(provider, "", true, true, {}, async (method) => {
           if (replacement && method === "initialize") {
-            throw new AgentProcessExitError("Claude stopped before it answered (exit code 3: rejected abcdef123456).");
+            // Past the shortening, so a cut before redaction would leave a prefix of the secret.
+            throw new AgentProcessExitError(
+              "Claude stopped before it answered (exit code 3).",
+              `${"x".repeat(285)} rejected abcdef123456`,
+            );
           }
         });
       },
@@ -1063,8 +1067,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       headers: [],
     });
 
-    const message =
-      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: rejected •••).";
+    const message = `OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3). ${"x".repeat(285)} rejected •••`;
     await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(message);
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "claude", state: "available", message }),

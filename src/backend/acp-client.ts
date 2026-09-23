@@ -82,14 +82,17 @@ const MODEL_DISCOVERY_RETURN_MS = 250;
  */
 const EXIT_REPORT_WAIT_MS = 2_000;
 
-/** What of the CLI's last stderr line a status message carries. The full line is in the log. */
-const EXIT_DIAGNOSTIC_LIMIT = 300;
-
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
   exit: [error: Error];
   diagnostic: [message: string];
+}
+
+interface ProcessEnd {
+  ending: string;
+  /** The last stderr line, after `redactText` only. See `AgentProcessExitError`. */
+  detail: string | null;
 }
 
 interface PendingServerRequest {
@@ -184,8 +187,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   #process: ChildProcessWithoutNullStreams | null = null;
   #connection: ClientSideConnection | null = null;
-  /** How the current process ended, once its output is read to the end. */
-  #ended: Promise<string> | null = null;
+  /** How the current process ended, and its last stderr line, once its output is read to the end. */
+  #ended: Promise<ProcessEnd> | null = null;
   #initialized: Promise<void> | null = null;
   #initialization: InitializeResponse | null = null;
   #models: AcpModel[] = [];
@@ -246,11 +249,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // Read at `close`, not `exit`: only then is stderr read to its end, and a CLI that fails at start
     // writes the reason as its last line.
     this.#ended = new Promise((resolve) => {
-      child.once("error", (error) => resolve(redactText(error.message)));
+      child.once("error", (error) => resolve({ ending: "it could not start", detail: redactText(error.message) }));
       child.once("close", (code, signal) => {
         diagnostics.flush();
-        const ending = signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`;
-        resolve(lastDiagnostic ? `${ending}: ${lastDiagnostic.slice(0, EXIT_DIAGNOSTIC_LIMIT)}` : ending);
+        resolve({ ending: signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`, detail: lastDiagnostic });
       });
     });
     child.once("error", (error) => this.#fail(error, child));
@@ -315,7 +317,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * exit, so a CLI that fails at start read to the user as that phrase and nothing else. When the
    * process ended on its own, this waits for its exit and reports it with the CLI's last stderr line.
    */
-  async #explainEnd(error: unknown, ended: Promise<string> | null): Promise<unknown> {
+  async #explainEnd(error: unknown, ended: Promise<ProcessEnd> | null): Promise<unknown> {
     if (!ended || this.#stopping) return error;
     const message = error instanceof Error ? error.message : "";
     if (message !== "ACP connection closed" && message !== "ACP client is not running.") return error;
@@ -327,9 +329,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }),
     ]).finally(() => clearTimeout(timer));
     if (ending === null) return error;
-    return new AgentProcessExitError(`${agentProviderName(this.provider)} stopped before it answered (${ending}).`, {
-      cause: error,
-    });
+    return new AgentProcessExitError(
+      `${agentProviderName(this.provider)} stopped before it answered (${ending.ending}).`,
+      ending.detail,
+      { cause: error },
+    );
   }
 
   async #request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {

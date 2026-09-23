@@ -27,14 +27,34 @@ export interface AgentClient {
   once(event: "exit", listener: (error: Error) => void): this;
 }
 
+/** What of the CLI's last stderr line a status message carries. The full line is in the log. */
+const EXIT_DETAIL_LIMIT = 300;
+
 /**
- * The provider CLI ended while OpenBot waited for an answer. The message names how it ended and the
- * last line it wrote to stderr, already redacted, because that line is usually the only cause a user
- * can act on: a config the CLI refuses, a CPU it cannot run on, a file it cannot open.
+ * The provider CLI ended while OpenBot waited for an answer. The message names how it ended.
+ *
+ * `detail` is the last line the CLI wrote to stderr, usually the only cause a user can act on: a
+ * config the CLI refuses, a CPU it cannot run on, a file it cannot open. It is kept out of the
+ * message because only `redactText` has read it, and the line can quote an MCP secret that only the
+ * provider runtime knows. The runtime redacts it and adds it with `withDetail`.
  */
 export class AgentProcessExitError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
+  constructor(
+    message: string,
+    readonly detail: string | null = null,
+    options?: ErrorOptions,
+  ) {
     super(message, options);
     this.name = "AgentProcessExitError";
+  }
+
+  /**
+   * The same error with `detail` in its message, shortened. Give it the detail after every
+   * redaction: a redactor matches a whole value, and a value the shortening cut is no longer one.
+   */
+  withDetail(detail: string): AgentProcessExitError {
+    return new AgentProcessExitError(`${this.message} ${detail.slice(0, EXIT_DETAIL_LIMIT)}`, null, {
+      cause: this.cause,
+    });
   }
 }

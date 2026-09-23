@@ -436,8 +436,11 @@ describe("OpenCode ACP environment", () => {
     // saw when an update's CLI failed to start, so the exit and the CLI's own reason replace it.
     const failure = client.request("initialize", {}, decodeRecordResponse);
     await expect(failure).rejects.toBeInstanceOf(AgentProcessExitError);
-    await expect(failure).rejects.toThrow(/^OpenCode stopped before it answered \(exit code 3: Error: config key /u);
-    await expect(failure).rejects.not.toThrow("sk-live-secret");
+    await expect(failure).rejects.toMatchObject({
+      message: "OpenCode stopped before it answered (exit code 3).",
+      detail: expect.stringMatching(/^Error: config key /u),
+    });
+    await expect(failure).rejects.not.toMatchObject({ detail: expect.stringContaining("sk-live-secret") });
   });
 
   it("refuses the prompt when the endpoint was removed while the turn was prepared", async () => {

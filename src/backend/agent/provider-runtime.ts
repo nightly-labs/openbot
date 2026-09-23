@@ -1050,6 +1050,13 @@ export class ProviderRuntime implements ProviderPort {
     return this.status();
   }
 
+  /** A CLI exit with its last stderr line in the message, after the MCP values are out of it. */
+  #withExitDetail(error: unknown): unknown {
+    return error instanceof AgentProcessExitError && error.detail
+      ? error.withDetail(this.#redactMcp(error.detail))
+      : error;
+  }
+
   async #createAuthenticatedProviderClient(
     provider: AgentProvider,
     cli: AgentCliInfo,
@@ -1083,10 +1090,7 @@ export class ProviderRuntime implements ProviderPort {
       await client.stop().catch(() => undefined);
       // The CLI's last stderr line can quote an MCP secret that `redactText` does not know, and this
       // message reaches the status, the IPC answer and the runtime download error.
-      if (error instanceof AgentProcessExitError) {
-        throw new AgentProcessExitError(this.#redactMcp(error.message), { cause: error.cause });
-      }
-      throw error;
+      throw this.#withExitDetail(error);
     }
   }
 
@@ -1607,8 +1611,9 @@ export class ProviderRuntime implements ProviderPort {
             }),
           });
           return null;
-        } catch (error) {
+        } catch (thrown) {
           if (client) await client.stop().catch(() => undefined);
+          const error = this.#withExitDetail(thrown);
           // The CLI's own words reach the status message and the joined start failure below, so
           // the MCP values go first. `providerFailureStatus` applies only the generic redaction.
           const message = this.#redactMcp(error instanceof Error ? error.message : String(error));
