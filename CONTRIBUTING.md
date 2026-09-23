@@ -88,6 +88,20 @@ own review. Each is optional: leave one out and that half keeps the default. The
 written back, so the next one starts from the defaults again — and the review comment records under
 `Review details` which reviewer actually ran.
 
+Pick the level from the highest-risk file in the diff, not from its size. A one-line migration
+needs a closer read than a large copy change.
+
+| Diff touches | Directive |
+| --- | --- |
+| Only documentation, comments, localization strings, Storybook stories, or tests with no production change | `NorbiAI-Model: chatgpt-web/medium` |
+| Ordinary product code in one workspace | none (the default, `chatgpt-web/high`) |
+| IPC contracts, persisted state, provider processes, queues and crash recovery, the updater, or several workspaces at once | `NorbiAI-Model: chatgpt-web/extra-high` |
+| A [non-negotiable](AGENTS.md#non-negotiable) area: migrations, a released Team API wire protocol, the renderer-to-main trust boundary, secret redaction, or licensing | `NorbiAI-Model: chatgpt-web/pro` |
+
+When unsure between two rows, take the higher one. Do not lower the level to get a faster result on
+a risky change. A slower model on a very large diff can reach the job's time limit: split the pull
+request rather than drop the level.
+
 `NorbiAI-Effort` reaches `gpt-6-astra` only. A `chatgpt-web/*` slug carries its own level — the
 `high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair the effort with
 `gpt-6-astra` or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking for more is
