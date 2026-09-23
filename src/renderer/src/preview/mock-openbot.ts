@@ -537,6 +537,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       notifications: input.notifications ?? true,
       model: input.model ?? "gpt-5.6-luna",
       reasoningEffort: input.reasoningEffort ?? "medium",
+      access: input.access ?? "full",
       threadId: input.threadId ?? `thread-${id}`,
       workspacePath: input.workspacePath ?? `/mock/OpenBot/Agents/${id}`,
       preview: input.preview ?? "No messages yet",

@@ -2070,6 +2070,25 @@ textarea {
     minmax(var(--agent-role-badge-collapsed-width), 1fr);
 }
 
+.agent-row-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.agent-row-access {
+  display: inline-flex;
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+.agent-row-access svg {
+  width: 12px;
+  height: 12px;
+}
+
 .agent-row-title strong,
 .person-row .agent-row-heading strong,
 .channel-row .agent-row-heading strong {
@@ -3092,7 +3111,6 @@ textarea {
   color: var(--openbot-text-primary);
 }
 
-.agent-settings-model,
 .agent-settings-notifications,
 .provider-model-panel,
 .provider-model-rail,

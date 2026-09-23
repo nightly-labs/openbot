@@ -41,6 +41,7 @@ export { default as Info } from "lucide-solid/icons/info";
 export { default as LifeBuoy } from "lucide-solid/icons/life-buoy";
 export { default as Link2 } from "lucide-solid/icons/link-2";
 export { default as LoaderCircle } from "lucide-solid/icons/loader-circle";
+export { default as Lock } from "lucide-solid/icons/lock";
 export { default as LogIn } from "lucide-solid/icons/log-in";
 export { default as LogOut } from "lucide-solid/icons/log-out";
 export { default as Mail } from "lucide-solid/icons/mail";

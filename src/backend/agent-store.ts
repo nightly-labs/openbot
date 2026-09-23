@@ -21,16 +21,19 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentProfileDraft } from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
+  type AgentAccess,
   type AgentModelId,
   type AgentProviderId,
   type AgentReasoningEffort,
   type AgentSummary,
   type AvatarImageInput,
   type CreateAgentInput,
+  DEFAULT_AGENT_ACCESS,
   type DuplicateAgentResult,
   decodeAgentProfileDraft,
   decodeSaveAgentProfileResult,
   defaultProviderModel,
+  isAgentAccess,
   isAgentModel,
   isAvatarHue,
   isAvatarSeed,
@@ -48,10 +51,12 @@ import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isRecord } from "./protocol";
 
-type StoredAgent = AgentSummary;
-type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider"> & {
+type StoredAgent = AgentSummary & { access: AgentAccess };
+type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access"> & {
   avatarUrl?: string | null;
   provider?: AgentProviderId;
+  // Absent on every agent stored before the setting existed, which keeps the access it always had.
+  access?: AgentAccess;
 };
 type StoredAgentBase = Omit<PersistedStoredAgent, "avatarSeed" | "avatarHue"> & DynamicRecord;
 
@@ -302,6 +307,7 @@ export class AgentStore {
     record.provider = source.provider;
     record.model = source.model;
     record.reasoningEffort = source.reasoningEffort;
+    record.access = source.access;
     record.avatarSeed = source.avatarSeed;
     record.avatarHue = source.avatarHue;
 
@@ -515,6 +521,10 @@ export class AgentStore {
     if (input.reasoningEffort !== undefined) {
       if (!isReasoningEffort(input.reasoningEffort)) throw new Error("Invalid reasoning effort.");
       next.reasoningEffort = input.reasoningEffort;
+    }
+    if (input.access !== undefined) {
+      if (!isAgentAccess(input.access)) throw new Error("Invalid agent access.");
+      next.access = input.access;
     }
     if (input.avatarSeed !== undefined) {
       if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
@@ -1107,6 +1117,7 @@ export class AgentStore {
       provider: DEFAULT_AGENT_PROVIDER,
       model: DEFAULT_AGENT_MODEL,
       reasoningEffort: DEFAULT_REASONING_EFFORT,
+      access: DEFAULT_AGENT_ACCESS,
       threadId: null,
       workspacePath: join(this.#agentsRoot, id),
       preview: NEW_AGENT_PREVIEW,
@@ -1318,6 +1329,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
   const record = value;
   return (
     (record.provider === undefined || isOneOf(AGENT_PROVIDERS, record.provider)) &&
+    (record.access === undefined || isAgentAccess(record.access)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     isMarketplaceSource(record.marketplaceSource)
@@ -1368,6 +1380,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
   const model = isAgentModel(value.model)
     ? value.model
     : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : defaultProviderModel(provider));
+  const access =
+    value.access === undefined || isAgentAccess(value.access) ? value.access : reset("access", DEFAULT_AGENT_ACCESS);
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {
@@ -1397,6 +1411,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     avatarHue: value.avatarHue === null || isAvatarHue(value.avatarHue) ? value.avatarHue : reset("avatarHue", null),
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
+    ...(access === undefined ? {} : { access }),
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
   };
   return { agent, repaired };
@@ -1454,6 +1469,7 @@ function migrateLegacyAgent(agent: LegacyStoredAgent): StoredAgent {
     provider: providerForLegacyModel(agent.model),
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
+    access: DEFAULT_AGENT_ACCESS,
     threadId: agent.threadId,
     workspacePath: agent.workspacePath,
     preview: agent.preview,
@@ -1468,6 +1484,7 @@ function normalizeStoredAgent(agent: PersistedStoredAgent): StoredAgent {
   return {
     ...agent,
     provider: agent.provider ?? providerForLegacyModel(agent.model),
+    access: agent.access ?? DEFAULT_AGENT_ACCESS,
     avatarUrl: isString(agent.avatarUrl) && parseAgentAvatarUrl(agent.avatarUrl, agent.id) ? agent.avatarUrl : null,
     ...(agent.marketplaceSource === undefined
       ? {}

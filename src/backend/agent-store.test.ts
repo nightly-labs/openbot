@@ -465,17 +465,17 @@ describe("AgentStore", () => {
     const threadId = await store.ensureThreadId("chief");
     const workspacePath = store.list().find((agent) => agent.id === "chief")?.workspacePath;
 
-    // Four values a released build stored and a later one cannot read: a model id the provider CLI
-    // renamed under a running install, an effort and a hue from a release the user has since left, and
-    // a marketplace source written as SQL `null`. Every one of them used to stop the app from starting.
+    // Values a released build stored and a later one cannot read: a model id the provider CLI renamed
+    // under a running install, an effort and a hue from a release the user has since left, a marketplace
+    // source written as SQL `null`, and an access mode a newer release added. Every one of them used to stop the app from starting.
     store.database.connection
       .prepare(
         `UPDATE projection_agents SET agent_json = json_set(agent_json,
            '$.model', ?, '$.reasoningEffort', ?, '$.avatarSeed', ?, '$.avatarHue', ?,
-           '$.marketplaceSource', json('null'))
+           '$.marketplaceSource', json('null'), '$.access', ?)
          WHERE agent_id = ?`,
       )
-      .run("claude fable 5.1 (1m)", "ultra", "Chief Seed", 7, "chief");
+      .run("claude fable 5.1 (1m)", "ultra", "Chief Seed", 7, "root", "chief");
 
     const repaired = new AgentStore(userData, home);
     await repaired.initialize();
@@ -492,6 +492,7 @@ describe("AgentStore", () => {
       // there is. It is the floor of the range, which is the safe direction for a repair: it costs
       // thinking on the next turn rather than money the user did not ask to spend.
       reasoningEffort: "low",
+      access: "full",
       avatarSeed: "chief",
       avatarHue: null,
     });
@@ -501,6 +502,7 @@ describe("AgentStore", () => {
     expect(repaired.database.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
       model: "claude-opus-5-5",
       reasoningEffort: "low",
+      access: "full",
       avatarSeed: "chief",
       avatarHue: null,
     });
@@ -624,6 +626,7 @@ describe("AgentStore", () => {
       provider: "claude",
       model: "claude-opus-5",
       reasoningEffort: "high",
+      access: "workspace",
       avatarSeed: "research:avatar",
       avatarHue: 215,
     });
@@ -656,6 +659,7 @@ describe("AgentStore", () => {
       provider: "claude",
       model: "claude-opus-5",
       reasoningEffort: "high",
+      access: "workspace",
       threadId: null,
       preview: "No messages yet",
       updatedAt: null,
@@ -941,6 +945,7 @@ describe("AgentStore", () => {
       notifications: false,
       model: "gpt-5.6-sol",
       reasoningEffort: "high",
+      access: "workspace",
       avatarSeed: "chief:avatar:2:4",
       avatarHue: 215,
     });
@@ -953,9 +958,29 @@ describe("AgentStore", () => {
       notifications: false,
       model: "gpt-5.6-sol",
       reasoningEffort: "high",
+      access: "workspace",
       avatarSeed: "chief:avatar:2:4",
       avatarHue: 215,
     });
+  });
+
+  it("gives new agents and agents stored before the access setting full access", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbot-store-access-"));
+    temporaryRoots.push(root);
+    const userData = join(root, "user-data");
+    const home = join(root, "home");
+    const store = new AgentStore(userData, home);
+    await store.initialize();
+    expect((await store.getOrCreate("chief")).access).toBe("full");
+    await store.updateAgent({ agentId: "chief", access: "workspace" });
+    // A profile an older release wrote has no access key.
+    store.database.connection
+      .prepare("UPDATE projection_agents SET agent_json = json_remove(agent_json, '$.access') WHERE agent_id = ?")
+      .run("chief");
+
+    const restored = new AgentStore(userData, home);
+    await restored.initialize();
+    expect(restored.list().find((agent) => agent.id === "chief")?.access).toBe("full");
   });
 
   it("stores, restores, and removes managed agent avatar files", async () => {

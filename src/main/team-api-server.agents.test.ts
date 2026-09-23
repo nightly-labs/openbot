@@ -239,6 +239,35 @@ describe("TeamApiServer agents", () => {
     expect(updateAgent).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps agent access on the computer that runs the agent", async () => {
+    const fixture = opencodeFixture[0];
+    if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");
+    const source: AgentSummary = { ...fixture, access: "workspace" };
+    const updateAgent = vi.fn(async () => source);
+    const { start, signIn } = await createTeamApiFixture("agent-access", { configure: true });
+    const { base } = await start({
+      appVersion: "1.0.0",
+      agents: createAgents({ listAgents: () => [source], updateAgent }),
+    });
+    const token = await signIn({ protocol: 4, appVersion: "1.0.0" });
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      [TEAM_PROTOCOL_VERSION_HEADER]: "4",
+      [TEAM_APP_VERSION_HEADER]: "1.0.0",
+      "Content-Type": "application/json",
+    };
+
+    const list = await fetch(`${base}/v1/agents`, { headers });
+    expect(await list.json()).toEqual([expect.not.objectContaining({ access: expect.anything() })]);
+    const update = await fetch(`${base}/v1/agents/${source.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name: "Renamed", access: "full" }),
+    });
+    expect(update.status).toBe(200);
+    expect(updateAgent).toHaveBeenCalledWith({ agentId: source.id, name: "Renamed" });
+  });
+
   it("hides only the agent a client's protocol cannot describe", async () => {
     const source = opencodeFixture[0];
     if (!isAgentSummary(source)) throw new Error("Invalid agent fixture.");

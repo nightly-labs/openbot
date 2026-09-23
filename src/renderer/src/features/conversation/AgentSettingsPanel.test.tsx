@@ -509,6 +509,46 @@ describe("AgentSettingsPanel", () => {
     expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Sol" })).toBeInTheDocument();
   });
 
+  it("asks before it gives a Workspace only agent full access", async () => {
+    const onUpdateAgent = vi.fn(async () => undefined);
+    render(() => (
+      <SharedAgentSettingsPanel
+        agent={{ ...STORY_AGENTS[0], access: "workspace" }}
+        accessEditable
+        runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
+        agentStatus={STORY_AGENT_STATUS}
+        modelOptions={STORY_MODELS}
+        working={false}
+        width={296}
+        maxWidth={() => 640}
+        onClose={vi.fn()}
+        onResize={vi.fn()}
+        onResizeEnd={vi.fn()}
+        onUpdateAgent={onUpdateAgent}
+        onUpdateRuntimeSettings={vi.fn(async () => true)}
+        onSetAgentAvatar={vi.fn(async () => undefined)}
+      />
+    ));
+    expect(await screen.findByText(/Not enforced yet/)).toBeInTheDocument();
+    const chooseFullAccess = async () => {
+      await fireEvent.pointerDown(screen.getByRole("button", { name: /Agent access/ }), {
+        pointerType: "mouse",
+        button: 0,
+      });
+      await fireEvent.click(screen.getByRole("option", { name: "Full access" }));
+      return screen.findByRole("alertdialog", { name: "Give this agent full access?" });
+    };
+
+    await fireEvent.click(within(await chooseFullAccess()).getByRole("button", { name: "Keep workspace only" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Agent access/ })).toHaveTextContent("Workspace only");
+    expect(onUpdateAgent).not.toHaveBeenCalled();
+
+    await fireEvent.click(within(await chooseFullAccess()).getByRole("button", { name: "Allow full access" }));
+    await waitFor(() => expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, { access: "full" }));
+    expect(screen.getByRole("button", { name: /Agent access/ })).toHaveTextContent("Full access");
+  });
+
   it("states that Claude acts without approval prompts", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;

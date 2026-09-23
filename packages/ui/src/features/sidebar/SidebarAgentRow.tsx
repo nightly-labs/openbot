@@ -1,6 +1,6 @@
 /** One agent in a section: the drag wrapper, the row itself, and its context menu. */
 
-import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
+import { Badge, buttonVariants, ContextMenu, Lock } from "@openbot/ui";
 import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -20,6 +20,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
     startChatDragging,
   } = useSidebarScope();
   const title = () => rowProps.agent.title.trim();
+  const accessLabel = () => (rowProps.agent.access === "workspace" ? ". Workspace only (not enforced yet)" : "");
   const routineLabel = () => {
     const state = props.agentStates[rowProps.agent.id];
     return state?.kind === "routine" ? sidebarAgentStateLabel(state) : "";
@@ -52,7 +53,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
               "sidebar-agent-row-dragging": draggedChatId() === rowProps.agent.id,
             },
           ]}
-          aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}. ${rowProps.agent.preview}${routineLabel() ? `. ${routineLabel()}` : ""}`}
+          aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}${accessLabel()}. ${rowProps.agent.preview}${routineLabel() ? `. ${routineLabel()}` : ""}`}
           title={routineLabel() || undefined}
           aria-pressed={props.activeAgentId === rowProps.agent.id ? "true" : "false"}
           onClick={(event: MouseEvent) => {
@@ -66,7 +67,14 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
           <span class="agent-row-copy">
             <span class="agent-row-heading">
               <span class="agent-row-title">
-                <strong>{rowProps.agent.name}</strong>
+                <span class="agent-row-name">
+                  <strong>{rowProps.agent.name}</strong>
+                  <Show when={rowProps.agent.access === "workspace"}>
+                    <span class="agent-row-access" title="Workspace only (not enforced yet)">
+                      <Lock aria-hidden="true" />
+                    </span>
+                  </Show>
+                </span>
                 <Show when={title()}>
                   {(label) => (
                     <Badge class="agent-role-badge" size="sm" title={label()}>

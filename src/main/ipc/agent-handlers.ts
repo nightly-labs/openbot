@@ -463,11 +463,16 @@ function routeUpdateAgent(
 ) {
   return routeToServer(serverId, {
     local: () => service.updateAgent(input),
-    remote: (target) =>
-      remoteServers.request(target, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+    remote: (target) => {
+      // The Team API does not carry access, and a team member must not be able to widen it.
+      if (input.access !== undefined) {
+        throw new Error("Agent access can only be changed on the computer that runs the agent.");
+      }
+      return remoteServers.request(target, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
         method: "PATCH",
         body: input,
-      }),
+      });
+    },
   });
 }
 
