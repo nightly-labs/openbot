@@ -147,10 +147,12 @@ agent tool results expose `openerTabId` while that relationship is live. Indepen
 tabs survive parent closure; dependent popups close with the parent. Closing a popup returns to its
 opener. Saved popup URLs omit OAuth callback credentials. Popup state is not restored as a live
 JavaScript relationship after an app restart.
-Secure input cards are unavailable in both sides of a native opener connection; those tabs require
-human takeover for passwords and codes. This restriction lasts for the tab lifetime, including after
-popup closure or navigation, because connected pages can retain document references. Independent
-tabs remain eligible for secure input. Account selection without secret entry remains automated.
+Connected pages in a native opener group can retain references to each other's documents, including
+a document that received a secret. The browser blocks that access between sites, so a secure input
+card is available in a connected tab only when no frame in another live connected tab has the
+secret's site. The host checks this when the card opens and again before the fill; otherwise the tab
+requires human takeover. The site check uses the last two host labels, which can refuse two sites
+under one public suffix but cannot allow one site. Independent tabs remain eligible for secure input. Account selection without secret entry remains automated.
 Agents use `list_tabs` after sign-in actions and inspect the new tab before continuing. Secure input
 and takeover still handle passwords, codes, CAPTCHA, and passkeys. Blocked requests produce a
 reason without including authentication URLs or request data.
@@ -1174,8 +1176,11 @@ resolves fields before consent and checks the document and origin again before e
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
 or an uncertain submission. After a completed submit action without document replacement, the host
-waits up to five seconds, then loads the current URL with GET to replace the document without replaying
-a form POST. Failure retains protection and falls back to takeover. A new document releases it and
+waits up to five seconds, then empties the filled fields. When every field is empty and an automation-world scan finds the
+value in no title, URL, text node, value, or attribute, including open shadow roots, it keeps the
+document so a single-page sign-in can show its next step, and blocks evaluation and recording in the
+opener group until a main-frame navigation, which also clears history. Otherwise it loads the current
+URL with GET to replace the document without replaying a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.

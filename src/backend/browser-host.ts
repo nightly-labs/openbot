@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { isIP } from "node:net";
 import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -145,6 +146,13 @@ interface InternalTab {
   openerTabId?: string;
   /** Retained document references can outlive popup closure and navigation. */
   hasSharedBrowsingContext?: boolean;
+  /**
+   * The current document received a secret and was kept, with its filled fields empty and no
+   * readable copy of the value, so a
+   * single-page sign-in can show its next step. Page code can still hold the value, so evaluation
+   * and recording stay blocked in its opener group until a main-frame navigation replaces it.
+   */
+  secretDocument?: boolean;
   popup: boolean;
   popupFailure?: BrowserTab["popupFailure"];
   closing?: boolean;
@@ -538,10 +546,9 @@ export class BrowserHost {
     this.#requireToolTab(params, args.tabId);
     const tab = this.#requireTab(args.tabId);
     if (tab.secret) throw new Error("Authentication is already active.");
-    if (tab.hasSharedBrowsingContext)
-      throw new Error("Secure input is unavailable in tabs with shared popup contexts. Use takeover.");
     const url = new URL(currentTabUrl(tab));
     if (url.protocol !== "https:") throw new Error("Secure authentication requires HTTPS.");
+    this.#requireIsolatedFromConnectedTabs(tab, url.origin);
     if (args.method !== "password" && args.digits === 0) throw new Error("Authentication codes require 4–12 digits.");
     if (
       (args.method === "password" && args.targets.length !== 1) ||
@@ -554,7 +561,7 @@ export class BrowserHost {
     this.#invalidateViews(tab);
     this.#syncAttachedView();
     try {
-      const enter = await this.#enqueue(
+      const entry = await this.#enqueue(
         args.tabId,
         async (_tab, keepQueueBlocked) => {
           await this.#recorder.discard(args.tabId, "requested");
@@ -581,19 +588,22 @@ export class BrowserHost {
         },
         submit: async (secret) => {
           if (tab.secret !== protection || protection.submitted) throw new Error("Authentication request expired.");
+          // A connected page can navigate to the secret's site while the card is open.
+          this.#requireIsolatedFromConnectedTabs(tab, url.origin);
           if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
             throw new Error("Enter the requested number of digits.");
           protection.submitted = true;
           this.#invalidateViews(tab);
           protection.running = true;
           this.#syncAttachedView();
+          let kept = false;
           try {
             await this.#enqueue(
               args.tabId,
               async (_tab, keepQueueBlocked) => {
                 await this.#boundEngineOperation(
                   tab,
-                  enter(secret),
+                  entry.enter(secret),
                   10_000,
                   "Authentication submission timed out.",
                   keepQueueBlocked,
@@ -613,6 +623,18 @@ export class BrowserHost {
                   });
                 }
                 if (!protection.replaced) {
+                  // A reload would restart a single-page sign-in at its first step. Keep the
+                  // document when its fields are empty and nothing a snapshot reads shows the value.
+                  const cleared = await this.#boundEngineOperation(
+                    tab,
+                    entry.clear(secret),
+                    10_000,
+                    "Authentication field cleanup timed out.",
+                    keepQueueBlocked,
+                  ).catch(() => false);
+                  if (cleared && !protection.replaced) kept = true;
+                }
+                if (!protection.replaced && !kept) {
                   // Load with GET rather than replaying a possible form POST. Keep capture
                   // blocked until navigation has replaced the document and this operation ends.
                   await this.#boundEngineOperation(
@@ -633,10 +655,14 @@ export class BrowserHost {
               tab.contents.navigationHistory.clear();
               tab.secret = undefined;
               this.#syncAttachedView();
+            } else if (kept) {
+              tab.secretDocument = true;
+              tab.secret = undefined;
+              this.#syncAttachedView();
             }
             this.#emitChanged();
           }
-          return protection.replaced ? "submitted" : "takeover";
+          return protection.replaced || kept ? "submitted" : "takeover";
         },
       };
     } catch {
@@ -644,6 +670,42 @@ export class BrowserHost {
       this.#syncAttachedView();
       throw new Error("Secure authentication is unavailable. Use browser takeover.");
     }
+  }
+
+  /**
+   * Pages in one opener group can keep references to each other's documents, including a document
+   * that received a secret and was later replaced. The browser blocks that access between sites, so
+   * secure input is allowed in a connected tab only when no frame in another connected tab has the
+   * secret's site.
+   */
+  #requireIsolatedFromConnectedTabs(tab: InternalTab, origin: string): void {
+    if (!tab.hasSharedBrowsingContext) return;
+    const site = approximateSite(origin);
+    for (const connected of this.#connectedTabs(tab)) {
+      if (connected === tab || connected.contents.isDestroyed()) continue;
+      const origins = connected.contents.mainFrame.framesInSubtree.map((frame) => frame.origin);
+      if (origins.some((frameOrigin) => frameOrigin !== "null" && approximateSite(frameOrigin) === site))
+        throw new Error(
+          "Secure input is unavailable while a connected popup or opener tab shows the same site. Use takeover.",
+        );
+    }
+  }
+
+  #requireNoSecretDocument(tab: InternalTab, action: string): void {
+    if ([...this.#connectedTabs(tab)].some((connected) => connected.secretDocument))
+      throw new Error(
+        `${action} is unavailable while a page that received a secret is open. Use snapshots and actions until it navigates.`,
+      );
+  }
+
+  #connectedTabs(tab: InternalTab): Set<InternalTab> {
+    const connected = new Set([tab]);
+    for (const current of connected) {
+      for (const candidate of this.#tabs.values()) {
+        if (candidate.openerTabId === current.id || candidate.id === current.openerTabId) connected.add(candidate);
+      }
+    }
+    return connected;
   }
 
   endTakeover(tabId: string): void {
@@ -1052,7 +1114,10 @@ export class BrowserHost {
           const { args } = call;
           const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          await this.#enqueue(tabId, (tab) => this.#recorder.start(tabId, tab.contents));
+          await this.#enqueue(tabId, (tab) => {
+            this.#requireNoSecretDocument(tab, "Recording");
+            return this.#recorder.start(tabId, tab.contents);
+          });
           return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
         }
         case "recording_stop": {
@@ -1422,6 +1487,10 @@ export class BrowserHost {
     });
     contents.on("page-title-updated", changed);
     contents.on("did-navigate", (_event, url) => {
+      if (tab.secretDocument) {
+        tab.secretDocument = false;
+        contents.navigationHistory.clear();
+      }
       if (tab.secret?.submitted) {
         tab.secret.replaced = true;
         if (!tab.secret.running) {
@@ -1806,6 +1875,7 @@ export class BrowserHost {
     const tab = this.#requireTab(tabId);
     const started = tab.queue.then(() => {
       if (tab.secret) throw new Error("Browser inspection is protected during authentication. Use takeover.");
+      this.#requireNoSecretDocument(tab, "Page evaluation");
       const deadline = Date.now() + timeoutMs;
       const timeoutMessage = "Browser evaluate timed out.";
       let unwound: Promise<void> | undefined;
@@ -2362,6 +2432,17 @@ function toPublicTab(tab: InternalTab): BrowserTab {
     ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
     ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
   };
+}
+
+/**
+ * Returns the last two host labels, or the whole host for an IP address. Without the public suffix
+ * list, this can join two sites (for example under `co.uk`) but never splits one site, so a match
+ * can only refuse secure input, not permit it.
+ */
+function approximateSite(origin: string): string {
+  const hostname = new URL(origin).hostname;
+  if (isIP(hostname.replace(/^\[|\]$/gu, "")) !== 0) return hostname;
+  return hostname.split(".").slice(-2).join(".");
 }
 
 /** A restored tab that has not loaded yet shows a blank page; its host name stands in for its title. */

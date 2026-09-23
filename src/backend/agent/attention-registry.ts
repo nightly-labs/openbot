@@ -14,6 +14,7 @@ import type {
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { PreparedBrowserSecret } from "../browser-host";
 import {
@@ -47,6 +48,8 @@ import {
 } from "./prompts";
 import { compactRuntimeApproval, compactRuntimeQuestion } from "./runtime-snapshot";
 import { isDynamicToolCall } from "./thread-items";
+
+const logger = createOpenBotLogger("attention-registry");
 
 interface PendingPrompt {
   client: AgentClient;
@@ -496,10 +499,17 @@ export class AttentionRegistry {
           this.#routines.markNeedsAttention(turnId);
           this.#emit({ type: "browser-takeover-requested", request: takeover });
         },
-        () => {
+        (error: unknown) => {
+          logger.warn("Unable to prepare browser takeover", { tool: params.tool, error: toLogValue(error) });
           if (this.#takeovers.get(requestId) !== pending) return;
           this.#takeovers.delete(requestId);
-          resolve(browserTakeoverError());
+          // Secure input refusals are fixed host messages, such as "Use takeover." The agent needs the
+          // reason to pick request_takeover instead of retrying. No secret exists before the card opens.
+          resolve(
+            params.tool === "submit_secret" && error instanceof Error
+              ? browserTakeoverError(error.message)
+              : browserTakeoverError(),
+          );
           this.#emitRuntimeSnapshot();
         },
       );

@@ -1078,3 +1078,55 @@ it.each(["submitted", "takeover"] as const)(
     ).rejects.toThrow("no longer active");
   },
 );
+
+it("returns the secure input refusal so the agent can request takeover", async () => {
+  const client = new FakeAgentClient("codex");
+  const tabs: BrowserTab[] = [];
+  const browser = {
+    ...fakeBrowser(tabs),
+    prepareSecret: async () => {
+      throw new Error("Secure input is unavailable in tabs with shared popup contexts. Use takeover.");
+    },
+  };
+  const { store, mailbox } = stores(root);
+  service = createTestService({ store, mailbox, browser, preferredProvider: "codex", clientFactory: () => client });
+  const events: AgentEvent[] = [];
+  service.on("event", (event) => events.push(structuredClone(event)));
+  await service.initialize();
+  await service.sendMessage({ agentId: "chief", text: "Sign in" });
+  await waitFor(() => events.some((event) => event.type === "turn-started"));
+  const started = events.find((event) => event.type === "turn-started");
+  const threadId = store.activeProviderSession("chief")?.externalSessionId;
+  if (!started || !threadId) throw new Error("Turn did not start.");
+  tabs.push({
+    id: "popup-tab",
+    title: "Sign in",
+    url: "https://example.com",
+    ownerThreadId: started.threadId,
+    ownerAgentId: "chief",
+    loading: false,
+  });
+  client.emit("request", {
+    method: "item/tool/call",
+    id: "auth-request",
+    params: {
+      namespace: "openbot_browser",
+      tool: "submit_secret",
+      threadId,
+      turnId: started.turnId,
+      callId: "auth-request",
+      arguments: { tabId: "popup-tab" },
+    },
+  });
+  await waitFor(() => client.responses.length === 1);
+  expect(client.responses[0]?.result).toEqual({
+    success: false,
+    contentItems: [
+      {
+        type: "inputText",
+        text: "Secure input is unavailable in tabs with shared popup contexts. Use takeover.",
+      },
+    ],
+  });
+  expect(service.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
+});

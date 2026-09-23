@@ -154,7 +154,7 @@ export class BrowserCdpEngine {
     origin: string,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
-  ): Promise<(secret: string) => Promise<void>> {
+  ): Promise<{ enter: (secret: string) => Promise<void>; clear: (secret: string) => Promise<boolean> }> {
     const generation = this.#navigationGeneration;
     const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
     const nodes = await this.#lease(async (send) => {
@@ -182,7 +182,7 @@ export class BrowserCdpEngine {
       return { inputs, button, fingerprints };
     });
     if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-    return async (secret) => {
+    const enter = async (secret: string) => {
       try {
         await this.#lease(async (send) => {
           if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
@@ -249,6 +249,30 @@ export class BrowserCdpEngine {
         throw new Error("Secure authentication could not be completed. Take over to check the page.");
       }
     };
+    /**
+     * Empties the filled fields, attached or detached, and reports whether the document is now free
+     * of the value: every field is empty and no title, URL, text, value or attribute contains it.
+     */
+    const clear = (secret: string) =>
+      this.#lease(async (send) => {
+        for (const node of nodes.inputs) {
+          const cleared = await this.#callOnNode(
+            send,
+            node.backendNodeId,
+            `function() { this.value = ''; return this.value === ''; }`,
+            [],
+          ).catch(() => false);
+          if (cleared !== true) return false;
+        }
+        const scan = await send("Runtime.callFunctionOn", {
+          executionContextId: await automationContextId(send),
+          functionDeclaration: SECRET_SCAN_FUNCTION,
+          arguments: [{ value: secret }],
+          returnByValue: true,
+        });
+        return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
+      }).catch(() => false);
+    return { enter, clear };
   }
   #retainDebugger = false;
   #ownsDebugger = false;
@@ -2751,6 +2775,27 @@ async function waitForDomQuietAcrossTargets(
     throw new Error("DOM did not become quiet.");
   }
 }
+
+/** Runs in the automation world. Returns true when the document shows the value anywhere a snapshot reads. */
+const SECRET_SCAN_FUNCTION = `function(secret) {
+  const found = (value) => typeof value === 'string' && value.includes(secret);
+  if (found(document.title) || found(location.href)) return true;
+  const walk = (root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.currentNode; node; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (found(node.data)) return true;
+        continue;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      if ('value' in node && found(String(node.value))) return true;
+      for (const attribute of node.attributes) if (found(attribute.value)) return true;
+      if (node.shadowRoot && walk(node.shadowRoot)) return true;
+    }
+    return false;
+  };
+  return walk(document);
+}`;
 
 async function automationContextId(send: SendCommand, sessionId?: string): Promise<number> {
   const tree = await send("Page.getFrameTree", {}, sessionId);
