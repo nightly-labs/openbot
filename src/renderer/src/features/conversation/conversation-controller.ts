@@ -310,7 +310,7 @@ export function createServerConversationState() {
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
-  const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-5.6-luna");
+  const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
   const [browserAddress, setBrowserAddress] = createSignal("https://www.google.com");
   const [browserAddressEditing, setBrowserAddressEditing] = createSignal(false);

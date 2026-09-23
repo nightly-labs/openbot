@@ -187,7 +187,7 @@ describe("ProviderModelPicker", () => {
     );
 
     await fireEvent.click(within(dialog).getByRole("tab", { name: /Claude:/ }));
-    expect(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" })).toBeDisabled();
+    expect(within(dialog).getByRole("option", { name: "Claude Opus 5.5, default" })).toBeDisabled();
     expect(onChange).not.toHaveBeenCalled();
   });
 
