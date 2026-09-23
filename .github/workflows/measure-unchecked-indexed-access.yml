@@ -1,0 +1,126 @@
+name: Measure noUncheckedIndexedAccess
+
+# Temporary measurement. Do not merge. It counts the errors that
+# `noUncheckedIndexedAccess` would add, for each project, without a change to
+# any tsconfig. The normal CI stops at the first failed project, so it cannot
+# give the full count. This job continues after each failure and passes; the
+# step summary is the result.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/measure-unchecked-indexed-access.yml
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: Measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      # A fresh checkout has no `expo-env.d.ts` or uniwind declarations.
+      - name: Generate mobile declarations
+        run: bun run --cwd apps/mobile codegen
+
+      - name: Typecheck each project with the flag
+        shell: bash
+        run: |
+          set -u
+          mkdir -p tsc-logs
+          # name|directory|tsconfig
+          projects=(
+            "node|.|tsconfig.node.json"
+            "renderer|.|tsconfig.web.json"
+            "storybook|.|tsconfig.storybook.json"
+            "contracts|packages/contracts|tsconfig.json"
+            "brand|packages/brand|tsconfig.json"
+            "logging|packages/logging|tsconfig.json"
+            "user-errors|packages/user-errors|tsconfig.json"
+            "i18n|packages/i18n|tsconfig.json"
+            "team-client|packages/team-client|tsconfig.json"
+            "auth-api|apps/auth-api|tsconfig.json"
+            "site-router|apps/site-router|tsconfig.json"
+            "mobile|apps/mobile|tsconfig.json"
+            "remote-api|remote/api|tsconfig.json"
+          )
+          for entry in "${projects[@]}"; do
+            IFS='|' read -r name directory tsconfig <<< "$entry"
+            echo "::group::$name"
+            bun run --cwd "$directory" tsc --noEmit -p "$tsconfig" \
+              --noUncheckedIndexedAccess --pretty false > "tsc-logs/$name.log" 2>&1
+            echo "$?" > "tsc-logs/$name.exit"
+            if [ "$directory" = "." ]; then prefix=""; else prefix="$directory/"; fi
+            # tsc prints paths relative to its working directory. The prefix
+            # makes them relative to the repository root, so that projects
+            # that include the same file report the same error once.
+            { grep -E '^[^ ].*\([0-9]+,[0-9]+\): error TS[0-9]+' "tsc-logs/$name.log" || true; } \
+              | sed "s|^|$prefix|" > "tsc-logs/$name.errors"
+            echo "$name: $(wc -l < "tsc-logs/$name.errors") errors, exit $(cat "tsc-logs/$name.exit")"
+            echo "::endgroup::"
+          done
+
+      - name: Summarize
+        shell: bash
+        run: |
+          set -u
+          cat tsc-logs/*.errors \
+            | sed -E 's/^(.*\([0-9]+,[0-9]+\): error TS[0-9]+):.*/\1/' \
+            | sort -u > tsc-logs/unique.txt
+          raw=$(cat tsc-logs/*.errors | wc -l)
+          unique=$(wc -l < tsc-logs/unique.txt)
+          files=$(sed -E 's/\([0-9]+,[0-9]+\).*//' tsc-logs/unique.txt | sort -u | wc -l)
+          {
+            echo "# noUncheckedIndexedAccess"
+            echo
+            echo "**$unique unique errors in $files files** ($raw before duplicates are removed)."
+            echo
+            echo "## Projects"
+            echo
+            echo "| Project | Errors | tsc exit |"
+            echo "| --- | ---: | ---: |"
+            for errors in tsc-logs/*.errors; do
+              name=$(basename "$errors" .errors)
+              echo "| $name | $(wc -l < "$errors") | $(cat "tsc-logs/$name.exit") |"
+            done
+            echo
+            echo "A non-zero exit with 0 errors is a failure that is not a type error. Read the log."
+            echo
+            echo "## Error codes"
+            echo
+            echo "| Code | Errors |"
+            echo "| --- | ---: |"
+            grep -oE 'TS[0-9]+$' tsc-logs/unique.txt | sort | uniq -c | sort -rn \
+              | awk '{ print "| " $2 " | " $1 " |" }'
+            echo
+            echo "## Directories"
+            echo
+            echo "| Directory | Errors |"
+            echo "| --- | ---: |"
+            sed -E 's/\([0-9]+,[0-9]+\).*//' tsc-logs/unique.txt | cut -d/ -f1-2 \
+              | sort | uniq -c | sort -rn | awk '{ print "| " $2 " | " $1 " |" }'
+            echo
+            echo "## 25 files with the most errors"
+            echo
+            echo "| File | Errors |"
+            echo "| --- | ---: |"
+            sed -E 's/\([0-9]+,[0-9]+\).*//' tsc-logs/unique.txt \
+              | sort | uniq -c | sort -rn | head -25 | awk '{ print "| " $2 " | " $1 " |" }'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: no-unchecked-indexed-access-logs
+          path: tsc-logs/
