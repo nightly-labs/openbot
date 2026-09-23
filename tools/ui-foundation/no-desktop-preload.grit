@@ -10,9 +10,5 @@ or {
   `globalThis["openbot"]`,
   `globalThis?.["openbot"]`
 } as $access where {
-  register_diagnostic(
-    span=$access,
-    message="Shared UI must receive platform actions through props, not the desktop preload.",
-    severity="error"
-  )
+  register_diagnostic(span=$access, message="Shared UI must receive platform actions through props, not the desktop preload.", severity="error")
 }
