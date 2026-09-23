@@ -21,6 +21,13 @@
         "installedBytes": 360000000,
         "executable": "bin/codex"
       },
+      "linux-arm64": {
+        "asset": "codex-package-aarch64-unknown-linux-musl.tar.gz",
+        "assetSha256": "fc395cb043a1093ab0db34f44aba3199bfaa9ce640cd9be7fd588f44b0da64a4",
+        "downloadBytes": 117238842,
+        "installedBytes": 330000000,
+        "executable": "bin/codex"
+      },
       "win32-x64": {
         "asset": "codex-package-x86_64-pc-windows-msvc.tar.gz",
         "assetSha256": "a6ef3442cb12766a88b39311d79244289e4f9763e2c53ff4fbebc2cb653cc5f3",
@@ -53,6 +60,16 @@
         "assetSha256": "f07fcb22da213dae5c03bdc01c37f4cc0588441e1128220102fdeb8f25f4dd63",
         "binarySha256": "26d020351e8112f4006790f3cfce43b4c9df0c1bb1d0e542364d64151b81d5ba",
         "downloadBytes": 96941292,
+        "installedBytes": 250000000,
+        "executable": "claude",
+        "platformDirectory": "linux"
+      },
+      "linux-arm64": {
+        "package": "@anthropic-ai/claude-agent-sdk-linux-arm64",
+        "asset": "claude-agent-sdk-linux-arm64-0.3.263.tgz",
+        "assetSha256": "9636bbd457bddc1fc696f4c095e5910e1ddc8dce19265b90fa61b10282ee7a13",
+        "binarySha256": "7d25d7c8ae6c6e009cc7dae4e817f674179fd31fb7761bcd56fee4c2902b4c03",
+        "downloadBytes": 97379798,
         "installedBytes": 250000000,
         "executable": "claude",
         "platformDirectory": "linux"
@@ -96,6 +113,16 @@
         "executable": "opencode",
         "platformDirectory": "linux"
       },
+      "linux-arm64": {
+        "package": "opencode-linux-arm64",
+        "asset": "opencode-linux-arm64-1.18.30.tgz",
+        "assetSha256": "1e20b66e76afbb7c1e5cd9be7515d2744cb4ea3476ff57add1f7e9ad6fb3a32d",
+        "binarySha256": "01edb5839aa10d5b09133fedcb335a062ecad6e82552933bb14f71756f2b296b",
+        "downloadBytes": 59985069,
+        "installedBytes": 200000000,
+        "executable": "opencode",
+        "platformDirectory": "linux"
+      },
       "win32-x64": {
         "package": "opencode-windows-x64",
         "asset": "opencode-windows-x64-1.18.30.tgz",
@@ -130,6 +157,14 @@
         "assetSha256": "ad2510e8d7edcfe04fbdd25fa0f19dd1fb5babc8b238532b06e4bf3548d210ad",
         "downloadBytes": 156995968,
         "installedBytes": 170000000,
+        "executable": "grok",
+        "platformDirectory": "linux"
+      },
+      "linux-arm64": {
+        "asset": "grok-1.0.22-linux-aarch64",
+        "assetSha256": "85ca59e425db9040451ff37b89c865772be2ccf949638702c3c0d1c2210e0963",
+        "downloadBytes": 130906472,
+        "installedBytes": 150000000,
         "executable": "grok",
         "platformDirectory": "linux"
       },
@@ -186,6 +221,18 @@
         "downloadBytes": 30603028,
         "files": {
           "cua-driver": "3739101d072bdfdd83b7e70b3a16d9271f6eb124e7c5e69b3406f20f0910a4ca",
+          "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
+          "wayland-helper/README.md": "0c38155388bdb5b3a276c4d434fbc5311ed7bb775ae6b04969f50de81c8c2703",
+          "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
+          "wayland-helper/winrects@cua/extension.js": "27aac56799574ecd201e810d32772d3695d8b6ace5ab4a68d026648009004eed"
+        }
+      },
+      "linux-arm64": {
+        "asset": "cua-driver-rs-0.28.2-linux-arm64-binary.tar.gz",
+        "assetSha256": "55e8a32839a4ac369a773df4dac87b345bd4567779221ade4a5e39223a45a2e8",
+        "downloadBytes": 30639613,
+        "files": {
+          "cua-driver": "7bf81867627620c72a01a6bb514cc5af650a33a94cf5122b270aa09d07ce4161",
           "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
           "wayland-helper/README.md": "0c38155388bdb5b3a276c4d434fbc5311ed7bb775ae6b04969f50de81c8c2703",
           "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
@@ -311,6 +358,15 @@
         "assetSha256": "129ae8dfaca565e8008735e3d6adae7515421c5b226d6f1f90c4bcb35803a647",
         "binarySha256": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c",
         "downloadBytes": 37119716,
+        "installedBytes": 170000000,
+        "executable": "bun"
+      },
+      "linux-arm64": {
+        "package": "@oven/bun-linux-aarch64",
+        "asset": "bun-linux-aarch64-1.4.2.tgz",
+        "assetSha256": "9ab3970a19660b5cd089f17fb021d900e1ca1b988dafd461d66d0a0ff4d6eac4",
+        "binarySha256": "616f267a34278ff5ac282df37ffdfba1d7141f4f6926bca99af2cd6ef3ad32b1",
+        "downloadBytes": 37629062,
         "installedBytes": 170000000,
         "executable": "bun"
       },

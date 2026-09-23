@@ -242,7 +242,7 @@ function bundledProviderExecutable(
   const targetPlatform =
     platform === "darwin" && architecture === "arm64"
       ? "mac"
-      : platform === "linux" && architecture === "x64"
+      : platform === "linux" && (architecture === "x64" || architecture === "arm64")
         ? "linux"
         : platform === "win32" && architecture === "x64"
           ? "win"

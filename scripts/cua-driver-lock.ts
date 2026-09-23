@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 
-export const cuaDriverTargets = ["darwin-arm64", "linux-x64", "win32-x64"] as const;
+export const cuaDriverTargets = ["darwin-arm64", "linux-x64", "linux-arm64", "win32-x64"] as const;
 export type CuaDriverTarget = (typeof cuaDriverTargets)[number];
 
 /** One file OpenBot copies out of a release archive, and the mode it gets on disk. */
@@ -23,6 +23,14 @@ interface CuaDriverTargetDescriptor {
   readonly executable: "cua-driver" | "cua-driver.exe";
   readonly files: readonly CuaDriverShippedFile[];
 }
+
+const LINUX_FILES = [
+  { path: "cua-driver", executable: true },
+  { path: "wayland-helper/install.sh", executable: true },
+  { path: "wayland-helper/README.md", executable: false },
+  { path: "wayland-helper/winrects@cua/metadata.json", executable: false },
+  { path: "wayland-helper/winrects@cua/extension.js", executable: false },
+] as const satisfies readonly CuaDriverShippedFile[];
 
 /**
  * The `-binary` assets, whose entries sit at the archive root, rather than the directory assets the
@@ -56,13 +64,15 @@ export const CUA_DRIVER_TARGETS = {
     executable: "cua-driver",
     // `wayland-helper` holds the GNOME shell extension that gives the driver window rectangles on
     // Wayland. OpenBot does not install or enable it, but the user cannot get it separately.
-    files: [
-      { path: "cua-driver", executable: true },
-      { path: "wayland-helper/install.sh", executable: true },
-      { path: "wayland-helper/README.md", executable: false },
-      { path: "wayland-helper/winrects@cua/metadata.json", executable: false },
-      { path: "wayland-helper/winrects@cua/extension.js", executable: false },
-    ],
+    files: LINUX_FILES,
+  },
+  "linux-arm64": {
+    platform: "linux",
+    architecture: "arm64",
+    assetSuffix: "linux-arm64-binary.tar.gz",
+    archive: "tar.gz",
+    executable: "cua-driver",
+    files: LINUX_FILES,
   },
   "win32-x64": {
     platform: "win32",
@@ -96,6 +106,7 @@ const cuaDriverLockSchema = z.object({
     artifacts: z.object({
       "darwin-arm64": cuaDriverArtifactSchema,
       "linux-x64": cuaDriverArtifactSchema,
+      "linux-arm64": cuaDriverArtifactSchema,
       "win32-x64": cuaDriverArtifactSchema,
     }),
   }),

@@ -7,7 +7,7 @@ The mobile workflow is separate from the desktop tag release described below.
 OpenBot updates are published through GitHub Releases and installed with `electron-updater`.
 macOS requires every auto-updatable build to be signed with a Developer ID Application certificate.
 The release workflow also notarizes and staples the macOS application before publishing it. Windows
-x64 and Linux x64 releases are currently unsigned, so Windows can show an Unknown publisher or
+x64 and Linux releases are currently unsigned, so Windows can show an Unknown publisher or
 SmartScreen warning and the Linux AppImage carries no signature.
 All three platforms must pass before one release is published. A release also requires the pinned
 Sunshine and Moonlight Web runtime artifacts. GitHub Actions downloads those artifacts, checks SHA-256, and
@@ -255,8 +255,8 @@ The workflow:
 3. runs the complete offline repository check;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on the same GitHub macOS runner;
 5. builds an unsigned Windows x64 NSIS installer on a GitHub Windows runner;
-6. builds an unsigned Linux x64 AppImage on a GitHub Ubuntu 24.04 runner, with the launch check under
-   `xvfb-run`;
+6. builds unsigned Linux x64 and arm64 AppImages on GitHub Ubuntu 24.04 runners of each architecture,
+   with the launch check under `xvfb-run`;
 7. verifies all three unpacked applications, update metadata, included runtimes, provider control
    artifacts, licenses, checksums, platform signing contracts, launch behavior, and update artifact
    size limits;

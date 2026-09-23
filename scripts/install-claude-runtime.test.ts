@@ -20,6 +20,7 @@ describe.runIf(process.platform !== "win32")("bundled Claude installer", () => {
   it.each([
     ["darwin-arm64", "mac/arm64"],
     ["linux-x64", "linux/x64"],
+    ["linux-arm64", "linux/arm64"],
   ] as const)("installs a verified %s SDK binary into %s and reuses the current runtime", async (target, directory) => {
     const root = await temporaryRoot();
     const fixture = join(root, "fixture");
