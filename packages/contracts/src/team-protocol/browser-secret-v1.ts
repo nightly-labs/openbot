@@ -8,7 +8,7 @@ export function restoreBrowserSecretMetadata(
   source: unknown,
 ): TeamProtocolV4BaseJsonValue {
   if (!isDynamicRecord(projected) || !isDynamicRecord(source)) return projected;
-  if (projected.type === "browser-takeover-requested")
+  if (projected.type === "browser-takeover-requested" && projected.request !== undefined)
     return { ...projected, request: restoreRequest(projected.request, source.request) };
   if (
     projected.type === "runtime-snapshot" &&
