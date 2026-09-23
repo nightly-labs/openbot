@@ -954,7 +954,7 @@ describe("secure browser handoff", () => {
     await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("fixture-password"));
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(submitted).resolves.toBe("submitted");
-    expect(secretClear).toHaveBeenCalledOnce();
+    expect(secretClear).toHaveBeenCalledExactlyOnceWith("fixture-password");
     expect(load).not.toHaveBeenCalled();
     await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
     const blocked = await evaluate();

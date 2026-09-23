@@ -147,7 +147,8 @@ interface InternalTab {
   /** Retained document references can outlive popup closure and navigation. */
   hasSharedBrowsingContext?: boolean;
   /**
-   * The current document received a secret and was kept, with its filled fields empty, so a
+   * The current document received a secret and was kept, with its filled fields empty and no
+   * readable copy of the value, so a
    * single-page sign-in can show its next step. Page code can still hold the value, so evaluation
    * and recording stay blocked in its opener group until a main-frame navigation replaces it.
    */
@@ -623,10 +624,10 @@ export class BrowserHost {
                 }
                 if (!protection.replaced) {
                   // A reload would restart a single-page sign-in at its first step. Keep the
-                  // document when every filled field is empty after clearing.
+                  // document when its fields are empty and nothing a snapshot reads shows the value.
                   const cleared = await this.#boundEngineOperation(
                     tab,
-                    entry.clear(),
+                    entry.clear(secret),
                     10_000,
                     "Authentication field cleanup timed out.",
                     keepQueueBlocked,
