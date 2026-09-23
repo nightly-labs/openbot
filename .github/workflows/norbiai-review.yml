@@ -712,8 +712,39 @@ jobs:
               break
             fi
           done
+          # Above the cap, as many whole files as fit still go in, in diff order, and the
+          # reviewer reads only the rest. With none of it in the prompt, a reviewer that made
+          # no tool call saw no code at all and still reported no findings. The loop above
+          # left the default-context diff and its fence length.
+          omitted_file="$RUNNER_TEMP/norbiai-diff-omitted.txt"
+          : > "$omitted_file"
+          diff_whole=true
           if [ -z "$diff_context" ]; then
-            : > "$diff_file"
+            diff_whole=false
+            LC_ALL=C awk -v budget=$(( INLINE_DIFF_MAX_BYTES - 2 * fence_length )) -v omitted="$omitted_file" '
+              function flush(   i) {
+                if (count == 0) return
+                if (used + size <= budget) {
+                  for (i = 0; i < count; i++) print lines[i]
+                  used += size
+                } else {
+                  print name > omitted
+                }
+                count = 0
+                size = 0
+              }
+              /^diff --git / {
+                flush()
+                name = $0
+                sub(/^diff --git a\/.* b\//, "", name)
+              }
+              { lines[count++] = $0; size += length($0) + 1 }
+              END { flush() }
+            ' "$diff_file" > "$diff_file.part"
+            mv "$diff_file.part" "$diff_file"
+            if [ -s "$diff_file" ]; then
+              diff_fence=$(printf '%*s' "$fence_length" '' | tr ' ' '`')
+            fi
           fi
 
           if git cat-file -e "$BASE_SHA:.github/norbiai-review-prompt.md" 2>/dev/null; then
@@ -804,7 +835,17 @@ jobs:
             elif [ -n "$diff_context" ]; then
               printf '\n%s is empty.\n' "$diff_label"
             else
-              printf '\n%s is too large to include. Read it with `%s`, one file at a time.\n' "$diff_label" "$diff_command"
+              printf '\n%s is too large to include whole.' "$diff_label"
+              if [ -s "$diff_file" ]; then
+                printf ' The diff of some files is below, with 3 lines of context. It is the output of `%s` for those files: read it here rather than running that again.\n\n' "$diff_command"
+                printf '%s diff\n' "$diff_fence"
+                cat "$diff_file"
+                printf '%s\n' "$diff_fence"
+              else
+                printf '\n'
+              fi
+              printf '\nThese files are not in the prompt. You must read the diff of each one with `%s -- <path>`, one file at a time:\n\n' "$diff_command"
+              sed 's/^/- /' "$omitted_file"
             fi
             printf '\n## Previous active findings\n\n'
             if [ -s "$PREVIOUS_FILE" ]; then
@@ -854,30 +895,50 @@ jobs:
             mcp_args=()
           fi
 
+          run_reviewer() {
+            # The runners share one bridge, which allows 5 browser turns at a time, and a
+            # cancelled run can keep its turn for a while. That refusal comes in seconds, so
+            # wait for a free turn instead of failing the review.
+            for attempt in 1 2 3; do
+              : > "$last_message_file"
+              timeout 900 codex exec \
+                ${mcp_args[@]+"${mcp_args[@]}"} \
+                --ephemeral \
+                --sandbox danger-full-access \
+                --model "$MODEL" \
+                --config "model_reasoning_effort=\"${EFFORT}\"" \
+                --color never \
+                --output-last-message "$last_message_file" \
+                - < "$prompt_file" 2>&1 | tee "$live_file"
+              exit_code=${PIPESTATUS[0]}
+              if [ "$exit_code" -eq 0 ] || [ "$attempt" -eq 3 ] ||
+                ! grep -q 'simultaneous browser turns' "$live_file"; then
+                break
+              fi
+              echo "::notice title=NorbiAI waiting for the bridge::All browser turns are busy. Attempt ${attempt} of 3 failed. Next attempt in 60 s."
+              sleep 60
+            done
+          }
+
+          # A review of code it never read. Through the bridge, a reviewer sometimes makes no
+          # tool call and reports that its tools were unavailable, and that answer has the
+          # shape of a clean review. Codex prints `exec` on a line of its own for each command.
+          review_is_blind() {
+            if [ "$diff_whole" != true ] && ! grep -q '^exec$' "$live_file"; then
+              return 0
+            fi
+            awk '/^## Verdict/ { text = ""; on = 1; next } /^## / { on = 0 } on { text = text " " $0 } END { print text }' "$last_message_file" |
+              grep -qiE 'unable to (complete|perform|finish)|could not (inspect|read|access|open)|(tool|session)[^.]* (unavailable|not available)'
+          }
+
           set +e
           review_started=$SECONDS
-          # The runners share one bridge, which allows 5 browser turns at a time, and a
-          # cancelled run can keep its turn for a while. That refusal comes in seconds, so
-          # wait for a free turn instead of failing the review.
-          for attempt in 1 2 3; do
-            : > "$last_message_file"
-            timeout 900 codex exec \
-              ${mcp_args[@]+"${mcp_args[@]}"} \
-              --ephemeral \
-              --sandbox danger-full-access \
-              --model "$MODEL" \
-              --config "model_reasoning_effort=\"${EFFORT}\"" \
-              --color never \
-              --output-last-message "$last_message_file" \
-              - < "$prompt_file" 2>&1 | tee "$live_file"
-            exit_code=${PIPESTATUS[0]}
-            if [ "$exit_code" -eq 0 ] || [ "$attempt" -eq 3 ] ||
-              ! grep -q 'simultaneous browser turns' "$live_file"; then
-              break
-            fi
-            echo "::notice title=NorbiAI waiting for the bridge::All browser turns are busy. Attempt ${attempt} of 3 failed. Next attempt in 60 s."
-            sleep 60
-          done
+          run_reviewer
+          # Once, and only after a short run, so that the retry fits the job timeout.
+          if [ "$exit_code" -eq 0 ] && review_is_blind && [ $(( SECONDS - review_started )) -lt 300 ]; then
+            echo "::notice title=NorbiAI retried a blind review::The reviewer did not read the code. Trying once more."
+            run_reviewer
+          fi
           set -e
           # Recorded in the comment so the cost of a review can be followed without the logs.
           review_seconds=$(( SECONDS - review_started ))
@@ -907,12 +968,15 @@ jobs:
             [ -n "$findings_line" ] &&
             [ "$start_line" -lt "$resolved_line" ] &&
             [ "$resolved_line" -lt "$findings_line" ] &&
-            [ "$withdrawn_ok" = true ]; then
+            [ "$withdrawn_ok" = true ] &&
+            ! review_is_blind; then
             tail -n "+${start_line}" "$last_message_file" > "$review_file"
             status=success
           else
             status=failed
-            if [ "$exit_code" -eq 124 ]; then
+            if [ "$exit_code" -eq 0 ] && review_is_blind; then
+              reason="Reviewer did not read the code it had to review. Human review required."
+            elif [ "$exit_code" -eq 124 ]; then
               reason="Review timed out after 15 minutes. Human review required."
             elif [ "$exit_code" -ne 0 ]; then
               reason="Reviewer exited with code ${exit_code}. Human review required."
