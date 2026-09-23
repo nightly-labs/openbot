@@ -152,6 +152,10 @@ bun run dev
 `codex:doctor` checks the CLI version, App Server handshake, and ChatGPT login without starting a
 model turn. `bun run cua-driver:doctor` reports the Computer Use driver separately.
 
+In a new git worktree, run `bun run dev:bootstrap`. It copies the files that `.worktreeinclude`
+lists from the main checkout when they are missing, installs dependencies, migrates the local API,
+and seeds the isolated profile. Set it as the worktree setup command of your agent harness.
+
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
 The command deletes the app and test-client development profiles plus the legacy host profile,
