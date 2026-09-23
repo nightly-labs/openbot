@@ -5,6 +5,33 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-23
+
+### Added
+
+- Use OpenBot in French.
+- Open invitation (including permanent links), pairing, and plugin links directly in the mobile app.
+- See a running, waiting, blocked, or failed routine as a mark on the agent row.
+- Update a provider, or sign in with a code, from the new "More actions" menu on each provider row.
+- Start with OpenCode free models without a sign-in.
+
+### Changed
+
+- New ChatGPT agents start on GPT-6 Luna, and new Claude agents on Claude Opus 5.5. Existing
+  agents keep their model.
+- Refresh the server list on other signed-in devices when a membership changes.
+- Show the routine run history in chat as one summary per run.
+- Improve mobile reply animations and keyboard scrolling.
+
+### Fixed
+
+- Send live view clicks to the correct point of the remote page.
+- Keep Claude narration between tool calls out of the chat bubble.
+- Keep embedded browser sign-in popups and OAuth sessions working.
+- Load a remote server's agents when one agent uses a 1M-context Claude model.
+- Show why an updated OpenCode CLI stopped, instead of "ACP connection closed".
+- Stop showing a Grok tool error as a provider error.
+
 ## [0.17.0] - 2026-09-21
 
 ### Added
