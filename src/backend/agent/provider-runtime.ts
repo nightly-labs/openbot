@@ -122,6 +122,20 @@ export function isTelemetryExportDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether a provider diagnostic reports one failed tool call rather than a failure of the provider.
+ *
+ * Grok's CLI logs `tool_error: tool_output_error` on stderr each time a tool returns an error, such
+ * as a browser click whose target is gone. The agent already reads that error as the tool's result
+ * and can try again, and the chat marks the step as failed. The user met it as a "Provider error"
+ * toast during an embedded-browser click, with nothing to do about it. It belongs in the log.
+ *
+ * Only Grok's per-call kinds count. Any other failure, the provider's own included, stays visible.
+ */
+export function isToolCallDiagnostic(message: string): boolean {
+  return /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message);
+}
+
+/**
  * Whether a provider says that the account's paid usage is exhausted.
  *
  * This is narrower than an HTTP status check. A 429 can be a short request-rate throttle, and a
@@ -1681,6 +1695,10 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (isTelemetryExportDiagnostic(message)) {
         logger.warn("A provider reported a telemetry export failure.", { provider: client.provider, message });
+        return;
+      }
+      if (isToolCallDiagnostic(message)) {
+        logger.warn("A provider reported a failed tool call.", { provider: client.provider, message });
         return;
       }
       if (isUsageLimitDiagnostic(message)) {
