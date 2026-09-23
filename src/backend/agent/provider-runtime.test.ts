@@ -195,7 +195,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.id),
-    ).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
+    ).toEqual(["gpt-6-luna", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
   });
   async function opencodeModelIds(storedKey: string | null, catalog?: string[]): Promise<string[]> {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
