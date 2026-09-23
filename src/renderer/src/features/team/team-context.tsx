@@ -3,6 +3,7 @@ import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { EMPTY_TEAM_PRESENCE } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
+import { teamPort } from "./team-port";
 
 /**
  * Who else is on the active workspace, and which of them is the signed-in user.
@@ -44,7 +45,7 @@ const Presence = createSimpleContext({
       return teamPresence().members.filter((member) => member.id !== currentMemberId && !member.disabled);
     });
 
-    onSettled(() => window.openbot.servers.onPresence((snapshot) => flush(() => setTeamPresence(snapshot))));
+    onSettled(() => teamPort().servers.onPresence((snapshot) => flush(() => setTeamPresence(snapshot))));
 
     return { teamPresence, setTeamPresence, currentTeamMember, directPeople };
   },
