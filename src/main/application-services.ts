@@ -768,9 +768,9 @@ export async function createApplicationServices({
 
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
-   * pinned lock. It knows the copies it downloaded itself; a CLI the user installed is only ever
-   * reported in the agent status, so it is passed on from here. Its update offer installs the
-   * pinned managed copy and leaves the system installation untouched.
+   * latest upstream release. It knows the copies it downloaded itself; a CLI the user installed is
+   * only ever reported in the agent status, so it is passed on from here. Its update offer installs
+   * a managed copy and leaves the system installation untouched.
    */
   const trackSystemCliVersions = (status: AgentStatus): void => {
     for (const provider of status.providers ?? []) {
@@ -783,6 +783,8 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
+  // After the status forward, so the offer a check finds reaches the renderer.
+  providerRuntimes.startUpdateChecks();
   // A tool runtime that becomes ready changes what the MCP servers resolve to, for every
   // provider: sessions that dropped their stdio servers before it finished downloading are
   // marked for refresh, and the deferred mechanism spends the mark before each agent's next

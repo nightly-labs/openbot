@@ -80,7 +80,10 @@ export interface UpdatePreference {
 export type ProviderRuntimePhase = "not-downloaded" | "downloading" | "finishing" | "ready" | "download-error";
 
 export interface ProviderRuntimeStatus {
-  /** Newer managed version pinned by this OpenBot release, when an older install exists. */
+  /**
+   * The newer version an update installs, when an older install exists: the latest upstream release
+   * the last check found, or the version this OpenBot release carries, whichever is newer.
+   */
   availableVersion?: string | null;
   phase: ProviderRuntimePhase;
   progress: number | null;

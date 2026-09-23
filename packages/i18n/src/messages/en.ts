@@ -176,7 +176,7 @@ export const en = {
   "provider.action.restart": "Restart",
   "provider.action.retry": "Retry",
   "provider.action.updateTo": "Update to {version}",
-  "provider.action.upToDate": "Up to date",
+  "provider.action.checkForUpdates": "Check for updates",
   "provider.action.install": "Install",
   "provider.action.signIn": "Sign in",
   "provider.action.signInWithCode": "Log in with code",

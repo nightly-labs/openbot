@@ -402,6 +402,8 @@ export interface ProviderRuntimesDesktopApi {
   getStatus: () => Promise<ProviderRuntimeSnapshot>;
   download: (provider: AgentProviderId) => Promise<ProviderRuntimeSnapshot>;
   cancel: (provider: AgentProviderId) => Promise<ProviderRuntimeSnapshot>;
+  /** Asks each provider's upstream for its latest release. Rejects when no source answered. */
+  checkForUpdates: () => Promise<ProviderRuntimeSnapshot>;
   onEvent: (listener: (snapshot: ProviderRuntimeSnapshot) => void) => () => void;
 }
 

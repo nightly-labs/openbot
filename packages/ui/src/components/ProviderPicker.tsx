@@ -70,8 +70,9 @@ export interface ProviderPickerProps {
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   /**
-   * Starts the update the row offers. Whether that re-downloads the managed runtime or runs the
-   * CLI's own updater is decided by the caller, which knows who owns the install.
+   * Starts the update the row offers, or asks for one when none is offered yet. Whether that
+   * re-downloads the managed runtime or runs the CLI's own updater is decided by the caller, which
+   * knows who owns the install.
    */
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -352,8 +353,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 (runtimeStatus()?.phase ?? "ready") === "ready";
               /**
                * Every row with a runtime on the computer offers Update in the same place, so the user
-               * looks for it in one menu. It is enabled only while a newer version waits; the badge
-               * says so, and the menu names the version it installs.
+               * looks for it in one menu. While a newer version waits, the badge says so and the menu
+               * names the version it installs; otherwise the same item checks for one.
                */
               const updateOffered = () =>
                 Boolean(props.onUpdateProvider) && (runtimeStatus()?.phase === "ready" || updatable());
@@ -564,13 +565,13 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           <DropdownMenu.Content>
                             <Show when={updateOffered()}>
                               <DropdownMenu.Item
-                                disabled={!updatable() || connecting()}
+                                disabled={connecting()}
                                 onSelect={() => void props.onUpdateProvider?.(option().id)}
                               >
                                 <RefreshCw aria-hidden="true" />
                                 {updatable()
                                   ? props.t("provider.action.updateTo", { version: option().availableVersion ?? "" })
-                                  : props.t("provider.action.upToDate")}
+                                  : props.t("provider.action.checkForUpdates")}
                               </DropdownMenu.Item>
                             </Show>
                             <Show when={codeSignInOffered()}>

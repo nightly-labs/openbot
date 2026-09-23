@@ -80,8 +80,10 @@ Voice prompts and remote desktop are not available on Linux.
 
 OpenBot can download a supported provider runtime when you select `Download` in onboarding,
 Settings, agent setup, or the model picker. OpenBot prefers its managed CLI. Explicit `OPENBOT_*_PATH` overrides take precedence; a compatible
-system CLI is used when no managed copy is available. Updates install OpenBot’s pinned runtime
-without changing the user’s system CLI.
+system CLI is used when no managed copy is available. OpenBot checks for a newer provider CLI
+release at startup and every hour, and `Check for updates` in a provider's actions menu checks at
+once. Updates install the latest upstream release without changing the user’s system CLI; the
+version in `native-runtime.lock.json` is only the first-install fallback.
 
 You can also install a CLI yourself.
 
