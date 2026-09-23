@@ -1081,6 +1081,11 @@ export class ProviderRuntime implements ProviderPort {
       return { client, account: account.account };
     } catch (error) {
       await client.stop().catch(() => undefined);
+      // The CLI's last stderr line can quote an MCP secret that `redactText` does not know, and this
+      // message reaches the status, the IPC answer and the runtime download error.
+      if (error instanceof AgentProcessExitError) {
+        throw new AgentProcessExitError(this.#redactMcp(error.message), { cause: error.cause });
+      }
       throw error;
     }
   }

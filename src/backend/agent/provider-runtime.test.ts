@@ -23,7 +23,7 @@ import {
   waitFor,
 } from "../agent-service-test-harness";
 import type { AgentStore } from "../agent-store";
-
+import { McpServerStore } from "../mcp-server-store";
 import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
@@ -1021,16 +1021,53 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
     await service.initialize();
 
-    await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(
-      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: Error: bad config).",
-    );
+    const message =
+      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: Error: bad config).";
+    await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(message);
     expect(service.getStatus().providers).toContainEqual(
-      expect.objectContaining({
-        id: "claude",
-        state: "error",
-        message:
-          "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: Error: bad config).",
-      }),
+      expect.objectContaining({ id: "claude", state: "error", message }),
+    );
+  });
+
+  it("keeps an MCP secret the stopped CLI quoted out of the update failure", async () => {
+    const managed = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    let claudeClients = 0;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "claude",
+      // The running client starts; its replacement stops and quotes the server's secret on stderr.
+      clientFactory: (provider) => {
+        const replacement = provider === "claude" && ++claudeClients > 1;
+        return new FakeAgentClient(provider, "", true, true, {}, async (method) => {
+          if (replacement && method === "initialize") {
+            throw new AgentProcessExitError("Claude stopped before it answered (exit code 3: rejected abcdef123456).");
+          }
+        });
+      },
+      bundledExecutables: { claude: managed },
+    });
+    await service.initialize();
+    new McpServerStore(store.database).save({
+      id: "",
+      name: "Filesystem",
+      transport: "stdio",
+      enabled: true,
+      command: "/bin/echo",
+      args: [],
+      env: [{ key: "API_KEY", value: "abcdef123456" }],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "",
+      headers: [],
+    });
+
+    const message =
+      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: rejected •••).";
+    await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(message);
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "available", message }),
     );
   });
 
