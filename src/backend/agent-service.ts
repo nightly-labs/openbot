@@ -78,7 +78,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_TEXT_LIMIT, isMessageReaction, skillConversationEventItemType } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
-import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
@@ -92,14 +92,9 @@ import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import { CustomEndpoints } from "./agent/custom-endpoints";
 import { handleDataTool } from "./agent/data-tools";
-import {
-  agentNamesById,
-  deliveryInput,
-  displayMessageReferences,
-  responseAttachmentMessageId,
-} from "./agent/delivery-content";
+import { agentNamesById, displayMessageReferences, responseAttachmentMessageId } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
-import { DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./agent/drain-scheduler";
+import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
@@ -112,6 +107,7 @@ import { generateProfile, generateTextWithoutTools } from "./agent/profile-gener
 import { ProfileSave } from "./agent/profile-save";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
+import { QueueControls } from "./agent/queue-controls";
 import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-scheduler";
 import { type OpenBotToolResponse, openBotToolResult } from "./agent/routine-tools";
 import { fitRuntimeSnapshot } from "./agent/runtime-snapshot";
@@ -233,6 +229,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #images: ImageGenRuntime;
   readonly #threads: ThreadLifecycle;
   readonly #drain: DrainScheduler;
+  readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
   readonly #mailboxSync: MailboxSync;
@@ -665,6 +662,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#browser.onControlChanged((state) => {
       this.#emit({ type: "browser-control-changed", state });
+    });
+    this.#queue = new QueueControls({
+      store,
+      mailbox,
+      mailboxSync: this.#mailboxSync,
+      conversation: this.#conversation,
+      providers: this.#providers,
+      endpoints: this.#endpoints,
+      drain: this.#drain,
+      hooks: {
+        channelAssignment: (deliveryId) => this.channels.store.assignmentForDelivery(deliveryId),
+      },
     });
     this.#turn = new TurnLifecycle({
       store,
@@ -1502,149 +1511,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#turn.acknowledgeFailedTurn(agentId, turnId);
   }
 
-  async cancelQueuedMessage(agentId: string, deliveryId: string): Promise<void> {
-    if (this.channels.store.assignmentForDelivery(deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
-    await this.#mailbox.cancel(agentId, deliveryId);
-    this.#mailboxSync.emitQueue(agentId);
-    this.#drain.scheduleDrain(agentId);
+  cancelQueuedMessage(agentId: string, deliveryId: string): Promise<void> {
+    return this.#queue.cancel(agentId, deliveryId);
   }
 
-  async editQueuedMessage(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {
-    const finished = this.#mailbox.finishedQueueEditAction(agentId, input.deliveryId, input.editId);
-    if (finished) {
-      if (input.action === "begin" || input.action === "retain-attachments")
-        throw new QueueEditRejectedError("This edit has already finished.");
-      // The uploads belong to an edit that is over, so they never stay behind.
-      if (input.action === "save")
-        await Promise.all(input.attachmentDraftIds.map((id) => this.#mailbox.discardDraft(id)));
-      // Only a retry of the action that finished can report success. A Save that follows a
-      // finished Cancel never reached the message, so the client must keep its text.
-      if (input.action !== finished)
-        throw new QueueEditRejectedError(
-          finished === "cancel"
-            ? "This edit was cancelled, so the message keeps its original text."
-            : "This edit was already saved.",
-        );
-      if (
-        input.action === "save" &&
-        !this.#mailbox.matchesFinishedQueueSave(
-          agentId,
-          input.deliveryId,
-          input.editId,
-          input.text,
-          input.keepAttachmentIds,
-          input.attachmentDraftIds,
-        )
-      )
-        throw new QueueEditRejectedError(
-          "This edit was already saved with different contents. Your changes were not saved.",
-        );
-      this.#drain.scheduleDrain(agentId);
-      this.#mailboxSync.emitQueue(agentId);
-      return this.listQueue(agentId);
-    }
-    if (this.channels.store.assignmentForDelivery(input.deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
-    if (input.action === "begin") this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId);
-    else {
-      if (input.action === "retain-attachments")
-        this.#mailbox.retainQueueEditAttachments(agentId, input.deliveryId, input.editId, input.attachmentDraftIds);
-      if (input.action === "save") {
-        await this.#mailbox.updateQueuedMessage(
-          agentId,
-          input.deliveryId,
-          input.text,
-          input.keepAttachmentIds,
-          input.attachmentDraftIds,
-          input.editId,
-        );
-        const snapshot = this.#conversation.snapshot(agentId);
-        if (snapshot) {
-          this.#mailboxSync.syncMailboxMessages(snapshot);
-          this.#conversation.emitConversation(snapshot, "queue.message-updated");
-        }
-      }
-      if (input.action === "cancel") this.#mailbox.finishQueueEdit(agentId, input.deliveryId, input.editId);
-      this.#drain.scheduleDrain(agentId);
-    }
-    this.#mailboxSync.emitQueue(agentId);
-    return this.#mailbox.listQueue(agentId);
+  editQueuedMessage(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {
+    return this.#queue.edit(agentId, input);
   }
 
-  async updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {
-    if (this.channels.store.assignmentForDelivery(input.deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
-    await this.#mailbox.updateQueuedMessage(
-      input.agentId,
-      input.deliveryId,
-      input.text,
-      input.keepAttachmentIds,
-      input.attachmentDraftIds,
-    );
-    const snapshot = this.#conversation.snapshot(input.agentId);
-    if (snapshot) this.#mailboxSync.syncMailboxMessages(snapshot);
-    this.#mailboxSync.emitQueue(input.agentId);
-    if (snapshot) this.#conversation.emitConversation(snapshot, "queue.message-updated");
-    this.#drain.scheduleDrain(input.agentId);
+  updateQueuedMessage(input: UpdateQueuedMessageInput): Promise<void> {
+    return this.#queue.update(input);
   }
 
-  async reorderQueue(input: ReorderQueueInput): Promise<void> {
-    if (input.deliveryIds.some((id) => this.channels.store.assignmentForDelivery(id)))
-      throw new Error("Use the channel task controls for channel work.");
-    // The queue the user reads holds no channel work, so the order it sends names the normal
-    // messages alone, and the mailbox reads the whole queued order. Channel work stays at the head:
-    // it reserved the agent before these messages arrived.
-    const channelDeliveryIds = this.#mailbox.queuedChannelDeliveryIds(input.agentId);
-    await this.#mailbox.reorderQueue(input.agentId, [...channelDeliveryIds, ...input.deliveryIds]);
-    this.#mailboxSync.emitQueue(input.agentId);
+  reorderQueue(input: ReorderQueueInput): Promise<void> {
+    return this.#queue.reorder(input);
   }
 
-  async steerQueuedMessage(input: SteerQueuedMessageInput): Promise<void> {
-    const agent = await this.#store.getOrCreate(input.agentId);
-    const client = this.#providers.requireReadyClient(providerForAgent(agent));
-    const session = this.#store.activeProviderSession(agent.id);
-    const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
-    if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId) {
-      throw new Error("The active turn changed before this message could be steered.");
-    }
-    if (this.channels.store.assignmentForDelivery(input.deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
-    const context = this.#mailbox.getDelivery(input.deliveryId);
-    if (!context || context.delivery.recipientAgentId !== agent.id || context.delivery.status !== "queued") {
-      throw new Error("Only queued messages can be steered.");
-    }
-
-    const turnId = snapshot.activeTurnId;
-    // Steering carries a new message into the turn that is running, on the session the CLI opened,
-    // so it reaches the endpoint that turn started on. The agent record may already name another
-    // model, because a removal moves it, while the CLI keeps that session until it restarts, and
-    // the restart waits for the turn. So the turn's own model is what the exclusion is read for.
-    if (!this.#endpoints.serves(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model)) {
-      throw new Error(REMOVED_ENDPOINT_MESSAGE);
-    }
-    await this.#mailbox.markSteering(input.deliveryId, turnId);
-    this.#mailboxSync.emitQueue(agent.id);
-    try {
-      await client.request(
-        "turn/steer",
-        {
-          threadId: session.externalSessionId,
-          expectedTurnId: turnId,
-          clientUserMessageId: input.deliveryId,
-          input: deliveryInput(context, agentNamesById(this.#store.list())),
-        },
-        decodeRecordResponse,
-      );
-      await this.#mailbox.markRunning(input.deliveryId, turnId);
-      this.#mailboxSync.syncMailboxMessages(snapshot);
-      this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
-    } catch (error) {
-      await this.#mailbox.restoreQueued(input.deliveryId);
-      this.#mailboxSync.emitQueue(agent.id);
-      throw error;
-    }
+  steerQueuedMessage(input: SteerQueuedMessageInput): Promise<void> {
+    return this.#queue.steer(input);
   }
 
   async sendMessage(input: SendMessageInput): Promise<QueuedMessageReceipt> {
