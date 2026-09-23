@@ -154,7 +154,7 @@ export class BrowserCdpEngine {
     origin: string,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
-  ): Promise<(secret: string) => Promise<void>> {
+  ): Promise<{ enter: (secret: string) => Promise<void>; clear: () => Promise<boolean> }> {
     const generation = this.#navigationGeneration;
     const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
     const nodes = await this.#lease(async (send) => {
@@ -182,7 +182,7 @@ export class BrowserCdpEngine {
       return { inputs, button, fingerprints };
     });
     if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-    return async (secret) => {
+    const enter = async (secret: string) => {
       try {
         await this.#lease(async (send) => {
           if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
@@ -249,6 +249,22 @@ export class BrowserCdpEngine {
         throw new Error("Secure authentication could not be completed. Take over to check the page.");
       }
     };
+    /** Empties the filled fields, attached or detached, and reports whether every one is now empty. */
+    const clear = () =>
+      this.#lease(async (send) => {
+        let empty = true;
+        for (const node of nodes.inputs) {
+          const cleared = await this.#callOnNode(
+            send,
+            node.backendNodeId,
+            `function() { this.value = ''; return this.value === ''; }`,
+            [],
+          ).catch(() => false);
+          if (cleared !== true) empty = false;
+        }
+        return empty;
+      });
+    return { enter, clear };
   }
   #retainDebugger = false;
   #ownsDebugger = false;

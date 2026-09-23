@@ -146,6 +146,12 @@ interface InternalTab {
   openerTabId?: string;
   /** Retained document references can outlive popup closure and navigation. */
   hasSharedBrowsingContext?: boolean;
+  /**
+   * The current document received a secret and was kept, with its filled fields empty, so a
+   * single-page sign-in can show its next step. Page code can still hold the value, so evaluation
+   * and recording stay blocked in its opener group until a main-frame navigation replaces it.
+   */
+  secretDocument?: boolean;
   popup: boolean;
   popupFailure?: BrowserTab["popupFailure"];
   closing?: boolean;
@@ -540,7 +546,7 @@ export class BrowserHost {
     this.#invalidateViews(tab);
     this.#syncAttachedView();
     try {
-      const enter = await this.#enqueue(
+      const entry = await this.#enqueue(
         args.tabId,
         async (_tab, keepQueueBlocked) => {
           await this.#recorder.discard(args.tabId, "requested");
@@ -575,13 +581,14 @@ export class BrowserHost {
           this.#invalidateViews(tab);
           protection.running = true;
           this.#syncAttachedView();
+          let kept = false;
           try {
             await this.#enqueue(
               args.tabId,
               async (_tab, keepQueueBlocked) => {
                 await this.#boundEngineOperation(
                   tab,
-                  enter(secret),
+                  entry.enter(secret),
                   10_000,
                   "Authentication submission timed out.",
                   keepQueueBlocked,
@@ -601,6 +608,18 @@ export class BrowserHost {
                   });
                 }
                 if (!protection.replaced) {
+                  // A reload would restart a single-page sign-in at its first step. Keep the
+                  // document when every filled field is empty after clearing.
+                  const cleared = await this.#boundEngineOperation(
+                    tab,
+                    entry.clear(),
+                    10_000,
+                    "Authentication field cleanup timed out.",
+                    keepQueueBlocked,
+                  ).catch(() => false);
+                  if (cleared && !protection.replaced) kept = true;
+                }
+                if (!protection.replaced && !kept) {
                   // Load with GET rather than replaying a possible form POST. Keep capture
                   // blocked until navigation has replaced the document and this operation ends.
                   await this.#boundEngineOperation(
@@ -621,10 +640,14 @@ export class BrowserHost {
               tab.contents.navigationHistory.clear();
               tab.secret = undefined;
               this.#syncAttachedView();
+            } else if (kept) {
+              tab.secretDocument = true;
+              tab.secret = undefined;
+              this.#syncAttachedView();
             }
             this.#emitChanged();
           }
-          return protection.replaced ? "submitted" : "takeover";
+          return protection.replaced || kept ? "submitted" : "takeover";
         },
       };
     } catch {
@@ -651,6 +674,13 @@ export class BrowserHost {
           "Secure input is unavailable while a connected popup or opener tab shows the same site. Use takeover.",
         );
     }
+  }
+
+  #requireNoSecretDocument(tab: InternalTab, action: string): void {
+    if ([...this.#connectedTabs(tab)].some((connected) => connected.secretDocument))
+      throw new Error(
+        `${action} is unavailable while a page that received a secret is open. Use snapshots and actions until it navigates.`,
+      );
   }
 
   #connectedTabs(tab: InternalTab): Set<InternalTab> {
@@ -1069,7 +1099,10 @@ export class BrowserHost {
           const { args } = call;
           const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          await this.#enqueue(tabId, (tab) => this.#recorder.start(tabId, tab.contents));
+          await this.#enqueue(tabId, (tab) => {
+            this.#requireNoSecretDocument(tab, "Recording");
+            return this.#recorder.start(tabId, tab.contents);
+          });
           return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
         }
         case "recording_stop": {
@@ -1439,6 +1472,10 @@ export class BrowserHost {
     });
     contents.on("page-title-updated", changed);
     contents.on("did-navigate", (_event, url) => {
+      if (tab.secretDocument) {
+        tab.secretDocument = false;
+        contents.navigationHistory.clear();
+      }
       if (tab.secret?.submitted) {
         tab.secret.replaced = true;
         if (!tab.secret.running) {
@@ -1823,6 +1860,7 @@ export class BrowserHost {
     const tab = this.#requireTab(tabId);
     const started = tab.queue.then(() => {
       if (tab.secret) throw new Error("Browser inspection is protected during authentication. Use takeover.");
+      this.#requireNoSecretDocument(tab, "Page evaluation");
       const deadline = Date.now() + timeoutMs;
       const timeoutMessage = "Browser evaluate timed out.";
       let unwound: Promise<void> | undefined;

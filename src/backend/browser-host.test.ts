@@ -156,6 +156,7 @@ import type { BrowserScreencastFrame, BrowserScreencastOptions } from "./browser
 
 const viewFrames = vi.hoisted((): Array<(frame: BrowserScreencastFrame) => void> => []);
 const secretEntry = vi.hoisted(() => vi.fn<(secret: string) => Promise<void>>());
+const secretClear = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 
 vi.mock("./browser-cdp", () => ({
   BrowserCdpEngine: class {
@@ -163,8 +164,12 @@ vi.mock("./browser-cdp", () => ({
     destroy() {}
     invalidateReferences() {}
     async prepareSecret() {
-      return secretEntry;
+      return { enter: secretEntry, clear: secretClear };
     }
+    async evaluate() {
+      return "page value";
+    }
+    async settle() {}
     async startScreencast(_options: BrowserScreencastOptions, onFrame: (frame: BrowserScreencastFrame) => void) {
       viewFrames.push(onFrame);
       return async () => undefined;
@@ -184,6 +189,8 @@ beforeEach(async () => {
   viewFrames.length = 0;
   secretEntry.mockReset();
   secretEntry.mockResolvedValue(undefined);
+  secretClear.mockReset();
+  secretClear.mockResolvedValue(false);
   windowOpenHandlers.length = 0;
   menuTemplates.length = 0;
   clipboardWrites.length = 0;
@@ -905,6 +912,35 @@ describe("secure browser handoff", () => {
     expect(load.mock.calls[0]?.[0]).toBe(tab.url);
     expect(secretEntry).toHaveBeenCalledOnce();
     await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+
+  it("keeps a same-page sign-in step after clearing the fields and blocks evaluation until navigation", async () => {
+    const { tab, prepared, contents } = await prepare("password", 0);
+    const load = vi.spyOn(contents, "loadURL");
+    secretClear.mockResolvedValue(true);
+    const evaluate = () =>
+      host.handleDynamicTool({
+        namespace: "openbot_browser",
+        tool: "evaluate",
+        arguments: { tabId: tab.id, expression: "document.title" },
+        threadId: "thread",
+        ownerAgentId: "agent",
+        turnId: "turn",
+        callId: "evaluate",
+      });
+    vi.useFakeTimers();
+    const submitted = prepared.submit("fixture-password");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("fixture-password"));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(submitted).resolves.toBe("submitted");
+    expect(secretClear).toHaveBeenCalledOnce();
+    expect(load).not.toHaveBeenCalled();
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+    const blocked = await evaluate();
+    expect(blocked.success).toBe(false);
+    expect(JSON.stringify(blocked)).toContain("received a secret");
+    contents.emit("did-navigate", {}, "https://example.com/account");
+    expect((await evaluate()).success).toBe(true);
   });
 
   it("keeps protection when automatic navigation does not replace the document", async () => {
