@@ -657,6 +657,7 @@ describe("channel data in the shared chat", () => {
         superseded: entry.superseded,
         body: entry.message.text,
         streaming: index === 2,
+        status: index === 2 ? "streaming" : "completed",
         replyToMessageId: entry.message.replyToMessageId,
         attachments: entry.message.attachments,
       })),

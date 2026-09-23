@@ -106,6 +106,10 @@ export type SignalClientMessage =
 
 export type SignalServerMessage =
   | { type: "account-profile-changed"; version: SignalProtocolVersion }
+  // The account's server list changed: a membership this user accepted, or one that was revoked.
+  // Sent to every socket that peer's account holds, which is how a server joined on the desktop
+  // reaches the phone paired with it without either of them polling the account service.
+  | { type: "account-servers-changed"; version: SignalProtocolVersion }
   | {
       type: "ready";
       version: SignalProtocolVersion;

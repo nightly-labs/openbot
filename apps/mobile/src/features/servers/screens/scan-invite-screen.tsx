@@ -1,48 +1,40 @@
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
-import { router, Stack } from "expo-router";
-import { Button } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
-import { useState } from "react";
-import { useCSSVariable } from "uniwind";
-import { QrScanner } from "@/features/auth/components/qr-scanner";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
-import { AddServerScreen } from "./add-server-screen";
+import { router } from "expo-router";
+import { Typography } from "heroui-native";
+import { View } from "react-native";
 
+import { QrScanner } from "@/features/auth/components/qr-scanner";
+import { ScannerCloseButton } from "@/features/auth/components/scanner-close-button";
+import { rememberIncomingLink } from "@/features/links/model/incoming-links";
+
+// An inner page of the add-server sheet. The preview fills the whole sheet, so the title and the
+// close control ride over the camera instead of a native header.
 export function ScanInviteScreen() {
-  const [invite, setInvite] = useState<string | null>(null);
-  const foreground = useThemeColor("foreground");
-  const sheetBackground = String(useCSSVariable("--openbot-bg-sheet"));
   return (
-    <>
-      <Stack.Screen
-        options={{
-          headerTintColor: invite ? foreground : undefined,
-          headerStyle: invite ? { backgroundColor: sheetBackground } : undefined,
-          headerLeft: isAndroid
-            ? () => (
-                <Button variant="ghost" onPress={() => router.back()}>
-                  <Button.Label>Cancel</Button.Label>
-                </Button>
-              )
-            : undefined,
-        }}
-      />
-      {isIOS ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button onPress={() => router.back()}>Cancel</Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      ) : null}
-      {invite ? (
-        <AddServerScreen initialInvite={invite} onJoined={() => router.dismissTo("/connected")} />
-      ) : (
-        <QrScanner
-          pairing={false}
-          onScan={async (data) => {
-            parseInviteUrl(data);
-            setInvite(data);
-          }}
-        />
+    <QrScanner
+      embedded
+      pairing={false}
+      onScan={async (data) => {
+        try {
+          parseInviteUrl(data);
+        } catch {
+          throw new Error("This QR code is not an OpenBot invitation.");
+        }
+        // The one-use token stays out of navigation params, as deep links do.
+        const request = rememberIncomingLink({ kind: "invite", url: data });
+        router.dismissTo({ pathname: "/add-server", params: { request } });
+      }}
+      renderOverlay={(camera) => (
+        <View
+          pointerEvents="box-none"
+          className="absolute inset-x-0 top-0 flex-row items-center justify-between gap-3 px-5 py-3"
+        >
+          <Typography.Heading type="h4" className={camera ? "text-white" : undefined}>
+            Scan invitation
+          </Typography.Heading>
+          <ScannerCloseButton disabled={false} onPress={() => router.back()} />
+        </View>
       )}
-    </>
+    />
   );
 }
