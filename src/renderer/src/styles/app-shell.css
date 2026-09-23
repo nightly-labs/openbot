@@ -3241,3 +3241,19 @@ textarea {
   background: var(--openbot-bg-sidebar);
   border-radius: var(--openbot-radius-sm);
 }
+
+/* A server menu item with a second line, such as "Muted until 14:30", like Discord's. */
+.ui-action-menu:not([data-menu-layout="grid"]) .server-rail-menu-detail-item {
+  height: auto;
+}
+
+.server-rail-menu-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.server-rail-menu-detail {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}

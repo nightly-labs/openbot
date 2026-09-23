@@ -100,6 +100,7 @@ import {
 import { ManagedSkillService } from "./managed-skill-service";
 import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
+import { NotificationPreferenceStore } from "./notification-preference-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
@@ -140,6 +141,7 @@ const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
+const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
 const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
@@ -231,6 +233,7 @@ export interface ApplicationServices {
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   language: LanguageService;
+  notificationPreference: NotificationPreferenceStore;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -433,6 +436,10 @@ export async function createApplicationServices({
     systemLocale: app.getLocale(),
   });
   await language.load();
+  const notificationPreference = new NotificationPreferenceStore(
+    join(app.getPath("userData"), NOTIFICATION_PREFERENCE_FILE),
+  );
+  await notificationPreference.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
@@ -1138,6 +1145,7 @@ export async function createApplicationServices({
     updatePreferenceFile,
     approvalAutomation,
     language,
+    notificationPreference,
     agentInitialization,
     hostUpdateCoordinator,
     describeRestartReadiness,

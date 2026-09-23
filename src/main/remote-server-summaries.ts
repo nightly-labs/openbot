@@ -22,6 +22,8 @@ export function remoteServerSummaries(
     {
       id: LOCAL_SERVER_ID,
       notificationsMuted: false,
+      notificationsMutedUntil: null,
+      notificationLevel: "all",
       name: "Local",
       kind: "local",
       state: "online",
@@ -38,6 +40,8 @@ export function remoteServerSummaries(
       return {
         id: server.id,
         notificationsMuted: false,
+        notificationsMutedUntil: null,
+        notificationLevel: "all" as const,
         name: server.name,
         kind: "remote" as const,
         state: status.state,

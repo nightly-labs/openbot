@@ -22,6 +22,7 @@ import {
   SettingsSection,
   SwitchField,
   Text,
+  toast,
 } from "@openbot/ui";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
@@ -69,10 +70,22 @@ interface SettingsGeneralTabProps {
   /** Opens the code sign-in. Absent in the stories, where there is no provider to answer it. */
   onSignInWithCodeProvider?: (provider: AgentProviderId) => void | Promise<void>;
   turboModePending?: boolean;
+  /** Shows one desktop notification now. Absent where there is no operating system to show it. */
+  onTestNotification?: () => void | Promise<void>;
+  /** Opens the operating system notification settings. Absent where the system has no such page. */
+  onOpenNotificationSettings?: () => void | Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
+  const runNotificationAction = (
+    action: () => void | Promise<void>,
+    failed: "settings.testNotification.failed" | "settings.testNotification.openSettingsFailed",
+  ) => {
+    void Promise.resolve()
+      .then(action)
+      .catch(() => toast.error(i18n.t(failed)));
+  };
   const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
     value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
   const customProviders = () => props.customProviders ?? [];
@@ -279,6 +292,43 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.desktopNotifications.title")}
             description={i18n.t("settings.desktopNotifications.description")}
           />
+          <Show when={props.onTestNotification}>
+            {(onTestNotification) => (
+              <Item>
+                <ItemContent>
+                  <ItemTitle>{i18n.t("settings.testNotification.title")}</ItemTitle>
+                  <ItemDescription>{i18n.t("settings.testNotification.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Show when={props.onOpenNotificationSettings}>
+                    {(onOpenNotificationSettings) => (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          runNotificationAction(
+                            onOpenNotificationSettings(),
+                            "settings.testNotification.openSettingsFailed",
+                          )
+                        }
+                      >
+                        {i18n.t("settings.testNotification.openSettings")}
+                      </Button>
+                    )}
+                  </Show>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runNotificationAction(onTestNotification(), "settings.testNotification.failed")}
+                  >
+                    {i18n.t("settings.testNotification.action")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            )}
+          </Show>
           <SwitchField
             checked={props.value.taskCompletionSound}
             onChange={(checked) => props.onUpdateSetting("taskCompletionSound", checked)}

@@ -17,6 +17,9 @@ export const ja = {
   "notification.needsInput": "入力が必要です。",
   "notification.needsApproval": "承認が必要です。",
   "notification.finished": "作業が完了しました。",
+  "notification.failed": "エラーで停止しました。",
+  "notification.test": "通知は正常に動作しています。",
+  "notification.welcome": "エージェントが対応を必要とするときは、ここでお知らせします。",
 
   "dialog.chooseSiteDirectory": "静的サイトのフォルダを選択",
   "dialog.chooseSkill": "スキルのフォルダまたは ZIP を選択",
@@ -77,6 +80,13 @@ export const ja = {
   "settings.notifications.title": "通知",
   "settings.desktopNotifications.title": "デスクトップ通知",
   "settings.desktopNotifications.description": "エージェントに対応が必要なときに通知を表示します。",
+  "settings.testNotification.title": "テスト通知",
+  "settings.testNotification.description":
+    "今すぐ通知を表示します。表示されない場合は、システム設定で OpenBot の通知を許可してください。",
+  "settings.testNotification.action": "テストを送信",
+  "settings.testNotification.failed": "通知を表示できませんでした。",
+  "settings.testNotification.openSettings": "システム設定を開く",
+  "settings.testNotification.openSettingsFailed": "システム設定を開けませんでした。",
   "settings.taskSound.title": "タスクの完了時に音を鳴らす",
   "settings.taskSound.description": "完了したタスクに短い音を使います。",
   "settings.notch.title": "動作",

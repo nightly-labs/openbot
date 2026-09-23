@@ -5,6 +5,7 @@ import type {
   AvatarImageInput,
   CentralAuthUser,
   CustomProviderRestart,
+  DesktopPlatform,
   HostedSitesDesktopApi,
   MobileConnectedDevice,
   SaveCustomProviderInput,
@@ -1164,5 +1165,42 @@ describe("isOpenSettingsShortcut", () => {
     expect(isOpenSettingsShortcut({ key: ".", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false })).toBe(
       false,
     );
+  });
+});
+
+describe("notification settings", () => {
+  function renderSettings(platform: DesktopPlatform, onOpenNotificationSettings: () => Promise<void>) {
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform, variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        onTestNotification={vi.fn(async () => undefined)}
+        onOpenNotificationSettings={onOpenNotificationSettings}
+      />
+    ));
+  }
+
+  it("opens the system page where the user allows notifications", async () => {
+    const onOpenNotificationSettings = vi.fn(async () => undefined);
+    renderSettings("darwin", onOpenNotificationSettings);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open system settings" }));
+    await waitFor(() => expect(onOpenNotificationSettings).toHaveBeenCalledOnce());
+  });
+
+  it("offers no system page on Linux", async () => {
+    renderSettings(
+      "linux",
+      vi.fn(async () => undefined),
+    );
+    await screen.findByRole("button", { name: "Send test" });
+    expect(screen.queryByRole("button", { name: "Open system settings" })).not.toBeInTheDocument();
   });
 });
