@@ -376,19 +376,17 @@ export const CustomProviderList: Story = {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Manage 2 endpoints" }));
     await expect(body.findByRole("button", { name: "Delete Studio Local" })).resolves.toBeTruthy();
-    // The removal asks first. Storybook has no dialog to answer, so the answer is given here.
-    const previousConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      await userEvent.click(body.getByRole("button", { name: "Delete House Router" }));
-      await waitFor(() => expect(body.queryByRole("button", { name: "Delete House Router" })).toBeNull());
-      await expect(body.getByRole("button", { name: "Delete Studio Local" })).toBeVisible();
-      // The last endpoint leaves the dialog on its empty state rather than closing under the hand.
-      await userEvent.click(body.getByRole("button", { name: "Delete Studio Local" }));
-      await expect(body.findByText("No custom endpoints yet.")).resolves.toBeTruthy();
-    } finally {
-      window.confirm = previousConfirm;
-    }
+    // The removal asks first, in a confirmation dialog above the list.
+    await userEvent.click(body.getByRole("button", { name: "Delete House Router" }));
+    const first = await body.findByRole("alertdialog", { name: "Remove House Router?" });
+    await userEvent.click(within(first).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(body.queryByRole("button", { name: "Delete House Router" })).toBeNull());
+    await expect(body.getByRole("button", { name: "Delete Studio Local" })).toBeVisible();
+    // The last endpoint leaves the dialog on its empty state rather than closing under the hand.
+    await userEvent.click(body.getByRole("button", { name: "Delete Studio Local" }));
+    const last = await body.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    await userEvent.click(within(last).getByRole("button", { name: "Remove" }));
+    await expect(body.findByText("No custom endpoints yet.")).resolves.toBeTruthy();
   },
 };
 

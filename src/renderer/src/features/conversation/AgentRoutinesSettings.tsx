@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
-import { Button, CirclePause, Clock3, Dialog, Input, Plus, Switch, Textarea } from "@openbot/ui";
+import { Button, CirclePause, Clock3, ConfirmDialog, Input, Plus, Switch, Textarea } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { errorMessage } from "@openbot/ui/error-message";
@@ -493,30 +493,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           )}
         </Show>
       </div>
-      <Dialog.Root
+      <ConfirmDialog
         open={pendingExit() !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingExit(null);
-        }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay class="agent-memory-confirm-overlay" />
-          <Dialog.Content class="agent-memory-confirm-dialog">
-            <div class="agent-memory-confirm-content">
-              <Dialog.Title>Discard changes?</Dialog.Title>
-              <Dialog.Description>Your unsaved changes to this routine will be lost.</Dialog.Description>
-              <div class="agent-memory-confirm-actions">
-                <Button variant="ghost" type="button" onClick={() => setPendingExit(null)}>
-                  Keep editing
-                </Button>
-                <Button variant="destructive" type="button" onClick={discardChanges}>
-                  Discard changes
-                </Button>
-              </div>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onCancel={() => setPendingExit(null)}
+        onConfirm={discardChanges}
+        title="Discard changes?"
+        description="Your unsaved changes to this routine will be lost."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        initialFocus="cancel"
+      />
     </div>
   );
 }

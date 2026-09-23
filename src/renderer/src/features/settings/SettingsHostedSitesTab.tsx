@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  ConfirmDialog,
   ExternalLink,
   Item,
   ItemActions,
@@ -81,7 +82,7 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                       size="sm"
                       aria-label={`Delete ${site.hostname}`}
                       disabled={props.store.state.busy}
-                      onClick={() => void props.store.deleteSite(site)}
+                      onClick={() => props.store.requestDelete(site)}
                     >
                       <Trash2 size={14} aria-hidden="true" />
                       Delete
@@ -92,6 +93,17 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
             </For>
           </ItemGroup>
         </Show>
+        <ConfirmDialog
+          open={props.store.state.pendingDelete !== null}
+          title={`Delete ${props.store.state.pendingDelete?.hostname ?? ""}?`}
+          description="This address will immediately return 410 Gone."
+          confirmLabel="Delete"
+          pendingLabel="Deleting…"
+          pending={props.store.state.busy}
+          error={props.store.state.deleteError ?? undefined}
+          onCancel={props.store.cancelDelete}
+          onConfirm={props.store.confirmDelete}
+        />
       </Show>
     </SettingsSection>
   );

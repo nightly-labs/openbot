@@ -6,8 +6,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  AlertDialog,
   Button,
+  ConfirmDialog,
   Item,
   ItemActions,
   ItemContent,
@@ -22,6 +22,7 @@ import {
   SettingsSection,
   SwitchField,
   Text,
+  toast,
 } from "@openbot/ui";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
@@ -69,10 +70,22 @@ interface SettingsGeneralTabProps {
   /** Opens the code sign-in. Absent in the stories, where there is no provider to answer it. */
   onSignInWithCodeProvider?: (provider: AgentProviderId) => void | Promise<void>;
   turboModePending?: boolean;
+  /** Shows one desktop notification now. Absent where there is no operating system to show it. */
+  onTestNotification?: () => void | Promise<void>;
+  /** Opens the operating system notification settings. Absent where the system has no such page. */
+  onOpenNotificationSettings?: () => void | Promise<void>;
 }
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
+  const runNotificationAction = (
+    action: () => void | Promise<void>,
+    failed: "settings.testNotification.failed" | "settings.testNotification.openSettingsFailed",
+  ) => {
+    void Promise.resolve()
+      .then(action)
+      .catch(() => toast.error(i18n.t(failed)));
+  };
   const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
     value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
   const customProviders = () => props.customProviders ?? [];
@@ -83,7 +96,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
    */
   const [customSelected, setCustomSelected] = createSignal(false);
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
-  let cancelTurboButton: HTMLButtonElement | undefined;
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
@@ -229,47 +241,20 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <AlertDialog.Root
+      <ConfirmDialog
         open={confirmingTurbo()}
-        onOpenChange={(open) => {
-          if (!open) setConfirmingTurbo(false);
+        tone="default"
+        initialFocus="cancel"
+        title={i18n.t("settings.turbo.confirmTitle")}
+        description={i18n.t("settings.turbo.confirmDescription")}
+        cancelLabel={i18n.t("settings.turbo.confirmCancel")}
+        confirmLabel={i18n.t("settings.turbo.confirmAccept")}
+        onCancel={() => setConfirmingTurbo(false)}
+        onConfirm={() => {
+          setConfirmingTurbo(false);
+          props.onUpdateSetting("turboMode", true);
         }}
-      >
-        <AlertDialog.Portal>
-          <AlertDialog.Overlay class="approval-confirm-backdrop">
-            <AlertDialog.Content
-              class="approval-confirm-dialog"
-              onOpenAutoFocus={(event) => {
-                event.preventDefault();
-                cancelTurboButton?.focus({ preventScroll: true });
-              }}
-            >
-              <AlertDialog.Title>{i18n.t("settings.turbo.confirmTitle")}</AlertDialog.Title>
-              <AlertDialog.Description>{i18n.t("settings.turbo.confirmDescription")}</AlertDialog.Description>
-              <div class="approval-confirm-actions">
-                <Button
-                  ref={cancelTurboButton}
-                  variant="outline"
-                  type="button"
-                  onClick={() => setConfirmingTurbo(false)}
-                >
-                  {i18n.t("settings.turbo.confirmCancel")}
-                </Button>
-                <Button
-                  variant="default"
-                  type="button"
-                  onClick={() => {
-                    setConfirmingTurbo(false);
-                    props.onUpdateSetting("turboMode", true);
-                  }}
-                >
-                  {i18n.t("settings.turbo.confirmAccept")}
-                </Button>
-              </div>
-            </AlertDialog.Content>
-          </AlertDialog.Overlay>
-        </AlertDialog.Portal>
-      </AlertDialog.Root>
+      />
 
       <SettingsSection title={i18n.t("settings.notifications.title")}>
         <ItemGroup class="settings-modal-card">
@@ -279,6 +264,43 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             label={i18n.t("settings.desktopNotifications.title")}
             description={i18n.t("settings.desktopNotifications.description")}
           />
+          <Show when={props.onTestNotification}>
+            {(onTestNotification) => (
+              <Item>
+                <ItemContent>
+                  <ItemTitle>{i18n.t("settings.testNotification.title")}</ItemTitle>
+                  <ItemDescription>{i18n.t("settings.testNotification.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Show when={props.onOpenNotificationSettings}>
+                    {(onOpenNotificationSettings) => (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          runNotificationAction(
+                            onOpenNotificationSettings(),
+                            "settings.testNotification.openSettingsFailed",
+                          )
+                        }
+                      >
+                        {i18n.t("settings.testNotification.openSettings")}
+                      </Button>
+                    )}
+                  </Show>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runNotificationAction(onTestNotification(), "settings.testNotification.failed")}
+                  >
+                    {i18n.t("settings.testNotification.action")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            )}
+          </Show>
           <SwitchField
             checked={props.value.taskCompletionSound}
             onChange={(checked) => props.onUpdateSetting("taskCompletionSound", checked)}

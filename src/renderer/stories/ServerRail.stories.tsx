@@ -8,6 +8,7 @@ const args: Parameters<typeof ServerRail>[0] = {
   servers: STORY_SERVERS,
   onSelect: fn(),
   onSetMuted: fn(),
+  onSetNotificationLevel: fn(),
   onReorder: fn(),
   onAdd: fn(),
   onOpenSettings: fn(),
@@ -59,6 +60,7 @@ function InteractiveServerRail(props: Parameters<typeof ServerRail>[0]) {
         props.onReorder(serverIds);
       }}
       onSetMuted={props.onSetMuted}
+      onSetNotificationLevel={props.onSetNotificationLevel}
       onAdd={props.onAdd}
       onOpenSettings={props.onOpenSettings}
       onOpenUsage={props.onOpenUsage}
@@ -292,4 +294,27 @@ export const RemoteSelected: Story = {
 
 export const Muted: Story = {
   args: { servers: STORY_SERVERS.map((server) => ({ ...server, notificationsMuted: server.kind === "remote" })) },
+};
+
+/** A remote server muted for one hour, with its menu open on the unmute item and the level choice. */
+export const MutedUntil: Story = {
+  args: {
+    servers: STORY_SERVERS.map((server) =>
+      server.kind === "remote"
+        ? {
+            ...server,
+            notificationsMuted: true,
+            notificationsMutedUntil: Date.now() + 3_600_000,
+            notificationLevel: "needs-me" as const,
+          }
+        : server,
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await fireEvent.contextMenu(canvas.getByRole("button", { name: /notifications muted/ }));
+    const page = within(canvasElement.ownerDocument.body);
+    await expect(await page.findByRole("menuitem", { name: /Unmute server.*Muted until/ })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /Notification settings.*Only when it needs me/ })).toBeVisible();
+  },
 };

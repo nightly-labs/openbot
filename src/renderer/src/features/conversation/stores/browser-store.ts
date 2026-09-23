@@ -46,8 +46,8 @@ function browserAddressUrl(value: string): string {
 }
 
 export interface BrowserPanels {
+  activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode) => void;
-  screenOpen: () => boolean;
 }
 
 export interface BrowserStoreDeps {
@@ -72,6 +72,11 @@ export interface BrowserStoreDeps {
 export function createBrowserStore(deps: BrowserStoreDeps) {
   const browserInteractionAvailable = () =>
     deps.props.browserEnabled !== false && !deps.props.browserVisibilitySuspended;
+  const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser";
+  const browserExpandedOpen = () =>
+    browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-expanded";
+  const browserPipOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-pip";
+  const screenOpen = () => browserSidebarOpen() || browserExpandedOpen() || browserPipOpen();
   const browserTabs = createMemo(() => {
     if (deps.props.browserEnabled === false) return [];
     const agent = deps.props.agent;
@@ -191,7 +196,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   };
   let previousBrowserTabCount = 0;
   createEffect(
-    () => ({ count: browserTabs().length, open: deps.panels.screenOpen() }),
+    () => ({ count: browserTabs().length, open: screenOpen() }),
     ({ count, open }) => {
       if (deps.props.browserEnabled === false) return;
       const browserWasClosed = open && previousBrowserTabCount > 0 && count === 0;
@@ -398,6 +403,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
 
   return {
     browserInteractionAvailable,
+    browserSidebarOpen,
+    browserExpandedOpen,
+    browserPipOpen,
+    screenOpen,
     browserTabs,
     activeBrowserTab,
     browserTakeoverTab,

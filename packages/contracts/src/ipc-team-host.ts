@@ -31,8 +31,37 @@ export interface ServerCompatibility {
   capabilities: string[];
 }
 
+// How much of a server's agent activity reaches the desktop as an OS notification. "needs-me" keeps
+// only input requests and approvals.
+export type ServerNotificationLevel = "all" | "needs-me" | "nothing";
+export const SERVER_NOTIFICATION_LEVELS: readonly ServerNotificationLevel[] = ["all", "needs-me", "nothing"];
+
+// The timed mute choices the server menu offers. A mute without a duration lasts until it is undone.
+export const SERVER_MUTE_DURATIONS_MS: readonly number[] = [
+  15 * 60_000,
+  60 * 60_000,
+  3 * 60 * 60_000,
+  8 * 60 * 60_000,
+  24 * 60 * 60_000,
+];
+
+export interface SetServerMutedInput {
+  serverId: string;
+  muted: boolean;
+  // One of `SERVER_MUTE_DURATIONS_MS`. Absent means the mute lasts until the user undoes it.
+  durationMs?: number;
+}
+
+export interface SetServerNotificationLevelInput {
+  serverId: string;
+  level: ServerNotificationLevel;
+}
+
 export interface ServerSummary {
   notificationsMuted: boolean;
+  // Epoch milliseconds when a timed mute ends; null for no mute or a mute without an end.
+  notificationsMutedUntil: number | null;
+  notificationLevel: ServerNotificationLevel;
   id: string;
   name: string;
   kind: "local" | "remote";

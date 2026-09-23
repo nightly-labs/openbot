@@ -166,7 +166,7 @@ export const UnsavedChangesConfirmation: Story = {
     await userEvent.type(canvas.getByRole("textbox", { name: "Name" }), "Changed morning brief");
     await userEvent.click(canvas.getByRole("button", { name: "Back to Routines" }));
     const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("dialog")).toHaveAccessibleName("Discard changes?");
+    await expect(await body.findByRole("alertdialog")).toHaveAccessibleName("Discard changes?");
     await expect(body.getByRole("button", { name: "Keep editing" })).toBeInTheDocument();
     await expect(body.getByRole("button", { name: "Discard changes" })).toBeInTheDocument();
   },

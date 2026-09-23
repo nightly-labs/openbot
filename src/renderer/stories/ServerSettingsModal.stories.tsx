@@ -297,7 +297,8 @@ export const RemoveMemberConfirmation: Story = {
     await userEvent.click(body.getByRole("tab", { name: "Members" }));
     await userEvent.click(body.getByRole("button", { name: "Actions for Jon Bell" }));
     await userEvent.click(await body.findByRole("menuitem", { name: "Remove member" }));
-    await expect(await body.findByRole("alertdialog", { name: "Remove Jon Bell?" })).toBeVisible();
+    const confirmation = await body.findByRole("alertdialog", { name: "Remove Jon Bell?" });
+    await waitFor(() => expect(confirmation).toBeVisible());
   },
 };
 

@@ -184,7 +184,7 @@ describe("AgentRoutinesSettings", () => {
     await fireEvent.input(name, { target: { value: "Changed morning brief" } });
     await fireEvent.click(screen.getByRole("button", { name: "Back to Routines" }));
 
-    expect(screen.getByRole("dialog")).toHaveAccessibleName("Discard changes?");
+    expect(screen.getByRole("alertdialog")).toHaveAccessibleName("Discard changes?");
     await fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Changed morning brief");
 

@@ -94,8 +94,7 @@ needs a closer read than a large copy change.
 | Diff touches | Directive |
 | --- | --- |
 | Only documentation, comments, localization strings, Storybook stories, or tests with no production change | none (the workflow picks `chatgpt-web/medium` itself) |
-| Ordinary product code in one workspace | none (the default, `chatgpt-web/high`) |
-| IPC contracts, persisted state, provider processes, queues and crash recovery, the updater, or several workspaces at once | `NorbiAI-Model: chatgpt-web/extra-high` |
+| Ordinary product code, IPC contracts, persisted state, provider processes, queues and crash recovery, the updater, or several workspaces at once | none (the default, `chatgpt-web/extra-high`) |
 | A [non-negotiable](AGENTS.md#non-negotiable) area: migrations, a released Team API wire protocol, the renderer-to-main trust boundary, secret redaction, or licensing | `NorbiAI-Model: chatgpt-web/pro` |
 
 When unsure between two rows, take the higher one. Do not lower the level to get a faster result on

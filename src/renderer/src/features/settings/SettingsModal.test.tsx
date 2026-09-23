@@ -5,6 +5,7 @@ import type {
   AvatarImageInput,
   CentralAuthUser,
   CustomProviderRestart,
+  DesktopPlatform,
   HostedSitesDesktopApi,
   MobileConnectedDevice,
   SaveCustomProviderInput,
@@ -13,7 +14,7 @@ import type {
 import { toast } from "@openbot/ui";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
@@ -569,7 +570,6 @@ describe("SettingsModal", () => {
       replace: vi.fn(async () => site),
       delete: vi.fn(async () => undefined),
     };
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(() => (
       <SettingsModal
         open
@@ -590,9 +590,10 @@ describe("SettingsModal", () => {
     expect(await screen.findByText(site.hostname)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: `Delete ${site.hostname}` }));
 
-    expect(window.confirm).toHaveBeenCalledWith(
-      `Delete ${site.hostname}? This address will immediately return 410 Gone.`,
-    );
+    const confirmation = await screen.findByRole("alertdialog", { name: `Delete ${site.hostname}?` });
+    expect(confirmation).toHaveAccessibleDescription("This address will immediately return 410 Gone.");
+    expect(hostedSitesApi.delete).not.toHaveBeenCalled();
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(hostedSitesApi.delete).toHaveBeenCalledWith({ siteId: site.id }));
     await waitFor(() => expect(hostedSitesApi.list).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText(site.hostname)).not.toBeInTheDocument());
@@ -894,7 +895,6 @@ describe("SettingsModal", () => {
   // run only after the user answers the question.
   it("removes a custom endpoint only after the confirmation is accepted", async () => {
     const onDeleteCustomProvider = vi.fn<(id: string) => Promise<CustomProviderRestart>>(async () => "restarted");
-    vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
     render(() => (
       <SettingsModal
         open
@@ -925,12 +925,17 @@ describe("SettingsModal", () => {
     // The endpoints are listed in a dialog now, which the count on the Custom provider row opens.
     await fireEvent.click(screen.getByRole("button", { name: "Manage 1 endpoint" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Delete Studio Local" }));
-    expect(window.confirm).toHaveBeenCalledWith(
-      "Remove Studio Local? Its API key is discarded, its models disappear from the picker, and any agent using one falls back to a default model.",
+    const declined = await screen.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    expect(declined).toHaveAccessibleDescription(
+      "Its API key is discarded, its models disappear from the picker, and any agent using one falls back to a default model.",
     );
+    await fireEvent.click(within(declined).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(onDeleteCustomProvider).not.toHaveBeenCalled();
 
     await fireEvent.click(screen.getByRole("button", { name: "Delete Studio Local" }));
+    const accepted = await screen.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    await fireEvent.click(within(accepted).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onDeleteCustomProvider).toHaveBeenCalledWith("studio-local"));
     // The outcome is read inside the dialog, which stays open: the section behind it is hidden.
     expect(await screen.findByRole("status")).toHaveTextContent("Removed. OpenBot is loading the models.");
@@ -1164,5 +1169,42 @@ describe("isOpenSettingsShortcut", () => {
     expect(isOpenSettingsShortcut({ key: ".", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false })).toBe(
       false,
     );
+  });
+});
+
+describe("notification settings", () => {
+  function renderSettings(platform: DesktopPlatform, onOpenNotificationSettings: () => Promise<void>) {
+    render(() => (
+      <SettingsModal
+        open
+        onOpenChange={() => undefined}
+        value={DEFAULT_GENERAL_SETTINGS}
+        onValueChange={() => undefined}
+        appInfo={{ name: "OpenBot", version: "0.2.1", platform, variant: "dev" }}
+        updateStatus={idleUpdateStatus}
+        onUpdateAction={vi.fn(async () => undefined)}
+        account={account}
+        onUpdateAccountName={vi.fn(async () => undefined)}
+        onUpdateAccountAvatar={vi.fn(async () => undefined)}
+        onTestNotification={vi.fn(async () => undefined)}
+        onOpenNotificationSettings={onOpenNotificationSettings}
+      />
+    ));
+  }
+
+  it("opens the system page where the user allows notifications", async () => {
+    const onOpenNotificationSettings = vi.fn(async () => undefined);
+    renderSettings("darwin", onOpenNotificationSettings);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open system settings" }));
+    await waitFor(() => expect(onOpenNotificationSettings).toHaveBeenCalledOnce());
+  });
+
+  it("offers no system page on Linux", async () => {
+    renderSettings(
+      "linux",
+      vi.fn(async () => undefined),
+    );
+    await screen.findByRole("button", { name: "Send test" });
+    expect(screen.queryByRole("button", { name: "Open system settings" })).not.toBeInTheDocument();
   });
 });

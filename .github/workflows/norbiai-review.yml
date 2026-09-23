@@ -144,7 +144,7 @@ jobs:
       # plus whatever the pull request or the review request overrode, and the override is
       # scoped to that one run: nothing here is written back, so the next pull request
       # starts from these values again.
-      DEFAULT_MODEL: chatgpt-web/high
+      DEFAULT_MODEL: chatgpt-web/extra-high
       # The default instead, when every changed file is documentation, a story, a test or a
       # message table. Has to be on `ALLOWED_MODELS`.
       LOW_RISK_MODEL: chatgpt-web/medium

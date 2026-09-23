@@ -525,8 +525,7 @@
   color: var(--openbot-text-muted);
 }
 
-.agent-memories-overlay,
-.agent-memory-confirm-overlay {
+.agent-memories-overlay {
   position: fixed;
   inset: 0;
 }
@@ -535,17 +534,11 @@
   z-index: var(--openbot-layer-dialog);
 }
 
-.agent-memory-confirm-overlay {
-  z-index: calc(var(--openbot-layer-dialog) + 2);
-}
-
-.agent-memories-overlay[data-expanded],
-.agent-memory-confirm-overlay[data-expanded] {
+.agent-memories-overlay[data-expanded] {
   animation: agent-dialog-overlay-in var(--openbot-duration-dialog) ease;
 }
 
-.agent-memories-overlay[data-closed],
-.agent-memory-confirm-overlay[data-closed] {
+.agent-memories-overlay[data-closed] {
   animation: agent-dialog-overlay-out var(--openbot-duration-dialog) ease;
 }
 
@@ -1048,27 +1041,11 @@
   display: none;
 }
 
-.agent-memory-confirm-dialog {
-  position: fixed;
-  z-index: calc(var(--openbot-layer-dialog) + 3);
-  top: 50%;
-  left: 50%;
-  width: min(430px, calc(100vw - 32px));
-  outline: none;
-  background: var(--openbot-bg-control);
-  padding: var(--openbot-space-4);
-  color: var(--openbot-text-primary);
-  transform: translate(-50%, -50%);
-  transform-origin: center;
-}
-
-.agent-memories-modal[data-expanded],
-.agent-memory-confirm-dialog[data-expanded] {
+.agent-memories-modal[data-expanded] {
   animation: agent-dialog-content-in var(--openbot-duration-dialog) ease;
 }
 
-.agent-memories-modal[data-closed],
-.agent-memory-confirm-dialog[data-closed] {
+.agent-memories-modal[data-closed] {
   animation: agent-dialog-content-out var(--openbot-duration-dialog) ease;
 }
 
@@ -1098,27 +1075,6 @@
   }
 }
 
-.agent-memory-confirm-content h2 {
-  margin: 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xl);
-  font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-xl);
-}
-
-.agent-memory-confirm-content > p:not(.agent-memory-error) {
-  margin: var(--openbot-space-2) 0 var(--openbot-space-4);
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
-}
-
-.agent-memory-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--openbot-space-2);
-}
-
 @media (max-width: 520px) {
   .agent-memories-modal {
     width: calc(100vw - 24px);
@@ -1132,9 +1088,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .agent-memories-overlay,
-  .agent-memory-confirm-overlay,
-  .agent-memories-modal,
-  .agent-memory-confirm-dialog {
+  .agent-memories-modal {
     animation: none;
   }
 }

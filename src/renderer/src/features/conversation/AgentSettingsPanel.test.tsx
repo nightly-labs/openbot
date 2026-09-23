@@ -412,7 +412,7 @@ describe("AgentSettingsPanel", () => {
     ));
     await fireEvent.pointerDown(await screen.findByRole("button", { name: `More for ${skill.name}` }), { button: 0 });
     await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Repair" }), { button: 0 });
-    const confirm = await screen.findByRole("dialog", { name: "Replace local changes?" });
+    const confirm = await screen.findByRole("alertdialog", { name: "Replace local changes?" });
     expect(install).not.toHaveBeenCalled();
     await fireEvent.click(within(confirm).getByRole("button", { name: "Replace skill" }));
     await waitFor(() =>

@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -67,7 +67,7 @@ describe("dynamic island preference store", () => {
     });
   });
 
-  it("migrates version 3 preferences with the default size", async () => {
+  it("reads version 3 preferences without a size at the default size", async () => {
     const root = await temporaryRoot();
     const path = join(root, "dynamic-island.json");
     await writeFile(
@@ -89,7 +89,7 @@ describe("dynamic island preference store", () => {
     const path = join(root, "dynamic-island.json");
     await writeFile(
       path,
-      '{"version":4,"enabled":true,"hapticsEnabled":false,"idleVisible":true,"additionalDisplaysEnabled":false,"widthPercent":5,"heightPercent":110}\n',
+      '{"version":3,"enabled":true,"hapticsEnabled":false,"idleVisible":true,"additionalDisplaysEnabled":false,"widthPercent":5,"heightPercent":110}\n',
     );
     await expect(readDynamicIslandPreference(path)).resolves.toEqual({
       enabled: true,
@@ -101,7 +101,7 @@ describe("dynamic island preference store", () => {
     });
   });
 
-  it("persists a version 4 preference atomically", async () => {
+  it("persists the size in a version 3 file that older builds still read", async () => {
     const root = await temporaryRoot();
     const path = join(root, "dynamic-island.json");
     const preference = {
@@ -114,6 +114,7 @@ describe("dynamic island preference store", () => {
     };
     await expect(writeDynamicIslandPreference(path, preference)).resolves.toEqual(preference);
     await expect(readDynamicIslandPreference(path)).resolves.toEqual(preference);
+    expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ version: 3, ...preference });
   });
 });
 

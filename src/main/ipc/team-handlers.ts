@@ -21,6 +21,7 @@ import {
   parseReorderServers,
   parseSendDirectMessage,
   parseSetServerMuted,
+  parseSetServerNotificationLevel,
   parseSetTeamTyping,
   parseUpdateTeamMember,
 } from "./server-inputs";
@@ -41,8 +42,15 @@ export function teamIpcHandlers({
 }: TeamIpcDependencies): Pick<IpcGroupHandlers, "servers" | "host" | "remoteDesktop"> {
   return {
     servers: {
-      setMuted: payloadHandler(parseSetServerMuted, ({ serverId, muted }) =>
-        remoteServers.setMuted(serverId, muted).then((servers) => withLocalHostSummary(servers, host.getStatus())),
+      setMuted: payloadHandler(parseSetServerMuted, ({ serverId, muted, durationMs }) =>
+        remoteServers
+          .setMuted(serverId, muted, durationMs)
+          .then((servers) => withLocalHostSummary(servers, host.getStatus())),
+      ),
+      setNotificationLevel: payloadHandler(parseSetServerNotificationLevel, ({ serverId, level }) =>
+        remoteServers
+          .setNotificationLevel(serverId, level)
+          .then((servers) => withLocalHostSummary(servers, host.getStatus())),
       ),
       list: handler(() => withLocalHostSummary(remoteServers.list(), host.getStatus())),
       select: payloadHandler(stringPayload("serverId"), (serverId) =>
