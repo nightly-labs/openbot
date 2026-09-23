@@ -87,7 +87,7 @@ const LEGACY_AVATAR_COLORS = [
 ] as const;
 
 export const NEW_AGENT_PREVIEW = "No messages yet";
-export const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-5.6-luna";
+export const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
 // A provider CLI reports the effort its own configuration uses -- Codex says `medium` for every
 // GPT-5.6 model -- which is not the one this product leads with: a new agent starts on the fast

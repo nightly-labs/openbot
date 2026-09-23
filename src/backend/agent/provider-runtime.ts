@@ -331,12 +331,20 @@ function claudeModelName(id: string): string | null {
 const FALLBACK_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
-    id: "gpt-5.6-luna",
-    name: "GPT-5.6 Luna",
+    id: "gpt-6-luna",
+    name: "GPT-6 Luna",
     description: "Fast and efficient for everyday agent work.",
     // `DEFAULT_REASONING_EFFORT`, not the `medium` the Codex CLI reports: this is the model a new
     // agent starts on, and the two have to say the same thing.
     defaultReasoningEffort: "low",
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+  {
+    provider: "codex",
+    id: "gpt-5.6-luna",
+    name: "GPT-5.6 Luna",
+    description: "Older fast and efficient model.",
+    defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
   {
@@ -360,6 +368,14 @@ const FALLBACK_MODELS: AgentModelOption[] = [
     id: "claude-fable-5",
     name: "Claude Fable 5",
     description: "Fast Claude model for everyday agent work.",
+    defaultReasoningEffort: "high",
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+  {
+    provider: "claude",
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    description: "Most capable Claude model for complex work.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },

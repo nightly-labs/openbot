@@ -2308,7 +2308,7 @@ describe.sequential("AgentService: providers", () => {
       const params = paramsRecord(start.params);
       if (!params) throw new Error("The fake thread request has no parameters.");
       expect(params).toMatchObject({
-        model: "gpt-5.6-luna",
+        model: "gpt-6-luna",
         approvalPolicy: "on-request",
         sandbox: "danger-full-access",
         ephemeral: false,
@@ -2386,7 +2386,7 @@ describe.sequential("AgentService: providers", () => {
       const params = paramsRecord(turn.params);
       if (!params) throw new Error("The fake turn request has no parameters.");
       expect(params).toMatchObject({
-        model: "gpt-5.6-luna",
+        model: "gpt-6-luna",
         effort: "low",
         approvalPolicy: "on-request",
         sandboxPolicy: { type: "dangerFullAccess" },

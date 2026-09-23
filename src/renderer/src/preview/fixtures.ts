@@ -121,6 +121,14 @@ export const STORY_SHARED_TABLES: SharedTable[] = [
 export const STORY_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
+    id: "gpt-6-luna",
+    name: "GPT-6 Luna",
+    description: "Fast and efficient for everyday agent work.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "codex",
     id: "gpt-5.6-luna",
     name: "GPT-5.6 Luna",
     description: "Fast and efficient for everyday agent work.",
@@ -142,6 +150,14 @@ export const STORY_MODELS: AgentModelOption[] = [
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["medium", "high", "xhigh"],
+  },
+  {
+    provider: "claude",
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    description: "Most capable Claude model for complex work.",
+    defaultReasoningEffort: "high",
+    supportedReasoningEfforts: ["low", "medium", "high"],
   },
   {
     provider: "claude",
