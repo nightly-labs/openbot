@@ -69,7 +69,27 @@ mock. The separate web preview implements the browser runtime with that same moc
   result require closing the form and refreshing before another attempt.
 - The browser-view transport uses the existing host stream and input protocol. The shared
   panel is available only when the host advertises browser control and browser view.
-- No full remote desktop, push notifications, or offline operation is included.
+- No full remote desktop, push notifications, or offline operation is included. See
+  [Remote desktop](#remote-desktop) for the reason.
+
+## Remote desktop
+
+The Moonlight Web viewer already runs as browser code: it uses WebRTC and WebCodecs, with the
+host's TURN servers. Only its loading and its signaling socket depend on Electron. On desktop,
+`RemoteViewerProxy` serves the viewer from a local origin and sends its HTTP requests and
+signaling socket over the host connection.
+
+The browser has no such proxy. The viewer is code from the host, so it must not run in the web
+app origin: there it could use the account cookie and read the web app page. An opaque sandboxed
+iframe is not sufficient. The viewer reads `location` to find its session and signaling path, it
+loads about 100 relative ES modules, and it starts a module Worker from `import.meta.url`.
+A Service Worker cannot control an opaque iframe. To serve the viewer there, the client would
+have to rewrite and bundle the host's code.
+
+A possible design uses a separate viewer origin, for example `viewer.openbot.run`, on the same
+Worker. That origin serves only a trusted bootstrap page and a Service Worker. The Service Worker
+sends viewer requests to the web app. The web app sends them over the host connection, limited
+to one remote-screen session. On 2026-09-23 the user decided not to add this origin for the MVP.
 
 ## Local checks
 
@@ -287,8 +307,7 @@ Biome checks. The live in-app browser check covered a new account with no hosts,
 invitation feedback, logout, sign-in to the development host, and opening/closing the existing
 remote browser view. No browser console errors were observed in that run.
 
-Full remote desktop is deferred: its existing UI depends on a native viewer proxy that has no
-browser transport equivalent. Remote browser viewing and takeover use the existing host API.
+Full remote desktop is deferred (see [Remote desktop](#remote-desktop)). Remote browser viewing and takeover use the existing host API.
 The earlier live-test gaps remain documented above; focused tests do not establish full live
 two-host or competing-owner coverage. Broad checks remain assigned to CI. Development remains
 running, and the public release flag has not been enabled.
