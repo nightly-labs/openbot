@@ -424,7 +424,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         bootstrap = await this.#options.issueTicket(sessionId, clientPublicKey);
         await this.#assertCurrent(hostId, active, sessionId);
       } catch (error) {
-        if (!existingSessionId) throw error;
+        // Only an ended session is replaced. Another failure keeps it, so a retry costs one ticket.
+        if (!existingSessionId || !isEndedSessionError(error)) throw error;
         await this.#options.endSession(existingSessionId).catch(() => undefined);
         const session = await this.#options.startSession(hostId);
         sessionId = session.sessionId;
@@ -846,4 +847,9 @@ function binaryBody(value: unknown): Uint8Array | null {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
   return null;
+}
+
+/** The account API answers 403 or 404 for a session that ended, expired, or does not exist. */
+function isEndedSessionError(error: unknown): boolean {
+  return error instanceof Error && "status" in error && (error.status === 403 || error.status === 404);
 }

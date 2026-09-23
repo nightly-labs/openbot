@@ -656,7 +656,20 @@ describe("TeamWebRtcClientTransport", () => {
     expect(issueTicket).toHaveBeenNthCalledWith(2, "session-1", expect.stringContaining("PUBLIC KEY"));
     expect(endSession).not.toHaveBeenCalled();
 
-    await transport.stop();
+    // A temporary account API failure keeps the session; only an ended session is replaced.
+    const apiError = (status: number) => Object.assign(new Error(`status ${status}`), { status });
+    issueTicket.mockRejectedValueOnce(apiError(503));
+    await expect(transport.connect("host-1")).rejects.toThrow("status 503");
+    expect(startSession).toHaveBeenCalledOnce();
+    expect(endSession).not.toHaveBeenCalled();
+    issueTicket.mockRejectedValueOnce(apiError(403));
+    const replaced = transport.connect("host-1");
+    await vi.waitFor(() => expect(connectBridge).toHaveBeenCalledTimes(3));
+    rejectBridge(new Error("bridge failed"));
+    await expect(replaced).rejects.toThrow("bridge failed");
     expect(endSession).toHaveBeenCalledWith("session-1");
+    expect(startSession).toHaveBeenCalledTimes(2);
+
+    await transport.stop();
   });
 });
