@@ -18,7 +18,7 @@ import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AgentClient } from "./agent-client";
+import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
 import type { CustomProviderConfig } from "./opencode-config";
 import {
@@ -97,6 +97,11 @@ process.stdout.on("error", (error) => {
 });
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
+  // A CLI that fails at start: it reads the request, says why on stderr, and exits unanswered.
+  if (process.env.OPENBOT_FAKE_ACP_CRASH) {
+    process.stderr.write("Error: " + process.env.OPENBOT_FAKE_ACP_CRASH + NL);
+    process.exit(3);
+  }
   buffer += chunk;
   let index = buffer.indexOf(NL);
   while (index >= 0) {
@@ -420,6 +425,23 @@ describe("OpenCode ACP environment", () => {
     await expect(client.request("initialize", {}, decodeRecordResponse)).rejects.toThrow(
       "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
     );
+  });
+
+  it("reports why OpenCode stopped instead of a closed connection", async () => {
+    const fake = await createFakeOpencodeAgent("managed");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CRASH", "config key OPENCODE_API_KEY=sk-live-secret is invalid");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    // The SDK rejects with "ACP connection closed" as soon as stdout ends. That phrase was all a user
+    // saw when an update's CLI failed to start, so the exit and the CLI's own reason replace it.
+    const failure = client.request("initialize", {}, decodeRecordResponse);
+    await expect(failure).rejects.toBeInstanceOf(AgentProcessExitError);
+    await expect(failure).rejects.toThrow("OpenCode stopped before it answered (exit code 3).");
+    const error = await failure.catch((reason: unknown) => reason);
+    if (!(error instanceof AgentProcessExitError)) throw error;
+    const reported = error.withDetail((text) => text).message;
+    expect(reported).toMatch(/^OpenCode stopped before it answered \(exit code 3\)\. Error: config key /u);
+    expect(reported).not.toContain("sk-live-secret");
   });
 
   it("refuses the prompt when the endpoint was removed while the turn was prepared", async () => {

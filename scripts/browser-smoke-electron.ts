@@ -7,6 +7,7 @@ import { app, BrowserWindow, type WebContents, webContents } from "electron";
 import { BrowserHost } from "../src/backend/browser-host";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
 import { runSecretHandoffScenario } from "./browser-secret-smoke";
+import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
@@ -507,6 +508,9 @@ async function main(): Promise<void> {
       throw new Error("Browser fill-mode status did not use the current panel bounds.");
     }
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    const localContents = webContents.getFocusedWebContents();
+    if (!localContents) throw new Error("The local tab lost focus.");
+    await waitForPresentedFrame(localContents);
     process.stdout.write("BrowserHost: local tab opened.\n");
     const first = await browser.snapshot(tab.id);
     const input = first.elements.find((element) => element.name === "Task");
