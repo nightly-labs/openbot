@@ -127,7 +127,7 @@ export function AgentRuntimeFields({
                 {selected?.supportedReasoningEfforts.map((effort) => (
                   <Picker.Item
                     key={effort}
-                    label={effort === "xhigh" ? "Extra high" : effort[0].toUpperCase() + effort.slice(1)}
+                    label={effort === "xhigh" ? "Extra high" : effort.charAt(0).toUpperCase() + effort.slice(1)}
                     value={effort}
                   />
                 ))}

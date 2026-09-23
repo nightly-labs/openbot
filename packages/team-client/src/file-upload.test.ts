@@ -18,7 +18,7 @@ describe("mobile file upload", () => {
     await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
     await sender.cancelUpload();
     await rejected;
-    expect(decodeTeamProtocolV2FileControlFrame(send.mock.calls[1][0])).toMatchObject({
+    expect(decodeTeamProtocolV2FileControlFrame(send.mock.calls[1]?.[0])).toMatchObject({
       type: "file-cancel",
       transferId,
     });

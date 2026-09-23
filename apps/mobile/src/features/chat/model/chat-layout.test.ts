@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import {
   CHAT_HISTORY_BATCH,
   type ChatLayout,
@@ -92,7 +92,9 @@ it("bounds the reveal tail and retains all text when words finish or the stream 
     size: 14,
     text: body,
   });
-  const completed = body.slice(0, window.words[window.words.length - 1].end);
+  const lastWord = window.words[window.words.length - 1];
+  assert(lastWord);
+  const completed = body.slice(0, lastWord.end);
   expect([
     streamRevealWindow(body, completed, true),
     streamRevealWindow("replacement", body, true),
@@ -126,8 +128,9 @@ describe("chat history window", () => {
     let start = chatHistoryStart(messages, 48, empty);
     const revealed = messages.slice(start);
     while (start > 0) {
-      const firstId = messages[Math.max(0, start - CHAT_HISTORY_BATCH)].id;
-      const next = chatHistoryStart(messages, 48, { firstId, headId: "0" });
+      const first = messages[Math.max(0, start - CHAT_HISTORY_BATCH)];
+      assert(first);
+      const next = chatHistoryStart(messages, 48, { firstId: first.id, headId: "0" });
       revealed.unshift(...messages.slice(next, start));
       start = next;
     }

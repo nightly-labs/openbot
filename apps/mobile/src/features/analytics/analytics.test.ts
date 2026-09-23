@@ -1,5 +1,5 @@
 import { RemoteTeamDirectoryClient } from "@openbot/team-client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileChannelStore } from "../channels/model/channel-store";
 import { MobileConversationStore } from "../workspace/model/conversation-store";
 import type { MobileWorkspaceContextValue } from "../workspace/model/workspace-types";
@@ -225,7 +225,9 @@ describe("installed React Native SDK", () => {
     if (kind === "track") mobileAnalytics.track("usage_viewed", {});
     await vi.advanceTimersByTimeAsync(0);
     expect(requests).toHaveLength(1);
-    expect(JSON.parse(requests[0]).type).toBe(kind);
+    const [request] = requests;
+    assert(request);
+    expect(JSON.parse(request).type).toBe(kind);
     expect(vi.getTimerCount()).toBeGreaterThan(0);
 
     mobileAnalytics.setEnabled(false);
@@ -237,7 +239,9 @@ describe("installed React Native SDK", () => {
     expect(requests.map((body) => JSON.parse(body).type)).toEqual(
       kind === "identify" ? ["identify", "identify", "track"] : ["track", "identify", "track"],
     );
-    expect(JSON.parse(requests[requests.length - 1]).payload.name).toBe("mobile_app_opened");
+    const lastRequest = requests[requests.length - 1];
+    assert(lastRequest);
+    expect(JSON.parse(lastRequest).payload.name).toBe("mobile_app_opened");
   });
 
   it("uses the native endpoint and strips SDK referrers, identifiers and content from actual HTTP requests", async () => {

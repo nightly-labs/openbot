@@ -625,7 +625,7 @@ export class RemoteControlPlane {
         .bind(now, invite.host_id, user.id),
       this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now),
     ]);
-    if ((accepted[2].meta.changes ?? 0) !== 1 || (accepted[3].meta.changes ?? 0) !== 1) {
+    if ((accepted[2]?.meta.changes ?? 0) !== 1 || (accepted[3]?.meta.changes ?? 0) !== 1) {
       throw new RemoteControlPlaneError(409, "invite_already_used", "The invitation was already used.");
     }
     const membership = await this.#database

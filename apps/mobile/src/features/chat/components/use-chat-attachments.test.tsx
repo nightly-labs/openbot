@@ -2,7 +2,7 @@ import { ATTACHMENT_FILE_EXTENSIONS, attachmentMimeTypeForName } from "@openbot/
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { useChatAttachments } from "./use-chat-attachments";
 
 const native = vi.hoisted(() => ({
@@ -96,7 +96,9 @@ describe("mobile attachment selection", () => {
       await state().chooseFiles();
     });
     expect(native.alert).toHaveBeenCalledWith("Could not add attachment", "large.pdf is larger than 10 MB.");
-    act(() => state().remove(state().items[0].id));
+    const [large] = state().items;
+    assert(large);
+    act(() => state().remove(large.id));
     expect(state().items).toEqual([]);
   });
   it("handles camera permission, native picker cancellation, and a captured photo", async () => {
@@ -253,6 +255,7 @@ it("replaces one file in place, keeps the order, and changes nothing when the pi
     await state().chooseFiles();
   });
   const [first, second, third] = state().items;
+  assert(second);
   native.documents.mockResolvedValue({ canceled: true });
   await act(async () => {
     await state().replace(second.id);
@@ -264,7 +267,9 @@ it("replaces one file in place, keeps the order, and changes nothing when the pi
   });
   expect(state().items.map((item) => item.name)).toEqual(["a.txt", "new.md", "c.txt"]);
   expect(native.documents).toHaveBeenLastCalledWith({ multiple: false, copyToCacheDirectory: true });
-  expect(state().items[1].id).not.toBe(second.id);
+  const [, replaced] = state().items;
+  assert(replaced);
+  expect(replaced.id).not.toBe(second.id);
 });
 
 it("replaces an image from the photo library and reads its shape from the file", async () => {
@@ -296,10 +301,12 @@ it("replaces an image from the photo library and reads its shape from the file",
   await act(async () => {
     await state().choosePhotos();
   });
-  expect(state().items[0].dimensions).toEqual({ width: 1600, height: 900 });
+  const [photo] = state().items;
+  assert(photo);
+  expect(photo.dimensions).toEqual({ width: 1600, height: 900 });
   native.photos.mockResolvedValue({ canceled: false, assets: [{ uri: "file:///two.png", fileName: "two.png" }] });
   await act(async () => {
-    await state().replace(state().items[0].id);
+    await state().replace(photo.id);
   });
   expect(state().items.map((item) => item.name)).toEqual(["two.png"]);
 });

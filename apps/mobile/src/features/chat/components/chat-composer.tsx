@@ -676,7 +676,7 @@ export function ChatComposer({
                     <NativeText>
                       {display.mentions.map((mention, index) => (
                         <NativeText key={mention.start}>
-                          {displayText.slice(index ? display.mentions[index - 1].end : 0, mention.start)}
+                          {displayText.slice(index ? (display.mentions[index - 1]?.end ?? 0) : 0, mention.start)}
                           <NativeText style={{ color: action }}>
                             {displayText.slice(mention.start, mention.end)}
                           </NativeText>
