@@ -2,10 +2,15 @@
 
     uv run python eval.py                 # baseline, then each checkpoint in its own process, then report
     uv run python eval.py --model NAME    # one checkpoint only (used by the line above)
+
+With TYPESAFE_API_KEY set, the run also scores TypeSafe's hosted Jev model through its API:
+
+    uv run --env-file ~/.config/openbot-research/typesafe.env python eval.py
 """
 
 import argparse
 import json
+import os
 import resource
 import subprocess
 import sys
@@ -56,6 +61,13 @@ SUCCESS_QUESTION = {
 }
 SHORTLIST_K = 20
 WARMUP_CALLS = 3
+
+JEV = "jev"
+JEV_URL = "https://api.typesafe.ai/v1/systemone"
+# Jev reads 32k tokens of state plus the longest question. The budget is counted with the Laya
+# tokenizer, so keep a margin for the difference between the two tokenizers.
+JEV_STATE_TOKENS = 24000
+TASKS = ("pageState", "riskyAction", "riskyMinimal", "shortlist", "actionSuccess")
 
 
 def load_cases() -> dict:
@@ -118,9 +130,10 @@ class Runner:
         started = time.perf_counter()
         self.agent = laya.load(repo, revision=revision)
         self.load_seconds = time.perf_counter() - started
+        self.tok = self.agent.tok
         self.embed = laya.embed_fn_from_agent(self.agent)
         self.predict_shortlist = laya.predict_shortlist
-        self.timings = {"pageState": [], "riskyAction": [], "riskyMinimal": [], "shortlist": [], "actionSuccess": []}
+        self.timings = {task: [] for task in TASKS}
         for _ in range(WARMUP_CALLS):
             self.agent.predict("warm up", {"q": {"type": "noul", "instructions": "Is this a test?"}})
         mx.reset_peak_memory()
@@ -144,12 +157,75 @@ class Runner:
         self.timings[task].append((time.perf_counter() - started) * 1000)
         return result
 
+    def runtime(self) -> dict:
+        return {
+            "load_seconds": round(self.load_seconds, 2),
+            "peak_mlx_mib": round(self.mx.get_peak_memory() / 2**20, 1),
+            "max_rss_mib": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20, 1),
+            "timings_ms": {task: [round(t, 2) for t in values] for task, values in self.timings.items()},
+        }
+
+
+class JevRunner:
+    """TypeSafe's hosted Jev model. Same questions and packing as Laya, with Jev's larger state budget."""
+
+    def __init__(self):
+        import httpx
+        from huggingface_hub import snapshot_download
+        from laya_mlx.tokenizer import Tokenizer
+
+        repo, revision = MODELS["multilingual"]
+        tokenizer_dir = Path(snapshot_download(repo, revision=revision, allow_patterns=["tokenizer/*"]))
+        self.tok = Tokenizer(tokenizer_dir / "tokenizer")
+        self.client = httpx.Client(timeout=60)
+        self.headers = {"Authorization": f"Bearer {os.environ['TYPESAFE_API_KEY']}"}
+        self.timings = {task: [] for task in TASKS}
+        self.input_tokens = 0
+        self.model = None
+
+    def room(self, questions: dict) -> int:
+        return JEV_STATE_TOKENS
+
+    def ask(self, task: str, state, questions: dict, *, shortlist: bool = False) -> dict:
+        # Jev takes every label in one question, so the embedding shortlist is not used. Jev wants choice
+        # options as {id: description}, as jev-ultrafast sends them, so number list options and map back.
+        options = {qid: q["criteria"] for qid, q in questions.items() if isinstance(q.get("criteria"), list)}
+        questions = {
+            qid: {**q, "criteria": {str(i): label for i, label in enumerate(options[qid], 1)}} if qid in options else q
+            for qid, q in questions.items()
+        }
+        body = {"model": "jev-latest", "state": state, "questions": questions}
+        for attempt in range(3):
+            started = time.perf_counter()
+            response = self.client.post(JEV_URL, json=body, headers=self.headers)
+            if response.status_code not in (429, 503, 529) or attempt == 2:
+                break
+            time.sleep(0.5 * 2**attempt)
+        if response.is_error:
+            raise RuntimeError(f"Jev returned HTTP {response.status_code}: {response.text[:300]}")
+        self.timings[task].append((time.perf_counter() - started) * 1000)
+        result = response.json()
+        for qid, labels in options.items():
+            answer = result["answers"][qid]
+            answer["choice"] = labels[int(answer["choice"]) - 1]
+            answer["probabilities"] = {labels[int(i) - 1]: p for i, p in answer["probabilities"].items()}
+        self.input_tokens += result["usage"]["input_tokens"]
+        self.model = result["model"]
+        return result
+
+    def runtime(self) -> dict:
+        return {
+            "model": self.model,
+            "input_tokens": self.input_tokens,
+            "timings_ms": {task: [round(t, 2) for t in values] for task, values in self.timings.items()},
+        }
+
 
 def run_model(name: str) -> dict:
     from state import describe_steps, pack, text_diff
 
-    runner = Runner(name)
-    tok = runner.agent.tok
+    runner = JevRunner() if name == JEV else Runner(name)
+    tok = runner.tok
     cases = load_cases()
     out = {"model": name, "pageState": [], "riskyAction": [], "shortlist": [], "actionSuccess": []}
 
@@ -210,7 +286,7 @@ def run_model(name: str) -> dict:
                 "correct": predicted == expected,
                 "kept": expected in kept,
                 "options": len(labels),
-                "confidence": result["answers"]["target"]["confidence"],
+                "confidence": result["answers"]["target"].get("confidence"),
             }
         )
 
@@ -235,12 +311,7 @@ def run_model(name: str) -> dict:
             }
         )
 
-    out["runtime"] = {
-        "load_seconds": round(runner.load_seconds, 2),
-        "peak_mlx_mib": round(runner.mx.get_peak_memory() / 2**20, 1),
-        "max_rss_mib": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20, 1),
-        "timings_ms": {task: [round(t, 2) for t in values] for task, values in runner.timings.items()},
-    }
+    out["runtime"] = runner.runtime()
     return out
 
 
@@ -251,7 +322,7 @@ def write(result: dict) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=sorted(MODELS))
+    parser.add_argument("--model", choices=[*sorted(MODELS), JEV])
     args = parser.parse_args()
     if args.model:
         write(run_model(args.model))
@@ -260,6 +331,8 @@ def main() -> None:
     for name in MODELS:
         # One process per checkpoint, run in sequence, so memory and timings do not mix.
         subprocess.run([sys.executable, __file__, "--model", name], check=True)
+    if os.environ.get("TYPESAFE_API_KEY"):
+        write(run_model(JEV))
     import report
 
     report.main()
