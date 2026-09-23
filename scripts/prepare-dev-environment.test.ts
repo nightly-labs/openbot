@@ -86,10 +86,18 @@ describe("development environment preparation", () => {
   });
 
   it("copies missing listed files from the main checkout and keeps existing ones", () => {
-    const main = createTemporaryRoot();
-    const worktree = createTemporaryRoot();
-    writeFileSync(join(worktree, ".worktreeinclude"), "# Keys\n.env.keys\nremote/.env.keys\napps/auth-api/.env.dev\n");
+    // Each checkout sits one folder deep, so a "../" entry has a real file to reach.
+    const mainParent = createTemporaryRoot();
+    const main = join(mainParent, "main");
+    const worktree = join(createTemporaryRoot(), "worktree");
+    mkdirSync(join(main, "apps", "auth-api"), { recursive: true });
+    mkdirSync(join(worktree, "apps", "auth-api"), { recursive: true });
+    writeFileSync(
+      join(worktree, ".worktreeinclude"),
+      "# Keys\n.env.keys\nremote/.env.keys\napps/auth-api/.env.dev\n../outside.keys\nremote/../../outside.keys\n/etc/hosts\n",
+    );
     writeFileSync(join(main, ".env.keys"), "main keys");
+    writeFileSync(join(mainParent, "outside.keys"), "outside keys");
     mkdirSync(join(main, "remote"));
     writeFileSync(join(main, "remote", ".env.keys"), "remote keys");
     writeFileSync(join(main, "apps", "auth-api", ".env.dev"), "main identity");
@@ -99,6 +107,7 @@ describe("development environment preparation", () => {
     expect(readFileSync(join(worktree, ".env.keys"), "utf8")).toBe("main keys");
     expect(readFileSync(join(worktree, "remote", ".env.keys"), "utf8")).toBe("remote keys");
     expect(readFileSync(join(worktree, "apps", "auth-api", ".env.dev"), "utf8")).toBe("worktree identity");
+    expect(existsSync(join(worktree, "..", "outside.keys"))).toBe(false);
     expect(copyWorktreeIncludes(main, main)).toEqual([]);
   });
 });

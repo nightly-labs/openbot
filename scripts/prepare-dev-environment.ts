@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { constants, copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { developmentInstanceIdForWorktree } from "../src/main/development-profile";
 import { type DevelopmentEnvOutcome, ensureDevelopmentEnvFile } from "./development-secrets";
@@ -63,7 +63,7 @@ export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = 
 /**
  * Copies each ignored file that `.worktreeinclude` lists from the main checkout, so a worktree made
  * by any harness gets the local secrets without a manual copy. An existing file is never replaced.
- * Lines are literal paths, not gitignore patterns.
+ * Lines are literal paths, not gitignore patterns. A path that leaves the checkout is skipped.
  */
 export function copyWorktreeIncludes(projectRoot: string, mainCheckoutRoot: string | undefined): string[] {
   if (!mainCheckoutRoot || resolve(mainCheckoutRoot) === resolve(projectRoot)) return [];
@@ -73,7 +73,7 @@ export function copyWorktreeIncludes(projectRoot: string, mainCheckoutRoot: stri
   const copied: string[] = [];
   for (const line of readFileSync(listPath, "utf8").split("\n")) {
     const path = line.trim();
-    if (!path || path.startsWith("#")) continue;
+    if (!path || path.startsWith("#") || !isInsideCheckout(path)) continue;
     const source = join(mainCheckoutRoot, path);
     const target = join(projectRoot, path);
     if (!existsSync(source) || existsSync(target)) continue;
@@ -82,6 +82,11 @@ export function copyWorktreeIncludes(projectRoot: string, mainCheckoutRoot: stri
     copied.push(path);
   }
   return copied;
+}
+
+function isInsideCheckout(path: string): boolean {
+  const normalized = normalize(path);
+  return !isAbsolute(normalized) && normalized !== ".." && !normalized.startsWith(`..${sep}`);
 }
 
 function findMainCheckoutRoot(projectRoot: string): string | undefined {
