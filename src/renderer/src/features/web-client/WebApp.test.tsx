@@ -40,6 +40,23 @@ describe("browser account UI", () => {
     await screen.findByRole("button", { name: "View agent settings" });
     expect(screen.queryByRole("link", { name: "Download OpenBot" })).not.toBeInTheDocument();
   });
+  it("reads the host models after a connect that the user started", async () => {
+    setup();
+    const models = vi.fn();
+    render(() => (
+      <WebApp
+        createRuntime={(...args) => {
+          const runtime = createMockWebRuntime(...args);
+          models.mockImplementation(runtime.models);
+          return { ...runtime, models, listHosts: vi.fn(runtime.listHosts).mockResolvedValueOnce([]) };
+        }}
+      />
+    ));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh hosts" })).toBeEnabled());
+    await fireEvent.click(screen.getByRole("button", { name: "Refresh hosts" }));
+    await screen.findByRole("button", { name: "View agent settings" });
+    await waitFor(() => expect(models).toHaveBeenCalled());
+  });
   it("allows retry when the host directory fails", async () => {
     setup();
     render(() => (

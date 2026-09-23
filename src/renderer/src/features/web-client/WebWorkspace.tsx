@@ -119,6 +119,11 @@ export function WebWorkspace(props: {
       (request) => request.agentId === agent.id && request.threadId === agent.threadId,
     );
   });
+  const approval = createMemo(() =>
+    workspace.state.approvals.find(
+      (item) => item.agentId === workspace.state.selectedId && item.threadId === workspace.selected()?.threadId,
+    ),
+  );
   const prompt = createMemo<Extract<AgentEvent, { type: "prompt" }> | undefined>(() => {
     if (workspace.state.status !== "online") return;
     const page = workspace.conversation()?.page;
@@ -165,14 +170,18 @@ export function WebWorkspace(props: {
       setModels([]);
       setStatus(CONNECTING_STATUS);
       if (host && state === "online") {
-        void workspace.run(async () => {
-          const nextStatus = await workspace.runtime.status();
-          const nextModels = await workspace.runtime.models();
-          if (active) {
+        // Not through `workspace.run`: it drops a task while another runs, and the reconnect that
+        // made the host online is still running here.
+        void Promise.all([workspace.runtime.status(), workspace.runtime.models()]).then(
+          ([nextStatus, nextModels]) => {
+            if (!active) return;
             setStatus(nextStatus);
             setModels(nextModels);
-          }
-        });
+          },
+          (error: unknown) => {
+            if (active) toast.error(error instanceof Error ? error.message : "The host status could not be read.");
+          },
+        );
       }
       return () => {
         active = false;
@@ -432,10 +441,7 @@ export function WebWorkspace(props: {
               remoteDesktopSessionActive={false}
               remoteDesktopVisible={false}
               prompt={prompt()}
-              approval={workspace.state.approvals.find(
-                (item) =>
-                  item.agentId === workspace.state.selectedId && item.threadId === workspace.selected()?.threadId,
-              )}
+              approval={approval()}
               browserTakeover={browserTakeover()}
               onSelectAgent={(id) => {
                 setMobilePane("conversation");
@@ -479,9 +485,7 @@ export function WebWorkspace(props: {
                 return true;
               }}
               onRespondToApproval={async (decision) => {
-                const item = workspace.state.approvals.find(
-                  (approval) => approval.agentId === workspace.state.selectedId,
-                );
+                const item = approval();
                 if (!item) return false;
                 await workspace.approve({ requestId: item.requestId, decision });
                 return true;
