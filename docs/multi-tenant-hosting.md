@@ -190,6 +190,44 @@ macOS tests build and expand an unsigned fixture package without installing it. 
 verification also requires Developer ID signatures, notarization, stapling, an exact ownership/mode
 manifest, standalone launch checks without Bun/Node in PATH, and the expected source scripts.
 
+## Live status
+
+`sudo openbot-host status` prints one read-only snapshot: management flag, daemon state, phase,
+staged version, update cycle, recorded error, and one line for each registered tenant with its
+version, health, work state, and the reason it blocks maintenance. `--json` gives the same report
+for scripts. `sudo openbot-host watch [--interval <seconds>]` repeats the snapshot, default every
+five seconds. Both commands read `config.json`, `state.json`, each tenant status file, and the same
+executable paths and UIDs from `ps` that the daemon uses. A status file that claims another UID is
+ignored, exactly as the daemon ignores it. The commands never write host state, never read process
+arguments, never open a tenant home, and never start or stop maintenance.
+
+Each reported blocker mirrors the rule the host applies in that phase: `waiting` uses restart
+safety, idle state, cycle, and one matching main process; `stopping` waits for every process inside
+the bundle, helpers included; `released` uses the health report, the installed version, and the
+cycle. A `stopping` blocker comes from the process list alone, because the host reads no tenant
+status in that phase; the tenant report is still read there for the version and health columns.
+A staged version is named only while one is pending, because the host keeps its version field after
+a finished update. A failed process scan makes `status` fail and `watch` report the reading as
+unavailable; it never becomes an empty process list. A tenant gets a blocker only in `waiting`,
+`stopping`, and `released`, the phases whose rules read that information; in every other phase its
+report is still shown, but it blocks nothing. An OpenBot process under an unregistered UID is always
+listed on its own line, helpers included, because a helper alone still holds the bundle during
+`stopping`. That process becomes the summary only in `waiting`, and only for a main process,
+the one case the host treats as a blocker. When a `waiting` or `stopping` state stops
+advancing, the summary reports the stalled daemon and gives no countdown, because a daemon that
+does not poll can start neither the shutdown nor the installation. An unregistered main process is
+the exception: the host stops publishing while it waits for that process, so the state is old and
+the daemon is alive. An unmanaged host is the other exception, for the same reason: it keeps its
+last state and publishes nothing. The countdowns still go, because the host counts no grace in that condition.
+
+While the host waits, each idle tenant shows the remaining five-minute grace. This value is the
+earliest possible time, not a promise: the host counts from its own first observation of that idle
+report, and new work resets the grace. In the `idle` phase there is no countdown, because the host
+keeps its next release check in memory; a check occurs at most every four minutes.
+
+Only the `waiting` and `stopping` phases rewrite `state.json` at every poll, so only those phases
+can show a stalled daemon through the state age. Use the reported daemon state in the other phases.
+
 ## State and recovery
 
 Read `state.json` as the administrator. Phases are `idle`, `downloading`, `waiting`, `stopping`,
