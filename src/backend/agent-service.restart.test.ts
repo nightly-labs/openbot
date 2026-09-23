@@ -1,10 +1,14 @@
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   createFakeClaude,
+  createFakeGrok,
+  createFakeOpencode,
   createTestService,
   FakeAgentClient,
+  paramsRecord,
   protocolMessages,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -14,8 +18,15 @@ import {
 import { getString } from "./protocol";
 
 let root: string;
+
 let logPath: string;
+
 let service: AgentService | null = null;
+
+/**
+ * What a stdio MCP server is launched with: this user's own `PATH`, then the configuration's pairs.
+ * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
+ */
 
 beforeEach(async () => {
   ({ root, logPath } = await startAgentTestFixture());
@@ -26,7 +37,7 @@ afterEach(async () => {
   service = null;
 });
 
-describe.sequential("AgentService: restart (1/2)", () => {
+describe.sequential("AgentService: restart", () => {
   it("notifies other devices when a member reads a reply without clearing another member's unread state", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({
@@ -410,4 +421,61 @@ describe.sequential("AgentService: restart (1/2)", () => {
       ]),
     );
   });
+
+  it.each<AgentProvider>(["codex", "claude", "grok", "opencode"])(
+    "delivers the quiet collaboration policy to %s on startup and after restart",
+    async (provider) => {
+      process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
+      process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+      process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+      const { store, mailbox } = stores(root);
+      for (const method of ["thread/start", "thread/resume"]) {
+        const clients = new Map<AgentProvider, FakeAgentClient>();
+        service = createTestService({
+          store,
+          mailbox,
+          preferredProvider: provider,
+          clientFactory: (selectedProvider) => {
+            const client = new FakeAgentClient(selectedProvider);
+            clients.set(selectedProvider, client);
+            return client;
+          },
+        });
+        await service.initialize();
+        if (method === "thread/start") {
+          await store.getOrCreate("chief");
+          await service.updateAgent({
+            agentId: "chief",
+            provider,
+            model:
+              provider === "codex"
+                ? "gpt-5.6-luna"
+                : provider === "claude"
+                  ? "claude-sonnet-5"
+                  : provider === "grok"
+                    ? "grok-4.5"
+                    : "opencode/example-model",
+          });
+        }
+        await service.sendMessage({ agentId: "chief", text: "Continue coordinating the research task." });
+        await waitFor(() =>
+          service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"),
+        );
+
+        const request = clients.get(provider)?.requests.find((candidate) => candidate.method === method);
+        const instructions = paramsRecord(request?.params)?.developerInstructions;
+        expect(instructions).toContain("Keep routine teammate communication internal");
+        expect(instructions).toContain("On startup or resume, begin or continue the task without narrating setup");
+        expect(instructions).toContain(
+          "Report meaningful outcomes, completed work, material changes, blockers, failures",
+        );
+        expect(instructions).toContain("required user input or approval");
+        expect(instructions).toContain("If the user asks for a detailed coordination report, provide it");
+        expect(instructions).toContain("send the result back in the Status/Result/Evidence format");
+        expect(instructions).toContain("Do not create acknowledgement loops");
+        expect(instructions).not.toContain("When you receive a reply, summarize it for the user");
+        await service.stop();
+      }
+    },
+  );
 });

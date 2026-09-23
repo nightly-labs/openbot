@@ -1,13 +1,9 @@
-// @vitest-environment node
-import { randomUUID } from "node:crypto";
-import { readdir } from "node:fs/promises";
+import { readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
-  CREATE_AGENT_INPUT,
   createFakeClaude,
   createFakeGrok,
   createFakeOpencode,
@@ -22,11 +18,17 @@ import {
   waitFor,
 } from "./agent-service-test-harness";
 import { getString } from "./protocol";
-import { SidebarLayoutStore } from "./sidebar-layout-store";
 
 let root: string;
+
 let logPath: string;
+
 let service: AgentService | null = null;
+
+/**
+ * What a stdio MCP server is launched with: this user's own `PATH`, then the configuration's pairs.
+ * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
+ */
 
 beforeEach(async () => {
   ({ root, logPath } = await startAgentTestFixture());
@@ -37,115 +39,32 @@ afterEach(async () => {
   service = null;
 });
 
-describe.sequential("AgentService: queue (2/3)", () => {
-  it("removes queued profile creation on receipt failure and runs only the successful retry", async () => {
-    const {
-      service: agentService,
-      client,
-      store,
-      mailbox,
-    } = await startService(root, {
+describe.sequential("AgentService: provider switches", () => {
+  it("removes private handoff files immediately when replacement session binding fails", async () => {
+    const { service: agentService, store } = await startService(root, {
       provider: "codex",
       preferredProvider: "codex",
     });
     service = agentService;
-    const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
-    await sidebar.initialize();
-    const input = {
-      operationId: randomUUID(),
-      initialMessage: "Introduce yourself",
-      draft: {
-        name: "Researcher",
-        title: "Research",
-        description: "Cite sources",
-        avatarSeed: "research",
-        avatarHue: null,
-        sectionId: null,
-      },
-    };
-    let failedAgentId = "";
-    const failure = vi.spyOn(store, "commitReviewedProfile").mockImplementationOnce((agentId) => {
-      failedAgentId = agentId;
-      expect(mailbox.listQueue(agentId).deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
-      throw new Error("Receipt write failed.");
+    await service.sendMessage({ agentId: "chief", text: "Private history for the replacement session." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const original = store.activeProviderSession("chief")?.externalSessionId;
+    const manifests = join(store.database.userDataPath, "provider-toolsets");
+    const recorded = await readdir(manifests);
+    for (const file of recorded) await writeFile(join(manifests, file), "outdated");
+    const binding = vi.spyOn(store, "bindProviderSession").mockImplementationOnce(() => {
+      throw new Error("Session binding failed.");
     });
-    await expect(service.saveProfile(input, sidebar)).rejects.toThrow("Receipt write failed.");
-    expect(service.listAgents()).toEqual([]);
-    expect(store.database.listAgents()).toEqual([]);
-    expect(mailbox.listQueue(failedAgentId).deliveries).toEqual([]);
-    expect(sidebar.getSnapshot().agentAssignments).toEqual({});
-    expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
-    await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([]);
-    failure.mockRestore();
-    const result = await service.saveProfile(input, sidebar);
-    expect((await service.saveProfile(input, sidebar)).agent.id).toBe(result.agent.id);
-    expect(service.listAgents()).toHaveLength(1);
-    await waitFor(() => client.requests.some((request) => request.method === "turn/start"));
-    expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
+    try {
+      await service.sendMessage({ agentId: "chief", text: "Continue with new tools." });
+      await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+      expect(store.activeProviderSession("chief")?.externalSessionId).toBe(original);
+      expect(await readdir(join(store.database.userDataPath, "provider-handoffs"))).toEqual([]);
+      expect(await readdir(manifests)).toEqual(recorded);
+    } finally {
+      binding.mockRestore();
+    }
   });
-
-  it.each([false, true])(
-    "recovers profile creation before startup drains queues (committed: %s)",
-    async (committed) => {
-      const { store, mailbox } = stores(root);
-      await store.initialize();
-      await mailbox.initialize();
-      const existing = await store.createAgent({ ...CREATE_AGENT_INPUT, name: "Keep this agent" });
-      const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
-      await sidebar.initialize();
-      const input = {
-        operationId: randomUUID(),
-        initialMessage: "Introduce yourself",
-        draft: {
-          name: "Researcher",
-          title: "Research",
-          description: "Cite sources",
-          avatarSeed: "research",
-          avatarHue: null,
-          sectionId: null,
-        },
-      };
-      const pending = await store.createAgent(input.draft, input.operationId);
-      await mailbox.enqueue({
-        sender: { kind: "user" },
-        recipientAgentIds: [pending.id],
-        text: input.initialMessage,
-        draftIds: [],
-        replyToMessageId: null,
-      });
-      if (committed)
-        store.commitReviewedProfile(
-          pending.id,
-          input.draft,
-          `agent-profile:${input.operationId}`,
-          sidebar.getSnapshot(),
-        );
-      // Reopen the persisted state without invoking ProfileSave's in-memory catch or finally.
-      store.database.close();
-      const restarted = stores(root);
-      const client = new FakeAgentClient("codex");
-      service = createTestService({
-        store: restarted.store,
-        mailbox: restarted.mailbox,
-        preferredProvider: "codex",
-        clientFactory: () => client,
-      });
-      await service.initialize();
-      expect(service.listAgents().some((agent) => agent.id === existing.id)).toBe(true);
-      expect(service.listAgents().some((agent) => agent.id === pending.id)).toBe(committed);
-      if (!committed) {
-        expect(restarted.mailbox.listQueue(pending.id).deliveries).toEqual([]);
-        expect(client.requests.filter((request) => request.method === "turn/start")).toEqual([]);
-        await expect(readdir(join(root, "home", "OpenBot", "Agents"))).resolves.toEqual([existing.id]);
-      }
-      const result = await service.saveProfile(input, sidebar);
-      if (committed) expect(result.agent.id).toBe(pending.id);
-      else expect(result.agent.id).not.toBe(pending.id);
-      expect(service.listAgents()).toHaveLength(2);
-      await waitFor(() => client.requests.some((request) => request.method === "turn/start"));
-      expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
-    },
-  );
 
   it("keeps the agent model and thread when a lazy provider cannot start", async () => {
     const { service: agentService, store } = await startService(root);
@@ -403,124 +322,5 @@ describe.sequential("AgentService: queue (2/3)", () => {
     expect(instructions).toContain("put exactly ✓ or — in every option cell");
     expect(instructions).toContain("render that Markdown as a comparison table");
     expect(instructions).toContain("standing remit");
-  });
-
-  it("keeps rapid messages in FIFO order before the first turn-start event is observed", async () => {
-    const { service: agentService } = await startService(root);
-    service = agentService;
-
-    await service.sendMessage({ agentId: "chief", text: "Start immediately" });
-    await service.sendMessage({ agentId: "chief", text: "Wait behind the first message" });
-
-    await waitFor(() => {
-      const deliveries = service?.listQueue("chief").deliveries ?? [];
-      return deliveries[0]?.status === "running" && deliveries[1]?.status === "queued";
-    });
-    const deliveries = service.listQueue("chief").deliveries;
-    expect(deliveries.map((delivery) => delivery.text)).toEqual(["Start immediately", "Wait behind the first message"]);
-    expect((await protocolMessages(logPath)).filter((message) => message.method === "turn/start")).toHaveLength(1);
-  });
-
-  it("keeps each completed response after the queued message that started its turn", async () => {
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await service.initialize();
-
-    await service.sendMessage({ agentId: "chief", text: "Question 1" });
-    await service.sendMessage({ agentId: "chief", text: "Question 2" });
-    await service.sendMessage({ agentId: "chief", text: "Question 3" });
-    await service.sendMessage({ agentId: "chief", text: "Question 4" });
-
-    await waitFor(() => {
-      const deliveries = service?.listQueue("chief").deliveries ?? [];
-      return deliveries.length === 4 && deliveries.every((delivery) => delivery.status === "completed");
-    });
-
-    const conversation = await service.readConversation("chief");
-    const turnMessages = conversation.messages.filter(
-      (message) => message.author === "user" || message.author === "assistant",
-    );
-    expect(turnMessages).toHaveLength(8);
-    for (let index = 0; index < turnMessages.length; index += 2) {
-      expect(turnMessages[index]?.author).toBe("user");
-      expect(turnMessages[index + 1]?.author).toBe("assistant");
-      expect(turnMessages[index + 1]?.turnId).toBe(turnMessages[index]?.turnId);
-      expect(turnMessages[index]?.delivery).toMatchObject({ status: "completed" });
-    }
-    expect(clients.get("codex")?.requests.filter((request) => request.method === "turn/start")).toHaveLength(4);
-
-    // MailboxSync.emitQueue tells the renderer about every queue transition.
-    const queueEvents = events.filter((event) => event.type === "queue-changed");
-    expect(queueEvents.length).toBeGreaterThan(0);
-    const lastQueue = queueEvents.at(-1);
-    expect(lastQueue?.type).toBe("queue-changed");
-    if (lastQueue?.type === "queue-changed") {
-      expect(lastQueue.snapshot.deliveries).toHaveLength(4);
-      expect(lastQueue.snapshot.deliveries.every((delivery) => delivery.status === "completed")).toBe(true);
-    }
-
-    // A finished turn is never published with a stale delivery: completeTurn
-    // stamps the terminal status before anything renders the snapshot, so any
-    // publication with no active turn shows terminal deliveries.
-    for (const event of events) {
-      if (event.type !== "conversation" || event.snapshot.activeTurnId !== null) continue;
-      for (const message of event.snapshot.messages) {
-        if (message.author !== "user" || !message.turnId) continue;
-        expect(message.delivery?.status).toBe("completed");
-      }
-    }
-  });
-
-  it("queues FIFO instead of steering and continues draining after an interrupt", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({ store, mailbox });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await service.initialize();
-
-    await service.sendMessage({ agentId: "chief", text: "Start" });
-    await waitFor(() => events.some((event) => event.type === "turn-started"));
-    const active = events.find((event) => event.type === "turn-started");
-    if (active?.type !== "turn-started") throw new Error("Turn did not start.");
-    await service.sendMessage({ agentId: "chief", text: "Run after the first task" });
-
-    const queue = service.listQueue("chief");
-    expect(queue.deliveries.map((item) => item.status)).toEqual(["running", "queued"]);
-    expect((await protocolMessages(logPath)).some((message) => message.method === "turn/steer")).toBe(false);
-
-    await service.interrupt("chief", active.turnId);
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "interrupted");
-
-    await waitFor(
-      async () => (await protocolMessages(logPath)).filter((item) => item.method === "turn/start").length === 2,
-    );
-    expect(service.listQueue("chief").deliveries[1]?.status).toBe("running");
-
-    const conversationSignatures = events
-      .filter((event) => event.type === "conversation" && event.snapshot.agentId === "chief")
-      .map((event) =>
-        event.type === "conversation"
-          ? JSON.stringify({
-              threadId: event.snapshot.threadId,
-              activeTurnId: event.snapshot.activeTurnId,
-              messages: event.snapshot.messages,
-            })
-          : "",
-      );
-    for (let index = 1; index < conversationSignatures.length; index += 1) {
-      expect(conversationSignatures[index]).not.toBe(conversationSignatures[index - 1]);
-    }
   });
 });

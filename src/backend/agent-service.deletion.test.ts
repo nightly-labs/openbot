@@ -1,31 +1,30 @@
-import { type AgentEvent, type BrowserTab, isAgentEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+// @vitest-environment node
+import { createHash } from "node:crypto";
+import { readdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { AgentEvent, BrowserTab } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   createTestService,
   FakeAgentClient,
   fakeBrowser,
-  firstInputText,
   nextRoutinesChanged,
-  notification,
   startAgentTestFixture,
+  startService,
   stopAgentTestFixture,
   stores,
   waitFor,
 } from "./agent-service-test-harness";
 
-const browserTab = (id: string, ownerAgentId: string | null, ownerThreadId: string | null): BrowserTab => ({
-  id,
-  title: id,
-  url: `https://example.com/${id}`,
-  loading: false,
-  ownerThreadId,
-  ownerAgentId,
-});
-
 let root: string;
+
 let service: AgentService | null = null;
+
+/**
+ * What a stdio MCP server is launched with: this user's own `PATH`, then the configuration's pairs.
+ * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
+ */
 
 beforeEach(async () => {
   ({ root } = await startAgentTestFixture());
@@ -36,7 +35,16 @@ afterEach(async () => {
   service = null;
 });
 
-describe.sequential("AgentService: restart (2/2)", () => {
+const browserTab = (id: string, ownerAgentId: string | null, ownerThreadId: string | null): BrowserTab => ({
+  id,
+  title: id,
+  url: `https://example.com/${id}`,
+  loading: false,
+  ownerThreadId,
+  ownerAgentId,
+});
+
+describe.sequential("AgentService: agent deletion", () => {
   it("deletes idle agents and refuses to orphan active work", async () => {
     const { store, mailbox } = stores(root);
     let revokeFails = true;
@@ -177,173 +185,6 @@ describe.sequential("AgentService: restart (2/2)", () => {
       vi.useRealTimers();
     }
   });
-
-  it("queues independent manual routine runs and renders routine metadata", async () => {
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider, "", false);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
-    const routine = service.createRoutine({
-      agentId: agent.id,
-      name: "Queue health",
-      instruction: "Check the current queue health.",
-      active: true,
-      timezone: "Europe/Warsaw",
-      schedule: { kind: "daily", time: "09:00" },
-    });
-
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
-    await waitFor(() => service?.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "running"));
-
-    const queue = service.listQueue(agent.id);
-    expect(queue.deliveries.map((delivery) => delivery.status)).toEqual(["running", "queued"]);
-    expect(queue.deliveries.every((delivery) => delivery.sender.kind === "routine")).toBe(true);
-    const conversation = await service.readConversation(agent.id);
-    expect(conversation.messages.filter((message) => message.routine?.name === "Queue health")).toHaveLength(2);
-
-    const running = queue.deliveries.find((delivery) => delivery.status === "running");
-    const client = clients.get("codex");
-    const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
-    if (!running?.turnId || !client || !threadId) throw new Error("The routine turn did not start.");
-    const routineInput = firstInputText(client.requests.find((request) => request.method === "turn/start")?.params);
-    expect(routineInput).toContain("Execute one run of an existing OpenBot routine now.");
-    expect(routineInput).toContain("Run type: manual Test run");
-    expect(routineInput).toContain("Do not create, update, delete, list, or test routines during this run.");
-    expect(routineInput).toContain("Report the action and result");
-    expect(routineInput).toContain("Check the current queue health.");
-    client.emit("request", {
-      id: "routine-approval",
-      method: "item/commandExecution/requestApproval",
-      params: { threadId, turnId: running.turnId, command: "echo routine" },
-    });
-    await waitFor(() =>
-      service
-        ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
-        .some((run) => run.status === "needs-attention"),
-    );
-    expect(client.responses).toEqual([]);
-    await service.respondToApproval({ requestId: "routine-approval", decision: "accept" });
-    expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toEqual(
-      expect.arrayContaining([expect.objectContaining({ status: "running" })]),
-    );
-    expect(client.responses).toEqual([
-      expect.objectContaining({ id: "routine-approval", result: { decision: "accept" } }),
-    ]);
-
-    const queued = queue.deliveries.find((delivery) => delivery.status === "queued");
-    if (!queued) throw new Error("The second routine run was not queued.");
-    await service.cancelQueuedMessage(agent.id, queued.id);
-    expect(
-      service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 }).map((run) => run.status),
-    ).toEqual(expect.arrayContaining(["running", "cancelled"]));
-    expect(client.requests.some((request) => request.method === "turn/start")).toBe(true);
-
-    client.emit(
-      "notification",
-      notification("turn/completed", {
-        threadId,
-        turn: { id: running.turnId, status: "failed" },
-      }),
-    );
-    await waitFor(() =>
-      service
-        ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
-        .some((run) => run.status === "failed"),
-    );
-    const failedRuntime = service.getRuntimeSnapshot();
-    expect(isAgentEvent({ type: "runtime-snapshot", snapshot: failedRuntime })).toBe(true);
-    expect(failedRuntime.failedTurns).toEqual([{ agentId: agent.id, turnId: running.turnId }]);
-    expect(failedRuntime.work).toEqual([
-      expect.objectContaining({ id: running.id, agentId: agent.id, status: "failed", turnId: running.turnId }),
-    ]);
-    service.acknowledgeFailedTurn(agent.id, running.turnId);
-    expect(service.getRuntimeSnapshot().failedTurns).toEqual([]);
-    expect(service.getRuntimeSnapshot().work).toEqual([]);
-
-    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
-    await waitFor(
-      () => service?.listQueue(agent.id).deliveries.filter((delivery) => delivery.status === "running").length === 1,
-    );
-    const interruptedDelivery = service
-      .listQueue(agent.id)
-      .deliveries.find((delivery) => delivery.status === "running");
-    if (!interruptedDelivery?.turnId) throw new Error("The interrupted routine turn did not start.");
-    client.emit(
-      "notification",
-      notification("turn/completed", {
-        threadId,
-        turn: { id: interruptedDelivery.turnId, status: "interrupted" },
-      }),
-    );
-    await waitFor(() =>
-      service
-        ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
-        .some((run) => run.status === "interrupted"),
-    );
-    const transitionStatuses = (await service.readConversation(agent.id)).messages.flatMap(
-      (message) => routineRunConversationEvent(message)?.status ?? [],
-    );
-    expect(transitionStatuses).toEqual(
-      expect.arrayContaining(["running", "needs-attention", "cancelled", "failed", "interrupted"]),
-    );
-    expect(transitionStatuses.filter((status) => status === "running")).toHaveLength(3);
-  });
-
-  it("queues only the last missed run after sleep and does not duplicate it after restart", async () => {
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => new FakeAgentClient(provider),
-    });
-    await service.initialize();
-    const agent = await store.getOrCreate("chief");
-    vi.useFakeTimers({ now: new Date("2026-08-25T11:07:00.000Z") });
-    const routine = service.createRoutine({
-      agentId: agent.id,
-      name: "Quarter-hour check",
-      instruction: "Check the current queue.",
-      active: true,
-      timezone: "UTC",
-      schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
-    });
-    store.database.connection
-      .prepare("UPDATE projection_routine_triggers SET next_run_at = ? WHERE trigger_id = ?")
-      .run("2026-08-25T10:15:00.000Z", routine.trigger.id);
-    service.updateRoutine({ agentId: agent.id, routineId: routine.id, name: routine.name });
-    const routineChanged = nextRoutinesChanged(service, agent.id);
-
-    await vi.advanceTimersByTimeAsync(0);
-    await routineChanged;
-
-    expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toEqual([
-      expect.objectContaining({ kind: "scheduled", scheduledFor: "2026-08-25T11:00:00.000Z" }),
-    ]);
-    expect(service.listRoutines(agent.id)[0]?.trigger.nextRunAt).toBe("2026-08-25T11:15:00.000Z");
-
-    await service.stop();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => new FakeAgentClient(provider),
-    });
-    await service.initialize();
-
-    expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toHaveLength(1);
-  });
   it("closes a deleted agent's browser tabs and leaves another agent's tabs open", async () => {
     const { store, mailbox } = stores(root);
     const tabs: BrowserTab[] = [];
@@ -387,5 +228,95 @@ describe.sequential("AgentService: restart (2/2)", () => {
 
     await expect(service.deleteAgent(agent.id)).resolves.toBeUndefined();
     expect(service.listAgents().some((entry) => entry.id === agent.id)).toBe(false);
+  });
+
+  it("keeps an agent with active channel work from being deleted", async () => {
+    const { service: agentService, store } = await startService(root, {
+      provider: "codex",
+      output: "",
+      autoComplete: false,
+      preferredProvider: "codex",
+    });
+    service = agentService;
+    await store.getOrCreate("chief");
+    await service.channels.command(
+      {
+        type: "save",
+        channelId: "channel-busy",
+        operationId: "create-busy",
+        draft: {
+          name: "Project",
+          title: "",
+          instructions: "Shared work",
+          members: [{ agentId: "chief" }],
+          leadAgentId: "chief",
+        },
+      },
+      { id: "human", name: "Alex" },
+    );
+    await service.channels.command(
+      {
+        type: "send",
+        channelId: "channel-busy",
+        operationId: "send-busy",
+        text: "Continue working",
+        recipientAgentId: "chief",
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      { id: "human", name: "Alex" },
+    );
+    await waitFor(() => service?.channels.store.tasks("channel-busy")[0]?.state === "running");
+    expect(service.listQueue("chief").deliveries).toEqual([]);
+    await expect(service.deleteAgent("chief")).rejects.toThrow("Stop the agent");
+    expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(true);
+  });
+
+  it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
+    const { store, mailbox } = stores(root);
+    let rejectTurn = false;
+    const client = new FakeAgentClient("codex", "DONE", true, true, {}, async (method) => {
+      if (rejectTurn && method === "turn/start") throw new Error("Turn rejected.");
+    });
+    const start = async () => {
+      const next = createTestService({
+        store,
+        mailbox,
+        preferredProvider: "codex",
+        clientFactory: () => client,
+      });
+      await next.initialize();
+      return next;
+    };
+    service = await start();
+    await service.sendMessage({ agentId: "chief", text: "Private conversation to remove with this agent." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const manifests = join(store.database.userDataPath, "provider-toolsets");
+    const handoffs = join(store.database.userDataPath, "provider-handoffs");
+    rejectTurn = true;
+    for (const attempt of [1, 2]) {
+      await service.stop();
+      for (const file of await readdir(manifests)) await writeFile(join(manifests, file), "outdated");
+      service = await start();
+      await service.sendMessage({ agentId: "chief", text: `Continue ${attempt}` });
+      await waitFor(
+        () =>
+          service?.listQueue("chief").deliveries.filter((delivery) => delivery.status === "failed").length === attempt,
+      );
+    }
+    const recordedHandoffs = await readdir(handoffs);
+    const recordedManifests = await readdir(manifests);
+    expect(recordedHandoffs).toHaveLength(2);
+    await service.stop();
+    const orphan = createHash("sha256").update("unrecorded-session").digest("hex");
+    await writeFile(join(handoffs, orphan), "Private history written before a crash.");
+    await writeFile(join(manifests, orphan), "unrecorded-toolset");
+    service = await start();
+    expect(await readdir(handoffs)).toEqual(recordedHandoffs);
+    expect(await readdir(manifests)).toEqual(recordedManifests);
+    await service.deleteAgent("chief");
+    expect(await readdir(handoffs)).toEqual([]);
+    expect(await readdir(manifests)).toEqual([]);
+    expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
   });
 });

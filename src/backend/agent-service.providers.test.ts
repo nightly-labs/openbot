@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { mkdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
@@ -11,7 +10,6 @@ import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
-  createFakeOpencode,
   createTestService,
   FakeAgentClient,
   fakeBrowser,
@@ -28,13 +26,16 @@ import {
 import type { DynamicToolCallParams } from "./protocol";
 
 let root: string;
+
 let logPath: string;
+
 let service: AgentService | null = null;
 
 /**
  * What a stdio MCP server is launched with: this user's own `PATH`, then the configuration's pairs.
  * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
  */
+
 beforeEach(async () => {
   ({ root, logPath } = await startAgentTestFixture());
 });
@@ -44,133 +45,7 @@ afterEach(async () => {
   service = null;
 });
 
-describe.sequential("AgentService: providers (3/3)", () => {
-  it("keeps a removed endpoint out when the replacement cannot list its models", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    let opencodeClients = 0;
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        if (provider === "opencode") {
-          opencodeClients += 1;
-          const failsDiscovery = opencodeClients === 2;
-          client.modelList = () => {
-            if (failsDiscovery) throw new Error("Model discovery failed.");
-            return { data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] };
-          };
-        }
-        return client;
-      },
-    });
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
-
-    await service.removeCustomProvider("studio", async () => undefined);
-    await service.reloadOpenCodeConfig();
-
-    expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(false);
-  });
-
-  // An id this app never saved can already exist in OpenCode's own configuration. Until a process
-  // that read the save answers, those models belong to the old URL, not to the endpoint just saved.
-  it("keeps a saved id out until a process that read the save answers", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { service: agentService, store } = await startService(root, {
-      client: (provider) => {
-        const client = new FakeAgentClient(provider);
-        if (provider === "opencode") {
-          client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
-        }
-        return client;
-      },
-      preferredProvider: "opencode",
-    });
-    service = agentService;
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
-
-    await service.saveCustomProvider("studio", async () => undefined);
-
-    expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(false);
-
-    await service.reloadOpenCodeConfig();
-
-    expect(service.listModels().some((model) => model.id === "studio/local-llm")).toBe(true);
-  });
-
-  // An id saved again is served again, whatever the CLI did with the removal before it.
-  it("offers an endpoint's models again after the id is saved a second time", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { service: agentService, store } = await startService(root, {
-      client: (provider) => {
-        const client = new FakeAgentClient(provider);
-        if (provider === "opencode") {
-          client.modelList = () => ({ data: [{ model: "studio/local-llm" }, { model: "house/router-llm" }] });
-        }
-        return client;
-      },
-      preferredProvider: "opencode",
-    });
-    service = agentService;
-    await service.ensureProvider("codex");
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "house/router-llm" });
-
-    await service.removeCustomProvider("studio", async () => undefined);
-    await service.reloadOpenCodeConfig();
-
-    await service.removeCustomProvider("house", async () => undefined);
-
-    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
-      provider: "opencode",
-      model: "studio/local-llm",
-    });
-  });
-
-  it("refuses to release a busy agent when the only model left belongs to another provider", async () => {
-    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
-    const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "opencode",
-      clientFactory: (provider) => {
-        // The turn never finishes, so the agent stays busy for the whole test.
-        const client = new FakeAgentClient(provider, "", false);
-        // Every OpenCode model comes from the endpoint being removed, so the fallback has to change
-        // provider, and that is the switch which must not happen under a running turn.
-        if (provider === "opencode") client.modelList = () => ({ data: [{ model: "lmstudio/local-llm" }] });
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    await service.ensureProvider("codex");
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "opencode", model: "lmstudio/local-llm" });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await service.sendMessage({ agentId: "chief", text: "Keep working" });
-    await waitFor(() => events.some((event) => event.type === "turn-started"));
-
-    await expect(service.removeCustomProvider("lmstudio", async () => undefined)).rejects.toThrow(
-      "Wait for the active turn and queue to finish before you remove this endpoint.",
-    );
-
-    // The endpoint stays saved because the caller stops on the refusal, so the agent must still name
-    // its model: a switch here would leave the running OpenCode process unowned and stoppable.
-    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
-      provider: "opencode",
-      model: "lmstudio/local-llm",
-    });
-  });
-
+describe.sequential("AgentService: providers", () => {
   it("derives live progress from the provider-neutral turn and tool lifecycle", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
@@ -773,5 +648,79 @@ describe.sequential("AgentService: providers (3/3)", () => {
 
     await waitFor(() => calls.length === 1);
     expect(calls[0]).toMatchObject({ threadId: openbotThreadId, ownerAgentId: "chief" });
+  });
+
+  it("reads the canonical SQLite conversation during an active stream", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "First turn" });
+    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    const firstTurnId = service.listQueue("chief").deliveries[0]?.turnId;
+    if (!firstTurnId) throw new Error("First turn did not start.");
+    await service.interrupt("chief", firstTurnId);
+    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "interrupted");
+    await service.sendMessage({ agentId: "chief", text: "New live turn" });
+    await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "running");
+
+    const snapshot = await service.readConversation("chief");
+    expect(snapshot.activeTurnId).toBe(service.listQueue("chief").deliveries[1]?.turnId);
+    expect(snapshot.messages).toEqual(
+      expect.arrayContaining([expect.objectContaining({ text: "Streaming", status: "streaming" })]),
+    );
+    expect((await protocolMessages(logPath)).filter((message) => message.method === "thread/read")).toHaveLength(0);
+  });
+
+  it("does not fail or replay a turn whose start response times out after lifecycle events", async () => {
+    process.env.OPENBOT_FAKE_AUTO_COMPLETE = "Finished despite the late response";
+    // Auto-complete is 20ms. The RPC timeout has to land after that, and before
+    // the delayed start response. 75ms vs 250ms loses that order when CI load
+    // delays the fake CLI, and the wait then never sees completed.
+    process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "1500";
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox, requestTimeoutMs: 400 });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+
+    await service.sendMessage({ agentId: "chief", text: "Run exactly once" });
+    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitFor(() => events.some((event) => event.type === "error" && event.code === "delivery_start_unconfirmed"));
+
+    expect(service.listQueue("chief").deliveries[0]).toMatchObject({
+      status: "completed",
+      error: null,
+    });
+    expect((await protocolMessages(logPath)).filter((message) => message.method === "turn/start")).toHaveLength(1);
+    expect(events).toContainEqual(expect.objectContaining({ type: "error", code: "delivery_start_unconfirmed" }));
+  });
+
+  it("keeps a completed turn idle when its start response arrives after lifecycle events", async () => {
+    process.env.OPENBOT_FAKE_AUTO_COMPLETE = "Finished before the start response";
+    process.env.OPENBOT_FAKE_TURN_START_RESPONSE_DELAY = "100";
+    const { store, mailbox } = stores(root);
+    service = createTestService({ store, mailbox });
+    await service.initialize();
+
+    await service.sendMessage({ agentId: "chief", text: "Run exactly once" });
+    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    const deliveryId = service.listQueue("chief").deliveries[0]?.id;
+
+    // The fake answers `turn/start` on a delay, so a second completed turn is the
+    // barrier proving the first turn's late start response was already written and
+    // processed: both responses travel the same pipe, in order.
+    await service.sendMessage({ agentId: "chief", text: "Run once more" });
+    await waitFor(
+      () => service?.listQueue("chief").deliveries.filter((entry) => entry.status === "completed").length === 2,
+    );
+
+    const delivery = service.listQueue("chief").deliveries.find((entry) => entry.id === deliveryId);
+    if (!delivery?.turnId) throw new Error("The completed delivery did not have a turn.");
+    expect((await service.readConversation("chief")).activeTurnId).toBeNull();
+    expect(
+      store.database.connection
+        .prepare("SELECT status, completed_at FROM projection_turns WHERE turn_id = ?")
+        .get(delivery.turnId),
+    ).toMatchObject({ status: "completed", completed_at: expect.any(String) });
   });
 });

@@ -22,16 +22,17 @@ env:
 jobs:
   changes:
     # Every run starts by asking which areas the diff touches, so jobs that
-    # cannot be affected never reserve a runner. Skipped jobs report `skipped`,
-    # which branch protection treats as passing, and `deploy-production` runs
-    # when every needed job succeeded or skipped. The dependency map lives
-    # here, in one place: `packages/contracts` fans out to everything because
-    # every surface consumes the IPC contract, while `packages/brand` reaches
-    # desktop, mobile, the account API landing and Storybook, and
-    # `packages/team-client` reaches desktop and mobile.
+    # cannot be affected never reserve a runner. `scripts/ci-affected-areas.ts`
+    # holds the map and derives package edges from the workspace manifests;
+    # its test keeps the map in step with the repository.
     #
-    # The diff is fail-open: when the base cannot be fetched or compared, all
-    # flags go true and the run costs what it costs today, never less coverage.
+    # The checkout is sparse, blobless and two commits deep: the script needs
+    # only the manifests and itself, and `git diff --name-only` compares trees,
+    # never file contents. On a pull request `HEAD` is GitHub's merge commit,
+    # whose first parent is the base tip, so the diff needs no merge-base.
+    #
+    # The diff is fail-open: when it cannot be computed or mapped, every flag
+    # goes true and the run costs what a full run costs, never less coverage.
     name: Detect changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -42,87 +43,65 @@ jobs:
       sites: ${{ steps.flags.outputs.sites }}
       remote: ${{ steps.flags.outputs.remote }}
       storybook: ${{ steps.flags.outputs.storybook }}
+      unit: ${{ steps.flags.outputs.unit }}
       code: ${{ steps.flags.outputs.code }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 1
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/
+            /package.json
+            /apps/*/package.json
+            /packages/*/package.json
+            /packages/contracts/src/runtime-values.ts
+            /remote/api/package.json
+
+      # Not `./.github/actions/setup-bun`: this job needs no Node, no package
+      # store and no install, and every other job waits for it.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.0
 
       - name: Flag affected areas
         id: flags
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
-          fail_all() {
-            for name in desktop mobile api sites remote storybook code; do
-              echo "${name}=true" >> "$GITHUB_OUTPUT"
-            done
-          }
-
+          # `--no-renames` lists both sides of a rename, and keeps git from
+          # fetching blobs to detect one.
           list_files() {
             if [[ "$EVENT_NAME" == "pull_request" ]]; then
-              git fetch --no-tags --depth=200 origin "$BASE_REF" || return 1
-              local base
-              base="$(git merge-base "origin/$BASE_REF" HEAD)" || return 1
-              git diff --name-only "$base" HEAD || return 1
+              git diff --name-only --no-renames HEAD^1 HEAD
             elif [[ "$EVENT_NAME" == "push" ]]; then
               if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+                echo "The push has no previous commit to compare against." >&2
                 return 1
               fi
-              git fetch --no-tags --depth=1 origin "$BEFORE_SHA" || return 1
-              git diff --name-only "$BEFORE_SHA" HEAD || return 1
+              git fetch --no-tags --depth=1 --filter=blob:none origin "$BEFORE_SHA" &&
+                git diff --name-only --no-renames "$BEFORE_SHA" HEAD
             else
+              echo "A $EVENT_NAME run has no change to compare." >&2
               return 1
             fi
           }
 
-          files="$(list_files)" || {
-            echo "Could not diff the change; running every job." >&2
-            fail_all
+          if files="$(list_files)" && flags="$(printf '%s\n' "$files" | bun scripts/ci-affected-areas.ts)"; then
+            printf '%s\n' "$files"
+            printf '%s\n' "$flags" | tee -a "$GITHUB_OUTPUT"
             exit 0
-          }
+          fi
 
-          desktop=false
-          mobile=false
-          api=false
-          sites=false
-          remote=false
-          storybook=false
-          code=false
-          while IFS= read -r f; do
-            [[ -z "$f" ]] && continue
-            case "$f" in
-              *.md|docs/*|.github/ISSUE_TEMPLATE/*|.github/issue-assets/*|plans/*) continue ;;
-            esac
-            code=true
-            case "$f" in
-              .github/*|package.json|bun.lock|bunfig.toml|.nvmrc|tsconfig*.json|vitest.config.ts|tools/vitest/*|packages/contracts/*)
-                desktop=true; mobile=true; api=true; sites=true; remote=true; storybook=true ;;
-              src/renderer/*|.storybook/*) desktop=true; storybook=true ;;
-              src/*|resources/*|electron.vite.config.ts|electron-builder.yml|scripts/*|tools/*|packages/logging/*|packages/i18n/*)
-                desktop=true ;;
-              packages/user-errors/*) desktop=true; mobile=true ;;
-              packages/brand/*) desktop=true; mobile=true; api=true; storybook=true ;;
-              packages/team-client/*) desktop=true; mobile=true ;;
-              apps/mobile/*) mobile=true ;;
-              apps/auth-api/*) api=true ;;
-              apps/site-router/*) sites=true ;;
-              remote/*) remote=true ;;
-              *) desktop=true; mobile=true; api=true; sites=true; remote=true; storybook=true ;;
-            esac
-          done <<< "$files"
-
-          echo "desktop=$desktop" >> "$GITHUB_OUTPUT"
-          echo "mobile=$mobile" >> "$GITHUB_OUTPUT"
-          echo "api=$api" >> "$GITHUB_OUTPUT"
-          echo "sites=$sites" >> "$GITHUB_OUTPUT"
-          echo "remote=$remote" >> "$GITHUB_OUTPUT"
-          echo "storybook=$storybook" >> "$GITHUB_OUTPUT"
-          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Could not map the change; running every job." >&2
+          for area in desktop mobile api sites remote storybook unit code; do
+            echo "${area}=true"
+          done | tee -a "$GITHUB_OUTPUT"
 
   lint:
     # Whole-repo Biome lint for changes outside `src/`: the `check` job lints
@@ -220,7 +199,7 @@ jobs:
     # in `surfaces`.
     name: Tests (desktop ${{ matrix.shard }}/2)
     needs: [changes]
-    if: needs.changes.outputs.desktop == 'true' || needs.changes.outputs.mobile == 'true'
+    if: needs.changes.outputs.unit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -434,14 +413,21 @@ jobs:
 
   deploy-production:
     name: Deploy Cloudflare production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !(contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
-    # Only the jobs that can break the Worker gate the deploy: the Worker it
-    # ships lives in `apps/auth-api`, which `api` covers, and mobile, the site
-    # router, the team client and the remote stack all consume the account API,
-    # which `surfaces` covers. Desktop checks, the browser smoke test and the
-    # Storybook build still run on the pull request, but a red Storybook is no
-    # reason to hold back an account-API deploy. Skipped jobs report `skipped`
-    # rather than failing the gate, so path-filtered runs still deploy.
+    # `surfaces` gates the deploy even though the Worker it ships lives in
+    # `apps/auth-api`, which `api` already covers: mobile, the site router, the
+    # team client and the remote stack all consume the account API, so a red
+    # Surfaces is the signal that this deploy is the thing about to break them.
+    # Every other job gates it too.
+    #
+    # `always()` is load-bearing. Without a status function GitHub prepends
+    # `success()`, which is false when any needed job was skipped, and `lint`
+    # and `check` never both run. A skipped job means the change could not
+    # reach it, so only a failure or a cancellation holds the deploy back.
+    if: >-
+      always() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     needs: [changes, lint, check, browser, tests-desktop, tests-small, api, storybook, surfaces]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -569,3 +555,25 @@ jobs:
           tr -d '\r' < "$verification_dir/site-router.headers" | grep -Eiq '^cache-control:.*no-store'
           tr -d '\r' < "$verification_dir/site-router.headers" | grep -Eiq '^x-content-type-options:.*nosniff'
           tr -d '\r' < "$verification_dir/site-router.headers" | grep -Eiq '^x-robots-tag:.*noindex'
+
+  ci-result:
+    # The one check branch protection requires. Path filtering skips jobs, and
+    # renaming or merging a job would otherwise mean editing the required list
+    # in repository settings. This job always runs and fails when any check
+    # failed or was cancelled; a skipped check passes.
+    name: CI result
+    if: always()
+    needs: [changes, lint, check, browser, tests-desktop, tests-small, surfaces, api, storybook]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every check to pass or skip
+        shell: bash
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          failed="$(jq -r 'to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | "\(.key): \(.value.result)"' <<< "$RESULTS")"
+          if [[ -n "$failed" ]]; then
+            echo "$failed" >&2
+            exit 1
+          fi

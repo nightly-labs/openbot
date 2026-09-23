@@ -1,16 +1,12 @@
-// @vitest-environment node
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
 import {
   createFakeClaude,
   createFakeCodex,
+  createFakeGrok,
   createPendingFakeClaude,
   createTestService,
-  createUpdatableFakeClaude,
   FakeAgentClient,
   readTextOrEmpty,
   startAgentTestFixture,
@@ -19,7 +15,6 @@ import {
   stores,
   waitFor,
 } from "../agent-service-test-harness";
-import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 
 let root: string;
 let service: AgentService | null = null;
@@ -33,7 +28,112 @@ afterEach(async () => {
   service = null;
 });
 
-describe.sequential("ProviderRuntime: account checks and login (2/3)", () => {
+describe.sequential("ProviderRuntime: sign-in", () => {
+  it("connects ChatGPT through the Codex App Server and promotes the authenticated client", async () => {
+    const { store, mailbox } = stores(root);
+    const codexClients: FakeAgentClient[] = [];
+    const openExternal = vi.fn(async () => undefined);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(
+          provider,
+          provider === "codex" ? "CODEX_DONE" : "CLAUDE_DONE",
+          true,
+          provider !== "codex",
+        );
+        if (provider === "codex") codexClients.push(client);
+        return client;
+      },
+    });
+    await service.initialize();
+
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "codex", state: "sign-in-required" }),
+    );
+    const connecting = await service.connectProvider("codex", openExternal);
+
+    expect(connecting.providers).toContainEqual(
+      expect.objectContaining({
+        id: "codex",
+        state: "sign-in-required",
+        connectionState: "connecting",
+        version: "0.144.1",
+      }),
+    );
+    expect(openExternal).toHaveBeenCalledWith("https://auth.openai.test/connect");
+    expect(codexClients).toHaveLength(2);
+    expect(codexClients[1]?.requests).toContainEqual({
+      method: "account/login/start",
+      params: {
+        type: "chatgpt",
+        appBrand: "chatgpt",
+        codexStreamlinedLogin: true,
+        useHostedLoginSuccessPage: true,
+      },
+    });
+
+    await service.connectProvider("codex", openExternal);
+    expect(openExternal).toHaveBeenCalledTimes(2);
+    expect(codexClients).toHaveLength(3);
+    expect(codexClients[1]?.requests).toContainEqual({
+      method: "account/login/cancel",
+      params: { loginId: "login-1" },
+    });
+    expect(codexClients[1]?.running).toBe(false);
+    codexClients[1]?.completeLogin(true);
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "codex", connectionState: "connecting" }),
+    );
+    codexClients[2]?.completeLogin(true);
+    await waitFor(
+      () => service?.getStatus().providers?.find((provider) => provider.id === "codex")?.state === "available",
+    );
+
+    expect(service.getStatus().phase).toBe("ready");
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "codex", state: "available", email: "codex@example.com" }),
+    );
+  });
+
+  it.each([
+    { target: "claude", pathVariable: "OPENBOT_CLAUDE_PATH", createCli: createFakeClaude },
+    { target: "grok", pathVariable: "OPENBOT_GROK_PATH", createCli: createFakeGrok },
+  ] as const)("connects $target through the bundled CLI login command", async ({ target, pathVariable, createCli }) => {
+    process.env[pathVariable] = await createCli(root);
+    const { store, mailbox } = stores(root);
+    let clients = 0;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: target,
+      clientFactory: (provider) => {
+        const authenticated = provider === target ? clients > 0 : true;
+        if (provider === target) clients += 1;
+        return new FakeAgentClient(provider, "DONE", true, authenticated);
+      },
+    });
+    await service.initialize();
+
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: target, state: "sign-in-required" }),
+    );
+
+    const connecting = await service.connectProvider(target, async () => undefined);
+
+    expect(connecting.providers).toContainEqual(
+      expect.objectContaining({ id: target, state: "sign-in-required", connectionState: "connecting" }),
+    );
+    await waitFor(() => clients === 2);
+    await waitFor(
+      () => service?.getStatus().providers?.find((provider) => provider.id === target)?.state === "available",
+    );
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: target, state: "available", email: `${target}@example.com` }),
+    );
+  });
   it("restores the connect action when the login page cannot open", async () => {
     const { service: agentService } = await startService(root, {
       client: (provider) => new FakeAgentClient(provider, "DONE", true, provider !== "codex"),
@@ -349,35 +449,6 @@ describe.sequential("ProviderRuntime: account checks and login (2/3)", () => {
     },
   );
 
-  it("activates the downloaded managed CLI instead of running the user's updater", async () => {
-    const system = await createUpdatableFakeClaude(root, "2.1.250");
-    process.env.OPENBOT_CLAUDE_PATH = system.executable;
-    const { store, mailbox } = stores(root);
-    const clients: FakeAgentClient[] = [];
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "claude",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        if (provider === "claude") clients.push(client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const managed = await createFakeClaude(root);
-    await writeFile(managed, (await readFile(managed, "utf8")).replaceAll("2.1.246", "2.1.263"));
-    // Remove the test's explicit override to model automatic system discovery at startup.
-    process.env.OPENBOT_CLAUDE_PATH = join(root, "missing-claude");
-    const status = await service.updateProviderCli("claude", async () => managed);
-    expect(await readTextOrEmpty(system.started)).toBe("");
-    expect(status.providers).toContainEqual(
-      expect.objectContaining({ id: "claude", state: "available", version: "2.1.263", cliSource: "managed" }),
-    );
-    expect(clients[0]?.running).toBe(false);
-    expect(clients[1]?.running).toBe(true);
-  });
-
   it("keeps the previous client when the replacement cannot authenticate", async () => {
     const managed = await createFakeClaude(root);
     const { store, mailbox } = stores(root);
@@ -400,213 +471,5 @@ describe.sequential("ProviderRuntime: account checks and login (2/3)", () => {
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "claude", version: "2.1.246", state: "available" }),
     );
-  });
-
-  it("logs a provider's MCP server failure and raises the provider's own failures", async () => {
-    const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
-        return client;
-      },
-      bundledExecutables: {},
-      prepareAgentWorkspace: async () => undefined,
-      hostedSites: null,
-      sidebarLayout: null,
-      preferredModel: null,
-      credentials: {
-        apiKey: () => null,
-        customProviders: () => [],
-        // A server OpenBot configured. The user asked for this one here, so its failure is theirs
-        // to fix and must stay visible.
-        mcpServers: () => [
-          {
-            id: "mcp-1",
-            name: "Filesystem",
-            transport: "stdio",
-            enabled: true,
-            command: "/bin/echo",
-            args: [],
-            env: [{ key: "API_KEY", value: "abcdef123456" }],
-            envPassthrough: [],
-            workingDirectory: "",
-            url: "",
-            headers: [],
-          },
-        ],
-      },
-    });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await service.initialize();
-    const client = clients.get("codex");
-    if (!client) throw new Error("The fake provider did not start.");
-
-    // Verbatim, because these two lines are what the user met: a per-session MCP server that lost a
-    // race with the short session OpenBot opens to read the model list, and an MCP client's own
-    // transport giving up. Neither stops the turn and neither is OpenBot's to configure.
-    client.emit(
-      "diagnostic",
-      "Failed to spawn MCP server 'chrome-devtools': session is closing (process scope already reclaimed); MCP server not started",
-    );
-    client.emit("diagnostic", "ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed");
-    client.emit("diagnostic", "ERROR the provider failed to reach the model endpoint");
-    // Named in this app's own settings, so the user can act on it and has to be told - and the CLI
-    // reports the failure by quoting what it sent, credential and all.
-    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': rejected abcdef123456");
-
-    await waitFor(() => events.filter((event) => event.type === "error").length === 2);
-    expect(events.filter((event) => event.type === "error")).toEqual([
-      expect.objectContaining({ message: "ERROR the provider failed to reach the model endpoint" }),
-      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': rejected •••" }),
-    ]);
-  });
-
-  it("redacts an MCP credential a running provider still holds after the user removes the server", async () => {
-    const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const client = clients.get("codex");
-    if (!client) throw new Error("The fake provider did not start.");
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: [],
-        env: [{ key: "API_KEY", value: "abcdef123456" }],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
-    // What a spawn reads. The running process keeps this credential until it stops.
-    expect(service.enabledMcpServers()).toHaveLength(1);
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-
-    // The user removes the server while that process runs, so the store no longer names the value.
-    service.removeMcpServer({ mcpServerId: service.listMcpServers()[0]?.id ?? "" });
-    client.emit("diagnostic", "Failed to spawn MCP server 'Filesystem': rejected abcdef123456");
-
-    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
-    expect(events.filter((event) => event.type === "error")).toEqual([
-      expect.objectContaining({ message: "Failed to spawn MCP server 'Filesystem': rejected •••" }),
-    ]);
-  });
-
-  // A CLI reports a failure by quoting what it sent, and that line can be long enough for the bound
-  // on a diagnostic to fall inside the credential. Redacted whole first, the bound cuts text that no
-  // longer holds the value; the other way round it would leave the head of one on screen.
-  it("redacts an MCP credential a long diagnostic quotes past the length a line is held to", async () => {
-    const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const client = clients.get("codex");
-    if (!client) throw new Error("The fake provider did not start.");
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: [],
-        env: [{ key: "API_KEY", value: "abcdef123456" }],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
-    // What a spawn reads. The process holds this server, so its failure stays visible to the user.
-    expect(service.enabledMcpServers()).toHaveLength(1);
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-
-    // The credential starts just before the bound, so a line shortened first would keep its head.
-    const opening = "Failed to spawn MCP server 'Filesystem': rejected ";
-    const filler = ".".repeat(DIAGNOSTIC_TEXT_LIMIT - 5 - opening.length);
-    client.emit("diagnostic", `${opening}${filler}abcdef123456 after the bound`);
-
-    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
-    const [error] = events.filter((event) => event.type === "error");
-    expect(error?.type === "error" && error.message.length).toBeLessThanOrEqual(DIAGNOSTIC_TEXT_LIMIT);
-    expect(error?.type === "error" && error.message).not.toContain("abcde");
-  });
-
-  it("redacts an MCP credential a provider error quotes, not only a diagnostic", async () => {
-    const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const client = clients.get("codex");
-    if (!client) throw new Error("The fake provider did not start.");
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: [],
-        env: [{ key: "API_KEY", value: "abcdef123456" }],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-
-    // A provider error notification, which takes its own path to the shared error boundary rather
-    // than the diagnostic handler. It reaches the renderer, so the value has to go first.
-    client.emit("notification", {
-      method: "error",
-      params: { message: "Filesystem MCP failed: rejected abcdef123456" },
-    });
-
-    await waitFor(() => events.filter((event) => event.type === "error").length === 1);
-    expect(events.filter((event) => event.type === "error")).toEqual([
-      expect.objectContaining({ message: "Filesystem MCP failed: rejected •••" }),
-    ]);
   });
 });

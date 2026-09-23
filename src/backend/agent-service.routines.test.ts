@@ -1,17 +1,18 @@
-// @vitest-environment node
-import { readFile, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { type AgentEvent, routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  isAgentEvent,
+  routineConversationEvent,
+  routineRunConversationEvent,
+} from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
-  callOpenBotTool,
   createTestService,
-  expectOpenBotToolError,
   FakeAgentClient,
+  firstInputText,
+  nextRoutinesChanged,
   notification,
-  openBotToolPayload,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
@@ -21,7 +22,13 @@ import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
 
 let root: string;
+
 let service: AgentService | null = null;
+
+/**
+ * What a stdio MCP server is launched with: this user's own `PATH`, then the configuration's pairs.
+ * The `PATH` is what makes a command found through a login shell runnable outside a terminal.
+ */
 
 beforeEach(async () => {
   ({ root } = await startAgentTestFixture());
@@ -32,7 +39,173 @@ afterEach(async () => {
   service = null;
 });
 
-describe.sequential("AgentService: routines (1/2)", () => {
+describe.sequential("AgentService: routines", () => {
+  it("queues independent manual routine runs and renders routine metadata", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    await service.initialize();
+    const agent = await store.getOrCreate("chief");
+    const routine = service.createRoutine({
+      agentId: agent.id,
+      name: "Queue health",
+      instruction: "Check the current queue health.",
+      active: true,
+      timezone: "Europe/Warsaw",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+
+    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    await waitFor(() => service?.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "running"));
+
+    const queue = service.listQueue(agent.id);
+    expect(queue.deliveries.map((delivery) => delivery.status)).toEqual(["running", "queued"]);
+    expect(queue.deliveries.every((delivery) => delivery.sender.kind === "routine")).toBe(true);
+    const conversation = await service.readConversation(agent.id);
+    expect(conversation.messages.filter((message) => message.routine?.name === "Queue health")).toHaveLength(2);
+
+    const running = queue.deliveries.find((delivery) => delivery.status === "running");
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession(agent.id)?.externalSessionId;
+    if (!running?.turnId || !client || !threadId) throw new Error("The routine turn did not start.");
+    const routineInput = firstInputText(client.requests.find((request) => request.method === "turn/start")?.params);
+    expect(routineInput).toContain("Execute one run of an existing OpenBot routine now.");
+    expect(routineInput).toContain("Run type: manual Test run");
+    expect(routineInput).toContain("Do not create, update, delete, list, or test routines during this run.");
+    expect(routineInput).toContain("Report the action and result");
+    expect(routineInput).toContain("Check the current queue health.");
+    client.emit("request", {
+      id: "routine-approval",
+      method: "item/commandExecution/requestApproval",
+      params: { threadId, turnId: running.turnId, command: "echo routine" },
+    });
+    await waitFor(() =>
+      service
+        ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
+        .some((run) => run.status === "needs-attention"),
+    );
+    expect(client.responses).toEqual([]);
+    await service.respondToApproval({ requestId: "routine-approval", decision: "accept" });
+    expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: "running" })]),
+    );
+    expect(client.responses).toEqual([
+      expect.objectContaining({ id: "routine-approval", result: { decision: "accept" } }),
+    ]);
+
+    const queued = queue.deliveries.find((delivery) => delivery.status === "queued");
+    if (!queued) throw new Error("The second routine run was not queued.");
+    await service.cancelQueuedMessage(agent.id, queued.id);
+    expect(
+      service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 }).map((run) => run.status),
+    ).toEqual(expect.arrayContaining(["running", "cancelled"]));
+    expect(client.requests.some((request) => request.method === "turn/start")).toBe(true);
+
+    client.emit(
+      "notification",
+      notification("turn/completed", {
+        threadId,
+        turn: { id: running.turnId, status: "failed" },
+      }),
+    );
+    await waitFor(() =>
+      service
+        ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
+        .some((run) => run.status === "failed"),
+    );
+    const failedRuntime = service.getRuntimeSnapshot();
+    expect(isAgentEvent({ type: "runtime-snapshot", snapshot: failedRuntime })).toBe(true);
+    expect(failedRuntime.failedTurns).toEqual([{ agentId: agent.id, turnId: running.turnId }]);
+    expect(failedRuntime.work).toEqual([
+      expect.objectContaining({ id: running.id, agentId: agent.id, status: "failed", turnId: running.turnId }),
+    ]);
+    service.acknowledgeFailedTurn(agent.id, running.turnId);
+    expect(service.getRuntimeSnapshot().failedTurns).toEqual([]);
+    expect(service.getRuntimeSnapshot().work).toEqual([]);
+
+    await service.testRoutine({ agentId: agent.id, routineId: routine.id });
+    await waitFor(
+      () => service?.listQueue(agent.id).deliveries.filter((delivery) => delivery.status === "running").length === 1,
+    );
+    const interruptedDelivery = service
+      .listQueue(agent.id)
+      .deliveries.find((delivery) => delivery.status === "running");
+    if (!interruptedDelivery?.turnId) throw new Error("The interrupted routine turn did not start.");
+    client.emit(
+      "notification",
+      notification("turn/completed", {
+        threadId,
+        turn: { id: interruptedDelivery.turnId, status: "interrupted" },
+      }),
+    );
+    await waitFor(() =>
+      service
+        ?.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })
+        .some((run) => run.status === "interrupted"),
+    );
+    const transitionStatuses = (await service.readConversation(agent.id)).messages.flatMap(
+      (message) => routineRunConversationEvent(message)?.status ?? [],
+    );
+    expect(transitionStatuses).toEqual(
+      expect.arrayContaining(["running", "needs-attention", "cancelled", "failed", "interrupted"]),
+    );
+    expect(transitionStatuses.filter((status) => status === "running")).toHaveLength(3);
+  });
+
+  it("queues only the last missed run after sleep and does not duplicate it after restart", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
+    await service.initialize();
+    const agent = await store.getOrCreate("chief");
+    vi.useFakeTimers({ now: new Date("2026-08-25T11:07:00.000Z") });
+    const routine = service.createRoutine({
+      agentId: agent.id,
+      name: "Quarter-hour check",
+      instruction: "Check the current queue.",
+      active: true,
+      timezone: "UTC",
+      schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
+    });
+    store.database.connection
+      .prepare("UPDATE projection_routine_triggers SET next_run_at = ? WHERE trigger_id = ?")
+      .run("2026-08-25T10:15:00.000Z", routine.trigger.id);
+    service.updateRoutine({ agentId: agent.id, routineId: routine.id, name: routine.name });
+    const routineChanged = nextRoutinesChanged(service, agent.id);
+
+    await vi.advanceTimersByTimeAsync(0);
+    await routineChanged;
+
+    expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toEqual([
+      expect.objectContaining({ kind: "scheduled", scheduledFor: "2026-08-25T11:00:00.000Z" }),
+    ]);
+    expect(service.listRoutines(agent.id)[0]?.trigger.nextRunAt).toBe("2026-08-25T11:15:00.000Z");
+
+    await service.stop();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider),
+    });
+    await service.initialize();
+
+    expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id, limit: 10 })).toHaveLength(1);
+  });
   it("rearms the shared timer when restoring an archived channel routine", async () => {
     vi.useFakeTimers({ now: new Date("2026-08-25T10:00:00.000Z") });
     const { store, mailbox } = stores(root);
@@ -371,300 +544,5 @@ describe.sequential("AgentService: routines (1/2)", () => {
         (message) => routineRunConversationEvent(message)?.status ?? [],
       ),
     ).toContain("succeeded");
-  });
-
-  it("lets an agent react to the current user message without replacing the user's reaction", async () => {
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider, "", false);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const receipt = await service.sendMessage({ agentId: "chief", text: "The launch is approved." });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
-
-    const client = clients.get("codex");
-    const threadId = store.activeProviderSession("chief")?.externalSessionId;
-    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
-    const messageId = receipt.deliveries[0]?.id;
-    if (!client || !threadId || !turnId || !messageId) throw new Error("The reaction test turn did not start.");
-
-    await service.setMessageReaction({ agentId: "chief", messageId, emoji: "❤️" });
-    const first = await callOpenBotTool(client, threadId, "react_to_user_message", { emoji: "🎉" }, turnId);
-    expect(openBotToolPayload(first.result)).toMatchObject({ status: "reacted", messageId, emoji: "🎉" });
-    const second = await callOpenBotTool(client, threadId, "react_to_user_message", { emoji: "👨‍👩‍👧‍👦" }, turnId);
-    expect(openBotToolPayload(second.result)).toMatchObject({ emoji: "👨‍👩‍👧‍👦" });
-
-    const message = (await service.readConversation("chief")).messages.find((candidate) => candidate.id === messageId);
-    expect(message).toMatchObject({
-      reaction: "❤️",
-      reactions: [
-        { emoji: "❤️", actor: { kind: "user" } },
-        { emoji: "👨‍👩‍👧‍👦", actor: { kind: "agent", agentId: "chief" } },
-      ],
-    });
-    await expectOpenBotToolError(
-      client,
-      threadId,
-      "react_to_user_message",
-      { emoji: "🎉🎉" },
-      "exactly one complete Unicode emoji",
-      turnId,
-    );
-  });
-
-  it("rejects an agent reaction when the current turn was not started by the user", async () => {
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    await store.initialize();
-    await mailbox.initialize();
-    await store.getOrCreate("chief");
-    await store.getOrCreate("research");
-    await mailbox.enqueue({
-      sender: { kind: "agent", agentId: "research" },
-      recipientAgentIds: ["chief"],
-      text: "Teammate update.",
-    });
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider, "", false);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
-
-    const client = clients.get("codex");
-    const threadId = store.activeProviderSession("chief")?.externalSessionId;
-    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
-    if (!client || !threadId || !turnId) throw new Error("The teammate reaction test turn did not start.");
-    await expectOpenBotToolError(
-      client,
-      threadId,
-      "react_to_user_message",
-      { emoji: "👍" },
-      "Only the current user message",
-      turnId,
-    );
-  });
-
-  it("attaches an agent-created screenshot to the current user response", async () => {
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider, "", false);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const screenshotPath = join(store.sharedRoot, "desktop-screenshot.png");
-    const screenshot = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4]);
-    await writeFile(screenshotPath, screenshot);
-    await service.sendMessage({ agentId: "chief", text: "Send me a screenshot." });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
-
-    const client = clients.get("codex");
-    const threadId = store.activeProviderSession("chief")?.externalSessionId;
-    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
-    if (!client || !threadId || !turnId) throw new Error("The screenshot attachment turn did not start.");
-
-    const result = await callOpenBotTool(
-      client,
-      threadId,
-      "attach_files_to_response",
-      { paths: [screenshotPath] },
-      turnId,
-    );
-    expect(openBotToolPayload(result.result)).toMatchObject({
-      status: "attached",
-      attachments: [{ name: "desktop-screenshot.png" }],
-    });
-
-    const message = (await service.readConversation("chief")).messages.find(
-      (candidate) => candidate.itemType === "agent_attachment" && candidate.turnId === turnId,
-    );
-    expect(message).toMatchObject({
-      author: "assistant",
-      status: "completed",
-      text: "",
-      attachments: [
-        {
-          name: "desktop-screenshot.png",
-          kind: "image",
-          mimeType: "image/png",
-          previewKind: "image",
-        },
-      ],
-    });
-    expect(service.getRuntimeSnapshot().latestMessages).not.toContainEqual(
-      expect.objectContaining({ id: message?.id }),
-    );
-    const managed = await mailbox.resolveAttachment(message?.attachments?.[0]?.id ?? "");
-    expect(managed?.path).not.toBe(screenshotPath);
-    await expect(readFile(managed?.path ?? "")).resolves.toEqual(screenshot);
-
-    const outsidePath = join(root, "outside.png");
-    await writeFile(outsidePath, screenshot);
-    await expectOpenBotToolError(
-      client,
-      threadId,
-      "attach_files_to_response",
-      { paths: [outsidePath] },
-      "inside this agent's workspace or the OpenBot shared directory",
-      turnId,
-    );
-    const linkedPath = join(store.sharedRoot, "linked-outside.png");
-    await symlink(outsidePath, linkedPath);
-    await expectOpenBotToolError(
-      client,
-      threadId,
-      "attach_files_to_response",
-      { paths: [linkedPath] },
-      "inside this agent's workspace or the OpenBot shared directory",
-      turnId,
-    );
-    await expectOpenBotToolError(
-      client,
-      threadId,
-      "attach_files_to_response",
-      { paths: [screenshotPath, screenshotPath] },
-      "Duplicate attachment paths are not allowed.",
-      turnId,
-    );
-
-    const publishedPath = join(store.sharedRoot, "published-screenshot.png");
-    await writeFile(publishedPath, screenshot);
-    const publicationFailure = (event: AgentEvent) => {
-      if (
-        event.type === "conversation" &&
-        event.snapshot.messages.some((candidate) =>
-          candidate.attachments?.some((attachment) => attachment.name === "published-screenshot.png"),
-        )
-      ) {
-        throw new Error("conversation listener failed");
-      }
-    };
-    const publicationEvents: AgentEvent[] = [];
-    const recordPublicationEvent = (event: AgentEvent) => publicationEvents.push(event);
-    service.on("event", publicationFailure);
-    service.on("event", recordPublicationEvent);
-    const publicationCallId = "publication-failure-call";
-    const publicationResult = await callOpenBotTool(
-      client,
-      threadId,
-      "attach_files_to_response",
-      { paths: [publishedPath] },
-      turnId,
-      publicationCallId,
-    );
-    service.off("event", publicationFailure);
-    service.off("event", recordPublicationEvent);
-    expect(openBotToolPayload(publicationResult.result)).toMatchObject({
-      status: "attached",
-      attachments: [{ name: "published-screenshot.png" }],
-    });
-    expect(publicationEvents).toContainEqual(
-      expect.objectContaining({
-        type: "error",
-        code: "conversation_publication_failed",
-        message: "conversation listener failed",
-      }),
-    );
-    const publishedMessage = (await service.readConversation("chief")).messages.find((candidate) =>
-      candidate.attachments?.some((attachment) => attachment.name === "published-screenshot.png"),
-    );
-    await expect(mailbox.resolveAttachment(publishedMessage?.attachments?.[0]?.id ?? "")).resolves.not.toBeNull();
-  });
-
-  it("shares one attachment operation between concurrent retries", async () => {
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    const { store, mailbox } = stores(root);
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider, "", false);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    await service.initialize();
-    const screenshotPath = join(store.sharedRoot, "concurrent-screenshot.png");
-    await writeFile(screenshotPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-    await service.sendMessage({ agentId: "chief", text: "Send the screenshot once." });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
-
-    const client = clients.get("codex");
-    const threadId = store.activeProviderSession("chief")?.externalSessionId;
-    const turnId = service.listQueue("chief").deliveries[0]?.turnId;
-    if (!client || !threadId || !turnId) throw new Error("The concurrent attachment turn did not start.");
-
-    const originalStore = mailbox.stageGeneratedAttachments.bind(mailbox);
-    let releaseStore: (() => void) | undefined;
-    const storeGate = new Promise<void>((resolve) => {
-      releaseStore = resolve;
-    });
-    let markStoreStarted: (() => void) | undefined;
-    const storeStarted = new Promise<void>((resolve) => {
-      markStoreStarted = resolve;
-    });
-    const storage = vi.spyOn(mailbox, "stageGeneratedAttachments").mockImplementation(async (input) => {
-      markStoreStarted?.();
-      await storeGate;
-      return originalStore(input);
-    });
-    const callId = "concurrent-attachment-call";
-    const first = callOpenBotTool(
-      client,
-      threadId,
-      "attach_files_to_response",
-      { paths: [screenshotPath] },
-      turnId,
-      callId,
-    );
-    await storeStarted;
-    const second = callOpenBotTool(
-      client,
-      threadId,
-      "attach_files_to_response",
-      { paths: [screenshotPath] },
-      turnId,
-      callId,
-    );
-    let stopCompleted = false;
-    const stopping = service.stop().then(() => {
-      stopCompleted = true;
-    });
-    await Promise.resolve();
-    expect(stopCompleted).toBe(false);
-    releaseStore?.();
-
-    const [firstResult, secondResult] = await Promise.all([first, second, stopping]);
-    expect(stopCompleted).toBe(true);
-    expect(openBotToolPayload(firstResult.result)).toEqual(openBotToolPayload(secondResult.result));
-    expect(storage).toHaveBeenCalledTimes(1);
-    expect(
-      (await service.readConversation("chief")).messages.filter(
-        (message) => message.itemType === "agent_attachment" && message.turnId === turnId,
-      ),
-    ).toHaveLength(1);
-    await expect(mailbox.listExportAttachments()).resolves.toHaveLength(1);
   });
 });

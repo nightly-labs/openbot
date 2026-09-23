@@ -11,20 +11,25 @@
 // The second describe covers the other fact about these manifests that nothing
 // else enforces: which of them the remote API image has to carry.
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { describe, expect, it } from "vitest";
-
-const repositoryRoot = resolve(import.meta.dirname, "..");
+import {
+  readDependencies,
+  readManifest,
+  readWorkspaces,
+  repositoryRoot,
+  workspaceClosure,
+  workspaceDependencies,
+  workspaceDirectories,
+} from "./workspace-graph";
 
 const rootManifest = readManifest("package.json");
 const workspaces = readWorkspaces(rootManifest);
 const catalog = readCatalog(rootManifest);
 const manifests = ["package.json", ...workspaces.map((workspace) => `${workspace}/package.json`)];
-
-const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 
 // A "catalog:" specifier is only meaningful to bun. Anything that reads the
 // declared version string itself sees a value it cannot parse, so these keep
@@ -137,18 +142,8 @@ describe("dependency catalog", () => {
 // which is listed in bun.lock but not on disk`.
 describe("remote API Dockerfile", () => {
   it("copies a manifest for every workspace the pruned install needs", () => {
-    const directoryOf = new Map(
-      workspaces.map((directory) => [readManifest(`${directory}/package.json`).name, directory]),
-    );
-    const required = new Set<string>();
-    const pending: unknown[] = [...workspaceDependencies("package.json"), "@openbot/remote-api"];
-    while (pending.length > 0) {
-      const name = pending.pop();
-      if (!isString(name) || required.has(name)) continue;
-      required.add(name);
-      const directory = directoryOf.get(name);
-      if (isString(directory)) pending.push(...workspaceDependencies(`${directory}/package.json`));
-    }
+    const directoryOf = workspaceDirectories();
+    const required = workspaceClosure([...workspaceDependencies("package.json"), "@openbot/remote-api"]);
 
     // Extra COPY lines are harmless - bun prunes whatever nothing depends on - so
     // this asserts the set that must be present, never the exact list.
@@ -173,18 +168,8 @@ describe("remote API Dockerfile", () => {
   // Scoped to what `@openbot/remote-api` itself reaches, not to what the root manifest names: bun
   // needs the others on disk to resolve the pruned install, but nothing imports them at runtime.
   it("copies the source of every workspace the running service imports", () => {
-    const directoryOf = new Map(
-      workspaces.map((directory) => [readManifest(`${directory}/package.json`).name, directory]),
-    );
-    const required = new Set<string>();
-    const pending: unknown[] = ["@openbot/remote-api"];
-    while (pending.length > 0) {
-      const name = pending.pop();
-      if (!isString(name) || required.has(name)) continue;
-      required.add(name);
-      const directory = directoryOf.get(name);
-      if (isString(directory)) pending.push(...workspaceDependencies(`${directory}/package.json`));
-    }
+    const directoryOf = workspaceDirectories();
+    const required = workspaceClosure(["@openbot/remote-api"]);
 
     // Only the last stage ships. The install stage copies manifests the runtime image never sees,
     // and `COPY --from=` moves build output rather than repository source, so neither counts here.
@@ -201,48 +186,6 @@ describe("remote API Dockerfile", () => {
   });
 });
 
-// Every field, not just `dependencies`, even though the image installs with
-// `--production`. Today every workspace edge in the repo is a plain dependency, so
-// the difference is inert; the bias is deliberate for when it stops being. Naming a
-// workspace the pruned install turns out not to need costs one harmless COPY line,
-// and missing one costs the image.
-function workspaceDependencies(manifest: string): string[] {
-  return readDependencies(manifest)
-    .filter(([, , version]) => version.startsWith("workspace:"))
-    .map(([, name]) => name);
-}
-
-function readManifest(path: string): DynamicRecord {
-  const parsed = JSON.parse(readFileSync(join(repositoryRoot, path), "utf8"));
-  if (!isDynamicRecord(parsed)) throw new Error(`${path} is not an object.`);
-  return parsed;
-}
-
-// Expands the workspace globs the root manifest declares, so a workspace added
-// later is covered without editing this test.
-function readWorkspaces(manifest: DynamicRecord): readonly string[] {
-  const workspaces = manifest.workspaces;
-  if (!isDynamicRecord(workspaces)) throw new Error("Expected the object form of workspaces, with a catalog.");
-  const patterns = workspaces.packages;
-  if (!Array.isArray(patterns)) throw new Error("Expected workspaces.packages to be an array of globs.");
-
-  const directories: string[] = [];
-  for (const pattern of patterns) {
-    if (!isString(pattern)) throw new Error("Expected every workspace glob to be a string.");
-    if (!pattern.endsWith("/*")) {
-      directories.push(pattern);
-      continue;
-    }
-    const parent = pattern.slice(0, -2);
-    for (const entry of readdirSync(join(repositoryRoot, parent), { withFileTypes: true })) {
-      if (entry.isDirectory() && existsSync(join(repositoryRoot, parent, entry.name, "package.json"))) {
-        directories.push(`${parent}/${entry.name}`);
-      }
-    }
-  }
-  return directories.sort();
-}
-
 function readCatalog(manifest: DynamicRecord): Record<string, string> {
   const workspaces = manifest.workspaces;
   if (!isDynamicRecord(workspaces) || !isDynamicRecord(workspaces.catalog)) {
@@ -254,18 +197,4 @@ function readCatalog(manifest: DynamicRecord): Record<string, string> {
     catalogued[name] = version;
   }
   return catalogued;
-}
-
-function readDependencies(path: string): readonly (readonly [string, string, string])[] {
-  const manifest = readManifest(path);
-  const declared: (readonly [string, string, string])[] = [];
-  for (const field of DEPENDENCY_FIELDS) {
-    const block = manifest[field];
-    if (!isDynamicRecord(block)) continue;
-    for (const [name, version] of Object.entries(block)) {
-      if (!isString(version)) throw new Error(`Expected a version string for ${field}.${name} in ${path}.`);
-      declared.push([field, name, version]);
-    }
-  }
-  return declared;
 }

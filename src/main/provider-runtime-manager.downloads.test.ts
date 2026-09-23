@@ -1,14 +1,15 @@
 // @vitest-environment node
 
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
+import { MANAGED_RUNTIME_PROVIDERS, MANAGED_TOOL_RUNTIMES, type ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
+import { ProviderRuntimeManager } from "./provider-runtime-manager";
 
 const roots: string[] = [];
 
@@ -17,86 +18,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-/** A served `opencode-darwin-arm64` tarball with the lock rewritten to match it. */
-/** A served `@oven/bun-darwin-aarch64` tarball with the lock rewritten to match it. */
-async function temporaryRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "openbot-provider-runtime-test-"));
-  roots.push(root);
-  return root;
-}
-
-function digest(value: Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function chunkedResponse(value: Uint8Array, chunkSize: number, headers?: HeadersInit): Response {
-  let offset = 0;
-  return new Response(
-    new ReadableStream({
-      pull(controller) {
-        const next = value.slice(offset, offset + chunkSize);
-        offset += next.byteLength;
-        if (next.byteLength > 0) controller.enqueue(next);
-        if (offset >= value.byteLength) controller.close();
-      },
-    }),
-    { status: 200, headers },
-  );
-}
-
-function slowResponse(value: Uint8Array): Response {
-  let offset = 0;
-  return new Response(
-    new ReadableStream({
-      async pull(controller) {
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        if (offset >= value.byteLength) {
-          controller.close();
-          return;
-        }
-        controller.enqueue(value.slice(offset, offset + 256));
-        offset += 256;
-      },
-    }),
-    { status: 200, headers: { etag: '"slow"' } },
-  );
-}
-
-function grokFixture(): {
-  executable: Uint8Array<ArrayBuffer>;
-  license: Uint8Array<ArrayBuffer>;
-  notices: Uint8Array<ArrayBuffer>;
-  lock: ReturnType<typeof parseAgentRuntimeLock>;
-} {
-  const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(1_000)}`);
-  const license = new TextEncoder().encode("license\n");
-  const notices = new TextEncoder().encode("notices\n");
-  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
-  lock.grok.artifacts["darwin-arm64"].downloadBytes = executable.byteLength;
-  lock.grok.artifacts["darwin-arm64"].installedBytes = executable.byteLength + 1_024;
-  lock.grok.artifacts["darwin-arm64"].assetSha256 = digest(executable);
-  lock.grok.licenseSha256 = digest(license);
-  lock.grok.noticesSha256 = digest(notices);
-  return { executable, license, notices, lock };
-}
-
-/** Six hours is the staging threshold and thirty days the version one; both are cleared here. */
-/** The claim an instance leaves on a path while it replaces the runtime there. */
-/** A manager on a store it shares with another, with a profile download directory of its own. */
-function waitFor(
-  manager: ProviderRuntimeManager,
-  predicate: (snapshot: ProviderRuntimeSnapshot) => boolean,
-): Promise<ProviderRuntimeSnapshot> {
-  return new Promise((resolve) => {
-    const listener = (snapshot: ProviderRuntimeSnapshot) => {
-      if (!predicate(snapshot)) return;
-      manager.off("status", listener);
-      resolve(snapshot);
-    };
-    manager.on("status", listener);
-  });
-}
-describe("ProviderRuntimeManager (1/3)", () => {
+describe("ProviderRuntimeManager: downloads and updates", () => {
   it("streams a verified runtime and reports monotonic progress", async () => {
     const root = await temporaryRoot();
     const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(2_000)}`);
@@ -518,14 +440,136 @@ describe("ProviderRuntimeManager (1/3)", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("keeps one store for every profile on this computer", () => {
-    // An exact path, because it is what every profile has to agree on to share one download. In
-    // development each renderer port and each worktree gets a `userData` of its own; the packaged
-    // app's is `appData/OpenBot`, so this is the path released builds already use.
-    const appData = join("/home", "someone", ".config");
-    expect(providerRuntimeRoot({ appData, userDataOverride: "" })).toBe(join(appData, "OpenBot", "provider-runtimes"));
-    expect(providerRuntimeRoot({ appData, userDataOverride: "   " })).toBe(
-      join(appData, "OpenBot", "provider-runtimes"),
-    );
+  it("rejects an archive that contains a link", async () => {
+    const root = await temporaryRoot();
+    const source = join(root, "unsafe-source");
+    const archive = join(root, "unsafe.tar.gz");
+    await mkdir(join(source, "bin"), { recursive: true });
+    await symlink("../outside", join(source, "bin", "codex"));
+    execFileSync("tar", ["-czf", archive, "-C", source, "."]);
+    const bytes = await readFile(archive);
+    const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+    const artifact = lock.codex.artifacts["darwin-arm64"];
+    artifact.downloadBytes = bytes.byteLength;
+    artifact.installedBytes = 1_024;
+    artifact.assetSha256 = digest(bytes);
+    const manager = new ProviderRuntimeManager({
+      root: join(root, "runtimes"),
+      platform: "darwin",
+      architecture: "arm64",
+      lock,
+      fetchImpl: async () => new Response(bytes),
+    });
+    await manager.initialize();
+    const failed = waitFor(manager, (snapshot) => snapshot.providers.codex.phase === "download-error");
+
+    await manager.download("codex");
+    const snapshot = await failed;
+
+    expect(snapshot.providers.codex.message).toContain("link or special file");
+    const providerEntries = await readdir(join(root, "runtimes", "codex")).catch(() => []);
+    expect(providerEntries.some((entry) => entry.startsWith(".staging-"))).toBe(false);
+  });
+
+  it.each([
+    ["darwin", "arm64"],
+    ["linux", "x64"],
+    ["win32", "x64"],
+  ] as const)("offers managed downloads on %s %s", async (platform, architecture) => {
+    const root = await temporaryRoot();
+    const manager = new ProviderRuntimeManager({ root, platform, architecture });
+
+    const snapshot = await manager.initialize();
+
+    for (const provider of MANAGED_RUNTIME_PROVIDERS) {
+      expect(snapshot.providers[provider]).toMatchObject({ phase: "not-downloaded", message: null });
+    }
+    for (const tool of MANAGED_TOOL_RUNTIMES) {
+      expect(snapshot.toolRuntimes[tool]).toMatchObject({ phase: "not-downloaded", message: null });
+    }
+  });
+
+  it("reports an unsupported platform rather than a download that cannot work", async () => {
+    const root = await temporaryRoot();
+    const manager = new ProviderRuntimeManager({ root, platform: "linux", architecture: "arm64" });
+
+    const snapshot = await manager.initialize();
+
+    expect(snapshot.providers.codex.message).toBe("This platform is not supported.");
   });
 });
+
+async function temporaryRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "openbot-provider-runtime-test-"));
+  roots.push(root);
+  return root;
+}
+
+function digest(value: Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function chunkedResponse(value: Uint8Array, chunkSize: number, headers?: HeadersInit): Response {
+  let offset = 0;
+  return new Response(
+    new ReadableStream({
+      pull(controller) {
+        const next = value.slice(offset, offset + chunkSize);
+        offset += next.byteLength;
+        if (next.byteLength > 0) controller.enqueue(next);
+        if (offset >= value.byteLength) controller.close();
+      },
+    }),
+    { status: 200, headers },
+  );
+}
+
+function slowResponse(value: Uint8Array): Response {
+  let offset = 0;
+  return new Response(
+    new ReadableStream({
+      async pull(controller) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        if (offset >= value.byteLength) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(value.slice(offset, offset + 256));
+        offset += 256;
+      },
+    }),
+    { status: 200, headers: { etag: '"slow"' } },
+  );
+}
+
+function grokFixture(): {
+  executable: Uint8Array<ArrayBuffer>;
+  license: Uint8Array<ArrayBuffer>;
+  notices: Uint8Array<ArrayBuffer>;
+  lock: ReturnType<typeof parseAgentRuntimeLock>;
+} {
+  const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(1_000)}`);
+  const license = new TextEncoder().encode("license\n");
+  const notices = new TextEncoder().encode("notices\n");
+  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+  lock.grok.artifacts["darwin-arm64"].downloadBytes = executable.byteLength;
+  lock.grok.artifacts["darwin-arm64"].installedBytes = executable.byteLength + 1_024;
+  lock.grok.artifacts["darwin-arm64"].assetSha256 = digest(executable);
+  lock.grok.licenseSha256 = digest(license);
+  lock.grok.noticesSha256 = digest(notices);
+  return { executable, license, notices, lock };
+}
+
+function waitFor(
+  manager: ProviderRuntimeManager,
+  predicate: (snapshot: ProviderRuntimeSnapshot) => boolean,
+): Promise<ProviderRuntimeSnapshot> {
+  return new Promise((resolve) => {
+    const listener = (snapshot: ProviderRuntimeSnapshot) => {
+      if (!predicate(snapshot)) return;
+      manager.off("status", listener);
+      resolve(snapshot);
+    };
+    manager.on("status", listener);
+  });
+}

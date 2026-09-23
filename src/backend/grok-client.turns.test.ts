@@ -1,5 +1,4 @@
 import { AcpAgentClient } from "./acp-client";
-import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "./provider-drivers";
 // @vitest-environment node
 
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -11,8 +10,6 @@ import { GrokAgentClient } from "./grok-client";
 import {
   type AppServerNotification,
   type AppServerRequest,
-  decodeAccountRateLimitsReadResult,
-  decodeAccountReadResult,
   decodeRecordResponse,
   decodeThreadResponse,
   decodeTurnResponse,
@@ -39,6 +36,193 @@ afterEach(async () => {
   delete process.env.OPENBOT_FAKE_GROK_LOG;
   delete process.env.OPENBOT_FAKE_GROK_MODE;
   await rm(root, { recursive: true, force: true });
+});
+
+describe.sequential("GrokAgentClient: turns", () => {
+  it.each([
+    ["empty", "failed"],
+    ["whitespace", "failed"],
+    ["thought", "failed"],
+    ["tools", "completed"],
+    ["answer", "completed"],
+    ["cancel", "interrupted"],
+  ])("handles OpenCode %s turns and allows a retry in the same session", async (mode, status) => {
+    process.env.OPENBOT_FAKE_GROK_MODE = `opencode-${mode}`;
+    client = new AcpAgentClient({ executable, version: "1.3.13" }, 5_000, {
+      provider: "opencode",
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect OpenCode.",
+    });
+    const notifications: AppServerNotification[] = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Answer" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    expect(notifications.find((event) => event.method === "turn/completed")?.params).toMatchObject({
+      turn: { status },
+    });
+    const errors = notifications.filter((event) => event.method === "error");
+    if (status === "failed")
+      expect(errors).toEqual([
+        expect.objectContaining({
+          params: expect.objectContaining({
+            threadId: thread.id,
+            message:
+              "OpenCode returned no response. Check the selected model's sign-in and billing in OpenCode, then retry or choose another model.",
+          }),
+        }),
+      ]);
+    else expect(errors).toEqual([]);
+    notifications.length = 0;
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Retry" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+    expect(history.thread.turns?.map((turn) => turn.status)).toEqual([status, "completed"]);
+    expect(history.thread.turns?.[1]?.items).toContainEqual(expect.objectContaining({ text: "Reply after retry." }));
+  });
+
+  it.each(["grok", "opencode"] as const)("keeps %s tool names when completion updates omit them", async (provider) => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "end_turn";
+    client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
+      provider,
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect the provider.",
+    });
+    const notifications: AppServerNotification[] = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Inspect" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    const tools = notifications.flatMap((event) => {
+      if (event.method !== "item/completed" || !isDynamicRecord(event.params) || !isDynamicRecord(event.params.item))
+        return [];
+      return event.params.item.type === "toolCall" ? [event.params.item.name] : [];
+    });
+    expect(tools).toEqual(["Read files", "Check results"]);
+  });
+
+  it("starts profile generation with no built-in tools and denies approval requests", async () => {
+    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000, true);
+    const requests: AppServerRequest[] = [];
+    client.on("request", (request) => requests.push(request));
+    client.start();
+    await client.request("initialize", {}, decodeRecordResponse);
+    const thread = await client.request("thread/start", { cwd: root, dynamicTools: [] }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.thread.id, input: [{ type: "text", text: "Draft a profile" }] },
+      decodeTurnResponse,
+    );
+    await vi.waitFor(async () => expect(await readFile(logPath, "utf8")).toContain("permission-response"));
+    const log = (await readFile(logPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(log).toContainEqual(
+      expect.objectContaining({
+        event: "start",
+        args: [
+          "--no-auto-update",
+          "--tools=",
+          "--deny",
+          "*",
+          "--no-subagents",
+          "--disable-web-search",
+          "agent",
+          "stdio",
+        ],
+      }),
+    );
+    expect(log).toContainEqual(expect.objectContaining({ event: "permission-response", outcome: "cancelled" }));
+    expect(requests.some((request) => request.method.includes("requestApproval"))).toBe(false);
+  });
+
+  it.each(["end_turn", "cancelled", "max_tokens"])(
+    "shows only the final segment in chat when Grok ends with %s",
+    async (stopReason) => {
+      process.env.OPENBOT_FAKE_GROK_MODE = stopReason;
+      client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
+      const notifications: AppServerNotification[] = [];
+      client.on("notification", (notification) => notifications.push(notification));
+      client.start();
+      const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+      await client.request(
+        "turn/start",
+        { threadId: thread.id, input: [{ type: "text", text: "Inspect and answer" }] },
+        decodeTurnResponse,
+      );
+      await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
+      expect(notifications.find((event) => event.method === "openbot/usage")?.params).toMatchObject({
+        usage: { inputTokens: 300, outputTokens: 50, cachedReadTokens: 200 },
+      });
+      const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
+      const messages = history.thread.turns?.[0]?.items;
+      expect(messages).toEqual([
+        expect.objectContaining({ phase: "commentary", text: "Planning inspection." }),
+        expect.objectContaining({ phase: "commentary", text: "Inspecting files." }),
+        expect.objectContaining({ phase: "commentary", text: "Reviewing findings." }),
+        expect.objectContaining({ phase: "commentary", text: "Checking results." }),
+        expect.objectContaining({
+          phase: "final_answer",
+          text: "The final answer.",
+        }),
+      ]);
+      // Only explicit thoughts stream into activity. Unclassified text stays private until
+      // a later boundary establishes commentary or the final answer.
+      const phases = new Map<string, string>();
+      const texts = new Map<string, string>();
+      const completedAnswers: string[] = [];
+      const streamedThoughts: string[] = [];
+      for (const notification of notifications) {
+        if (notification.method === "turn/completed") break;
+        const params = notification.params;
+        if (!isDynamicRecord(params)) continue;
+        if (
+          (notification.method === "item/started" || notification.method === "item/completed") &&
+          isDynamicRecord(params.item)
+        ) {
+          const { id, phase } = params.item;
+          if (typeof id === "string" && typeof phase === "string") phases.set(id, phase);
+          if (phase === "final_answer") {
+            expect(notification.method).toBe("item/completed");
+            completedAnswers.push(String(params.item.text));
+          }
+        }
+        if (notification.method === "item/agentMessage/delta") {
+          const id = String(params.itemId);
+          const text = (texts.get(id) ?? "") + String(params.delta);
+          texts.set(id, text);
+          expect(phases.get(id)).toBe("commentary");
+          expect([...phases.values()]).not.toContain("final_answer");
+          if (text === "Reviewing findings.") {
+            const latestCommentaryId = [...phases].filter(([, phase]) => phase === "commentary").at(-1)?.[0];
+            expect(texts.get(latestCommentaryId ?? "")).toBe("Reviewing findings.");
+            streamedThoughts.push(text);
+          }
+        }
+      }
+      expect([...texts.values()]).toEqual(["Planning inspection.", "Reviewing findings."]);
+      expect(streamedThoughts).toEqual(["Reviewing findings."]);
+      expect(completedAnswers).toEqual(["The final answer."]);
+      expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
+    },
+  );
 });
 
 async function waitFor(predicate: () => boolean, timeoutMs = 3_000): Promise<void> {
@@ -352,300 +536,3 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   }
 });
 `;
-describe.sequential("GrokAgentClient (1/2)", () => {
-  it("runs OpenCode ACP without Grok authentication or billing and preserves its resumed session", async () => {
-    client = new AcpAgentClient({ executable, version: "1.0.0" }, 5_000, {
-      provider: "opencode",
-      argv: ["acp"],
-      env: {},
-      signInMessage: "Connect OpenCode.",
-    });
-    client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
-    expect((await client.request("account/read", {}, decodeAccountReadResult)).account?.type).toBe("opencode");
-    expect(await client.request("account/rateLimits/read", {}, decodeAccountRateLimitsReadResult)).toEqual({
-      rateLimits: null,
-      rateLimitsByLimitId: null,
-    });
-    const resumed = await client.request(
-      "thread/resume",
-      { threadId: "existing-opencode-session", cwd: root, dynamicTools: [] },
-      decodeThreadResponse,
-    );
-    expect(resumed.thread.id).toBe("existing-opencode-session");
-    const log = (await readFile(logPath, "utf8"))
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line));
-    expect(log).toContainEqual(expect.objectContaining({ event: "start", args: ["acp"] }));
-    expect(log.some((entry) => entry.method === "authenticate" || entry.method === "_x.ai/billing")).toBe(false);
-    expect(log).toContainEqual(
-      expect.objectContaining({ method: "session/load", sessionId: "existing-opencode-session" }),
-    );
-  });
-
-  it.each([
-    ["empty", "failed"],
-    ["whitespace", "failed"],
-    ["thought", "failed"],
-    ["tools", "completed"],
-    ["answer", "completed"],
-    ["cancel", "interrupted"],
-  ])("handles OpenCode %s turns and allows a retry in the same session", async (mode, status) => {
-    process.env.OPENBOT_FAKE_GROK_MODE = `opencode-${mode}`;
-    client = new AcpAgentClient({ executable, version: "1.3.13" }, 5_000, {
-      provider: "opencode",
-      argv: ["acp"],
-      env: {},
-      signInMessage: "Connect OpenCode.",
-    });
-    const notifications: AppServerNotification[] = [];
-    client.on("notification", (event) => notifications.push(event));
-    client.start();
-    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
-    await client.request(
-      "turn/start",
-      { threadId: thread.id, input: [{ type: "text", text: "Answer" }] },
-      decodeTurnResponse,
-    );
-    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
-    expect(notifications.find((event) => event.method === "turn/completed")?.params).toMatchObject({
-      turn: { status },
-    });
-    const errors = notifications.filter((event) => event.method === "error");
-    if (status === "failed")
-      expect(errors).toEqual([
-        expect.objectContaining({
-          params: expect.objectContaining({
-            threadId: thread.id,
-            message:
-              "OpenCode returned no response. Check the selected model's sign-in and billing in OpenCode, then retry or choose another model.",
-          }),
-        }),
-      ]);
-    else expect(errors).toEqual([]);
-    notifications.length = 0;
-    await client.request(
-      "turn/start",
-      { threadId: thread.id, input: [{ type: "text", text: "Retry" }] },
-      decodeTurnResponse,
-    );
-    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
-    const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
-    expect(history.thread.turns?.map((turn) => turn.status)).toEqual([status, "completed"]);
-    expect(history.thread.turns?.[1]?.items).toContainEqual(expect.objectContaining({ text: "Reply after retry." }));
-  });
-
-  it("uses external sign-in for OpenCode and creates its ACP process", async () => {
-    const driver = requireProviderDriver("opencode");
-    expect(driver.signIn).toEqual({ kind: "external" });
-    const providerClient = driver.createClient({ executable, version: "1.0.0" }, 5_000, NO_PROVIDER_CREDENTIALS);
-    providerClient.start();
-    try {
-      await providerClient.request("initialize", {}, decodeRecordResponse);
-      expect((await providerClient.request("account/read", {}, decodeAccountReadResult)).account?.type).toBe(
-        "opencode",
-      );
-    } finally {
-      await providerClient.stop();
-    }
-  });
-
-  it("explains rejected OpenCode credentials and permits retry in the same session", async () => {
-    process.env.OPENBOT_FAKE_GROK_MODE = "opencode-auth-error";
-    client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
-      provider: "opencode",
-      argv: ["acp"],
-      env: {},
-      signInMessage: "Connect OpenCode.",
-    });
-    const notifications: AppServerNotification[] = [];
-    client.on("notification", (event) => notifications.push(event));
-    client.start();
-    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
-    for (const text of ["Try", "Retry"]) {
-      await client.request("turn/start", { threadId: thread.id, input: [{ type: "text", text }] }, decodeTurnResponse);
-      await waitFor(
-        () => notifications.filter((event) => event.method === "turn/completed").length === (text === "Try" ? 1 : 2),
-      );
-    }
-    expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
-      expect.objectContaining({
-        message:
-          "OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\nRequestError: Internal error: Invalid API key.",
-      }),
-    ]);
-    const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
-    expect(history.thread.turns?.map((turn) => turn.status)).toEqual(["failed", "completed"]);
-  });
-
-  it.each(["grok", "opencode"] as const)("keeps %s tool names when completion updates omit them", async (provider) => {
-    process.env.OPENBOT_FAKE_GROK_MODE = "end_turn";
-    client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
-      provider,
-      argv: ["acp"],
-      env: {},
-      signInMessage: "Connect the provider.",
-    });
-    const notifications: AppServerNotification[] = [];
-    client.on("notification", (event) => notifications.push(event));
-    client.start();
-    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
-    await client.request(
-      "turn/start",
-      { threadId: thread.id, input: [{ type: "text", text: "Inspect" }] },
-      decodeTurnResponse,
-    );
-    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
-    const tools = notifications.flatMap((event) => {
-      if (event.method !== "item/completed" || !isDynamicRecord(event.params) || !isDynamicRecord(event.params.item))
-        return [];
-      return event.params.item.type === "toolCall" ? [event.params.item.name] : [];
-    });
-    expect(tools).toEqual(["Read files", "Check results"]);
-  });
-
-  it("starts profile generation with no built-in tools and denies approval requests", async () => {
-    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000, true);
-    const requests: AppServerRequest[] = [];
-    client.on("request", (request) => requests.push(request));
-    client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
-    const thread = await client.request("thread/start", { cwd: root, dynamicTools: [] }, decodeThreadResponse);
-    await client.request(
-      "turn/start",
-      { threadId: thread.thread.id, input: [{ type: "text", text: "Draft a profile" }] },
-      decodeTurnResponse,
-    );
-    await vi.waitFor(async () => expect(await readFile(logPath, "utf8")).toContain("permission-response"));
-    const log = (await readFile(logPath, "utf8"))
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line));
-    expect(log).toContainEqual(
-      expect.objectContaining({
-        event: "start",
-        args: [
-          "--no-auto-update",
-          "--tools=",
-          "--deny",
-          "*",
-          "--no-subagents",
-          "--disable-web-search",
-          "agent",
-          "stdio",
-        ],
-      }),
-    );
-    expect(log).toContainEqual(expect.objectContaining({ event: "permission-response", outcome: "cancelled" }));
-    expect(requests.some((request) => request.method.includes("requestApproval"))).toBe(false);
-  });
-
-  it.each(["end_turn", "cancelled", "max_tokens"])(
-    "shows only the final segment in chat when Grok ends with %s",
-    async (stopReason) => {
-      process.env.OPENBOT_FAKE_GROK_MODE = stopReason;
-      client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
-      const notifications: AppServerNotification[] = [];
-      client.on("notification", (notification) => notifications.push(notification));
-      client.start();
-      const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
-      await client.request(
-        "turn/start",
-        { threadId: thread.id, input: [{ type: "text", text: "Inspect and answer" }] },
-        decodeTurnResponse,
-      );
-      await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
-      expect(notifications.find((event) => event.method === "openbot/usage")?.params).toMatchObject({
-        usage: { inputTokens: 300, outputTokens: 50, cachedReadTokens: 200 },
-      });
-      const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
-      const messages = history.thread.turns?.[0]?.items;
-      expect(messages).toEqual([
-        expect.objectContaining({ phase: "commentary", text: "Planning inspection." }),
-        expect.objectContaining({ phase: "commentary", text: "Inspecting files." }),
-        expect.objectContaining({ phase: "commentary", text: "Reviewing findings." }),
-        expect.objectContaining({ phase: "commentary", text: "Checking results." }),
-        expect.objectContaining({
-          phase: "final_answer",
-          text: "The final answer.",
-        }),
-      ]);
-      // Only explicit thoughts stream into activity. Unclassified text stays private until
-      // a later boundary establishes commentary or the final answer.
-      const phases = new Map<string, string>();
-      const texts = new Map<string, string>();
-      const completedAnswers: string[] = [];
-      const streamedThoughts: string[] = [];
-      for (const notification of notifications) {
-        if (notification.method === "turn/completed") break;
-        const params = notification.params;
-        if (!isDynamicRecord(params)) continue;
-        if (
-          (notification.method === "item/started" || notification.method === "item/completed") &&
-          isDynamicRecord(params.item)
-        ) {
-          const { id, phase } = params.item;
-          if (typeof id === "string" && typeof phase === "string") phases.set(id, phase);
-          if (phase === "final_answer") {
-            expect(notification.method).toBe("item/completed");
-            completedAnswers.push(String(params.item.text));
-          }
-        }
-        if (notification.method === "item/agentMessage/delta") {
-          const id = String(params.itemId);
-          const text = (texts.get(id) ?? "") + String(params.delta);
-          texts.set(id, text);
-          expect(phases.get(id)).toBe("commentary");
-          expect([...phases.values()]).not.toContain("final_answer");
-          if (text === "Reviewing findings.") {
-            const latestCommentaryId = [...phases].filter(([, phase]) => phase === "commentary").at(-1)?.[0];
-            expect(texts.get(latestCommentaryId ?? "")).toBe("Reviewing findings.");
-            streamedThoughts.push(text);
-          }
-        }
-      }
-      expect([...texts.values()]).toEqual(["Planning inspection.", "Reviewing findings."]);
-      expect(streamedThoughts).toEqual(["Reviewing findings."]);
-      expect(completedAnswers).toEqual(["The final answer."]);
-      expect([...phases.values()].filter((phase) => phase === "final_answer")).toHaveLength(1);
-    },
-  );
-
-  it("reads the current weekly billing period and a monthly period", async () => {
-    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
-    client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
-    await expect(
-      client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
-    ).resolves.toMatchObject({
-      rateLimits: {
-        secondary: { usedPercent: 8, windowDurationMins: 10_080, resetsAt: 1_788_825_600 },
-      },
-    });
-    await client.stop();
-
-    process.env.OPENBOT_FAKE_GROK_MODE = "monthly-billing";
-    client = new GrokAgentClient({ executable, version: "1.0.5" }, 5_000);
-    client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
-    await expect(
-      client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
-    ).resolves.toMatchObject({
-      rateLimits: {
-        secondary: { usedPercent: 8, windowDurationMins: 43_200 },
-      },
-    });
-  });
-
-  it("reports unavailable usage for a unified weekly billing period without quota values", async () => {
-    process.env.OPENBOT_FAKE_GROK_MODE = "unified-billing";
-    client = new GrokAgentClient({ executable, version: "1.0.13" }, 5_000);
-    client.start();
-    await client.request("initialize", {}, decodeRecordResponse);
-
-    await expect(
-      client.request("account/rateLimits/read", { model: "grok-4.5" }, decodeAccountRateLimitsReadResult),
-    ).resolves.toEqual({ rateLimits: null, rateLimitsByLimitId: null });
-  });
-});

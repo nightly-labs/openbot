@@ -1,23 +1,22 @@
 // @vitest-environment node
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
 import {
   CREATE_AGENT_INPUT,
   createFakeClaude,
-  createFakeGrok,
   createTestService,
   createUpdatableFakeClaude,
   FakeAgentClient,
+  readTextOrEmpty,
   startAgentTestFixture,
   startService,
   stopAgentTestFixture,
   stores,
   waitFor,
 } from "../agent-service-test-harness";
-import { isUsageLimitDiagnostic } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -31,176 +30,34 @@ afterEach(async () => {
   service = null;
 });
 
-describe.sequential("ProviderRuntime: account checks and login (3/3)", () => {
-  it("keeps an MCP credential out of the provider status a crashed CLI leaves behind", async () => {
+describe.sequential("ProviderRuntime: CLI updates and key changes", () => {
+  it("activates the downloaded managed CLI instead of running the user's updater", async () => {
+    const system = await createUpdatableFakeClaude(root, "2.1.250");
+    process.env.OPENBOT_CLAUDE_PATH = system.executable;
     const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const clients: FakeAgentClient[] = [];
     service = createTestService({
       store,
       mailbox,
-      preferredProvider: "codex",
+      preferredProvider: "claude",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
+        if (provider === "claude") clients.push(client);
         return client;
       },
     });
     await service.initialize();
-    const client = clients.get("codex");
-    if (!client) throw new Error("The fake provider did not start.");
-    service.saveMcpServer({
-      config: {
-        id: "",
-        name: "Filesystem",
-        transport: "stdio",
-        enabled: true,
-        command: "/bin/echo",
-        args: [],
-        env: [{ key: "API_KEY", value: "abcdef123456" }],
-        envPassthrough: [],
-        workingDirectory: "",
-        url: "",
-        headers: [],
-      },
-    });
-    const messages: (string | null)[] = [];
-    service.on("event", (event) => {
-      if (event.type !== "status") return;
-      for (const provider of event.status.providers ?? []) {
-        if (provider.id === "codex" && provider.state === "error") messages.push(provider.message);
-      }
-    });
-
-    // The CLI quotes what it was given as it dies, and its last words become the provider status
-    // the renderer shows beside the provider.
-    client.emit("exit", new Error("Codex App Server exited: rejected abcdef123456"));
-
-    await waitFor(() => messages.length > 0);
-    expect(messages[0]).toBe("Codex App Server exited: rejected •••");
-  });
-
-  it("keeps Grok's telemetry export failure out of the chat it was switched into", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
-    const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
-    const client = clients.get("grok");
-    if (!client) throw new Error("Grok did not start.");
-
-    // Verbatim, with the colour the CLI writes on a pipe already removed by the stderr reader. A
-    // computer that cannot reach the collector writes this on every flush while the turn runs, and
-    // the user met it as a "Provider error" toast right after switching the chat to Grok.
-    client.emit(
-      "diagnostic",
-      '2026-09-14T08:28:39.022673Z ERROR name="BatchSpanProcessor.ExporterError" error="Operation failed: HTTP export failed: network error"',
+    const managed = await createFakeClaude(root);
+    await writeFile(managed, (await readFile(managed, "utf8")).replaceAll("2.1.246", "2.1.263"));
+    // Remove the test's explicit override to model automatic system discovery at startup.
+    process.env.OPENBOT_CLAUDE_PATH = join(root, "missing-claude");
+    const status = await service.updateProviderCli("claude", async () => managed);
+    expect(await readTextOrEmpty(system.started)).toBe("");
+    expect(status.providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "available", version: "2.1.263", cliSource: "managed" }),
     );
-    // Grok's own network failure is not telemetry, and stays visible.
-    client.emit("diagnostic", "ERROR grok: the model endpoint could not be reached");
-
-    await waitFor(() => events.some((event) => event.type === "error"));
-    expect(events.filter((event) => event.type === "error")).toEqual([
-      expect.objectContaining({ message: "ERROR grok: the model endpoint could not be reached" }),
-    ]);
-
-    // The chat is on Grok and still runs a turn: the export failed, the agent's work did not.
-    await service.sendMessage({ agentId: "chief", text: "Continue on Grok." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
-    expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
-  });
-
-  it.each([
-    "Grok Build usage balance exhausted",
-    "insufficient_quota",
-    "Your credit balance is too low to access the Anthropic API",
-    "You have exceeded your current quota",
-    "Billing hard limit has been reached",
-  ])("recognizes an exhausted provider usage limit: %s", (message) => {
-    expect(isUsageLimitDiagnostic(message)).toBe(true);
-  });
-
-  it.each([
-    "402 Payment Required",
-    "429 Too Many Requests",
-    "The provider failed to reach the model endpoint",
-    "Authentication failed",
-  ])("does not hide another provider failure: %s", (message) => {
-    expect(isUsageLimitDiagnostic(message)).toBe(false);
-  });
-
-  it("replaces Grok's repeated exhausted-balance errors with one usage refresh", async () => {
-    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
-    const { store, mailbox } = stores(root);
-    const clients = new Map<AgentProvider, FakeAgentClient>();
-    service = createTestService({
-      store,
-      mailbox,
-      preferredProvider: "codex",
-      clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider);
-        clients.set(provider, client);
-        return client;
-      },
-    });
-    const events: AgentEvent[] = [];
-    service.on("event", (event) => events.push(event));
-    await service.initialize();
-    await store.getOrCreate("chief");
-    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
-    const client = clients.get("grok");
-    if (!client) throw new Error("Grok did not start.");
-    client.accountRateLimits = {
-      rateLimits: {
-        limitId: "grok",
-        secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_787_040_000 },
-      },
-      rateLimitsByLimitId: null,
-    };
-    const usageReadsBefore = client.requests.filter((request) => request.method === "account/rateLimits/read").length;
-    events.length = 0;
-
-    client.emit(
-      "diagnostic",
-      '2026-09-18T08:54:24.476465Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
-    );
-    client.emit(
-      "diagnostic",
-      '2026-09-18T08:54:24.476222Z ERROR error=Internal error: {"message":"API error (status 402 Payment Required): Grok Build usage balance exhausted","http_status":402}',
-    );
-    client.emit("notification", {
-      method: "error",
-      params: {
-        message:
-          'responses API error status=402 Payment Required error_message=Grok Build usage balance exhausted body_preview={"error":"Grok Build usage balance exhausted"} model_id=grok-4.6',
-      },
-    });
-
-    await waitFor(() => events.some((event) => event.type === "usage-changed"));
-    expect(events.filter((event) => event.type === "error")).toEqual([]);
-    expect(client.requests.filter((request) => request.method === "account/rateLimits/read")).toHaveLength(
-      usageReadsBefore + 1,
-    );
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        type: "usage-changed",
-        usage: expect.objectContaining({
-          limits: [expect.objectContaining({ id: "grok", secondary: expect.objectContaining({ usedPercent: 100 }) })],
-        }),
-      }),
-    );
+    expect(clients[0]?.running).toBe(false);
+    expect(clients[1]?.running).toBe(true);
   });
 
   it("refuses to replace a CLI that is running a turn", async () => {

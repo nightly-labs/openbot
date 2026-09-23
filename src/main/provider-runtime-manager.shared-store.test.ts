@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { access, chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import type { ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
+import { MANAGED_RUNTIME_PROVIDERS, MANAGED_TOOL_RUNTIMES, type ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
 import { parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
@@ -21,115 +21,17 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-/** A served `opencode-darwin-arm64` tarball with the lock rewritten to match it. */
-/** A served `@oven/bun-darwin-aarch64` tarball with the lock rewritten to match it. */
-async function temporaryRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "openbot-provider-runtime-test-"));
-  roots.push(root);
-  return root;
-}
-
-function digest(value: Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function chunkedResponse(value: Uint8Array, chunkSize: number, headers?: HeadersInit): Response {
-  let offset = 0;
-  return new Response(
-    new ReadableStream({
-      pull(controller) {
-        const next = value.slice(offset, offset + chunkSize);
-        offset += next.byteLength;
-        if (next.byteLength > 0) controller.enqueue(next);
-        if (offset >= value.byteLength) controller.close();
-      },
-    }),
-    { status: 200, headers },
-  );
-}
-
-function grokFixture(): {
-  executable: Uint8Array<ArrayBuffer>;
-  license: Uint8Array<ArrayBuffer>;
-  notices: Uint8Array<ArrayBuffer>;
-  lock: ReturnType<typeof parseAgentRuntimeLock>;
-} {
-  const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(1_000)}`);
-  const license = new TextEncoder().encode("license\n");
-  const notices = new TextEncoder().encode("notices\n");
-  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
-  lock.grok.artifacts["darwin-arm64"].downloadBytes = executable.byteLength;
-  lock.grok.artifacts["darwin-arm64"].installedBytes = executable.byteLength + 1_024;
-  lock.grok.artifacts["darwin-arm64"].assetSha256 = digest(executable);
-  lock.grok.licenseSha256 = digest(license);
-  lock.grok.noticesSha256 = digest(notices);
-  return { executable, license, notices, lock };
-}
-
-/** Six hours is the staging threshold and thirty days the version one; both are cleared here. */
-const STAGING_AGE_MS = 7 * 60 * 60 * 1000;
-const VERSION_AGE_MS = 31 * 24 * 60 * 60 * 1000;
-
-/** The claim an instance leaves on a path while it replaces the runtime there. */
-async function heldClaim(lock: string, claim: string): Promise<void> {
-  await mkdir(lock, { recursive: true });
-  await writeFile(join(lock, "claim"), `${claim}\n`);
-}
-
-async function aged(path: string, age = STAGING_AGE_MS): Promise<void> {
-  const when = new Date(Date.now() - age);
-  await utimes(path, when, when);
-}
-
-interface SiblingOptions {
-  /** Each instance keeps its partial transfers in a directory of its own. */
-  downloadRoot: string;
-  /** Holds the executable response, so another instance can commit while this one waits. */
-  held?: Promise<void>;
-  /** The swap the agent service makes for its running clients. */
-  updateRuntime?: ProviderRuntimeManagerOptions["updateRuntime"];
-  /** Counts what was asked for, to tell a skipped transfer from a repeated one. */
-  onFetch?: (url: string) => void;
-}
-
-/** A manager on a store it shares with another, with a profile download directory of its own. */
-function siblingManager(
-  root: string,
-  fixture: ReturnType<typeof grokFixture>,
-  options: SiblingOptions,
-): ProviderRuntimeManager {
-  return new ProviderRuntimeManager({
-    root,
-    downloadRoot: options.downloadRoot,
-    platform: "darwin",
-    architecture: "arm64",
-    lock: fixture.lock,
-    updateRuntime: options.updateRuntime,
-    fetchImpl: async (input) => {
-      const url = String(input);
-      options.onFetch?.(url);
-      if (url.endsWith("/LICENSE")) return new Response(fixture.license);
-      if (url.endsWith("/THIRD-PARTY-NOTICES")) return new Response(fixture.notices);
-      await options.held;
-      return chunkedResponse(fixture.executable, 1_024);
-    },
+describe("ProviderRuntimeManager: the store instances share", () => {
+  it("keeps one store for every profile on this computer", () => {
+    // An exact path, because it is what every profile has to agree on to share one download. In
+    // development each renderer port and each worktree gets a `userData` of its own; the packaged
+    // app's is `appData/OpenBot`, so this is the path released builds already use.
+    const appData = join("/home", "someone", ".config");
+    expect(providerRuntimeRoot({ appData, userDataOverride: "" })).toBe(join(appData, "OpenBot", "provider-runtimes"));
+    expect(providerRuntimeRoot({ appData, userDataOverride: "   " })).toBe(
+      join(appData, "OpenBot", "provider-runtimes"),
+    );
   });
-}
-
-function waitFor(
-  manager: ProviderRuntimeManager,
-  predicate: (snapshot: ProviderRuntimeSnapshot) => boolean,
-): Promise<ProviderRuntimeSnapshot> {
-  return new Promise((resolve) => {
-    const listener = (snapshot: ProviderRuntimeSnapshot) => {
-      if (!predicate(snapshot)) return;
-      manager.off("status", listener);
-      resolve(snapshot);
-    };
-    manager.on("status", listener);
-  });
-}
-describe("ProviderRuntimeManager (2/3)", () => {
   it("keeps the store inside a user data directory the caller named", () => {
     const override = join("/tmp", "openbot-automation");
     expect(providerRuntimeRoot({ appData: "/home/someone/.config", userDataOverride: `${override} ` })).toBe(
@@ -422,4 +324,171 @@ describe("ProviderRuntimeManager (2/3)", () => {
     expect(await readFile(destination, "utf8")).toBe(new TextDecoder().decode(fixture.executable));
     expect((await readdir(join(root, "grok"))).filter((entry) => entry.startsWith("."))).toEqual([]);
   });
+  it("keeps partial transfers out of the store the computer shares", async () => {
+    const root = await temporaryRoot();
+    const downloadRoot = join(await temporaryRoot(), "profile-downloads");
+    const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+    lock.grok.artifacts["darwin-arm64"].downloadBytes = 64_000;
+    const manager = new ProviderRuntimeManager({
+      root,
+      downloadRoot,
+      platform: "darwin",
+      architecture: "arm64",
+      lock,
+      fetchImpl: async () => slowResponse(new Uint8Array(64_000)),
+    });
+    await manager.initialize();
+    const partial = join(downloadRoot, `grok-darwin-arm64-${lock.grok.version}.partial`);
+    const transferring = waitFor(manager, (snapshot) => (snapshot.providers.grok.progress ?? 0) > 0);
+
+    await manager.download("grok");
+    await transferring;
+
+    await expect(access(partial)).resolves.toBeUndefined();
+    expect(await readdir(root)).not.toContain(".downloads");
+
+    await manager.cancel("grok");
+    await expect(access(partial)).rejects.toThrow();
+    await manager.stop();
+  });
+
+  it("installs each runtime under its own name and version", async () => {
+    // The manager used to answer "which artifact does this provider get?" with `else grok`, so a
+    // provider it had never heard of got Grok's binary in its own directory. Every managed runtime
+    // is asked here, so a new one joins this case by joining the registry.
+    const root = await temporaryRoot();
+    const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+    const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", lock });
+
+    for (const runtime of [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES]) {
+      expect(manager.executablePath(runtime)).toBe(
+        join(root, runtime, "darwin-arm64", lock[runtime].version, "bin", runtime),
+      );
+    }
+  });
 });
+
+async function temporaryRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "openbot-provider-runtime-test-"));
+  roots.push(root);
+  return root;
+}
+
+function digest(value: Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function chunkedResponse(value: Uint8Array, chunkSize: number, headers?: HeadersInit): Response {
+  let offset = 0;
+  return new Response(
+    new ReadableStream({
+      pull(controller) {
+        const next = value.slice(offset, offset + chunkSize);
+        offset += next.byteLength;
+        if (next.byteLength > 0) controller.enqueue(next);
+        if (offset >= value.byteLength) controller.close();
+      },
+    }),
+    { status: 200, headers },
+  );
+}
+
+function slowResponse(value: Uint8Array): Response {
+  let offset = 0;
+  return new Response(
+    new ReadableStream({
+      async pull(controller) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        if (offset >= value.byteLength) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(value.slice(offset, offset + 256));
+        offset += 256;
+      },
+    }),
+    { status: 200, headers: { etag: '"slow"' } },
+  );
+}
+
+function grokFixture(): {
+  executable: Uint8Array<ArrayBuffer>;
+  license: Uint8Array<ArrayBuffer>;
+  notices: Uint8Array<ArrayBuffer>;
+  lock: ReturnType<typeof parseAgentRuntimeLock>;
+} {
+  const executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.22\n${"# runtime\n".repeat(1_000)}`);
+  const license = new TextEncoder().encode("license\n");
+  const notices = new TextEncoder().encode("notices\n");
+  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+  lock.grok.artifacts["darwin-arm64"].downloadBytes = executable.byteLength;
+  lock.grok.artifacts["darwin-arm64"].installedBytes = executable.byteLength + 1_024;
+  lock.grok.artifacts["darwin-arm64"].assetSha256 = digest(executable);
+  lock.grok.licenseSha256 = digest(license);
+  lock.grok.noticesSha256 = digest(notices);
+  return { executable, license, notices, lock };
+}
+
+/** Six hours is the staging threshold and thirty days the version one; both are cleared here. */
+const STAGING_AGE_MS = 7 * 60 * 60 * 1000;
+const VERSION_AGE_MS = 31 * 24 * 60 * 60 * 1000;
+
+/** The claim an instance leaves on a path while it replaces the runtime there. */
+async function heldClaim(lock: string, claim: string): Promise<void> {
+  await mkdir(lock, { recursive: true });
+  await writeFile(join(lock, "claim"), `${claim}\n`);
+}
+
+async function aged(path: string, age = STAGING_AGE_MS): Promise<void> {
+  const when = new Date(Date.now() - age);
+  await utimes(path, when, when);
+}
+
+interface SiblingOptions {
+  /** Each instance keeps its partial transfers in a directory of its own. */
+  downloadRoot: string;
+  /** Holds the executable response, so another instance can commit while this one waits. */
+  held?: Promise<void>;
+  /** The swap the agent service makes for its running clients. */
+  updateRuntime?: ProviderRuntimeManagerOptions["updateRuntime"];
+  /** Counts what was asked for, to tell a skipped transfer from a repeated one. */
+  onFetch?: (url: string) => void;
+}
+
+/** A manager on a store it shares with another, with a profile download directory of its own. */
+function siblingManager(
+  root: string,
+  fixture: ReturnType<typeof grokFixture>,
+  options: SiblingOptions,
+): ProviderRuntimeManager {
+  return new ProviderRuntimeManager({
+    root,
+    downloadRoot: options.downloadRoot,
+    platform: "darwin",
+    architecture: "arm64",
+    lock: fixture.lock,
+    updateRuntime: options.updateRuntime,
+    fetchImpl: async (input) => {
+      const url = String(input);
+      options.onFetch?.(url);
+      if (url.endsWith("/LICENSE")) return new Response(fixture.license);
+      if (url.endsWith("/THIRD-PARTY-NOTICES")) return new Response(fixture.notices);
+      await options.held;
+      return chunkedResponse(fixture.executable, 1_024);
+    },
+  });
+}
+
+function waitFor(
+  manager: ProviderRuntimeManager,
+  predicate: (snapshot: ProviderRuntimeSnapshot) => boolean,
+): Promise<ProviderRuntimeSnapshot> {
+  return new Promise((resolve) => {
+    const listener = (snapshot: ProviderRuntimeSnapshot) => {
+      if (!predicate(snapshot)) return;
+      manager.off("status", listener);
+      resolve(snapshot);
+    };
+    manager.on("status", listener);
+  });
+}
