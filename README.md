@@ -203,9 +203,8 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 ## Commands
 
 The browser client is served at `/app` by the public web app. For local development, run
-`WEB_CLIENT_ENABLED=true bun run dev:api --isolated` and open `/app` on the API URL printed by
-the supervisor. Use `bun run dev --isolated` with the same flag when a desktop host is also needed.
-The deployed Worker keeps browser access disabled unless `WEB_CLIENT_ENABLED` is `true`.
+`bun run dev:api --isolated` and open `/app` on the API URL printed by the supervisor. Use
+`bun run dev --isolated` when a desktop host is also needed.
 Use `bun run storybook` and **Web → Workspace → Connected** for shared UI test data.
 See [web client delivery](docs/web-client.md) for the release gate and focused checks.
 

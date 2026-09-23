@@ -157,13 +157,4 @@ describe("browser account UI", () => {
     );
     expect(mock.posted).toHaveBeenCalledWith("session-changed");
   });
-  it("hides the private workspace when the server disables browser access", async () => {
-    const mock = setup();
-    mock.fetch.mockResolvedValue(
-      Response.json({ error: { message: "Disabled" } }, { status: 404, headers: { "X-OpenBot-Web-Disabled": "1" } }),
-    );
-    render(() => <WebApp createRuntime={createMockWebRuntime} />);
-    await waitFor(() => expect(screen.getByText("Browser access is not available yet.")).toBeVisible());
-    expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
-  });
 });

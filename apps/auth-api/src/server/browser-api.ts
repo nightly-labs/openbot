@@ -9,7 +9,6 @@ const PREFIX = "/api/browser/";
 const COOKIE_ATTRIBUTES = "Path=/; Secure; HttpOnly; SameSite=Lax";
 
 export interface BrowserApiServices {
-  enabled: boolean;
   auth: Pick<AuthService, "startEmailSignIn" | "verifyEmailCode" | "authenticate">;
   remote: Pick<
     RemoteControlPlane,
@@ -57,11 +56,6 @@ export function browserSessionToken(request: Request): string | null {
 /** A closed list of account operations. Chat traffic never passes through this handler. */
 export async function handleBrowserApi(request: Request, services: BrowserApiServices): Promise<Response> {
   const path = new URL(request.url).pathname.slice(PREFIX.length).replace(/\/$/u, "");
-  if (!services.enabled && path !== "logout") {
-    const response = failure(404, "OpenBot web is not available.");
-    response.headers.set("X-OpenBot-Web-Disabled", "1");
-    return response;
-  }
   if (request.method !== "GET" && request.method !== "POST") return failure(405, "This method is not supported.");
   if (
     request.method === "POST" &&
