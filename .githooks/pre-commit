@@ -26,7 +26,7 @@ else
 fi
 
 # Migrations cannot be undone on a user's computer, so a schema change runs its parity test here.
-schema_pattern='^src/backend/(openbot-database-schema|openbot-database-schema-parity\.test|channel-schema|mcp-schema)\.ts$'
+schema_pattern='^src/backend/(openbot-database-schema|openbot-database-schema-parity\.test|channel-schema|mcp-schema)\.ts$|^src/backend/openbot-database-schema-history\.json$'
 if printf '%s\n' "$staged_paths" | grep -Eq "$schema_pattern"; then
   echo "Running the database schema parity test..."
   bun run test:desktop -- src/backend/openbot-database-schema-parity.test.ts
