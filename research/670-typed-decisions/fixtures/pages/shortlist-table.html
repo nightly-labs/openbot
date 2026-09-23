@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><title>Orders – Admin</title></head><body>
+<main><h1>Orders</h1><label>Filter orders <input type="search"></label><table><thead><tr><th>Order</th><th>Customer</th><th>Total</th></tr></thead><tbody id="rows"></tbody></table>
+<nav aria-label="Pagination"><a href="#">Previous</a> <a href="#">1</a> <a href="#">2</a> <a href="#">3</a> <a href="#">Next</a></nav></main>
+<script>
+  const names = ["Kim", "Lee", "Moss", "Nash", "Ortiz", "Park", "Quinn", "Reyes"];
+  for (let i = 0; i < 150; i++) { const tr = document.createElement("tr"); const td = document.createElement("td"); const a = document.createElement("a"); a.href = "#"; a.textContent = "Order #" + (10001 + i); td.append(a); tr.append(td); const c = document.createElement("td"); c.textContent = names[i % 8]; const t = document.createElement("td"); t.textContent = "$" + (20 + ((i * 13) % 300)); tr.append(c, t); document.querySelector("#rows").append(tr); }
+</script>
+<script src="site.js"></script></body></html>

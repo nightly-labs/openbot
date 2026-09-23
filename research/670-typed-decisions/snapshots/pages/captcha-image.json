@@ -1,0 +1,144 @@
+{
+  "title": "Security check",
+  "url": "https://fixtures.test/captcha-image.html",
+  "loading": false,
+  "text": "Select all images with traffic lights Click verify once there are none left. Image tile 1 Image tile 2 Image tile 3 Image tile 4 Image tile 5 Image tile 6 Image tile 7 Image tile 8 Image tile 9 Verify ⟳ 🎧",
+  "elements": [
+    {
+      "role": "button",
+      "name": "Image tile 1",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 2",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 3",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 4",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 5",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 6",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 7",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 8",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Image tile 9",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Verify",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Get a new challenge",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Get an audio challenge",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><title>mechanical keyboard - Search</title></head><body>
+<main><form role="search"><label>Search <input type="search" value="mechanical keyboard"></label><button type="button">Search</button></form><p>About 1,240,000 results</p>
+<ol id="results"></ol><nav aria-label="Pagination"><a href="#">1</a> <a href="#">2</a> <a href="#">3</a> <a href="#">Next</a></nav></main>
+<script>
+  const results = [["The best mechanical keyboards of 2026", "keyboards.example.com"], ["Mechanical keyboard switches explained", "switches.example.org"], ["How to build your own mechanical keyboard", "diy.example.net"], ["Mechanical vs membrane keyboards: which is better?", "tech.example.com"], ["r/MechanicalKeyboards", "forum.example.com"], ["Quiet mechanical keyboards for the office", "office.example.com"]];
+  for (const [title, host] of results) { const li = document.createElement("li"); const a = document.createElement("a"); a.href = "#"; a.textContent = title; li.append(a, " — " + host); document.querySelector("#results").append(li); }
+</script>
+<script src="site.js"></script></body></html>

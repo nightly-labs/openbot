@@ -1,0 +1,172 @@
+{
+  "title": "Upgrade – Choose your plan",
+  "url": "https://fixtures.test/checkout-subscription.html",
+  "loading": false,
+  "text": "Home Products Pricing Blog Help Sign in Choose your plan Plan Free — $0 Pro — $9.99/month Team — $29/month Card on file: Mastercard ending in 8812 By clicking Continue you agree to be charged $9.99 every month until you cancel. Continue Compare plans Privacy Terms Contact us © 2026 Example Inc.",
+  "elements": [
+    {
+      "role": "link",
+      "name": "Home",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Products",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Pricing",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Blog",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Help",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Sign in",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "radio",
+      "name": " Free — $0",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "radio",
+      "name": " Pro — $9.99/month",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:true"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "radio",
+      "name": " Team — $29/month",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Continue",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Compare plans",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Privacy",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Terms",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Contact us",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

@@ -1,0 +1,243 @@
+{
+  "title": "mechanical keyboard - Search",
+  "url": "https://fixtures.test/content-search.html",
+  "loading": false,
+  "text": "Home Products Pricing Blog Help Sign in Search Search About 1,240,000 results The best mechanical keyboards of 2026 — keyboards.example.com Mechanical keyboard switches explained — switches.example.org How to build your own mechanical keyboard — diy.example.net Mechanical vs membrane keyboards: which is better? — tech.example.com r/MechanicalKeyboards — forum.example.com Quiet mechanical keyboards for the office — office.example.com 1 2 3 Next Privacy Terms Contact us © 2026 Example Inc.",
+  "elements": [
+    {
+      "role": "link",
+      "name": "Home",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Products",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Pricing",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Blog",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Help",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Sign in",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "searchbox",
+      "name": "Search ",
+      "description": "",
+      "tag": "input",
+      "value": "mechanical keyboard",
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Search",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "The best mechanical keyboards of 2026",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Mechanical keyboard switches explained",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "How to build your own mechanical keyboard",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Mechanical vs membrane keyboards: which is better?",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "r/MechanicalKeyboards",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Quiet mechanical keyboards for the office",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "1",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "2",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "3",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Next",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Privacy",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Terms",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Contact us",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

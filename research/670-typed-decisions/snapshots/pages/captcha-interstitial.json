@@ -1,0 +1,25 @@
+{
+  "title": "Just a moment...",
+  "url": "https://fixtures.test/captcha-interstitial.html",
+  "loading": false,
+  "text": "shop.example.com Verify you are human by completing the action below. Verify you are human shop.example.com needs to review the security of your connection before proceeding. Ray ID: 8f2a1c9b0d4e · Performance & security by Cloudflare",
+  "elements": [
+    {
+      "role": "checkbox",
+      "name": " Verify you are human",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "title": "Sign in – Acme Cloud",
+  "url": "https://fixtures.test/login-basic.html",
+  "loading": false,
+  "text": "Home Products Pricing Blog Help Sign in Sign in to Acme Cloud Email address Password Keep me signed in Sign in Forgot password? New to Acme? Create an account Privacy Terms Contact us © 2026 Example Inc.",
+  "elements": [
+    {
+      "role": "link",
+      "name": "Home",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Products",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Pricing",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Blog",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Help",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Sign in",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "textbox",
+      "name": "Email address ",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "readonly:false",
+        "required:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "textbox",
+      "name": "Password ",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "readonly:false",
+        "required:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "checkbox",
+      "name": " Keep me signed in",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Sign in",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Forgot password?",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Create an account",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Privacy",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Terms",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Contact us",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

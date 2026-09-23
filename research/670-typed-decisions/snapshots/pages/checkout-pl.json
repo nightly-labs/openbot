@@ -1,0 +1,147 @@
+{
+  "title": "Kasa – Podsumowanie zamówienia",
+  "url": "https://fixtures.test/checkout-pl.html",
+  "loading": false,
+  "text": "Strona główna Produkty Cennik Blog Pomoc Zaloguj się Podsumowanie zamówienia Plecak turystyczny 40 l — 129,00 zł Dostawa: Paczkomat — 0,00 zł Do zapłaty: 129,00 zł Metoda płatności: BLIK Kod BLIK Zapłać 129,00 zł Wróć do koszyka Prywatność Regulamin Kontakt © 2026 Example Inc.",
+  "elements": [
+    {
+      "role": "link",
+      "name": "Strona główna",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Produkty",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Cennik",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Blog",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Pomoc",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Zaloguj się",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "textbox",
+      "name": "Kod BLIK ",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "readonly:false",
+        "required:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Zapłać 129,00 zł",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Wróć do koszyka",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Prywatność",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Regulamin",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Kontakt",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

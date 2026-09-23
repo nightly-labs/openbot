@@ -1,0 +1,351 @@
+{
+  "before": {
+    "title": "Contact us – Helpdesk",
+    "url": "https://fixtures.test/action-form.html?mode=broken",
+    "loading": false,
+    "text": "Home Products Pricing Blog Help Sign in Contact us Name Email Message Send message Privacy Terms Contact us © 2026 Example Inc.",
+    "elements": [
+      {
+        "role": "link",
+        "name": "Home",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Products",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Pricing",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Blog",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Help",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Sign in",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "textbox",
+        "name": "Name ",
+        "description": "",
+        "tag": "input",
+        "value": null,
+        "states": [
+          "readonly:false",
+          "required:false"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "textbox",
+        "name": "Email ",
+        "description": "",
+        "tag": "input",
+        "value": null,
+        "states": [
+          "readonly:false",
+          "required:false"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "textbox",
+        "name": "Message ",
+        "description": "",
+        "tag": "textarea",
+        "value": null,
+        "states": [
+          "readonly:false",
+          "required:false"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "button",
+        "name": "Send message",
+        "description": "",
+        "tag": "button",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Privacy",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Terms",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Contact us",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      }
+    ],
+    "focus": {
+      "role": null,
+      "name": ""
+    }
+  },
+  "after": {
+    "title": "Contact us – Helpdesk",
+    "url": "https://fixtures.test/action-form.html?mode=broken",
+    "loading": false,
+    "text": "Home Products Pricing Blog Help Sign in Contact us Name Email Message Send message Sorry, we could not send your message. Please try again later. Privacy Terms Contact us © 2026 Example Inc.",
+    "elements": [
+      {
+        "role": "link",
+        "name": "Home",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Products",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Pricing",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Blog",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Help",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Sign in",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "textbox",
+        "name": "Name ",
+        "description": "",
+        "tag": "input",
+        "value": "Alex Novak",
+        "states": [
+          "readonly:false",
+          "required:false"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "textbox",
+        "name": "Email ",
+        "description": "",
+        "tag": "input",
+        "value": "alex@example.com",
+        "states": [
+          "readonly:false",
+          "required:false"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "textbox",
+        "name": "Message ",
+        "description": "",
+        "tag": "textarea",
+        "value": null,
+        "states": [
+          "readonly:false",
+          "required:false"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "button",
+        "name": "Send message",
+        "description": "",
+        "tag": "button",
+        "value": null,
+        "states": [
+          "focused:true"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Privacy",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Terms",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Contact us",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      }
+    ],
+    "focus": {
+      "role": null,
+      "name": "send"
+    }
+  },
+  "steps": [
+    {
+      "tool": "type",
+      "role": "textbox",
+      "name": "Name",
+      "text": "Alex Novak"
+    },
+    {
+      "tool": "type",
+      "role": "textbox",
+      "name": "Email",
+      "text": "alex@example.com"
+    },
+    {
+      "tool": "click",
+      "role": "button",
+      "name": "Send message"
+    }
+  ]
+}

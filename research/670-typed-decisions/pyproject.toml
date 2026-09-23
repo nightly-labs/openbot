@@ -1,0 +1,9 @@
+[project]
+name = "openbot-research-670-typed-decisions"
+version = "0.0.0"
+description = "Issue #670: evaluate Laya typed decisions on OpenBot browser snapshots. Research only; not shipped."
+requires-python = ">=3.11"
+dependencies = ["laya-mlx==0.2.0"]
+
+[tool.uv]
+package = false

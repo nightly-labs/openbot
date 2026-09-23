@@ -1,0 +1,144 @@
+{
+  "title": "Przepisy kulinarne – Pierogi ruskie",
+  "url": "https://fixtures.test/cookie-pl.html",
+  "loading": false,
+  "text": "Strona główna Produkty Cennik Blog Pomoc Zaloguj się Pierogi ruskie Składniki: 500 g mąki, 250 ml ciepłej wody, 1 kg ziemniaków, 250 g twarogu, 2 cebule. Ta strona używa plików cookie Używamy plików cookie, aby zapewnić prawidłowe działanie serwisu, analizować ruch i wyświetlać reklamy dopasowane do Twoich zainteresowań. Akceptuję wszystkie Odrzuć Ustawienia Prywatność Regulamin Kontakt © 2026 Example Inc.",
+  "elements": [
+    {
+      "role": "link",
+      "name": "Strona główna",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Produkty",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Cennik",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Blog",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Pomoc",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Zaloguj się",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Akceptuję wszystkie",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Odrzuć",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Ustawienia",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Prywatność",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Regulamin",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Kontakt",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}
