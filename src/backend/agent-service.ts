@@ -110,6 +110,7 @@ import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
+import { ProfileClients } from "./agent/profile-clients";
 import { generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
 import { ProfileSave } from "./agent/profile-save";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
@@ -215,11 +216,7 @@ export interface AgentServiceOptions {
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
-  /**
-   * Every disposable client that is generating, with the record that ends its generation. A client
-   * alone is not enough to stop the work: it may not hold a process yet.
-   */
-  readonly #profileClients = new Map<AgentClient, { cancelled: boolean }>();
+  readonly #profileClients = new ProfileClients();
   readonly #deletingAgents = new Set<string>();
   /**
    * Endpoints the running CLI may still list although the saved file no longer defines them, because
@@ -564,18 +561,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const model = this.#availableModels().find((item) => item.provider === lead.provider && item.id === lead.model);
         if (!model) throw new Error("The channel lead model is unavailable.");
         const client = this.#providers.createProfileClient(lead.provider);
-        const generation = { cancelled: false };
-        this.#profileClients.set(client, generation);
-        try {
-          return await generateTextWithoutTools(
+        return this.#profileClients.run(client, (cancelled) =>
+          generateTextWithoutTools(
             client,
             { ...model, defaultReasoningEffort: lead.reasoningEffort },
             prompt,
-            () => generation.cancelled,
-          );
-        } finally {
-          this.#profileClients.delete(client);
-        }
+            cancelled,
+          ),
+        );
       },
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       awaitDrain: (agentId) => this.#drain.taskFor(agentId),
@@ -1011,23 +1004,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return !this.#releasedCustomProviders.has(modelId.slice(0, separator));
   }
 
-  /** Ends every disposable generation that may reach an endpoint the user has taken out. */
-  #stopProfileClients(): void {
-    for (const [client, generation] of this.#profileClients) {
-      if (client.provider !== "opencode") continue;
-      // The generation is cancelled as well as the client stopped. A generation still preparing its
-      // workspace holds no process, so the stop reaches nothing, and its own `start()` would then
-      // spawn the process with the endpoints as they were before this change.
-      generation.cancelled = true;
-      void client.stop().catch(() => undefined);
-    }
-  }
-
   async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
     const agent = input.agentId ? this.listAgents().find((candidate) => candidate.id === input.agentId) : null;
     if (input.agentId && !agent) throw new Error("This agent no longer exists.");
     if (this.#stopping) throw new Error("OpenBot is shutting down.");
-    if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
+    if (this.#profileClients.busy()) throw new Error("Profile generation is busy. Try again shortly.");
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
     const models = this.#availableModels();
@@ -1036,15 +1017,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       : this.#startingModel(provider, models);
     if (!model) throw new Error("The selected provider has no available model.");
     if (this.#stopping) throw new Error("OpenBot is shutting down.");
-    if (this.#profileClients.size >= 3) throw new Error("Profile generation is busy. Try again shortly.");
+    if (this.#profileClients.busy()) throw new Error("Profile generation is busy. Try again shortly.");
     const client = this.#providers.createProfileClient(provider);
-    const generation = { cancelled: false };
-    this.#profileClients.set(client, generation);
-    try {
-      return await generateProfile(client, model, input, sections, () => generation.cancelled);
-    } finally {
-      this.#profileClients.delete(client);
-    }
+    return this.#profileClients.run(client, (cancelled) => generateProfile(client, model, input, sections, cancelled));
   }
 
   saveProfile(
@@ -1527,7 +1502,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#emitModelsChanged();
       // The same reason as a removal: a profile or channel client is a process of its own, holding
       // the endpoints it was spawned with, and no restart of the main client reaches it.
-      this.#stopProfileClients();
+      this.#profileClients.stopOpenCode();
       try {
         const persisted = await persist();
         // Only now can a spawning process read the saved endpoint.
@@ -1561,7 +1536,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // A profile or channel client is a process of its own, spawned with the endpoints as they
       // were, and no restart of the main client reaches it. It is one short request, so it is
       // stopped rather than watched: its caller reports a failure the user can repeat.
-      this.#stopProfileClients();
+      this.#profileClients.stopOpenCode();
       try {
         await this.#releaseCustomProviderModels();
         const persisted = await persist();
@@ -1719,8 +1694,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#attention.clearPrompts();
     this.#attention.clearBrowserTakeovers();
     this.#attention.clearApprovals();
-    const clients = [...this.#providers.dispose(), ...this.#profileClients.keys()];
-    this.#profileClients.clear();
+    const clients = [...this.#providers.dispose(), ...this.#profileClients.release()];
     for (const [agentId, snapshot] of this.#conversation.activeSnapshots()) {
       if (!snapshot.activeTurnId) continue;
       const agent = this.#store.list().find((item) => item.id === agentId);
