@@ -77,6 +77,8 @@ export function WebWorkspace(props: {
       active: host.hostId === workspace.state.host?.hostId,
       state: host.hostId === workspace.state.host?.hostId ? workspace.state.status : "offline",
       notificationsMuted: false,
+      notificationsMutedUntil: null,
+      notificationLevel: "all",
       remoteDesktopAvailable: false,
       compatibility: {
         localAppVersion: "web",

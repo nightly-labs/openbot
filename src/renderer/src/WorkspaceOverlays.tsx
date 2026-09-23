@@ -191,7 +191,7 @@ function JoinServer(props: AccountProps) {
  */
 function ServerSettings() {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel } = useServers();
   const { toolRuntimeStatuses } = useProviders();
   const {
     serverSettingsTarget,
@@ -245,6 +245,7 @@ function ServerSettings() {
             onSaveIdentity={saveServerIdentity}
             onSetPublished={setServerPublished}
             onSetMuted={(muted) => setServerMuted(server().id, muted)}
+            onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
             onCreateInvite={createServerInvite}
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}
@@ -287,6 +288,8 @@ function AppSettings(props: AccountProps) {
     updateGeneralSettings,
     appSettingsRestoreTarget,
     turboModePending,
+    sendTestNotification,
+    openNotificationSettings,
   } = useSettings();
   const {
     providerRuntimeStatuses,
@@ -345,6 +348,8 @@ function AppSettings(props: AccountProps) {
         codeLogin={localProviderDownloads() ? codeLogin : undefined}
         hostedSitesApi={window.openbot.hostedSites}
         turboModePending={turboModePending()}
+        onTestNotification={sendTestNotification}
+        onOpenNotificationSettings={openNotificationSettings}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />
     </Loading>
