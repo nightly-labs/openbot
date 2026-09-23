@@ -17,6 +17,11 @@ and was omitted. It now has `typecheck:mobile`; the old name remains an alias fo
 `@openbot/brand`, `@openbot/contracts`, and `@openbot/team-client`. Its Expo and Uniwind generation
 writes ignored files before TypeScript runs.
 
+Each `typecheck` script starts TypeScript through `node_modules/typescript/bin/tsc`, not a bare
+`tsc`. `storybook-solidjs-vite` installs typescript@6 as `@typescript/old`, and bun links that
+package's `tsc` into `node_modules/.bin` in place of the TypeScript 7 one. A bare `tsc` therefore
+checks with TypeScript 6 without a warning; `scripts/dependency-catalog.test.ts` rejects one.
+
 Signal had a similar gap: `remote:check` was its only entry point and also required Compose
 validation. `typecheck:remote` and `test:remote` now run in CI. `remote:check:compose` validates both
 Compose files with the Docker CLI; it does not need a daemon. `remote:check` remains the combined
