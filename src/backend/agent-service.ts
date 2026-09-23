@@ -81,6 +81,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
+import { AgentRemoval } from "./agent/agent-removal";
 import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
 import { AttachmentGateway } from "./agent/attachment-gateway";
 import { AttentionRegistry } from "./agent/attention-registry";
@@ -209,7 +210,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly #profileSave: ProfileSave;
   readonly #profileClients = new ProfileClients();
-  readonly #deletingAgents = new Set<string>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
@@ -238,10 +238,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #turn: TurnLifecycle;
   readonly #compaction: ContextCompaction;
   readonly #duplication: DuplicationGate;
+  readonly #removal: AgentRemoval;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
   readonly #developmentDefaults: boolean;
-  readonly #deleteWithRevokedApproval: NonNullable<AgentServiceOptions["deleteWithRevokedApproval"]>;
   #initialized = false;
   #stopping = false;
 
@@ -265,7 +265,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       computerUseMcpServer = () => null,
     } = options;
     this.#developmentDefaults = developmentDefaults;
-    this.#deleteWithRevokedApproval = options.deleteWithRevokedApproval ?? ((_agentId, remove) => remove());
     this.#localSkillTools = localSkillTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
@@ -291,7 +290,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#drain.scheduleDrain(agent.id);
       },
       delete: async (agent) => {
-        await this.#deleteAgentData(agent);
+        await this.#removal.deleteData(agent);
         this.#emit({ type: "agents-changed", agents: this.listAgents() });
       },
     });
@@ -331,7 +330,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         awaitDrain: (agentId) => this.#drain.taskFor(agentId),
         syncMailboxMessages: (snapshot) => this.#mailboxSync.syncMailboxMessages(snapshot),
         listAgents: () => this.listAgents(),
-        excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#deletingAgents]),
+        excludedAgents: () => new Set([...this.#duplication.pendingAgents(), ...this.#removal.deleting()]),
         isRunning: () => this.#initialized && !this.#stopping,
       },
     });
@@ -453,7 +452,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         listAgents: () => this.listAgents(),
-        deleteAgentData: (agent) => this.#deleteAgentData(agent),
+        deleteAgentData: (agent) => this.#removal.deleteData(agent),
         hasAttentionFor: (agentId) => this.#attention.hasAttentionFor(agentId),
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
       },
@@ -692,6 +691,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
+        listAgents: () => this.listAgents(),
+      },
+    });
+    this.#removal = new AgentRemoval({
+      store,
+      mailbox,
+      conversation: this.#conversation,
+      browser,
+      channels: this.channels,
+      routines: this.#routines,
+      duplication: this.#duplication,
+      drain: this.#drain,
+      threads: this.#threads,
+      turn: this.#turn,
+      hostedSites: this.#hostedSites,
+      compaction: this.#compaction,
+      deleteWithRevokedApproval: options.deleteWithRevokedApproval ?? ((_agentId, remove) => remove()),
+      logger,
+      hooks: {
+        emit: (event) => this.#emit(event),
         listAgents: () => this.listAgents(),
       },
     });
@@ -1072,7 +1091,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } catch (error) {
       let rollbackError: unknown;
       try {
-        await this.#deleteAgentData(agent);
+        await this.#removal.deleteData(agent);
       } catch (caught) {
         rollbackError = caught;
       }
@@ -1097,7 +1116,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       return agent;
     } catch (error) {
-      await this.#deleteAgentData(agent);
+      await this.#removal.deleteData(agent);
       throw error;
     }
   }
@@ -1232,100 +1251,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
   }
 
-  async deleteAgent(agentId: string): Promise<void> {
-    if (this.#deletingAgents.has(agentId)) throw new Error("Agent deletion is already in progress.");
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(agentId);
-    if (hasPendingWork || this.#conversation.workingSnapshot(agentId)?.activeTurnId) {
-      throw new Error("Stop the agent and cancel its queued messages before deleting it.");
-    }
-
-    const { wasPending, release } = this.#duplication.releaseForDelete(agentId);
-    this.#deletingAgents.add(agentId);
-    const releaseDeliveries = this.#mailbox.blockAgentDeliveries(agentId);
-    try {
-      this.#routines.arm();
-      await this.#deleteAgentData(agent ?? { id: agentId, threadId: null });
-      this.#duplication.forget(agentId);
-      if (!wasPending) this.#emit({ type: "agents-changed", agents: this.listAgents() });
-    } finally {
-      release();
-      releaseDeliveries();
-      this.#deletingAgents.delete(agentId);
-      this.#routines.arm();
-      if (this.#store.list().some((candidate) => candidate.id === agentId)) this.#drain.scheduleDrain(agentId);
-    }
+  deleteAgent(agentId: string): Promise<void> {
+    return this.#removal.delete(agentId);
   }
 
   deleteChannel(channelId: string): Promise<void> {
     return this.channels.deleteChannel(channelId);
-  }
-
-  async #deleteAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
-    try {
-      await this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentData(agent));
-    } catch {
-      throw new Error("The agent data could not be removed completely. Retry deleting the agent.");
-    }
-  }
-
-  async #removeAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
-    const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
-    let stage = "provider-files";
-    try {
-      // Keep session records available if private file removal needs a retry.
-      for (const session of providerSessions) await this.#threads.deleteProviderSessionFiles(session.externalSessionId);
-      stage = "mailbox";
-      await this.#mailbox.deleteAgentData(agent.id, this.channels.store.allContextThreads());
-      stage = "agent-files-and-record";
-      await this.#store.deleteAgent(agent.id);
-    } catch {
-      // File-system errors can contain private paths. Log only the failed stage.
-      logger.warn("Agent deletion failed.", { stage });
-      throw new Error("The agent data could not be removed completely. Retry deleting the agent.");
-    }
-    await this.#closeBrowserTabsForAgent(agent);
-    this.#conversation.forgetAgent(agent.id);
-    this.#turn.forgetAgent(agent.id);
-    this.#drain.forgetAgent(agent.id);
-    this.#hostedSites.forgetAgent(agent.id);
-    if (agent.threadId) {
-      for (const session of providerSessions) {
-        this.#conversation.unbindThread(session.externalSessionId);
-        this.#conversation.unloadThread(session.externalSessionId);
-        this.#compaction.forgetThread(session.externalSessionId);
-      }
-    }
-    this.#compaction.forgetAgent(agent.id);
-  }
-
-  /**
-   * A deleted agent's tabs are reachable by nobody: no agent passes the host's owner check for them,
-   * and the renderer lists tabs per agent, so they hold a view the user cannot even see to close.
-   * They also survive a restart, because the browser persists its tabs outside `openbot.db`.
-   *
-   * The owner test matches the renderer's, so a tab the user could see under this agent is a tab this
-   * closes -- including a legacy tab carrying only the thread id. Runs after the agent record is
-   * already gone, so a failure here must not fail the deletion the user asked for.
-   */
-  async #closeBrowserTabsForAgent(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
-    const owned = this.#browser
-      .listTabs()
-      .filter((tab) =>
-        tab.ownerAgentId
-          ? tab.ownerAgentId === agent.id
-          : Boolean(agent.threadId && tab.ownerThreadId === agent.threadId),
-      );
-    let closed = 0;
-    for (const tab of owned) {
-      try {
-        await this.#browser.close(tab.id);
-        closed += 1;
-      } catch (error) {
-        logger.warn("Could not close a deleted agent's browser tab.", { error });
-      }
-    }
-    if (closed > 0) logger.info("Closed a deleted agent's browser tabs.", { agentId: agent.id, count: closed });
   }
 
   async initialize(): Promise<void> {
