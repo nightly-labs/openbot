@@ -70,7 +70,7 @@ and mailbox commit succeeds. Keep deletion-outbox completion in the store, after
 
 The two that used to be larger are both worth copying. `agent-service.ts` was split into one
 controller per concern, each constructed and owned by the service; `openbot-database.ts` was split
-into nine under `database/`, leaving a ~300-line facade that had to keep its class name, instance
+into modules under `database/`, leaving a ~300-line facade that had to keep its class name, instance
 identity, constructor signature and public surface because callers reach past it into `connection`
 and `dispatch`. The shape in both: one class per file, kebab-case, `<Name>Options` + `<Name>`,
 `readonly #` fields, a constructor that only assigns, and a doc comment saying what the class
