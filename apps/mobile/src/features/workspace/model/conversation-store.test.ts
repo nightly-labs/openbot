@@ -45,6 +45,17 @@ function setup() {
   };
 }
 
+describe("generated images in mobile history", () => {
+  it("keeps a generation that has no text or image yet, so its placeholder shows in its message", () => {
+    const imageGeneration = { prompt: "A lighthouse", resolution: "1024×1024", aspectRatio: "square" as const };
+    const generating: ConversationMessage = { ...message("image", ""), status: "streaming", imageGeneration };
+    expect(projectChatMessages([message("before"), generating])).toEqual([
+      expect.objectContaining({ id: "before" }),
+      expect.objectContaining({ id: "image", streaming: true, imageGeneration }),
+    ]);
+  });
+});
+
 describe("mobile conversation windows", () => {
   it("does not rebuild or notify an unchanged history on refresh", () => {
     const { store } = setup();

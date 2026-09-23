@@ -5,6 +5,7 @@ import type {
   ChannelRoutingConversationEvent,
   ConversationMessage,
   ConversationQuestionPrompt,
+  ImageGenerationInfo,
 } from "@openbot/contracts/ipc";
 
 import { channelRoutingConversationEvent } from "@openbot/contracts/ipc";
@@ -34,6 +35,8 @@ export type ChatMessage =
       status?: ConversationMessage["status"];
       replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
+      /** An image the agent is generating or generated. Its first attachment is the image. */
+      imageGeneration?: ImageGenerationInfo;
     }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
 
@@ -92,7 +95,12 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
       result.push({ id: message.id, kind: "question", turnId: message.turnId, prompt: message.questionPrompt });
       continue;
     }
-    if ((!message.text.trim() && !message.attachments?.length) || message.author === "system") continue;
+    // A generation has no text or attachment until its image arrives, and it still needs its placeholder.
+    if (
+      (!message.text.trim() && !message.attachments?.length && !message.imageGeneration) ||
+      message.author === "system"
+    )
+      continue;
     if (message.author === "assistant" && message.itemType === "commentary") {
       const key = message.turnId ?? message.id;
       let thinking = thinkingByTurn.get(key);
@@ -113,6 +121,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
           streaming: message.status === "streaming",
           status: message.status,
           attachments: message.attachments,
+          imageGeneration: message.imageGeneration,
           replyToMessageId: message.replyToMessageId,
         };
         projectedBubbles.set(message, bubble);
@@ -127,7 +136,8 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
   return messages.findLast(
     (message) =>
       Boolean(message.questionPrompt) ||
-      (message.author !== "system" && (message.text.trim().length > 0 || Boolean(message.attachments?.length))),
+      (message.author !== "system" &&
+        (message.text.trim().length > 0 || Boolean(message.attachments?.length) || Boolean(message.imageGeneration))),
   );
 }
 
@@ -184,13 +194,20 @@ function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessag
     status: entry.message.status,
     replyToMessageId: entry.message.replyToMessageId,
     attachments: entry.message.attachments,
+    imageGeneration: entry.message.imageGeneration,
   };
 }
 
 /** Keep channel authors explicit: another human member is not the current user. */
 export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
   return messages
-    .filter((entry) => entry.message.questionPrompt || entry.message.text.trim() || entry.message.attachments?.length)
+    .filter(
+      (entry) =>
+        entry.message.questionPrompt ||
+        entry.message.imageGeneration ||
+        entry.message.text.trim() ||
+        entry.message.attachments?.length,
+    )
     .map((entry) => {
       const self = entry.author.kind === "member" && entry.author.id === memberId;
       const cached = projectedChannelMessages.get(entry);

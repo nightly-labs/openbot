@@ -10,6 +10,10 @@ const native = vi.hoisted(() => ({ push: vi.fn(), selection: vi.fn(async () => {
 vi.mock("expo-router", () => ({ router: { push: native.push } }));
 vi.mock("@/shared/lib/haptics", () => ({ haptics: { selection: native.selection } }));
 vi.mock("expo-glass-effect", () => ({ GlassView: ({ children }: PropsWithChildren) => <div>{children}</div> }));
+vi.mock("react-native-reanimated", () => ({
+  default: { View: ({ children }: PropsWithChildren) => <div>{children}</div> },
+  cubicBezier: () => "ease-out",
+}));
 vi.mock("lucide-react-native", () => ({ ChevronUp: () => null, Clock: () => null, TriangleAlert: () => null }));
 vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => "gray" }));
 vi.mock("heroui-native", () => {
@@ -62,6 +66,7 @@ function stubQueue(
     serverId: "host",
     attachments: [],
     changeAttachments: async () => {},
+    attachmentSupport: () => ({ eml: true, media: true }),
     queued,
     deliveries: queued,
     edit,

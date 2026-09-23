@@ -26,7 +26,8 @@ import type { ChatAttachment } from "./use-chat-attachments";
 const EMPTY_DELIVERIES: QueueDelivery[] = [];
 
 export function useChatQueue(agentId: string, serverId: string, online: boolean, activeTurnId: string | null) {
-  const { loadQueue, changeQueue, editQueue, canEditQueue, uploadAttachment, discardAttachment } = useMobileWorkspace();
+  const { loadQueue, changeQueue, editQueue, canEditQueue, uploadAttachment, discardAttachment, attachmentSupport } =
+    useMobileWorkspace();
   const { session } = useMobileSession();
   const storageKey = `queue-edit.${session?.user.id}.${serverId}.${agentId}`;
   const queryClient = useQueryClient();
@@ -287,6 +288,8 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       serverId,
       attachments,
       changeAttachments,
+      /** What this host accepts, for files an edit adds. */
+      attachmentSupport: () => attachmentSupport(serverId),
       editUnavailable,
       discardFinishedEdit: () =>
         run(async () => {
@@ -382,6 +385,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       agentId,
       serverId,
       clearEdit,
+      attachmentSupport,
     ],
   );
 }

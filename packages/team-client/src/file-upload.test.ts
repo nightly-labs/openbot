@@ -39,7 +39,10 @@ describe("mobile file upload", () => {
       },
       () => transferId,
     );
-    await sender.upload(input);
+    const progress: [number, number][] = [];
+    await sender.upload(input, (sent, total) => progress.push([sent, total]));
+    // Reported after the bytes left, so a person never sees more sent than the channel took.
+    expect(progress).toEqual([[5, 5]]);
     expect(
       received.map((data) =>
         typeof data === "string" ? decodeTeamProtocolV2FileControlFrame(data) : decodeTeamProtocolV2FileChunk(data),

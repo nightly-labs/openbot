@@ -19,6 +19,7 @@ const boundary = vi.hoisted(() => ({
   uploadAttachment: vi.fn(),
   discardAttachment: vi.fn(),
   canEditQueue: () => true,
+  attachmentSupport: () => ({ eml: true, media: true }),
 }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => boundary.storage.get(key) ?? null,
