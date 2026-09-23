@@ -1069,6 +1069,47 @@ memory and routine editors share their controls with agent settings and use chan
 Channel settings have no provider or model controls because each member retains its own runtime.
 No account API, Signal, IPC contract, or database migration changes are required for mobile channels.
 
+## Skill folders and MCP configuration
+
+A skill follows the [Agent Skills specification](https://agentskills.io/specification): a folder
+`<name>/` with a `SKILL.md` file. The YAML frontmatter has `name`, which is the folder name, and a
+`description` of 1 to 1024 characters. Each provider CLI finds skills in its own folders:
+
+| Folder | Written by | Read by |
+| --- | --- | --- |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode |
+| `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode |
+| `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
+| `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
+| `~/.claude/skills/` | the user | Claude Code, OpenCode |
+| `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
+
+OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
+`.claude/skills/<slug>`, because Claude Code does not read `.agents/skills`. It copies the files and
+does not make links. `.openbot/skills-lock.json` in the workspace records the file hashes, and
+`.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
+marker.
+
+`src/main/skill-folder-discovery.ts` lists all other skills in the three workspace folders as
+`workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
+they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
+skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a
+folder that the agent's provider does not read. An agent keeps its workspace when its provider
+changes, so a skill in `.agents/skills` stops working after a change to Claude Code. A skill with a
+problem is not offered as a chat tag.
+
+OpenBot does not list the home-directory folders. They hold the host user's skills, which are the
+same for every agent, and each provider CLI changes its home-folder rules without notice.
+
+MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
+whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
+`~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor and Gemini
+CLI read their own folders. OpenBot writes none of these files. It gives the servers to each
+provider when the session starts. Claude starts with `strictMcpConfig`, so it ignores `.mcp.json`
+and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The panel masks header and
+environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
+`safeStorage`.
+
 ## Local skill library
 
 `src/main/local-skill-library.ts` owns immutable revisions under the application's user-data directory, in `local-skills/<local-skill-uuid>/<revision>/bundle.zip`. A staging directory is renamed only after the bundle is written; reads ignore unpublished staging directories. Revisions are serialized and checked against the caller's expected revision. No SQLite migration is required.

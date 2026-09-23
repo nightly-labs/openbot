@@ -5,6 +5,16 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Show the skills in an agent's workspace skill folders that OpenBot did not install, such as
+  `.agents/skills`. OpenBot does not change these folders. A skill shows a problem when its
+  `SKILL.md` is not valid, or when the agent's provider does not read its folder.
+
+### Changed
+
+- Accept a skill description of up to 1024 characters, as the Agent Skills specification allows.
+
 ## [0.19.0] - 2026-09-23
 
 ### Added

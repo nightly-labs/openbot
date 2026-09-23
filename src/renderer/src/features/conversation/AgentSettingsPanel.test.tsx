@@ -420,6 +420,43 @@ describe("AgentSettingsPanel", () => {
     );
   });
 
+  it("lists a workspace skill folder read-only with its problem", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    vi.spyOn(mock.api.skills, "listInstalled").mockResolvedValue([
+      {
+        skillId: "workspace:deploy",
+        slug: "deploy",
+        name: "deploy",
+        installedVersion: 1,
+        availableVersion: 1,
+        state: "installed",
+        origin: "workspace",
+        location: ".agents/skills/deploy",
+        problem: "Claude Code does not read .agents/skills. Copy this folder to .claude/skills.",
+      },
+    ]);
+    const get = vi.spyOn(mock.api.skills, "get");
+    const onCountChange = vi.fn();
+    render(() => (
+      <AgentSkillsModal open agentId="chief" agentName="Chief" onOpenChange={vi.fn()} onCountChange={onCountChange} />
+    ));
+    const row = await screen.findByRole("button", { name: /^deploy/ });
+    // OpenBot did not assign this skill, so the "Skills N assigned" count leaves it out.
+    expect(onCountChange).toHaveBeenLastCalledWith(0);
+    expect(screen.queryByRole("switch", { name: "Enable deploy" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More for deploy" })).not.toBeInTheDocument();
+    await fireEvent.click(row);
+    expect(
+      await screen.findByText("OpenBot did not install this skill. Edit or remove it in .agents/skills/deploy."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Claude Code does not read .agents/skills. Copy this folder to .claude/skills."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Enable deploy" })).not.toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
+  });
+
   it("does not read this computer's library for a remote local skill", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;

@@ -98,7 +98,15 @@ export interface SubmitSkillInput {
   skillId?: string;
 }
 
-export type InstalledSkillOrigin = "marketplace" | "managed" | "local";
+/**
+ * `workspace` is a skill folder in `.agents/skills`, `.claude/skills` or `.opencode/skills` of the
+ * agent workspace that OpenBot did not install. OpenBot lists it read-only and never writes to it.
+ */
+export const INSTALLED_SKILL_ORIGINS = ["marketplace", "managed", "local", "workspace"] as const;
+export type InstalledSkillOrigin = (typeof INSTALLED_SKILL_ORIGINS)[number];
+
+/** The Agent Skills specification limit for a SKILL.md `description`. */
+export const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
 
 export interface InstalledSkill {
   skillId: string;
@@ -113,6 +121,13 @@ export interface InstalledSkill {
   origin?: InstalledSkillOrigin;
   /** Missing on older hosts, Team GET payloads, and pre-description lock files. */
   description?: string;
+  /** For a `workspace` skill: its folder, relative to the agent workspace. */
+  location?: string;
+  /**
+   * For a `workspace` skill: why it does not follow the Agent Skills specification, or why
+   * the agent's provider does not read its folder. A provider can skip such a skill.
+   */
+  problem?: string;
 }
 
 export interface InstallSkillInput {
@@ -144,7 +159,12 @@ export function isSkillCategory(value: unknown): value is SkillCategory {
   return isOneOf(SKILL_CATEGORIES, value);
 }
 
-import { isOneOf } from "./runtime-values";
+/** A valid `location` or `problem` of an {@link InstalledSkill}. */
+export function isSkillNote(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= SKILL_DESCRIPTION_MAX_LENGTH;
+}
+
+import { isOneOf, isString } from "./runtime-values";
 
 export interface CreateLocalSkillInput {
   agentId: string;

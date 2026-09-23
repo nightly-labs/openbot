@@ -48,6 +48,7 @@ import {
   type FilePreview,
   type HostedSiteSummary,
   type ImportAttachmentsInput,
+  INSTALLED_SKILL_ORIGINS,
   type InstalledSkill,
   IPC_CHANNELS,
   isAccountUsage,
@@ -80,6 +81,7 @@ import {
   isSharedTable,
   isSidebarLayoutSnapshot,
   isSkillCategory,
+  isSkillNote,
   LOCAL_SERVER_ID,
   type MarketplaceAgentDetail,
   type MarketplaceAgentPage,
@@ -100,6 +102,7 @@ import {
   type ScopedTeamPresenceSnapshot,
   type SharedTable,
   type SidebarLayoutSnapshot,
+  SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
   type UpdateStatus,
@@ -689,17 +692,17 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
     availableVersion: requiredNumber(item, "availableVersion"),
     state,
     ...(item.enabled === false ? { enabled: false } : item.enabled === true ? { enabled: true } : {}),
-    ...(item.origin === "managed" || item.origin === "marketplace" || item.origin === "local"
-      ? { origin: item.origin }
-      : {}),
+    ...(isOneOf(INSTALLED_SKILL_ORIGINS, item.origin) ? { origin: item.origin } : {}),
     ...(description ? { description } : {}),
+    ...(isSkillNote(item.location) ? { location: item.location } : {}),
+    ...(isSkillNote(item.problem) ? { problem: item.problem } : {}),
   };
 }
 
 function optionalSkillDescription(value: unknown): string | undefined {
   if (!isString(value)) return undefined;
   const description = value.trim();
-  return description && description.length <= 500 ? description : undefined;
+  return description && description.length <= SKILL_DESCRIPTION_MAX_LENGTH ? description : undefined;
 }
 
 function decodeInstalledSkillsFromMain(value: unknown): InstalledSkill[] {
