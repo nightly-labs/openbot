@@ -4,11 +4,37 @@ set -eu
 repository_root=$(git rev-parse --show-toplevel)
 cd "$repository_root"
 
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# Biome fixes the working-tree copy, and staging that copy again would also stage the edits the
+# author left unstaged. Only fully staged files are staged again; a partly staged file that Biome
+# changes stops the commit so the author can choose which fixes to stage.
+git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR >"$work/staged"
+git -c core.quotePath=false diff --name-only >"$work/unstaged"
+grep -Fx -f "$work/unstaged" "$work/staged" >"$work/partly-staged" || true
+grep -Fxv -f "$work/partly-staged" "$work/staged" >"$work/fully-staged" || true
+
+hash_partly_staged() {
+  while IFS= read -r path; do
+    printf '%s %s\n' "$(git hash-object -- "$path" 2>/dev/null || echo missing)" "$path"
+  done <"$work/partly-staged"
+}
+
+hash_partly_staged >"$work/before"
 echo "Running staged format and lint checks..."
 bun run check:staged
+hash_partly_staged >"$work/after"
 
-if git diff --cached --name-only --diff-filter=ACMR | grep -q .; then
-  git diff --cached --name-only -z --diff-filter=ACMR | xargs -0 git add --
+if [ -s "$work/fully-staged" ]; then
+  tr '\n' '\0' <"$work/fully-staged" | xargs -0 git add --
+fi
+
+if ! cmp -s "$work/before" "$work/after"; then
+  echo "Biome fixed files that also have unstaged changes:" >&2
+  diff "$work/before" "$work/after" | sed -n 's/^> [^ ]* /  /p' >&2
+  echo "Stage the fixes you want to commit, then commit again." >&2
+  exit 1
 fi
 
 staged_paths=$(git diff --cached --name-only --diff-filter=ACMRD)

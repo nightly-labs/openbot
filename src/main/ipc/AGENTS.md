@@ -8,8 +8,8 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
 
 1. Add the wire value to `packages/contracts/src/ipc-channels.ts`.
 2. Add it to a group in `packages/contracts/src/ipc-endpoints.ts`, as `request(...)` or `event(...)`.
-3. Commit, or wait for CI. The typecheck in the pre-commit hook and in CI names the file to change
-   and the key to add.
+3. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
+   change and the key to add.
 4. Add the handler here, the `invoke` in `src/preload/index.ts`, and the method in
    `src/renderer/src/preview/mock-openbot.ts`.
 
