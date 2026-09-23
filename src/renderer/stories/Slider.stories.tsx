@@ -17,7 +17,7 @@ export const Gallery: Story = {
     value: 100,
     minValue: 70,
     maxValue: 130,
-    formatValue: (value) => `${value}%`,
+    formatValue: (value: number) => `${value}%`,
   },
   render: () => {
     const [width, setWidth] = createSignal(100);
