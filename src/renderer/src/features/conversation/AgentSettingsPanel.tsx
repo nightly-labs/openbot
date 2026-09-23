@@ -7,6 +7,7 @@ import SharedAgentSettingsPanel, {
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { skillsPort } from "../../skills-port";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
@@ -118,8 +119,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     try {
       const items =
         skillsMode() === "readonly"
-          ? await window.openbot.agent.listInstalledSkills(agentId)
-          : await window.openbot.skills.listInstalled(agentId);
+          ? await skillsPort().agent.listInstalledSkills(agentId)
+          : await skillsPort().skills.listInstalled(agentId);
       setDraft((state) => {
         state.skills.count = assignedSkillCount(items);
       });

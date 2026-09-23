@@ -7,6 +7,7 @@ import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { settingsPort } from "./settings-port";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
@@ -101,7 +102,7 @@ const Settings = createSimpleContext({
       if (previous.productAnalytics !== value.productAnalytics) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics);
         setAnalyticsPreferenceLoaded(value.productAnalytics);
-        void window.openbot
+        void settingsPort()
           .setAnalyticsPreference({ enabled: value.productAnalytics })
           .then((preference) => {
             desktopAnalytics.setTrackingEnabled(preference.enabled);
@@ -117,7 +118,7 @@ const Settings = createSimpleContext({
       if (previous.turboMode !== turboMode) {
         turboModeChanged = true;
         setTurboModePending(true);
-        void window.openbot
+        void settingsPort()
           .setApprovalAutomation({ turbo: turboMode })
           .then((preference) => {
             setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
@@ -135,8 +136,8 @@ const Settings = createSimpleContext({
       }
       if (previous.autoDownloadUpdates !== value.autoDownloadUpdates) {
         autoDownloadUpdatesChanged = true;
-        void window.openbot.update
-          .setPreference({ autoDownload: value.autoDownloadUpdates })
+        void settingsPort()
+          .update.setPreference({ autoDownload: value.autoDownloadUpdates })
           .then((preference) =>
             setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: preference.autoDownload })),
           )
@@ -146,8 +147,8 @@ const Settings = createSimpleContext({
       }
       if (previous.desktopNotifications !== value.desktopNotifications) {
         desktopNotificationsChanged = true;
-        void window.openbot.notifications
-          .setPreference({ desktopNotifications: value.desktopNotifications })
+        void settingsPort()
+          .notifications.setPreference({ desktopNotifications: value.desktopNotifications })
           .then((preference) =>
             setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications })),
           )
@@ -166,8 +167,8 @@ const Settings = createSimpleContext({
         // A slider drag sends one save per step. Only the reply to the newest save may change the
         // form, or an older reply would move the slider back while the user drags.
         const save = ++dynamicIslandSaveCount;
-        void window.openbot.dynamicIsland
-          .setPreference({
+        void settingsPort()
+          .dynamicIsland.setPreference({
             enabled: value.macBookNotch,
             hapticsEnabled: value.macBookNotchHaptics,
             idleVisible: value.macBookNotchIdle,
@@ -211,7 +212,7 @@ const Settings = createSimpleContext({
      * stored - accepting first would leave an agent the user believes is trusted still asking.
      */
     async function setAgentAutoApprove(agentId: string, autoApprove: boolean): Promise<void> {
-      const preference = await window.openbot.setApprovalAutomation({ agentId, autoApprove });
+      const preference = await settingsPort().setApprovalAutomation({ agentId, autoApprove });
       setApprovalAutomation(preference);
       setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
     }
@@ -237,7 +238,7 @@ const Settings = createSimpleContext({
         openAppSettings(event.target instanceof HTMLElement ? event.target : null);
       };
       window.addEventListener("keydown", handleSettingsShortcut);
-      const unsubscribe = window.openbot.onOpenSettings(() => openAppSettings());
+      const unsubscribe = settingsPort().onOpenSettings(() => openAppSettings());
       return () => {
         window.removeEventListener("keydown", handleSettingsShortcut);
         unsubscribe();
@@ -245,7 +246,7 @@ const Settings = createSimpleContext({
     });
 
     onSettled(() => {
-      void window.openbot
+      void settingsPort()
         .getAnalyticsPreference()
         .then((preference) => {
           setAnalyticsPreferenceLoaded(preference.enabled);
@@ -255,7 +256,7 @@ const Settings = createSimpleContext({
           setAnalyticsPreferenceLoaded(false);
           setGeneralSettings((current) => ({ ...current, productAnalytics: false }));
         });
-      void window.openbot
+      void settingsPort()
         .getApprovalAutomation()
         .then((preference) => {
           setApprovalAutomation(preference);
@@ -265,8 +266,8 @@ const Settings = createSimpleContext({
           setGeneralSettings((current) => ({ ...current, turboMode: preference.turbo }));
         })
         .catch(() => undefined);
-      void window.openbot.update
-        .getPreference()
+      void settingsPort()
+        .update.getPreference()
         .then((preference) => {
           // A toggle made before this read resolves has already been persisted, so the older value
           // must not be painted back over it.
@@ -274,15 +275,15 @@ const Settings = createSimpleContext({
           setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: preference.autoDownload }));
         })
         .catch(() => undefined);
-      void window.openbot.notifications
-        .getPreference()
+      void settingsPort()
+        .notifications.getPreference()
         .then((preference) => {
           if (desktopNotificationsChanged) return;
           setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications }));
         })
         .catch(() => undefined);
-      void window.openbot.dynamicIsland
-        .getPreference()
+      void settingsPort()
+        .dynamicIsland.getPreference()
         .then((preference) =>
           setGeneralSettings((current) => ({
             ...current,
@@ -297,8 +298,8 @@ const Settings = createSimpleContext({
         .catch(() => undefined);
     });
 
-    const sendTestNotification = () => window.openbot.notifications.test();
-    const openNotificationSettings = () => window.openbot.notifications.openSettings();
+    const sendTestNotification = () => settingsPort().notifications.test();
+    const openNotificationSettings = () => settingsPort().notifications.openSettings();
 
     return {
       analyticsPreferenceLoaded,

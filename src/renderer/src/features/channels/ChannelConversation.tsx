@@ -52,6 +52,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { appPort } from "../../app-port";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
@@ -625,7 +626,7 @@ export function ChannelConversation() {
                               selectAgent(id);
                             }}
                             onOpenLink={(url) => {
-                              void window.openbot.openUrl(url);
+                              void appPort().openUrl(url);
                             }}
                             onPreview={(attachment) => void previewChannelAttachment(attachment)}
                             onDownloadAttachments={async (attachments) => {
@@ -909,7 +910,7 @@ export function ChannelConversation() {
                     maxWidth={() => settingsPanelMaxWidth(conversationPanel)}
                     onWidthChange={setPanelWidth}
                     onOpenLink={(url) => {
-                      void window.openbot.openUrl(url);
+                      void appPort().openUrl(url);
                     }}
                     /* A channel transcript has no agent workspace of its own, so a path in a
                        previewed file cannot be resolved here. Only attachments open in this slot. */
