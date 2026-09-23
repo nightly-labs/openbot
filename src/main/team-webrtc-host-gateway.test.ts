@@ -38,19 +38,24 @@ class FakeBridge extends TeamWebRtcBridge {
   readonly disconnectedPeers: string[] = [];
   readonly sent: Array<{ peerId: string; channel: string; data: string | ArrayBuffer }> = [];
 
-  async connect(input: { peerId: string; signalUrl: string; token: string; peer: "host" | "client" }): Promise<void> {
+  override async connect(input: {
+    peerId: string;
+    signalUrl: string;
+    token: string;
+    peer: "host" | "client";
+  }): Promise<void> {
     this.connections.push(input);
     // A local Signal may be ready before the connect command acknowledges.
     this.emit("signalReady", input.peerId);
   }
 
-  async disconnect(): Promise<void> {}
+  override async disconnect(): Promise<void> {}
 
-  async disconnectPeer(peerId: string): Promise<void> {
+  override async disconnectPeer(peerId: string): Promise<void> {
     this.disconnectedPeers.push(peerId);
   }
 
-  async send(
+  override async send(
     peerId: string,
     channel: "rpc" | "events" | "files" | "desktop",
     data: string | ArrayBuffer,
