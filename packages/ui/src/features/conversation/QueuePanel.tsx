@@ -243,9 +243,10 @@ export function QueuePanel(props: QueuePanelProps) {
   }
 
   function updateDragTarget(clientY: number) {
-    if (!queueList || dragSlots.length === 0) return;
+    const [first] = dragSlots;
+    if (!queueList || !first) return;
     const scrollDelta = queueList.scrollTop - dragStartScrollTop;
-    let closest = dragSlots[0];
+    let closest = first;
     let closestDistance = Math.abs(clientY - (closest.centerY - scrollDelta));
     for (const slot of dragSlots.slice(1)) {
       const distance = Math.abs(clientY - (slot.centerY - scrollDelta));
@@ -321,8 +322,11 @@ export function QueuePanel(props: QueuePanelProps) {
     const ids = [...queueIds()];
     const index = ids.indexOf(deliveryId);
     const target = index + direction;
-    if (index < 0 || target < 0 || target >= ids.length) return;
-    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const moved = ids[index];
+    const displaced = ids[target];
+    if (index < 0 || moved === undefined || displaced === undefined) return;
+    ids[index] = displaced;
+    ids[target] = moved;
     props.onReorder(ids);
     setAnnouncement(`Moved queued message to position ${target + 1} of ${ids.length}.`);
   }

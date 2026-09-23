@@ -2,7 +2,7 @@ import { serializeAttachmentReference } from "@openbot/contracts/attachment-refe
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { ConversationSnapshot, DirectConversationSnapshot, QueueDelivery } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { expect, it, vi } from "vitest";
+import { assert, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
   attachment,
@@ -1217,7 +1217,8 @@ describe("queue edit", () => {
     const composer = await screen.findByRole("textbox", { name: "Message Chief" });
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
     await screen.findByRole("button", { name: "Save queued message" });
-    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0]?.[0];
+    assert(begin);
     expect(begin).toMatchObject({ action: "begin", agentId: "chief", deliveryId: delivery.id });
     composer.textContent = "Changed safely";
     await fireEvent.input(composer);
@@ -1241,7 +1242,8 @@ describe("queue edit", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
     await screen.findByRole("button", { name: "Save queued message" });
     // Save confirms the hold with the same identity first, so the second hold is calls[3].
-    const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[3][0];
+    const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[3]?.[0];
+    assert(secondBegin);
     await fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() =>
       expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
@@ -1259,7 +1261,8 @@ describe("queue edit", () => {
     const composer = await screen.findByRole("textbox", { name: "Message Chief" });
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
     await screen.findByRole("button", { name: "Save queued message" });
-    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0]?.[0];
+    assert(begin);
     composer.textContent = "First save";
     await fireEvent.input(composer);
     // The hold confirm succeeds; only the Save response is lost.
@@ -1301,7 +1304,10 @@ describe("queue edit", () => {
       .mocked(window.openbot.agent.editQueuedMessage)
       .mock.calls.filter(([input]) => input.action === "save");
     expect(saves).toHaveLength(2);
-    expect(saves[0][0]).toEqual(saves[1][0]);
+    const [firstSave, secondSave] = saves;
+    assert(firstSave);
+    assert(secondSave);
+    expect(firstSave[0]).toEqual(secondSave[0]);
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save queued message" })).not.toBeInTheDocument());
     expect(window.localStorage.getItem("openbot:queue-edit")).toBeNull();
   });
@@ -1355,7 +1361,8 @@ describe("queue edit", () => {
     render(() => <App />);
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
     await screen.findByText("Connection lost");
-    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0]?.[0];
+    assert(begin);
     expect(window.localStorage.getItem("openbot:queue-edit")).toContain(begin.editId);
     await fireEvent.click(screen.getByRole("button", { name: "Edit queued message 2" }));
     await waitFor(() =>
@@ -1416,7 +1423,8 @@ describe("queue edit", () => {
     render(() => <App />);
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Save queued message" })).toBeEnabled());
-    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0]?.[0];
+    assert(begin);
     let retain = () => {};
     vi.mocked(window.openbot.agent.editQueuedMessage).mockImplementationOnce(
       () =>
@@ -1466,7 +1474,8 @@ describe("queue edit", () => {
     await screen.findByRole("button", { name: "Remove backup.pdf" });
     await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
     await screen.findByRole("button", { name: "Save queued message" });
-    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+    const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0]?.[0];
+    assert(begin);
     await waitFor(() =>
       expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
         { ...begin, action: "retain-attachments", attachmentDraftIds: ["backup-1"] },
@@ -1506,7 +1515,8 @@ describe("queue edit", () => {
       await screen.findByRole("button", { name: "Remove backup.pdf" });
       await fireEvent.click(await screen.findByRole("button", { name: "Edit queued message 1" }));
       await screen.findByText("Connection lost");
-      const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0][0];
+      const begin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[0]?.[0];
+      assert(begin);
       expect(window.localStorage.getItem("openbot:queue-edit")).toContain(begin.editId);
       expect(composer).toHaveTextContent("Queued text");
       await fireEvent.keyDown(document, { key: "Escape" });

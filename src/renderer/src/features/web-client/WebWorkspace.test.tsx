@@ -1,6 +1,6 @@
 import type { AttachmentImportEvent, AttachmentSummary, ConversationPage } from "@openbot/contracts/ipc";
 import { render, waitFor } from "@solidjs/testing-library";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_SUMMARIES } from "../../preview/fixtures";
 import { createWebWorkspace } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
@@ -181,7 +181,9 @@ describe("web workspace state", () => {
   });
 
   it("does not submit duplicate requests while one is pending", async () => {
-    const copy = { ...STORY_AGENT_SUMMARIES[0], id: "chief-copy", name: "Chief copy", threadId: null };
+    const [chief] = STORY_AGENT_SUMMARIES;
+    assert(chief);
+    const copy = { ...chief, id: "chief-copy", name: "Chief copy", threadId: null };
     const layout = {
       revision: 2,
       sections: [],

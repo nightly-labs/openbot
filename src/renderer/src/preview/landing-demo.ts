@@ -139,7 +139,7 @@ export function createLandingDemoController(
       createdAt: SCRIPT_TIME,
       status: "completed",
     };
-    const thinking = script.thinkingSteps.map<ConversationMessage>((text, index) => ({
+    const thinkingMessage = (text: string, index: number): ConversationMessage => ({
       id: scriptId(script.agentId, runId, `thinking-${index + 1}`),
       turnId,
       author: "assistant",
@@ -148,7 +148,12 @@ export function createLandingDemoController(
       text,
       createdAt: SCRIPT_TIME,
       status: "completed",
-    }));
+    });
+    const [firstThinkingStep, secondThinkingStep] = script.thinkingSteps;
+    const thinking: [ConversationMessage, ConversationMessage] = [
+      thinkingMessage(firstThinkingStep, 0),
+      thinkingMessage(secondThinkingStep, 1),
+    ];
     const answer: ConversationMessage = {
       id: scriptId(script.agentId, runId, "answer"),
       turnId,
@@ -201,7 +206,10 @@ export function createLandingDemoController(
     });
   }
 
-  function createDirectMessages(script: LandingDirectDemoScript, runId: number): DirectMessage[] {
+  function createDirectMessages(
+    script: LandingDirectDemoScript,
+    runId: number,
+  ): [DirectMessage, DirectMessage, DirectMessage, DirectMessage] {
     const snapshot = mock.readDirectConversationSnapshot(script.memberId);
     let sequence = snapshot.messages.reduce((highest, message) => Math.max(highest, message.sequence), 0);
     const createMessage = (part: string, senderMemberId: string, recipientMemberId: string, text: string) => {

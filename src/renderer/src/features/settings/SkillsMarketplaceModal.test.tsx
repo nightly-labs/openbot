@@ -1181,6 +1181,7 @@ describe("SkillsMarketplaceModal", () => {
     const app = plugin.apps[0];
     if (app?.server.transport !== "http") throw new Error("The plugin under test must publish one http app.");
     const appUrl = app.server.url;
+    const appName = app.server.name;
 
     async function openPluginPage() {
       fireEvent.click(screen.getByRole("tab", { name: "Plugins" }));
@@ -1487,7 +1488,7 @@ describe("SkillsMarketplaceModal", () => {
     function hostApp(): McpServerConfig {
       return {
         id: "mcp-1",
-        name: app.server.name,
+        name: appName,
         transport: "http" as const,
         enabled: true,
         command: "",

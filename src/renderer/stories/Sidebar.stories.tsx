@@ -7,7 +7,7 @@ import { createSignal, untrack } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
-import { STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
+import { requireFixture, STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
 
 const agentStates: Record<string, SidebarAgentState> = {
   chief: { kind: "working" },
@@ -82,12 +82,15 @@ const stressAgents = [
     };
   }),
 ];
+function stressSectionId(index: number): string {
+  return requireFixture(stressSectionIds[index % stressSectionIds.length], "Stress section");
+}
 const stressLayout: SidebarLayoutSnapshot = {
   revision: 1,
   sections: stressSectionIds.map((id, index) => ({ id, name: `Team ${index + 1}` })),
   order: ["people", ...stressSectionIds, "unassigned"],
   agentAssignments: Object.fromEntries(
-    stressAgents.slice(0, -3).map((agent, index) => [agent.id, stressSectionIds[index % stressSectionIds.length]]),
+    stressAgents.slice(0, -3).map((agent, index) => [agent.id, stressSectionId(index)]),
   ),
   agentOrder: stressAgents.map((agent) => agent.id),
 };
@@ -463,7 +466,9 @@ export const TimestampLabels: Story = {
     ...AgentLongLabels.args,
     agents: longLabelAgents.map((agent, index) => {
       const updatedAt = new Date();
-      updatedAt.setDate(updatedAt.getDate() - [0, 1, 30][index % 3]);
+      const daysAgo = [0, 1, 30][index % 3];
+      if (daysAgo === undefined) throw new Error("The timestamp story has no day offset.");
+      updatedAt.setDate(updatedAt.getDate() - daysAgo);
       updatedAt.setHours(13, 42, 0, 0);
       return {
         ...agent,
@@ -493,21 +498,22 @@ export const AgentContextMenu: Story = {
     });
 
     const menu = await within(canvasElement.ownerDocument.body).findByRole("menu", { name: "Agent actions" });
-    const items = within(menu).getAllByRole("menuitem");
+    const [firstItem] = within(menu).getAllByRole("menuitem");
+    if (!firstItem) throw new Error("The agent menu has no items.");
     const menuStyle = getComputedStyle(menu);
-    const itemStyle = getComputedStyle(items[0]);
+    const itemStyle = getComputedStyle(firstItem);
 
     await expect(menu).toHaveClass("ui-action-menu");
     await expect(menu.getBoundingClientRect().width).toBe(160);
     await expect(menuStyle.padding).toBe("4px");
     await expect(menuStyle.outlineStyle).toBe("none");
-    await expect(items[0].getBoundingClientRect().height).toBe(32);
+    await expect(firstItem.getBoundingClientRect().height).toBe(32);
     await expect(itemStyle.padding).toBe("6px 8px");
     await expect(itemStyle.gap).toBe("8px");
     await expect(itemStyle.borderRadius).toBe("6px");
     await expect(itemStyle.fontSize).toBe("14px");
     await expect(itemStyle.lineHeight).toBe("20px");
-    await expect(items[0].querySelector("svg")?.getBoundingClientRect().width).toBe(16);
+    await expect(firstItem.querySelector("svg")?.getBoundingClientRect().width).toBe(16);
 
     const moveTo = within(menu).getByRole("menuitem", { name: "Move to" });
     moveTo.focus();
@@ -521,7 +527,7 @@ export const AgentContextMenu: Story = {
 
     await expect(moveTo).toHaveAttribute("aria-expanded", "true");
     await expect(getComputedStyle(moveTo).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
-    await expect(getComputedStyle(items[0]).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+    await expect(getComputedStyle(firstItem).backgroundColor).toBe("rgba(0, 0, 0, 0)");
     await expect(coreTeam.querySelector(".lucide-check")).toBeInTheDocument();
     await expect(unassigned.querySelector(".lucide-folder")).toBeInTheDocument();
     await expect(emptySection).toBeInTheDocument();
@@ -764,10 +770,11 @@ async function expectDragShift(
   await waitFor(() => expect(totalDragOffset(shifted)).toBe(0));
 }
 
-function dragRows(root: HTMLElement, selector: string, what: string): HTMLElement[] {
+function dragRows(root: HTMLElement, selector: string, what: string): [HTMLElement, HTMLElement, ...HTMLElement[]] {
   const rows = Array.from(root.querySelectorAll<HTMLElement>(selector));
-  if (rows.length < 2) throw new Error(`Need two ${what} rows to show a shift, found ${rows.length}.`);
-  return rows;
+  const [first, second, ...rest] = rows;
+  if (!first || !second) throw new Error(`Need two ${what} rows to show a shift, found ${rows.length}.`);
+  return [first, second, ...rest];
 }
 
 export const DragOffsets: Story = {

@@ -57,7 +57,8 @@ export const Gallery: Story = {
   ),
   play: async ({ canvas, userEvent }) => {
     // The trigger reads its label and its value, so match the start of the name.
-    const trigger = canvas.getAllByRole("button", { name: /^Language/ })[0];
+    const [trigger] = canvas.getAllByRole("button", { name: /^Language/ });
+    if (!trigger) throw new Error("Language trigger is missing.");
     await userEvent.click(trigger);
     const body = within(document.body);
     await userEvent.click(await body.findByRole("option", { name: "日本語" }));

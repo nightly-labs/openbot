@@ -7,7 +7,7 @@ import type {
   StoredFileSource,
   StoredFileStatus,
 } from "@openbot/ui/features/files/files-view";
-import { STORY_AGENTS } from "./fixtures";
+import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 /** The fixed clock of every Files story, so "Today" and "Yesterday" do not move with the run date. */
 export const FILES_NOW = new Date("2026-09-23T15:00:00");
@@ -389,20 +389,24 @@ export const FILES_STATUS_ROWS: StoredFileRow[] = [
   })),
 ];
 
+function filesRow(index: number): StoredFileRow {
+  return requireFixture(FILES_ROWS[index], `Files row ${index}`);
+}
+
 export const FILES_LONG_NAME_ROWS: StoredFileRow[] = [
   {
-    ...FILES_ROWS[0],
+    ...filesRow(0),
     id: "long-1",
     name: "customer-import-validation-pipeline.final.review.after-legal-comments.ts",
     mimeType: "text/typescript",
   },
   {
-    ...FILES_ROWS[4],
+    ...filesRow(4),
     id: "long-2",
     name: "quarterly-operating-plan-with-regional-breakdown-and-headcount-forecast.xlsx",
   },
   {
-    ...FILES_ROWS[1],
+    ...filesRow(1),
     id: "long-3",
     name: "autumn-campaign-hero-image-generated-variant-with-warmer-light-and-logo.png",
   },

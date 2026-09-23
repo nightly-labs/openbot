@@ -249,7 +249,7 @@ function StreamingTailText(props: { body: string }) {
 function splitStreamingTail(body: string): { prefix: string; tail: string } {
   const match = /(\S+\s*)$/u.exec(body);
   if (!match || match.index === undefined) return { prefix: body, tail: "" };
-  return { prefix: body.slice(0, match.index), tail: match[1] };
+  return { prefix: body.slice(0, match.index), tail: match[1] ?? "" };
 }
 
 export function MessageLink(props: {

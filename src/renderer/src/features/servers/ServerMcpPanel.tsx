@@ -551,7 +551,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         disabled={disabled()}
                         onValueChange={(next) =>
                           setState((current) => {
-                            current.draft.env[index].key = next;
+                            const entry = current.draft.env[index];
+                            if (entry) entry.key = next;
                           })
                         }
                       />
@@ -566,7 +567,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         disabled={disabled()}
                         onValueChange={(next) =>
                           setState((current) => {
-                            current.draft.env[index].value = next;
+                            const entry = current.draft.env[index];
+                            if (entry) entry.value = next;
                           })
                         }
                       />
@@ -701,7 +703,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         disabled={disabled()}
                         onValueChange={(next) =>
                           setState((current) => {
-                            current.draft.headers[index].key = next;
+                            const entry = current.draft.headers[index];
+                            if (entry) entry.key = next;
                           })
                         }
                       />
@@ -716,7 +719,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         disabled={disabled()}
                         onValueChange={(next) =>
                           setState((current) => {
-                            current.draft.headers[index].value = next;
+                            const entry = current.draft.headers[index];
+                            if (entry) entry.value = next;
                           })
                         }
                       />
