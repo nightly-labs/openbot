@@ -925,6 +925,38 @@ The desktop chart adapts Zaidan's chart and interactive area composition. The pi
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
+### Storage and files
+
+Three surfaces show what a host keeps on disk: Server Settings > Storage (scope `host`), Agent
+settings > Files (scope `agent`) and the chat Files panel (scope `conversation`). They share
+`src/renderer/src/features/files/storage-usage.ts`, which names the server explicitly, because Server
+Settings can be open for a server that is not the selected one.
+
+`src/backend/storage-usage.ts` owns the scan and has no Electron imports. Sent and generated files
+come from the mailbox state in memory, with their chat from paged read-only queries in
+`database/storage-usage-queries.ts`; a file's status comes from `stat`, not from
+`resolveAttachment`, which hashes the file. Workspaces, shared files, downloads, caches, logs and
+runtimes are measured by a bounded walk: `lstat`, no symlinks followed, a stop at 100,000 entries,
+and a yield between pages, because `DatabaseSync` and the walk run on the main thread. A result is
+cached for 60 seconds per scope, a scan in progress is shared, and a delete, clear or agent delete
+drops the cache. Lists stop at `STORAGE_LIMITS` and set `truncated`; the breakdown still counts
+every byte.
+
+A delete does not change the schema. `MailboxStore.deleteStoredFile` sets `deletedAt` on the stored
+attachment, persists, and queues the file path, not the transfer folder, in the file-deletion outbox.
+It keeps a path that another live record uses, and it deletes only a real path under the Transfers
+folder. `resolveAttachment` then returns null, so a file card shows "File not found" and a generated image
+shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote` and
+`logs/update` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
+
+`storage:*` IPC reaches the local service or a joined server. The optional `storage-v1` capability
+exposes `POST /v1/storage/usage`, `/v1/storage/delete-file` and `/v1/storage/clear` with the frozen
+codec in `team-protocol/storage-v1.ts`. The host advertises it only when its storage service
+exists. Every member reads usage; delete and clear need an owner or admin (`requireAdmin`), and the
+renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
+download files travel only as category totals. A host without the capability reads as null, and the
+surface asks for an update; a change is refused before any request.
+
 ### OpenCode and ACP
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,

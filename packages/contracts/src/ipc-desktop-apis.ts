@@ -180,6 +180,14 @@ import type {
   UninstallSkillInput,
 } from "./ipc-skills";
 import type {
+  ClearStorageInput,
+  DeleteStoredFileInput,
+  GetStorageUsageInput,
+  OpenStorageLocationInput,
+  OpenStoredFileInput,
+  StorageUsage,
+} from "./ipc-storage";
+import type {
   ConfigureHostInput,
   CreateTeamInviteInput,
   DirectConversationPage,
@@ -552,6 +560,19 @@ export interface CustomProvidersDesktopApi {
   delete: (input: DeleteCustomProviderInput) => Promise<CustomProviderResult>;
 }
 
+/**
+ * Storage and files of one host. Every method names its server, because the settings modal can be
+ * open for a server the user has not switched to. A remote host without `storage-v1` answers null.
+ */
+export interface StorageDesktopApi {
+  getUsage: (input: GetStorageUsageInput, serverId: string) => Promise<StorageUsage | null>;
+  deleteFile: (input: DeleteStoredFileInput, serverId: string) => Promise<void>;
+  clear: (input: ClearStorageInput, serverId: string) => Promise<void>;
+  openFile: (input: OpenStoredFileInput, serverId: string) => Promise<void>;
+  /** Opens an agent workspace folder. Only the local host has a folder this computer can open. */
+  openLocation: (input: OpenStorageLocationInput) => Promise<void>;
+}
+
 export interface OpenBotDesktopApi {
   getAppInfo: () => Promise<AppInfo>;
   getSetupState: () => Promise<AppSetupState>;
@@ -611,6 +632,7 @@ export interface OpenBotDesktopApi {
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
+  storage: StorageDesktopApi;
   hostedSites: HostedSitesDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
   auth: CentralAuthDesktopApi;

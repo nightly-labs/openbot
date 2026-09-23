@@ -56,6 +56,11 @@ export function AttachmentCards(props: {
 }) {
   const tooltipId = `attachment-action-tooltip-${createUniqueId()}`;
   const [tooltip, setTooltip] = createSignal<{ anchor: HTMLElement; content: string } | null>(null);
+  // An image whose preview does not load was deleted from the host, or never arrived. The card
+  // keeps its place in the message and says so, instead of an empty frame.
+  const [missing, setMissing] = createSignal<ReadonlySet<string>>(new Set());
+  const isMissing = (attachment: AttachmentSummary) => missing().has(attachment.id);
+  const markMissing = (attachment: AttachmentSummary) => setMissing((current) => new Set(current).add(attachment.id));
 
   const openTooltip = (anchor: HTMLElement) => {
     setTooltip({ anchor, content: "Open file" });
@@ -72,17 +77,17 @@ export function AttachmentCards(props: {
       <div class="message-attachments">
         <For each={props.attachments}>
           {(attachment) => (
-            <div class="message-attachment">
+            <div class="message-attachment" data-status={isMissing(attachment) ? "missing" : undefined}>
               <Button
                 variant="ghost"
                 type="button"
                 class="attachment-preview-button"
-                disabled={!canPreviewAttachment(attachment)}
+                disabled={isMissing(attachment) || !canPreviewAttachment(attachment)}
                 aria-label={`Preview ${attachment.name}`}
                 onClick={() => props.onPreview(attachment)}
               >
                 <Show
-                  when={attachment.previewKind === "image"}
+                  when={attachment.previewKind === "image" && !isMissing(attachment)}
                   fallback={
                     <span
                       class="attachment-file-visual"
@@ -97,46 +102,48 @@ export function AttachmentCards(props: {
                     class="attachment-file-visual attachment-file-image"
                     data-file-tone={attachmentReferenceTone(attachment.name)}
                   >
-                    <img src={attachment.previewUrl ?? ""} alt="" />
+                    <img src={attachment.previewUrl ?? ""} alt="" onError={() => markMissing(attachment)} />
                   </span>
                 </Show>
                 <span class="attachment-file-copy">
                   <strong>{attachment.name}</strong>
-                  <small>{formatFileSize(attachment.size)}</small>
+                  <small>{isMissing(attachment) ? "File not found" : formatFileSize(attachment.size)}</small>
                 </span>
               </Button>
-              <Button
-                variant="ghost"
-                type="button"
-                class="attachment-open-button"
-                aria-label={`Download ${attachment.name}`}
-                onClick={() => {
-                  setTooltip(null);
-                  props.onAction(attachment, "download");
-                }}
-              >
-                <Download />
-              </Button>
-              <Button
-                variant="ghost"
-                type="button"
-                class="attachment-open-button"
-                aria-label={`Open ${attachment.name}`}
-                aria-describedby={tooltipId}
-                onPointerEnter={(event) => openTooltip(event.currentTarget)}
-                onMouseEnter={(event) => openTooltip(event.currentTarget)}
-                onPointerLeave={(event) => closeTooltip(event.currentTarget)}
-                onMouseLeave={(event) => closeTooltip(event.currentTarget)}
-                onFocus={(event) => openTooltip(event.currentTarget)}
-                onBlur={(event) => closeTooltip(event.currentTarget)}
-                onKeyDown={closeTooltipOnEscape}
-                onClick={() => {
-                  setTooltip(null);
-                  props.onAction(attachment, "open");
-                }}
-              >
-                <AttachmentOpenIcon />
-              </Button>
+              <Show when={!isMissing(attachment)}>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  class="attachment-open-button"
+                  aria-label={`Download ${attachment.name}`}
+                  onClick={() => {
+                    setTooltip(null);
+                    props.onAction(attachment, "download");
+                  }}
+                >
+                  <Download />
+                </Button>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  class="attachment-open-button"
+                  aria-label={`Open ${attachment.name}`}
+                  aria-describedby={tooltipId}
+                  onPointerEnter={(event) => openTooltip(event.currentTarget)}
+                  onMouseEnter={(event) => openTooltip(event.currentTarget)}
+                  onPointerLeave={(event) => closeTooltip(event.currentTarget)}
+                  onMouseLeave={(event) => closeTooltip(event.currentTarget)}
+                  onFocus={(event) => openTooltip(event.currentTarget)}
+                  onBlur={(event) => closeTooltip(event.currentTarget)}
+                  onKeyDown={closeTooltipOnEscape}
+                  onClick={() => {
+                    setTooltip(null);
+                    props.onAction(attachment, "open");
+                  }}
+                >
+                  <AttachmentOpenIcon />
+                </Button>
+              </Show>
             </div>
           )}
         </For>
@@ -175,5 +182,7 @@ function AttachmentOpenIcon() {
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes < 1024 ** 4) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  return `${(bytes / 1024 ** 4).toFixed(1)} TB`;
 }

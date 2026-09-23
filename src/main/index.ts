@@ -39,6 +39,7 @@ import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
 import { skillIpcHandlers } from "./ipc/skill-handlers";
+import { storageIpcHandlers } from "./ipc/storage-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
@@ -329,6 +330,7 @@ function registerIpcHandlers({
   cuaDriver,
   computerUsePermissionHelp,
   analytics,
+  storageUsage,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
   // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
@@ -394,6 +396,14 @@ function registerIpcHandlers({
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
+    ...storageIpcHandlers({
+      storage: storageUsage,
+      mailbox,
+      remoteServers,
+      getMainWindow,
+      agents: () => service.listAgents(),
+      openPath: (path) => shell.openPath(path),
+    }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView }),
   });

@@ -35,6 +35,7 @@ export { default as FolderPlus } from "lucide-solid/icons/folder-plus";
 export { default as Gauge } from "lucide-solid/icons/gauge";
 export { default as Globe2 } from "lucide-solid/icons/globe-2";
 export { default as GripVertical } from "lucide-solid/icons/grip-vertical";
+export { default as HardDrive } from "lucide-solid/icons/hard-drive";
 export { default as Hash } from "lucide-solid/icons/hash";
 export { default as Image } from "lucide-solid/icons/image";
 export { default as Info } from "lucide-solid/icons/info";

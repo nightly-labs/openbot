@@ -10,6 +10,7 @@ import {
 } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -278,10 +279,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             ? channelRequest(path, init.body)
             : isMcpRoute(path)
               ? mcpRequest(path, init.body)
-              : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
-                  preserveSemanticTags: init.preserveSemanticTags,
-                  agentCreateModel: init.agentCreateModel,
-                }),
+              : isStorageRoute(path)
+                ? storageRequest(path, init.body)
+                : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
+                    preserveSemanticTags: init.preserveSemanticTags,
+                    agentCreateModel: init.agentCreateModel,
+                  }),
         capabilities: [...TEAM_CURRENT_CAPABILITIES],
         ...(bodyTransferId ? { bodyTransferId } : {}),
         ...(init.contentType ? { contentType: init.contentType } : {}),
@@ -324,7 +327,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           ? channelResponse(path, envelope.status, envelope.body)
           : isMcpRoute(path)
             ? mcpResponse(path, envelope.status, envelope.body)
-            : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
+            : isStorageRoute(path)
+              ? storageResponse(path, envelope.status, envelope.body)
+              : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
       } catch {
         throw new TeamWebRtcRequestError(502, "protocol_error", "The host returned an invalid response body.");
       }

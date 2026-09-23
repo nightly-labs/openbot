@@ -29,12 +29,14 @@ import {
   CHANNEL_DELETE_CAPABILITY,
   isTeamCurrentCapability,
   MCP_SERVERS_CAPABILITY,
+  STORAGE_CAPABILITY,
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
 import { isMcpRoute, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isStorageRoute, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -80,6 +82,7 @@ import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
 import { routeMcpServers } from "./team-api/route-mcp";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
+import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
 import { TeamStoreError } from "./team-store";
 
@@ -548,6 +551,7 @@ export class TeamApiServer {
         "handled"
       )
         return;
+      if ((await routeStorage(context, this.#options.storage)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -1076,11 +1080,13 @@ export class TeamApiServer {
       ? JSON.stringify(channelResponse(route.path, status, visibleValue))
       : isMcpRoute(route.path)
         ? JSON.stringify(mcpResponse(route.path, status, visibleValue))
-        : route.protocol === TEAM_PROTOCOL_V4
-          ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-          : route.protocol === TEAM_PROTOCOL_V3
-            ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-            : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, visibleValue, options);
+        : isStorageRoute(route.path)
+          ? JSON.stringify(storageResponse(route.path, status, visibleValue))
+          : route.protocol === TEAM_PROTOCOL_V4
+            ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
+            : route.protocol === TEAM_PROTOCOL_V3
+              ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
+              : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, visibleValue, options);
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -1132,6 +1138,7 @@ export class TeamApiServer {
         if (capability === "remote-desktop-setup")
           return this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined;
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
+        if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
         return true;
       }),
     };

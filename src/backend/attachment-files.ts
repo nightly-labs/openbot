@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   copyFile,
   type FileHandle,
+  lstat,
   mkdir,
   open,
   readdir,
@@ -31,6 +32,11 @@ const TRANSFER_MANIFEST_FILE = ".openbot-transfer.json";
 export interface StoredAttachment extends AttachmentSummary {
   path: string;
   sha256: string;
+  /**
+   * ISO time the user deleted the file from Storage. The record stays, so the message that sent it
+   * keeps its card and says the file is not found. Absent on every record from before the field.
+   */
+  deletedAt?: string;
 }
 
 export interface StoredGeneratedAttachment extends StoredAttachment {
@@ -124,6 +130,20 @@ export class AttachmentFiles {
 
   generatedRootForPath(path: string): string | null {
     return generatedRootForPath(this.#transfersRoot, path);
+  }
+
+  /**
+   * The real path of a managed transfer file, or null when the file is gone or resolves outside
+   * the Transfers folder. A delete from Storage removes only a path this returns.
+   */
+  async managedTransferFile(path: string): Promise<string | null> {
+    try {
+      const [root, candidate] = await Promise.all([realpath(this.#transfersRoot), realpath(path)]);
+      if (!isWithin(root, candidate)) return null;
+      return (await lstat(candidate)).isFile() ? candidate : null;
+    } catch {
+      return null;
+    }
   }
 
   async remove(path: string): Promise<void> {

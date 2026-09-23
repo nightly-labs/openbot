@@ -1000,6 +1000,13 @@ export function installOpenbotStub(): void {
         disconnect: vi.fn().mockResolvedValue(undefined),
         onEvent: vi.fn(() => () => undefined),
       },
+      storage: {
+        getUsage: vi.fn().mockResolvedValue(null),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+        clear: vi.fn().mockResolvedValue(undefined),
+        openFile: vi.fn().mockResolvedValue(undefined),
+        openLocation: vi.fn().mockResolvedValue(undefined),
+      },
       // The custom providers context lists on mount, so every harnessed mount reaches this group.
       customProviders: {
         list: vi.fn().mockResolvedValue([]),

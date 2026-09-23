@@ -1,5 +1,6 @@
 import { channelRequest, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   decodeTeamProtocolV4CurrentHttpResponse,
   encodeTeamProtocolV4CurrentHttpRequest,
@@ -79,18 +80,20 @@ export async function requestJson<T>(
             ? JSON.stringify(channelRequest(path, options.body))
             : isMcpRoute(path)
               ? JSON.stringify(mcpRequest(path, options.body))
-              : options.protocol === 4
-                ? encodeTeamProtocolV4CurrentHttpRequest(method, path, options.body, {
-                    preserveSemanticTags: options.preserveSemanticTags,
-                    agentCreateModel: options.agentCreateModel,
-                  })
-                : options.protocol === TEAM_PROTOCOL_V3
-                  ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
+              : isStorageRoute(path)
+                ? JSON.stringify(storageRequest(path, options.body))
+                : options.protocol === 4
+                  ? encodeTeamProtocolV4CurrentHttpRequest(method, path, options.body, {
                       preserveSemanticTags: options.preserveSemanticTags,
+                      agentCreateModel: options.agentCreateModel,
                     })
-                  : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
-                      preserveSemanticTags: options.preserveSemanticTags,
-                    }),
+                  : options.protocol === TEAM_PROTOCOL_V3
+                    ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
+                        preserveSemanticTags: options.preserveSemanticTags,
+                      })
+                    : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
+                        preserveSemanticTags: options.preserveSemanticTags,
+                      }),
     },
     options.timeoutMs,
   );
@@ -114,11 +117,13 @@ export async function requestJson<T>(
         ? channelResponse(path, response.status, value)
         : isMcpRoute(path)
           ? mcpResponse(path, response.status, value)
-          : options.protocol === 4
-            ? decodeTeamProtocolV4CurrentHttpResponse(method, path, response.status, value)
-            : options.protocol === TEAM_PROTOCOL_V3
-              ? decodeTeamProtocolV3CurrentHttpResponse(method, path, response.status, value)
-              : decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, value);
+          : isStorageRoute(path)
+            ? storageResponse(path, response.status, value)
+            : options.protocol === 4
+              ? decodeTeamProtocolV4CurrentHttpResponse(method, path, response.status, value)
+              : options.protocol === TEAM_PROTOCOL_V3
+                ? decodeTeamProtocolV3CurrentHttpResponse(method, path, response.status, value)
+                : decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, value);
     } catch (error) {
       throw new RemoteProtocolError(
         "protocol_error",
