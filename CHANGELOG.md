@@ -31,6 +31,8 @@ All notable changes to OpenBot will be documented here. The project follows
 - Load a remote server's agents when one agent uses a 1M-context Claude model.
 - Show why an updated OpenCode CLI stopped, instead of "ACP connection closed".
 - Stop showing a Grok tool error as a provider error.
+- Stop showing a refused routine as a provider error; the agent now gets the reason and can correct it.
+- Keep failed Codex background refreshes out of provider error messages.
 
 ## [0.17.0] - 2026-09-21
 
