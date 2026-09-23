@@ -335,8 +335,9 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     stateAgeMs !== null &&
     stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS &&
     !waitingOnUnregistered;
+  // #tick applies no phase rule while management is off, so no tenant blocks and no countdown runs.
   const tenants = input.tenants.map((entry) =>
-    describeTenant(entry, state, input.processes, now, !managed || stateStale || waitingOnUnregistered),
+    describeTenant(entry, managed ? state : null, input.processes, now, stateStale || waitingOnUnregistered),
   );
   const partial = {
     managed,

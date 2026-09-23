@@ -519,8 +519,10 @@ describe("host status reporting", () => {
     // The host stops publishing with the update, so the old state says nothing about the daemon.
     expect(report.stateStale).toBe(false);
     expect(report.tenants.map((tenant) => tenant.readyInMs)).toEqual([null, null]);
+    expect(report.tenants.map((tenant) => tenant.blocker)).toEqual([null, null]);
     const text = formatHostStatus(report);
     expect(text).not.toContain("not polling");
+    expect(text).not.toContain("blocks:");
     expect(text).toContain("Host management is off");
   });
 
