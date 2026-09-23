@@ -81,6 +81,10 @@ export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
 }
 
+export function parseChannelId(value: unknown): string {
+  return requireString(value, "channelId", INPUT_LIMITS.identifier);
+}
+
 export function parseOptionalAgentId(value: unknown): string | undefined {
   if (value === null || value === undefined) return undefined;
   return parseAgentId(value);

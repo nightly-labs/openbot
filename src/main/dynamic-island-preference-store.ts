@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 export async function readDynamicIslandPreference(path: string): Promise<DynamicIslandPreference> {
   try {
@@ -46,7 +47,7 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
         : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent,
     };
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
+    if (isMissingFileError(error) || error instanceof SyntaxError) return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
     throw error;
   }
 }
@@ -57,8 +58,4 @@ export async function writeDynamicIslandPreference(
 ): Promise<DynamicIslandPreference> {
   await writeJsonFileAtomically(path, { version: 3, ...preference });
   return { ...preference };
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

@@ -15,8 +15,50 @@
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
 import type { AgentIpcRequest } from "./ipc-agent-events";
+import type {
+  AgentMemory,
+  CreateAgentMemoryInput,
+  DeleteAgentMemoryInput,
+  UpdateAgentMemoryInput,
+} from "./ipc-agent-memories";
 import type { ExportResult } from "./ipc-app-auth";
+import type {
+  ChannelMemory,
+  CreateChannelMemoryInput,
+  DeleteChannelMemoryInput,
+  UpdateChannelMemoryInput,
+} from "./ipc-channel-memories";
+import type {
+  ChannelRoutine,
+  ChannelRoutineRun,
+  CreateChannelRoutineInput,
+  DeleteChannelRoutineInput,
+  ListChannelRoutineRunsInput,
+  TestChannelRoutineInput,
+  UpdateChannelRoutineInput,
+} from "./ipc-channel-routines";
 import { IPC_CHANNELS } from "./ipc-channels";
+import type {
+  CustomProviderResult,
+  CustomProviderSummary,
+  DeleteCustomProviderInput,
+  SaveCustomProviderInput,
+} from "./ipc-custom-providers";
+import type {
+  DeleteHostedSiteInput,
+  HostedSiteSummary,
+  PublishHostedSiteInput,
+  ReplaceHostedSiteInput,
+} from "./ipc-hosted-sites";
+import type {
+  CreateRoutineInput,
+  DeleteRoutineInput,
+  ListRoutineRunsInput,
+  Routine,
+  RoutineRun,
+  TestRoutineInput,
+  UpdateRoutineInput,
+} from "./ipc-routines";
 import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
 
@@ -161,16 +203,16 @@ export const IPC_ENDPOINTS = {
   // No event channel: the renderer is the only writer, and the models a saved endpoint adds arrive
   // through the ready `status` event the provider restart already emits.
   customProviders: {
-    list: untypedRequest(IPC_CHANNELS.customProvidersList),
-    save: untypedRequest(IPC_CHANNELS.customProvidersSave),
-    delete: untypedRequest(IPC_CHANNELS.customProvidersDelete),
+    list: request<undefined, CustomProviderSummary[]>()(IPC_CHANNELS.customProvidersList),
+    save: request<SaveCustomProviderInput, CustomProviderResult>()(IPC_CHANNELS.customProvidersSave),
+    delete: request<DeleteCustomProviderInput, CustomProviderResult>()(IPC_CHANNELS.customProvidersDelete),
   },
   hostedSites: {
-    list: untypedRequest(IPC_CHANNELS.hostedSitesList),
-    chooseDirectory: untypedRequest(IPC_CHANNELS.hostedSitesChooseDirectory),
-    publish: untypedRequest(IPC_CHANNELS.hostedSitesPublish),
-    replace: untypedRequest(IPC_CHANNELS.hostedSitesReplace),
-    delete: untypedRequest(IPC_CHANNELS.hostedSitesDelete),
+    list: request<undefined, HostedSiteSummary[]>()(IPC_CHANNELS.hostedSitesList),
+    chooseDirectory: request<undefined, string | null>()(IPC_CHANNELS.hostedSitesChooseDirectory),
+    publish: request<PublishHostedSiteInput, HostedSiteSummary>()(IPC_CHANNELS.hostedSitesPublish),
+    replace: request<ReplaceHostedSiteInput, HostedSiteSummary>()(IPC_CHANNELS.hostedSitesReplace),
+    delete: request<DeleteHostedSiteInput, void>()(IPC_CHANNELS.hostedSitesDelete),
   },
   marketplaceAgents: {
     list: untypedRequest(IPC_CHANNELS.marketplaceAgentsList),
@@ -254,38 +296,54 @@ export const IPC_ENDPOINTS = {
     event: untypedEvent(IPC_CHANNELS.agentEvent),
   },
   agentMemories: {
-    listMemories: untypedRequest(IPC_CHANNELS.agentListMemories),
-    createMemory: untypedRequest(IPC_CHANNELS.agentCreateMemory),
-    updateMemory: untypedRequest(IPC_CHANNELS.agentUpdateMemory),
-    deleteMemory: untypedRequest(IPC_CHANNELS.agentDeleteMemory),
-    clearMemories: untypedRequest(IPC_CHANNELS.agentClearMemories),
+    listMemories: request<AgentIpcRequest<string>, AgentMemory[]>()(IPC_CHANNELS.agentListMemories),
+    createMemory: request<AgentIpcRequest<CreateAgentMemoryInput>, AgentMemory>()(IPC_CHANNELS.agentCreateMemory),
+    updateMemory: request<AgentIpcRequest<UpdateAgentMemoryInput>, AgentMemory>()(IPC_CHANNELS.agentUpdateMemory),
+    deleteMemory: request<AgentIpcRequest<DeleteAgentMemoryInput>, void>()(IPC_CHANNELS.agentDeleteMemory),
+    clearMemories: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentClearMemories),
   },
   sharedTables: {
     listTables: request<AgentIpcRequest<null>, SharedTable[]>()(IPC_CHANNELS.sharedListTables),
     deleteTable: request<AgentIpcRequest<DeleteSharedTableInput>, void>()(IPC_CHANNELS.sharedDeleteTable),
   },
   agentRoutines: {
-    listRoutines: untypedRequest(IPC_CHANNELS.agentListRoutines),
-    createRoutine: untypedRequest(IPC_CHANNELS.agentCreateRoutine),
-    updateRoutine: untypedRequest(IPC_CHANNELS.agentUpdateRoutine),
-    deleteRoutine: untypedRequest(IPC_CHANNELS.agentDeleteRoutine),
-    testRoutine: untypedRequest(IPC_CHANNELS.agentTestRoutine),
-    listRoutineRuns: untypedRequest(IPC_CHANNELS.agentListRoutineRuns),
+    listRoutines: request<AgentIpcRequest<string>, Routine[]>()(IPC_CHANNELS.agentListRoutines),
+    createRoutine: request<AgentIpcRequest<CreateRoutineInput>, Routine>()(IPC_CHANNELS.agentCreateRoutine),
+    updateRoutine: request<AgentIpcRequest<UpdateRoutineInput>, Routine>()(IPC_CHANNELS.agentUpdateRoutine),
+    deleteRoutine: request<AgentIpcRequest<DeleteRoutineInput>, void>()(IPC_CHANNELS.agentDeleteRoutine),
+    testRoutine: request<AgentIpcRequest<TestRoutineInput>, RoutineRun>()(IPC_CHANNELS.agentTestRoutine),
+    listRoutineRuns: request<AgentIpcRequest<ListRoutineRunsInput>, RoutineRun[]>()(IPC_CHANNELS.agentListRoutineRuns),
   },
   channelMemories: {
-    listChannelMemories: untypedRequest(IPC_CHANNELS.agentListChannelMemories),
-    createChannelMemory: untypedRequest(IPC_CHANNELS.agentCreateChannelMemory),
-    updateChannelMemory: untypedRequest(IPC_CHANNELS.agentUpdateChannelMemory),
-    deleteChannelMemory: untypedRequest(IPC_CHANNELS.agentDeleteChannelMemory),
-    clearChannelMemories: untypedRequest(IPC_CHANNELS.agentClearChannelMemories),
+    listChannelMemories: request<AgentIpcRequest<string>, ChannelMemory[]>()(IPC_CHANNELS.agentListChannelMemories),
+    createChannelMemory: request<AgentIpcRequest<CreateChannelMemoryInput>, ChannelMemory>()(
+      IPC_CHANNELS.agentCreateChannelMemory,
+    ),
+    updateChannelMemory: request<AgentIpcRequest<UpdateChannelMemoryInput>, ChannelMemory>()(
+      IPC_CHANNELS.agentUpdateChannelMemory,
+    ),
+    deleteChannelMemory: request<AgentIpcRequest<DeleteChannelMemoryInput>, void>()(
+      IPC_CHANNELS.agentDeleteChannelMemory,
+    ),
+    clearChannelMemories: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentClearChannelMemories),
   },
   channelRoutines: {
-    listChannelRoutines: untypedRequest(IPC_CHANNELS.agentListChannelRoutines),
-    createChannelRoutine: untypedRequest(IPC_CHANNELS.agentCreateChannelRoutine),
-    updateChannelRoutine: untypedRequest(IPC_CHANNELS.agentUpdateChannelRoutine),
-    deleteChannelRoutine: untypedRequest(IPC_CHANNELS.agentDeleteChannelRoutine),
-    testChannelRoutine: untypedRequest(IPC_CHANNELS.agentTestChannelRoutine),
-    listChannelRoutineRuns: untypedRequest(IPC_CHANNELS.agentListChannelRoutineRuns),
+    listChannelRoutines: request<AgentIpcRequest<string>, ChannelRoutine[]>()(IPC_CHANNELS.agentListChannelRoutines),
+    createChannelRoutine: request<AgentIpcRequest<CreateChannelRoutineInput>, ChannelRoutine>()(
+      IPC_CHANNELS.agentCreateChannelRoutine,
+    ),
+    updateChannelRoutine: request<AgentIpcRequest<UpdateChannelRoutineInput>, ChannelRoutine>()(
+      IPC_CHANNELS.agentUpdateChannelRoutine,
+    ),
+    deleteChannelRoutine: request<AgentIpcRequest<DeleteChannelRoutineInput>, void>()(
+      IPC_CHANNELS.agentDeleteChannelRoutine,
+    ),
+    testChannelRoutine: request<AgentIpcRequest<TestChannelRoutineInput>, ChannelRoutineRun>()(
+      IPC_CHANNELS.agentTestChannelRoutine,
+    ),
+    listChannelRoutineRuns: request<AgentIpcRequest<ListChannelRoutineRunsInput>, ChannelRoutineRun[]>()(
+      IPC_CHANNELS.agentListChannelRoutineRuns,
+    ),
   },
   agentAttachments: {
     chooseAttachments: untypedRequest(IPC_CHANNELS.agentChooseAttachments),
@@ -477,3 +535,32 @@ export type AgentRequestChannel = {
 /** The payload inside the server scope of an agent request. */
 export type InnerPayloadOf<Channel extends AgentRequestChannel> =
   PayloadOf<Channel> extends AgentIpcRequest<infer Payload> ? Payload : never;
+
+// What a typed endpoint looks like to the renderer. A server-scoped payload loses its scope, because
+// the preload adds the selected server; a scope that carries nothing takes no argument.
+type ArgsOf<Payload> = [Payload] extends [undefined]
+  ? []
+  : [Payload] extends [AgentIpcRequest<infer Inner>]
+    ? [Inner] extends [null]
+      ? []
+      : [input: Inner]
+    : [input: Payload];
+
+/**
+ * The `OpenBotDesktopApi` signature of a typed request, so a method that passes its input straight
+ * through takes its types from the endpoint instead of repeating them. An untyped endpoint is `never`.
+ */
+export type Invoke<Endpoint> =
+  Endpoint extends RequestEndpoint<string, infer Payload, infer Result>
+    ? [Payload] extends [Untyped]
+      ? never
+      : (...args: ArgsOf<Payload>) => Promise<Result>
+    : never;
+
+/** The `OpenBotDesktopApi` subscription to a typed event. It answers the unsubscribe call. */
+export type Subscribe<Endpoint> =
+  Endpoint extends EventEndpoint<string, infer Payload>
+    ? [Payload] extends [Untyped]
+      ? never
+      : (listener: [Payload] extends [undefined] ? () => void : (payload: Payload) => void) => () => void
+    : never;

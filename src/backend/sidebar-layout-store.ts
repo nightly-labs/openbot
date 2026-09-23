@@ -14,6 +14,7 @@ import {
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
 import { writeJsonFileAtomically } from "./atomic-json-file";
+import { isMissingFileError } from "./file-errors";
 
 interface StoredSidebarLayout extends SidebarLayoutSnapshot {
   version: 2;
@@ -54,7 +55,7 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
         this.#layout = { ...snapshotFromLegacyStored(parsed), agentOrder: [] };
       else throw new Error("Invalid sidebar layout state.");
     } catch (error) {
-      if (isMissingFile(error)) return;
+      if (isMissingFileError(error)) return;
       const backupPath = `${this.#path}.corrupt-${Date.now()}`;
       await rename(this.#path, backupPath).catch(() => undefined);
       this.#layout = structuredClone(DEFAULT_LAYOUT);
@@ -410,8 +411,4 @@ function snapshotFromLegacyStored(stored: LegacyStoredSidebarLayout): Omit<Sideb
     order: [...stored.order],
     agentAssignments: { ...stored.agentAssignments },
   };
-}
-
-function isMissingFile(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import type { Rectangle } from "electron";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 interface WindowSize {
   width: number;
@@ -87,7 +88,7 @@ export async function readMainWindowBounds(path: string): Promise<Rectangle | nu
       height: Math.round(parsed.height),
     };
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return null;
+    if (isMissingFileError(error) || error instanceof SyntaxError) return null;
     throw error;
   }
 }
@@ -226,8 +227,4 @@ function intersectionArea(left: Rectangle, right: Rectangle): number {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

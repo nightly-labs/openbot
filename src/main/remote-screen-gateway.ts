@@ -23,6 +23,7 @@ import {
   SunshineMoonlightRuntime,
   type SunshineMoonlightRuntimeState,
 } from "./sunshine-moonlight-runtime";
+import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const GRANT_TTL_MS = 60_000;
 export const REMOTE_DESKTOP_MAX_SESSIONS = 4;
@@ -928,17 +929,6 @@ function allowedMoonlightPath(path: string): boolean {
     return false;
   }
   return !path.startsWith("/api/") && !path.includes("..") && /^\/[A-Za-z0-9_./-]*$/.test(path);
-}
-
-function rawDataSize(data: Ws.RawData): number {
-  if (Array.isArray(data)) return data.reduce((total, chunk) => total + chunk.byteLength, 0);
-  return data.byteLength;
-}
-
-function rawDataText(data: Ws.RawData): string {
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
-  return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
 }
 
 function moonlightRuntimeUser(session: ManagedRemoteScreenSession): string {

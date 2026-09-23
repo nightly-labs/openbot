@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentProviderId,
+  DeleteHostedSiteInput,
   DynamicIslandAction,
   DynamicIslandPreference,
   DynamicIslandPresentation,
@@ -244,9 +245,9 @@ export function parseReplaceHostedSite(input: unknown): ReplaceHostedSiteInput {
   };
 }
 
-export function parseDeleteHostedSite(input: unknown): string {
+export function parseDeleteHostedSite(input: unknown): DeleteHostedSiteInput {
   if (!isObject(input)) throw new Error("Invalid site deletion.");
-  return requireString(input.siteId, "siteId", INPUT_LIMITS.identifier);
+  return { siteId: requireString(input.siteId, "siteId", INPUT_LIMITS.identifier) };
 }
 
 export function parseSubmitMarketplaceAgent(input: unknown): SubmitMarketplaceAgentInput {

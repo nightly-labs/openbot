@@ -2,14 +2,12 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   type AgentEvent,
   type AgentSummary,
-  BROWSER_SECRET_RESPONSE_PATH,
   type BrowserTakeoverRequest,
   type CreateAgentInput,
   isAgentMemory,
   isAgentModel,
   isAgentModelOption,
   isAgentProvider,
-  isAttachmentSummary,
   isAvatarHue,
   isQueuedMessageReceipt,
   isQueueSnapshot,
@@ -43,6 +41,15 @@ import {
   readAgentAnalytics,
 } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import {
+  deleteAgent,
+  discardAttachmentDraft,
+  interruptAgentTurn,
+  respondToBrowserSecret,
+  respondToBrowserTakeover,
+  type TeamApiRequest,
+  uploadAttachmentDraft,
+} from "@openbot/team-client/team-api-requests";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
@@ -306,6 +313,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       return client.request(method, path, decode, body, upload, onUploadProgress);
     },
     [],
+  );
+  /** The shared Team API requests, sent to one server. */
+  const teamApi = useCallback(
+    (serverId?: string, onUploadProgress?: (fraction: number) => void): TeamApiRequest =>
+      (method, path, decode, body, upload) =>
+        request(method, path, decode, body, serverId, upload, onUploadProgress),
+    [request],
   );
 
   const channelStore = useMemo(
@@ -735,12 +749,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       conversationStore,
       activityByServer,
       browserRequests,
-      respondToBrowserTakeover: async (serverId, input) => {
-        await request("POST", TEAM_API_ROUTES.respond.browserTakeover, ignoreResponse, input, serverId);
-      },
-      respondToBrowserSecret: async (serverId, input) => {
-        await request("POST", BROWSER_SECRET_RESPONSE_PATH, ignoreResponse, input, serverId);
-      },
+      respondToBrowserTakeover: (serverId, input) => respondToBrowserTakeover(teamApi(serverId), input),
+      respondToBrowserSecret: (serverId, input) => respondToBrowserSecret(teamApi(serverId), input),
       selectServer: (id) => {
         loadGeneration.current += 1;
         conversationStore.cancelRequests();
@@ -1008,9 +1018,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           serverId,
         );
       },
-      deleteAgent: async (agentId) => {
-        await request("DELETE", TEAM_API_ROUTES.agent.one(agentId), ignoreResponse);
-      },
+      deleteAgent: (agentId) => deleteAgent(teamApi(), agentId),
       duplicateAgent: async (agentId) => {
         await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), ignoreResponse, {
           operationId: Crypto.randomUUID(),
@@ -1059,27 +1067,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               : TEAM_API_ROUTES.agent.queueReorder;
         await request("POST", route(agentId), ignoreResponse, input, serverId);
       },
-      interruptTurn: async (agentId, turnId, serverId) => {
-        await request("POST", TEAM_API_ROUTES.agent.interrupt(agentId), ignoreResponse, { turnId }, serverId);
-      },
+      interruptTurn: (agentId, turnId, serverId) => interruptAgentTurn(teamApi(serverId), agentId, turnId),
       loadConversation,
       loadOlderMessages,
       uploadAttachment: async (agentId, input, targetServerId, onProgress) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
-        const query = new URLSearchParams({ name: input.name, mime: input.mimeType });
-        return request(
-          "POST",
-          `${TEAM_API_ROUTES.attachments}?${query}`,
-          (value) => {
-            if (!isAttachmentSummary(value)) throw new Error("The host returned an invalid attachment.");
-            return value;
-          },
-          undefined,
-          serverId,
-          input,
-          onProgress,
-        );
+        return uploadAttachmentDraft(teamApi(serverId, onProgress), input);
       },
       downloadAttachment: (serverId, attachmentId) => {
         const download = () =>
@@ -1111,7 +1105,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       discardAttachment: async (agentId, attachmentId, targetServerId) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
-        await request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), ignoreResponse, undefined, serverId);
+        await discardAttachmentDraft(teamApi(serverId), attachmentId);
       },
       sendMessage: async (agentId, text, attachmentDraftIds = [], replyToMessageId = null, targetServerId) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
@@ -1232,6 +1226,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     readRefresh,
     request,
     serverDirectoryError,
+    teamApi,
     serverDirectoryState,
     servers,
     session.host,

@@ -1100,16 +1100,16 @@ const openbotApi: OpenBotDesktopApi = {
     setEnabled: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsSetEnabled, input).then(decodeInstalledSkill),
   },
   hostedSites: {
-    list: () => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesList).then(decodeHostedSites),
-    chooseDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesChooseDirectory).then(decodeNullablePath),
-    publish: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesPublish, input).then(decodeHostedSite),
-    replace: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesReplace, input).then(decodeHostedSite),
-    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesDelete, input).then(decodeVoid),
+    list: () => invokeRequest(IPC_CHANNELS.hostedSitesList, decodeHostedSites),
+    chooseDirectory: () => invokeRequest(IPC_CHANNELS.hostedSitesChooseDirectory, decodeNullablePath),
+    publish: (input) => invokeRequest(IPC_CHANNELS.hostedSitesPublish, decodeHostedSite, input),
+    replace: (input) => invokeRequest(IPC_CHANNELS.hostedSitesReplace, decodeHostedSite, input),
+    delete: (input) => invokeRequest(IPC_CHANNELS.hostedSitesDelete, decodeVoid, input),
   },
   customProviders: {
-    list: () => ipcRenderer.invoke(IPC_CHANNELS.customProvidersList).then(decodeCustomProviders),
-    save: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersSave, input).then(decodeCustomProviderResult),
-    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersDelete, input).then(decodeCustomProviderResult),
+    list: () => invokeRequest(IPC_CHANNELS.customProvidersList, decodeCustomProviders),
+    save: (input) => invokeRequest(IPC_CHANNELS.customProvidersSave, decodeCustomProviderResult, input),
+    delete: (input) => invokeRequest(IPC_CHANNELS.customProvidersDelete, decodeCustomProviderResult, input),
   },
   marketplaceAgents: {
     list: (query) =>

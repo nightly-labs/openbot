@@ -1,6 +1,5 @@
 // Channel routines: a standing instruction that fires into the channel on a schedule.
 
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   decodeChannelRoutine,
   decodeChannelRoutineRun,
@@ -12,7 +11,8 @@ import type { AgentService } from "../../backend/agent-service";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
-  parseAgentRequest,
+  agentRequest,
+  parseChannelId,
   parseCreateChannelRoutine,
   parseDeleteChannelRoutine,
   parseListChannelRoutineRuns,
@@ -21,7 +21,6 @@ import {
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
-import { requireString } from "./validation";
 
 interface ChannelRoutineIpcDependencies {
   service: AgentService;
@@ -34,8 +33,8 @@ export function channelRoutineIpcHandlers({
 }: ChannelRoutineIpcDependencies): Pick<IpcGroupHandlers, "channelRoutines"> {
   return {
     channelRoutines: {
-      listChannelRoutines: payloadHandler(parseAgentRequest, (scoped) => {
-        const channelId = requireString(scoped.payload, "channelId", INPUT_LIMITS.identifier);
+      listChannelRoutines: payloadHandler(agentRequest(parseChannelId), (scoped) => {
+        const channelId = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.listChannelRoutines(channelId),
           remote: (serverId) =>
@@ -45,8 +44,8 @@ export function channelRoutineIpcHandlers({
             }),
         });
       }),
-      createChannelRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseCreateChannelRoutine(scoped.payload);
+      createChannelRoutine: payloadHandler(agentRequest(parseCreateChannelRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.createChannelRoutine(parsed),
           remote: (serverId) =>
@@ -56,8 +55,8 @@ export function channelRoutineIpcHandlers({
             }),
         });
       }),
-      updateChannelRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseUpdateChannelRoutine(scoped.payload);
+      updateChannelRoutine: payloadHandler(agentRequest(parseUpdateChannelRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.updateChannelRoutine(parsed),
           remote: (serverId) =>
@@ -67,8 +66,8 @@ export function channelRoutineIpcHandlers({
             }),
         });
       }),
-      deleteChannelRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseDeleteChannelRoutine(scoped.payload);
+      deleteChannelRoutine: payloadHandler(agentRequest(parseDeleteChannelRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.deleteChannelRoutine(parsed),
           remote: (serverId) =>
@@ -78,8 +77,8 @@ export function channelRoutineIpcHandlers({
             }),
         });
       }),
-      testChannelRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseTestChannelRoutine(scoped.payload);
+      testChannelRoutine: payloadHandler(agentRequest(parseTestChannelRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.testChannelRoutine(parsed),
           remote: (serverId) =>
@@ -89,8 +88,8 @@ export function channelRoutineIpcHandlers({
             }),
         });
       }),
-      listChannelRoutineRuns: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseListChannelRoutineRuns(scoped.payload);
+      listChannelRoutineRuns: payloadHandler(agentRequest(parseListChannelRoutineRuns), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.listChannelRoutineRuns(parsed),
           remote: (serverId) =>

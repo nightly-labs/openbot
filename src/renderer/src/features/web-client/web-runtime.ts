@@ -30,12 +30,10 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import {
-  BROWSER_SECRET_RESPONSE_PATH,
   isAccountUsage,
   isAgentModelOption,
   isAgentStatus,
   isAgentSummary,
-  isAttachmentSummary,
   isConversationMessage,
   isConversationSnapshot,
   isQueuedMessageReceipt,
@@ -59,6 +57,14 @@ import {
   type RemoteFileUpload,
   type RemoteTeamConnectionUpdate,
 } from "@openbot/team-client/remote-peer";
+import {
+  deleteAgent,
+  discardAttachmentDraft,
+  interruptAgentTurn,
+  respondToBrowserSecret,
+  respondToBrowserTakeover,
+  uploadAttachmentDraft,
+} from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { acquireWebHostLock } from "./web-host-lock";
 
@@ -187,7 +193,7 @@ export function createWebWorkspaceRuntime(
         return;
       }
       try {
-        await request("DELETE", TEAM_API_ROUTES.attachment(id));
+        await discardAttachmentDraft(teamApi, id);
         ids.delete(id);
         if (!ids.size) completedDraftIdsByHost.delete(hostId);
       } catch {
@@ -206,6 +212,17 @@ export function createWebWorkspaceRuntime(
     if (!result.ok || (result.status ?? 500) >= 400)
       throw new Error("The host could not complete this request. Refresh before trying again.");
     return result.body;
+  }
+  // The shared Team API requests decode their own responses. A declaration, like `request`, so the
+  // draft cleanup above can reach it.
+  async function teamApi<T>(
+    method: string,
+    path: string,
+    decode: (value: unknown) => T,
+    body?: TeamProtocolV2Json,
+    upload?: RemoteFileUpload,
+  ): Promise<T> {
+    return decode(await request(method, path, body, upload));
   }
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
@@ -291,12 +308,8 @@ export function createWebWorkspaceRuntime(
       if (!isSidebarLayoutSnapshot(value)) throw new Error("The host returned an invalid sidebar layout.");
       return value;
     },
-    async respondToBrowserSecret(input) {
-      await request("POST", BROWSER_SECRET_RESPONSE_PATH, { ...input });
-    },
-    async respondToTakeover(input) {
-      await request("POST", TEAM_API_ROUTES.respond.browserTakeover, { ...input });
-    },
+    respondToBrowserSecret: (input) => respondToBrowserSecret(teamApi, input),
+    respondToTakeover: (input) => respondToBrowserTakeover(teamApi, input),
     listHosts: () => directory.listHosts(),
     async previewInvite(url) {
       const value = await directory.previewInvite(url);
@@ -426,9 +439,7 @@ export function createWebWorkspaceRuntime(
         throw new Error("Message delivery is not confirmed. Refresh before sending it again.");
       removeCompletedDrafts(attachmentDraftIds);
     },
-    async stop(id, turnId) {
-      await request("POST", TEAM_API_ROUTES.agent.interrupt(id), { turnId });
-    },
+    stop: (id, turnId) => interruptAgentTurn(teamApi, id, turnId),
     async approve(input) {
       await request("POST", TEAM_API_ROUTES.respond.approval, { ...input });
     },
@@ -452,16 +463,9 @@ export function createWebWorkspaceRuntime(
       let binary = "";
       for (const byte of bytes) binary += String.fromCharCode(byte);
       const mimeType = file.type || "application/octet-stream";
-      const query = new URLSearchParams({ name: file.name, mime: mimeType });
-      const value = await request(
-        "POST",
-        `${TEAM_API_ROUTES.attachments}?${query}`,
-        {},
-        { name: file.name, mimeType, base64: btoa(binary) },
-      );
-      if (!isAttachmentSummary(value)) throw new Error("The host returned an invalid attachment.");
+      const value = await uploadAttachmentDraft(teamApi, { name: file.name, mimeType, base64: btoa(binary) });
       if (currentUpload !== uploadGeneration) {
-        if (uploadHostGeneration === generation) await request("DELETE", TEAM_API_ROUTES.attachment(value.id));
+        if (uploadHostGeneration === generation) await discardAttachmentDraft(teamApi, value.id);
         throw new Error("The attachment upload was cancelled.");
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
@@ -472,7 +476,7 @@ export function createWebWorkspaceRuntime(
       await peer.cancelUpload();
     },
     async discard(id) {
-      await request("DELETE", TEAM_API_ROUTES.attachment(id));
+      await discardAttachmentDraft(teamApi, id);
       removeCompletedDrafts([id]);
     },
     async download(id) {
@@ -522,7 +526,7 @@ export function createWebWorkspaceRuntime(
     },
     async deleteAgent(agentId) {
       if (connectedHostRole === "member") throw new Error("Members cannot delete agents.");
-      await request("DELETE", TEAM_API_ROUTES.agent.one(agentId));
+      await deleteAgent(teamApi, agentId);
     },
     async search(agentId, query, cursor) {
       const params = new URLSearchParams({ botId: agentId, q: query, limit: "50", ...(cursor ? { cursor } : {}) });

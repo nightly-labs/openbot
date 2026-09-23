@@ -3,12 +3,6 @@ import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics"
 import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
 import type {
-  AgentMemory,
-  CreateAgentMemoryInput,
-  DeleteAgentMemoryInput,
-  UpdateAgentMemoryInput,
-} from "./ipc-agent-memories";
-import type {
   AgentProfileDraft,
   GenerateAgentProfileInput,
   SaveAgentProfileInput,
@@ -30,7 +24,6 @@ import type {
   ComputerUseHighlightPlacement,
   ComputerUsePermissionApp,
   ComputerUseState,
-  ExportResult,
   ExternalDestination,
   MacPermissionId,
   ProviderRuntimeSnapshot,
@@ -69,21 +62,6 @@ import type {
   BrowserVisibilityInput,
 } from "./ipc-browser";
 import type { RespondToBrowserSecretInput } from "./ipc-browser-secret";
-import type {
-  ChannelMemory,
-  CreateChannelMemoryInput,
-  DeleteChannelMemoryInput,
-  UpdateChannelMemoryInput,
-} from "./ipc-channel-memories";
-import type {
-  ChannelRoutine,
-  ChannelRoutineRun,
-  CreateChannelRoutineInput,
-  DeleteChannelRoutineInput,
-  ListChannelRoutineRunsInput,
-  TestChannelRoutineInput,
-  UpdateChannelRoutineInput,
-} from "./ipc-channel-routines";
 import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
 import type {
   ConversationPage,
@@ -98,12 +76,6 @@ import type {
   SetMessageReactionInput,
 } from "./ipc-conversations";
 import type {
-  CustomProviderResult,
-  CustomProviderSummary,
-  DeleteCustomProviderInput,
-  SaveCustomProviderInput,
-} from "./ipc-custom-providers";
-import type {
   DynamicIslandAction,
   DynamicIslandGeometry,
   DynamicIslandPreference,
@@ -111,13 +83,8 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
+import type { Invoke, IPC_ENDPOINTS, Subscribe } from "./ipc-endpoints";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
-import type {
-  DeleteHostedSiteInput,
-  HostedSiteSummary,
-  PublishHostedSiteInput,
-  ReplaceHostedSiteInput,
-} from "./ipc-hosted-sites";
 import type {
   AgentPublicationPreview,
   AgentSubmission,
@@ -153,16 +120,6 @@ import type {
   RemoteDesktopTestInput,
   RemoteDesktopTestStatus,
 } from "./ipc-remote-desktop-setup";
-import type {
-  CreateRoutineInput,
-  DeleteRoutineInput,
-  ListRoutineRunsInput,
-  Routine,
-  RoutineRun,
-  TestRoutineInput,
-  UpdateRoutineInput,
-} from "./ipc-routines";
-import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import type {
   CreateLocalSkillInput,
@@ -222,7 +179,6 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
-import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
 import type { QueueEditRequest } from "./team-protocol/queue-edit-v1";
 
 export interface AgentDesktopApi {
@@ -246,34 +202,34 @@ export interface AgentDesktopApi {
   updateAgent: (input: UpdateAgentInput) => Promise<AgentSummary>;
   setAvatar: (input: SetAgentAvatarInput) => Promise<AgentSummary>;
   deleteAgent: (agentId: string) => Promise<void>;
-  listMemories: (agentId: string) => Promise<AgentMemory[]>;
-  createMemory: (input: CreateAgentMemoryInput) => Promise<AgentMemory>;
-  updateMemory: (input: UpdateAgentMemoryInput) => Promise<AgentMemory>;
-  deleteMemory: (input: DeleteAgentMemoryInput) => Promise<void>;
-  clearMemories: (agentId: string) => Promise<void>;
+  listMemories: Invoke<typeof IPC_ENDPOINTS.agentMemories.listMemories>;
+  createMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.createMemory>;
+  updateMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.updateMemory>;
+  deleteMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.deleteMemory>;
+  clearMemories: Invoke<typeof IPC_ENDPOINTS.agentMemories.clearMemories>;
   /**
    * Shared tables are not scoped to an agent: there is no `agentId` on either call. The list is
    * every table in the one shared database, and the user's delete is not owner-gated.
    */
-  listTables: () => Promise<SharedTable[]>;
-  deleteTable: (input: DeleteSharedTableInput) => Promise<void>;
-  listRoutines: (agentId: string) => Promise<Routine[]>;
-  createRoutine: (input: CreateRoutineInput) => Promise<Routine>;
-  updateRoutine: (input: UpdateRoutineInput) => Promise<Routine>;
-  deleteRoutine: (input: DeleteRoutineInput) => Promise<void>;
-  testRoutine: (input: TestRoutineInput) => Promise<RoutineRun>;
-  listRoutineRuns: (input: ListRoutineRunsInput) => Promise<RoutineRun[]>;
-  listChannelMemories: (channelId: string) => Promise<ChannelMemory[]>;
-  createChannelMemory: (input: CreateChannelMemoryInput) => Promise<ChannelMemory>;
-  updateChannelMemory: (input: UpdateChannelMemoryInput) => Promise<ChannelMemory>;
-  deleteChannelMemory: (input: DeleteChannelMemoryInput) => Promise<void>;
-  clearChannelMemories: (channelId: string) => Promise<void>;
-  listChannelRoutines: (channelId: string) => Promise<ChannelRoutine[]>;
-  createChannelRoutine: (input: CreateChannelRoutineInput) => Promise<ChannelRoutine>;
-  updateChannelRoutine: (input: UpdateChannelRoutineInput) => Promise<ChannelRoutine>;
-  deleteChannelRoutine: (input: DeleteChannelRoutineInput) => Promise<void>;
-  testChannelRoutine: (input: TestChannelRoutineInput) => Promise<ChannelRoutineRun>;
-  listChannelRoutineRuns: (input: ListChannelRoutineRunsInput) => Promise<ChannelRoutineRun[]>;
+  listTables: Invoke<typeof IPC_ENDPOINTS.sharedTables.listTables>;
+  deleteTable: Invoke<typeof IPC_ENDPOINTS.sharedTables.deleteTable>;
+  listRoutines: Invoke<typeof IPC_ENDPOINTS.agentRoutines.listRoutines>;
+  createRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.createRoutine>;
+  updateRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.updateRoutine>;
+  deleteRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.deleteRoutine>;
+  testRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.testRoutine>;
+  listRoutineRuns: Invoke<typeof IPC_ENDPOINTS.agentRoutines.listRoutineRuns>;
+  listChannelMemories: Invoke<typeof IPC_ENDPOINTS.channelMemories.listChannelMemories>;
+  createChannelMemory: Invoke<typeof IPC_ENDPOINTS.channelMemories.createChannelMemory>;
+  updateChannelMemory: Invoke<typeof IPC_ENDPOINTS.channelMemories.updateChannelMemory>;
+  deleteChannelMemory: Invoke<typeof IPC_ENDPOINTS.channelMemories.deleteChannelMemory>;
+  clearChannelMemories: Invoke<typeof IPC_ENDPOINTS.channelMemories.clearChannelMemories>;
+  listChannelRoutines: Invoke<typeof IPC_ENDPOINTS.channelRoutines.listChannelRoutines>;
+  createChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.createChannelRoutine>;
+  updateChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.updateChannelRoutine>;
+  deleteChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.deleteChannelRoutine>;
+  testChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.testChannelRoutine>;
+  listChannelRoutineRuns: Invoke<typeof IPC_ENDPOINTS.channelRoutines.listChannelRoutineRuns>;
   // Every MCP method names its server, because the settings modal can be open for a server the user
   // has not switched to. Each mutation answers with the whole list, so the panel never merges.
   listMcpServers: (serverId: string) => Promise<McpServerConfig[]>;
@@ -416,8 +372,8 @@ export interface ProviderRuntimesDesktopApi {
 }
 
 export interface MaintenanceDesktopApi {
-  exportData: () => Promise<ExportResult>;
-  exportDiagnostics: () => Promise<ExportResult>;
+  exportData: Invoke<typeof IPC_ENDPOINTS.maintenance.exportData>;
+  exportDiagnostics: Invoke<typeof IPC_ENDPOINTS.maintenance.exportDiagnostics>;
 }
 
 export interface DynamicIslandDesktopApi {
@@ -474,8 +430,8 @@ export interface ServersDesktopApi {
  * and a link that carried the listing itself would let the address bar describe what gets installed.
  */
 export interface PluginsDesktopApi {
-  takePendingListing: () => Promise<string | null>;
-  onOpenListing: (listener: (slug: string) => void) => () => void;
+  takePendingListing: Invoke<typeof IPC_ENDPOINTS.plugins.takePendingListing>;
+  onOpenListing: Subscribe<typeof IPC_ENDPOINTS.plugins.openListing>;
 }
 
 export interface HostDesktopApi {
@@ -517,10 +473,10 @@ export interface RemoteDesktopDesktopApi {
 }
 
 export interface VoiceDesktopApi {
-  getModelStatus: () => Promise<VoiceModelStatus>;
-  prepareModel: () => Promise<VoiceModelStatus>;
-  transcribe: (input: VoiceTranscriptionInput) => Promise<VoiceTranscriptionResult>;
-  onModelStatus: (listener: (status: VoiceModelStatus) => void) => () => void;
+  getModelStatus: Invoke<typeof IPC_ENDPOINTS.voice.getModelStatus>;
+  prepareModel: Invoke<typeof IPC_ENDPOINTS.voice.prepareModel>;
+  transcribe: Invoke<typeof IPC_ENDPOINTS.voice.transcribe>;
+  onModelStatus: Subscribe<typeof IPC_ENDPOINTS.voice.modelStatus>;
 }
 
 export interface SkillsDesktopApi {
@@ -542,11 +498,11 @@ export interface SkillsDesktopApi {
 }
 
 export interface HostedSitesDesktopApi {
-  list: () => Promise<HostedSiteSummary[]>;
-  chooseDirectory: () => Promise<string | null>;
-  publish: (input: PublishHostedSiteInput) => Promise<HostedSiteSummary>;
-  replace: (input: ReplaceHostedSiteInput) => Promise<HostedSiteSummary>;
-  delete: (input: DeleteHostedSiteInput) => Promise<void>;
+  list: Invoke<typeof IPC_ENDPOINTS.hostedSites.list>;
+  chooseDirectory: Invoke<typeof IPC_ENDPOINTS.hostedSites.chooseDirectory>;
+  publish: Invoke<typeof IPC_ENDPOINTS.hostedSites.publish>;
+  replace: Invoke<typeof IPC_ENDPOINTS.hostedSites.replace>;
+  delete: Invoke<typeof IPC_ENDPOINTS.hostedSites.delete>;
 }
 
 /**
@@ -555,9 +511,9 @@ export interface HostedSitesDesktopApi {
  * whether the models are on their way.
  */
 export interface CustomProvidersDesktopApi {
-  list: () => Promise<CustomProviderSummary[]>;
-  save: (input: SaveCustomProviderInput) => Promise<CustomProviderResult>;
-  delete: (input: DeleteCustomProviderInput) => Promise<CustomProviderResult>;
+  list: Invoke<typeof IPC_ENDPOINTS.customProviders.list>;
+  save: Invoke<typeof IPC_ENDPOINTS.customProviders.save>;
+  delete: Invoke<typeof IPC_ENDPOINTS.customProviders.delete>;
 }
 
 /**

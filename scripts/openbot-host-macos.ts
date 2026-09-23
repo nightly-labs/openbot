@@ -4,9 +4,9 @@ import { chmod, chown, lstat, mkdir, open, readdir, rm, unlink, writeFile } from
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
+import { isMissingFileError } from "../src/backend/file-errors";
 import {
   hostStateSchema,
-  isMissingFile,
   HOST_MANAGER_DIRECTORY as ROOT,
   readHostConfig,
   readOwnedJson,
@@ -226,7 +226,7 @@ export function macHostAdminOperations(): HostAdminOperations {
         try {
           await lstat(`/Users/${name}`);
         } catch (error) {
-          if (isMissingFile(error)) continue;
+          if (isMissingFileError(error)) continue;
           throw error;
         }
         throw new Error("Requested home already exists.");
@@ -304,7 +304,7 @@ export function macHostAdminOperations(): HostAdminOperations {
         await verifyHostDirectory(ROOT);
         return await readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema);
       } catch (error) {
-        if (isMissingFile(error)) return null;
+        if (isMissingFileError(error)) return null;
         throw error;
       }
     },
