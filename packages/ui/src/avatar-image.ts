@@ -24,7 +24,7 @@ export async function normalizeAvatarFile(file: File): Promise<AvatarImageInput>
       const blob = source
         ? await renderAvatar(source, source.width, source.height, outputSize, quality)
         : await renderAnimatedAvatar(bytes, outputSize, quality);
-      if (blob.size <= AVATAR_IMAGE_LIMITS.storedBytes) {
+      if (blob && blob.size <= AVATAR_IMAGE_LIMITS.storedBytes) {
         return {
           mimeType: "image/webp",
           bytes: new Uint8Array(await blob.arrayBuffer()),
@@ -43,17 +43,25 @@ function isAnimatedWebp(bytes: Uint8Array): boolean {
   return header.startsWith("RIFF") && header.endsWith("WEBPVP8X") && ((bytes[20] ?? 0) & 0x02) !== 0;
 }
 
-/** Resizes each frame on its own, because a canvas keeps only the first frame of an animation. */
-async function renderAnimatedAvatar(bytes: Uint8Array, outputSize: number, quality: number): Promise<Blob> {
+/**
+ * Resizes each frame on its own, because a canvas keeps only the first frame of an animation.
+ * Returns null as soon as the frames pass the stored size limit, so a large file does not encode
+ * every frame again for each output size.
+ */
+async function renderAnimatedAvatar(bytes: Uint8Array, outputSize: number, quality: number): Promise<Blob | null> {
   const decoder = new ImageDecoder({ data: bytes, type: "image/webp" });
   try {
     await decoder.tracks.ready;
     const frames: AnimationFrame[] = [];
+    let frameBytes = 0;
     for (let frameIndex = 0; frameIndex < (decoder.tracks.selectedTrack?.frameCount ?? 0); frameIndex++) {
       const { image } = await decoder.decode({ frameIndex });
       try {
         const still = await renderAvatar(image, image.displayWidth, image.displayHeight, outputSize, quality);
-        frames.push({ data: await frameData(still), durationMs: Math.round((image.duration ?? 0) / 1000) });
+        const data = await frameData(still);
+        frameBytes += data.size;
+        if (frameBytes > AVATAR_IMAGE_LIMITS.storedBytes) return null;
+        frames.push({ data, durationMs: Math.round((image.duration ?? 0) / 1000) });
       } finally {
         image.close();
       }

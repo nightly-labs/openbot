@@ -50,6 +50,39 @@ describe("normalizeAvatarFile", () => {
     // A frame that holds an ICCP chunk makes the whole file invalid.
     expect(text).not.toContain("ICCP");
   });
+
+  it("stops encoding frames once an animated WebP passes the stored size limit", async () => {
+    const decode = vi.fn(async () => ({
+      image: { displayWidth: 96, displayHeight: 64, duration: 200_000, close: vi.fn() },
+    }));
+    vi.stubGlobal(
+      "ImageDecoder",
+      class {
+        tracks = { ready: Promise.resolve(), selectedTrack: { frameCount: 100 } };
+        close = vi.fn();
+        decode = decode;
+      },
+    );
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => ({ drawImage: vi.fn() })),
+    });
+    // A 300 KB frame: two of them pass the 512 KB limit.
+    const largeFrame = new Uint8Array(12 + 8 + 300 * 1024);
+    largeFrame.set(CANVAS_STILL_WEBP.subarray(0, 12));
+    largeFrame.set([0x56, 0x50, 0x38, 0x20], 12);
+    new DataView(largeFrame.buffer).setUint32(16, 300 * 1024, true);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+      callback(new Blob([largeFrame], { type: "image/webp" }));
+    });
+
+    await expect(normalizeAvatarFile(new File([ANIMATED_WEBP], "avatar.webp", { type: "image/webp" }))).rejects.toThrow(
+      "OpenBot could not make this image small enough. Choose a simpler image.",
+    );
+    // Two frames for each of the four output sizes, not all 100 frames four times.
+    expect(decode).toHaveBeenCalledTimes(8);
+  });
 });
 
 function base64Bytes(value: string): Uint8Array<ArrayBuffer> {
