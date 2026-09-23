@@ -88,6 +88,7 @@ import { loadAvatarFile } from "./agent/avatar-file";
 import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import { ContextCompaction } from "./agent/context-compaction";
+import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import { CustomEndpoints } from "./agent/custom-endpoints";
 import { handleDataTool } from "./agent/data-tools";
@@ -126,8 +127,7 @@ import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
-import { type ConversationMarkerExclusions, ConversationReadStore } from "./conversation-read-store";
-import { mergeConversationSnapshots } from "./conversation-snapshots";
+import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { MailboxStore } from "./mailbox-store";
 import { McpServerStore } from "./mcp-server-store";
 import { type AppServerRequest, type DynamicToolCallParams, decodeRecordResponse, isRecord } from "./protocol";
@@ -217,7 +217,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
   readonly #browser: AgentBrowserHost;
-  readonly #conversationReads: ConversationReadStore;
+  readonly #reader: ConversationReader;
   readonly #memories: AgentMemories;
   readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
@@ -300,7 +300,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#mailbox = mailbox;
     this.#browser = browser;
-    this.#conversationReads = new ConversationReadStore(store.database);
     this.#prepareAgentWorkspace = prepareAgentWorkspace;
     this.#conversation = new ConversationRuntime(
       store,
@@ -492,6 +491,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         // Read late: `channels` is built after this.
         queueHold: (agentId) => this.channels.queueHold(agentId),
+      },
+    });
+    this.#reader = new ConversationReader({
+      store,
+      conversation: this.#conversation,
+      mailboxSync: this.#mailboxSync,
+      hooks: {
+        emit: (event) => this.#emit(event),
+        listAgents: () => this.listAgents(),
       },
     });
     this.#attachments = new AttachmentGateway({
@@ -1428,77 +1436,50 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#providers.markStopped();
   }
 
-  async readConversation(agentId: string): Promise<ConversationSnapshot> {
-    const agent = await this.#store.getOrCreate(agentId);
-    const persisted = this.#store.database.readConversation(agentId, agent.threadId);
-    const live = this.#conversation.snapshot(agentId);
-    const snapshot = live?.activeTurnId ? mergeConversationSnapshots(persisted, live) : persisted;
-    this.#mailboxSync.syncMailboxMessages(snapshot);
-    this.#conversation.setSnapshot(agentId, snapshot);
-    return structuredClone(snapshot);
+  readConversation(agentId: string): Promise<ConversationSnapshot> {
+    return this.#reader.read(agentId);
   }
 
-  async readConversationFor(agentId: string, memberId: string): Promise<ConversationWithReadState> {
-    const snapshot = await this.readConversation(agentId);
-    return {
-      ...snapshot,
-      readState: this.#conversationReads.readState(memberId, snapshot),
-    };
+  readConversationFor(agentId: string, memberId: string): Promise<ConversationWithReadState> {
+    return this.#reader.readFor(agentId, memberId);
   }
 
-  async readConversationPageFor(
+  readConversationPageFor(
     agentId: string,
     memberId: string,
-    anchor: ConversationPageAnchor = { type: "latest" },
-    limit = 50,
-    options: ConversationMarkerExclusions = {},
+    anchor?: ConversationPageAnchor,
+    limit?: number,
+    options?: ConversationMarkerExclusions,
   ): Promise<ConversationPage> {
-    const agent = await this.#store.getOrCreate(agentId);
-    this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
-    const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
-    return {
-      ...page,
-      readState: this.#conversationReads.readStateForThread(memberId, agent.threadId, options),
-    };
+    return this.#reader.readPageFor(agentId, memberId, anchor, limit, options);
   }
 
-  searchConversationMessages(query: string, agentId?: string, cursor?: string, limit = 100): ConversationSearchPage {
-    return this.#store.database.searchConversationMessages(query, agentId, cursor, limit);
+  searchConversationMessages(query: string, agentId?: string, cursor?: string, limit?: number): ConversationSearchPage {
+    return this.#reader.search(query, agentId, cursor, limit);
   }
 
   listConversationReads(
     memberId: string,
-    options: ConversationMarkerExclusions = {},
+    options?: ConversationMarkerExclusions,
   ): Record<string, ConversationReadState> {
-    return this.#conversationReads.listStates(memberId, this.listAgents(), options);
+    return this.#reader.listReads(memberId, options);
   }
 
   adoptConversationReads(sourceMemberId: string, targetMemberId: string): void {
-    this.#conversationReads.adoptMemberState(sourceMemberId, targetMemberId);
+    this.#reader.adoptReads(sourceMemberId, targetMemberId);
   }
 
-  async markConversationRead(
+  markConversationRead(
     agentId: string,
     memberId: string,
     throughMessageId: string | null,
-    options: ConversationMarkerExclusions = {},
+    options?: ConversationMarkerExclusions,
   ): Promise<ConversationReadState> {
-    const snapshot = await this.readConversation(agentId);
-    const previous = this.#conversationReads.readState(memberId, snapshot).throughMessageId;
-    const state = this.#conversationReads.markRead(memberId, snapshot, throughMessageId, options);
-    if (this.#conversationReads.readState(memberId, snapshot).throughMessageId !== previous) {
-      // Read cursors are shared by a member's devices, not by every team member.
-      // Invalidate without broadcasting a reader's cursor; each client reloads its own state.
-      this.#emit({ type: "conversation-invalidated", agentId, revision: snapshot.revision });
-    }
-    return state;
+    return this.#reader.markRead(agentId, memberId, throughMessageId, options);
   }
 
-  async markConversationUnread(agentId: string, memberId: string): Promise<ConversationReadState> {
-    const snapshot = await this.readConversation(agentId);
-    const state = this.#conversationReads.markUnread(memberId, snapshot);
-    this.#emit({ type: "conversation-invalidated", agentId, revision: snapshot.revision });
-    return state;
+  markConversationUnread(agentId: string, memberId: string): Promise<ConversationReadState> {
+    return this.#reader.markUnread(agentId, memberId);
   }
 
   prepareAttachments(paths: string[]): Promise<DraftAttachment[]> {
