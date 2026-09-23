@@ -26,7 +26,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function runtimeHarness() {
+function runtimeHarness(owners?: Parameters<typeof createProviderRuntimeStore>[1]) {
   let snapshot: ProviderRuntimeSnapshot = {
     revision: 1,
     providers: {
@@ -62,7 +62,7 @@ function runtimeHarness() {
   const onOpenChange = vi.fn();
   let store: ReturnType<typeof createProviderRuntimeStore> | undefined;
   render(() => {
-    const runtimes = createProviderRuntimeStore(api);
+    const runtimes = createProviderRuntimeStore(api, owners);
     store = runtimes;
     return (
       <>
@@ -142,5 +142,15 @@ it("checks for a newer version when none is offered, and offers what the check f
   await store.startProviderUpdate("claude");
   expect(await screen.findByText("Claude update available")).toBeInTheDocument();
   expect(screen.getByText("v2.1.250 → v2.1.260")).toBeInTheDocument();
+  expect(api.download).not.toHaveBeenCalled();
+});
+
+it("checks rather than downloads for a CLI the user installed that is already on the latest version", async () => {
+  const { store, api, emit } = runtimeHarness({ systemCliVersion: () => "2.1.250" });
+  await waitFor(() => expect(store.providerAvailableVersions().claude).toBe("2.1.250"));
+  emit({ version: null });
+  dismissProviderUpdateToast("claude");
+  await store.startProviderUpdate("claude");
+  expect(api.checkForUpdates).toHaveBeenCalled();
   expect(api.download).not.toHaveBeenCalled();
 });

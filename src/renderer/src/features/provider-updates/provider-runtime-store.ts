@@ -84,7 +84,12 @@ export function createProviderRuntimeStore(
   function runProviderUpdate(provider: AgentProviderId): Promise<void> {
     if (!isLocalServer()) return Promise.reject(new Error("Provider CLI updates run on the computer that hosts them."));
     const update = providerUpdate(provider);
-    if (update.runtime.phase === "ready" && !providerUpdateAvailable(update.runtime, update.availableVersion)) {
+    // A CLI the user installed is not downloaded, but it has a version, and the row offers it the
+    // same check as a managed runtime. Only a newer version is a reason to download.
+    const installed =
+      update.runtime.phase === "ready" ||
+      (update.runtime.phase === "not-downloaded" && update.runtime.version !== null);
+    if (installed && !providerUpdateAvailable(update.runtime, update.availableVersion)) {
       return checkProviderUpdates(provider);
     }
     return downloadProviderRuntime(provider);
