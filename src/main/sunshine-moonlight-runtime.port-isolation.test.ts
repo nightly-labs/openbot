@@ -77,10 +77,10 @@ async function readBody(request: IncomingMessage): Promise<string> {
 }
 
 class FakeChild extends ChildProcess {
-  exitCode: number | null = null;
-  killed = false;
-  stdout = new PassThrough();
-  stderr = new PassThrough();
+  override exitCode: number | null = null;
+  override killed = false;
+  override stdout = new PassThrough();
+  override stderr = new PassThrough();
   readonly #onKill: () => void;
 
   constructor(onKill: () => void = () => undefined) {
@@ -88,7 +88,7 @@ class FakeChild extends ChildProcess {
     this.#onKill = onKill;
   }
 
-  kill(): boolean {
+  override kill(): boolean {
     if (this.exitCode !== null) return false;
     this.killed = true;
     this.exitCode = 0;
