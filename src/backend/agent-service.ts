@@ -1408,7 +1408,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agent.reasoningEffort,
       );
     }
-    // Re-resume before the next turn so App Server receives the updated standing instructions. The
+    // Re-resume before the next turn so the provider receives the updated standing instructions.
+    // Codex keeps the ones a loaded session started with, so `ThreadLifecycle.ensureThread` replaces
+    // that session instead - see `toolFingerprint`. The
     // agent chat is not the only session that holds them: a channel turn runs on a session of its
     // own, and it is written from the same profile.
     if (profileChanged) this.#conversation.unloadAgentThreads(agent.id);

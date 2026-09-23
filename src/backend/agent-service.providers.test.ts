@@ -119,7 +119,7 @@ describe.sequential("AgentService: providers", () => {
     expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
   });
 
-  it("resumes a channel session after the profile or the memories of the agent change", async () => {
+  it("carries a change to the profile or the memories of the agent to its channel session", async () => {
     const {
       service: agentService,
       client,
@@ -185,9 +185,18 @@ describe.sequential("AgentService: providers", () => {
     await ask("second", "Continue the shared work.", 2);
     expect(lastChannelResume()).toContain("The user prefers concise status updates.");
 
+    // Codex keeps the developer instructions a loaded session started with, so a profile edit
+    // replaces the session instead of resuming it. The old one is closed in the client.
+    const channelSessionNow = () =>
+      store.database.activeProviderSession(execution.threadId, "codex")?.externalSessionId;
+    const lastStart = (): string =>
+      JSON.stringify(client.requests.filter((request) => request.method === "thread/start").at(-1)?.params ?? "");
     await service.updateAgent({ agentId: "chief", description: "Owns the quarterly report." });
     await ask("third", "Report on the shared work.", 3);
-    expect(lastChannelResume()).toContain("Owns the quarterly report.");
+    const editedSession = channelSessionNow();
+    expect(editedSession).not.toBe(channelSession);
+    expect(client.releasedThreads).toContain(channelSession);
+    expect(lastStart()).toContain("Owns the quarterly report.");
 
     // The profile dialog saves through a second path, which holds the same standing instructions.
     const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
@@ -208,7 +217,8 @@ describe.sequential("AgentService: providers", () => {
       sidebar,
     );
     await ask("fourth", "Review the shared work.", 4);
-    expect(lastChannelResume()).toContain("Runs the weekly review.");
+    expect(channelSessionNow()).not.toBe(editedSession);
+    expect(lastStart()).toContain("Runs the weekly review.");
   });
 
   it("keeps an agent with active channel work from being deleted", async () => {

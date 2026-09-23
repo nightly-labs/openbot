@@ -676,10 +676,12 @@ fi
   it("restarts an inactive session when resumed with updated memory instructions", async () => {
     root = await mkdtemp(join(tmpdir(), "openbot-claude-memory-resume-"));
     const instructions: string[] = [];
-    const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.231" }, (params) => {
+    const snapshots: unknown[] = [];
+    const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.280" }, (params) => {
       const options: DynamicRecord | null = isDynamicRecord(params.options) ? params.options : null;
       const systemPrompt = options?.systemPrompt;
       if (isDynamicRecord(systemPrompt) && isString(systemPrompt.append)) instructions.push(systemPrompt.append);
+      snapshots.push(options?.extraArgs);
       return new TestQuery(new TestQueue<TestStreamMessage>());
     });
     client.start();
@@ -704,6 +706,9 @@ fi
       "<agent_memories>[]</agent_memories>",
       '<agent_memories>[{"text":"Uses metric units."}]</agent_memories>',
     ]);
+    // A CLI that records the first prompt would send it again on resume and drop the new text.
+    const off = { "system-prompt-snapshot": "off" };
+    expect(snapshots).toEqual([off, off]);
     await client.stop();
   });
 
