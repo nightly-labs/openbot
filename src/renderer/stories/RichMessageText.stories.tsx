@@ -73,6 +73,17 @@ const fileTypeAttachments: AttachmentSummary[] = fileTypeInputs.map(
   }),
 );
 
+function requireAttachment(items: readonly AttachmentSummary[], index: number): AttachmentSummary {
+  const attachment = items[index];
+  if (!attachment) throw new Error(`Story attachment ${index} is missing.`);
+  return attachment;
+}
+
+const firstStoryAttachment = requireAttachment(STORY_ATTACHMENTS, 0);
+const secondStoryAttachment = requireAttachment(STORY_ATTACHMENTS, 1);
+const secondFileTypeAttachment = requireAttachment(fileTypeAttachments, 1);
+const fourthFileTypeAttachment = requireAttachment(fileTypeAttachments, 3);
+
 const meta = {
   title: "Conversation/RichMessageText",
   component: RichMessageText,
@@ -171,29 +182,29 @@ export const PlainText: Story = {
 
 export const InlineFileReferences: Story = {
   args: {
-    body: `Review ${serializeAttachmentReference(STORY_ATTACHMENTS[0].name, STORY_ATTACHMENTS[0].id)} and keep the implementation aligned with ${serializeAttachmentReference(STORY_ATTACHMENTS[1].name, STORY_ATTACHMENTS[1].id)}.`,
+    body: `Review ${serializeAttachmentReference(firstStoryAttachment.name, firstStoryAttachment.id)} and keep the implementation aligned with ${serializeAttachmentReference(secondStoryAttachment.name, secondStoryAttachment.id)}.`,
     attachments: STORY_ATTACHMENTS,
     onOpenAttachment: fn(),
   },
   play: async ({ args: storyArgs, canvas, userEvent }) => {
     const reference = canvas.getByRole("button", {
-      name: `Open attached file ${STORY_ATTACHMENTS[0].name}`,
+      name: `Open attached file ${firstStoryAttachment.name}`,
     });
     await userEvent.click(reference);
-    await expect(storyArgs.onOpenAttachment).toHaveBeenCalledWith(STORY_ATTACHMENTS[0]);
+    await expect(storyArgs.onOpenAttachment).toHaveBeenCalledWith(firstStoryAttachment);
   },
 };
 
 export const PlainFileReferences: Story = {
   args: {
-    body: `Here is ${STORY_ATTACHMENTS[0].name}. You can also review ~/OpenBot/Shared/brief.pdf.`,
-    attachments: [STORY_ATTACHMENTS[0]],
+    body: `Here is ${firstStoryAttachment.name}. You can also review ~/OpenBot/Shared/brief.pdf.`,
+    attachments: [firstStoryAttachment],
     onOpenAttachment: fn(),
     onOpenSharedFile: fn(),
   },
   play: async ({ args: storyArgs, canvas, userEvent }) => {
     const attached = canvas.getByRole("button", {
-      name: `Open attached file ${STORY_ATTACHMENTS[0].name}`,
+      name: `Open attached file ${firstStoryAttachment.name}`,
     });
     const shared = canvas.getByRole("button", { name: "Open shared file brief.pdf" });
     await expect(attached).toBeInTheDocument();
@@ -305,8 +316,8 @@ export const FileReferenceTypes: Story = {
 export const MixedReferencesStress: Story = {
   name: "Mixed references stress",
   args: {
-    body: `Ask @Research to compare ${serializeAttachmentReference(longAttachment.name, longAttachment.id)} with ${serializeAttachmentReference(fileTypeAttachments[1].name, fileTypeAttachments[1].id)} and https://openbot.run/docs. Keep the decision traceable to the primary paper [1], then verify the compressed handoff in ${serializeAttachmentReference(fileTypeAttachments[3].name, fileTypeAttachments[3].id)} before shipping [2].`,
-    attachments: [longAttachment, fileTypeAttachments[1], fileTypeAttachments[3]],
+    body: `Ask @Research to compare ${serializeAttachmentReference(longAttachment.name, longAttachment.id)} with ${serializeAttachmentReference(secondFileTypeAttachment.name, secondFileTypeAttachment.id)} and https://openbot.run/docs. Keep the decision traceable to the primary paper [1], then verify the compressed handoff in ${serializeAttachmentReference(fourthFileTypeAttachment.name, fourthFileTypeAttachment.id)} before shipping [2].`,
+    attachments: [longAttachment, secondFileTypeAttachment, fourthFileTypeAttachment],
     citations,
     onOpenAttachment: fn(),
   },
@@ -327,8 +338,8 @@ export const MixedReferencesStress: Story = {
 export const InlineAlignment: Story = {
   name: "Inline alignment",
   args: {
-    body: `Review ${serializeAttachmentReference(fileTypeAttachments[1].name, fileTypeAttachments[1].id)} before launch.`,
-    attachments: [fileTypeAttachments[1]],
+    body: `Review ${serializeAttachmentReference(secondFileTypeAttachment.name, secondFileTypeAttachment.id)} before launch.`,
+    attachments: [secondFileTypeAttachment],
   },
   render: (storyArgs) => (
     <article aria-label="Inline alignment sample" style={{ width: "360px" }}>

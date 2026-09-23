@@ -37,12 +37,20 @@ import {
 } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
+function requireFirst<T>(items: readonly T[], name: string): T {
+  const [first] = items;
+  if (first === undefined) throw new Error(`${name} is missing.`);
+  return first;
+}
+
+const storyAttachment = requireFirst(STORY_ATTACHMENTS, "Story attachment");
+
 const messages: RendererAgentMessage[] = STORY_CONVERSATION_MESSAGES.map((message) => ({
   id: message.id,
   author: message.author === "user" ? "you" : "agent",
   body:
     message.id === "message-agent-1"
-      ? `${message.text}\n\nPlease review ${serializeAttachmentReference(STORY_ATTACHMENTS[0].name, STORY_ATTACHMENTS[0].id)} before editing the implementation notes.\n\nTransformers scale well with data and compute [1], though attention is quadratic in sequence length [2].`
+      ? `${message.text}\n\nPlease review ${serializeAttachmentReference(storyAttachment.name, storyAttachment.id)} before editing the implementation notes.\n\nTransformers scale well with data and compute [1], though attention is quadratic in sequence length [2].`
       : message.text,
   time: "10:00",
   itemType: message.itemType,
@@ -157,15 +165,18 @@ const generatedImageAttachment: AttachmentSummary = {
   previewKind: "image",
   previewUrl: generatedImagePreview,
 };
-const queuePreviewAttachments: AttachmentSummary[] = [
-  { ...generatedImageAttachment, id: "queue-preview-primary", name: "command-search.png" },
-  {
-    ...generatedImageAttachment,
-    id: "queue-preview-alternate",
-    name: "message-search.png",
-    previewUrl: generatedImagePreviewAlternate,
-  },
-];
+const queuePrimaryAttachment: AttachmentSummary = {
+  ...generatedImageAttachment,
+  id: "queue-preview-primary",
+  name: "command-search.png",
+};
+const queueAlternateAttachment: AttachmentSummary = {
+  ...generatedImageAttachment,
+  id: "queue-preview-alternate",
+  name: "message-search.png",
+  previewUrl: generatedImagePreviewAlternate,
+};
+const queuePreviewAttachments: AttachmentSummary[] = [queuePrimaryAttachment, queueAlternateAttachment];
 const supportedContextAttachments: AttachmentSummary[] = [
   {
     id: "composer-context-pdf",
@@ -283,13 +294,13 @@ const agentMessageGalleryMessages: RendererAgentMessage[] = [
       "",
       "You can also open [ConversationView.tsx](/Users/test/OpenBot/src/renderer/src/features/conversation/ConversationView.tsx), ask @Research, or inspect the attached source file below.",
       "",
-      `Attachment reference: ${serializeAttachmentReference(STORY_ATTACHMENTS[0].name, STORY_ATTACHMENTS[0].id)}.`,
+      `Attachment reference: ${serializeAttachmentReference(storyAttachment.name, storyAttachment.id)}.`,
       "",
       "The implementation follows the component source [1] and the accessibility guidance [2].",
     ].join("\n"),
     time: "10:02",
     kind: "text",
-    attachments: [STORY_ATTACHMENTS[0]],
+    attachments: [storyAttachment],
     citations: [
       {
         number: 1,
@@ -396,7 +407,7 @@ const agentMessageGalleryMessages: RendererAgentMessage[] = [
     body: "",
     time: "10:09",
     kind: "text",
-    attachments: [STORY_ATTACHMENTS[0]],
+    attachments: [storyAttachment],
     reaction: "🔥",
   },
   {
@@ -583,6 +594,8 @@ const streamingMarkdownChunks = [
 ] as const;
 
 function streamingMarkdownMessages(chunkIndex: number): RendererAgentMessage[] {
+  const body = streamingMarkdownChunks[chunkIndex];
+  if (body === undefined) throw new Error(`Streaming Markdown chunk ${chunkIndex} is missing.`);
   return [
     {
       id: "streaming-markdown-user",
@@ -594,7 +607,7 @@ function streamingMarkdownMessages(chunkIndex: number): RendererAgentMessage[] {
     {
       id: "streaming-markdown-agent",
       author: "agent",
-      body: streamingMarkdownChunks[chunkIndex],
+      body,
       time: "10:03",
       kind: "text",
       streaming: chunkIndex < streamingMarkdownChunks.length - 1,
@@ -823,11 +836,15 @@ const referenceQueue: QueueSnapshot = {
   deliveries: [
     ...queueWithItems(queueReferenceMessages.length)
       .deliveries.filter((delivery) => delivery.status === "queued")
-      .map((delivery, index) => ({
-        ...delivery,
-        text: queueReferenceMessages[index],
-        attachments: index === 2 ? [queuePreviewAttachments[0]] : index === 3 ? [queuePreviewAttachments[1]] : [],
-      })),
+      .map((delivery, index) => {
+        const text = queueReferenceMessages[index];
+        if (text === undefined) throw new Error(`Queue reference message ${index} is missing.`);
+        return {
+          ...delivery,
+          text,
+          attachments: index === 2 ? [queuePrimaryAttachment] : index === 3 ? [queueAlternateAttachment] : [],
+        };
+      }),
     runningDelivery,
   ],
 };
@@ -1239,7 +1256,7 @@ export const MixedAttachmentsInNarrowComposer: Story = {
       data-testid="narrow-composer-attachments-sample"
       style={{ width: "360px", height: "820px", overflow: "hidden" }}
     >
-      <MockedConversation args={storyArgs} initialAttachments={[...queuePreviewAttachments, STORY_ATTACHMENTS[0]]} />
+      <MockedConversation args={storyArgs} initialAttachments={[...queuePreviewAttachments, storyAttachment]} />
     </section>
   ),
 };
@@ -1790,7 +1807,7 @@ const actionMarkerMessages: RendererAgentMessage[] = [
     body: "",
     time: "22:49",
     kind: "exchange",
-    attachments: [STORY_ATTACHMENTS[0]],
+    attachments: [storyAttachment],
     exchange: {
       direction: "incoming",
       messageId: "spacing-marker-incoming",

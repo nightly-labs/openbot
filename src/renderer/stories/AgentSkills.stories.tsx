@@ -6,6 +6,14 @@ import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel"
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_INSTALLED_SKILLS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
+function requireStoryAgent() {
+  const [agent] = STORY_AGENTS;
+  if (!agent) throw new Error("The story fixtures have no agent.");
+  return agent;
+}
+
+const storyAgent = requireStoryAgent();
+
 function AgentSkillsStory(props: {
   skills: InstalledSkill[];
   localState?: "empty" | "error" | "loading" | "update";
@@ -65,11 +73,11 @@ function AgentSkillsStory(props: {
         onCreateSkill={fn()}
         onTrySkill={fn()}
         onOpenUsage={fn()}
-        agent={STORY_AGENTS[0]}
+        agent={storyAgent}
         runtimeSettings={{
-          provider: STORY_AGENTS[0].provider,
-          model: STORY_AGENTS[0].model,
-          reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+          provider: storyAgent.provider,
+          model: storyAgent.model,
+          reasoningEffort: storyAgent.reasoningEffort,
         }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -98,11 +106,11 @@ const meta = {
   title: "Settings/Agent Skills",
   component: AgentSettingsPanel,
   args: {
-    agent: STORY_AGENTS[0],
+    agent: storyAgent,
     runtimeSettings: {
-      provider: STORY_AGENTS[0].provider,
-      model: STORY_AGENTS[0].model,
-      reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+      provider: storyAgent.provider,
+      model: storyAgent.model,
+      reasoningEffort: storyAgent.reasoningEffort,
     },
     agentStatus: STORY_AGENT_STATUS,
     modelOptions: STORY_MODELS,

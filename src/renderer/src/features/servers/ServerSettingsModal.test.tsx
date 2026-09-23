@@ -9,7 +9,7 @@ import type {
 import { Toaster } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { createMockOpenBot } from "../../preview/mock-openbot";
 import { mcpToolRuntimeNote as note } from "./mcp-servers";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "./ServerSettingsModal";
@@ -323,7 +323,8 @@ describe("ServerSettingsModal", () => {
       const confirm = await screen.findByRole("button", { name: "I can see the test panel" });
       expect(confirm).toBeDisabled();
       const frame = screen.getByTitle<HTMLIFrameElement>("Sunshine remote desktop");
-      const session = (await mock.api.remoteDesktop.list())[0];
+      const [session] = await mock.api.remoteDesktop.list();
+      assert(session);
       await fireEvent(
         window,
         new MessageEvent("message", {
@@ -360,7 +361,8 @@ describe("ServerSettingsModal", () => {
     expect(test).not.toHaveBeenCalled();
     const frame = screen.getByTitle<HTMLIFrameElement>("Sunshine remote desktop");
     expect(frame).toHaveAttribute("inert");
-    const session = (await mock.api.remoteDesktop.list())[0];
+    const [session] = await mock.api.remoteDesktop.list();
+    assert(session);
     await fireEvent(
       window,
       new MessageEvent("message", {

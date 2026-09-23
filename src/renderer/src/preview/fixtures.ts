@@ -113,6 +113,11 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   preview: agent.preview,
 }));
 
+const [firstStoryAgent] = STORY_AGENTS;
+if (!firstStoryAgent) throw new Error("Story agent fixtures are empty.");
+/** The agent that single-agent stories show. */
+export const STORY_AGENT: AgentProfile = firstStoryAgent;
+
 export const STORY_SHARED_TABLES: SharedTable[] = [
   { name: "citations", ownerAgentId: "research", rowCount: null },
   { name: "companies", ownerAgentId: "chief", rowCount: 37 },
@@ -394,23 +399,23 @@ export const STORY_PRESENCE: TeamPresenceSnapshot = {
   ],
 };
 
-export const STORY_DIRECT_THREADS: DirectThreadSummary[] = [
-  {
+const STORY_DIRECT_ALICE_THREAD: DirectThreadSummary = {
+  threadId: "direct-alice",
+  otherMemberId: "member-alice",
+  lastMessage: {
+    id: "direct-message-alice",
     threadId: "direct-alice",
-    otherMemberId: "member-alice",
-    lastMessage: {
-      id: "direct-message-alice",
-      threadId: "direct-alice",
-      senderMemberId: "member-alice",
-      recipientMemberId: "member-self",
-      text: "The launch notes look good — can you review the last section?",
-      createdAt: "2026-08-19T09:30:00.000Z",
-      sequence: 2,
-    },
-    unreadCount: 2,
-    updatedAt: "2026-08-19T09:30:00.000Z",
+    senderMemberId: "member-alice",
+    recipientMemberId: "member-self",
+    text: "The launch notes look good — can you review the last section?",
+    createdAt: "2026-08-19T09:30:00.000Z",
+    sequence: 2,
   },
-];
+  unreadCount: 2,
+  updatedAt: "2026-08-19T09:30:00.000Z",
+};
+
+export const STORY_DIRECT_THREADS: DirectThreadSummary[] = [STORY_DIRECT_ALICE_THREAD];
 
 export const STORY_DIRECT_SNAPSHOTS: Record<string, DirectConversationSnapshot> = {
   "member-alice": {
@@ -432,7 +437,7 @@ export const STORY_DIRECT_SNAPSHOTS: Record<string, DirectConversationSnapshot> 
         createdAt: "2026-08-19T09:21:00.000Z",
         sequence: 1,
       },
-      STORY_DIRECT_THREADS[0].lastMessage,
+      STORY_DIRECT_ALICE_THREAD.lastMessage,
     ],
   },
 };

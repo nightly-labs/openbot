@@ -25,7 +25,7 @@ interface DynamicIslandDemoProps {
   onAction: (action: DynamicIslandAction) => void;
 }
 
-const AGENT_IDENTITIES = STORY_AGENTS.slice(0, 3).map(toIslandAgent);
+const AGENT_IDENTITIES = storyIslandAgents();
 const SCENARIOS: Scenario[] = ["idle", "working", "chat", "question", "approval", "takeover", "failed"];
 
 function DynamicIslandDemo(props: DynamicIslandDemoProps): JSX.Element {
@@ -248,6 +248,12 @@ function questionFixture(variant: QuestionVariant): DynamicIslandPromptItem {
       },
     ],
   };
+}
+
+function storyIslandAgents(): [DynamicIslandAgentIdentity, DynamicIslandAgentIdentity, DynamicIslandAgentIdentity] {
+  const [first, second, third] = STORY_AGENTS;
+  if (!first || !second || !third) throw new Error("The story fixtures need three agents.");
+  return [toIslandAgent(first), toIslandAgent(second), toIslandAgent(third)];
 }
 
 function toIslandAgent(agent: (typeof STORY_AGENTS)[number]): DynamicIslandAgentIdentity {

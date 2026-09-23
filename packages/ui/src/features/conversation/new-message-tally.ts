@@ -45,8 +45,9 @@ export function tallyNewMessages(
   following: boolean,
 ): NewMessageTally {
   if (following) return anchorNewMessages(rows);
-  if (rows.length === 0) return { count: 0, anchorId: undefined };
-  const latestId = rows[rows.length - 1].id;
+  const latest = rows[rows.length - 1];
+  if (!latest) return { count: 0, anchorId: undefined };
+  const latestId = latest.id;
   const anchorIndex = previous.anchorId === undefined ? -1 : rows.findIndex((row) => row.id === previous.anchorId);
   /*
    * Nothing here says what arrived, so the count stands: the anchor is missing because a message
@@ -56,8 +57,8 @@ export function tallyNewMessages(
   if (anchorIndex < 0) return { count: previous.count, anchorId: latestId };
   let arrived = 0;
   // A body that grows while it streams, and an older page that only prepends, both add nothing.
-  for (let index = anchorIndex + 1; index < rows.length; index += 1) {
-    if (rows[index].countable) arrived += 1;
+  for (const row of rows.slice(anchorIndex + 1)) {
+    if (row.countable) arrived += 1;
   }
   return { count: previous.count + arrived, anchorId: latestId };
 }

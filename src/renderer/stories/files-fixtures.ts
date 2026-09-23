@@ -389,20 +389,26 @@ export const FILES_STATUS_ROWS: StoredFileRow[] = [
   })),
 ];
 
+function filesRow(index: number): StoredFileRow {
+  const row = FILES_ROWS[index];
+  if (!row) throw new Error(`Files fixture row ${index} is missing.`);
+  return row;
+}
+
 export const FILES_LONG_NAME_ROWS: StoredFileRow[] = [
   {
-    ...FILES_ROWS[0],
+    ...filesRow(0),
     id: "long-1",
     name: "customer-import-validation-pipeline.final.review.after-legal-comments.ts",
     mimeType: "text/typescript",
   },
   {
-    ...FILES_ROWS[4],
+    ...filesRow(4),
     id: "long-2",
     name: "quarterly-operating-plan-with-regional-breakdown-and-headcount-forecast.xlsx",
   },
   {
-    ...FILES_ROWS[1],
+    ...filesRow(1),
     id: "long-3",
     name: "autumn-campaign-hero-image-generated-variant-with-warmer-light-and-logo.png",
   },

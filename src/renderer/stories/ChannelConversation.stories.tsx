@@ -27,7 +27,15 @@ import { STORY_AGENTS } from "./fixtures";
  * agree.
  */
 
-const [chief, sales, research] = STORY_AGENTS;
+function storyAgent(index: number) {
+  const agent = STORY_AGENTS[index];
+  if (!agent) throw new Error(`Story agent ${index} is missing.`);
+  return agent;
+}
+
+const chief = storyAgent(0);
+const sales = storyAgent(1);
+const research = storyAgent(2);
 
 interface Row {
   id: string;
@@ -159,8 +167,10 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
   play: async ({ canvas }) => {
     const chiefMessages = await canvas.findAllByRole("article", { name: `Message from ${chief.name}` });
     await expect(chiefMessages).toHaveLength(2);
-    await expect(within(chiefMessages[0]).getByText("11:12 PM")).toBeInTheDocument();
-    await expect(within(chiefMessages[1]).queryByText("11:13 PM")).not.toBeInTheDocument();
+    const [firstChiefMessage, secondChiefMessage] = chiefMessages;
+    if (!firstChiefMessage || !secondChiefMessage) throw new Error("Chief messages are missing.");
+    await expect(within(firstChiefMessage).getByText("11:12 PM")).toBeInTheDocument();
+    await expect(within(secondChiefMessage).queryByText("11:13 PM")).not.toBeInTheDocument();
     const ownMessage = await canvas.findByRole("article", { name: "Message from You" });
     await expect(within(ownMessage).getByText("12:59 PM")).toBeInTheDocument();
     // The label after the colon shifts on every turn, the way it does in the agent chat, so the

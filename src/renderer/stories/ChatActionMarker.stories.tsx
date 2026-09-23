@@ -105,7 +105,9 @@ export const AllStates: Story = {
   ),
   play: async ({ canvas, userEvent }) => {
     onOpenRoutine.mockClear();
-    await userEvent.click(canvas.getAllByRole("button", { name: "Open routine Morning brief" })[0]);
+    const [routineButton] = canvas.getAllByRole("button", { name: "Open routine Morning brief" });
+    if (!routineButton) throw new Error("Routine button is missing.");
+    await userEvent.click(routineButton);
     await expect(onOpenRoutine).toHaveBeenCalledWith({ routineId: "routine-1", name: "Morning brief" });
   },
 };

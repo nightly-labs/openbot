@@ -200,8 +200,11 @@ export function ServerRail(props: ServerRailProps) {
     const ids = remoteServerIds();
     const index = ids.indexOf(serverId);
     const targetIndex = index + direction;
-    if (index < 0 || targetIndex < 0 || targetIndex >= ids.length) return;
-    [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
+    const moved = ids[index];
+    const displaced = ids[targetIndex];
+    if (index < 0 || moved === undefined || displaced === undefined) return;
+    ids[index] = displaced;
+    ids[targetIndex] = moved;
     props.onReorder(ids);
     setAnnouncement(`Moved server to position ${targetIndex + 1} of ${ids.length}.`);
   }
