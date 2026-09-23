@@ -10,6 +10,7 @@ export type TeamWebRtcChannel = "rpc" | "events" | "files" | "desktop";
 
 interface TeamWebRtcBridgeEvents {
   accountProfileChanged: [peerId: string];
+  accountServersChanged: [peerId: string];
   signalReady: [peerId: string];
   incoming: [
     peerId: string,
@@ -246,6 +247,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         sessionExpiresAt: message.sessionExpiresAt,
       });
     } else if (message.type === "account-profile-changed") this.emit("accountProfileChanged", message.peerId);
+    else if (message.type === "account-servers-changed") this.emit("accountServersChanged", message.peerId);
     else if (message.type === "signal-ready") this.emit("signalReady", message.peerId);
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)
       this.emit("connected", message.peerId, {

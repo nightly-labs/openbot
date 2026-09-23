@@ -143,6 +143,7 @@ it("restores attachment-only messages in file order from a reloaded conversation
       author: "user",
       body: "",
       streaming: false,
+      status: "completed",
       replyToMessageId: undefined,
       attachments,
     },

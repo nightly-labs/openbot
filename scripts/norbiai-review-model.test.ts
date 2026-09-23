@@ -27,11 +27,13 @@ const scriptDirectory = mkdtempSync(join(tmpdir(), "norbiai-reviewer-"));
 const scriptPath = join(scriptDirectory, "resolve.sh");
 writeFileSync(scriptPath, step?.run ?? "");
 
-type Request = { description?: string; comment?: string; fork?: boolean };
+type Request = { description?: string; comment?: string; fork?: boolean; changedFiles?: string[] };
 
 /** Runs the workflow step as the runner would, and reads back what it chose. */
-function resolve({ description = "", comment = "", fork = false }: Request) {
+function resolve({ description = "", comment = "", fork = false, changedFiles = ["src/main/index.ts"] }: Request) {
   const bodyPath = join(scriptDirectory, "description.txt");
+  const changedFilesPath = join(scriptDirectory, "changed-files.txt");
+  writeFileSync(changedFilesPath, changedFiles.map((file) => `${file}\n`).join(""));
   const outputPath = join(scriptDirectory, "output.txt");
   writeFileSync(bodyPath, description);
   writeFileSync(outputPath, "");
@@ -41,6 +43,7 @@ function resolve({ description = "", comment = "", fork = false }: Request) {
     env: {
       ...process.env,
       DEFAULT_MODEL: job.env.DEFAULT_MODEL,
+      LOW_RISK_MODEL: job.env.LOW_RISK_MODEL,
       DEFAULT_EFFORT: job.env.DEFAULT_EFFORT,
       ALLOWED_MODELS: job.env.ALLOWED_MODELS,
       ALLOWED_EFFORTS: job.env.ALLOWED_EFFORTS,
@@ -48,6 +51,7 @@ function resolve({ description = "", comment = "", fork = false }: Request) {
       CAPPED_MODEL_EFFORT: job.env.CAPPED_MODEL_EFFORT,
       EFFORT_MODELS: job.env.EFFORT_MODELS,
       PR_BODY_FILE: bodyPath,
+      CHANGED_FILES_FILE: changedFilesPath,
       SAME_REPO: fork ? "false" : "true",
       COMMENT_BODY: comment,
       GITHUB_OUTPUT: outputPath,
@@ -92,6 +96,24 @@ describe("NorbiAI reviewer selection", () => {
     });
 
     expect(model).toBe("chatgpt-web/medium");
+  });
+
+  it("defaults to the low-risk model only when every changed file is prose, a story, a test or a message table", () => {
+    const lowRisk = resolve({
+      changedFiles: ["docs/ARCHITECTURE.md", "src/renderer/src/App.test.tsx", "packages/i18n/src/messages/fr.ts"],
+    });
+    const mixed = resolve({ changedFiles: ["docs/ARCHITECTURE.md", "src/renderer/src/App.tsx"] });
+    const instructions = resolve({ changedFiles: ["README.md", "src/renderer/AGENTS.md"] });
+
+    expect(lowRisk.model).toBe(job.env.LOW_RISK_MODEL);
+    expect(mixed.model).toBe(defaults.model);
+    expect(instructions.model).toBe(defaults.model);
+  });
+
+  it("lets a directive override the low-risk default", () => {
+    const { model } = resolve({ description: "NorbiAI-Model: chatgpt-web/pro", changedFiles: ["README.md"] });
+
+    expect(model).toBe("chatgpt-web/pro");
   });
 
   // The description belongs to whoever opened the pull request. On a fork that is someone

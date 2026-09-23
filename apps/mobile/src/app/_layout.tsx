@@ -14,6 +14,7 @@ import { useReducedMotion } from "react-native-reanimated";
 import { useUniwind, withUniwind } from "uniwind";
 
 import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
+import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
@@ -86,10 +87,7 @@ function RootNavigator() {
             importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
           >
             {!loading && appearanceReady ? (
-              <View
-                className="flex-1"
-                onLayout={session || pathname === "/scan-qr-code" ? () => reportReady() : undefined}
-              >
+              <View className="flex-1" onLayout={session || pathname !== "/" ? () => reportReady() : undefined}>
                 <Stack
                   screenOptions={{
                     headerBackButtonDisplayMode: "minimal",
@@ -110,6 +108,7 @@ function RootNavigator() {
                       options={{ animation: "fade", gestureEnabled: false, headerShown: false }}
                     />
                   </Stack.Protected>
+                  <Stack.Screen name="incoming-link" options={{ headerShown: false }} />
                 </Stack>
               </View>
             ) : null}
@@ -152,6 +151,7 @@ export default function RootLayout() {
               <BloubAnimationProvider>
                 <MobileSessionProvider>
                   <MobileAnalyticsLifecycle />
+                  {__DEV__ ? <DevelopmentConnectLinkHandler /> : null}
                   <AppLoadingOverlayProvider>
                     <RootNavigator />
                   </AppLoadingOverlayProvider>

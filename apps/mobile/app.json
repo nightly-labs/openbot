@@ -10,6 +10,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "run.openbot.mobile",
+      "associatedDomains": ["applinks:openbot.run"],
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Allow OpenBot to connect to your desktop during local development.",
         "NSAppTransportSecurity": {
@@ -70,6 +71,9 @@
         {
           "android": {
             "usesCleartextTraffic": true
+          },
+          "ios": {
+            "enableSceneSupport": true
           }
         }
       ],

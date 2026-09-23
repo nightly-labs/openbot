@@ -31,6 +31,8 @@ interface RemoteTeamTransportProps {
   active: boolean;
   directory: RemoteTeamDirectoryClient;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => void;
+  /** Signal says this account's server list changed on another device. */
+  onMembershipChanged?: () => Promise<void>;
   onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => void;
 }
 
@@ -40,7 +42,10 @@ type RemoteTeamCommandInput =
   | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
 
 export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeamTransportProps>(
-  function RemoteTeamTransport({ active: foreground, directory, onConnectionUpdate, onTeamEvent }, ref) {
+  function RemoteTeamTransport(
+    { active: foreground, directory, onConnectionUpdate, onMembershipChanged, onTeamEvent },
+    ref,
+  ) {
     const { refreshProfile } = useMobileSession();
     const [commands, setCommands] = useState<RemoteTeamCommand[]>([]);
     const mailboxRef = useRef<ReturnType<typeof createRemoteCommandMailbox> | null>(null);
@@ -120,6 +125,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         getBootstrap={(hostId, clientPublicKey) => directory.createBootstrap(hostId, clientPublicKey)}
         onCommandResult={handleCommandResult}
         onAccountProfileChanged={refreshProfile}
+        onAccountServersChanged={onMembershipChanged}
         onConnectionUpdate={async (update) => onConnectionUpdate(update)}
         onTeamEvent={async (hostId, event) => onTeamEvent(hostId, event)}
       />
