@@ -1,32 +1,9 @@
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
-import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
-import type { AgentModelOption } from "./ipc-agent-identity";
-import type {
-  AgentProfileDraft,
-  GenerateAgentProfileInput,
-  SaveAgentProfileInput,
-  SaveAgentProfileResult,
-} from "./ipc-agent-profile";
-import type { AccountUsage, AgentStatus } from "./ipc-agent-status";
-import type {
-  AgentSummary,
-  CreateAgentInput,
-  DuplicateAgentResult,
-  SetAgentAvatarInput,
-  UpdateAgentInput,
-} from "./ipc-agents";
+import type { AgentEvent } from "./ipc-agent-events";
+import type { AccountUsage } from "./ipc-agent-status";
+import type { AgentSummary } from "./ipc-agents";
 import type { CentralAuthState } from "./ipc-app-auth";
-import type { RespondToApprovalInput, RespondToBrowserTakeoverInput } from "./ipc-approvals";
-import type {
-  AttachmentImportEvent,
-  ChooseAttachmentsInput,
-  DownloadAttachmentsInput,
-  DraftAttachment,
-  FilePreview,
-  OpenAttachmentInput,
-  OpenSharedFileInput,
-  OpenWorkspaceFileInput,
-} from "./ipc-attachments";
+import type { AttachmentImportEvent } from "./ipc-attachments";
 import type {
   BrowserBounds,
   BrowserControlState,
@@ -40,19 +17,12 @@ import type {
   BrowserTab,
   BrowserVisibilityInput,
 } from "./ipc-browser";
-import type { RespondToBrowserSecretInput } from "./ipc-browser-secret";
-import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
 import type {
   ConversationPage,
   ConversationReadState,
-  ConversationSearchPage,
-  ConversationWithReadState,
   MarkConversationReadInput,
   ReadConversationPageInput,
-  RespondToPromptInput,
-  SearchConversationMessagesInput,
   SendMessageInput,
-  SetMessageReactionInput,
 } from "./ipc-conversations";
 import type { Invoke, IPC_ENDPOINTS, Subscribe } from "./ipc-endpoints";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
@@ -66,13 +36,9 @@ import type {
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
 import type {
-  AcknowledgeFailedTurnInput,
-  CancelQueuedMessageInput,
-  InterruptTurnInput,
+  EditQueuedMessageInput,
   QueuedMessageReceipt,
   QueueSnapshot,
-  ReorderQueueInput,
-  SteerQueuedMessageInput,
   UpdateQueuedMessageInput,
 } from "./ipc-queue";
 import type {
@@ -81,8 +47,7 @@ import type {
   RemoteDesktopTestInput,
   RemoteDesktopTestStatus,
 } from "./ipc-remote-desktop-setup";
-import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
-import type { InstalledSkill, MarketplaceSkillPage, MarketplaceSkillQuery } from "./ipc-skills";
+import type { MarketplaceSkillPage, MarketplaceSkillQuery } from "./ipc-skills";
 import type {
   ClearStorageInput,
   DeleteStoredFileInput,
@@ -125,29 +90,28 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
-import type { QueueEditRequest } from "./team-protocol/queue-edit-v1";
 
 export interface AgentDesktopApi {
-  listChannels: () => Promise<ChannelSummary[]>;
-  readChannel: (input: ChannelReadInput) => Promise<ChannelPage>;
-  channelCommand: (input: ChannelCommand) => Promise<Channel>;
-  deleteChannel: (channelId: string) => Promise<void>;
-  getStatus: () => Promise<AgentStatus>;
+  listChannels: Invoke<typeof IPC_ENDPOINTS.agent.listChannels>;
+  readChannel: Invoke<typeof IPC_ENDPOINTS.agent.readChannel>;
+  channelCommand: Invoke<typeof IPC_ENDPOINTS.agent.channelCommand>;
+  deleteChannel: Invoke<typeof IPC_ENDPOINTS.agent.deleteChannel>;
+  getStatus: Invoke<typeof IPC_ENDPOINTS.agent.getStatus>;
   getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
   getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
   getUsage: (agentId?: string) => Promise<AccountUsage>;
-  listModels: () => Promise<AgentModelOption[]>;
+  listModels: Invoke<typeof IPC_ENDPOINTS.agent.listModels>;
   listAgents: (serverId?: string) => Promise<AgentSummary[]>;
-  listInstalledSkills: (agentId: string) => Promise<InstalledSkill[]>;
-  getSidebarLayout: () => Promise<SidebarLayoutSnapshot>;
-  mutateSidebarLayout: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
-  generateProfile: (input: GenerateAgentProfileInput) => Promise<AgentProfileDraft>;
-  saveProfile: (input: SaveAgentProfileInput) => Promise<SaveAgentProfileResult>;
-  createAgent: (input: CreateAgentInput) => Promise<AgentSummary>;
-  duplicateAgent: (agentId: string) => Promise<DuplicateAgentResult>;
-  updateAgent: (input: UpdateAgentInput) => Promise<AgentSummary>;
-  setAvatar: (input: SetAgentAvatarInput) => Promise<AgentSummary>;
-  deleteAgent: (agentId: string) => Promise<void>;
+  listInstalledSkills: Invoke<typeof IPC_ENDPOINTS.agent.listInstalledSkills>;
+  getSidebarLayout: Invoke<typeof IPC_ENDPOINTS.agent.getSidebarLayout>;
+  mutateSidebarLayout: Invoke<typeof IPC_ENDPOINTS.agent.mutateSidebarLayout>;
+  generateProfile: Invoke<typeof IPC_ENDPOINTS.agent.generateProfile>;
+  saveProfile: Invoke<typeof IPC_ENDPOINTS.agent.saveProfile>;
+  createAgent: Invoke<typeof IPC_ENDPOINTS.agent.create>;
+  duplicateAgent: Invoke<typeof IPC_ENDPOINTS.agent.duplicate>;
+  updateAgent: Invoke<typeof IPC_ENDPOINTS.agent.update>;
+  setAvatar: Invoke<typeof IPC_ENDPOINTS.agent.setAvatar>;
+  deleteAgent: Invoke<typeof IPC_ENDPOINTS.agent.delete>;
   listMemories: Invoke<typeof IPC_ENDPOINTS.agentMemories.listMemories>;
   createMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.createMemory>;
   updateMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.updateMemory>;
@@ -184,36 +148,36 @@ export interface AgentDesktopApi {
   setMcpServerEnabled: (input: SetMcpServerEnabledInput, serverId: string) => Promise<McpServerConfig[]>;
   /** A test connects once and reports what it found. Nothing is stored, and no agent uses it. */
   testMcpServer: (input: TestMcpServerInput, serverId: string) => Promise<McpTestResult>;
-  readConversation: (agentId: string) => Promise<ConversationWithReadState>;
+  readConversation: Invoke<typeof IPC_ENDPOINTS.agent.readConversation>;
   readConversationPage: (input: ReadConversationPageInput, serverId?: string) => Promise<ConversationPage>;
-  searchConversationMessages: (input: SearchConversationMessagesInput) => Promise<ConversationSearchPage>;
-  listConversationReads: () => Promise<Record<string, ConversationReadState>>;
+  searchConversationMessages: Invoke<typeof IPC_ENDPOINTS.agent.searchConversationMessages>;
+  listConversationReads: Invoke<typeof IPC_ENDPOINTS.agent.listConversationReads>;
   markConversationRead: (input: MarkConversationReadInput, serverId?: string) => Promise<ConversationReadState>;
-  chooseAttachments: (input: ChooseAttachmentsInput) => Promise<DraftAttachment[]>;
+  chooseAttachments: Invoke<typeof IPC_ENDPOINTS.agentAttachments.chooseAttachments>;
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
   discardDraftAttachment: (attachmentId: string, serverId?: string) => Promise<void>;
-  downloadAttachments: (input: DownloadAttachmentsInput) => Promise<void>;
-  openAttachment: (input: OpenAttachmentInput) => Promise<void>;
-  openSharedFile: (input: OpenSharedFileInput) => Promise<void>;
-  openWorkspaceFile: (input: OpenWorkspaceFileInput) => Promise<void>;
-  previewSharedFile: (input: OpenSharedFileInput) => Promise<FilePreview>;
-  previewWorkspaceFile: (input: OpenWorkspaceFileInput) => Promise<FilePreview>;
+  downloadAttachments: Invoke<typeof IPC_ENDPOINTS.agentAttachments.downloadAttachments>;
+  openAttachment: Invoke<typeof IPC_ENDPOINTS.agentAttachments.openAttachment>;
+  openSharedFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.openSharedFile>;
+  openWorkspaceFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.openWorkspaceFile>;
+  previewSharedFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.previewSharedFile>;
+  previewWorkspaceFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.previewWorkspaceFile>;
   sendMessage: (input: SendMessageInput, serverId?: string) => Promise<QueuedMessageReceipt>;
-  setMessageReaction: (input: SetMessageReactionInput) => Promise<void>;
-  listQueue: (agentId: string) => Promise<QueueSnapshot>;
-  acknowledgeFailedTurn: (input: AcknowledgeFailedTurnInput) => Promise<void>;
-  cancelQueuedMessage: (input: CancelQueuedMessageInput) => Promise<void>;
-  steerQueuedMessage: (input: SteerQueuedMessageInput) => Promise<void>;
-  editQueuedMessage: (input: QueueEditRequest & { agentId: string }, serverId?: string) => Promise<QueueSnapshot>;
+  setMessageReaction: Invoke<typeof IPC_ENDPOINTS.agent.setMessageReaction>;
+  listQueue: Invoke<typeof IPC_ENDPOINTS.agent.listQueue>;
+  acknowledgeFailedTurn: Invoke<typeof IPC_ENDPOINTS.agent.acknowledgeFailedTurn>;
+  cancelQueuedMessage: Invoke<typeof IPC_ENDPOINTS.agent.cancelQueuedMessage>;
+  steerQueuedMessage: Invoke<typeof IPC_ENDPOINTS.agent.steerQueuedMessage>;
+  editQueuedMessage: (input: EditQueuedMessageInput, serverId?: string) => Promise<QueueSnapshot>;
   updateQueuedMessage: (input: UpdateQueuedMessageInput, serverId?: string) => Promise<void>;
-  reorderQueue: (input: ReorderQueueInput) => Promise<void>;
-  interrupt: (input: InterruptTurnInput) => Promise<void>;
-  respondToPrompt: (input: RespondToPromptInput) => Promise<void>;
-  respondToApproval: (input: RespondToApprovalInput) => Promise<void>;
-  respondToBrowserSecret: (input: RespondToBrowserSecretInput) => Promise<void>;
-  respondToBrowserTakeover: (input: RespondToBrowserTakeoverInput) => Promise<void>;
+  reorderQueue: Invoke<typeof IPC_ENDPOINTS.agent.reorderQueue>;
+  interrupt: Invoke<typeof IPC_ENDPOINTS.agent.interrupt>;
+  respondToPrompt: Invoke<typeof IPC_ENDPOINTS.agent.respondToPrompt>;
+  respondToApproval: Invoke<typeof IPC_ENDPOINTS.agent.respondToApproval>;
+  respondToBrowserSecret: Invoke<typeof IPC_ENDPOINTS.agent.respondToBrowserSecret>;
+  respondToBrowserTakeover: Invoke<typeof IPC_ENDPOINTS.agent.respondToBrowserTakeover>;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
-  onScopedEvent: (listener: (event: ScopedAgentEvent) => void) => () => void;
+  onScopedEvent: Subscribe<typeof IPC_ENDPOINTS.agent.event>;
 }
 
 export interface MarketplaceAgentsDesktopApi {

@@ -16,7 +16,9 @@
 
 import type { ManagedProviderId } from "./agent-providers";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
-import type { AgentIpcRequest } from "./ipc-agent-events";
+import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
+import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
+import type { AgentModelOption } from "./ipc-agent-identity";
 import type {
   AgentMemory,
   CreateAgentMemoryInput,
@@ -24,13 +26,27 @@ import type {
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
 import type {
+  AgentProfileDraft,
+  GenerateAgentProfileInput,
+  SaveAgentProfileInput,
+  SaveAgentProfileResult,
+} from "./ipc-agent-profile";
+import type {
+  AccountUsage,
   AgentProviderId,
   AgentStatus,
   ProviderApiKeyState,
   ProviderCodeLoginStart,
   SetProviderApiKeyInput,
 } from "./ipc-agent-status";
-import type { AvatarImageInput } from "./ipc-agents";
+import type {
+  AgentSummary,
+  AvatarImageInput,
+  CreateAgentInput,
+  DuplicateAgentResult,
+  SetAgentAvatarInput,
+  UpdateAgentInput,
+} from "./ipc-agents";
 import type {
   AnalyticsPreference,
   AppInfo,
@@ -49,7 +65,23 @@ import type {
   UpdateStatus,
   VerifyEmailCodeInput,
 } from "./ipc-app-auth";
-import type { ApprovalAutomationPreference, SetApprovalAutomationInput } from "./ipc-approvals";
+import type {
+  ApprovalAutomationPreference,
+  RespondToApprovalInput,
+  RespondToBrowserTakeoverInput,
+  SetApprovalAutomationInput,
+} from "./ipc-approvals";
+import type {
+  ChooseAttachmentsInput,
+  DownloadAttachmentsInput,
+  DraftAttachment,
+  FilePreview,
+  ImportAttachmentsInput,
+  OpenAttachmentInput,
+  OpenSharedFileInput,
+  OpenWorkspaceFileInput,
+} from "./ipc-attachments";
+import type { RespondToBrowserSecretInput } from "./ipc-browser-secret";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -66,6 +98,19 @@ import type {
   UpdateChannelRoutineInput,
 } from "./ipc-channel-routines";
 import { IPC_CHANNELS } from "./ipc-channels";
+import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
+  ConversationPage,
+  ConversationReadState,
+  ConversationSearchPage,
+  ConversationWithReadState,
+  MarkConversationReadInput,
+  ReadConversationPageInput,
+  RespondToPromptInput,
+  SearchConversationMessagesInput,
+  SendMessageInput,
+  SetMessageReactionInput,
+} from "./ipc-conversations";
 import type {
   CustomProviderResult,
   CustomProviderSummary,
@@ -80,6 +125,7 @@ import type {
   SetDynamicIslandInteractiveInput,
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
+import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type {
   DeleteHostedSiteInput,
   HostedSiteSummary,
@@ -106,6 +152,17 @@ import type {
 } from "./ipc-mcp-servers";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
+  AcknowledgeFailedTurnInput,
+  CancelQueuedMessageInput,
+  EditQueuedMessageInput,
+  InterruptTurnInput,
+  QueuedMessageReceipt,
+  QueueSnapshot,
+  ReorderQueueInput,
+  SteerQueuedMessageInput,
+  UpdateQueuedMessageInput,
+} from "./ipc-queue";
+import type {
   CreateRoutineInput,
   DeleteRoutineInput,
   ListRoutineRunsInput,
@@ -115,6 +172,7 @@ import type {
   UpdateRoutineInput,
 } from "./ipc-routines";
 import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
+import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import type {
   CreateLocalSkillInput,
   InstalledSkill,
@@ -346,46 +404,76 @@ export const IPC_ENDPOINTS = {
     openedEvent: event<NotificationOpenedEvent>()(IPC_CHANNELS.notificationsOpenedEvent),
   },
   agent: {
-    getStatus: untypedRequest(IPC_CHANNELS.agentGetStatus),
-    getAnalytics: untypedRequest(IPC_CHANNELS.agentGetAnalytics),
-    getHostAnalytics: untypedRequest(IPC_CHANNELS.hostGetAnalytics),
-    getUsage: untypedRequest(IPC_CHANNELS.agentGetUsage),
-    listModels: untypedRequest(IPC_CHANNELS.agentListModels),
-    list: untypedRequest(IPC_CHANNELS.agentList),
-    listInstalledSkills: untypedRequest(IPC_CHANNELS.agentListInstalledSkills),
-    listChannels: untypedRequest(IPC_CHANNELS.agentListChannels),
-    readChannel: untypedRequest(IPC_CHANNELS.agentReadChannel),
-    channelCommand: untypedRequest(IPC_CHANNELS.agentChannelCommand),
-    deleteChannel: untypedRequest(IPC_CHANNELS.agentDeleteChannel),
-    getSidebarLayout: untypedRequest(IPC_CHANNELS.agentGetSidebarLayout),
-    mutateSidebarLayout: untypedRequest(IPC_CHANNELS.agentMutateSidebarLayout),
-    generateProfile: untypedRequest(IPC_CHANNELS.agentGenerateProfile),
-    saveProfile: untypedRequest(IPC_CHANNELS.agentSaveProfile),
-    create: untypedRequest(IPC_CHANNELS.agentCreate),
-    duplicate: untypedRequest(IPC_CHANNELS.agentDuplicate),
-    update: untypedRequest(IPC_CHANNELS.agentUpdate),
-    setAvatar: untypedRequest(IPC_CHANNELS.agentSetAvatar),
-    delete: untypedRequest(IPC_CHANNELS.agentDelete),
-    readConversation: untypedRequest(IPC_CHANNELS.agentReadConversation),
-    readConversationPage: untypedRequest(IPC_CHANNELS.agentReadConversationPage),
-    searchConversationMessages: untypedRequest(IPC_CHANNELS.agentSearchConversationMessages),
-    listConversationReads: untypedRequest(IPC_CHANNELS.agentListConversationReads),
-    markConversationRead: untypedRequest(IPC_CHANNELS.agentMarkConversationRead),
-    sendMessage: untypedRequest(IPC_CHANNELS.agentSendMessage),
-    setMessageReaction: untypedRequest(IPC_CHANNELS.agentSetMessageReaction),
-    listQueue: untypedRequest(IPC_CHANNELS.agentListQueue),
-    acknowledgeFailedTurn: untypedRequest(IPC_CHANNELS.agentAcknowledgeFailedTurn),
-    cancelQueuedMessage: untypedRequest(IPC_CHANNELS.agentCancelQueuedMessage),
-    steerQueuedMessage: untypedRequest(IPC_CHANNELS.agentSteerQueuedMessage),
-    editQueuedMessage: untypedRequest(IPC_CHANNELS.agentEditQueuedMessage),
-    updateQueuedMessage: untypedRequest(IPC_CHANNELS.agentUpdateQueuedMessage),
-    reorderQueue: untypedRequest(IPC_CHANNELS.agentReorderQueue),
-    interrupt: untypedRequest(IPC_CHANNELS.agentInterrupt),
-    respondToPrompt: untypedRequest(IPC_CHANNELS.agentRespondToPrompt),
-    respondToApproval: untypedRequest(IPC_CHANNELS.agentRespondToApproval),
-    respondToBrowserSecret: untypedRequest(IPC_CHANNELS.agentRespondToBrowserSecret),
-    respondToBrowserTakeover: untypedRequest(IPC_CHANNELS.agentRespondToBrowserTakeover),
-    event: untypedEvent(IPC_CHANNELS.agentEvent),
+    getStatus: request<AgentIpcRequest<null>, AgentStatus>()(IPC_CHANNELS.agentGetStatus),
+    getAnalytics: request<AgentIpcRequest<AgentAnalyticsInput>, AgentAnalytics | null>()(
+      IPC_CHANNELS.agentGetAnalytics,
+    ),
+    getHostAnalytics: request<AgentIpcRequest<HostAnalyticsInput>, HostAnalytics | null>()(
+      IPC_CHANNELS.hostGetAnalytics,
+    ),
+    getUsage: request<AgentIpcRequest<string | undefined>, AccountUsage>()(IPC_CHANNELS.agentGetUsage),
+    listModels: request<AgentIpcRequest<null>, AgentModelOption[]>()(IPC_CHANNELS.agentListModels),
+    list: request<AgentIpcRequest<null>, AgentSummary[]>()(IPC_CHANNELS.agentList),
+    listInstalledSkills: request<AgentIpcRequest<string>, InstalledSkill[]>()(IPC_CHANNELS.agentListInstalledSkills),
+    listChannels: request<AgentIpcRequest<null>, ChannelSummary[]>()(IPC_CHANNELS.agentListChannels),
+    readChannel: request<AgentIpcRequest<ChannelReadInput>, ChannelPage>()(IPC_CHANNELS.agentReadChannel),
+    channelCommand: request<AgentIpcRequest<ChannelCommand>, Channel>()(IPC_CHANNELS.agentChannelCommand),
+    deleteChannel: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentDeleteChannel),
+    getSidebarLayout: request<AgentIpcRequest<null>, SidebarLayoutSnapshot>()(IPC_CHANNELS.agentGetSidebarLayout),
+    mutateSidebarLayout: request<AgentIpcRequest<SidebarLayoutAction>, SidebarLayoutSnapshot>()(
+      IPC_CHANNELS.agentMutateSidebarLayout,
+    ),
+    generateProfile: request<AgentIpcRequest<GenerateAgentProfileInput>, AgentProfileDraft>()(
+      IPC_CHANNELS.agentGenerateProfile,
+    ),
+    saveProfile: request<AgentIpcRequest<SaveAgentProfileInput>, SaveAgentProfileResult>()(
+      IPC_CHANNELS.agentSaveProfile,
+    ),
+    create: request<AgentIpcRequest<CreateAgentInput>, AgentSummary>()(IPC_CHANNELS.agentCreate),
+    duplicate: request<AgentIpcRequest<string>, DuplicateAgentResult>()(IPC_CHANNELS.agentDuplicate),
+    update: request<AgentIpcRequest<UpdateAgentInput>, AgentSummary>()(IPC_CHANNELS.agentUpdate),
+    setAvatar: request<AgentIpcRequest<SetAgentAvatarInput>, AgentSummary>()(IPC_CHANNELS.agentSetAvatar),
+    delete: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentDelete),
+    readConversation: request<AgentIpcRequest<string>, ConversationWithReadState>()(IPC_CHANNELS.agentReadConversation),
+    readConversationPage: request<AgentIpcRequest<ReadConversationPageInput>, ConversationPage>()(
+      IPC_CHANNELS.agentReadConversationPage,
+    ),
+    searchConversationMessages: request<AgentIpcRequest<SearchConversationMessagesInput>, ConversationSearchPage>()(
+      IPC_CHANNELS.agentSearchConversationMessages,
+    ),
+    listConversationReads: request<AgentIpcRequest<null>, Record<string, ConversationReadState>>()(
+      IPC_CHANNELS.agentListConversationReads,
+    ),
+    markConversationRead: request<AgentIpcRequest<MarkConversationReadInput>, ConversationReadState>()(
+      IPC_CHANNELS.agentMarkConversationRead,
+    ),
+    sendMessage: request<AgentIpcRequest<SendMessageInput>, QueuedMessageReceipt>()(IPC_CHANNELS.agentSendMessage),
+    setMessageReaction: request<AgentIpcRequest<SetMessageReactionInput>, void>()(IPC_CHANNELS.agentSetMessageReaction),
+    listQueue: request<AgentIpcRequest<string>, QueueSnapshot>()(IPC_CHANNELS.agentListQueue),
+    acknowledgeFailedTurn: request<AgentIpcRequest<AcknowledgeFailedTurnInput>, void>()(
+      IPC_CHANNELS.agentAcknowledgeFailedTurn,
+    ),
+    cancelQueuedMessage: request<AgentIpcRequest<CancelQueuedMessageInput>, void>()(
+      IPC_CHANNELS.agentCancelQueuedMessage,
+    ),
+    steerQueuedMessage: request<AgentIpcRequest<SteerQueuedMessageInput>, void>()(IPC_CHANNELS.agentSteerQueuedMessage),
+    editQueuedMessage: request<AgentIpcRequest<EditQueuedMessageInput>, QueueSnapshot>()(
+      IPC_CHANNELS.agentEditQueuedMessage,
+    ),
+    updateQueuedMessage: request<AgentIpcRequest<UpdateQueuedMessageInput>, void>()(
+      IPC_CHANNELS.agentUpdateQueuedMessage,
+    ),
+    reorderQueue: request<AgentIpcRequest<ReorderQueueInput>, void>()(IPC_CHANNELS.agentReorderQueue),
+    interrupt: request<AgentIpcRequest<InterruptTurnInput>, void>()(IPC_CHANNELS.agentInterrupt),
+    respondToPrompt: request<AgentIpcRequest<RespondToPromptInput>, void>()(IPC_CHANNELS.agentRespondToPrompt),
+    respondToApproval: request<AgentIpcRequest<RespondToApprovalInput>, void>()(IPC_CHANNELS.agentRespondToApproval),
+    respondToBrowserSecret: request<AgentIpcRequest<RespondToBrowserSecretInput>, void>()(
+      IPC_CHANNELS.agentRespondToBrowserSecret,
+    ),
+    respondToBrowserTakeover: request<AgentIpcRequest<RespondToBrowserTakeoverInput>, void>()(
+      IPC_CHANNELS.agentRespondToBrowserTakeover,
+    ),
+    event: event<ScopedAgentEvent>()(IPC_CHANNELS.agentEvent),
   },
   agentMemories: {
     listMemories: request<AgentIpcRequest<string>, AgentMemory[]>()(IPC_CHANNELS.agentListMemories),
@@ -438,15 +526,25 @@ export const IPC_ENDPOINTS = {
     ),
   },
   agentAttachments: {
-    chooseAttachments: untypedRequest(IPC_CHANNELS.agentChooseAttachments),
-    importAttachments: untypedRequest(IPC_CHANNELS.agentImportAttachments),
-    discardDraftAttachment: untypedRequest(IPC_CHANNELS.agentDiscardDraftAttachment),
-    downloadAttachments: untypedRequest(IPC_CHANNELS.agentDownloadAttachments),
-    openAttachment: untypedRequest(IPC_CHANNELS.agentOpenAttachment),
-    openSharedFile: untypedRequest(IPC_CHANNELS.agentOpenSharedFile),
-    openWorkspaceFile: untypedRequest(IPC_CHANNELS.agentOpenWorkspaceFile),
-    previewSharedFile: untypedRequest(IPC_CHANNELS.agentPreviewSharedFile),
-    previewWorkspaceFile: untypedRequest(IPC_CHANNELS.agentPreviewWorkspaceFile),
+    chooseAttachments: request<AgentIpcRequest<ChooseAttachmentsInput>, DraftAttachment[]>()(
+      IPC_CHANNELS.agentChooseAttachments,
+    ),
+    importAttachments: request<AgentIpcRequest<ImportAttachmentsInput>, DraftAttachment[]>()(
+      IPC_CHANNELS.agentImportAttachments,
+    ),
+    discardDraftAttachment: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentDiscardDraftAttachment),
+    downloadAttachments: request<AgentIpcRequest<DownloadAttachmentsInput>, void>()(
+      IPC_CHANNELS.agentDownloadAttachments,
+    ),
+    openAttachment: request<AgentIpcRequest<OpenAttachmentInput>, void>()(IPC_CHANNELS.agentOpenAttachment),
+    openSharedFile: request<AgentIpcRequest<OpenSharedFileInput>, void>()(IPC_CHANNELS.agentOpenSharedFile),
+    openWorkspaceFile: request<AgentIpcRequest<OpenWorkspaceFileInput>, void>()(IPC_CHANNELS.agentOpenWorkspaceFile),
+    previewSharedFile: request<AgentIpcRequest<OpenSharedFileInput>, FilePreview>()(
+      IPC_CHANNELS.agentPreviewSharedFile,
+    ),
+    previewWorkspaceFile: request<AgentIpcRequest<OpenWorkspaceFileInput>, FilePreview>()(
+      IPC_CHANNELS.agentPreviewWorkspaceFile,
+    ),
   },
   browser: {
     open: untypedRequest(IPC_CHANNELS.browserOpen),

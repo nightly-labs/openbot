@@ -101,7 +101,6 @@ import {
   type RemoteDesktopTestStatus,
   type RequestChannel,
   type ResultOf,
-  type ScopedAgentEvent,
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
   type ScopedTeamPresenceSnapshot,
@@ -127,6 +126,7 @@ import {
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { decodeScopedAgentEvent } from "./agent-event-decoding";
 import {
   decodeAccountSessions,
   decodeAnalyticsPreference,
@@ -1126,7 +1126,7 @@ const openbotApi: OpenBotDesktopApi = {
       invokeAgentForServer(serverId, IPC_CHANNELS.hostGetAnalytics, input, decodeHostAnalyticsFromMain),
     getAnalytics: (input, serverId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentGetAnalytics, input, decodeAgentAnalyticsFromMain),
-    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId ?? null, decodeAccountUsageFromMain),
+    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId, decodeAccountUsageFromMain),
     listModels: () => invokeAgent(IPC_CHANNELS.agentListModels, null, decodeAgentModels),
     listAgents: (serverId) =>
       serverId === undefined
@@ -1225,14 +1225,15 @@ const openbotApi: OpenBotDesktopApi = {
     respondToBrowserSecret: (input) => invokeAgent(IPC_CHANNELS.agentRespondToBrowserSecret, input, decodeVoid),
     respondToBrowserTakeover: (input) => invokeAgent(IPC_CHANNELS.agentRespondToBrowserTakeover, input, decodeVoid),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedAgentEvent) => {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        const payload = decodeScopedAgentEvent(value);
         if (payload.serverId === selectedServerId) listener(payload.event);
       };
       ipcRenderer.on(IPC_CHANNELS.agentEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.agentEvent, handler);
     },
     onScopedEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedAgentEvent) => listener(payload);
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => listener(decodeScopedAgentEvent(value));
       ipcRenderer.on(IPC_CHANNELS.agentEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.agentEvent, handler);
     },
