@@ -44,7 +44,10 @@ import {
 import { guardedListDecoder, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  decodeBrowserViewInputValue,
+  TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -204,7 +207,11 @@ export function createWebWorkspaceRuntime(
       throw new Error("The host could not complete this request. Refresh before trying again.");
     return result.body;
   }
-  const browserView = createRemoteBrowserView((data) => peer.sendHostStreamData(data), request);
+  const browserView = createRemoteBrowserView(
+    (data) => peer.sendHostStreamData(data),
+    request,
+    () => capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
+  );
   let liveView: RemoteBrowserView | null = null;
   let liveViewGeneration = 0;
   async function releaseLiveView(): Promise<void> {

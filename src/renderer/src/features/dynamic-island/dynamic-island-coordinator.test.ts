@@ -1,6 +1,6 @@
-import type { AgentEvent, AgentRuntimeSnapshot, AgentSummary } from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentRuntimeSnapshot, AgentSummary, QueueDelivery } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { DynamicIslandCoordinator } from "./dynamic-island-coordinator";
+import { DynamicIslandCoordinator, reconcileQueuesWithRuntimeWork } from "./dynamic-island-coordinator";
 import type { DynamicIslandPresentationInput } from "./dynamic-island-presentation";
 
 describe("DynamicIslandCoordinator", () => {
@@ -739,3 +739,56 @@ function agent(id: string, name: string): AgentSummary {
     avatarUrl: null,
   };
 }
+
+describe("reconcileQueuesWithRuntimeWork", () => {
+  it("keeps a routine sender when a runtime snapshot refreshes that delivery", () => {
+    const sender: QueueDelivery["sender"] = {
+      kind: "routine",
+      routineId: "routine-1",
+      runId: "run-1",
+      routineName: "Daily",
+      scheduledFor: "2026-09-22T10:00:00.000Z",
+    };
+    const delivery: QueueDelivery = {
+      id: "delivery-1",
+      messageId: "message-1",
+      recipientAgentId: "chief",
+      sender,
+      text: "Do the thing",
+      attachments: [],
+      replyToMessageId: null,
+      status: "running",
+      position: null,
+      turnId: "turn-1",
+      error: null,
+      createdAt: "2026-09-22T10:00:00.000Z",
+    };
+
+    const next = reconcileQueuesWithRuntimeWork(
+      { chief: { agentId: "chief", deliveries: [delivery] } },
+      [
+        {
+          id: "delivery-1",
+          agentId: "chief",
+          turnId: "turn-2",
+          status: "running",
+          text: "Do the thing",
+          error: null,
+        },
+      ],
+      new Map([["chief", "turn-2"]]),
+    );
+
+    expect(next.chief?.deliveries).toEqual([{ ...delivery, turnId: "turn-2" }]);
+  });
+
+  it("uses a user sender only for a delivery the queue has not seen", () => {
+    const next = reconcileQueuesWithRuntimeWork(
+      {},
+      [{ id: "delivery-1", agentId: "chief", turnId: "turn-1", status: "running", text: "Hello", error: null }],
+      new Map([["chief", "turn-1"]]),
+    );
+
+    expect(next.chief?.deliveries[0]?.sender).toEqual({ kind: "user" });
+  });
+});

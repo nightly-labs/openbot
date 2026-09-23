@@ -3,6 +3,7 @@ import {
   computeSidebarAgentStates,
   type SidebarAgentStatesInput,
 } from "@openbot/ui/features/sidebar/sidebar-agent-states";
+import { sidebarAgentStateLabel } from "@openbot/ui/features/sidebar/sidebar-filtering";
 
 function queue(agentId: string, ...statuses: QueueDeliveryStatus[]): QueueSnapshot {
   const deliveries: QueueDelivery[] = statuses.map((status, index) => ({
@@ -29,8 +30,43 @@ function input(overrides: Partial<SidebarAgentStatesInput> = {}): SidebarAgentSt
     queues: {},
     unreadReplies: {},
     recentReplies: {},
+    pendingPrompts: {},
+    pendingApprovals: {},
+    failedTurns: {},
     ...overrides,
   };
+}
+
+function routineDelivery(
+  agentId: string,
+  status: QueueDeliveryStatus,
+  overrides: Partial<QueueDelivery> = {},
+): QueueDelivery {
+  return {
+    id: `delivery-${status}`,
+    messageId: `message-${status}`,
+    recipientAgentId: agentId,
+    sender: {
+      kind: "routine",
+      routineId: "routine-1",
+      runId: `run-${status}`,
+      routineName: "Daily",
+      scheduledFor: "2026-09-22T10:00:00.000Z",
+    },
+    text: "Do the thing",
+    attachments: [],
+    replyToMessageId: null,
+    status,
+    position: status === "queued" ? 1 : null,
+    turnId: status === "queued" ? null : "turn-1",
+    error: null,
+    createdAt: "2026-09-22T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function snapshot(agentId: string, ...deliveries: QueueDelivery[]): QueueSnapshot {
+  return { agentId, deliveries };
 }
 
 describe("computeSidebarAgentStates", () => {
@@ -109,5 +145,104 @@ describe("computeSidebarAgentStates", () => {
     const states = computeSidebarAgentStates(input({ agentIds: [], activeTurns: { chief: "turn-1" } }));
 
     expect(states).toEqual({});
+  });
+
+  it("marks the agent that owns the running routine and nobody else", () => {
+    const states = computeSidebarAgentStates(
+      input({
+        agentIds: ["chief", "sales"],
+        queues: {
+          chief: snapshot(
+            "chief",
+            routineDelivery("chief", "running"),
+            routineDelivery("chief", "running", {
+              id: "delivery-2",
+              messageId: "message-2",
+              sender: {
+                kind: "routine",
+                routineId: "routine-2",
+                runId: "run-2",
+                routineName: "Weekly",
+                scheduledFor: "2026-09-22T11:00:00.000Z",
+              },
+            }),
+          ),
+          sales: snapshot("sales", routineDelivery("sales", "completed", { turnId: "turn-sales" })),
+        },
+      }),
+    );
+
+    expect(states).toEqual({ chief: { kind: "routine", phase: "running", count: 2 } });
+    expect(sidebarAgentStateLabel(states.chief)).toBe("2 routines running");
+  });
+
+  it("shows a queued routine only when none of its runs are already going", () => {
+    const waiting = computeSidebarAgentStates(
+      input({ queues: { chief: snapshot("chief", routineDelivery("chief", "queued")) } }),
+    );
+    expect(waiting.chief).toEqual({ kind: "routine", phase: "queued", count: 1 });
+    expect(sidebarAgentStateLabel(waiting.chief)).toBe("Routine waiting");
+
+    const started = computeSidebarAgentStates(
+      input({
+        queues: {
+          chief: snapshot(
+            "chief",
+            routineDelivery("chief", "queued", { id: "delivery-queued" }),
+            routineDelivery("chief", "running"),
+          ),
+        },
+      }),
+    );
+    expect(started.chief).toEqual({ kind: "routine", phase: "running", count: 1 });
+  });
+
+  it("shows needs attention when a prompt blocks the routine turn", () => {
+    const states = computeSidebarAgentStates(
+      input({
+        queues: { chief: snapshot("chief", routineDelivery("chief", "running")) },
+        pendingPrompts: { chief: { type: "prompt", turnId: "turn-1" } },
+        unreadReplies: { chief: 4 },
+      }),
+    );
+
+    expect(states.chief).toEqual({ kind: "routine", phase: "needs-attention", count: 1 });
+    expect(sidebarAgentStateLabel(states.chief)).toBe("Routine needs attention");
+  });
+
+  it("marks the current failed routine turn and ignores an older one", () => {
+    const current = computeSidebarAgentStates(
+      input({
+        queues: { chief: snapshot("chief", routineDelivery("chief", "failed")) },
+        failedTurns: { chief: "turn-1" },
+      }),
+    );
+    expect(current.chief).toEqual({ kind: "routine", phase: "failed", count: 1 });
+
+    const older = computeSidebarAgentStates(
+      input({
+        queues: { chief: snapshot("chief", routineDelivery("chief", "failed", { turnId: "turn-old" })) },
+        failedTurns: { chief: "turn-new" },
+        unreadReplies: { chief: 1 },
+      }),
+    );
+    expect(older.chief).toEqual({ kind: "unread", count: 1 });
+  });
+
+  it("keeps a user turn on the working mark", () => {
+    const states = computeSidebarAgentStates(input({ queues: { chief: queue("chief", "running") } }));
+
+    expect(states.chief).toEqual({ kind: "working" });
+  });
+
+  it("lets an unread reply replace a finished routine", () => {
+    const states = computeSidebarAgentStates(
+      input({
+        queues: { chief: snapshot("chief", routineDelivery("chief", "completed", { turnId: "turn-done" })) },
+        unreadReplies: { chief: 1 },
+      }),
+    );
+
+    expect(states.chief).toEqual({ kind: "unread", count: 1 });
   });
 });

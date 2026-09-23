@@ -1,7 +1,9 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  BROWSER_VIEW_FRAME_ACK_QUERY,
   type BrowserViewFrame,
   type BrowserViewInput,
+  browserViewInputForHost,
   decodeBrowserViewFrame,
   decodeBrowserViewSessionResponse,
   encodeBrowserViewInput,
@@ -27,6 +29,8 @@ interface View {
 export function createRemoteBrowserView(
   send: (data: string) => Promise<void>,
   request: (method: string, path: string, body?: { tabId: string }) => Promise<unknown>,
+  /** Whether the host advertises `browser-view-frame-point`. An older host closes a view on an input it does not know. */
+  namesFrames: () => boolean,
 ) {
   let view: View | null = null;
   let generation = 0;
@@ -81,9 +85,17 @@ export function createRemoteBrowserView(
       }
       const next: View = { sessionId: session.id, streamId: crypto.randomUUID(), ready: false, frame, ended };
       view = next;
+      const acksFrames = namesFrames();
+      // The host keeps a frame's size only for a client that will say when that frame is on screen.
+      const path = new URL(session.streamPath, "http://host");
+      if (acksFrames) path.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
       try {
         await send(
-          encodeRemoteDesktopSignalControl({ type: "open", streamId: next.streamId, path: session.streamPath }),
+          encodeRemoteDesktopSignalControl({
+            type: "open",
+            streamId: next.streamId,
+            path: path.pathname + path.search,
+          }),
         );
       } catch (error) {
         await close().catch(() => undefined);
@@ -92,11 +104,13 @@ export function createRemoteBrowserView(
       return {
         async input(input) {
           if (view !== next || !next.ready) throw new Error("The browser view is not connected.");
+          const wire = browserViewInputForHost(input, acksFrames);
+          if (!wire) return;
           await send(
             encodeRemoteDesktopSignalControl({
               type: "text",
               streamId: next.streamId,
-              data: encodeBrowserViewInput(input),
+              data: encodeBrowserViewInput(wire),
             }),
           );
         },

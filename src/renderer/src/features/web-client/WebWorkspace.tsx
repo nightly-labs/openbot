@@ -100,16 +100,12 @@ export function WebWorkspace(props: {
     queues: {},
     unreadReplies: {},
     recentReplies: {},
+    failedTurns: {},
+    pendingPrompts: Object.fromEntries(workspace.state.prompts.map((prompt) => [prompt.agentId, prompt])),
+    pendingApprovals: Object.fromEntries(workspace.state.approvals.map((approval) => [approval.agentId, approval])),
   }));
   const sidebarAgentStates = createMemo(() => computeSidebarAgentStates(sidebarActivity()));
-  const sidebarAgentMoods = createMemo(() =>
-    computeAgentAvatarMoods({
-      ...sidebarActivity(),
-      failedTurns: {},
-      pendingPrompts: Object.fromEntries(workspace.state.prompts.map((prompt) => [prompt.agentId, prompt])),
-      pendingApprovals: Object.fromEntries(workspace.state.approvals.map((approval) => [approval.agentId, approval])),
-    }),
-  );
+  const sidebarAgentMoods = createMemo(() => computeAgentAvatarMoods(sidebarActivity()));
   const browserEnabled = createMemo(
     () =>
       workspace.state.status === "online" &&

@@ -2,8 +2,12 @@
 
 ## Communication
 
-Use ASD-STE100 Simplified Technical English for questions, updates, explanations, and final answers.
-Keep quotations, code, commands, paths, identifiers, and required technical terms unchanged.
+Use ASD-STE100 Simplified Technical English for all text you write: questions, updates,
+explanations, final answers, commit messages, PR descriptions, and review comments. Be as concise as
+possible. Keep quotations, code, commands, paths, identifiers, and required technical terms unchanged.
+
+Do not add an agent or model as author or co-author. Do not add `Co-Authored-By:` trailers or
+"Generated with" lines to commits or PRs.
 
 **Non-negotiable** rules protect user data, released contracts, and security. Change them only on
 an explicit developer decision. All other rules are defaults: follow the developer's preference
@@ -166,6 +170,10 @@ They describe the enforced syntax, fixture behavior, and reasons for removed rul
 - Open a PR only when asked.
 - For UI changes, show before and after. State the model and harness in the PR body.
   Do not commit screenshots or other PR review image assets to the repository.
+- Choose the NorbiAI reviewer level from the riskiest file in the diff with the
+  [reviewer table](CONTRIBUTING.md#choosing-the-reviewer-for-one-pull-request). Put the
+  `NorbiAI-Model:` line in the PR body as an HTML comment; omit it for the default. Do not add
+  `NorbiAI-Effort:` with a `chatgpt-web/*` model: it has no effect.
 - Do not run wider checks locally before a PR. Report focused checks and leave broad checks to CI.
 - A PR needs a named reason and is not auto-approvable if it adds `biome-ignore`, `@ts-expect-error`,
   or `@ts-ignore`; disables rules through `biome.json` overrides or removes a GritQL plugin; widens

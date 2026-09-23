@@ -1915,6 +1915,36 @@ export const ActionMarkerSpacing: Story = {
   args: actionMarkerArgs,
 };
 
+/* The history opens and closes inside a real timeline, where the messages under
+   the marker move with it. The isolated marker story cannot show that. */
+export const ActionMarkerHistory: Story = {
+  name: "Action marker history",
+  args: {
+    ...actionMarkerArgs,
+    messages: actionMarkerMessages.map((message) =>
+      message.id === "spacing-routine-run" && message.actionMarker?.kind === "routine-run"
+        ? {
+            ...message,
+            actionMarker: {
+              ...message.actionMarker,
+              status: "succeeded",
+              previousTransitions: [
+                { status: "queued", timestamp: "2026-08-19T22:49:00.000Z" },
+                { status: "running", timestamp: "2026-08-19T22:50:00.000Z" },
+                { status: "needs-attention", timestamp: "2026-08-19T22:51:00.000Z" },
+                { status: "running", timestamp: "2026-08-19T22:52:00.000Z" },
+              ],
+            },
+          }
+        : message,
+    ),
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Show history for Daily source check" }));
+    await expect(canvas.getByRole("list", { name: "Earlier routine states" })).toBeVisible();
+  },
+};
+
 export const NarrowActionMarkerSpacing: Story = {
   name: "Narrow action marker spacing",
   args: actionMarkerArgs,

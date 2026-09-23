@@ -200,10 +200,21 @@ export class SignalService {
   }
 
   profileChanged(userId: string): void {
+    this.#notifyAccount(userId, "account-profile-changed");
+  }
+
+  /**
+   * A membership this account accepted or lost. Every socket the account holds is told, because
+   * the device that made the change is not the one that needs to hear about it: the desktop and
+   * the phone signed in to one account each keep their own server list.
+   */
+  serversChanged(userId: string): void {
+    this.#notifyAccount(userId, "account-servers-changed");
+  }
+
+  #notifyAccount(userId: string, type: "account-profile-changed" | "account-servers-changed"): void {
     for (const peer of this.#peers.values()) {
-      if (peer.claims.userId === userId) {
-        this.#send(peer.socket, { type: "account-profile-changed", version: 1 });
-      }
+      if (peer.claims.userId === userId) this.#send(peer.socket, { type, version: 1 });
     }
   }
 

@@ -1,5 +1,10 @@
 import type { QueueSnapshot } from "@openbot/contracts/ipc";
-import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
+import type { SidebarAgentState, SidebarRoutinePhase } from "./sidebar-types";
+
+/** The turn a prompt or approval is blocked on. Only `turnId` matters to the badge. */
+export type SidebarAttention =
+  | { type: "prompt"; turnId: string }
+  | { type: "browser-takeover-requested"; request: { turnId: string } };
 
 export interface SidebarAgentStatesInput {
   agentIds: readonly string[];
@@ -7,6 +12,9 @@ export interface SidebarAgentStatesInput {
   queues: Record<string, QueueSnapshot>;
   unreadReplies: Record<string, number>;
   recentReplies: Record<string, boolean>;
+  pendingPrompts: Record<string, SidebarAttention | undefined>;
+  pendingApprovals: Record<string, { turnId: string } | undefined>;
+  failedTurns: Record<string, string | undefined>;
 }
 
 /**
@@ -32,25 +40,60 @@ export function isAgentWorking(
 }
 
 /**
- * The badge each agent shows in the sidebar, from the four signals that can
- * claim one.
+ * The badge each agent shows in the sidebar.
  *
- * Pure, and outside every context, because the inputs come from three different
- * domains - agents, turns and conversation - and a context that read all three
- * would have to sit under all three. The precedence is the point and is why this
- * is one function rather than three: an agent that is working shows *working*
- * even with unread replies waiting, because the count is about to change again.
+ * Pure, and outside every context, because the inputs come from different domains and a context
+ * that read all of them would have to sit under all of them. The precedence is the point: a
+ * routine mark outranks a generic working mark, and either outranks unread replies, because that
+ * count is about to change again.
  *
- * An agent with nothing to say gets no entry at all, so the result is sparse and
- * a missing key means "idle" rather than "unknown".
+ * One routine mark per agent. Several routine deliveries share it; `count` is how many are in the
+ * phase the mark shows. A paused schedule is not a delivery, so it does not mark the row.
+ *
+ * An agent with nothing to say gets no entry at all, so the result is sparse and a missing key
+ * means "idle" rather than "unknown".
  */
 export function computeSidebarAgentStates(input: SidebarAgentStatesInput): Record<string, SidebarAgentState> {
   const states: Record<string, SidebarAgentState> = {};
   for (const agentId of input.agentIds) {
-    if (isAgentWorking(agentId, input.activeTurns, input.queues)) states[agentId] = { kind: "working" };
+    const routine = routineBadge(agentId, input);
+    if (routine) states[agentId] = routine;
+    else if (isAgentWorking(agentId, input.activeTurns, input.queues)) states[agentId] = { kind: "working" };
     else if ((input.unreadReplies[agentId] ?? 0) > 0) {
       states[agentId] = { kind: "unread", count: input.unreadReplies[agentId] ?? 1 };
     } else if (input.recentReplies[agentId]) states[agentId] = { kind: "responded" };
   }
   return states;
+}
+
+function routineBadge(agentId: string, input: SidebarAgentStatesInput): SidebarAgentState | undefined {
+  const deliveries = (input.queues[agentId]?.deliveries ?? []).filter((delivery) => delivery.sender.kind === "routine");
+  if (deliveries.length === 0) return undefined;
+
+  const running = deliveries.filter((delivery) => delivery.status === "starting" || delivery.status === "running");
+  const attentionTurnId = blockedTurnId(input.pendingPrompts[agentId], input.pendingApprovals[agentId]);
+  const blocked = running.filter((delivery) => delivery.turnId !== null && delivery.turnId === attentionTurnId);
+  if (blocked.length > 0) return routineState("needs-attention", blocked.length);
+  if (running.length > 0) return routineState("running", running.length);
+
+  const failedTurnId = input.failedTurns[agentId];
+  const failed = deliveries.filter((delivery) => delivery.status === "failed" && delivery.turnId === failedTurnId);
+  if (failedTurnId && failed.length > 0) return routineState("failed", failed.length);
+
+  const queued = deliveries.filter((delivery) => delivery.status === "queued");
+  if (queued.length > 0) return routineState("queued", queued.length);
+  return undefined;
+}
+
+function routineState(phase: SidebarRoutinePhase, count: number): SidebarAgentState {
+  return { kind: "routine", phase, count };
+}
+
+function blockedTurnId(
+  prompt: SidebarAttention | undefined,
+  approval: { turnId: string } | undefined,
+): string | undefined {
+  if (prompt?.type === "prompt") return prompt.turnId;
+  if (prompt?.type === "browser-takeover-requested") return prompt.request.turnId;
+  return approval?.turnId;
 }

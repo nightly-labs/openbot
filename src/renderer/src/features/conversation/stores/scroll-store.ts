@@ -18,6 +18,7 @@ import {
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
+import { summarizeRoutineRunMessages } from "../routine-run-timeline";
 
 export interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;
@@ -52,7 +53,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
   let talliedConversationIdentity: string | undefined;
 
-  const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
+  const timelineMessages = createMemo(() =>
+    summarizeRoutineRunMessages(deps.props.messages.filter((message) => message.kind !== "thinking")),
+  );
   /* Every row anchors the count, but only some rows add to it. */
   const timelineRows = createMemo(() =>
     deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),

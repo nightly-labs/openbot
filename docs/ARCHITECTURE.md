@@ -142,6 +142,25 @@ the `media-attachments` capability; released protocol adapters keep their existi
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
+hook. Native guests retain their opener, request body, and shared browser session. Local tab and
+agent tool results expose `openerTabId` while that relationship is live. Independent `noopener`
+tabs survive parent closure; dependent popups close with the parent. Closing a popup returns to its
+opener. Saved popup URLs omit OAuth callback credentials. Popup state is not restored as a live
+JavaScript relationship after an app restart.
+Secure input cards are unavailable in both sides of a native opener connection; those tabs require
+human takeover for passwords and codes. This restriction lasts for the tab lifetime, including after
+popup closure or navigation, because connected pages can retain document references. Independent
+tabs remain eligible for secure input. Account selection without secret entry remains automated.
+Agents use `list_tabs` after sign-in actions and inspect the new tab before continuing. Secure input
+and takeover still handle passwords, codes, CAPTCHA, and passkeys. Blocked requests produce a
+reason without including authentication URLs or request data.
+Agent instructions keep the viewport stable during sign-in and require fresh targets after page
+changes or covered-target errors. X Google sign-in starts on the landing page after cookie consent.
+X can retain a Google callback for a removed login dialog and report `Input2SSO: Unsupported provider`.
+For that error in the current attempt, agents may reload the signed-out landing page and retry once,
+then verify authenticated navigation. This recovery does not run during secure handoff or discard
+non-login work. The host does not rewrite site scripts or weaken cross-origin security policies.
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
@@ -519,6 +538,23 @@ the native/DOM bridge limits each file to 10 MB and cancels transfers when its c
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+Mobile external links enter through Expo Router's `+native-intent` and the links feature.
+Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
+local request ID. Invitations wait through sign-in and show a verified host preview before an
+explicit join. Mobile Connect links require confirmation and cannot replace a signed-in account.
+The one exception is development builds: `bun run dev:mobile` opens the link with `simctl openurl`,
+and a `__DEV__` build redeems it without confirmation only when its account service is a loopback
+or private-network `http:` origin. Release builds always use the confirmed flow.
+Plugin links open their validated public page in the in-app browser. Unsupported links show a
+safe fallback. Permanent invitation metadata comes from the shared Team client; revocation stops
+new joins without removing existing members.
+iOS associates only `https://openbot.run/join` with `run.openbot.mobile`. Changes to associated
+domains require a new native app build and deployment of the website association file. Android
+continues to open HTTPS invitations in the browser, whose button opens `openbot://join`. Enabling
+verified Android App Links requires the release app-signing certificate's SHA-256 fingerprint,
+`/.well-known/assetlinks.json`, and a matching verified `/join` intent filter. No certificate
+fingerprint is stored in this repository yet.
+
 Mobile Settings uses one native form sheet with stable detents and a nested Expo Router stack.
 Inner pages push within the sheet and use native back navigation; standalone forms remain
 fit-to-content sheets. Both reuse SheetScrollView. General, Profile, Connections and About use HeroUI typography and shared
@@ -540,7 +576,13 @@ account-to-Signal outbox before returning. Worker `waitUntil` delivers notificat
 profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
 the account API on notification, cold launch, and every 15 minutes while active.
-Desktop window focus does not trigger an automatic account or directory check.
+Membership writes enqueue an `account-servers-changed` invalidation the same way, addressed to the
+account rather than to a host: accepting an invitation, changing a membership, and registering a
+host this account did not have all queue one for the member whose server list changed. Republishing
+an existing host rotates its credential without changing a list, and queues nothing. Signal forwards it to every authenticated socket that account
+holds, and the frame names no server. That is how a server joined on one device reaches the other
+devices of the same account. Desktop window focus does not trigger an automatic account or directory
+check; a device holding no Signal socket finds the change at its next 15-minute check.
 Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
 A foreground return checks absolute freshness: successful account and directory responses stay fresh
 for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
@@ -1121,7 +1163,8 @@ waits up to five seconds, then loads the current URL with GET to replace the doc
 a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
-OAuth selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+
 ### Shared UI package
 
 `@openbot/ui` owns the existing SolidJS primitives and their primitive stylesheet. Desktop,

@@ -21,8 +21,8 @@ describe("language preference store", () => {
   it("persists a chosen language", async () => {
     const root = await temporaryRoot();
     const path = join(root, "language.json");
-    await expect(writeLanguagePreference(path, { language: "ja" })).resolves.toEqual({ language: "ja" });
-    await expect(readLanguagePreference(path)).resolves.toEqual({ language: "ja" });
+    await expect(writeLanguagePreference(path, { language: "fr" })).resolves.toEqual({ language: "fr" });
+    await expect(readLanguagePreference(path)).resolves.toEqual({ language: "fr" });
   });
 
   it("follows the system language when the file names one this build no longer ships", async () => {

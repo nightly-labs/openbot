@@ -7,6 +7,7 @@ import { app, BrowserWindow, type WebContents, webContents } from "electron";
 import { BrowserHost } from "../src/backend/browser-host";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
 import { runSecretHandoffScenario } from "./browser-secret-smoke";
+import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
@@ -24,6 +25,67 @@ interface PersistenceSnapshot {
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === "/popup-parent") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<style>
+      html { overflow-y: scroll; }
+      body { min-height: 120vh; }
+      ::-webkit-scrollbar { width: 16px; }
+      </style><h1>Sign in</h1>
+      <button onclick="window.auth = window.open('/popup-login', 'auth')"><span style="display:block">Sign in with account</span></button>
+      <button onclick="window.auth = window.open('', 'auth'); auth.location.href='/popup-login'">Blank popup</button>
+      <button onclick="window.open('http://localhost:' + location.port + '/popup-login', 'cross-auth')">Cross-origin sign-in</button>
+      <iframe title="Embedded sign-in" src="http://localhost:${request.headers.host?.split(":").at(-1)}/popup-launcher"></iframe>
+      <a href="/popup-login" target="_blank">Independent tab</a>
+      <form action="/popup-post" method="POST" target="_blank"><input name="state" value="local-state"><button>Post sign-in</button></form>
+      <p id="result">Signed out</p><script>
+      document.cookie='popup_session=shared; Path=/';
+      addEventListener('resize', () => {
+        const expected = window.callbackViewport;
+        if (expected) {
+          window.callbackExpired = true;
+        }
+      });
+      addEventListener('message', event => {
+        if (event.origin === location.origin && event.data === 'signed-in') document.querySelector('#result').textContent = window.callbackExpired ? 'Sign-in expired after resize' : 'Signed in';
+      });
+      </script>`);
+    return;
+  }
+  if (url.pathname === "/popup-launcher") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<button onclick="window.open('/popup-login', 'frame-auth')"><span style="display:block">Iframe sign-in</span></button>
+      <div style="position:relative;width:max-content">
+        <button onclick="window.open('/popup-login', 'blocked-auth')"><span>Blocked frame sign-in</span></button>
+        <div style="position:absolute;inset:0">Covering layer</div>
+      </div>`);
+    return;
+  }
+  if (url.pathname === "/popup-login") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<h1>Choose account</h1><button onclick="location.href='http://127.0.0.1:' + location.port + '/popup-callback'"><span style="display:block">Use test account</span></button>`,
+    );
+    return;
+  }
+  if (url.pathname === "/popup-callback") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<script>opener.parent.postMessage('signed-in', location.origin); window.close();</script>`);
+    return;
+  }
+  if (url.pathname === "/popup-post") {
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
+    request.on("end", () => {
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(
+        `<h1>${request.method === "POST" && body === "state=local-state" ? "Post received" : "Post lost"}</h1>`,
+      );
+    });
+    return;
+  }
   if (url.pathname === "/cached") {
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
@@ -319,6 +381,7 @@ async function main(): Promise<void> {
       "wait-deadlines",
       "live-view",
       "secret-handoff",
+      "popups",
     ].includes(scenario)
   ) {
     throw new Error(
@@ -379,6 +442,8 @@ async function main(): Promise<void> {
       try {
         if (scenario === "background") {
           // The scenario runs before the browser panel is first shown.
+        } else if (scenario === "popups") {
+          await runPopupScenario(browser, origin);
         } else if (scenario === "secret-handoff") {
           await runSecretHandoffScenario(browser, origin);
         } else if (scenario === "tool-boundary") {
@@ -443,6 +508,9 @@ async function main(): Promise<void> {
       throw new Error("Browser fill-mode status did not use the current panel bounds.");
     }
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    const localContents = webContents.getFocusedWebContents();
+    if (!localContents) throw new Error("The local tab lost focus.");
+    await waitForPresentedFrame(localContents);
     process.stdout.write("BrowserHost: local tab opened.\n");
     const first = await browser.snapshot(tab.id);
     const input = first.elements.find((element) => element.name === "Task");
@@ -454,23 +522,12 @@ async function main(): Promise<void> {
       ref: input.ref,
       text: "runs locally",
     });
-    const currentSave = typed.elements.find((element) => element.name === "Save");
-    if (!currentSave) throw new Error("Save control disappeared after typing.");
-    await browser.act(tab.id, typed.revision, { type: "click", ref: currentSave.ref });
-    // A native click travels the input pipeline, not the snapshot channel, so the page can still be
-    // running the handler when the act call returns. Wait for the text the handler writes; a click
-    // that was not native never writes it, so the check keeps its meaning.
-    const clickDeadline = Date.now() + 5_000;
-    let result = await browser.snapshot(tab.id);
-    while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < clickDeadline) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      result = await browser.snapshot(tab.id);
+    if (!typed.text.includes("runs locally|input:true")) {
+      throw new Error(`Browser input was not native: ${typed.text}`);
     }
-    if (!result.text.includes("runs locally|input:true|click:true")) {
-      const contents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
-      const pointerEvents = await contents?.executeJavaScript("JSON.stringify(window.smokePointerEvents)");
-      throw new Error(`Browser input was not native: ${result.text}; pointer events: ${pointerEvents}`);
-    }
+    const pageContents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
+    if (!pageContents) throw new Error("The local tab's web contents were not available.");
+    await waitForMouseInput(browser, tab.id, pageContents);
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 
     await runDoubleClickScenario(browser, origin);
@@ -1578,9 +1635,10 @@ async function main(): Promise<void> {
     if (whatsappLive) await runWhatsAppLiveProbe(browser);
     await expectFailure(() => browser.act(tab.id, first.revision, { type: "click", ref: save.ref }));
 
-    const child = result.elements.find((element) => element.name === "Child");
+    const current = await browser.snapshot(tab.id);
+    const child = current.elements.find((element) => element.name === "Child");
     if (!child) throw new Error("Child-tab control is missing.");
-    await browser.act(tab.id, result.revision, { type: "click", ref: child.ref });
+    await browser.act(tab.id, current.revision, { type: "click", ref: child.ref });
     await waitForValue(() =>
       browser.listTabs().find((candidate) => candidate.id !== tab.id && candidate.url.includes("/child")),
     );
@@ -1659,6 +1717,7 @@ async function main(): Promise<void> {
     });
     if (!toolResult.success) throw new Error("Dynamic browser tool failed.");
     await runToolBoundaryScenario(browser, origin);
+    await runPopupScenario(browser, origin);
     await runSecretHandoffScenario(browser, origin);
     if (!controlPhases.includes("open:acting") || !controlPhases.includes("open:waiting")) {
       throw new Error(`Browser control lifecycle was not reported: ${controlPhases.join(", ")}`);
@@ -1985,6 +2044,48 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   })()`,
     true,
   );
+}
+
+/**
+ * Wait until the view actually delivers a mouse event to the page.
+ *
+ * A key event goes to the focused renderer, but a mouse event needs the view to be producing
+ * compositor frames, and under a virtual display it can take seconds to get there - an animation
+ * frame does not run at all until it does. Chromium drops every mouse event in the meantime and
+ * reports nothing: no error, no pointer event, just a click that never happened. Every scenario
+ * after this one clicks once and means it, so the waiting belongs here rather than in each of them.
+ *
+ * The probe is thrown away, so retrying it costs nothing and proves nothing about the product.
+ */
+async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  await contents.executeJavaScript(
+    `(() => {
+    const probe = document.createElement('button');
+    probe.id = 'smoke-input-probe';
+    probe.textContent = 'Input probe';
+    probe.style.cssText = 'position:fixed;left:8px;top:8px;z-index:2147483647';
+    probe.addEventListener('click', event => {
+      if (event.isTrusted) probe.dataset.clicked = 'true';
+    });
+    document.body.prepend(probe);
+  })()`,
+    true,
+  );
+  const deadline = Date.now() + 60_000;
+  let landed = false;
+  while (!landed && Date.now() < deadline) {
+    await callBrowserTool(browser, "click", {
+      tabId,
+      target: { kind: "role", role: "button", name: "Input probe", exact: true },
+    });
+    landed =
+      (await contents.executeJavaScript(
+        "document.getElementById('smoke-input-probe').dataset.clicked === 'true'",
+        true,
+      )) === true;
+  }
+  await contents.executeJavaScript("document.getElementById('smoke-input-probe').remove()", true);
+  if (!landed) throw new Error("The view never delivered a native mouse event to the page.");
 }
 
 async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {
@@ -2610,6 +2711,97 @@ async function waitForPersistenceSnapshot(browser: BrowserHost, tabId: string): 
 
 function argumentValue(prefix: string): string | null {
   return process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length) || null;
+}
+
+async function runPopupScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const { tab: parent, contents } = await openTabWithContents(
+    browser,
+    `${origin}/popup-parent`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const click = async (tabId: string, role: string, name: string) => {
+    const result = await callBrowserTool(browser, "click", {
+      tabId,
+      target: { kind: "role", role, name, exact: true },
+    });
+    if (!result.success) throw new Error(`Popup click failed: ${toolError(result)}`);
+  };
+  try {
+    for (const button of ["Sign in with account", "Blank popup", "Cross-origin sign-in", "Iframe sign-in"]) {
+      await click(parent.id, "button", button);
+      const popup = await waitForValue(() => browser.listTabs().find((tab) => tab.openerTabId === parent.id));
+      const listed = await callBrowserTool(browser, "list_tabs", {});
+      if (!JSON.stringify(toolTextPayload(listed)).includes(popup.id)) throw new Error("Agent cannot discover popup.");
+      const snapshot = await callBrowserTool(browser, "snapshot", { tabId: popup.id, image: "never" });
+      if (!snapshot.success || !JSON.stringify(toolTextPayload(snapshot)).includes("Use test account"))
+        throw new Error("Agent cannot read popup.");
+      const popupContents = webContents.getAllWebContents().find((item) => item.getURL().endsWith("/popup-login"));
+      if (!popupContents) throw new Error("Popup contents missing.");
+      const shared = await popupContents.executeJavaScript(
+        "(location.hostname === 'localhost' || document.cookie.includes('popup_session=shared')) && !!opener && typeof window.openbot === 'undefined' && typeof require === 'undefined'",
+      );
+      if (!shared) throw new Error("Popup lost session, opener, or isolation.");
+      // Named-window reuse must not register another view or lose the live relationship on reload.
+      if (button !== "Cross-origin sign-in" && button !== "Iframe sign-in")
+        await contents.executeJavaScript("window.open('/popup-login', 'auth'); void 0", true);
+      if (popupContents.session !== contents.session) throw new Error("Popup session changed.");
+      if (BrowserWindow.fromWebContents(popupContents) !== BrowserWindow.fromWebContents(contents))
+        throw new Error("Unmanaged popup window.");
+      await browser.setVisible({ visible: false });
+      await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+      if (browser.listTabs().filter((tab) => tab.openerTabId === parent.id).length !== 1)
+        throw new Error("Duplicate named popup.");
+      // Reloading a top-level opener preserves it; reloading removes an iframe opener.
+      if (button !== "Iframe sign-in") await browser.reload(parent.id);
+      if (!browser.listTabs().some((tab) => tab.id === popup.id)) throw new Error("Parent reload closed popup.");
+      // Background preview capture must not resize the opener and dispose its login callback.
+      await contents.executeJavaScript(
+        "window.callbackExpired = false; window.callbackViewport = { width: innerWidth, height: innerHeight, scale: devicePixelRatio }; void 0",
+      );
+      await browser.capturePreview(parent.id);
+      await click(popup.id, "button", "Use test account");
+      await waitFor(
+        async () => !browser.listTabs().some((tab) => tab.id === popup.id),
+        `${button}: OAuth popup closure`,
+      );
+      await waitFor(
+        async () => (await contents.executeJavaScript("document.querySelector('#result').textContent")) === "Signed in",
+        "OAuth callback",
+      );
+      // listTabs() hides the popup on its "close" event, but the host hands the active tab back to the
+      // opener only after "destroyed", so a slow runner can observe the gap.
+      await waitFor(async () => browser.activeTabId === parent.id, `${button}: popup return to opener`);
+    }
+    const blocked = await callBrowserTool(browser, "click", {
+      tabId: parent.id,
+      target: { kind: "role", role: "button", name: "Blocked frame sign-in", exact: true },
+    });
+    if (blocked.success || !toolError(blocked).includes("covered"))
+      throw new Error("A real covering layer did not block the iframe click.");
+    await click(parent.id, "link", "Independent tab");
+    const independent = await waitForValue(() =>
+      browser.listTabs().find((tab) => tab.id !== parent.id && tab.url === `${origin}/popup-login`),
+    );
+    await waitFor(
+      async () => browser.listTabs().some((tab) => tab.id === independent.id && !tab.loading),
+      "independent popup navigation",
+    );
+    if (independent.openerTabId) throw new Error("noopener link gained an opener.");
+    await browser.activate(parent.id);
+    await click(parent.id, "button", "Post sign-in");
+    const post = await waitForValue(() => browser.listTabs().find((tab) => tab.url === `${origin}/popup-post`));
+    const result = await callBrowserTool(browser, "snapshot", { tabId: post.id, image: "never" });
+    if (!JSON.stringify(toolTextPayload(result)).includes("Post received"))
+      throw new Error("Popup form POST was lost.");
+    await browser.close(parent.id);
+    if (!browser.listTabs().some((tab) => tab.id === independent.id))
+      throw new Error("Closing opener closed independent tab.");
+    await browser.close(independent.id);
+    await browser.close(post.id);
+  } finally {
+    await browser.close(parent.id);
+  }
 }
 
 async function openTabWithContents(

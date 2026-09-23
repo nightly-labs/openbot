@@ -12,13 +12,13 @@ import { STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
 const agentStates: Record<string, SidebarAgentState> = {
   chief: { kind: "working" },
   research: { kind: "unread", count: 3 },
-  sales: { kind: "responded" },
+  sales: { kind: "routine", phase: "running", count: 1 },
 };
 
 const agentMoods: Record<string, AvatarMood> = {
   chief: "working",
   research: "waiting",
-  sales: "responded",
+  sales: "working",
 };
 
 const sidebarAgents = STORY_AGENTS.map((agent) => {

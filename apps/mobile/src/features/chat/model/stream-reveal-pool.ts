@@ -3,17 +3,27 @@ interface Reveal {
   skip: () => void;
 }
 
+export const STREAM_WORD_INTERVAL_MS = 32;
+
 /** Bounds native animated nodes; bursts catch up instead of delaying the answer. */
 export function createStreamRevealPool(limit = 4) {
   const waiting = new Set<Reveal>();
   const active = new Set<Reveal>();
   let timer: ReturnType<typeof setTimeout> | null = null;
   function schedule() {
-    if (timer !== null || waiting.size === 0 || active.size >= limit) return;
+    if (timer !== null || waiting.size === 0) return;
     timer = setTimeout(() => {
       timer = null;
-      const batch = Math.max(2, Math.ceil(waiting.size / 5));
-      for (const item of Array.from(waiting).slice(0, Math.min(batch, limit - active.size))) {
+      // Never wait for an animation callback to admit the next word. A busy RN
+      // runtime can deliver that callback late even though its UI fade has finished.
+      if (active.size >= limit) {
+        const oldest = active.values().next().value;
+        if (oldest) {
+          active.delete(oldest);
+          oldest.skip();
+        }
+      }
+      for (const item of Array.from(waiting).slice(0, 1)) {
         waiting.delete(item);
         active.add(item);
         item.start(() => {
@@ -22,7 +32,7 @@ export function createStreamRevealPool(limit = 4) {
         });
       }
       schedule();
-    }, 32);
+    }, STREAM_WORD_INTERVAL_MS);
   }
   return {
     add(item: Reveal) {

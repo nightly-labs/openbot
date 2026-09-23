@@ -40,6 +40,7 @@ import {
 } from "./agent-inputs";
 import {
   parseAnalyticsPreference,
+  parseAppLanguagePreference,
   parseApprovalAutomation,
   parseDynamicIslandAction,
   parseDynamicIslandInteractive,
@@ -73,6 +74,11 @@ import { nullishPayload, optionalPayload, requireString } from "./validation";
 import { parseVoiceTranscription } from "./voice-inputs";
 
 describe("app IPC input parsing", () => {
+  it("accepts only shipped app languages", () => {
+    expect(parseAppLanguagePreference({ language: "fr" })).toEqual({ language: "fr" });
+    expect(() => parseAppLanguagePreference({ language: "kl" })).toThrowError("Language preference is required.");
+  });
+
   it("validates creator photo consent and agent categories without changing legacy submissions", () => {
     expect(parseSubmitMarketplaceAgent({ agentId: "agent-1" })).toEqual({ agentId: "agent-1" });
     expect(parseSubmitMarketplaceAgent({ agentId: "agent-1", category: "research", showCreatorAvatar: false })).toEqual(

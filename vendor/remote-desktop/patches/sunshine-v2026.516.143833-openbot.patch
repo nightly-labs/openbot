@@ -162,7 +162,7 @@ index f95d49f9..94758cb9 100644
    }
  }
 diff --git a/src/confighttp.cpp b/src/confighttp.cpp
-index 2f703dbc..80e99739 100644
+index 2f703dbc..c9fb7f58 100644
 --- a/src/confighttp.cpp
 +++ b/src/confighttp.cpp
 @@ -1,3 +1,7 @@
@@ -173,7 +173,127 @@ index 2f703dbc..80e99739 100644
  /**
   * @file src/confighttp.cpp
   * @brief Definitions for the Web UI Config HTTP server.
-@@ -1356,6 +1360,64 @@ namespace confighttp {
+@@ -1306,18 +1310,86 @@ namespace confighttp {
+   }
+ 
+   /**
+-   * @brief Send a pin code to the host. The pin is generated from the Moonlight client during the pairing process.
+-   * @param response The HTTP response object.
+-   * @param request The HTTP request object.
++   * @brief List client pairing requests that are waiting for PIN approval.
++   *
++   * @api_examples{/api/pin| GET| null}
++   */
++  void getPendingPairings(const resp_https_t &response, const req_https_t &request) {
++    if (!authenticate(response, request)) {
++      return;
++    }
++
++    print_req(request);
++
++    nlohmann::json output_tree;
++    output_tree["pairings"] = nlohmann::json::array();
++    for (const auto &pairing : nvhttp::get_pending_pairings()) {
++      output_tree["pairings"].push_back({
++        {"id", pairing.id},
++        {"name", pairing.name},
++        {"address", pairing.address},
++      });
++    }
++    send_response(response, output_tree);
++  }
++
++  /**
++   * @brief Cancel a client pairing request that is waiting for PIN approval.
++   * The body for the delete request should be JSON serialized in the following format:
++   * @code{.json}
++   * {
++   *   "pairing_id": "<pairing_id>"
++   * }
++   * @endcode
++   *
++   * @api_examples{/api/pin| DELETE| {"pairing_id":"0123456789abcdef0123456789abcdef"}}
++   */
++  void cancelPairing(const resp_https_t &response, const req_https_t &request) {
++    if (!check_content_type(response, request, "application/json")) {
++      return;
++    }
++    if (!authenticate(response, request)) {
++      return;
++    }
++
++    const std::string client_id = get_client_id(request);
++    if (!validate_csrf_token(response, request, client_id)) {
++      return;
++    }
++
++    print_req(request);
++
++    std::stringstream ss;
++    ss << request->content.rdbuf();
++    try {
++      const nlohmann::json input_tree = nlohmann::json::parse(ss);
++      const std::string pairing_id = input_tree.value("pairing_id", "");
++      if (!nvhttp::is_valid_pairing_id(pairing_id)) {
++        bad_request(response, request, "pairing_id must contain exactly 32 hexadecimal characters");
++        return;
++      }
++
++      nlohmann::json output_tree;
++      output_tree["status"] = nvhttp::cancel_pairing(pairing_id);
++      send_response(response, output_tree);
++    } catch (std::exception &e) {
++      BOOST_LOG(warning) << "CancelPairing: "sv << e.what();
++      bad_request(response, request, e.what());
++    }
++  }
++
++  /**
++   * @brief Send a PIN code to the explicitly selected pairing request.
+    * The body for the post request should be JSON serialized in the following format:
+    * @code{.json}
+    * {
++   *   "pairing_id": "<pairing_id>",
+    *   "pin": "<pin>",
+    *   "name": "Friendly Client Name"
+    * }
+    * @endcode
+    *
+-   * @api_examples{/api/pin| POST| {"pin":"1234","name":"My PC"}}
++   * @api_examples{/api/pin| POST| {"pairing_id":"0123456789abcdef0123456789abcdef","pin":"1234","name":"My PC"}}
+    */
+   void savePin(const resp_https_t &response, const req_https_t &request) {
+     if (!check_content_type(response, request, "application/json")) {
+@@ -1340,15 +1412,22 @@ namespace confighttp {
+       nlohmann::json output_tree;
+       nlohmann::json input_tree = nlohmann::json::parse(ss);
+       const std::string name = input_tree.value("name", "");
++      const std::string pairing_id = input_tree.value("pairing_id", "");
+       const std::string pin = input_tree.value("pin", "");
+-
+-      int _pin = 0;
+-      _pin = std::stoi(pin);
+-      if (_pin < 0 || _pin > 9999) {
+-        bad_request(response, request, "PIN must be between 0000 and 9999");
++      if (!nvhttp::is_valid_pairing_id(pairing_id)) {
++        bad_request(response, request, "pairing_id must contain exactly 32 hexadecimal characters");
++        return;
++      }
++      if (!nvhttp::is_valid_pairing_pin(pin)) {
++        bad_request(response, request, "PIN must contain exactly 4 numeric digits");
++        return;
++      }
++      if (!nvhttp::is_valid_pairing_name(name)) {
++        bad_request(response, request, "Client name must contain between 1 and 128 bytes");
++        return;
+       }
+ 
+-      output_tree["status"] = nvhttp::pin(pin, name);
++      output_tree["status"] = nvhttp::pin(pairing_id, pin, name);
+       send_response(response, output_tree);
+     } catch (std::exception &e) {
+       BOOST_LOG(warning) << "SavePin: "sv << e.what();
+@@ -1356,6 +1435,64 @@ namespace confighttp {
      }
    }
  
@@ -238,8 +358,12 @@ index 2f703dbc..80e99739 100644
    /**
     * @brief Reset the display device persistence.
     * @param response The HTTP response object.
-@@ -1780,6 +1842,10 @@ namespace confighttp {
+@@ -1778,8 +1915,14 @@ namespace confighttp {
+     server.resource["^/api/covers/upload$"]["POST"] = uploadCover;
+     server.resource["^/api/csrf-token$"]["GET"] = getCSRFToken;
      server.resource["^/api/password$"]["POST"] = savePassword;
++    server.resource["^/api/pin$"]["DELETE"] = cancelPairing;
++    server.resource["^/api/pin$"]["GET"] = getPendingPairings;
      server.resource["^/api/pin$"]["POST"] = savePin;
      server.resource["^/api/logs$"]["GET"] = getLogs;
 +    server.resource["^/api/openbot/setup$"]["GET"] = getOpenBotSetup;
@@ -250,22 +374,26 @@ index 2f703dbc..80e99739 100644
      server.resource["^/api/restart$"]["POST"] = restart;
      server.resource["^/api/vigembus/status$"]["GET"] = getViGEmBusStatus;
 diff --git a/src/confighttp.h b/src/confighttp.h
-index e8c4ea00..dc40bb92 100644
+index e8c4ea00..404fef87 100644
 --- a/src/confighttp.h
 +++ b/src/confighttp.h
-@@ -46,6 +46,7 @@ namespace confighttp {
+@@ -46,6 +46,11 @@ namespace confighttp {
    void browseDirectory(const resp_https_t &response, const req_https_t &request);
    void getLocale(const resp_https_t &response, const req_https_t &request);
    void getCSRFToken(const resp_https_t &response, const req_https_t &request);
 +  void getOpenBotDisplays(const resp_https_t &response, const req_https_t &request);
++
++  void getPendingPairings(const resp_https_t &, const req_https_t &);
++  void cancelPairing(const resp_https_t &, const req_https_t &);
++  void savePin(const resp_https_t &, const req_https_t &);
  
    // Browse helper functions (also exposed for unit testing)
    /**
 diff --git a/src/crypto.cpp b/src/crypto.cpp
-index c5e236e9..d6f8cd74 100644
+index c5e236e9..878a9472 100644
 --- a/src/crypto.cpp
 +++ b/src/crypto.cpp
-@@ -5,12 +5,14 @@
+@@ -5,12 +5,19 @@
  // lib includes
  #include <openssl/pem.h>
  #include <openssl/rsa.h>
@@ -277,9 +405,58 @@ index c5e236e9..d6f8cd74 100644
  namespace crypto {
    using asn1_string_t = util::safe_ptr<ASN1_STRING, ASN1_STRING_free>;
 +  using x509_extension_t = util::safe_ptr<X509_EXTENSION, X509_EXTENSION_free>;
++  /**
++   * @brief OpenSSL X.509 subject/issuer name pointer with automatic release.
++   */
++  using x509_name_t = util::safe_ptr<X509_NAME, &X509_NAME_free>;
++  constexpr char UNPAIRED_CERTIFICATE_ERROR[] = "Client certificate identity is not paired";  ///< Error returned when no exact stored certificate matches.
  
    cert_chain_t::cert_chain_t():
        _certs {},
+@@ -44,19 +51,9 @@ namespace crypto {
+     }
+   }
+ 
+-  /**
+-   * @brief Verify the certificate chain.
+-   * When certificates from two or more instances of Moonlight have been added to x509_store_t,
+-   * only one of them will be verified by X509_verify_cert, resulting in only a single instance of
+-   * Moonlight to be able to use Sunshine
+-   *
+-   * To circumvent this, x509_store_t instance will be created for each instance of the certificates.
+-   * @param cert The certificate to verify.
+-   * @return nullptr if the certificate is valid, otherwise an error string.
+-   */
+   const char *cert_chain_t::verify(x509_t::element_type *cert) {
+     int err_code = 0;
+-    for (auto &[_, x509_store] : _certs) {
++    for (auto &[trusted_cert, x509_store] : _certs) {
+       auto fg = util::fail_guard([this]() {
+         X509_STORE_CTX_cleanup(_cert_ctx.get());
+       });
+@@ -72,7 +69,12 @@ namespace crypto {
+       auto err = X509_verify_cert(_cert_ctx.get());
+ 
+       if (err == 1) {
+-        return nullptr;
++        if (X509_cmp(trusted_cert.get(), cert) == 0) {
++          return nullptr;
++        }
++
++        err_code = X509_V_ERR_CERT_REJECTED;
++        continue;
+       }
+ 
+       err_code = X509_STORE_CTX_get_error(_cert_ctx.get());
+@@ -82,7 +84,7 @@ namespace crypto {
+       }
+     }
+ 
+-    return X509_verify_cert_error_string(err_code);
++    return err_code == 0 ? UNPAIRED_CERTIFICATE_ERROR : X509_verify_cert_error_string(err_code);
+   }
+ 
+   namespace cipher {
 @@ -465,6 +467,19 @@ namespace crypto {
      X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (const std::uint8_t *) cn.data(), (int) cn.size(), -1, 0);
  
@@ -300,6 +477,175 @@ index c5e236e9..d6f8cd74 100644
      X509_sign(x509.get(), pkey.get(), EVP_sha256());
  
      return {pem(x509), pem(pkey)};
+diff --git a/src/crypto.h b/src/crypto.h
+index 944cd77e..c503f826 100644
+--- a/src/crypto.h
++++ b/src/crypto.h
+@@ -68,6 +68,12 @@ namespace crypto {
+ 
+     void clear();
+ 
++    /**
++     * @brief Verify that a certificate exactly matches one stored trust anchor.
++     *
++     * @param cert Client certificate to verify.
++     * @return `nullptr` when the exact certificate is trusted, otherwise an OpenSSL error string.
++     */
+     const char *verify(x509_t::element_type *cert);
+ 
+   private:
+diff --git a/src/input.cpp b/src/input.cpp
+index db7618bf..8d28091a 100644
+--- a/src/input.cpp
++++ b/src/input.cpp
+@@ -12,6 +12,8 @@ extern "C" {
+ #include <bitset>
+ #include <chrono>
+ #include <cmath>
++#include <cstring>
++#include <span>
+ #include <list>
+ #include <thread>
+ #include <unordered_map>
+@@ -1241,6 +1243,82 @@ namespace input {
+     gamepad.gamepad_state = gamepad_state;
+   }
+ 
++  /**
++   * @brief Validate the declared and available sizes of a fixed-size input packet.
++   *
++   * @tparam Packet Protocol packet structure.
++   * @param packet Raw packet bytes.
++   * @param declared_size Packet size declared after the size field.
++   * @return True when both sizes safely contain the fixed packet structure.
++   */
++  template<typename Packet>
++  bool validate_fixed_input_packet(std::span<const std::uint8_t> packet, std::uint32_t declared_size) {
++    constexpr auto expected_size = static_cast<std::uint32_t>(sizeof(Packet) - sizeof(std::uint32_t));
++    if (declared_size != expected_size) {
++      return false;
++    }
++    return packet.size() >= sizeof(Packet);
++  }
++
++  /**
++   * @brief Validate an input packet before any typed access or batching.
++   *
++   * @param packet Raw packet bytes.
++   * @param parsed_header Optional destination for the safely copied packet header.
++   * @return True when the packet is large enough for its declared and protocol-specific fields.
++   */
++  bool validate_input_packet(std::span<const std::uint8_t> packet, NV_INPUT_HEADER *parsed_header = nullptr) {
++    if (packet.size() < sizeof(NV_INPUT_HEADER)) {
++      return false;
++    }
++
++    NV_INPUT_HEADER header {};
++    std::memcpy(&header, packet.data(), sizeof(header));
++    if (parsed_header) {
++      *parsed_header = header;
++    }
++
++    const auto declared_size = util::endian::big(header.size);
++    if (declared_size < sizeof(header.magic) || declared_size > packet.size() - sizeof(header.size)) {
++      return false;
++    }
++
++    switch (util::endian::little(header.magic)) {
++      case MOUSE_MOVE_REL_MAGIC_GEN5:
++        return validate_fixed_input_packet<NV_REL_MOUSE_MOVE_PACKET>(packet, declared_size);
++      case MOUSE_MOVE_ABS_MAGIC:
++        return validate_fixed_input_packet<NV_ABS_MOUSE_MOVE_PACKET>(packet, declared_size);
++      case MOUSE_BUTTON_DOWN_EVENT_MAGIC_GEN5:
++      case MOUSE_BUTTON_UP_EVENT_MAGIC_GEN5:
++        return validate_fixed_input_packet<NV_MOUSE_BUTTON_PACKET>(packet, declared_size);
++      case SCROLL_MAGIC_GEN5:
++        return validate_fixed_input_packet<NV_SCROLL_PACKET>(packet, declared_size);
++      case SS_HSCROLL_MAGIC:
++        return validate_fixed_input_packet<SS_HSCROLL_PACKET>(packet, declared_size);
++      case KEY_DOWN_EVENT_MAGIC:
++      case KEY_UP_EVENT_MAGIC:
++        return validate_fixed_input_packet<NV_KEYBOARD_PACKET>(packet, declared_size);
++      case UTF8_TEXT_EVENT_MAGIC:
++        return declared_size - sizeof(header.magic) <= UTF8_TEXT_EVENT_MAX_COUNT;
++      case MULTI_CONTROLLER_MAGIC_GEN5:
++        return validate_fixed_input_packet<NV_MULTI_CONTROLLER_PACKET>(packet, declared_size);
++      case SS_TOUCH_MAGIC:
++        return validate_fixed_input_packet<SS_TOUCH_PACKET>(packet, declared_size);
++      case SS_PEN_MAGIC:
++        return validate_fixed_input_packet<SS_PEN_PACKET>(packet, declared_size);
++      case SS_CONTROLLER_ARRIVAL_MAGIC:
++        return validate_fixed_input_packet<SS_CONTROLLER_ARRIVAL_PACKET>(packet, declared_size);
++      case SS_CONTROLLER_TOUCH_MAGIC:
++        return validate_fixed_input_packet<SS_CONTROLLER_TOUCH_PACKET>(packet, declared_size);
++      case SS_CONTROLLER_MOTION_MAGIC:
++        return validate_fixed_input_packet<SS_CONTROLLER_MOTION_PACKET>(packet, declared_size);
++      case SS_CONTROLLER_BATTERY_MAGIC:
++        return validate_fixed_input_packet<SS_CONTROLLER_BATTERY_PACKET>(packet, declared_size);
++      default:
++        return true;
++    }
++  }
++
+   enum class batch_result_e {
+     batched,  ///< This entry was batched with the source entry
+     not_batchable,  ///< Not eligible to batch but continue attempts to batch
+@@ -1626,6 +1704,20 @@ namespace input {
+    * @param input_data The input message.
+    */
+   void passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data) {
++    NV_INPUT_HEADER header {};
++    if (!validate_input_packet(input_data, &header)) {
++      if (input_data.size() >= sizeof(header)) {
++        BOOST_LOG(warning)
++          << "Dropping malformed input packet type ["sv
++          << util::hex(util::endian::little(header.magic)).to_string_view()
++          << "] with declared payload size ["sv << util::endian::big(header.size)
++          << "] and actual size ["sv << input_data.size() << ']';
++      } else {
++        BOOST_LOG(warning) << "Dropping malformed input packet with actual size ["sv << input_data.size() << ']';
++      }
++      return;
++    }
++
+     {
+       std::lock_guard<std::mutex> lg(input->input_queue_lock);
+       input->input_queue.push_back(std::move(input_data));
+@@ -1696,4 +1788,12 @@ namespace input {
+ 
+     return input;
+   }
++
++#ifdef SUNSHINE_TESTS
++  namespace testing {
++    bool is_valid_input_packet(std::span<const std::uint8_t> packet) {
++      return validate_input_packet(packet);
++    }
++  }
++#endif
+ }  // namespace input
+diff --git a/src/input.h b/src/input.h
+index 0e7007c9..7be7787f 100644
+--- a/src/input.h
++++ b/src/input.h
+@@ -3,6 +3,7 @@
+  * @brief Declarations for gamepad, keyboard, and mouse input handling.
+  */
+ #pragma once
++#include <span>
+ 
+ // standard includes
+ #include <functional>
+@@ -12,6 +13,9 @@
+ #include "thread_safe.h"
+ 
+ namespace input {
++#ifdef SUNSHINE_TESTS
++  namespace testing { bool is_valid_input_packet(std::span<const std::uint8_t> packet); }
++#endif
+   struct input_t;
+ 
+   void print(void *input);
 diff --git a/src/main.cpp b/src/main.cpp
 index 13df6784..26e77cec 100644
 --- a/src/main.cpp
@@ -325,6 +671,968 @@ index 13df6784..26e77cec 100644
    bool run_loop = false;
  
    // Conditions that would require the main thread event loop
+diff --git a/src/nvhttp.cpp b/src/nvhttp.cpp
+index 4db8c6e4..594254c7 100644
+--- a/src/nvhttp.cpp
++++ b/src/nvhttp.cpp
+@@ -6,8 +6,11 @@
+ #define BOOST_BIND_GLOBAL_PLACEHOLDERS
+ 
+ // standard includes
++#include <algorithm>
++#include <chrono>
+ #include <filesystem>
+ #include <format>
++#include <mutex>
+ #include <string>
+ #include <utility>
+ 
+@@ -45,7 +48,8 @@ namespace nvhttp {
+   namespace fs = std::filesystem;
+   namespace pt = boost::property_tree;
+ 
+-  crypto::cert_chain_t cert_chain;
++  crypto::cert_chain_t cert_chain;  ///< Enabled paired-client certificates accepted by Sunshine's GameStream HTTPS server.
++  std::mutex client_auth_mutex;  ///< Serializes paired-client state and certificate authorization changes.
+ 
+   class SunshineHTTPSServer: public SimpleWeb::ServerBase<SunshineHTTPS> {
+   public:
+@@ -140,9 +144,10 @@ namespace nvhttp {
+   };
+ 
+   // uniqueID, session
+-  std::unordered_map<std::string, pair_session_t> map_id_sess;
+-  client_t client_root;
+-  std::atomic<uint32_t> session_id_counter;
++  std::unordered_map<std::string, pair_session_t> map_id_sess;  ///< Pairing sessions keyed by temporary unique ID.
++  std::recursive_mutex map_id_sess_mutex;  ///< Mutex protecting pairing-session storage and lifecycle transitions.
++  client_t client_root;  ///< In-memory representation of the paired-client database.
++  std::atomic<uint32_t> session_id_counter;  ///< Monotonic counter used to allocate GameStream session IDs.
+ 
+   using args_t = SimpleWeb::CaseInsensitiveMultimap;
+   using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>;
+@@ -204,6 +209,80 @@ namespace nvhttp {
+     }
+   }
+ 
++  /**
++   * @brief Convert a PEM certificate to Sunshine's canonical OpenSSL serialization.
++   *
++   * @param cert_pem PEM-encoded certificate to canonicalize.
++   * @return Canonical PEM text, or an empty string when the certificate is invalid.
++   */
++  std::string canonical_certificate_pem(const std::string_view cert_pem) {
++    auto certificate = crypto::x509(cert_pem);
++    return certificate ? crypto::pem(certificate) : std::string {};
++  }
++
++  /**
++   * @brief Rebuild the GameStream trust stores from enabled paired-client records.
++   *
++   * @note The caller must hold `client_auth_mutex`.
++   */
++  void rebuild_client_cert_chain() {
++    cert_chain.clear();
++    for (const auto &named_cert : client_root.named_devices) {
++      if (!named_cert.enabled) {
++        continue;
++      }
++
++      auto certificate = crypto::x509(named_cert.cert);
++      if (!certificate) {
++        BOOST_LOG(warning) << "Ignoring invalid paired-client certificate"sv;
++        continue;
++      }
++
++      cert_chain.add(std::move(certificate));
++    }
++  }
++
++  /**
++   * @brief Check whether a certificate exactly matches an enabled paired-client record.
++   *
++   * @param certificate Parsed client certificate to compare by canonical X.509 identity.
++   * @return `true` only when exactly one matching paired-client record is enabled.
++   * @note The caller must hold `client_auth_mutex`.
++   */
++  bool is_client_enabled(const X509 *certificate) {
++    bool matched = false;
++    for (const auto &named_cert : client_root.named_devices) {
++      auto stored_certificate = crypto::x509(named_cert.cert);
++      if (!stored_certificate || X509_cmp(stored_certificate.get(), certificate) != 0) {
++        continue;
++      }
++
++      if (matched || !named_cert.enabled) {
++        return false;
++      }
++      matched = true;
++    }
++    return matched;
++  }
++
++  /**
++   * @brief Verify a client certificate against the exact enabled paired identity.
++   *
++   * @param certificate Parsed client certificate presented during the TLS handshake.
++   * @return `nullptr` when authorized, otherwise a non-sensitive error string.
++   * @note The caller must hold `client_auth_mutex`.
++   */
++  const char *verify_client_certificate(X509 *certificate) {
++    auto error = cert_chain.verify(certificate);
++    if (error) {
++      return error;
++    }
++    return is_client_enabled(certificate) ? nullptr : "Client certificate identity is not enabled";
++  }
++
++  /**
++   * @brief Load state from its backing store.
++   */
+   void load_state() {
+     if (!fs::exists(config::nvhttp.file_state)) {
+       BOOST_LOG(info) << "File "sv << config::nvhttp.file_state << " doesn't exist"sv;
+@@ -260,26 +339,44 @@ namespace nvhttp {
+       }
+     }
+ 
+-    // Empty certificate chain and import certs from file
+-    cert_chain.clear();
+     for (auto &named_cert : client.named_devices) {
+-      cert_chain.add(crypto::x509(named_cert.cert));
++      auto canonical_certificate = canonical_certificate_pem(named_cert.cert);
++      if (!canonical_certificate.empty()) {
++        named_cert.cert = std::move(canonical_certificate);
++      }
+     }
+ 
+-    client_root = client;
++    std::lock_guard lock {client_auth_mutex};
++    client_root = std::move(client);
++    rebuild_client_cert_chain();
+   }
+ 
+-  void add_authorized_client(const std::string &name, std::string &&cert) {
+-    client_t &client = client_root;
++  /**
++   * @brief Add authorized client data.
++   *
++   * @param name Human-readable name to assign.
++   * @param cert Certificate data or object used by the operation.
++   * @return Persistent UUID for the added client, or an empty string when the certificate is invalid.
++   */
++  std::string add_authorized_client(const std::string &name, std::string &&cert) {
++    auto canonical_certificate = canonical_certificate_pem(cert);
++    if (canonical_certificate.empty()) {
++      return {};
++    }
++
+     named_cert_t named_cert;
+     named_cert.name = name;
+-    named_cert.cert = std::move(cert);
++    named_cert.cert = std::move(canonical_certificate);
+     named_cert.uuid = uuid_util::uuid_t::generate().string();
+-    client.named_devices.emplace_back(named_cert);
++
++    std::lock_guard lock {client_auth_mutex};
++    client_root.named_devices.emplace_back(std::move(named_cert));
++    rebuild_client_cert_chain();
+ 
+     if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
+       save_state();
+     }
++    return client_root.named_devices.back().uuid;
+   }
+ 
+   std::shared_ptr<rtsp_stream::launch_session_t> make_launch_session(bool host_audio, const args_t &args) {
+@@ -340,7 +437,153 @@ namespace nvhttp {
+     return launch_session;
+   }
+ 
++  /**
++   * @brief Write a completed response to the client waiting for PIN approval.
++   *
++   * @param sess Pairing session that owns the waiting response.
++   * @param tree XML response body to write.
++   * @return `true` when a live response was available.
++   */
++  bool write_pairing_response(pair_session_t &sess, const pt::ptree &tree) {
++    std::ostringstream data;
++    pt::write_xml(data, tree);
++
++    auto &response = sess.async_insert_pin.response;
++    if (response.has_left() && response.left()) {
++      response.left()->close_connection_after_response = true;
++      response.left()->write(data.str());
++    } else if (response.has_right() && response.right()) {
++      response.right()->close_connection_after_response = true;
++      response.right()->write(data.str());
++    } else {
++      return false;
++    }
++
++    response = std::monostate {};
++    return true;
++  }
++
++  /**
++   * @brief Expire stale pairing sessions while the session mutex is held.
++   *
++   * @param now Monotonic time used to evaluate session deadlines.
++   */
++  void expire_pair_sessions_unlocked(const std::chrono::steady_clock::time_point now) {
++    for (auto it = map_id_sess.begin(); it != map_id_sess.end();) {
++      if (it->second.async_insert_pin.expires_at > now) {
++        ++it;
++        continue;
++      }
++
++      pt::ptree tree;
++      tree.put("root.paired", 0);
++      tree.put("root.<xmlattr>.status_code", 408);
++      tree.put("root.<xmlattr>.status_message", "Pairing session expired");
++      write_pairing_response(it->second, tree);
++      it = map_id_sess.erase(it);
++    }
++  }
++
++  pair_session_insert_e insert_pair_session(pair_session_t sess, std::string &pairing_id) {
++    std::scoped_lock lock(map_id_sess_mutex);
++    const auto now = std::chrono::steady_clock::now();
++    expire_pair_sessions_unlocked(now);
++    pairing_id.clear();
++
++    if (map_id_sess.contains(sess.client.uniqueID)) {
++      return pair_session_insert_e::ALREADY_EXISTS;
++    }
++    if (map_id_sess.size() >= MAX_PENDING_PAIRING_SESSIONS) {
++      return pair_session_insert_e::FULL;
++    }
++
++    do {
++      pairing_id = util::hex_vec(crypto::rand(PAIRING_ID_SIZE / 2), true);
++    } while (std::ranges::any_of(map_id_sess, [&](const auto &entry) {
++      return entry.second.async_insert_pin.id == pairing_id;
++    }));
++
++    sess.async_insert_pin.id = pairing_id;
++    sess.async_insert_pin.expires_at = now + PAIRING_SESSION_TIMEOUT;
++    map_id_sess.emplace(sess.client.uniqueID, std::move(sess));
++    return pair_session_insert_e::ADDED;
++  }
++
++  bool is_valid_pairing_id(const std::string_view pairing_id) {
++    return pairing_id.size() == PAIRING_ID_SIZE && std::ranges::all_of(pairing_id, [](const char character) {
++             return (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F');
++           });
++  }
++
++  bool is_valid_pairing_pin(const std::string_view pin) {
++    return pin.size() == 4 && std::ranges::all_of(pin, [](const char character) {
++             return character >= '0' && character <= '9';
++           });
++  }
++
++  bool is_valid_pairing_name(const std::string_view name) {
++    return !name.empty() && name.size() <= MAX_PAIRING_CLIENT_NAME_SIZE;
++  }
++
++  void expire_pair_sessions(const std::chrono::steady_clock::time_point now) {
++    std::scoped_lock lock(map_id_sess_mutex);
++    expire_pair_sessions_unlocked(now);
++  }
++
++  std::vector<pending_pairing_t> get_pending_pairings() {
++    std::scoped_lock lock(map_id_sess_mutex);
++    expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
++
++    std::vector<const pair_session_t *> pending_sessions;
++    pending_sessions.reserve(map_id_sess.size());
++    for (const auto &entry : map_id_sess) {
++      const auto &sess = entry.second;
++      if (sess.last_phase == PAIR_PHASE::NONE) {
++        pending_sessions.push_back(&sess);
++      }
++    }
++    std::ranges::sort(pending_sessions, {}, [](const pair_session_t *sess) {
++      return sess->async_insert_pin.expires_at;
++    });
++
++    std::vector<pending_pairing_t> result;
++    result.reserve(pending_sessions.size());
++    for (const auto *sess : pending_sessions) {
++      result.push_back({
++        .id = sess->async_insert_pin.id,
++        .name = sess->async_insert_pin.device_name,
++        .address = sess->async_insert_pin.address,
++      });
++    }
++    return result;
++  }
++
++  bool cancel_pairing(const std::string_view pairing_id) {
++    if (!is_valid_pairing_id(pairing_id)) {
++      return false;
++    }
++
++    std::scoped_lock lock(map_id_sess_mutex);
++    expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
++
++    const auto sess_it = std::ranges::find_if(map_id_sess, [&](const auto &entry) {
++      return entry.second.last_phase == PAIR_PHASE::NONE && entry.second.async_insert_pin.id == pairing_id;
++    });
++    if (sess_it == map_id_sess.end()) {
++      return false;
++    }
++
++    pt::ptree tree;
++    tree.put("root.paired", 0);
++    tree.put("root.<xmlattr>.status_code", 400);
++    tree.put("root.<xmlattr>.status_message", "Pairing request cancelled by operator");
++    write_pairing_response(sess_it->second, tree);
++    map_id_sess.erase(sess_it);
++    return true;
++  }
++
+   void remove_session(const pair_session_t &sess) {
++    std::scoped_lock lock(map_id_sess_mutex);
+     map_id_sess.erase(sess.client.uniqueID);
+   }
+ 
+@@ -348,7 +591,7 @@ namespace nvhttp {
+     tree.put("root.paired", 0);
+     tree.put("root.<xmlattr>.status_code", 400);
+     tree.put("root.<xmlattr>.status_message", status_msg);
+-    remove_session(sess);  // Security measure, delete the session when something went wrong and force a re-pair
++    sess.failed = true;
+   }
+ 
+   void getservercert(pair_session_t &sess, pt::ptree &tree, const std::string &pin) {
+@@ -447,7 +690,14 @@ namespace nvhttp {
+     tree.put("root.<xmlattr>.status_code", 200);
+   }
+ 
+-  void clientpairingsecret(pair_session_t &sess, std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, pt::ptree &tree, const std::string &client_pairing_secret) {
++  /**
++   * @brief Handle the client pairing-secret phase of GameStream pairing.
++   *
++   * @param sess Pairing session that owns the request state.
++   * @param tree XML property tree used for the response body.
++   * @param client_pairing_secret Client pairing secret.
++   */
++  void clientpairingsecret(pair_session_t &sess, pt::ptree &tree, const std::string &client_pairing_secret) {
+     if (sess.last_phase != PAIR_PHASE::SERVERCHALLENGERESP) {
+       fail_pair(sess, tree, "Out of order call to clientpairingsecret");
+       return;
+@@ -484,16 +734,12 @@ namespace nvhttp {
+     bool same_hash = hash.size() == sess.clienthash.size() && std::equal(hash.begin(), hash.end(), sess.clienthash.begin());
+     auto verify = crypto::verify256(crypto::x509(client.cert), secret, sign);
+     if (same_hash && verify) {
+-      tree.put("root.paired", 1);
+-      add_cert->raise(crypto::x509(client.cert));
+-
+       // The client is now successfully paired and will be authorized to connect
+-      add_authorized_client(client.name, std::move(client.cert));
++      tree.put("root.paired", add_authorized_client(client.name, std::move(client.cert)).empty() ? 0 : 1);
+     } else {
+       tree.put("root.paired", 0);
+     }
+ 
+-    remove_session(sess);
+     tree.put("root.<xmlattr>.status_code", 200);
+   }
+ 
+@@ -549,8 +795,14 @@ namespace nvhttp {
+     response->close_connection_after_response = true;
+   }
+ 
++  /**
++   * @brief Dispatch the top-level GameStream pairing request by phase.
++   *
++   * @param response HTTP response object to populate.
++   * @param request HTTP request data from the client.
++   */
+   template<class T>
+-  void pair(std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Response> response, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Request> request) {
++  void pair(std::shared_ptr<typename SimpleWeb::ServerBase<T>::Response> response, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Request> request) {
+     print_req<T>(request);
+ 
+     pt::ptree tree;
+@@ -578,27 +830,59 @@ namespace nvhttp {
+       if (it->second == "getservercert"sv) {
+         pair_session_t sess;
+ 
+-        sess.client.uniqueID = std::move(uniqID);
++        sess.client.uniqueID = uniqID;
+         sess.client.cert = util::from_hex_vec(get_arg(args, "clientcert"), true);
++        sess.async_insert_pin.salt = get_arg(args, "salt");
++        sess.async_insert_pin.device_name = get_arg(args, "devicename");
++        sess.async_insert_pin.address = net::addr_to_normalized_string(request->remote_endpoint().address());
+ 
+         BOOST_LOG(debug) << sess.client.cert;
+-        auto ptr = map_id_sess.emplace(sess.client.uniqueID, std::move(sess)).first;
++        const bool pin_stdin = config::sunshine.flags[config::flag::PIN_STDIN];
++        if (!pin_stdin) {
++          sess.async_insert_pin.response = response;
++        }
+ 
+-        ptr->second.async_insert_pin.salt = std::move(get_arg(args, "salt"));
+-        if (config::sunshine.flags[config::flag::PIN_STDIN]) {
++        std::string pairing_id;
++        switch (insert_pair_session(std::move(sess), pairing_id)) {
++          case pair_session_insert_e::ALREADY_EXISTS:
++            tree.put("root.paired", 0);
++            tree.put("root.<xmlattr>.status_code", 409);
++            tree.put("root.<xmlattr>.status_message", "A pairing session with this uniqueid already exists");
++            return;
++          case pair_session_insert_e::FULL:
++            tree.put("root.paired", 0);
++            tree.put("root.<xmlattr>.status_code", 503);
++            tree.put("root.<xmlattr>.status_message", "Too many pending pairing sessions");
++            return;
++          case pair_session_insert_e::ADDED:
++            break;
++        }
++
++        if (pin_stdin) {
+           std::string pin;
+ 
+           std::cout << "Please insert pin: "sv;
+           std::getline(std::cin, pin);
+ 
+-          getservercert(ptr->second, tree, pin);
++          std::scoped_lock lock(map_id_sess_mutex);
++          expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
++          const auto sess_it = map_id_sess.find(uniqID);
++          if (sess_it == map_id_sess.end() || sess_it->second.async_insert_pin.id != pairing_id) {
++            tree.put("root.paired", 0);
++            tree.put("root.<xmlattr>.status_code", 408);
++            tree.put("root.<xmlattr>.status_message", "Pairing session expired");
++            return;
++          }
++
++          getservercert(sess_it->second, tree, pin);
++          if (sess_it->second.failed) {
++            map_id_sess.erase(sess_it);
++          }
+           return;
+         } else {
+ #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+           system_tray::update_tray_require_pin();
+ #endif
+-          ptr->second.async_insert_pin.response = std::move(response);
+-
+           fg.disable();
+           return;
+         }
+@@ -609,6 +893,8 @@ namespace nvhttp {
+       }
+     }
+ 
++    std::scoped_lock lock(map_id_sess_mutex);
++    expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
+     auto sess_it = map_id_sess.find(uniqID);
+     if (sess_it == std::end(map_id_sess)) {
+       tree.put("root.<xmlattr>.status_code", 400);
+@@ -617,6 +903,7 @@ namespace nvhttp {
+       return;
+     }
+ 
++    bool pairing_complete = false;
+     if (it = args.find("clientchallenge"); it != std::end(args)) {
+       auto challenge = util::from_hex_vec(it->second, true);
+       clientchallenge(sess_it->second, tree, challenge);
+@@ -625,59 +912,44 @@ namespace nvhttp {
+       serverchallengeresp(sess_it->second, tree, encrypted_response);
+     } else if (it = args.find("clientpairingsecret"); it != std::end(args)) {
+       auto pairingsecret = util::from_hex_vec(it->second, true);
+-      clientpairingsecret(sess_it->second, add_cert, tree, pairingsecret);
++      clientpairingsecret(sess_it->second, tree, pairingsecret);
++      pairing_complete = true;
+     } else {
+-      tree.put("root.<xmlattr>.status_code", 404);
+-      tree.put("root.<xmlattr>.status_message", "Invalid pairing request");
++      fail_pair(sess_it->second, tree, "Invalid pairing request");
+     }
+-  }
+ 
+-  bool pin(std::string pin, std::string name) {
+-    pt::ptree tree;
+-    if (map_id_sess.empty()) {
+-      return false;
++    if (pairing_complete || sess_it->second.failed) {
++      map_id_sess.erase(sess_it);
+     }
++  }
+ 
+-    // ensure pin is 4 digits
+-    if (pin.size() != 4) {
+-      tree.put("root.paired", 0);
+-      tree.put("root.<xmlattr>.status_code", 400);
+-      tree.put(
+-        "root.<xmlattr>.status_message",
+-        std::format("Pin must be 4 digits, {} provided", pin.size())
+-      );
++  bool pin(const std::string_view pairing_id, std::string pin, std::string name) {
++    if (!is_valid_pairing_id(pairing_id) || !is_valid_pairing_pin(pin) || !is_valid_pairing_name(name)) {
+       return false;
+     }
+ 
+-    // ensure all pin characters are numeric
+-    if (!std::all_of(pin.begin(), pin.end(), ::isdigit)) {
+-      tree.put("root.paired", 0);
+-      tree.put("root.<xmlattr>.status_code", 400);
+-      tree.put("root.<xmlattr>.status_message", "Pin must be numeric");
++    std::scoped_lock lock(map_id_sess_mutex);
++    expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
++    const auto sess_it = std::ranges::find_if(map_id_sess, [&](const auto &entry) {
++      return entry.second.last_phase == PAIR_PHASE::NONE && entry.second.async_insert_pin.id == pairing_id;
++    });
++    if (sess_it == map_id_sess.end()) {
+       return false;
+     }
+ 
+-    auto &sess = std::begin(map_id_sess)->second;
++    auto &sess = sess_it->second;
++    pt::ptree tree;
+     getservercert(sess, tree, pin);
+-    sess.client.name = name;
+-
+-    // response to the request for pin
+-    std::ostringstream data;
+-    pt::write_xml(data, tree);
+-
+-    auto &async_response = sess.async_insert_pin.response;
+-    if (async_response.has_left() && async_response.left()) {
+-      async_response.left()->write(data.str());
+-    } else if (async_response.has_right() && async_response.right()) {
+-      async_response.right()->write(data.str());
+-    } else {
+-      return false;
++    if (!sess.failed) {
++      sess.client.name = std::move(name);
+     }
+ 
+-    // reset async_response
+-    async_response = std::decay_t<decltype(async_response.left())>();
+-    // response to the current request
+-    return true;
++    const bool response_written = write_pairing_response(sess, tree);
++    const bool success = response_written && !sess.failed;
++    if (!response_written || sess.failed) {
++      map_id_sess.erase(sess_it);
++    }
++    return success;
+   }
+ 
+   template<class T>
+@@ -779,8 +1051,8 @@ namespace nvhttp {
+ 
+   nlohmann::json get_all_clients() {
+     nlohmann::json named_cert_nodes = nlohmann::json::array();
+-    client_t &client = client_root;
+-    for (auto &named_cert : client.named_devices) {
++    std::lock_guard lock {client_auth_mutex};
++    for (const auto &named_cert : client_root.named_devices) {
+       nlohmann::json named_cert_node;
+       named_cert_node["name"] = named_cert.name;
+       named_cert_node["uuid"] = named_cert.uuid;
+@@ -1064,8 +1336,6 @@ namespace nvhttp {
+     conf_intern.servercert = cert;
+   }
+ 
+-  bool is_client_enabled(const std::string_view cert_pem);
+-
+   void start() {
+     platf::set_thread_name("nvhttp");
+     auto shutdown_event = mail::man->event<bool>(mail::shutdown);
+@@ -1084,8 +1354,6 @@ namespace nvhttp {
+     auto cert = file_handler::read_file(config::nvhttp.cert.c_str());
+     setup(pkey, cert);
+ 
+-    auto add_cert = std::make_shared<safe::queue_t<crypto::x509_t>>(30);
+-
+     // resume doesn't always get the parameter "localAudioPlayMode"
+     // launch will store it in host_audio
+     bool host_audio {};
+@@ -1094,7 +1362,7 @@ namespace nvhttp {
+     http_server_t http_server;
+ 
+     // Verify certificates after establishing connection
+-    https_server.verify = [add_cert](SSL *ssl) {
++    https_server.verify = [](SSL *ssl) {
+       crypto::x509_t x509 {
+ #if OPENSSL_VERSION_MAJOR >= 3
+         SSL_get1_peer_certificate(ssl)
+@@ -1117,30 +1385,14 @@ namespace nvhttp {
+         BOOST_LOG(debug) << subject_name << " -- "sv << (verified ? "verified"sv : "denied"sv);
+       });
+ 
+-      while (add_cert->peek()) {
+-        char subject_name[256];
+-
+-        auto cert = add_cert->pop();
+-        X509_NAME_oneline(X509_get_subject_name(cert.get()), subject_name, sizeof(subject_name));
+-
+-        BOOST_LOG(debug) << "Added cert ["sv << subject_name << ']';
+-        cert_chain.add(std::move(cert));
+-      }
+-
+-      auto err_str = cert_chain.verify(x509.get());
++      std::lock_guard lock {client_auth_mutex};
++      auto err_str = verify_client_certificate(x509.get());
+       if (err_str) {
+         BOOST_LOG(warning) << "SSL Verification error :: "sv << err_str;
+ 
+         return verified;
+       }
+ 
+-      // Check if this client is enabled
+-      auto pem = crypto::pem(x509);
+-      if (!is_client_enabled(pem)) {
+-        BOOST_LOG(info) << "Client is disabled -- denied"sv;
+-        return verified;
+-      }
+-
+       verified = 1;
+ 
+       return verified;
+@@ -1163,8 +1415,8 @@ namespace nvhttp {
+ 
+     https_server.default_resource["GET"] = not_found<SunshineHTTPS>;
+     https_server.resource["^/serverinfo$"]["GET"] = serverinfo<SunshineHTTPS>;
+-    https_server.resource["^/pair$"]["GET"] = [&add_cert](auto resp, auto req) {
+-      pair<SunshineHTTPS>(add_cert, resp, req);
++    https_server.resource["^/pair$"]["GET"] = [](auto resp, auto req) {
++      pair<SunshineHTTPS>(resp, req);
+     };
+     https_server.resource["^/applist$"]["GET"] = applist;
+     https_server.resource["^/appasset$"]["GET"] = appasset;
+@@ -1182,8 +1434,8 @@ namespace nvhttp {
+ 
+     http_server.default_resource["GET"] = not_found<SimpleWeb::HTTP>;
+     http_server.resource["^/serverinfo$"]["GET"] = serverinfo<SimpleWeb::HTTP>;
+-    http_server.resource["^/pair$"]["GET"] = [&add_cert](auto resp, auto req) {
+-      pair<SimpleWeb::HTTP>(add_cert, resp, req);
++    http_server.resource["^/pair$"]["GET"] = [](auto resp, auto req) {
++      pair<SimpleWeb::HTTP>(resp, req);
+     };
+ 
+     http_server.config.reuse_address = true;
+@@ -1220,34 +1472,35 @@ namespace nvhttp {
+   }
+ 
+   void erase_all_clients() {
+-    client_t client;
+-    client_root = client;
++    std::lock_guard lock {client_auth_mutex};
++    client_root = {};
+     cert_chain.clear();
+     save_state();
+   }
+ 
+   bool unpair_client(const std::string_view uuid) {
++    std::lock_guard lock {client_auth_mutex};
+     bool removed = false;
+-    client_t &client = client_root;
+-    for (auto it = client.named_devices.begin(); it != client.named_devices.end();) {
++    for (auto it = client_root.named_devices.begin(); it != client_root.named_devices.end();) {
+       if ((*it).uuid == uuid) {
+-        it = client.named_devices.erase(it);
++        it = client_root.named_devices.erase(it);
+         removed = true;
+       } else {
+         ++it;
+       }
+     }
+ 
++    rebuild_client_cert_chain();
+     save_state();
+-    load_state();
+     return removed;
+   }
+ 
+   bool set_client_enabled(const std::string_view uuid, bool enabled) {
+-    client_t &client = client_root;
+-    for (auto &named_cert : client.named_devices) {
++    std::lock_guard lock {client_auth_mutex};
++    for (auto &named_cert : client_root.named_devices) {
+       if (named_cert.uuid == uuid) {
+         named_cert.enabled = enabled;
++        rebuild_client_cert_chain();
+         save_state();
+         return true;
+       }
+@@ -1255,13 +1508,49 @@ namespace nvhttp {
+     return false;
+   }
+ 
+-  bool is_client_enabled(const std::string_view cert_pem) {
+-    const client_t &client = client_root;
+-    for (const auto &named_cert : client.named_devices) {
+-      if (named_cert.cert == cert_pem) {
+-        return named_cert.enabled;
++  /**
++   * @brief Get cert by UUID.
++   */
++  std::string get_cert_by_uuid(const std::string_view uuid) {
++    std::lock_guard lock {client_auth_mutex};
++    for (const auto &named_cert : client_root.named_devices) {
++      if (named_cert.uuid == uuid) {
++        return named_cert.cert;
+       }
+     }
+-    return true;
++    return {};
+   }
++
++
++#ifdef SUNSHINE_TESTS
++  namespace test_support {
++    void reset_client_state() {
++      std::lock_guard lock {client_auth_mutex};
++      client_root = {};
++      cert_chain.clear();
++    }
++
++    std::string add_client(const std::string &name, std::string cert, bool enabled) {
++      auto uuid = add_authorized_client(name, std::move(cert));
++      if (!uuid.empty() && !enabled) {
++        set_client_enabled(uuid, false);
++      }
++      return uuid;
++    }
++
++    bool authorize_client_certificate(const std::string_view cert) {
++      auto certificate = crypto::x509(cert);
++      if (!certificate) {
++        return false;
++      }
++
++      std::lock_guard lock {client_auth_mutex};
++      return verify_client_certificate(certificate.get()) == nullptr;
++    }
++
++    void reload_client_state() {
++      load_state();
++    }
++  }  // namespace test_support
++#endif
+ }  // namespace nvhttp
+diff --git a/src/nvhttp.h b/src/nvhttp.h
+index c24d018c..fc3e32dd 100644
+--- a/src/nvhttp.h
++++ b/src/nvhttp.h
+@@ -6,7 +6,11 @@
+ #pragma once
+ 
+ // standard includes
++#include <chrono>
++#include <cstddef>
+ #include <string>
++#include <string_view>
++#include <vector>
+ 
+ // lib includes
+ #include <boost/property_tree/ptree.hpp>
+@@ -15,7 +19,6 @@
+ 
+ // local includes
+ #include "crypto.h"
+-#include "thread_safe.h"
+ 
+ /**
+  * @brief Contains all the functions and variables related to the nvhttp (GameStream) server.
+@@ -44,6 +47,26 @@ namespace nvhttp {
+    */
+   constexpr auto PORT_HTTPS = -5;
+ 
++  /**
++   * @brief Maximum number of pairing sessions retained at one time.
++   */
++  constexpr std::size_t MAX_PENDING_PAIRING_SESSIONS = 32;
++
++  /**
++   * @brief Number of hexadecimal characters in an operator approval identifier.
++   */
++  constexpr std::size_t PAIRING_ID_SIZE = 32;
++
++  /**
++   * @brief Maximum number of bytes accepted for an operator-supplied paired-client name.
++   */
++  constexpr std::size_t MAX_PAIRING_CLIENT_NAME_SIZE = 128;
++
++  /**
++   * @brief Lifetime of an incomplete pairing session.
++   */
++  constexpr auto PAIRING_SESSION_TIMEOUT = std::chrono::minutes {5};
++
+   /**
+    * @brief Start the nvhttp server.
+    * @examples
+@@ -99,14 +122,92 @@ namespace nvhttp {
+         std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>>
+         response;
+       std::string salt = {};
+-    } async_insert_pin;
++      std::string id = {};  ///< Unguessable identifier used by the Web UI to approve this session.
++      std::string device_name = {};  ///< Untrusted device name reported by the pairing client.
++      std::string address = {};  ///< Network address from which the pairing request originated.
++      std::chrono::steady_clock::time_point expires_at = std::chrono::steady_clock::time_point::max();  ///< Deadline for completing this pairing session.
++    } async_insert_pin;  ///< Async insert pin.
+ 
+     /**
+      * @brief used as a security measure to prevent out of order calls
+      */
+     PAIR_PHASE last_phase = PAIR_PHASE::NONE;
++    bool failed = false;  ///< Whether protocol validation failed and the session must be removed.
++  };
++
++  /**
++   * @brief Operator-visible context for a pairing request awaiting PIN approval.
++   */
++  struct pending_pairing_t {
++    std::string id;  ///< Unguessable approval identifier.
++    std::string name;  ///< Untrusted device name reported by the pairing client.
++    std::string address;  ///< Network address from which the request originated.
+   };
+ 
++  /**
++   * @brief Result of inserting a new pairing session into bounded pending storage.
++   */
++  enum class pair_session_insert_e {
++    ADDED,  ///< The session was inserted successfully.
++    ALREADY_EXISTS,  ///< A session with the same client unique ID is already active.
++    FULL  ///< The bounded session store has reached its limit.
++  };
++
++  /**
++   * @brief Validate an operator approval identifier received from the REST API.
++   *
++   * @param pairing_id Approval identifier to validate.
++   * @return `true` when the value has the exact hexadecimal format Sunshine generates.
++   */
++  bool is_valid_pairing_id(std::string_view pairing_id);
++
++  /**
++   * @brief Validate a Moonlight pairing PIN received from the REST API.
++   *
++   * @param pin PIN to validate.
++   * @return `true` when the value contains exactly four ASCII digits.
++   */
++  bool is_valid_pairing_pin(std::string_view pin);
++
++  /**
++   * @brief Validate an operator-supplied paired-client name received from the REST API.
++   *
++   * @param name Client name to validate.
++   * @return `true` when the name is non-empty and within the storage limit.
++   */
++  bool is_valid_pairing_name(std::string_view name);
++
++  /**
++   * @brief Insert a newly created pairing session into bounded pending storage.
++   *
++   * @param sess Pairing session to insert.
++   * @param pairing_id Receives the unguessable approval identifier on success.
++   * @return Status describing whether the session was inserted.
++   */
++  pair_session_insert_e insert_pair_session(pair_session_t sess, std::string &pairing_id);
++
++  /**
++   * @brief Remove pairing sessions whose completion deadline has passed.
++   *
++   * @param now Monotonic time used to evaluate session deadlines.
++   */
++  void expire_pair_sessions(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
++
++  /**
++   * @brief List pairing requests that are waiting for operator PIN approval.
++   *
++   * @return Pending requests ordered from oldest to newest.
++   */
++  std::vector<pending_pairing_t> get_pending_pairings();
++
++  /**
++   * @brief Cancel a pairing request that is waiting for operator approval.
++   *
++   * @param pairing_id Unguessable approval identifier returned by @ref get_pending_pairings.
++   * @return `true` if the pending request was found and cancelled.
++   */
++  bool cancel_pairing(std::string_view pairing_id);
++
+   /**
+    * @brief removes the temporary pairing session
+    * @param sess
+@@ -161,19 +262,23 @@ namespace nvhttp {
+    *
+    * Then using the client certificate public key we should be able to verify that
+    * the client secret has been signed by Moonlight
++   * @param sess Pairing session that owns the request state.
++   * @param tree XML property tree used for the response body.
++   * @param client_pairing_secret Client pairing secret.
+    */
+-  void clientpairingsecret(pair_session_t &sess, std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, boost::property_tree::ptree &tree, const std::string &client_pairing_secret);
++  void clientpairingsecret(pair_session_t &sess, boost::property_tree::ptree &tree, const std::string &client_pairing_secret);
+ 
+   /**
+-   * @brief Compare the user supplied pin to the Moonlight pin.
++   * @brief Apply the user supplied PIN to the explicitly selected pairing request.
++   * @param pairing_id Unguessable identifier of the pairing request to approve.
+    * @param pin The user supplied pin.
+    * @param name The user supplied name.
+    * @return `true` if the pin is correct, `false` otherwise.
+    * @examples
+-   * bool pin_status = nvhttp::pin("1234", "laptop");
++   * bool pin_status = nvhttp::pin("0123456789abcdef0123456789abcdef", "1234", "laptop");
+    * @examples_end
+    */
+-  bool pin(std::string pin, std::string name);
++  bool pin(std::string_view pairing_id, std::string pin, std::string name);
+ 
+   /**
+    * @brief Remove single client.
+@@ -208,4 +313,40 @@ namespace nvhttp {
+    * @examples_end
+    */
+   void erase_all_clients();
++
++#ifdef SUNSHINE_TESTS
++  std::string get_cert_by_uuid(std::string_view uuid);
++  /**
++   * @brief Test-only accessors for paired-client authorization state.
++   */
++  namespace test_support {
++    /**
++     * @brief Clear in-memory paired-client records without changing persisted state.
++     */
++    void reset_client_state();
++
++    /**
++     * @brief Add a paired-client record for authorization tests.
++     *
++     * @param name Human-readable client name.
++     * @param cert PEM-encoded client certificate.
++     * @param enabled Whether the client may connect.
++     * @return Persistent UUID for the added client, or an empty string when invalid.
++     */
++    std::string add_client(const std::string &name, std::string cert, bool enabled);
++
++    /**
++     * @brief Run the production certificate authorization checks against PEM input.
++     *
++     * @param cert PEM-encoded certificate presented by a client.
++     * @return `true` when the exact certificate belongs to one enabled paired client.
++     */
++    bool authorize_client_certificate(std::string_view cert);
++
++    /**
++     * @brief Reload paired-client authorization state from the configured state file.
++     */
++    void reload_client_state();
++  }  // namespace test_support
++#endif
+ }  // namespace nvhttp
 diff --git a/src/platform/macos/input.cpp b/src/platform/macos/input.cpp
 index de721819..db7bf802 100644
 --- a/src/platform/macos/input.cpp
@@ -573,11 +1881,440 @@ index 00000000..e42489af
 +    }
 +  }
 +}
+diff --git a/src/stream.cpp b/src/stream.cpp
+index 8b303ef2..0e70b954 100644
+--- a/src/stream.cpp
++++ b/src/stream.cpp
+@@ -4,9 +4,12 @@
+  */
+ 
+ // standard includes
++#include <cstring>
+ #include <fstream>
+ #include <future>
++#include <optional>
+ #include <queue>
++#include <utility>
+ 
+ // lib includes
+ #include <boost/endian/arithmetic.hpp>
+@@ -474,6 +477,29 @@ namespace stream {
+ 
+   static auto broadcast = safe::make_shared<broadcast_ctx_t>(start_broadcast, end_broadcast);
+ 
++  /**
++   * @brief Parse a control message from an ENet packet.
++   *
++   * @param packet ENet packet containing the control message type and payload.
++   * @return The message type and payload view, or `std::nullopt` when the packet lacks a complete type.
++   */
++  std::optional<std::pair<std::uint16_t, std::string_view>> parse_control_packet(const ENetPacket &packet) {
++    if (packet.data == nullptr || packet.dataLength < sizeof(std::uint16_t)) {
++      return std::nullopt;
++    }
++
++    std::uint16_t type;
++    std::memcpy(&type, packet.data, sizeof(type));
++
++    return std::pair {
++      type,
++      std::string_view {
++        reinterpret_cast<const char *>(packet.data) + sizeof(type),
++        packet.dataLength - sizeof(type),
++      },
++    };
++  }
++
+   session_t *control_server_t::get_session(const net::peer_t peer, uint32_t connect_data) {
+     {
+       // Fast path - look up existing session by peer
+@@ -584,11 +610,10 @@ namespace stream {
+         case ENET_EVENT_TYPE_RECEIVE:
+           {
+             net::packet_t packet {event.packet};
+-
+-            auto type = *(std::uint16_t *) packet->data;
+-            std::string_view payload {(char *) packet->data + sizeof(type), packet->dataLength - sizeof(type)};
+-
+-            call(type, session, payload, false);
++            auto message = parse_control_packet(*packet);
++            if (message) {
++              call(message->first, session, message->second, false);
++            }
+           }
+           break;
+         case ENET_EVENT_TYPE_CONNECT:
+diff --git a/src_assets/common/assets/web/pin.html b/src_assets/common/assets/web/pin.html
+index 0ccc2491..c23d25a0 100644
+--- a/src_assets/common/assets/web/pin.html
++++ b/src_assets/common/assets/web/pin.html
+@@ -11,17 +11,39 @@
+     <h1 class="my-4 text-center">{{ $t('pin.pin_pairing') }}</h1>
+     <form class="form d-flex flex-column align-items-center" id="form" @submit.prevent="registerDevice">
+       <div class="card flex-column d-flex p-4 mb-4">
++        <div class="input-group mt-2">
++          <span class="input-group-text">
++            <user-round-search :size="18" class="icon"></user-round-search>
++          </span>
++          <select v-model="selectedPairingId" class="form-select" id="pairing-input" required>
++            <option disabled value="">
++              {{ pendingPairings.length ? $t('pin.select_pairing') : $t('pin.no_pending_pairings') }}
++            </option>
++            <option v-for="pairing in pendingPairings" :key="pairing.id" :value="pairing.id">
++              {{ pairing.name || $t('pin.unknown_device') }} — {{ pairing.address || $t('pin.unknown_address') }}
++            </option>
++          </select>
++          <button
++            type="button"
++            class="btn btn-outline-danger"
++            :disabled="!selectedPairingId"
++            :title="$t('pin.cancel_pairing')"
++            @click="cancelSelectedPairing"
++          >
++            <x :size="18" class="icon"></x>
++          </button>
++        </div>
+         <div class="input-group mt-2">
+           <span class="input-group-text">
+             <hash :size="18" class="icon"></hash>
+           </span>
+-          <input type="text" pattern="\d*" :placeholder="`${$t('navbar.pin')}`" autofocus id="pin-input" class="form-control" required />
++          <input v-model="pin" type="text" pattern="\d{4}" maxlength="4" inputmode="numeric" :placeholder="`${$t('navbar.pin')}`" autofocus id="pin-input" class="form-control" required />
+         </div>
+         <div class="input-group my-4">
+           <span class="input-group-text">
+             <monitor :size="18" class="icon"></monitor>
+           </span>
+-          <input type="text" :placeholder="`${$t('pin.device_name')}`" id="name-input" class="form-control" required />
++          <input v-model="name" type="text" :placeholder="`${$t('pin.device_name')}`" id="name-input" class="form-control" required />
+         </div>
+         <button class="btn btn-primary">
+           <forward :size="18" class="icon"></forward>
+@@ -31,7 +53,7 @@
+       <div class="alert alert-warning">
+         <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
+       </div>
+-      <div id="status"></div>
++      <div v-if="status" :class="`alert alert-${status.type}`" role="alert">{{ status.message }}</div>
+     </form>
+   </div>
+ </body>
+@@ -45,6 +67,8 @@
+     Forward,
+     Hash,
+     Monitor,
++    UserRoundSearch,
++    X,
+   } from 'lucide-vue-next'
+ 
+   let app = createApp({
+@@ -53,35 +77,102 @@
+       Forward,
+       Hash,
+       Monitor,
++      UserRoundSearch,
++      X,
+     },
+     inject: ['i18n'],
++    data() {
++      return {
++        name: '',
++        pendingPairings: [],
++        pin: '',
++        refreshTimer: null,
++        selectedPairingId: '',
++        status: null,
++      };
++    },
++    mounted() {
++      this.loadPendingPairings();
++      this.refreshTimer = window.setInterval(() => this.loadPendingPairings(), 2000);
++    },
++    beforeUnmount() {
++      window.clearInterval(this.refreshTimer);
++    },
+     methods: {
+-      registerDevice(e) {
+-        let pin = document.querySelector("#pin-input").value;
+-        let name = document.querySelector("#name-input").value;
+-        document.querySelector("#status").innerHTML = "";
+-        let b = JSON.stringify({pin: pin, name: name});
+-        apiFetch("./api/pin", {
++      /**
++       * Refresh the authenticated list of pairing requests awaiting approval.
++       */
++      async loadPendingPairings() {
++        try {
++          const response = await apiFetch('./api/pin', {method: 'GET'});
++          if (!response.ok) {
++            throw new Error(`HTTP ${response.status}`);
++          }
++
++          const body = await response.json();
++          this.pendingPairings = body.pairings || [];
++          if (!this.pendingPairings.some((pairing) => pairing.id === this.selectedPairingId)) {
++            this.selectedPairingId = this.pendingPairings.length === 1 ? this.pendingPairings[0].id : '';
++          }
++        } catch (error) {
++          console.error('Failed to load pending pairing requests', error);
++          this.status = {type: 'danger', message: this.i18n.t('pin.load_failure')};
++        }
++      },
++
++      /**
++       * Apply the entered PIN only to the pairing request selected by the operator.
++       */
++      async registerDevice() {
++        this.status = null;
++        if (!this.selectedPairingId) {
++          this.status = {type: 'danger', message: this.i18n.t('pin.select_pairing_required')};
++          return;
++        }
++
++        const body = JSON.stringify({
++          pairing_id: this.selectedPairingId,
++          pin: this.pin,
++          name: this.name,
++        });
++        const response = await apiFetch('./api/pin', {
+           method: "POST",
+           headers: {
+             'Content-Type': 'application/json'
+           },
+-          body: b
+-        })
+-          .then((response) => response.json())
+-          .then((response) => {
+-            if (response.status === true) {
+-              document.querySelector(
+-                "#status"
+-              ).innerHTML = `<div class="alert alert-success" role="alert">${this.i18n.t('pin.pair_success')}</div>`;
+-              document.querySelector("#pin-input").value = "";
+-              document.querySelector("#name-input").value = "";
+-            } else {
+-              document.querySelector(
+-                "#status"
+-              ).innerHTML = `<div class="alert alert-danger" role="alert">${this.i18n.t('pin.pair_failure')}</div>`;
+-            }
+-          });
++          body,
++        });
++        const result = await response.json();
++        if (result.status === true) {
++          this.status = {type: 'success', message: this.i18n.t('pin.pair_success')};
++          this.pin = '';
++          this.name = '';
++        } else {
++          this.status = {type: 'danger', message: this.i18n.t('pin.pair_failure')};
++        }
++        await this.loadPendingPairings();
++      },
++
++      /**
++       * Cancel the selected pending request without affecting other clients.
++       */
++      async cancelSelectedPairing() {
++        if (!this.selectedPairingId) {
++          return;
++        }
++
++        const response = await apiFetch('./api/pin', {
++          method: 'DELETE',
++          headers: {
++            'Content-Type': 'application/json',
++          },
++          body: JSON.stringify({pairing_id: this.selectedPairingId}),
++        });
++        const result = await response.json();
++        this.status = result.status === true
++          ? {type: 'success', message: this.i18n.t('pin.cancel_success')}
++          : {type: 'danger', message: this.i18n.t('pin.cancel_failure')};
++        await this.loadPendingPairings();
+       }
+     }
+   });
+diff --git a/src_assets/common/assets/web/public/assets/css/sunshine.css b/src_assets/common/assets/web/public/assets/css/sunshine.css
+index 6dbde5df..2c08ac87 100644
+--- a/src_assets/common/assets/web/public/assets/css/sunshine.css
++++ b/src_assets/common/assets/web/public/assets/css/sunshine.css
+@@ -1046,6 +1046,11 @@ p {
+     transition: all var(--transition-fast);
+ }
+ 
++/* Keep option text clear of the select's dropdown indicator. */
++.form-select {
++    padding-right: 2.25rem;
++}
++
+ .form-control:focus,
+ .form-select:focus {
+     border-color: var(--color-primary);
+diff --git a/src_assets/common/assets/web/public/assets/locale/en.json b/src_assets/common/assets/web/public/assets/locale/en.json
+index 1165ed88..9faaa9f2 100644
+--- a/src_assets/common/assets/web/public/assets/locale/en.json
++++ b/src_assets/common/assets/web/public/assets/locale/en.json
+@@ -461,11 +461,20 @@
+     "success_msg": "Password has been changed successfully! This page will reload soon, your browser will ask you for the new credentials."
+   },
+   "pin": {
++    "cancel_failure": "The pairing request could not be cancelled",
++    "cancel_pairing": "Cancel selected pairing request",
++    "cancel_success": "Pairing request cancelled",
+     "device_name": "Device Name",
++    "load_failure": "Pending pairing requests could not be loaded",
++    "no_pending_pairings": "No devices are waiting to pair",
+     "pair_failure": "Pairing Failed: Check if the PIN is typed correctly",
+     "pair_success": "Success! Please check Moonlight to continue",
+     "pin_pairing": "PIN Pairing",
++    "select_pairing": "Select the device requesting approval",
++    "select_pairing_required": "Select the device you intend to pair",
+     "send": "Send",
++    "unknown_address": "Unknown address",
++    "unknown_device": "Unknown device",
+     "warning_msg": "Make sure you have access to the client you are pairing with. This software can give total control to your computer, so be careful!"
+   },
+   "resource_card": {
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 984481f6..f8118465 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -109,6 +109,18 @@ if (APPLE)
+     list(APPEND TEST_SOURCES ${MACOS_TEST_SOURCES})
+ endif ()
+ 
++# Compile only the backported security regressions for OpenBot's runtime build.
++if(OPENBOT_SECURITY_TESTS)
++    set(TEST_SOURCES
++        "${CMAKE_SOURCE_DIR}/tests/tests_main.cpp"
++        "${CMAKE_SOURCE_DIR}/tests/unit/test_input.cpp"
++        "${CMAKE_SOURCE_DIR}/tests/unit/test_stream.cpp"
++        "${CMAKE_SOURCE_DIR}/tests/unit/test_crypto.cpp"
++        "${CMAKE_SOURCE_DIR}/tests/unit/test_nvhttp_client_auth.cpp"
++        "${CMAKE_SOURCE_DIR}/tests/unit/test_http_pairing.cpp"
++        "${CMAKE_SOURCE_DIR}/tests/unit/test_confighttp.cpp")
++endif()
++
+ set(SUNSHINE_SOURCES
+         ${SUNSHINE_TARGET_FILES})
+ 
+diff --git a/tests/certificate_test_utils.h b/tests/certificate_test_utils.h
+new file mode 100644
+index 00000000..440d84a2
+--- /dev/null
++++ b/tests/certificate_test_utils.h
+@@ -0,0 +1,90 @@
++/**
++ * @file tests/certificate_test_utils.h
++ * @brief Certificate fixtures shared by Sunshine security tests.
++ */
++#pragma once
++
++// standard includes
++#include <algorithm>
++
++// lib includes
++#include <openssl/x509v3.h>
++
++// local includes
++#include <src/crypto.h>
++
++namespace test_utils::certificates {
++  /**
++   * @brief Generate a self-signed certificate that OpenSSL may use as a certificate authority.
++   *
++   * @param common_name Common name for the generated certificate.
++   * @return PEM-encoded certificate-authority credentials.
++   */
++  inline crypto::creds_t generate_ca_credentials(const std::string_view common_name = "Sunshine Test Client CA") {
++    auto credentials = crypto::gen_creds(common_name, 2048);
++    auto certificate = crypto::x509(credentials.x509);
++    auto private_key = crypto::pkey(credentials.pkey);
++
++    util::safe_ptr<BASIC_CONSTRAINTS, BASIC_CONSTRAINTS_free> constraints {BASIC_CONSTRAINTS_new()};
++    constraints->ca = 1;
++    X509_add1_ext_i2d(certificate.get(), NID_basic_constraints, constraints.get(), 1, X509V3_ADD_DEFAULT);
++    X509_sign(certificate.get(), private_key.get(), EVP_sha256());
++    credentials.x509 = crypto::pem(certificate);
++    return credentials;
++  }
++
++  /**
++   * @brief Generate a leaf certificate signed by the supplied certificate authority.
++   *
++   * @param issuer_credentials PEM-encoded issuer certificate and private key.
++   * @return PEM-encoded leaf credentials.
++   */
++  inline crypto::creds_t generate_derived_leaf(const crypto::creds_t &issuer_credentials) {
++    auto credentials = crypto::gen_creds("Sunshine Test Derived Client", 2048);
++    auto certificate = crypto::x509(credentials.x509);
++    auto issuer_certificate = crypto::x509(issuer_credentials.x509);
++    auto issuer_private_key = crypto::pkey(issuer_credentials.pkey);
++
++    X509_set_issuer_name(certificate.get(), X509_get_subject_name(issuer_certificate.get()));
++    X509_sign(certificate.get(), issuer_private_key.get(), EVP_sha256());
++    credentials.x509 = crypto::pem(certificate);
++    return credentials;
++  }
++
++  /**
++   * @brief Change a certificate's validity period so it is already expired.
++   *
++   * @param credentials PEM-encoded certificate and its signing key.
++   * @return The supplied credentials with an expired, re-signed certificate.
++   */
++  inline crypto::creds_t expire_credentials(crypto::creds_t credentials) {
++    auto certificate = crypto::x509(credentials.x509);
++    auto private_key = crypto::pkey(credentials.pkey);
++    constexpr long two_hours = 2 * 60 * 60;
++    constexpr long one_hour = 60 * 60;
++
++    X509_gmtime_adj(X509_getm_notBefore(certificate.get()), -two_hours);
++    X509_gmtime_adj(X509_getm_notAfter(certificate.get()), -one_hour);
++    X509_sign(certificate.get(), private_key.get(), EVP_sha256());
++    credentials.x509 = crypto::pem(certificate);
++    return credentials;
++  }
++
++  /**
++   * @brief Convert canonical PEM line endings to CRLF without changing certificate identity.
++   *
++   * @param pem Canonical PEM text.
++   * @return Equivalent PEM text using CRLF line endings.
++   */
++  inline std::string to_crlf_pem(const std::string_view pem) {
++    std::string converted;
++    converted.reserve(pem.size() + std::ranges::count(pem, '\n'));
++    for (const char character : pem) {
++      if (character == '\n') {
++        converted.push_back('\r');
++      }
++      converted.push_back(character);
++    }
++    return converted;
++  }
++}  // namespace test_utils::certificates
 diff --git a/tests/unit/test_confighttp.cpp b/tests/unit/test_confighttp.cpp
-index 195a666c..f0b09b8a 100644
+index 195a666c..50c6630e 100644
 --- a/tests/unit/test_confighttp.cpp
 +++ b/tests/unit/test_confighttp.cpp
-@@ -178,6 +178,13 @@ protected:
+@@ -29,6 +29,7 @@
+ #include <src/crypto.h>
+ #include <src/httpcommon.h>
+ #include <src/network.h>
++#include <src/nvhttp.h>
+ #include <src/utility.h>
+ 
+ using namespace std::literals;
+@@ -107,6 +108,8 @@ protected:
+   std::filesystem::path web_dir_test_file;
+ 
+   void SetUp() override {
++    testing::Test::SetUp();
++    nvhttp::expire_pair_sessions(std::chrono::steady_clock::time_point::max());
+     // Save current config
+     saved_username = config::sunshine.username;
+     saved_password = config::sunshine.password;
+@@ -178,6 +181,13 @@ protected:
        // If not authenticated, authenticate() already sent the response
      };
  
@@ -591,7 +2328,163 @@ index 195a666c..f0b09b8a 100644
      // Add a route to test send_unauthorized
      server->resource["^/unauthorized-test$"]["GET"] = [](
                                                          const std::shared_ptr<SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Response> &response,
-@@ -405,6 +412,22 @@ TEST_F(ConfigHttpTest, AuthenticateAcceptsValidCredentials) {
+@@ -308,6 +318,9 @@ protected:
+       confighttp::browseDirectory(response, request);
+     };
+ 
++    server->resource["^/pairing-test$"]["DELETE"] = confighttp::cancelPairing;
++    server->resource["^/pairing-test$"]["GET"] = confighttp::getPendingPairings;
++    server->resource["^/pairing-test$"]["POST"] = confighttp::savePin;
+     // Start server
+     server_thread = std::thread([this]() {  // NOSONAR(cpp:S6168) - jthread not available on FreeBSD 14.3 libc++
+       server->start([this](const unsigned short assigned_port) {
+@@ -345,6 +358,7 @@ protected:
+     config::sunshine.salt = saved_salt;
+     config::sunshine.locale = saved_locale;
+     config::sunshine.csrf_allowed_origins = saved_csrf_allowed_origins;
++    nvhttp::expire_pair_sessions(std::chrono::steady_clock::time_point::max());
+ 
+     // Clean up test HTML file from WEB_DIR
+     if (std::filesystem::exists(web_dir_test_file)) {
+@@ -360,6 +374,23 @@ protected:
+     return "Basic " + SimpleWeb::Crypto::Base64::encode(username + ":" + password);
+   }
+ 
++  /**
++   * @brief Insert a test pairing request into the production pending-session registry.
++   *
++   * @return Unguessable approval identifier assigned to the request.
++   */
++  static std::string insert_pending_pairing() {
++    nvhttp::pair_session_t session;
++    session.client.uniqueID = "rest-api-client";
++    session.async_insert_pin.salt = "ff5dc6eda99339a8a0793e216c4257c4";
++    session.async_insert_pin.device_name = "REST client";
++    session.async_insert_pin.address = "192.0.2.30";
++
++    std::string pairing_id;
++    EXPECT_EQ(nvhttp::insert_pair_session(std::move(session), pairing_id), nvhttp::pair_session_insert_e::ADDED);
++    return pairing_id;
++  }
++
+   static void assert_security_headers(const std::shared_ptr<SimpleWeb::Client<SimpleWeb::HTTPS>::Response> &response) {
+     const auto x_frame = response->header.find("X-Frame-Options");
+     ASSERT_NE(x_frame, response->header.end());
+@@ -383,6 +414,113 @@ protected:
+   }
+ };
+ 
++TEST_F(ConfigHttpTest, PairingMutationsRejectUnauthenticatedRestRequests) {
++  SimpleWeb::CaseInsensitiveMultimap headers;
++  headers.emplace("Content-Type", "application/json");
++
++  const auto post_response = client->request(
++    "POST",
++    "/pairing-test",
++    R"({"pairing_id":"0123456789abcdef0123456789abcdef","pin":"1234","name":"Client"})",
++    headers
++  );
++  EXPECT_EQ(post_response->status_code, "401 Unauthorized");
++
++  const auto delete_response = client->request(
++    "DELETE",
++    "/pairing-test",
++    R"({"pairing_id":"0123456789abcdef0123456789abcdef"})",
++    headers
++  );
++  EXPECT_EQ(delete_response->status_code, "401 Unauthorized");
++}
++
++TEST_F(ConfigHttpTest, PairingMutationsRejectCrossOriginRestRequestsWithoutCsrfToken) {
++  const std::string pairing_id = insert_pending_pairing();
++  SimpleWeb::CaseInsensitiveMultimap headers;
++  headers.emplace("Authorization", create_auth_header("testuser", "testpass"));
++  headers.emplace("Content-Type", "application/json");
++  headers.emplace("Origin", "https://example.invalid");
++
++  const auto post_response = client->request(
++    "POST",
++    "/pairing-test",
++    nlohmann::json {
++      {"pairing_id", pairing_id},
++      {"pin", "1234"},
++      {"name", "Client"},
++    }
++      .dump(),
++    headers
++  );
++  EXPECT_EQ(post_response->status_code, "400 Bad Request");
++  EXPECT_TRUE(post_response->content.string().contains("Missing CSRF token"));
++
++  const auto delete_response = client->request(
++    "DELETE",
++    "/pairing-test",
++    nlohmann::json {{"pairing_id", pairing_id}}.dump(),
++    headers
++  );
++  EXPECT_EQ(delete_response->status_code, "400 Bad Request");
++  EXPECT_TRUE(delete_response->content.string().contains("Missing CSRF token"));
++  EXPECT_EQ(nvhttp::get_pending_pairings().size(), 1);
++}
++
++TEST_F(ConfigHttpTest, PairingRestApiListsAuthenticatedPendingRequests) {
++  const std::string pairing_id = insert_pending_pairing();
++  SimpleWeb::CaseInsensitiveMultimap headers;
++  headers.emplace("Authorization", create_auth_header("testuser", "testpass"));
++
++  const auto response = client->request("GET", "/pairing-test", "", headers);
++  ASSERT_EQ(response->status_code, "200 OK");
++  const auto body = nlohmann::json::parse(response->content.string());
++  ASSERT_EQ(body.at("pairings").size(), 1);
++  EXPECT_EQ(body.at("pairings").front().at("id"), pairing_id);
++  EXPECT_EQ(body.at("pairings").front().at("name"), "REST client");
++  EXPECT_EQ(body.at("pairings").front().at("address"), "192.0.2.30");
++}
++
++TEST_F(ConfigHttpTest, PairingRestApiRejectsMalformedFieldsWithoutConsumingRequest) {
++  const std::string pairing_id = insert_pending_pairing();
++  const std::array invalid_requests {
++    nlohmann::json {{"pairing_id", "not-a-pairing-id"}, {"pin", "1234"}, {"name", "Client"}},
++    nlohmann::json {{"pairing_id", pairing_id}, {"pin", "123"}, {"name", "Client"}},
++    nlohmann::json {{"pairing_id", pairing_id}, {"pin", "12a4"}, {"name", "Client"}},
++    nlohmann::json {{"pairing_id", pairing_id}, {"pin", "1234"}, {"name", ""}},
++    nlohmann::json {{"pairing_id", pairing_id}, {"pin", "1234"}, {"name", std::string(nvhttp::MAX_PAIRING_CLIENT_NAME_SIZE + 1, 'a')}},
++  };
++
++  SimpleWeb::CaseInsensitiveMultimap headers;
++  headers.emplace("Authorization", create_auth_header("testuser", "testpass"));
++  headers.emplace("Content-Type", "application/json");
++  for (const auto &request : invalid_requests) {
++    const auto response = client->request("POST", "/pairing-test", request.dump(), headers);
++    EXPECT_EQ(response->status_code, "400 Bad Request");
++  }
++
++  const auto pending = nvhttp::get_pending_pairings();
++  ASSERT_EQ(pending.size(), 1);
++  EXPECT_EQ(pending.front().id, pairing_id);
++}
++
++TEST_F(ConfigHttpTest, PairingRestApiCancelsOnlyExplicitRequest) {
++  const std::string pairing_id = insert_pending_pairing();
++  SimpleWeb::CaseInsensitiveMultimap headers;
++  headers.emplace("Authorization", create_auth_header("testuser", "testpass"));
++  headers.emplace("Content-Type", "application/json");
++
++  const auto response = client->request(
++    "DELETE",
++    "/pairing-test",
++    nlohmann::json {{"pairing_id", pairing_id}}.dump(),
++    headers
++  );
++  ASSERT_EQ(response->status_code, "200 OK");
++  EXPECT_TRUE(nlohmann::json::parse(response->content.string()).at("status").get<bool>());
++  EXPECT_TRUE(nvhttp::get_pending_pairings().empty());
++}
++
+ // Test: confighttp::authenticate() rejects requests without auth header
+ TEST_F(ConfigHttpTest, AuthenticateRejectsNoAuth) {
+   const auto response = client->request("GET", "/auth-test");
+@@ -405,6 +543,22 @@ TEST_F(ConfigHttpTest, AuthenticateAcceptsValidCredentials) {
    ASSERT_EQ(body, "authenticated");
  }
  
@@ -614,6 +2507,685 @@ index 195a666c..f0b09b8a 100644
  // Test: confighttp::authenticate() rejects invalid password
  TEST_F(ConfigHttpTest, AuthenticateRejectsInvalidPassword) {
    SimpleWeb::CaseInsensitiveMultimap headers;
+diff --git a/tests/unit/test_crypto.cpp b/tests/unit/test_crypto.cpp
+new file mode 100644
+index 00000000..bb953de7
+--- /dev/null
++++ b/tests/unit/test_crypto.cpp
+@@ -0,0 +1,65 @@
++/**
++ * @file tests/unit/test_crypto.cpp
++ * @brief Test src/crypto.*.
++ */
++// test includes
++#include "../tests_common.h"
++
++// lib includes
++#include <openssl/x509.h>
++
++// local includes
++#include "../certificate_test_utils.h"
++
++#include <src/crypto.h>
++
++TEST(CryptoTest, GeneratedCredentialsExposeSubjectAndVerifySignatures) {
++  constexpr std::string_view common_name = "Sunshine Test Host";
++  constexpr std::string_view payload = "payload";
++
++  auto creds = crypto::gen_creds(common_name, 2048);
++  ASSERT_FALSE(creds.x509.empty());
++  ASSERT_FALSE(creds.pkey.empty());
++
++  auto cert = crypto::x509(creds.x509);
++  auto pkey = crypto::pkey(creds.pkey);
++  ASSERT_NE(cert.get(), nullptr);
++  ASSERT_NE(pkey.get(), nullptr);
++
++  const auto subject = X509_get_subject_name(cert.get());
++  ASSERT_NE(subject, nullptr);
++
++  const auto common_name_index = X509_NAME_get_index_by_NID(subject, NID_commonName, -1);
++  ASSERT_GE(common_name_index, 0);
++
++  const auto common_name_entry = X509_NAME_get_entry(subject, common_name_index);
++  ASSERT_NE(common_name_entry, nullptr);
++
++  const auto common_name_data = X509_NAME_ENTRY_get_data(common_name_entry);
++  ASSERT_NE(common_name_data, nullptr);
++
++  const std::string_view parsed_common_name {
++    reinterpret_cast<const char *>(ASN1_STRING_get0_data(common_name_data)),
++    static_cast<std::size_t>(ASN1_STRING_length(common_name_data))
++  };
++  ASSERT_EQ(parsed_common_name, common_name);
++
++  ASSERT_FALSE(crypto::signature(cert).empty());
++
++  const auto signature = crypto::sign256(pkey, payload);
++  ASSERT_FALSE(signature.empty());
++  ASSERT_TRUE(crypto::verify256(cert, payload, {reinterpret_cast<const char *>(signature.data()), signature.size()}));
++}
++
++TEST(CryptoTest, CertificateChainRequiresExactPairedIdentity) {
++  const auto issuer_credentials = test_utils::certificates::generate_ca_credentials();
++  const auto derived_credentials = test_utils::certificates::generate_derived_leaf(issuer_credentials);
++  auto paired_certificate = crypto::x509(issuer_credentials.x509);
++  auto derived_certificate = crypto::x509(derived_credentials.x509);
++
++  crypto::cert_chain_t certificate_chain;
++  certificate_chain.add(crypto::x509(issuer_credentials.x509));
++
++  EXPECT_EQ(certificate_chain.verify(paired_certificate.get()), nullptr);
++  EXPECT_NE(certificate_chain.verify(derived_certificate.get()), nullptr);
++}
+diff --git a/tests/unit/test_http_pairing.cpp b/tests/unit/test_http_pairing.cpp
+index 0b75e32b..a7dfb888 100644
+--- a/tests/unit/test_http_pairing.cpp
++++ b/tests/unit/test_http_pairing.cpp
+@@ -5,6 +5,15 @@
+ 
+ #include "../tests_common.h"
+ 
++// standard includes
++#include <atomic>
++#include <chrono>
++#include <format>
++#include <thread>
++#include <vector>
++
++// local includes
++#include <src/config.h>
+ #include <src/nvhttp.h>
+ 
+ using namespace nvhttp;
+@@ -76,7 +85,29 @@ X4wnh1bwdiidqpcgyuKossLOPxbS786WmsesaAWPnpoY6M8aija+ALwNNuWWmyMg
+ 9SVDV76xJzM36Uq7Kg3QJYTlY04WmPIdJHkCtXWf9g==
+ -----END CERTIFICATE-----)";
+ 
+-struct PairingTest: testing::TestWithParam<std::tuple<pairing_input, pairing_output>> {};
++struct PairingTest: testing::Test, testing::WithParamInterface<std::tuple<pairing_input, pairing_output>> {
++  /**
++   * @brief Isolate pairing authorization state and suppress persistence for the test.
++   */
++  void SetUp() override {
++    testing::Test::SetUp();
++    original_fresh_state = config::sunshine.flags[config::flag::FRESH_STATE];
++    config::sunshine.flags[config::flag::FRESH_STATE] = true;
++    nvhttp::test_support::reset_client_state();
++  }
++
++  /**
++   * @brief Restore the caller's fresh-state configuration after the pairing test.
++   */
++  void TearDown() override {
++    nvhttp::test_support::reset_client_state();
++    config::sunshine.flags[config::flag::FRESH_STATE] = original_fresh_state;
++    testing::Test::TearDown();
++  }
++
++private:
++  bool original_fresh_state;  ///< Fresh-state flag restored after each pairing test.
++};
+ 
+ TEST_P(PairingTest, Run) {
+   auto [input, expected] = GetParam();
+@@ -109,22 +140,11 @@ TEST_P(PairingTest, Run) {
+ 
+   // phase 4
+   auto input_client_cert = input.session->client.cert;  // Will be moved
+-  auto add_cert = std::make_shared<safe::queue_t<crypto::x509_t>>(30);
+-  clientpairingsecret(*input.session, add_cert, tree, input.client_pairing_secret);
++  clientpairingsecret(*input.session, tree, input.client_pairing_secret);
+   ASSERT_EQ(tree.get<int>("root.paired") == 1, expected.phase_4_success);
+ 
+-  // Check that we actually added the input client certificate to `add_cert`
+   if (expected.phase_4_success) {
+-    ASSERT_EQ(add_cert->peek(), true);
+-    auto cert = add_cert->pop();
+-    char added_subject_name[256];
+-    X509_NAME_oneline(X509_get_subject_name(cert.get()), added_subject_name, sizeof(added_subject_name));
+-
+-    auto input_cert = crypto::x509(input_client_cert);
+-    char original_suject_name[256];
+-    X509_NAME_oneline(X509_get_subject_name(input_cert.get()), original_suject_name, sizeof(original_suject_name));
+-
+-    ASSERT_EQ(std::string(added_subject_name), std::string(original_suject_name));
++    ASSERT_TRUE(nvhttp::test_support::authorize_client_certificate(input_client_cert));
+   }
+ }
+ 
+@@ -252,8 +272,7 @@ TEST(PairingTest, OutOfOrderCalls) {
+   serverchallengeresp(sess, tree, "test");
+   ASSERT_FALSE(tree.get<int>("root.paired") == 1);
+ 
+-  auto add_cert = std::make_shared<safe::queue_t<crypto::x509_t>>(30);
+-  clientpairingsecret(sess, add_cert, tree, "test");
++  clientpairingsecret(sess, tree, "test");
+   ASSERT_FALSE(tree.get<int>("root.paired") == 1);
+ 
+   // This should work, it's the first time we call it
+@@ -265,3 +284,200 @@ TEST(PairingTest, OutOfOrderCalls) {
+   getservercert(sess, tree, "test");
+   ASSERT_FALSE(tree.get<int>("root.paired") == 1);
+ }
++
++namespace {
++  /**
++   * @brief Build a pairing session that is awaiting operator approval.
++   *
++   * @param unique_id Client-controlled GameStream unique identifier.
++   * @param device_name Client-reported device name.
++   * @param address Network address associated with the request.
++   * @return Pairing session ready for insertion into pending storage.
++   */
++  pair_session_t pending_session(std::string unique_id, std::string device_name, std::string address) {
++    return {
++      .client = {
++        .uniqueID = std::move(unique_id),
++      },
++      .async_insert_pin = {
++        .salt = "ff5dc6eda99339a8a0793e216c4257c4",
++        .device_name = std::move(device_name),
++        .address = std::move(address),
++      },
++    };
++  }
++
++  /**
++   * @brief Fixture that isolates tests using global pending-pairing storage.
++   */
++  class PairingSessionRegistryTest: public testing::Test {
++  protected:
++    void SetUp() override {
++      expire_pair_sessions(std::chrono::steady_clock::time_point::max());
++    }
++
++    void TearDown() override {
++      expire_pair_sessions(std::chrono::steady_clock::time_point::max());
++    }
++  };
++}  // namespace
++
++TEST_F(PairingSessionRegistryTest, PinApprovalTargetsExplicitPairingId) {
++  std::string legitimate_pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("legitimate", "Living Room", "192.0.2.10"), legitimate_pairing_id),
++    pair_session_insert_e::ADDED
++  );
++
++  std::string attacker_pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("attacker", "Living Room", "192.0.2.20"), attacker_pairing_id),
++    pair_session_insert_e::ADDED
++  );
++  ASSERT_NE(legitimate_pairing_id, attacker_pairing_id);
++
++  // Unit-test sessions have no parked HTTP response, so pin() returns false after
++  // consuming the explicitly selected session. The competing request must remain untouched.
++  EXPECT_FALSE(pin(legitimate_pairing_id, "1234", "Approved client"));
++
++  const auto pending = get_pending_pairings();
++  ASSERT_EQ(pending.size(), 1);
++  EXPECT_EQ(pending.front().id, attacker_pairing_id);
++  EXPECT_EQ(pending.front().address, "192.0.2.20");
++}
++
++TEST_F(PairingSessionRegistryTest, InvalidApprovalCannotConsumePendingSession) {
++  std::string pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("legitimate", "Laptop", "192.0.2.10"), pairing_id),
++    pair_session_insert_e::ADDED
++  );
++
++  EXPECT_FALSE(pin("unknown-approval", "1234", "Laptop"));
++  EXPECT_FALSE(pin(pairing_id, "123", "Laptop"));
++  EXPECT_FALSE(pin(pairing_id, "12a4", "Laptop"));
++  EXPECT_FALSE(pin(pairing_id, "1234", ""));
++  EXPECT_FALSE(pin(pairing_id, "1234", std::string(MAX_PAIRING_CLIENT_NAME_SIZE + 1, 'a')));
++
++  const auto pending = get_pending_pairings();
++  ASSERT_EQ(pending.size(), 1);
++  EXPECT_EQ(pending.front().id, pairing_id);
++}
++
++TEST_F(PairingSessionRegistryTest, RestApiPairingFieldsAreValidatedServerSide) {
++  EXPECT_TRUE(is_valid_pairing_id(std::string(PAIRING_ID_SIZE, 'a')));
++  EXPECT_TRUE(is_valid_pairing_id("0123456789ABCDEF0123456789abcdef"));
++  EXPECT_FALSE(is_valid_pairing_id(std::string(PAIRING_ID_SIZE - 1, 'a')));
++  EXPECT_FALSE(is_valid_pairing_id(std::string(PAIRING_ID_SIZE, 'g')));
++
++  EXPECT_TRUE(is_valid_pairing_pin("0000"));
++  EXPECT_TRUE(is_valid_pairing_pin("9999"));
++  EXPECT_FALSE(is_valid_pairing_pin("123"));
++  EXPECT_FALSE(is_valid_pairing_pin("12a4"));
++
++  EXPECT_TRUE(is_valid_pairing_name("Client"));
++  EXPECT_TRUE(is_valid_pairing_name(std::string(MAX_PAIRING_CLIENT_NAME_SIZE, 'a')));
++  EXPECT_FALSE(is_valid_pairing_name(""));
++  EXPECT_FALSE(is_valid_pairing_name(std::string(MAX_PAIRING_CLIENT_NAME_SIZE + 1, 'a')));
++}
++
++TEST_F(PairingSessionRegistryTest, DuplicateUniqueIdIsRejectedWithoutReplacingOriginal) {
++  std::string original_pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("duplicate", "Original", "192.0.2.10"), original_pairing_id),
++    pair_session_insert_e::ADDED
++  );
++
++  std::string rejected_pairing_id;
++  EXPECT_EQ(
++    insert_pair_session(pending_session("duplicate", "Replacement", "192.0.2.20"), rejected_pairing_id),
++    pair_session_insert_e::ALREADY_EXISTS
++  );
++  EXPECT_TRUE(rejected_pairing_id.empty());
++
++  const auto pending = get_pending_pairings();
++  ASSERT_EQ(pending.size(), 1);
++  EXPECT_EQ(pending.front().id, original_pairing_id);
++  EXPECT_EQ(pending.front().name, "Original");
++}
++
++TEST_F(PairingSessionRegistryTest, PendingSessionStorageIsBounded) {
++  for (std::size_t index = 0; index < MAX_PENDING_PAIRING_SESSIONS; ++index) {
++    std::string pairing_id;
++    ASSERT_EQ(
++      insert_pair_session(pending_session(std::format("client-{}", index), "Client", "192.0.2.10"), pairing_id),
++      pair_session_insert_e::ADDED
++    );
++    EXPECT_FALSE(pairing_id.empty());
++  }
++
++  std::string overflow_pairing_id;
++  EXPECT_EQ(
++    insert_pair_session(pending_session("overflow", "Overflow", "192.0.2.20"), overflow_pairing_id),
++    pair_session_insert_e::FULL
++  );
++  EXPECT_EQ(get_pending_pairings().size(), MAX_PENDING_PAIRING_SESSIONS);
++}
++
++TEST_F(PairingSessionRegistryTest, ExpiredApprovalCannotConsumeLaterSession) {
++  const auto expiration_check = std::chrono::steady_clock::now() + PAIRING_SESSION_TIMEOUT + std::chrono::seconds {1};
++  std::string expired_pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("expired", "Old client", "192.0.2.10"), expired_pairing_id),
++    pair_session_insert_e::ADDED
++  );
++  expire_pair_sessions(expiration_check);
++  EXPECT_TRUE(get_pending_pairings().empty());
++
++  std::string current_pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("current", "Current client", "192.0.2.20"), current_pairing_id),
++    pair_session_insert_e::ADDED
++  );
++  EXPECT_FALSE(pin(expired_pairing_id, "1234", "Old client"));
++
++  const auto pending = get_pending_pairings();
++  ASSERT_EQ(pending.size(), 1);
++  EXPECT_EQ(pending.front().id, current_pairing_id);
++}
++
++TEST_F(PairingSessionRegistryTest, CancellationRemovesOnlySelectedPendingSession) {
++  std::string first_pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("first", "First", "192.0.2.10"), first_pairing_id),
++    pair_session_insert_e::ADDED
++  );
++  std::string second_pairing_id;
++  ASSERT_EQ(
++    insert_pair_session(pending_session("second", "Second", "192.0.2.20"), second_pairing_id),
++    pair_session_insert_e::ADDED
++  );
++
++  EXPECT_TRUE(cancel_pairing(first_pairing_id));
++  EXPECT_FALSE(cancel_pairing(first_pairing_id));
++
++  const auto pending = get_pending_pairings();
++  ASSERT_EQ(pending.size(), 1);
++  EXPECT_EQ(pending.front().id, second_pairing_id);
++}
++
++TEST_F(PairingSessionRegistryTest, ConcurrentInsertionAndCancellationLeaveConsistentState) {
++  constexpr std::size_t session_count = 16;
++  std::atomic<std::size_t> successful_cancellations {0};
++  std::vector<std::thread> workers;
++  workers.reserve(session_count);
++
++  for (std::size_t index = 0; index < session_count; ++index) {
++    workers.emplace_back([index, &successful_cancellations]() {
++      std::string pairing_id;
++      if (insert_pair_session(pending_session(std::format("concurrent-{}", index), "Client", "192.0.2.10"), pairing_id) == pair_session_insert_e::ADDED && cancel_pairing(pairing_id)) {
++        ++successful_cancellations;
++      }
++    });
++  }
++  for (auto &worker : workers) worker.join();
++  workers.clear();
++
++  EXPECT_EQ(successful_cancellations, session_count);
++  EXPECT_TRUE(get_pending_pairings().empty());
++}
+diff --git a/tests/unit/test_input.cpp b/tests/unit/test_input.cpp
+new file mode 100644
+index 00000000..c67e3189
+--- /dev/null
++++ b/tests/unit/test_input.cpp
+@@ -0,0 +1,146 @@
++// Backported packet validation regression tests from upstream 1583e7c4.
++#include "../tests_common.h"
++#include <algorithm>
++#include <array>
++#include <cstdint>
++#include <cstring>
++#include <limits>
++#include <span>
++#include <vector>
++extern "C" {
++#include <moonlight-common-c/src/Input.h>
++}
++#include "src/input.h"
++#include "src/utility.h"
++namespace {
++  /**
++   * @brief Protocol metadata for a fixed-size input packet.
++   */
++  struct input_packet_spec_t {
++    std::uint32_t magic;  ///< Packet type identifier.
++    std::size_t size;  ///< Complete fixed packet size.
++  };
++
++  /**
++   * @brief Create raw input bytes with a caller-selected header and buffer size.
++   *
++   * @param magic Packet type identifier.
++   * @param declared_size Packet size declared after the size field.
++   * @param actual_size Number of bytes available in the packet buffer.
++   * @return Raw packet bytes.
++   */
++  std::vector<std::uint8_t> make_input_packet(std::uint32_t magic, std::uint32_t declared_size, std::size_t actual_size) {
++    std::vector<std::uint8_t> packet(actual_size);
++    const NV_INPUT_HEADER header {
++      util::endian::big(declared_size),
++      util::endian::little(magic),
++    };
++    if (!packet.empty()) {
++      std::memcpy(packet.data(), &header, std::min(packet.size(), sizeof(header)));
++    }
++    return packet;
++  }
++
++}
++TEST(InputPacketValidationTest, RejectsEveryBufferShorterThanTheHeader) {
++  for (std::size_t actual_size = 0; actual_size < sizeof(NV_INPUT_HEADER); ++actual_size) {
++    const auto packet = make_input_packet(UTF8_TEXT_EVENT_MAGIC, sizeof(std::uint32_t), actual_size);
++    EXPECT_FALSE(input::testing::is_valid_input_packet(packet)) << "actual_size=" << actual_size;
++  }
++}
++
++TEST(InputPacketValidationTest, RejectsDeclaredSizesOutsideTheAvailableBuffer) {
++  constexpr std::uint32_t unknown_magic = 0x12345678;
++  for (std::uint32_t declared_size = 0; declared_size < sizeof(std::uint32_t); ++declared_size) {
++    const auto packet = make_input_packet(unknown_magic, declared_size, sizeof(NV_INPUT_HEADER));
++    EXPECT_FALSE(input::testing::is_valid_input_packet(packet)) << "declared_size=" << declared_size;
++  }
++
++  const auto truncated_packet = make_input_packet(unknown_magic, sizeof(std::uint32_t) + 1, sizeof(NV_INPUT_HEADER));
++  EXPECT_FALSE(input::testing::is_valid_input_packet(truncated_packet));
++
++  const auto overflowing_size = make_input_packet(
++    unknown_magic,
++    std::numeric_limits<std::uint32_t>::max(),
++    sizeof(NV_INPUT_HEADER)
++  );
++  EXPECT_FALSE(input::testing::is_valid_input_packet(overflowing_size));
++}
++
++TEST(InputPacketValidationTest, ValidatesUnicodePacketBoundsWithoutOverflow) {
++  const auto empty_packet = make_input_packet(UTF8_TEXT_EVENT_MAGIC, sizeof(std::uint32_t), sizeof(NV_INPUT_HEADER));
++  EXPECT_TRUE(input::testing::is_valid_input_packet(empty_packet));
++
++  constexpr std::uint32_t maximum_declared_size = sizeof(std::uint32_t) + UTF8_TEXT_EVENT_MAX_COUNT;
++  const auto maximum_packet = make_input_packet(
++    UTF8_TEXT_EVENT_MAGIC,
++    maximum_declared_size,
++    sizeof(std::uint32_t) + maximum_declared_size
++  );
++  EXPECT_TRUE(input::testing::is_valid_input_packet(maximum_packet));
++
++  const auto oversized_text = make_input_packet(
++    UTF8_TEXT_EVENT_MAGIC,
++    maximum_declared_size + 1,
++    sizeof(std::uint32_t) + maximum_declared_size + 1
++  );
++  EXPECT_FALSE(input::testing::is_valid_input_packet(oversized_text));
++
++  const auto truncated_text = make_input_packet(UTF8_TEXT_EVENT_MAGIC, maximum_declared_size, sizeof(NV_INPUT_HEADER));
++  EXPECT_FALSE(input::testing::is_valid_input_packet(truncated_text));
++}
++
++TEST(InputPacketValidationTest, EnforcesEveryFixedPacketSize) {
++  constexpr std::array packet_specs {
++    input_packet_spec_t {MOUSE_MOVE_REL_MAGIC_GEN5, sizeof(NV_REL_MOUSE_MOVE_PACKET)},
++    input_packet_spec_t {MOUSE_MOVE_ABS_MAGIC, sizeof(NV_ABS_MOUSE_MOVE_PACKET)},
++    input_packet_spec_t {MOUSE_BUTTON_DOWN_EVENT_MAGIC_GEN5, sizeof(NV_MOUSE_BUTTON_PACKET)},
++    input_packet_spec_t {MOUSE_BUTTON_UP_EVENT_MAGIC_GEN5, sizeof(NV_MOUSE_BUTTON_PACKET)},
++    input_packet_spec_t {SCROLL_MAGIC_GEN5, sizeof(NV_SCROLL_PACKET)},
++    input_packet_spec_t {SS_HSCROLL_MAGIC, sizeof(SS_HSCROLL_PACKET)},
++    input_packet_spec_t {KEY_DOWN_EVENT_MAGIC, sizeof(NV_KEYBOARD_PACKET)},
++    input_packet_spec_t {KEY_UP_EVENT_MAGIC, sizeof(NV_KEYBOARD_PACKET)},
++    input_packet_spec_t {MULTI_CONTROLLER_MAGIC_GEN5, sizeof(NV_MULTI_CONTROLLER_PACKET)},
++    input_packet_spec_t {SS_TOUCH_MAGIC, sizeof(SS_TOUCH_PACKET)},
++    input_packet_spec_t {SS_PEN_MAGIC, sizeof(SS_PEN_PACKET)},
++    input_packet_spec_t {SS_CONTROLLER_ARRIVAL_MAGIC, sizeof(SS_CONTROLLER_ARRIVAL_PACKET)},
++    input_packet_spec_t {SS_CONTROLLER_TOUCH_MAGIC, sizeof(SS_CONTROLLER_TOUCH_PACKET)},
++    input_packet_spec_t {SS_CONTROLLER_MOTION_MAGIC, sizeof(SS_CONTROLLER_MOTION_PACKET)},
++    input_packet_spec_t {SS_CONTROLLER_BATTERY_MAGIC, sizeof(SS_CONTROLLER_BATTERY_PACKET)},
++  };
++
++  for (const auto &[magic, size] : packet_specs) {
++    const auto declared_size = static_cast<std::uint32_t>(size - sizeof(std::uint32_t));
++    const auto valid_packet = make_input_packet(magic, declared_size, size);
++    EXPECT_TRUE(input::testing::is_valid_input_packet(valid_packet)) << "magic=" << magic;
++
++    const auto trailing_bytes = make_input_packet(magic, declared_size, size + 8);
++    EXPECT_TRUE(input::testing::is_valid_input_packet(trailing_bytes)) << "magic=" << magic;
++
++    const auto wrong_declared_size = make_input_packet(magic, declared_size - 1, size);
++    EXPECT_FALSE(input::testing::is_valid_input_packet(wrong_declared_size)) << "magic=" << magic;
++
++    const auto oversized_declared_size = make_input_packet(magic, declared_size + 1, size + 1);
++    EXPECT_FALSE(input::testing::is_valid_input_packet(oversized_declared_size)) << "magic=" << magic;
++
++    const auto truncated_packet = make_input_packet(magic, declared_size, size - 1);
++    EXPECT_FALSE(input::testing::is_valid_input_packet(truncated_packet)) << "magic=" << magic;
++  }
++}
++
++TEST(InputPacketValidationTest, PreservesUnknownPacketHandlingWithinDeclaredBounds) {
++  constexpr std::uint32_t unknown_magic = 0x12345678;
++  const auto packet = make_input_packet(unknown_magic, sizeof(std::uint32_t), sizeof(NV_INPUT_HEADER));
++  EXPECT_TRUE(input::testing::is_valid_input_packet(packet));
++}
++
++
++TEST(InputPacketValidationTest, RejectsMalformedPacketsBeforeAccessingTheInputQueue) {
++  std::shared_ptr<input::input_t> no_session;
++  for (std::size_t size = 0; size < sizeof(NV_INPUT_HEADER); ++size) {
++    auto packet = make_input_packet(UTF8_TEXT_EVENT_MAGIC, 100, size);
++    input::passthrough(no_session, std::move(packet));
++  }
++  auto packet = make_input_packet(SS_PEN_MAGIC, sizeof(SS_PEN_PACKET), sizeof(NV_INPUT_HEADER));
++  input::passthrough(no_session, std::move(packet));
++}
+diff --git a/tests/unit/test_nvhttp_client_auth.cpp b/tests/unit/test_nvhttp_client_auth.cpp
+new file mode 100644
+index 00000000..9e539d1e
+--- /dev/null
++++ b/tests/unit/test_nvhttp_client_auth.cpp
+@@ -0,0 +1,163 @@
++/**
++ * @file tests/unit/test_nvhttp_client_auth.cpp
++ * @brief Test exact paired-client certificate authorization and persistence.
++ */
++
++#include "../certificate_test_utils.h"
++#include "../tests_common.h"
++
++// standard includes
++#include <atomic>
++#include <filesystem>
++#include <thread>
++#include <vector>
++
++// local includes
++#include <src/config.h>
++#include <src/nvhttp.h>
++
++namespace fs = std::filesystem;
++
++/**
++ * @brief Isolate paired-client authorization tests from the user's Sunshine state.
++ */
++class ClientAuthorizationTest: public testing::Test {
++protected:
++  /**
++   * @brief Redirect persisted client state to the test build directory.
++   */
++  void SetUp() override {
++    testing::Test::SetUp();
++    original_state_file = config::nvhttp.file_state;
++    original_fresh_state = config::sunshine.flags[config::flag::FRESH_STATE];
++    state_file = fs::path {SUNSHINE_TEST_BIN_DIR} / "client_authorization_state.json";
++
++    config::nvhttp.file_state = state_file.string();
++    config::sunshine.flags[config::flag::FRESH_STATE] = false;
++    nvhttp::test_support::reset_client_state();
++
++    std::error_code error;
++    fs::remove(state_file, error);
++  }
++
++  /**
++   * @brief Remove test state and restore the caller's configuration.
++   */
++  void TearDown() override {
++    nvhttp::test_support::reset_client_state();
++    std::error_code error;
++    fs::remove(state_file, error);
++
++    config::nvhttp.file_state = original_state_file;
++    config::sunshine.flags[config::flag::FRESH_STATE] = original_fresh_state;
++    testing::Test::TearDown();
++  }
++
++  fs::path state_file;  ///< Task-specific persisted state fixture.
++  std::string original_state_file;  ///< State-file setting restored after each test.
++  bool original_fresh_state;  ///< Fresh-state flag restored after each test.
++};
++
++TEST_F(ClientAuthorizationTest, CanonicalIdentityFailsClosedAndTracksEnableState) {
++  const auto paired_credentials = test_utils::certificates::generate_ca_credentials();
++  const auto crlf_certificate = test_utils::certificates::to_crlf_pem(paired_credentials.x509);
++  const auto unknown_credentials = crypto::gen_creds("Sunshine Unknown Client", 2048);
++  const auto uuid = nvhttp::test_support::add_client("paired", crlf_certificate, true);
++
++  ASSERT_FALSE(uuid.empty());
++  EXPECT_EQ(nvhttp::get_cert_by_uuid(uuid), paired_credentials.x509);
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(paired_credentials.x509));
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(crlf_certificate));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(unknown_credentials.x509));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate("not a certificate"));
++
++  ASSERT_TRUE(nvhttp::set_client_enabled(uuid, false));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(paired_credentials.x509));
++  ASSERT_TRUE(nvhttp::set_client_enabled(uuid, true));
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(paired_credentials.x509));
++}
++
++TEST_F(ClientAuthorizationTest, DerivedLeafDoesNotInheritPairedAuthorization) {
++  const auto paired_credentials = test_utils::certificates::generate_ca_credentials();
++  const auto derived_credentials = test_utils::certificates::generate_derived_leaf(paired_credentials);
++  const auto uuid = nvhttp::test_support::add_client("paired issuer", paired_credentials.x509, true);
++
++  ASSERT_FALSE(uuid.empty());
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(paired_credentials.x509));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(derived_credentials.x509));
++
++  ASSERT_TRUE(nvhttp::set_client_enabled(uuid, false));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(paired_credentials.x509));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(derived_credentials.x509));
++}
++
++TEST_F(ClientAuthorizationTest, MultipleClientsPersistAndUnpairIndependently) {
++  const auto enabled_credentials = test_utils::certificates::generate_ca_credentials("Sunshine Enabled Client");
++  const auto disabled_credentials = crypto::gen_creds("Sunshine Disabled Client", 2048);
++  const auto expired_credentials = test_utils::certificates::expire_credentials(
++    test_utils::certificates::generate_ca_credentials("Sunshine Expired Client")
++  );
++
++  const auto enabled_uuid = nvhttp::test_support::add_client("enabled", enabled_credentials.x509, true);
++  const auto disabled_uuid = nvhttp::test_support::add_client("disabled", disabled_credentials.x509, false);
++  const auto expired_uuid = nvhttp::test_support::add_client("expired", expired_credentials.x509, true);
++  ASSERT_FALSE(enabled_uuid.empty());
++  ASSERT_FALSE(disabled_uuid.empty());
++  ASSERT_FALSE(expired_uuid.empty());
++
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(enabled_credentials.x509));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(disabled_credentials.x509));
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(expired_credentials.x509));
++
++  nvhttp::test_support::reset_client_state();
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(enabled_credentials.x509));
++  nvhttp::test_support::reload_client_state();
++
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(enabled_credentials.x509));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(disabled_credentials.x509));
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(expired_credentials.x509));
++
++  ASSERT_TRUE(nvhttp::set_client_enabled(disabled_uuid, true));
++  EXPECT_TRUE(nvhttp::test_support::authorize_client_certificate(disabled_credentials.x509));
++  ASSERT_TRUE(nvhttp::unpair_client(enabled_uuid));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(enabled_credentials.x509));
++
++  nvhttp::erase_all_clients();
++  nvhttp::test_support::reset_client_state();
++  nvhttp::test_support::reload_client_state();
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(disabled_credentials.x509));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(expired_credentials.x509));
++}
++
++TEST_F(ClientAuthorizationTest, DuplicateCertificateIdentityFailsClosed) {
++  const auto credentials = test_utils::certificates::generate_ca_credentials();
++  ASSERT_FALSE(nvhttp::test_support::add_client("first", credentials.x509, true).empty());
++  ASSERT_FALSE(nvhttp::test_support::add_client("second", credentials.x509, true).empty());
++
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(credentials.x509));
++}
++
++TEST_F(ClientAuthorizationTest, ConcurrentStateChangesRemainConsistent) {
++  const auto credentials = test_utils::certificates::generate_ca_credentials();
++  const auto uuid = nvhttp::test_support::add_client("concurrent", credentials.x509, true);
++  ASSERT_FALSE(uuid.empty());
++
++  std::atomic_bool operations_succeeded {true};
++  std::vector<std::thread> workers;
++  for (std::size_t worker = 0; worker < 4; ++worker) {
++    workers.emplace_back([&operations_succeeded, uuid, certificate = credentials.x509, worker]() {
++      for (std::size_t iteration = 0; iteration < 8; ++iteration) {
++        if (!nvhttp::set_client_enabled(uuid, (worker + iteration) % 2 == 0)) {
++          operations_succeeded = false;
++        }
++        static_cast<void>(nvhttp::test_support::authorize_client_certificate(certificate));
++      }
++    });
++  }
++  for (auto &worker : workers) worker.join();
++  workers.clear();
++
++  EXPECT_TRUE(operations_succeeded);
++  ASSERT_TRUE(nvhttp::set_client_enabled(uuid, false));
++  EXPECT_FALSE(nvhttp::test_support::authorize_client_certificate(credentials.x509));
++}
 diff --git a/tests/unit/test_openbot_setup.mm b/tests/unit/test_openbot_setup.mm
 new file mode 100644
 index 00000000..7972aebd
@@ -674,4 +3246,78 @@ index 00000000..7972aebd
 +    require(!test_mode);
 +    puts("Native test: local input rejected; marked Sunshine input recognized; panel cleanup passed.");
 +  }
++}
+diff --git a/tests/unit/test_stream.cpp b/tests/unit/test_stream.cpp
+index fdc444cf..7ace468f 100644
+--- a/tests/unit/test_stream.cpp
++++ b/tests/unit/test_stream.cpp
+@@ -3,14 +3,26 @@
+  * @brief Test src/stream.*
+  */
+ 
++// test includes
++#include "../tests_common.h"
++
++// standard includes
++#include <array>
+ #include <cstdint>
+ #include <functional>
++#include <optional>
+ #include <string>
++#include <string_view>
++#include <utility>
+ #include <vector>
+ 
++// local includes
++#include <src/network.h>
++
+ namespace stream {
+   std::vector<uint8_t> concat_and_insert(uint64_t insert_size, uint64_t slice_size, const std::string_view &data1, const std::string_view &data2);
+-}
++  std::optional<std::pair<std::uint16_t, std::string_view>> parse_control_packet(const ENetPacket &packet);
++}  // namespace stream
+ 
+ #include "../tests_common.h"
+ 
+@@ -37,3 +49,41 @@ TEST(ConcatAndInsertTests, ConcatSmallStrideTest) {
+   auto expected = std::vector<uint8_t> {0, 'a', 0, 'b', 0, 'c', 0, 'd', 0, 'e'};
+   ASSERT_EQ(res, expected);
+ }
++
++TEST(ControlPacketTests, RejectsZeroLengthPacket) {
++  net::packet_t packet {enet_packet_create(nullptr, 0, 0)};
++
++  ASSERT_NE(packet, nullptr);
++  EXPECT_EQ(packet->data, nullptr);
++  EXPECT_EQ(stream::parse_control_packet(*packet), std::nullopt);
++}
++
++TEST(ControlPacketTests, RejectsOneBytePacket) {
++  const std::uint8_t data {0x06};
++  net::packet_t packet {enet_packet_create(&data, sizeof(data), 0)};
++
++  ASSERT_NE(packet, nullptr);
++  EXPECT_EQ(stream::parse_control_packet(*packet), std::nullopt);
++}
++
++TEST(ControlPacketTests, AcceptsTypeWithoutPayload) {
++  const std::array<std::uint8_t, 2> data {0x06, 0x02};
++  net::packet_t packet {enet_packet_create(data.data(), data.size(), 0)};
++
++  ASSERT_NE(packet, nullptr);
++  auto message = stream::parse_control_packet(*packet);
++  ASSERT_TRUE(message);
++  EXPECT_EQ(message->first, 0x0206);
++  EXPECT_TRUE(message->second.empty());
++}
++
++TEST(ControlPacketTests, AcceptsTypeAndPayload) {
++  const std::array<std::uint8_t, 5> data {0x06, 0x02, 'a', 'b', 'c'};
++  net::packet_t packet {enet_packet_create(data.data(), data.size(), 0)};
++
++  ASSERT_NE(packet, nullptr);
++  auto message = stream::parse_control_packet(*packet);
++  ASSERT_TRUE(message);
++  EXPECT_EQ(message->first, 0x0206);
++  EXPECT_EQ(message->second, "abc");
 +}

@@ -60,6 +60,11 @@ export function SidebarPinnedGroup() {
               const key = () => sidebarPinnedItemKey(item.ref);
               const name = () => chatName(item.chat);
               const active = () => chatIsActive(item.chat);
+              const routineLabel = () => {
+                if (item.chat.kind !== "agent") return "";
+                const state = props.agentStates[item.chat.id];
+                return state?.kind === "routine" ? sidebarAgentStateLabel(state) : "";
+              };
               return (
                 <li
                   class={[
@@ -100,7 +105,8 @@ export function SidebarPinnedGroup() {
                         "agent-row sidebar-pinned-row",
                         { "agent-row-active": active() },
                       ]}
-                      aria-label={`${name()}, pinned ${item.chat.kind}`}
+                      aria-label={`${name()}, pinned ${item.chat.kind}${routineLabel() ? `. ${routineLabel()}` : ""}`}
+                      title={routineLabel() || undefined}
                       aria-pressed={active() ? "true" : "false"}
                       onClick={() => selectChat(item.chat)}
                     >

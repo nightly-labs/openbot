@@ -113,6 +113,9 @@ interface Harness {
   observedSunshineHttpPorts: number[];
   sunshineHits: Array<{ path: string; localPort: number }>;
   pinBodies: string[];
+  pairingName: string;
+  duplicatePairing: boolean;
+  pendingPairings: Array<{ id: string; name: string; address: string }>;
   pinSubmitted: Deferred<void>;
   servers: Array<HttpServer | HttpsServer>;
   serverErrors: unknown[];
@@ -183,9 +186,19 @@ function sunshineHandler(harness: Harness): (request: IncomingMessage, response:
       json({ displays: [] });
       return;
     }
+    if (request.method === "GET" && url.pathname === "/api/pin") {
+      json({ pairings: harness.pendingPairings });
+      return;
+    }
     if (request.method === "POST" && url.pathname === "/api/pin") {
       void readBody(request).then((body) => {
+        const approval = z.object({ pairing_id: z.string(), pin: z.literal("4242") }).parse(JSON.parse(body));
+        if (approval.pairing_id !== "1".repeat(32)) {
+          response.writeHead(400).end();
+          return;
+        }
         harness.pinBodies.push(body);
+        harness.pendingPairings = [];
         for (const host of harness.hosts) host.paired = "Paired";
         harness.pinSubmitted.resolve();
         response.writeHead(200);
@@ -201,7 +214,7 @@ function sunshineHandler(harness: Harness): (request: IncomingMessage, response:
 const moonlightHostCreateSchema = z.object({ address: z.string(), http_port: z.number().int() });
 const moonlightPairRequestSchema = z.object({ host_id: z.number().int() });
 const moonlightConfigFileSchema = z.object({
-  moonlight: z.object({ default_http_port: z.number().int() }),
+  moonlight: z.object({ default_http_port: z.number().int(), pair_device_name: z.string() }),
   webrtc: z.object({ port_range: z.object({ min: z.number().int(), max: z.number().int() }) }),
   web_server: z.object({
     bind_address: z.string(),
@@ -252,7 +265,14 @@ function moonlightHandler(harness: Harness): (request: IncomingMessage, response
       void readBody(request).then(async (body) => {
         const parsed = moonlightPairRequestSchema.parse(JSON.parse(body));
         response.writeHead(200, { "Content-Type": "application/x-ndjson" });
-        response.write(`${JSON.stringify({ Pin: "424242" })}\n`);
+        harness.pendingPairings = [
+          { id: "2".repeat(32), name: "Competing client", address: "127.0.0.1" },
+          { id: "3".repeat(32), name: harness.pairingName, address: "192.0.2.1" },
+          { id: "1".repeat(32), name: harness.pairingName, address: "127.0.0.1" },
+        ];
+        if (harness.duplicatePairing)
+          harness.pendingPairings.push({ id: "4".repeat(32), name: harness.pairingName, address: "127.0.0.1" });
+        response.write(`${JSON.stringify({ Pin: "4242" })}\n`);
         const submitted = await Promise.race([
           harness.pinSubmitted.promise.then(() => true),
           delay(15_000).then(() => false),
@@ -291,6 +311,9 @@ function createHarness(stateDirectory: string): Harness {
     observedSunshineHttpPorts: [],
     sunshineHits: [],
     pinBodies: [],
+    pairingName: "",
+    duplicatePairing: false,
+    pendingPairings: [],
     pinSubmitted: createDeferred<void>(),
     servers: [],
     serverErrors: [],
@@ -332,6 +355,9 @@ function createHarness(stateDirectory: string): Harness {
         harness.iceUrl = options.env?.OPENBOT_ICE_HELPER_URL ?? "";
         harness.iceToken = options.env?.OPENBOT_ICE_HELPER_TOKEN ?? "";
         const configPath = args[args.indexOf("--config-path") + 1];
+        harness.pairingName = moonlightConfigFileSchema.parse(
+          JSON.parse(readFileSync(configPath, "utf8")),
+        ).moonlight.pair_device_name;
         harness.authHeader = moonlightConfigFileSchema.parse(
           JSON.parse(readFileSync(configPath, "utf8")),
         ).web_server.forwarded_header.username_header;
@@ -362,12 +388,14 @@ function createHarness(stateDirectory: string): Harness {
 
 async function createStartedRuntime(
   getIceServers: () => Promise<RemoteDesktopIceServer[]> = async () => [{ urls: "stun:127.0.0.1:3478" }],
+  configureHarness?: (harness: Harness) => void,
 ): Promise<{
   runtime: SunshineMoonlightRuntime;
   harness: Harness;
 }> {
   const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-sunshine-port-test-"));
   const harness = createHarness(stateDirectory);
+  configureHarness?.(harness);
   const runtime = new SunshineMoonlightRuntime({
     paths: TEST_PATHS,
     stateDirectory,
@@ -377,9 +405,15 @@ async function createStartedRuntime(
     getIceServers,
     spawnProcess: harness.spawn,
   });
-  await runtime.start();
-  if (harness.serverErrors.length > 0) throw harness.serverErrors[0];
-  return { runtime, harness };
+  try {
+    await runtime.start();
+    if (harness.serverErrors.length > 0) throw harness.serverErrors[0];
+    return { runtime, harness };
+  } catch (error) {
+    harness.pinSubmitted.resolve();
+    await disposeRuntime(runtime, harness);
+    throw error;
+  }
 }
 
 async function disposeRuntime(runtime: SunshineMoonlightRuntime, harness: Harness): Promise<void> {
@@ -398,6 +432,17 @@ async function blockTcp(port: number): Promise<TcpServer> {
 }
 
 describe("sunshine port family helpers", () => {
+  it("refuses ambiguous local pairing requests without submitting the PIN", async () => {
+    let pinBodies: string[] = [];
+    await expect(
+      createStartedRuntime(undefined, (harness) => {
+        harness.duplicatePairing = true;
+        pinBodies = harness.pinBodies;
+      }),
+    ).rejects.toThrow("ambiguous local pairing requests");
+    expect(pinBodies).toEqual([]);
+  });
+
   it.each(["throw", "reject"])("returns 503 for an ICE callback that can %s and recovers", async (failure) => {
     let fail = true;
     const { runtime, harness } = await createStartedRuntime(() => {
@@ -537,6 +582,9 @@ describe("Sunshine port isolation", () => {
     try {
       const second = await createStartedRuntime();
       try {
+        expect(first.harness.pairingName).toMatch(/^[A-Za-z0-9-]+$/);
+        expect(second.harness.pairingName).toMatch(/^[A-Za-z0-9-]+$/);
+        expect(first.harness.pairingName).not.toBe(second.harness.pairingName);
         expect(first.runtime.sunshineBasePort).not.toBeNull();
         expect(second.runtime.sunshineBasePort).not.toBeNull();
         expect(first.runtime.sunshineBasePort).not.toBe(second.runtime.sunshineBasePort);

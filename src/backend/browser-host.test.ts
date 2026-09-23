@@ -3,13 +3,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isBrowserSecretRequest } from "@openbot/contracts/ipc";
-import { BrowserWindow, type WebContents, WebContentsView, webContents } from "electron";
+import {
+  BrowserWindow,
+  type HandlerDetails,
+  type WebContents,
+  WebContentsView,
+  type WindowOpenHandlerResponse,
+  webContents,
+} from "electron";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
 import type { BrowserContextMenuParams } from "./browser-shortcuts";
 import type { DynamicToolResult } from "./protocol";
 
-const windowOpenHandlers = vi.hoisted((): Array<(details: { url: string }) => { action: string }> => []);
+const windowOpenHandlers = vi.hoisted(
+  (): Array<(details: { url: string; disposition?: HandlerDetails["disposition"] }) => WindowOpenHandlerResponse> => [],
+);
 type PermissionRequestHandler = (contents: unknown, permission: string, allow: (granted: boolean) => void) => void;
 type PermissionCheckHandler = (contents: unknown, permission: string) => boolean;
 interface PermissionPolicy {
@@ -61,8 +70,10 @@ vi.mock("electron", async () => {
     selectAll() {}
     setAudioMuted() {}
     invalidate() {}
-    setWindowOpenHandler(handler: (details: { url: string }) => { action: string }) {
-      windowOpenHandlers.push(handler);
+    setWindowOpenHandler(handler: (details: HandlerDetails) => WindowOpenHandlerResponse) {
+      windowOpenHandlers.push(({ url, disposition = "new-window" }) =>
+        handler({ url, disposition, features: "", frameName: "", referrer: { url: "", policy: "default" } }),
+      );
     }
     async executeJavaScript() {
       return null;
@@ -99,9 +110,10 @@ vi.mock("electron", async () => {
       }
     },
     WebContentsView: class {
-      webContents = new FakeContents();
-      constructor() {
-        contents.push(this.webContents);
+      webContents: FakeContents;
+      constructor(options?: { webContents?: FakeContents }) {
+        this.webContents = options?.webContents ?? new FakeContents();
+        if (!contents.includes(this.webContents)) contents.push(this.webContents);
       }
       setBackgroundColor() {}
       setVisible() {}
@@ -313,36 +325,149 @@ describe("browser address navigation", () => {
 });
 
 describe("browser auth popups", () => {
-  it("opens an allowed popup as a focused tab with the same owner", async () => {
+  function listTabsFor(ownerAgentId: string, threadId: string) {
+    return host.handleDynamicTool({
+      namespace: "openbot_browser",
+      tool: "list_tabs",
+      arguments: {},
+      ownerAgentId,
+      threadId,
+      turnId: "popup-turn",
+      callId: "popup-call",
+    });
+  }
+  async function popupRequest(url = "https://accounts.example.com/auth") {
     const opener = await host.open("https://example.com/start", "thread-a", "agent-a");
     const handler = windowOpenHandlers.at(-1);
     if (!handler) throw new Error("Window open handler was not set.");
-    const openSpy = vi.spyOn(host, "open");
-    const outcome = handler({ url: "https://accounts.google.com/o/oauth2/auth?client_id=test" });
-    expect(outcome).toEqual({ action: "deny" });
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://accounts.google.com/o/oauth2/auth?client_id=test",
-      "thread-a",
-      "agent-a",
-      true,
-    );
-    await vi.waitFor(() => expect(host.listTabs()).toHaveLength(2));
-    const popup = host.listTabs().find((tab) => tab.id !== opener.id);
-    expect(popup).toMatchObject({
-      url: "https://accounts.google.com/o/oauth2/auth?client_id=test",
-      ownerThreadId: "thread-a",
-      ownerAgentId: "agent-a",
+    return { opener, outcome: handler({ url }) };
+  }
+
+  it("adopts the native popup once, with its owner and opener, without replaying navigation", async () => {
+    const { opener, outcome } = await popupRequest();
+    expect(outcome.action).toBe("allow");
+    expect(outcome.overrideBrowserWindowOptions?.webPreferences).toMatchObject({
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
     });
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", {
+      value: webContents.getAllWebContents().find((item) => item.getURL() === opener.url)?.mainFrame,
+    });
+    const load = vi.spyOn(native, "loadURL");
+    expect(outcome.createWindow?.({ webContents: native })).toBe(native);
+    expect(outcome.createWindow?.({ webContents: native })).toBe(native);
+    expect(load).not.toHaveBeenCalled();
+    const popup = host.listTabs().find((tab) => tab.id !== opener.id);
+    expect(host.listTabs()).toHaveLength(2);
+    expect(popup).toMatchObject({ ownerThreadId: "thread-a", ownerAgentId: "agent-a", openerTabId: opener.id });
     expect(host.activeTabId).toBe(popup?.id);
+    const listed = await listTabsFor("agent-a", "thread-a");
+    expect(JSON.stringify(listed)).toContain(opener.id);
+    const other = await listTabsFor("agent-b", "thread-b");
+    expect(JSON.stringify(other)).not.toContain(popup?.id);
+    native.emit("destroyed");
+    await vi.waitFor(() => expect(host.listTabs()).toHaveLength(1));
+    expect(host.activeTabId).toBe(opener.id);
   });
 
-  it("ignores a popup to a disallowed URL", async () => {
-    await host.open("https://example.com/start", "thread-a", "agent-a");
+  it("requires takeover for connected tabs even after the popup closes", async () => {
+    const { opener, outcome } = await popupRequest();
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", { value: {} });
+    outcome.createWindow?.({ webContents: native });
+    const popup = host.listTabs().find((tab) => tab.openerTabId === opener.id);
+    if (!popup) throw new Error("Missing popup.");
+    const prepare = (tabId: string) =>
+      host.prepareSecret({
+        namespace: "openbot_browser",
+        tool: "submit_secret",
+        threadId: "thread-a",
+        ownerAgentId: "agent-a",
+        turnId: "turn",
+        callId: "secret",
+        arguments: { tabId, method: "password", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
+      });
+    await expect(prepare(popup.id)).rejects.toThrow("Use takeover");
+    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    await host.close(popup.id);
+    await host.reload(opener.id);
+    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    expect(secretEntry).not.toHaveBeenCalled();
+    const independent = await host.open("https://example.com/independent-secret", "thread-a", "agent-a");
+    const prepared = await prepare(independent.id);
+    prepared.cancel();
+  });
+
+  it("keeps independent tabs when the opener closes and cleans up dependent popups", async () => {
+    const { opener, outcome } = await popupRequest();
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", { value: {} });
+    outcome.createWindow?.({ webContents: native });
+    const dependent = host.activeTabId;
+    const handler = windowOpenHandlers[windowOpenHandlers.length - 2];
+    handler?.({ url: "https://example.com/independent" }).createWindow?.({});
+    const independent = host.activeTabId;
+    await host.close(opener.id);
+    expect(host.listTabs().map((tab) => tab.id)).toEqual([independent]);
+    expect(host.listTabs().some((tab) => tab.id === dependent)).toBe(false);
+  });
+
+  it("allows separate same-URL requests and an initially blank popup", async () => {
+    const { outcome } = await popupRequest("about:blank");
     const handler = windowOpenHandlers.at(-1);
-    if (!handler) throw new Error("Window open handler was not set.");
-    handler({ url: "file:///etc/passwd" });
-    await Promise.resolve();
+    outcome.createWindow?.({});
+    handler?.({ url: "about:blank" }).createWindow?.({});
+    expect(host.listTabs()).toHaveLength(3);
+  });
+
+  it("reports blocked URLs without exposing their contents", async () => {
+    const { opener, outcome } = await popupRequest("file:///private/secret-token");
+    expect(outcome.action).toBe("deny");
     expect(host.listTabs()).toHaveLength(1);
+    expect(host.listTabs()[0]).toMatchObject({
+      id: opener.id,
+      popupFailure: { message: expect.stringContaining("unsupported address") },
+    });
+    expect(JSON.stringify(host.listTabs())).not.toContain("secret-token");
+  });
+
+  it("explains unsupported popup types", async () => {
+    await popupRequest();
+    expect(windowOpenHandlers.at(-1)?.({ url: "https://example.com", disposition: "other" }).action).toBe("deny");
+    expect(host.listTabs()[0].popupFailure?.message).toContain("popup type");
+  });
+
+  it("restores safe URLs without claiming to restore live opener relationships", async () => {
+    const { opener, outcome } = await popupRequest();
+    const native = new WebContentsView().webContents;
+    Object.defineProperty(native, "opener", { value: {} });
+    outcome.createWindow?.({ webContents: native });
+    await native.loadURL("https://example.com/callback?code=private-code");
+    const popupId = host.activeTabId;
+    await host.activate(opener.id);
+    const state = await readFile(statePath, "utf8");
+    expect(state).not.toContain("private-code");
+    expect(state).not.toContain("openerTabId");
+    await host.destroy();
+    host = new BrowserHost(browserWindow, directory, statePath);
+    await host.restore();
+    expect(host.listTabs().find((tab) => tab.id === popupId)).toMatchObject({ url: "https://example.com/callback" });
+    expect(host.listTabs().every((tab) => tab.openerTabId === undefined)).toBe(true);
+  });
+
+  it("reports capacity and permits retry after a tab closes", async () => {
+    await fill("thread-a", "agent-a");
+    const handler = windowOpenHandlers.at(-1);
+    expect(handler?.({ url: "https://example.com/auth" }).action).toBe("deny");
+    expect(host.listTabs().at(-1)?.popupFailure?.message).toContain("tab limit");
+    await host.close(host.listTabs()[0].id);
+    const outcome = handler?.({ url: "https://example.com/auth" });
+    expect(outcome?.action).toBe("allow");
+    outcome?.createWindow?.({});
+    expect(host.listTabs()).toHaveLength(INPUT_LIMITS.browserTabs);
   });
 });
 

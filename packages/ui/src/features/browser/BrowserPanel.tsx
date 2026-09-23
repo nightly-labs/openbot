@@ -6,6 +6,10 @@ import type {
   BrowserTab,
 } from "@openbot/contracts/ipc";
 import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
   Button,
   buttonVariants,
   CircleDot,
@@ -25,7 +29,7 @@ import {
   PlusIcon,
 } from "@openbot/ui/features/conversation/ConversationIcons";
 import { Portal } from "@solidjs/web";
-import { createEffect, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import BrowserLiveView, { type BrowserViewRuntime } from "./BrowserLiveView";
 
 const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailAction, string> = {
@@ -91,6 +95,8 @@ function diagnosticErrorLabel(count: number): string {
 }
 
 export default function BrowserPanel(props: BrowserPanelProps) {
+  const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
+  const popupFailure = () => props.activeTab?.popupFailure;
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
   let hideButton: HTMLButtonElement | undefined;
   let panel: HTMLElement | undefined;
@@ -344,6 +350,25 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             </Button>
           </Show>
         </div>
+        <Show when={popupFailure() && !dismissedPopupFailures().has(popupFailure()?.id ?? "")}>
+          <Alert tone="warning" role="alert">
+            <AlertContent>
+              <AlertTitle>Popup blocked</AlertTitle>
+              <AlertDescription>{popupFailure()?.message}</AlertDescription>
+            </AlertContent>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Dismiss popup message"
+              onClick={() => {
+                const failure = popupFailure();
+                if (failure) setDismissedPopupFailures((ids) => new Set([...ids, failure.id]));
+              }}
+            >
+              <CloseIcon />
+            </Button>
+          </Alert>
+        </Show>
         {surface()}
       </Tabs.Content>
     </Tabs.Root>

@@ -43,9 +43,9 @@ checksum, SBOM, and provenance checks.
 
 ## Build the remote desktop runtime
 
-`native-runtime.lock.json` pins the OpenBot forks of Sunshine `v2026.516.143833` and Moonlight Web
-`v2.10.0` by full commit and source archive SHA-256. Each entry also records its exact upstream base
-commit and the reviewable OpenBot patch. Build on the target platform:
+`native-runtime.lock.json` pins the upstream source for Sunshine `v2026.516.143833` and Moonlight Web
+`v2.10.0` by full commit and source archive SHA-256. Each entry also records the reviewable OpenBot
+patch applied to that source. Build on the target platform:
 
 ```bash
 bun run build:remote-desktop-runtime
@@ -105,6 +105,29 @@ bun run verify:remote-desktop-runtime
 The installer accepts only the exact prerelease and assets in the lock file. It rejects a changed
 manifest, a changed archive, an unsafe archive path, and a mismatched source manifest. Do not replace
 assets in an existing runtime prerelease. Increase `recipeVersion` when the build process changes.
+
+### Sunshine security backports (runtime recipe 12)
+
+The Sunshine upstream base remains `v2026.516.143833` to keep the tested macOS input backend.
+The OpenBot patch includes these upstream security changes and regression tests:
+
+- `1583e7c4a7e99538c7700315a1d2a2101c6d2812`: validate input packets before queueing and
+  dispatch (GHSA-26q2-58j6-qmvv and GHSA-6w33-pjh7-p77c).
+- `82bccdf69894ee03ac422cc787f1ac9654da359d`: reject short ENet control packets
+  (GHSA-c428-87f8-rrv5).
+- `ccf97e38796be6cfcbff0ef248a684d39e181eba`: bind pairing approval to an explicit,
+  expiring request ID (GHSA-36ff-frg7-492f).
+- `4d768847fcd88cc94ac745c4611715c67d7d67e1`: require the exact enabled client
+  certificate and canonicalize stored certificate identities (GHSA-6jvv-jqr7-m6m3).
+
+Backport adaptations retain the older platform APIs and test fixtures. Native CI builds and runs
+only the relevant packet, pairing, REST authorization, and certificate regression tests. The local
+Moonlight client uses a random pairing name and approves only its matching loopback request ID.
+Moonlight now builds from the same upstream commit with the existing OpenBot patch and a fix
+that sends the configured pairing name instead of the upstream hard-coded name.
+The published runtime uses a new recipe/input digest; no existing release assets are replaced.
+The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
+on Linux.
 
 ## Pin the OpenCode CLI
 

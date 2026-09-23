@@ -433,13 +433,13 @@ describe("OpenBot connected desktop shell", () => {
     // The trigger reads its label and its value, so match the start of the name. It also opens on
     // pointer down rather than on click, so a plain click never reaches the list.
     await fireEvent.pointerDown(screen.getByRole("button", { name: /^Language/ }), { pointerType: "mouse", button: 0 });
-    await fireEvent.click(await screen.findByRole("option", { name: "日本語" }));
-    await waitFor(() => expect(window.openbot.setAppLanguagePreference).toHaveBeenCalledWith({ language: "ja" }));
+    await fireEvent.click(await screen.findByRole("option", { name: "Français" }));
+    await waitFor(() => expect(window.openbot.setAppLanguagePreference).toHaveBeenCalledWith({ language: "fr" }));
     // The screen is written in the chosen language at once, with no restart: the tab the user is
-    // looking at is the same tab, now named in Japanese.
-    await screen.findByRole("tab", { name: "一般" });
+    // looking at is the same tab, now named in French.
+    await screen.findByRole("tab", { name: "Général" });
     // The document says which language it is in, so a screen reader speaks it with the right voice.
-    expect(document.documentElement.lang).toBe("ja");
+    expect(document.documentElement.lang).toBe("fr");
   });
 
   it("does not open desktop analytics when the saved preference is disabled", async () => {

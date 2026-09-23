@@ -1,4 +1,6 @@
 import { Host, Picker } from "@expo/ui";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contracts/invite-links";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { RemoteTeamMember } from "@openbot/team-client";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
@@ -27,7 +29,7 @@ export function ServerMembersScreen() {
   const { session, sessionScope } = useMobileSession();
   const server = servers.find((candidate) => candidate.id === serverId);
   const canInvite = server?.role === "owner" || server?.role === "admin";
-  const [inviteMode, setInviteMode] = useState<"email" | "link">("link");
+  const [inviteMode, setInviteMode] = useState<"email" | "link" | "permanent">("link");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
   const [created, setCreated] = useState<{
@@ -53,11 +55,15 @@ export function ServerMembersScreen() {
     queryFn: () => teamDirectory.listInvites(serverId),
   });
   const inviteUsed = Boolean(
-    created && invites.data?.some((invite) => invite.inviteId === created.inviteId && invite.usedAt),
+    created &&
+      invites.data?.some((invite) => invite.inviteId === created.inviteId && !invite.permanent && invite.usedAt),
   );
   const pendingInvites = invites.data?.filter(
-    (invite) => !invite.usedAt && !invite.revokedAt && invite.expiresAt > Date.now(),
+    (invite) => (invite.permanent || !invite.usedAt) && !invite.revokedAt && invite.expiresAt > Date.now(),
   );
+  const permanentCount = pendingInvites?.filter((invite) => invite.permanent).length ?? 0;
+  const permanentLimitReached = inviteMode === "permanent" && permanentCount >= INPUT_LIMITS.maxPermanentInvites;
+  const createdPermanent = Boolean(created && created.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS);
   const action = useMutation({
     mutationFn: (operation: () => Promise<void>) => operation(),
     onSuccess: () => {
@@ -131,6 +137,7 @@ export function ServerMembersScreen() {
                   >
                     <Picker.Item label="Invite link" value="link" />
                     <Picker.Item label="Email" value="email" />
+                    <Picker.Item label="Permanent link" value="permanent" />
                   </Picker>
                 </Host>
               }
@@ -167,7 +174,7 @@ export function ServerMembersScreen() {
             </SettingsRow>
             <SettingsRow
               disclosure={false}
-              disabled={action.isPending}
+              disabled={action.isPending || permanentLimitReached}
               onPress={() =>
                 perform(async () => {
                   const host = { hostId: server.id, devicePublicKey: server.publicKey, name: server.name };
@@ -177,7 +184,12 @@ export function ServerMembersScreen() {
                     const invite = await teamDirectory.sendInviteEmail(host, { role, email: normalized });
                     setCreated({ ...invite, email: normalized });
                   } else {
-                    setCreated(await teamDirectory.createInvite(host, { role }));
+                    setCreated(
+                      await teamDirectory.createInvite(host, {
+                        role,
+                        ...(inviteMode === "permanent" ? { permanent: true } : {}),
+                      }),
+                    );
                   }
                   setCopied(false);
                 })
@@ -194,6 +206,9 @@ export function ServerMembersScreen() {
               </Typography.Paragraph>
             </SettingsRow>
           </SettingsSection>
+          {permanentLimitReached ? (
+            <SettingsNote>Revoke a permanent invitation link before creating another one.</SettingsNote>
+          ) : null}
           {created ? (
             <>
               <SettingsNote>
@@ -201,7 +216,9 @@ export function ServerMembersScreen() {
                   ? "Invitation accepted. The member joined this server."
                   : created.email
                     ? `Invitation sent to ${created.email}.`
-                    : `Share this one-time link. Expires ${new Date(created.expiresAt).toLocaleString()}.`}
+                    : createdPermanent
+                      ? "This link can be used more than once. It does not expire. Revoke it to stop new joins."
+                      : `Share this one-time link. Expires ${new Date(created.expiresAt).toLocaleString()}.`}
               </SettingsNote>
               {!created.email ? (
                 <SettingsSection>
@@ -225,7 +242,9 @@ export function ServerMembersScreen() {
             <SettingsNote>
               {inviteMode === "email"
                 ? "Send a one-time invitation to an email address."
-                : "Share a one-time link to invite someone to this server."}
+                : inviteMode === "permanent"
+                  ? `Share a reusable link with no expiry. Up to ${INPUT_LIMITS.maxPermanentInvites} permanent links per server.`
+                  : "Share a one-time link to invite someone to this server."}
             </SettingsNote>
           )}
         </View>
@@ -284,7 +303,7 @@ export function ServerMembersScreen() {
         </SettingsRow>
       </SettingsSection>
       {canInvite ? (
-        <SettingsSection title="Pending invitations">
+        <SettingsSection title="Active invitations">
           {invites.isError ? (
             <SettingsRow disclosure={false}>
               <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
@@ -302,7 +321,7 @@ export function ServerMembersScreen() {
           {invites.isSuccess && pendingInvites?.length === 0 ? (
             <SettingsRow disclosure={false}>
               <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
-                No pending invitations.
+                No active invitations.
               </Typography.Paragraph>
             </SettingsRow>
           ) : null}
@@ -311,7 +330,7 @@ export function ServerMembersScreen() {
               key={invite.inviteId}
               disabled={action.isPending}
               disclosure={false}
-              supportingText={`${invite.role} · Tap to revoke`}
+              supportingText={`${invite.role} · ${invite.permanent ? `No expiry · ${invite.useCount} joins · ` : ""}Tap to revoke`}
               onPress={() =>
                 Alert.alert("Revoke invitation?", "This invitation will stop working.", [
                   { text: "Cancel", style: "cancel" },
@@ -327,7 +346,9 @@ export function ServerMembersScreen() {
                 ])
               }
             >
-              <Typography.Paragraph type="body-sm">{invite.email || "Invite link"}</Typography.Paragraph>
+              <Typography.Paragraph type="body-sm">
+                {invite.email || (invite.permanent ? "Permanent link" : "Invite link")}
+              </Typography.Paragraph>
             </SettingsRow>
           ))}
         </SettingsSection>

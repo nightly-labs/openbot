@@ -20,6 +20,10 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
     startChatDragging,
   } = useSidebarScope();
   const title = () => rowProps.agent.title.trim();
+  const routineLabel = () => {
+    const state = props.agentStates[rowProps.agent.id];
+    return state?.kind === "routine" ? sidebarAgentStateLabel(state) : "";
+  };
   return (
     /* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */
     <div
@@ -48,7 +52,8 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
               "sidebar-agent-row-dragging": draggedChatId() === rowProps.agent.id,
             },
           ]}
-          aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}. ${rowProps.agent.preview}`}
+          aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}. ${rowProps.agent.preview}${routineLabel() ? `. ${routineLabel()}` : ""}`}
+          title={routineLabel() || undefined}
           aria-pressed={props.activeAgentId === rowProps.agent.id ? "true" : "false"}
           onClick={(event: MouseEvent) => {
             if (!sidebarClickIsSuppressed(event)) props.onSelectAgent(rowProps.agent.id);

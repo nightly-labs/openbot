@@ -354,6 +354,28 @@ describe("browser remote peer recovery", () => {
     }
   });
 
+  it("re-reads the server list when Signal says the account joined one on another device", async () => {
+    const refreshServers = vi.fn(async () => {
+      throw new Error("Account API offline");
+    });
+    const network = await setupNetwork({ onAccountServersChanged: refreshServers });
+    await network.connect();
+    try {
+      network.socket().receive({ type: "account-servers-changed", version: 1 });
+      await vi.waitFor(() => expect(refreshServers).toHaveBeenCalledTimes(1));
+      const result = await network.runtime.execute({
+        id: "after-servers",
+        type: "request",
+        method: "GET",
+        path: "/v1/agents",
+        body: {},
+      });
+      expect(result).toMatchObject({ ok: true, status: 200, body: [] });
+    } finally {
+      await network.runtime.dispose();
+    }
+  });
+
   it("sends without delay when the data channel drains before the low-buffer listener is registered", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const network = await setupNetwork();
@@ -819,6 +841,7 @@ async function setupNetwork(
     onHostStreamData?: (data: string | ArrayBuffer) => void;
     onTeamEvent?: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
     onAccountProfileChanged?: () => Promise<void>;
+    onAccountServersChanged?: () => Promise<void>;
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
@@ -1019,6 +1042,7 @@ async function setupNetwork(
       },
       endSession: options.endSession ?? (async () => {}),
       onAccountProfileChanged: options.onAccountProfileChanged,
+      onAccountServersChanged: options.onAccountServersChanged,
       onHostStreamData: options.onHostStreamData,
       onTeamEvent: options.onTeamEvent ?? (async () => {}),
       onConnectionUpdate: async (update) => {
