@@ -12,6 +12,7 @@ import {
   parseAgentId,
   parseAgentRequest,
   parseApprovalResponse,
+  parseAttachmentId,
   parseBrowserTakeoverResponse,
   parseCancelQueuedMessage,
   parseChannelId,
@@ -187,10 +188,12 @@ describe("app IPC input parsing", () => {
     expect(() => parseAgentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("agentId is too long.");
   });
 
-  it("validates channel identifiers and hosted site deletion", () => {
+  it("validates channel and attachment identifiers and hosted site deletion", () => {
     expect(parseChannelId("general")).toBe("general");
     expect(() => parseChannelId(42)).toThrowError("channelId is required.");
     expect(() => parseChannelId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("channelId is too long.");
+    expect(parseAttachmentId("attachment-1")).toBe("attachment-1");
+    expect(() => parseAttachmentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("attachmentId is too long.");
     expect(parseDeleteHostedSite({ siteId: "site-1" })).toEqual({ siteId: "site-1" });
     expect(() => parseDeleteHostedSite({})).toThrowError("siteId is required.");
   });

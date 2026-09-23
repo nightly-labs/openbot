@@ -1,8 +1,6 @@
 import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
 import type { AgentModelId } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
-import type { AvatarImageInput } from "./ipc-agents";
-import type { AccountSession, MobileConnectedDevice, MobileConnectTicket } from "./mobile-connect";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
@@ -166,20 +164,10 @@ export type CentralAuthState =
   | { status: "signed_in"; user: CentralAuthUser }
   | { status: "error"; issue: CentralAuthIssue };
 
-export interface CentralAuthDesktopApi {
-  getState: () => Promise<CentralAuthState>;
-  retry: () => Promise<CentralAuthState>;
-  requestEmailCode: (email: string) => Promise<CentralAuthState>;
-  verifyEmailCode: (challengeId: string, code: string) => Promise<CentralAuthState>;
-  updateName: (name: string) => Promise<CentralAuthState>;
-  updateAvatar: (image: AvatarImageInput | null) => Promise<CentralAuthState>;
-  createMobileConnect: () => Promise<MobileConnectTicket>;
-  listMobileConnectedDevices: () => Promise<MobileConnectedDevice[]>;
-  listAccountSessions: () => Promise<AccountSession[]>;
-  revokeAccountSession: (sessionId: string) => Promise<void>;
-  revokeMobileConnectedDevice: (sessionId: string) => Promise<void>;
-  logout: () => Promise<CentralAuthState>;
-  onEvent: (listener: (state: CentralAuthState) => void) => () => void;
+/** The sign-in code the user typed, with the challenge `requestEmailCode` answered. */
+export interface VerifyEmailCodeInput {
+  challengeId: string;
+  code: string;
 }
 
 export type MacPermissionId = "screen-recording" | "accessibility";

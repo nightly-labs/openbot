@@ -56,7 +56,8 @@ Declare its `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.nam
 `Subscribe<...>`. Then a payload or result change in `ipc-endpoints.ts` reaches the interface, the
 preload and the mock without a second edit. A server-scoped payload (`AgentIpcRequest<Input>`) becomes
 `(input: Input)`, or `()` for `AgentIpcRequest<null>`, because the preload adds the selected server. Write the signature by hand only when
-the method reshapes its arguments or reads preload state, or when the endpoint is still untyped.
+the method reshapes its arguments or reads preload state, or for `browser.sendLiveViewInput`, the one
+untyped endpoint.
 
 The preload is still the link no type pairs with an endpoint. Its API object is nested and renamed, so
 a channel it never invokes is dead trust-boundary surface that compiles.

@@ -14,14 +14,86 @@
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
-import type { AgentIpcRequest } from "./ipc-agent-events";
+import type { ManagedProviderId } from "./agent-providers";
+import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
+import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
+import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
+import type { AgentModelOption } from "./ipc-agent-identity";
 import type {
   AgentMemory,
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
-import type { ExportResult } from "./ipc-app-auth";
+import type {
+  AgentProfileDraft,
+  GenerateAgentProfileInput,
+  SaveAgentProfileInput,
+  SaveAgentProfileResult,
+} from "./ipc-agent-profile";
+import type {
+  AccountUsage,
+  AgentProviderId,
+  AgentStatus,
+  ProviderApiKeyState,
+  ProviderCodeLoginStart,
+  SetProviderApiKeyInput,
+} from "./ipc-agent-status";
+import type {
+  AgentSummary,
+  AvatarImageInput,
+  CreateAgentInput,
+  DuplicateAgentResult,
+  SetAgentAvatarInput,
+  UpdateAgentInput,
+} from "./ipc-agents";
+import type {
+  AnalyticsPreference,
+  AppInfo,
+  AppSetupState,
+  CentralAuthState,
+  ComputerUseHighlightPlacement,
+  ComputerUsePermissionApp,
+  ComputerUseState,
+  ExportResult,
+  ExternalDestination,
+  MacPermissionId,
+  ProviderRuntimeSnapshot,
+  SaveSetupInput,
+  SetAnalyticsPreferenceInput,
+  UpdatePreference,
+  UpdateStatus,
+  VerifyEmailCodeInput,
+} from "./ipc-app-auth";
+import type {
+  ApprovalAutomationPreference,
+  RespondToApprovalInput,
+  RespondToBrowserTakeoverInput,
+  SetApprovalAutomationInput,
+} from "./ipc-approvals";
+import type {
+  ChooseAttachmentsInput,
+  DownloadAttachmentsInput,
+  DraftAttachment,
+  FilePreview,
+  ImportAttachmentsInput,
+  OpenAttachmentInput,
+  OpenSharedFileInput,
+  OpenWorkspaceFileInput,
+} from "./ipc-attachments";
+import type {
+  BrowserBounds,
+  BrowserControlState,
+  BrowserDisplayState,
+  BrowserLiveViewEvent,
+  BrowserNavigateInput,
+  BrowserOpenInput,
+  BrowserPictureInPictureEvent,
+  BrowserPreview,
+  BrowserTab,
+  BrowserVisibilityInput,
+} from "./ipc-browser";
+import type { RespondToBrowserSecretInput } from "./ipc-browser-secret";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -38,6 +110,19 @@ import type {
   UpdateChannelRoutineInput,
 } from "./ipc-channel-routines";
 import { IPC_CHANNELS } from "./ipc-channels";
+import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
+import type {
+  ConversationPage,
+  ConversationReadState,
+  ConversationSearchPage,
+  ConversationWithReadState,
+  MarkConversationReadInput,
+  ReadConversationPageInput,
+  RespondToPromptInput,
+  SearchConversationMessagesInput,
+  SendMessageInput,
+  SetMessageReactionInput,
+} from "./ipc-conversations";
 import type {
   CustomProviderResult,
   CustomProviderSummary,
@@ -45,11 +130,56 @@ import type {
   SaveCustomProviderInput,
 } from "./ipc-custom-providers";
 import type {
+  DynamicIslandAction,
+  DynamicIslandGeometry,
+  DynamicIslandPreference,
+  DynamicIslandPresentation,
+  SetDynamicIslandInteractiveInput,
+  SetDynamicIslandPreferenceInput,
+} from "./ipc-dynamic-island";
+import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
+import type {
   DeleteHostedSiteInput,
   HostedSiteSummary,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
 } from "./ipc-hosted-sites";
+import type {
+  AgentPublicationPreview,
+  AgentSubmission,
+  InstallMarketplaceAgentInput,
+  InstallMarketplaceAgentResult,
+  MarketplaceAgentDetail,
+  MarketplaceAgentPage,
+  MarketplaceAgentQuery,
+  SubmitMarketplaceAgentInput,
+} from "./ipc-marketplace-agents";
+import type {
+  McpServerConfig,
+  McpTestResult,
+  RemoveMcpServerInput,
+  SaveMcpServerInput,
+  SetMcpServerEnabledInput,
+  TestMcpServerInput,
+} from "./ipc-mcp-servers";
+import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
+import type {
+  AcknowledgeFailedTurnInput,
+  CancelQueuedMessageInput,
+  EditQueuedMessageInput,
+  InterruptTurnInput,
+  QueuedMessageReceipt,
+  QueueSnapshot,
+  ReorderQueueInput,
+  SteerQueuedMessageInput,
+  UpdateQueuedMessageInput,
+} from "./ipc-queue";
+import type {
+  RemoteDesktopSetupAction,
+  RemoteDesktopSetupStatus,
+  RemoteDesktopTestInput,
+  RemoteDesktopTestStatus,
+} from "./ipc-remote-desktop-setup";
 import type {
   CreateRoutineInput,
   DeleteRoutineInput,
@@ -60,16 +190,77 @@ import type {
   UpdateRoutineInput,
 } from "./ipc-routines";
 import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
+import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
+import type {
+  CreateLocalSkillInput,
+  InstalledSkill,
+  InstallLocalSkillInput,
+  InstallSkillInput,
+  LocalSkillRevisionInput,
+  MarketplaceSkillDetail,
+  MarketplaceSkillPage,
+  MarketplaceSkillQuery,
+  ReviseLocalSkillInput,
+  SetEnabledSkillInput,
+  SkillPackagePreview,
+  SkillSubmission,
+  SubmitSkillInput,
+  UninstallSkillInput,
+} from "./ipc-skills";
+import type {
+  ClearStorageInput,
+  DeleteStoredFileInput,
+  GetStorageUsageInput,
+  OpenStorageLocationInput,
+  OpenStoredFileInput,
+  StorageUsage,
+} from "./ipc-storage";
+import type {
+  ConfigureHostInput,
+  CreateTeamInviteInput,
+  DirectConversationPage,
+  DirectConversationReadState,
+  DirectConversationSnapshot,
+  DirectMessage,
+  DirectThreadSummary,
+  DirectTypingInput,
+  HostStatus,
+  InvitePreview,
+  InviteSummary,
+  JoinServerInput,
+  LoginServerInput,
+  MarkDirectReadInput,
+  ReadDirectConversationPageInput,
+  RemoteDesktopConnectInput,
+  RemoteDesktopConnectResult,
+  RemoteDesktopSelectDisplayInput,
+  RemoteDesktopSession,
+  ReorderServersInput,
+  ScopedDirectMessageEvent,
+  ScopedDirectTypingEvent,
+  ScopedTeamPresenceSnapshot,
+  SendDirectMessageInput,
+  ServerSummary,
+  SetServerMutedInput,
+  SetServerNotificationLevelInput,
+  SetTeamTypingInput,
+  TeamInviteSummary,
+  TeamMemberSummary,
+  TeamPresenceSnapshot,
+  TeamSessionSummary,
+  UpdateHostIdentityInput,
+  UpdateTeamMemberInput,
+} from "./ipc-team-host";
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
+import type { AccountSession, MobileConnectedDevice, MobileConnectTicket } from "./mobile-connect";
 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
 declare const untypedBrand: unique symbol;
 
 /**
- * The payload and result of an endpoint whose group is not typed yet. The main binder and the
- * preload accept anything for it, as they did before endpoints had types. It goes away when the last
- * group is typed.
+ * The payload and result of an endpoint that has no types. The main binder and the preload accept
+ * anything for it. Only `browser.sendLiveViewInput` uses it: see the comment at that endpoint.
  */
 export interface Untyped {
   readonly [untypedBrand]: true;
@@ -108,52 +299,54 @@ function untypedRequest<Channel extends string>(channel: Channel): RequestEndpoi
   return { kind: "request", channel };
 }
 
-function untypedEvent<Channel extends string>(channel: Channel): EventEndpoint<Channel, Untyped> {
-  return { kind: "event", channel };
-}
-
 export const IPC_ENDPOINTS = {
   app: {
-    getAppInfo: untypedRequest(IPC_CHANNELS.getAppInfo),
-    getSetupState: untypedRequest(IPC_CHANNELS.getSetupState),
-    saveSetup: untypedRequest(IPC_CHANNELS.saveSetup),
-    getAnalyticsPreference: untypedRequest(IPC_CHANNELS.getAnalyticsPreference),
-    setAnalyticsPreference: untypedRequest(IPC_CHANNELS.setAnalyticsPreference),
-    getApprovalAutomation: untypedRequest(IPC_CHANNELS.getApprovalAutomation),
-    setApprovalAutomation: untypedRequest(IPC_CHANNELS.setApprovalAutomation),
-    getAppLanguagePreference: untypedRequest(IPC_CHANNELS.getAppLanguagePreference),
-    setAppLanguagePreference: untypedRequest(IPC_CHANNELS.setAppLanguagePreference),
+    getAppInfo: request<undefined, AppInfo>()(IPC_CHANNELS.getAppInfo),
+    getSetupState: request<undefined, AppSetupState>()(IPC_CHANNELS.getSetupState),
+    saveSetup: request<SaveSetupInput, AppSetupState>()(IPC_CHANNELS.saveSetup),
+    getAnalyticsPreference: request<undefined, AnalyticsPreference>()(IPC_CHANNELS.getAnalyticsPreference),
+    setAnalyticsPreference: request<SetAnalyticsPreferenceInput, AnalyticsPreference>()(
+      IPC_CHANNELS.setAnalyticsPreference,
+    ),
+    getApprovalAutomation: request<undefined, ApprovalAutomationPreference>()(IPC_CHANNELS.getApprovalAutomation),
+    setApprovalAutomation: request<SetApprovalAutomationInput, ApprovalAutomationPreference>()(
+      IPC_CHANNELS.setApprovalAutomation,
+    ),
+    getAppLanguagePreference: request<undefined, AppLanguagePreference>()(IPC_CHANNELS.getAppLanguagePreference),
+    setAppLanguagePreference: request<SetAppLanguagePreferenceInput, AppLanguagePreference>()(
+      IPC_CHANNELS.setAppLanguagePreference,
+    ),
     // Every window draws its own text, so the choice is broadcast rather than returned: the
     // Dynamic Island overlay has no Settings of its own and would otherwise stay in the old
     // language until it was next recreated.
-    appLanguagePreference: untypedEvent(IPC_CHANNELS.appLanguagePreference),
+    appLanguagePreference: event<AppLanguagePreference>()(IPC_CHANNELS.appLanguagePreference),
     // The native Preferences menu item and its shortcut live in main, while the dialog lives in
     // the renderer, so the menu click is broadcast rather than handled: every window opens its
     // own Settings.
-    openSettings: untypedEvent(IPC_CHANNELS.openSettings),
-    openExternal: untypedRequest(IPC_CHANNELS.openExternal),
-    openUrl: untypedRequest(IPC_CHANNELS.openUrl),
+    openSettings: event<undefined>()(IPC_CHANNELS.openSettings),
+    openExternal: request<ExternalDestination, void>()(IPC_CHANNELS.openExternal),
+    openUrl: request<string, void>()(IPC_CHANNELS.openUrl),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()(IPC_CHANNELS.maintenanceExportData),
     exportDiagnostics: request<undefined, ExportResult>()(IPC_CHANNELS.maintenanceExportDiagnostics),
   },
   providers: {
-    connectProvider: untypedRequest(IPC_CHANNELS.connectProvider),
-    refreshAgentProviders: untypedRequest(IPC_CHANNELS.refreshAgentProviders),
-    updateProviderCli: untypedRequest(IPC_CHANNELS.updateProviderCli),
-    setProviderApiKey: untypedRequest(IPC_CHANNELS.setProviderApiKey),
-    clearProviderApiKey: untypedRequest(IPC_CHANNELS.clearProviderApiKey),
-    getProviderApiKeyState: untypedRequest(IPC_CHANNELS.getProviderApiKeyState),
-    startProviderCodeLogin: untypedRequest(IPC_CHANNELS.startProviderCodeLogin),
-    cancelProviderCodeLogin: untypedRequest(IPC_CHANNELS.cancelProviderCodeLogin),
+    connectProvider: request<AgentProviderId, AgentStatus>()(IPC_CHANNELS.connectProvider),
+    refreshAgentProviders: request<undefined, AgentStatus>()(IPC_CHANNELS.refreshAgentProviders),
+    updateProviderCli: request<ManagedProviderId, AgentStatus>()(IPC_CHANNELS.updateProviderCli),
+    setProviderApiKey: request<SetProviderApiKeyInput, AgentStatus>()(IPC_CHANNELS.setProviderApiKey),
+    clearProviderApiKey: request<AgentProviderId, AgentStatus>()(IPC_CHANNELS.clearProviderApiKey),
+    getProviderApiKeyState: request<AgentProviderId, ProviderApiKeyState>()(IPC_CHANNELS.getProviderApiKeyState),
+    startProviderCodeLogin: request<AgentProviderId, ProviderCodeLoginStart>()(IPC_CHANNELS.startProviderCodeLogin),
+    cancelProviderCodeLogin: request<AgentProviderId, AgentStatus>()(IPC_CHANNELS.cancelProviderCodeLogin),
   },
   providerRuntimes: {
-    getStatus: untypedRequest(IPC_CHANNELS.providerRuntimesGetStatus),
-    download: untypedRequest(IPC_CHANNELS.providerRuntimesDownload),
-    cancel: untypedRequest(IPC_CHANNELS.providerRuntimesCancel),
-    checkForUpdates: untypedRequest(IPC_CHANNELS.providerRuntimesCheckForUpdates),
-    event: untypedEvent(IPC_CHANNELS.providerRuntimesEvent),
+    getStatus: request<undefined, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesGetStatus),
+    download: request<ManagedProviderId, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesDownload),
+    cancel: request<ManagedProviderId, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesCancel),
+    checkForUpdates: request<undefined, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesCheckForUpdates),
+    event: event<ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesEvent),
   },
   voice: {
     getModelStatus: request<undefined, VoiceModelStatus>()(IPC_CHANNELS.voiceGetModelStatus),
@@ -162,43 +355,45 @@ export const IPC_ENDPOINTS = {
     modelStatus: event<VoiceModelStatus>()(IPC_CHANNELS.voiceModelStatus),
   },
   dynamicIsland: {
-    getPreference: untypedRequest(IPC_CHANNELS.dynamicIslandGetPreference),
-    setPreference: untypedRequest(IPC_CHANNELS.dynamicIslandSetPreference),
-    publishPresentation: untypedRequest(IPC_CHANNELS.dynamicIslandPublishPresentation),
-    getPresentation: untypedRequest(IPC_CHANNELS.dynamicIslandGetPresentation),
-    presentation: untypedEvent(IPC_CHANNELS.dynamicIslandPresentation),
-    preference: untypedEvent(IPC_CHANNELS.dynamicIslandPreference),
-    geometry: untypedEvent(IPC_CHANNELS.dynamicIslandGeometry),
-    performAction: untypedRequest(IPC_CHANNELS.dynamicIslandPerformAction),
-    performHaptic: untypedRequest(IPC_CHANNELS.dynamicIslandPerformHaptic),
-    action: untypedEvent(IPC_CHANNELS.dynamicIslandAction),
-    setInteractive: untypedRequest(IPC_CHANNELS.dynamicIslandSetInteractive),
+    getPreference: request<undefined, DynamicIslandPreference>()(IPC_CHANNELS.dynamicIslandGetPreference),
+    setPreference: request<SetDynamicIslandPreferenceInput, DynamicIslandPreference>()(
+      IPC_CHANNELS.dynamicIslandSetPreference,
+    ),
+    publishPresentation: request<DynamicIslandPresentation, void>()(IPC_CHANNELS.dynamicIslandPublishPresentation),
+    getPresentation: request<undefined, DynamicIslandPresentation>()(IPC_CHANNELS.dynamicIslandGetPresentation),
+    presentation: event<DynamicIslandPresentation>()(IPC_CHANNELS.dynamicIslandPresentation),
+    preference: event<DynamicIslandPreference>()(IPC_CHANNELS.dynamicIslandPreference),
+    geometry: event<DynamicIslandGeometry>()(IPC_CHANNELS.dynamicIslandGeometry),
+    performAction: request<DynamicIslandAction, void>()(IPC_CHANNELS.dynamicIslandPerformAction),
+    performHaptic: request<undefined, void>()(IPC_CHANNELS.dynamicIslandPerformHaptic),
+    action: event<DynamicIslandAction>()(IPC_CHANNELS.dynamicIslandAction),
+    setInteractive: request<SetDynamicIslandInteractiveInput, void>()(IPC_CHANNELS.dynamicIslandSetInteractive),
   },
   computerUse: {
-    getState: untypedRequest(IPC_CHANNELS.computerUseGetState),
-    openPermissionPane: untypedRequest(IPC_CHANNELS.computerUseOpenPermissionPane),
-    closePermissionHelp: untypedRequest(IPC_CHANNELS.computerUseClosePermissionHelp),
-    getPermissionApp: untypedRequest(IPC_CHANNELS.computerUseGetPermissionApp),
-    startPermissionAppDrag: untypedRequest(IPC_CHANNELS.computerUseStartPermissionAppDrag),
-    revealPermissionApp: untypedRequest(IPC_CHANNELS.computerUseRevealPermissionApp),
-    highlightPlacement: untypedEvent(IPC_CHANNELS.computerUseHighlightPlacement),
+    getState: request<undefined, ComputerUseState>()(IPC_CHANNELS.computerUseGetState),
+    openPermissionPane: request<MacPermissionId, ComputerUseState>()(IPC_CHANNELS.computerUseOpenPermissionPane),
+    closePermissionHelp: request<undefined, void>()(IPC_CHANNELS.computerUseClosePermissionHelp),
+    getPermissionApp: request<undefined, ComputerUsePermissionApp | null>()(IPC_CHANNELS.computerUseGetPermissionApp),
+    startPermissionAppDrag: request<undefined, void>()(IPC_CHANNELS.computerUseStartPermissionAppDrag),
+    revealPermissionApp: request<undefined, void>()(IPC_CHANNELS.computerUseRevealPermissionApp),
+    highlightPlacement: event<ComputerUseHighlightPlacement>()(IPC_CHANNELS.computerUseHighlightPlacement),
   },
   skills: {
-    localList: untypedRequest(IPC_CHANNELS.skillsLocalList),
-    localGet: untypedRequest(IPC_CHANNELS.skillsLocalGet),
-    localCreate: untypedRequest(IPC_CHANNELS.skillsLocalCreate),
-    localRevise: untypedRequest(IPC_CHANNELS.skillsLocalRevise),
-    localInstall: untypedRequest(IPC_CHANNELS.skillsLocalInstall),
+    localList: request<undefined, MarketplaceSkillDetail[]>()(IPC_CHANNELS.skillsLocalList),
+    localGet: request<LocalSkillRevisionInput, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsLocalGet),
+    localCreate: request<CreateLocalSkillInput, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsLocalCreate),
+    localRevise: request<ReviseLocalSkillInput, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsLocalRevise),
+    localInstall: request<InstallLocalSkillInput, InstalledSkill>()(IPC_CHANNELS.skillsLocalInstall),
 
-    list: untypedRequest(IPC_CHANNELS.skillsList),
-    get: untypedRequest(IPC_CHANNELS.skillsGet),
-    listMine: untypedRequest(IPC_CHANNELS.skillsListMine),
-    choosePackage: untypedRequest(IPC_CHANNELS.skillsChoosePackage),
-    submit: untypedRequest(IPC_CHANNELS.skillsSubmit),
-    listInstalled: untypedRequest(IPC_CHANNELS.skillsListInstalled),
-    install: untypedRequest(IPC_CHANNELS.skillsInstall),
-    uninstall: untypedRequest(IPC_CHANNELS.skillsUninstall),
-    setEnabled: untypedRequest(IPC_CHANNELS.skillsSetEnabled),
+    list: request<MarketplaceSkillQuery | undefined, MarketplaceSkillPage>()(IPC_CHANNELS.skillsList),
+    get: request<string, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsGet),
+    listMine: request<undefined, SkillSubmission[]>()(IPC_CHANNELS.skillsListMine),
+    choosePackage: request<undefined, SkillPackagePreview | null>()(IPC_CHANNELS.skillsChoosePackage),
+    submit: request<SubmitSkillInput, SkillSubmission>()(IPC_CHANNELS.skillsSubmit),
+    listInstalled: request<string, InstalledSkill[]>()(IPC_CHANNELS.skillsListInstalled),
+    install: request<InstallSkillInput, InstalledSkill>()(IPC_CHANNELS.skillsInstall),
+    uninstall: request<UninstallSkillInput, void>()(IPC_CHANNELS.skillsUninstall),
+    setEnabled: request<SetEnabledSkillInput, InstalledSkill>()(IPC_CHANNELS.skillsSetEnabled),
   },
   // No event channel: the renderer is the only writer, and the models a saved endpoint adds arrive
   // through the ready `status` event the provider restart already emits.
@@ -215,85 +410,119 @@ export const IPC_ENDPOINTS = {
     delete: request<DeleteHostedSiteInput, void>()(IPC_CHANNELS.hostedSitesDelete),
   },
   marketplaceAgents: {
-    list: untypedRequest(IPC_CHANNELS.marketplaceAgentsList),
-    get: untypedRequest(IPC_CHANNELS.marketplaceAgentsGet),
-    listMine: untypedRequest(IPC_CHANNELS.marketplaceAgentsListMine),
-    preview: untypedRequest(IPC_CHANNELS.marketplaceAgentsPreview),
-    submit: untypedRequest(IPC_CHANNELS.marketplaceAgentsSubmit),
-    install: untypedRequest(IPC_CHANNELS.marketplaceAgentsInstall),
+    list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()(IPC_CHANNELS.marketplaceAgentsList),
+    get: request<string, MarketplaceAgentDetail>()(IPC_CHANNELS.marketplaceAgentsGet),
+    listMine: request<undefined, AgentSubmission[]>()(IPC_CHANNELS.marketplaceAgentsListMine),
+    preview: request<string, AgentPublicationPreview>()(IPC_CHANNELS.marketplaceAgentsPreview),
+    submit: request<SubmitMarketplaceAgentInput, AgentSubmission>()(IPC_CHANNELS.marketplaceAgentsSubmit),
+    install: request<InstallMarketplaceAgentInput, InstallMarketplaceAgentResult>()(
+      IPC_CHANNELS.marketplaceAgentsInstall,
+    ),
   },
   auth: {
-    getState: untypedRequest(IPC_CHANNELS.authGetState),
-    retry: untypedRequest(IPC_CHANNELS.authRetry),
-    requestEmailCode: untypedRequest(IPC_CHANNELS.authRequestEmailCode),
-    verifyEmailCode: untypedRequest(IPC_CHANNELS.authVerifyEmailCode),
-    updateName: untypedRequest(IPC_CHANNELS.authUpdateName),
-    updateAvatar: untypedRequest(IPC_CHANNELS.authUpdateAvatar),
-    createMobileConnect: untypedRequest(IPC_CHANNELS.authCreateMobileConnect),
-    listMobileConnectedDevices: untypedRequest(IPC_CHANNELS.authListMobileConnectedDevices),
-    listAccountSessions: untypedRequest(IPC_CHANNELS.authListAccountSessions),
-    revokeAccountSession: untypedRequest(IPC_CHANNELS.authRevokeAccountSession),
-    revokeMobileConnectedDevice: untypedRequest(IPC_CHANNELS.authRevokeMobileConnectedDevice),
-    logout: untypedRequest(IPC_CHANNELS.authLogout),
-    event: untypedEvent(IPC_CHANNELS.authEvent),
+    getState: request<undefined, CentralAuthState>()(IPC_CHANNELS.authGetState),
+    retry: request<undefined, CentralAuthState>()(IPC_CHANNELS.authRetry),
+    requestEmailCode: request<string, CentralAuthState>()(IPC_CHANNELS.authRequestEmailCode),
+    verifyEmailCode: request<VerifyEmailCodeInput, CentralAuthState>()(IPC_CHANNELS.authVerifyEmailCode),
+    updateName: request<string, CentralAuthState>()(IPC_CHANNELS.authUpdateName),
+    updateAvatar: request<AvatarImageInput | null, CentralAuthState>()(IPC_CHANNELS.authUpdateAvatar),
+    createMobileConnect: request<undefined, MobileConnectTicket>()(IPC_CHANNELS.authCreateMobileConnect),
+    listMobileConnectedDevices: request<undefined, MobileConnectedDevice[]>()(
+      IPC_CHANNELS.authListMobileConnectedDevices,
+    ),
+    listAccountSessions: request<undefined, AccountSession[]>()(IPC_CHANNELS.authListAccountSessions),
+    revokeAccountSession: request<string, void>()(IPC_CHANNELS.authRevokeAccountSession),
+    revokeMobileConnectedDevice: request<string, void>()(IPC_CHANNELS.authRevokeMobileConnectedDevice),
+    logout: request<undefined, CentralAuthState>()(IPC_CHANNELS.authLogout),
+    event: event<CentralAuthState>()(IPC_CHANNELS.authEvent),
   },
   update: {
-    getStatus: untypedRequest(IPC_CHANNELS.updateGetStatus),
-    check: untypedRequest(IPC_CHANNELS.updateCheck),
-    download: untypedRequest(IPC_CHANNELS.updateDownload),
-    install: untypedRequest(IPC_CHANNELS.updateInstall),
-    getPreference: untypedRequest(IPC_CHANNELS.updateGetPreference),
-    setPreference: untypedRequest(IPC_CHANNELS.updateSetPreference),
-    event: untypedEvent(IPC_CHANNELS.updateEvent),
+    getStatus: request<undefined, UpdateStatus>()(IPC_CHANNELS.updateGetStatus),
+    check: request<undefined, UpdateStatus>()(IPC_CHANNELS.updateCheck),
+    download: request<undefined, UpdateStatus>()(IPC_CHANNELS.updateDownload),
+    install: request<undefined, void>()(IPC_CHANNELS.updateInstall),
+    getPreference: request<undefined, UpdatePreference>()(IPC_CHANNELS.updateGetPreference),
+    setPreference: request<UpdatePreference, UpdatePreference>()(IPC_CHANNELS.updateSetPreference),
+    event: event<UpdateStatus>()(IPC_CHANNELS.updateEvent),
   },
   notifications: {
-    getPreference: untypedRequest(IPC_CHANNELS.notificationsGetPreference),
-    setPreference: untypedRequest(IPC_CHANNELS.notificationsSetPreference),
-    test: untypedRequest(IPC_CHANNELS.notificationsTest),
-    openSettings: untypedRequest(IPC_CHANNELS.notificationsOpenSettings),
-    openedEvent: untypedEvent(IPC_CHANNELS.notificationsOpenedEvent),
+    getPreference: request<undefined, NotificationPreference>()(IPC_CHANNELS.notificationsGetPreference),
+    setPreference: request<NotificationPreference, NotificationPreference>()(IPC_CHANNELS.notificationsSetPreference),
+    test: request<undefined, void>()(IPC_CHANNELS.notificationsTest),
+    openSettings: request<undefined, void>()(IPC_CHANNELS.notificationsOpenSettings),
+    openedEvent: event<NotificationOpenedEvent>()(IPC_CHANNELS.notificationsOpenedEvent),
   },
   agent: {
-    getStatus: untypedRequest(IPC_CHANNELS.agentGetStatus),
-    getAnalytics: untypedRequest(IPC_CHANNELS.agentGetAnalytics),
-    getHostAnalytics: untypedRequest(IPC_CHANNELS.hostGetAnalytics),
-    getUsage: untypedRequest(IPC_CHANNELS.agentGetUsage),
-    listModels: untypedRequest(IPC_CHANNELS.agentListModels),
-    list: untypedRequest(IPC_CHANNELS.agentList),
-    listInstalledSkills: untypedRequest(IPC_CHANNELS.agentListInstalledSkills),
-    listChannels: untypedRequest(IPC_CHANNELS.agentListChannels),
-    readChannel: untypedRequest(IPC_CHANNELS.agentReadChannel),
-    channelCommand: untypedRequest(IPC_CHANNELS.agentChannelCommand),
-    deleteChannel: untypedRequest(IPC_CHANNELS.agentDeleteChannel),
-    getSidebarLayout: untypedRequest(IPC_CHANNELS.agentGetSidebarLayout),
-    mutateSidebarLayout: untypedRequest(IPC_CHANNELS.agentMutateSidebarLayout),
-    generateProfile: untypedRequest(IPC_CHANNELS.agentGenerateProfile),
-    saveProfile: untypedRequest(IPC_CHANNELS.agentSaveProfile),
-    create: untypedRequest(IPC_CHANNELS.agentCreate),
-    duplicate: untypedRequest(IPC_CHANNELS.agentDuplicate),
-    update: untypedRequest(IPC_CHANNELS.agentUpdate),
-    setAvatar: untypedRequest(IPC_CHANNELS.agentSetAvatar),
-    delete: untypedRequest(IPC_CHANNELS.agentDelete),
-    readConversation: untypedRequest(IPC_CHANNELS.agentReadConversation),
-    readConversationPage: untypedRequest(IPC_CHANNELS.agentReadConversationPage),
-    searchConversationMessages: untypedRequest(IPC_CHANNELS.agentSearchConversationMessages),
-    listConversationReads: untypedRequest(IPC_CHANNELS.agentListConversationReads),
-    markConversationRead: untypedRequest(IPC_CHANNELS.agentMarkConversationRead),
-    sendMessage: untypedRequest(IPC_CHANNELS.agentSendMessage),
-    setMessageReaction: untypedRequest(IPC_CHANNELS.agentSetMessageReaction),
-    listQueue: untypedRequest(IPC_CHANNELS.agentListQueue),
-    acknowledgeFailedTurn: untypedRequest(IPC_CHANNELS.agentAcknowledgeFailedTurn),
-    cancelQueuedMessage: untypedRequest(IPC_CHANNELS.agentCancelQueuedMessage),
-    steerQueuedMessage: untypedRequest(IPC_CHANNELS.agentSteerQueuedMessage),
-    editQueuedMessage: untypedRequest(IPC_CHANNELS.agentEditQueuedMessage),
-    updateQueuedMessage: untypedRequest(IPC_CHANNELS.agentUpdateQueuedMessage),
-    reorderQueue: untypedRequest(IPC_CHANNELS.agentReorderQueue),
-    interrupt: untypedRequest(IPC_CHANNELS.agentInterrupt),
-    respondToPrompt: untypedRequest(IPC_CHANNELS.agentRespondToPrompt),
-    respondToApproval: untypedRequest(IPC_CHANNELS.agentRespondToApproval),
-    respondToBrowserSecret: untypedRequest(IPC_CHANNELS.agentRespondToBrowserSecret),
-    respondToBrowserTakeover: untypedRequest(IPC_CHANNELS.agentRespondToBrowserTakeover),
-    event: untypedEvent(IPC_CHANNELS.agentEvent),
+    getStatus: request<AgentIpcRequest<null>, AgentStatus>()(IPC_CHANNELS.agentGetStatus),
+    getAnalytics: request<AgentIpcRequest<AgentAnalyticsInput>, AgentAnalytics | null>()(
+      IPC_CHANNELS.agentGetAnalytics,
+    ),
+    getHostAnalytics: request<AgentIpcRequest<HostAnalyticsInput>, HostAnalytics | null>()(
+      IPC_CHANNELS.hostGetAnalytics,
+    ),
+    getUsage: request<AgentIpcRequest<string | undefined>, AccountUsage>()(IPC_CHANNELS.agentGetUsage),
+    listModels: request<AgentIpcRequest<null>, AgentModelOption[]>()(IPC_CHANNELS.agentListModels),
+    list: request<AgentIpcRequest<null>, AgentSummary[]>()(IPC_CHANNELS.agentList),
+    listInstalledSkills: request<AgentIpcRequest<string>, InstalledSkill[]>()(IPC_CHANNELS.agentListInstalledSkills),
+    listChannels: request<AgentIpcRequest<null>, ChannelSummary[]>()(IPC_CHANNELS.agentListChannels),
+    readChannel: request<AgentIpcRequest<ChannelReadInput>, ChannelPage>()(IPC_CHANNELS.agentReadChannel),
+    channelCommand: request<AgentIpcRequest<ChannelCommand>, Channel>()(IPC_CHANNELS.agentChannelCommand),
+    deleteChannel: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentDeleteChannel),
+    getSidebarLayout: request<AgentIpcRequest<null>, SidebarLayoutSnapshot>()(IPC_CHANNELS.agentGetSidebarLayout),
+    mutateSidebarLayout: request<AgentIpcRequest<SidebarLayoutAction>, SidebarLayoutSnapshot>()(
+      IPC_CHANNELS.agentMutateSidebarLayout,
+    ),
+    generateProfile: request<AgentIpcRequest<GenerateAgentProfileInput>, AgentProfileDraft>()(
+      IPC_CHANNELS.agentGenerateProfile,
+    ),
+    saveProfile: request<AgentIpcRequest<SaveAgentProfileInput>, SaveAgentProfileResult>()(
+      IPC_CHANNELS.agentSaveProfile,
+    ),
+    create: request<AgentIpcRequest<CreateAgentInput>, AgentSummary>()(IPC_CHANNELS.agentCreate),
+    duplicate: request<AgentIpcRequest<string>, DuplicateAgentResult>()(IPC_CHANNELS.agentDuplicate),
+    update: request<AgentIpcRequest<UpdateAgentInput>, AgentSummary>()(IPC_CHANNELS.agentUpdate),
+    setAvatar: request<AgentIpcRequest<SetAgentAvatarInput>, AgentSummary>()(IPC_CHANNELS.agentSetAvatar),
+    delete: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentDelete),
+    readConversation: request<AgentIpcRequest<string>, ConversationWithReadState>()(IPC_CHANNELS.agentReadConversation),
+    readConversationPage: request<AgentIpcRequest<ReadConversationPageInput>, ConversationPage>()(
+      IPC_CHANNELS.agentReadConversationPage,
+    ),
+    searchConversationMessages: request<AgentIpcRequest<SearchConversationMessagesInput>, ConversationSearchPage>()(
+      IPC_CHANNELS.agentSearchConversationMessages,
+    ),
+    listConversationReads: request<AgentIpcRequest<null>, Record<string, ConversationReadState>>()(
+      IPC_CHANNELS.agentListConversationReads,
+    ),
+    markConversationRead: request<AgentIpcRequest<MarkConversationReadInput>, ConversationReadState>()(
+      IPC_CHANNELS.agentMarkConversationRead,
+    ),
+    sendMessage: request<AgentIpcRequest<SendMessageInput>, QueuedMessageReceipt>()(IPC_CHANNELS.agentSendMessage),
+    setMessageReaction: request<AgentIpcRequest<SetMessageReactionInput>, void>()(IPC_CHANNELS.agentSetMessageReaction),
+    listQueue: request<AgentIpcRequest<string>, QueueSnapshot>()(IPC_CHANNELS.agentListQueue),
+    acknowledgeFailedTurn: request<AgentIpcRequest<AcknowledgeFailedTurnInput>, void>()(
+      IPC_CHANNELS.agentAcknowledgeFailedTurn,
+    ),
+    cancelQueuedMessage: request<AgentIpcRequest<CancelQueuedMessageInput>, void>()(
+      IPC_CHANNELS.agentCancelQueuedMessage,
+    ),
+    steerQueuedMessage: request<AgentIpcRequest<SteerQueuedMessageInput>, void>()(IPC_CHANNELS.agentSteerQueuedMessage),
+    editQueuedMessage: request<AgentIpcRequest<EditQueuedMessageInput>, QueueSnapshot>()(
+      IPC_CHANNELS.agentEditQueuedMessage,
+    ),
+    updateQueuedMessage: request<AgentIpcRequest<UpdateQueuedMessageInput>, void>()(
+      IPC_CHANNELS.agentUpdateQueuedMessage,
+    ),
+    reorderQueue: request<AgentIpcRequest<ReorderQueueInput>, void>()(IPC_CHANNELS.agentReorderQueue),
+    interrupt: request<AgentIpcRequest<InterruptTurnInput>, void>()(IPC_CHANNELS.agentInterrupt),
+    respondToPrompt: request<AgentIpcRequest<RespondToPromptInput>, void>()(IPC_CHANNELS.agentRespondToPrompt),
+    respondToApproval: request<AgentIpcRequest<RespondToApprovalInput>, void>()(IPC_CHANNELS.agentRespondToApproval),
+    respondToBrowserSecret: request<AgentIpcRequest<RespondToBrowserSecretInput>, void>()(
+      IPC_CHANNELS.agentRespondToBrowserSecret,
+    ),
+    respondToBrowserTakeover: request<AgentIpcRequest<RespondToBrowserTakeoverInput>, void>()(
+      IPC_CHANNELS.agentRespondToBrowserTakeover,
+    ),
+    event: event<ScopedAgentEvent>()(IPC_CHANNELS.agentEvent),
   },
   agentMemories: {
     listMemories: request<AgentIpcRequest<string>, AgentMemory[]>()(IPC_CHANNELS.agentListMemories),
@@ -346,88 +575,108 @@ export const IPC_ENDPOINTS = {
     ),
   },
   agentAttachments: {
-    chooseAttachments: untypedRequest(IPC_CHANNELS.agentChooseAttachments),
-    importAttachments: untypedRequest(IPC_CHANNELS.agentImportAttachments),
-    discardDraftAttachment: untypedRequest(IPC_CHANNELS.agentDiscardDraftAttachment),
-    downloadAttachments: untypedRequest(IPC_CHANNELS.agentDownloadAttachments),
-    openAttachment: untypedRequest(IPC_CHANNELS.agentOpenAttachment),
-    openSharedFile: untypedRequest(IPC_CHANNELS.agentOpenSharedFile),
-    openWorkspaceFile: untypedRequest(IPC_CHANNELS.agentOpenWorkspaceFile),
-    previewSharedFile: untypedRequest(IPC_CHANNELS.agentPreviewSharedFile),
-    previewWorkspaceFile: untypedRequest(IPC_CHANNELS.agentPreviewWorkspaceFile),
+    chooseAttachments: request<AgentIpcRequest<ChooseAttachmentsInput>, DraftAttachment[]>()(
+      IPC_CHANNELS.agentChooseAttachments,
+    ),
+    importAttachments: request<AgentIpcRequest<ImportAttachmentsInput>, DraftAttachment[]>()(
+      IPC_CHANNELS.agentImportAttachments,
+    ),
+    discardDraftAttachment: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.agentDiscardDraftAttachment),
+    downloadAttachments: request<AgentIpcRequest<DownloadAttachmentsInput>, void>()(
+      IPC_CHANNELS.agentDownloadAttachments,
+    ),
+    openAttachment: request<AgentIpcRequest<OpenAttachmentInput>, void>()(IPC_CHANNELS.agentOpenAttachment),
+    openSharedFile: request<AgentIpcRequest<OpenSharedFileInput>, void>()(IPC_CHANNELS.agentOpenSharedFile),
+    openWorkspaceFile: request<AgentIpcRequest<OpenWorkspaceFileInput>, void>()(IPC_CHANNELS.agentOpenWorkspaceFile),
+    previewSharedFile: request<AgentIpcRequest<OpenSharedFileInput>, FilePreview>()(
+      IPC_CHANNELS.agentPreviewSharedFile,
+    ),
+    previewWorkspaceFile: request<AgentIpcRequest<OpenWorkspaceFileInput>, FilePreview>()(
+      IPC_CHANNELS.agentPreviewWorkspaceFile,
+    ),
   },
   browser: {
-    open: untypedRequest(IPC_CHANNELS.browserOpen),
-    activate: untypedRequest(IPC_CHANNELS.browserActivate),
-    navigate: untypedRequest(IPC_CHANNELS.browserNavigate),
-    reload: untypedRequest(IPC_CHANNELS.browserReload),
-    close: untypedRequest(IPC_CHANNELS.browserClose),
-    listTabs: untypedRequest(IPC_CHANNELS.browserListTabs),
-    getDisplayState: untypedRequest(IPC_CHANNELS.browserGetDisplayState),
-    getControlState: untypedRequest(IPC_CHANNELS.browserGetControlState),
-    capturePreview: untypedRequest(IPC_CHANNELS.browserCapturePreview),
-    setVisible: untypedRequest(IPC_CHANNELS.browserSetVisible),
-    startLiveView: untypedRequest(IPC_CHANNELS.browserStartLiveView),
-    stopLiveView: untypedRequest(IPC_CHANNELS.browserStopLiveView),
+    open: request<BrowserOpenInput, BrowserTab>()(IPC_CHANNELS.browserOpen),
+    activate: request<string, void>()(IPC_CHANNELS.browserActivate),
+    navigate: request<BrowserNavigateInput, void>()(IPC_CHANNELS.browserNavigate),
+    reload: request<string, void>()(IPC_CHANNELS.browserReload),
+    close: request<string, void>()(IPC_CHANNELS.browserClose),
+    listTabs: request<undefined, BrowserTab[]>()(IPC_CHANNELS.browserListTabs),
+    getDisplayState: request<undefined, BrowserDisplayState>()(IPC_CHANNELS.browserGetDisplayState),
+    getControlState: request<undefined, BrowserControlState>()(IPC_CHANNELS.browserGetControlState),
+    capturePreview: request<string, BrowserPreview>()(IPC_CHANNELS.browserCapturePreview),
+    setVisible: request<BrowserVisibilityInput, void>()(IPC_CHANNELS.browserSetVisible),
+    startLiveView: request<string, void>()(IPC_CHANNELS.browserStartLiveView),
+    stopLiveView: request<undefined, void>()(IPC_CHANNELS.browserStopLiveView),
+    // The one untyped endpoint. The renderer sends `BrowserLiveViewInput` and main reads the wire
+    // `BrowserViewInput`, which differ on purpose (see `ipc-browser.ts`); main's wire decoder fills the rest.
     sendLiveViewInput: untypedRequest(IPC_CHANNELS.browserSendLiveViewInput),
-    liveViewEvent: untypedEvent(IPC_CHANNELS.browserLiveViewEvent),
-    displayStateEvent: untypedEvent(IPC_CHANNELS.browserDisplayStateEvent),
-    pictureInPictureOpen: untypedRequest(IPC_CHANNELS.browserPictureInPictureOpen),
-    pictureInPictureClose: untypedRequest(IPC_CHANNELS.browserPictureInPictureClose),
-    pictureInPictureDock: untypedRequest(IPC_CHANNELS.browserPictureInPictureDock),
-    pictureInPictureHide: untypedRequest(IPC_CHANNELS.browserPictureInPictureHide),
-    pictureInPictureEvent: untypedEvent(IPC_CHANNELS.browserPictureInPictureEvent),
+    liveViewEvent: event<BrowserLiveViewEvent>()(IPC_CHANNELS.browserLiveViewEvent),
+    displayStateEvent: event<BrowserDisplayState>()(IPC_CHANNELS.browserDisplayStateEvent),
+    pictureInPictureOpen: request<BrowserBounds | undefined, BrowserBounds>()(IPC_CHANNELS.browserPictureInPictureOpen),
+    pictureInPictureClose: request<undefined, void>()(IPC_CHANNELS.browserPictureInPictureClose),
+    pictureInPictureDock: request<undefined, void>()(IPC_CHANNELS.browserPictureInPictureDock),
+    pictureInPictureHide: request<undefined, void>()(IPC_CHANNELS.browserPictureInPictureHide),
+    pictureInPictureEvent: event<BrowserPictureInPictureEvent>()(IPC_CHANNELS.browserPictureInPictureEvent),
   },
   servers: {
-    list: untypedRequest(IPC_CHANNELS.serversList),
-    select: untypedRequest(IPC_CHANNELS.serversSelect),
-    reorder: untypedRequest(IPC_CHANNELS.serversReorder),
-    setMuted: untypedRequest(IPC_CHANNELS.serversSetMuted),
-    setNotificationLevel: untypedRequest(IPC_CHANNELS.serversSetNotificationLevel),
-    join: untypedRequest(IPC_CHANNELS.serversJoin),
-    previewInvite: untypedRequest(IPC_CHANNELS.serversPreviewInvite),
-    takePendingInvite: untypedRequest(IPC_CHANNELS.serversTakePendingInvite),
-    login: untypedRequest(IPC_CHANNELS.serversLogin),
-    retryConnection: untypedRequest(IPC_CHANNELS.serversRetryConnection),
-    remove: untypedRequest(IPC_CHANNELS.serversRemove),
-    getPresence: untypedRequest(IPC_CHANNELS.serversGetPresence),
-    getPresenceFor: untypedRequest(IPC_CHANNELS.serversGetPresenceFor),
-    refreshIdentity: untypedRequest(IPC_CHANNELS.serversRefreshIdentity),
-    listMembers: untypedRequest(IPC_CHANNELS.serversListMembers),
-    updateMember: untypedRequest(IPC_CHANNELS.serversUpdateMember),
-    removeMember: untypedRequest(IPC_CHANNELS.serversRemoveMember),
-    listInvites: untypedRequest(IPC_CHANNELS.serversListInvites),
-    revokeInvite: untypedRequest(IPC_CHANNELS.serversRevokeInvite),
-    createInvite: untypedRequest(IPC_CHANNELS.serversCreateInvite),
-    setTyping: untypedRequest(IPC_CHANNELS.serversSetTyping),
-    presence: untypedEvent(IPC_CHANNELS.serversPresence),
-    listDirectThreads: untypedRequest(IPC_CHANNELS.serversListDirectThreads),
-    readDirectConversation: untypedRequest(IPC_CHANNELS.serversReadDirectConversation),
-    readDirectConversationPage: untypedRequest(IPC_CHANNELS.serversReadDirectConversationPage),
-    sendDirectMessage: untypedRequest(IPC_CHANNELS.serversSendDirectMessage),
-    markDirectRead: untypedRequest(IPC_CHANNELS.serversMarkDirectRead),
-    setDirectTyping: untypedRequest(IPC_CHANNELS.serversSetDirectTyping),
-    directMessage: untypedEvent(IPC_CHANNELS.serversDirectMessage),
-    directTyping: untypedEvent(IPC_CHANNELS.serversDirectTyping),
-    event: untypedEvent(IPC_CHANNELS.serversEvent),
-    invite: untypedEvent(IPC_CHANNELS.serversInvite),
+    list: request<undefined, ServerSummary[]>()(IPC_CHANNELS.serversList),
+    select: request<string, ServerSummary[]>()(IPC_CHANNELS.serversSelect),
+    reorder: request<ReorderServersInput, ServerSummary[]>()(IPC_CHANNELS.serversReorder),
+    setMuted: request<SetServerMutedInput, ServerSummary[]>()(IPC_CHANNELS.serversSetMuted),
+    setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()(
+      IPC_CHANNELS.serversSetNotificationLevel,
+    ),
+    join: request<JoinServerInput, ServerSummary>()(IPC_CHANNELS.serversJoin),
+    previewInvite: request<JoinServerInput, InvitePreview>()(IPC_CHANNELS.serversPreviewInvite),
+    takePendingInvite: request<undefined, string | null>()(IPC_CHANNELS.serversTakePendingInvite),
+    login: request<LoginServerInput, ServerSummary>()(IPC_CHANNELS.serversLogin),
+    retryConnection: request<string, ServerSummary>()(IPC_CHANNELS.serversRetryConnection),
+    remove: request<string, void>()(IPC_CHANNELS.serversRemove),
+    getPresence: request<undefined, TeamPresenceSnapshot>()(IPC_CHANNELS.serversGetPresence),
+    getPresenceFor: request<string, TeamPresenceSnapshot>()(IPC_CHANNELS.serversGetPresenceFor),
+    refreshIdentity: request<string, ServerSummary>()(IPC_CHANNELS.serversRefreshIdentity),
+    listMembers: request<string, TeamMemberSummary[]>()(IPC_CHANNELS.serversListMembers),
+    updateMember: request<AgentIpcRequest<UpdateTeamMemberInput>, TeamMemberSummary>()(
+      IPC_CHANNELS.serversUpdateMember,
+    ),
+    removeMember: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.serversRemoveMember),
+    listInvites: request<string, TeamInviteSummary[]>()(IPC_CHANNELS.serversListInvites),
+    revokeInvite: request<AgentIpcRequest<string>, void>()(IPC_CHANNELS.serversRevokeInvite),
+    createInvite: request<AgentIpcRequest<CreateTeamInviteInput>, InviteSummary>()(IPC_CHANNELS.serversCreateInvite),
+    setTyping: request<SetTeamTypingInput, void>()(IPC_CHANNELS.serversSetTyping),
+    presence: event<ScopedTeamPresenceSnapshot>()(IPC_CHANNELS.serversPresence),
+    listDirectThreads: request<undefined, DirectThreadSummary[]>()(IPC_CHANNELS.serversListDirectThreads),
+    readDirectConversation: request<string, DirectConversationSnapshot>()(IPC_CHANNELS.serversReadDirectConversation),
+    readDirectConversationPage: request<ReadDirectConversationPageInput, DirectConversationPage>()(
+      IPC_CHANNELS.serversReadDirectConversationPage,
+    ),
+    sendDirectMessage: request<SendDirectMessageInput, DirectMessage>()(IPC_CHANNELS.serversSendDirectMessage),
+    markDirectRead: request<MarkDirectReadInput, DirectConversationReadState>()(IPC_CHANNELS.serversMarkDirectRead),
+    setDirectTyping: request<DirectTypingInput, void>()(IPC_CHANNELS.serversSetDirectTyping),
+    directMessage: event<ScopedDirectMessageEvent>()(IPC_CHANNELS.serversDirectMessage),
+    directTyping: event<ScopedDirectTypingEvent>()(IPC_CHANNELS.serversDirectTyping),
+    event: event<ServerSummary[]>()(IPC_CHANNELS.serversEvent),
+    invite: event<string>()(IPC_CHANNELS.serversInvite),
   },
   // A separate group, not part of `servers`: a group is what one registrar covers in full, and
   // `servers` is bound against `RemoteServerManager` while these are bound against `AgentService`.
   mcpServers: {
-    list: untypedRequest(IPC_CHANNELS.serversListMcpServers),
-    save: untypedRequest(IPC_CHANNELS.serversSaveMcpServer),
-    remove: untypedRequest(IPC_CHANNELS.serversRemoveMcpServer),
-    setEnabled: untypedRequest(IPC_CHANNELS.serversSetMcpServerEnabled),
-    test: untypedRequest(IPC_CHANNELS.serversTestMcpServer),
+    list: request<AgentIpcRequest<null>, McpServerConfig[]>()(IPC_CHANNELS.serversListMcpServers),
+    save: request<AgentIpcRequest<SaveMcpServerInput>, McpServerConfig[]>()(IPC_CHANNELS.serversSaveMcpServer),
+    remove: request<AgentIpcRequest<RemoveMcpServerInput>, McpServerConfig[]>()(IPC_CHANNELS.serversRemoveMcpServer),
+    setEnabled: request<AgentIpcRequest<SetMcpServerEnabledInput>, McpServerConfig[]>()(
+      IPC_CHANNELS.serversSetMcpServerEnabled,
+    ),
+    test: request<AgentIpcRequest<TestMcpServerInput>, McpTestResult>()(IPC_CHANNELS.serversTestMcpServer),
   },
   // Bound against the storage service, not `AgentService`, so it is its own group.
   storage: {
-    getUsage: untypedRequest(IPC_CHANNELS.storageGetUsage),
-    deleteFile: untypedRequest(IPC_CHANNELS.storageDeleteFile),
-    clear: untypedRequest(IPC_CHANNELS.storageClear),
-    openFile: untypedRequest(IPC_CHANNELS.storageOpenFile),
-    openLocation: untypedRequest(IPC_CHANNELS.storageOpenLocation),
+    getUsage: request<AgentIpcRequest<GetStorageUsageInput>, StorageUsage | null>()(IPC_CHANNELS.storageGetUsage),
+    deleteFile: request<AgentIpcRequest<DeleteStoredFileInput>, void>()(IPC_CHANNELS.storageDeleteFile),
+    clear: request<AgentIpcRequest<ClearStorageInput>, void>()(IPC_CHANNELS.storageClear),
+    openFile: request<AgentIpcRequest<OpenStoredFileInput>, void>()(IPC_CHANNELS.storageOpenFile),
+    openLocation: request<OpenStorageLocationInput, void>()(IPC_CHANNELS.storageOpenLocation),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived
@@ -437,32 +686,32 @@ export const IPC_ENDPOINTS = {
     openListing: event<string>()(IPC_CHANNELS.pluginsOpenListing),
   },
   host: {
-    getStatus: untypedRequest(IPC_CHANNELS.hostGetStatus),
-    configure: untypedRequest(IPC_CHANNELS.hostConfigure),
-    updateIdentity: untypedRequest(IPC_CHANNELS.hostUpdateIdentity),
-    getPresence: untypedRequest(IPC_CHANNELS.hostGetPresence),
-    start: untypedRequest(IPC_CHANNELS.hostStart),
-    stop: untypedRequest(IPC_CHANNELS.hostStop),
-    recheckScreenRecording: untypedRequest(IPC_CHANNELS.hostRecheckScreenRecording),
-    listMembers: untypedRequest(IPC_CHANNELS.hostListMembers),
-    createInvite: untypedRequest(IPC_CHANNELS.hostCreateInvite),
-    listInvites: untypedRequest(IPC_CHANNELS.hostListInvites),
-    revokeInvite: untypedRequest(IPC_CHANNELS.hostRevokeInvite),
-    updateMember: untypedRequest(IPC_CHANNELS.hostUpdateMember),
-    removeMember: untypedRequest(IPC_CHANNELS.hostRemoveMember),
-    listSessions: untypedRequest(IPC_CHANNELS.hostListSessions),
-    revokeSession: untypedRequest(IPC_CHANNELS.hostRevokeSession),
-    event: untypedEvent(IPC_CHANNELS.hostEvent),
+    getStatus: request<undefined, HostStatus>()(IPC_CHANNELS.hostGetStatus),
+    configure: request<ConfigureHostInput, HostStatus>()(IPC_CHANNELS.hostConfigure),
+    updateIdentity: request<UpdateHostIdentityInput, HostStatus>()(IPC_CHANNELS.hostUpdateIdentity),
+    getPresence: request<undefined, TeamPresenceSnapshot>()(IPC_CHANNELS.hostGetPresence),
+    start: request<undefined, HostStatus>()(IPC_CHANNELS.hostStart),
+    stop: request<undefined, HostStatus>()(IPC_CHANNELS.hostStop),
+    recheckScreenRecording: request<undefined, HostStatus>()(IPC_CHANNELS.hostRecheckScreenRecording),
+    listMembers: request<undefined, TeamMemberSummary[]>()(IPC_CHANNELS.hostListMembers),
+    createInvite: request<CreateTeamInviteInput, InviteSummary>()(IPC_CHANNELS.hostCreateInvite),
+    listInvites: request<undefined, TeamInviteSummary[]>()(IPC_CHANNELS.hostListInvites),
+    revokeInvite: request<string, void>()(IPC_CHANNELS.hostRevokeInvite),
+    updateMember: request<UpdateTeamMemberInput, TeamMemberSummary>()(IPC_CHANNELS.hostUpdateMember),
+    removeMember: request<string, void>()(IPC_CHANNELS.hostRemoveMember),
+    listSessions: request<undefined, TeamSessionSummary[]>()(IPC_CHANNELS.hostListSessions),
+    revokeSession: request<string, void>()(IPC_CHANNELS.hostRevokeSession),
+    event: event<HostStatus>()(IPC_CHANNELS.hostEvent),
   },
   remoteDesktop: {
-    checkSetup: untypedRequest(IPC_CHANNELS.remoteDesktopCheckSetup),
-    openSetup: untypedRequest(IPC_CHANNELS.remoteDesktopOpenSetup),
-    test: untypedRequest(IPC_CHANNELS.remoteDesktopTest),
-    list: untypedRequest(IPC_CHANNELS.remoteDesktopList),
-    connect: untypedRequest(IPC_CHANNELS.remoteDesktopConnect),
-    selectDisplay: untypedRequest(IPC_CHANNELS.remoteDesktopSelectDisplay),
-    disconnect: untypedRequest(IPC_CHANNELS.remoteDesktopDisconnect),
-    event: untypedEvent(IPC_CHANNELS.remoteDesktopEvent),
+    checkSetup: request<string, RemoteDesktopSetupStatus>()(IPC_CHANNELS.remoteDesktopCheckSetup),
+    openSetup: request<RemoteDesktopSetupAction, void>()(IPC_CHANNELS.remoteDesktopOpenSetup),
+    test: request<RemoteDesktopTestInput, RemoteDesktopTestStatus>()(IPC_CHANNELS.remoteDesktopTest),
+    list: request<undefined, RemoteDesktopSession[]>()(IPC_CHANNELS.remoteDesktopList),
+    connect: request<RemoteDesktopConnectInput, RemoteDesktopConnectResult>()(IPC_CHANNELS.remoteDesktopConnect),
+    selectDisplay: request<RemoteDesktopSelectDisplayInput, void>()(IPC_CHANNELS.remoteDesktopSelectDisplay),
+    disconnect: request<string, void>()(IPC_CHANNELS.remoteDesktopDisconnect),
+    event: event<RemoteDesktopSession[]>()(IPC_CHANNELS.remoteDesktopEvent),
   },
 } as const;
 
@@ -522,11 +771,6 @@ export type ResultOf<Channel extends RequestChannel> =
 export type EventPayloadOf<Channel extends EventChannel> =
   EventsByChannel[Channel] extends EventEndpoint<Channel, infer Payload> ? Payload : never;
 
-/** Request channels whose group is not typed yet. */
-export type UntypedRequestChannel = {
-  [Channel in RequestChannel]: [PayloadOf<Channel>] extends [Untyped] ? Channel : never;
-}[RequestChannel];
-
 /** Typed request channels whose payload is scoped to one server. */
 export type AgentRequestChannel = {
   [Channel in RequestChannel]: PayloadOf<Channel> extends AgentIpcRequest<unknown> ? Channel : never;
@@ -560,7 +804,5 @@ export type Invoke<Endpoint> =
 /** The `OpenBotDesktopApi` subscription to a typed event. It answers the unsubscribe call. */
 export type Subscribe<Endpoint> =
   Endpoint extends EventEndpoint<string, infer Payload>
-    ? [Payload] extends [Untyped]
-      ? never
-      : (listener: [Payload] extends [undefined] ? () => void : (payload: Payload) => void) => () => void
+    ? (listener: [Payload] extends [undefined] ? () => void : (payload: Payload) => void) => () => void
     : never;
