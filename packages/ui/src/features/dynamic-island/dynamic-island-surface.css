@@ -158,12 +158,12 @@ body:has(.dynamic-island-surface),
   display: grid;
   place-items: center;
   opacity: 0;
-  transform: translateY(-1px);
   transition: opacity 250ms var(--openbot-ease-out);
 }
 
+/* Mirrors the logo: its 20px box sits 10px from the left edge, this 14px box sits 6px from the right. */
 .dynamic-island-external.dynamic-island-idle .dynamic-island-surface-idle-greeting-layer {
-  transform: translate(-4px, -1px);
+  transform: translateX(-7px);
 }
 
 .dynamic-island-surface-idle-greeting[data-active-slot="0"] .dynamic-island-surface-idle-greeting-layer:first-child,
