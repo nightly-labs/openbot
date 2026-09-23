@@ -109,6 +109,8 @@ export interface RemoteTeamConnectionUpdate {
 
 export interface RemoteTeamPeerActions {
   onAccountProfileChanged?: () => Promise<void>;
+  /** The account's server list changed on another device of this account. */
+  onAccountServersChanged?: () => Promise<void>;
   getBootstrap: (hostId: string, clientPublicKey: string) => Promise<RemoteTeamBootstrapPayload>;
   endSession: (sessionId: string) => Promise<void>;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => Promise<void>;
@@ -428,6 +430,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     if (message.type === "account-profile-changed") {
       // Profile refresh failure must never break the RTC connection.
       void actions.current.onAccountProfileChanged?.().catch(() => undefined);
+      return;
+    }
+    if (message.type === "account-servers-changed") {
+      // A server list this phone cannot re-read must not break the connection the notice arrived
+      // on either: that connection is to a server this phone already has.
+      void actions.current.onAccountServersChanged?.().catch(() => undefined);
       return;
     }
     if (message.type === "error") {

@@ -31,6 +31,7 @@ export type ChatMessage =
       superseded?: boolean;
       body: string;
       streaming: boolean;
+      status?: ConversationMessage["status"];
       replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
     }
@@ -110,6 +111,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
           author: message.author === "user" ? "user" : "agent",
           body: message.exchange ? "" : message.text,
           streaming: message.status === "streaming",
+          status: message.status,
           attachments: message.attachments,
           replyToMessageId: message.replyToMessageId,
         };
@@ -179,6 +181,7 @@ function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessag
     superseded: entry.superseded,
     body: entry.message.text,
     streaming: entry.message.status === "streaming",
+    status: entry.message.status,
     replyToMessageId: entry.message.replyToMessageId,
     attachments: entry.message.attachments,
   };

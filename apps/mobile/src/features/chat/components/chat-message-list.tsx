@@ -2,25 +2,35 @@ import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
 import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { CornerUpRight, X } from "lucide-react-native";
-import { createContext, forwardRef, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  createContext,
+  forwardRef,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AccessibilityInfo, type CellRendererProps, FlatList, Pressable, View, type ViewStyle } from "react-native";
 import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
-  FadeIn,
   FadeInDown,
   ReduceMotion,
   useAnimatedStyle,
   useReducedMotion,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
-import {
-  BloubAvatarPreview,
-  BloubAvatarThumbnail,
-  getBloubAvatarColor,
-} from "@/features/agents/components/bloub-avatar";
+import { BloubAvatarThumbnail, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
+import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
+import { useActivityPresence } from "@/features/chat/components/use-activity-presence";
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
@@ -32,10 +42,10 @@ import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
+import { isStreamingReply } from "../model/reply-reveal";
 import { ChatAttachmentView } from "./chat-attachment";
 import { ChatMessageGesture } from "./chat-message-gesture";
-import { StreamingTailText, StreamRevealProvider } from "./streaming-tail-text";
-import { ThinkingTextGradient } from "./thinking-text-gradient";
+import { useReplyHaptics } from "./use-reply-haptics";
 
 type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }>;
 const TailLayoutContext = createContext<{ id: string | null; motion: ChatMotion } | null>(null);
@@ -80,7 +90,67 @@ const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] })
   .reduceMotion(ReduceMotion.System);
-const AGENT_MESSAGE_ENTRANCE = FadeIn.duration(240).reduceMotion(ReduceMotion.System);
+const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
+// The pill takes over from the activity row, so it fades rather than grows from nothing: its first
+// measurement is already the size of the first revealed word.
+const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
+
+function ChatBubble({
+  children,
+  agent,
+  collapsed = false,
+  className,
+  style,
+}: PropsWithChildren<{
+  agent: boolean;
+  collapsed?: boolean;
+  className: string;
+  style: ComponentProps<typeof Animated.View>["style"];
+}>) {
+  const size = useSharedValue({ width: 0, height: 0, measured: false });
+  const shown = useSharedValue(collapsed ? 0 : 1);
+  useEffect(() => {
+    shown.set(collapsed ? 0 : withTiming(1, REPLY_APPEAR));
+  }, [collapsed, shown]);
+  const background = useAnimatedStyle(() => {
+    const { width, height, measured } = size.get();
+    // The first measurement is adopted without motion; only later growth during streaming animates.
+    return {
+      opacity: shown.get(),
+      width: measured ? withTiming(width, REPLY_SIZE) : width,
+      height: measured ? withTiming(height, REPLY_SIZE) : height,
+    };
+  });
+  return (
+    <Animated.View
+      className={className}
+      style={style}
+      onLayout={
+        agent
+          ? ({ nativeEvent }) => {
+              const previous = size.get();
+              size.set({
+                width: nativeEvent.layout.width,
+                height: nativeEvent.layout.height,
+                measured: previous.measured || previous.width > 0,
+              });
+            }
+          : undefined
+      }
+    >
+      {/* Only the childless background resizes. The list measures the actual
+          content once, without a layout animation moving its native anchor. */}
+      {agent ? (
+        <Animated.View
+          pointerEvents="none"
+          className="absolute left-0 top-0 rounded-[30px] bg-control/60"
+          style={[{ borderCurve: "circular" }, background]}
+        />
+      ) : null}
+      {children}
+    </Animated.View>
+  );
+}
 
 /**
  * Matches the desktop marker. An absent mark means a request: that is what a host older than the
@@ -192,7 +262,22 @@ export function ChatMessageList({
   ]).map(String);
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && online && appActive;
-  const arrivals = useMessageArrivals(target.id, messages, animateMessages && historyState === "ready");
+  const replyHaptics = useReplyHaptics(animateMessages && historyState === "ready" && motion.responseVisible);
+  const conversationKey = JSON.stringify([target.serverId, target.kind, target.id]);
+  const replySession = useMemo(
+    () => ({ key: conversationKey, progress: new Map<string, number>(), revealed: new Set<string>() }),
+    [conversationKey],
+  );
+  const [, setRevealedCount] = useState(0);
+  const markRevealed = useCallback(
+    (id: string) => {
+      if (replySession.revealed.has(id)) return;
+      replySession.revealed.add(id);
+      setRevealedCount((count) => count + 1);
+    },
+    [replySession],
+  );
+  const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
   const userBubbleColor = getBloubAvatarColor(
     target.kind === "agent" ? target.avatarSeed : target.id,
     target.kind === "agent" ? target.avatarHue : null,
@@ -229,11 +314,32 @@ export function ChatMessageList({
       setBoundary({ firstId: visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)].id, headId });
     } else if (canLoadOlder) onLoadOlder();
   };
+  const playbackEligible = (message: VisibleMessage) =>
+    message.kind === "message" &&
+    message.author === "agent" &&
+    (message.streaming || message.status === "completed") &&
+    !message.superseded &&
+    (!message.speaker || message.speaker.kind === "agent");
+  const playbackEnabled = (message: VisibleMessage) =>
+    playbackEligible(message) &&
+    animateMessages &&
+    arrivals.has(message.id) &&
+    motion.responseVisible &&
+    !reducedMotion &&
+    !screenReaderEnabled;
+  // The activity row stands in for a reply until its first word is played back. Rendering the
+  // padded bubble before then leaves an empty pill beside the row.
+  const awaitingFirstWord = (message: VisibleMessage) =>
+    message.kind === "message" &&
+    message.body.trim().length > 0 &&
+    playbackEnabled(message) &&
+    !replySession.revealed.has(message.id) &&
+    (replySession.progress.get(message.id) ?? 0) === 0;
   const listRef = useRef<FlatList<VisibleMessage>>(null);
   const tailLayout = useMemo(() => ({ id: tailId, motion }), [tailId, motion]);
   const seekLatest = useCallback(() => {
-    if (!motion.historyVisible && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
-  }, [motion.historyVisible, visibleMessages.length]);
+    if (motion.needsInitialPosition() && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
+  }, [motion.needsInitialPosition, visibleMessages.length]);
   useEffect(() => {
     if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
   }, [tailId, motion.needsSendPosition, motion.atLatest]);
@@ -306,7 +412,7 @@ export function ChatMessageList({
             arrivals.has(message.id) && !isFirstUser
               ? message.author === "user"
                 ? USER_MESSAGE_ENTRANCE
-                : AGENT_MESSAGE_ENTRANCE
+                : undefined
               : undefined
           }
           className={
@@ -342,14 +448,16 @@ export function ChatMessageList({
             />
           ))}
           {message.body.trim() ? (
-            <Animated.View
+            <ChatBubble
+              agent={message.author === "agent"}
+              collapsed={awaitingFirstWord(message)}
               className={
                 message.author === "user"
                   ? `self-end rounded-[30px] px-4 py-3 ${target.kind === "channel" ? "bg-control/60" : ""} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
-                  : "max-w-full self-start rounded-[30px] bg-control/60 px-4 py-3"
+                  : `max-w-full self-start rounded-[30px] ${awaitingFirstWord(message) ? "" : "px-4 py-3"}`
               }
               style={[
-                { borderCurve: "circular" },
+                { borderCurve: "circular", overflow: "hidden" },
                 message.author === "user" && target.kind === "agent" ? userBubbleStyle : undefined,
               ]}
             >
@@ -358,10 +466,24 @@ export function ChatMessageList({
                 body={message.body}
                 selectable={message.author === "user"}
                 color={message.author === "user" && target.kind === "agent" ? userForeground : foreground}
-                streaming={message.author === "agent" && message.streaming}
+                playback={
+                  playbackEligible(message)
+                    ? {
+                        id: message.id,
+                        complete: message.status === "completed",
+                        progress: replySession.progress,
+                        enabled: playbackEnabled(message),
+                        onWord: (word, index) => {
+                          markRevealed(message.id);
+                          replyHaptics.onWord(word, index);
+                        },
+                        onComplete: replyHaptics.onComplete,
+                      }
+                    : undefined
+                }
                 animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
               />
-            </Animated.View>
+            </ChatBubble>
           ) : null}
         </Animated.View>
       );
@@ -406,21 +528,19 @@ export function ChatMessageList({
       </View>
     );
   };
-  const renderActivity = (activity?: MobileAgentActivity) => {
+  const pendingReveal = visibleMessages.some(awaitingFirstWord);
+  const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
     const latestThinking = messages.findLast(
-      (message) => message.kind === "thinking" && message.turnId === activity?.turnId,
+      (message) => message.kind === "thinking" && message.turnId === (activity?.turnId ?? activeTurnId),
     );
-    const thinkingDetail =
-      latestThinking?.kind === "thinking" &&
-      !messages.some(
-        (message) =>
-          message.kind === "message" &&
-          message.author === "agent" &&
-          message.streaming &&
-          (!activity?.agentId || message.speaker?.id === activity.agentId),
-      )
-        ? latestThinking.steps.at(-1)?.text
-        : null;
+    const replying = messages.some(
+      (message) =>
+        isStreamingReply(message) &&
+        message.kind === "message" &&
+        message.body.trim() &&
+        (!activity?.agentId || !message.speaker || message.speaker.id === activity.agentId),
+    );
+    const thinkingDetail = !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1)?.text : null;
     const activityLabel =
       sending && !activity
         ? "Sending…"
@@ -434,64 +554,38 @@ export function ChatMessageList({
             ? thinkingDetail
             : activity?.phase === "responding"
               ? "Responding…"
-              : activity?.detail || "Thinking…";
+              : activity?.detail || (replying ? "Responding…" : "Thinking…");
     const activityAgent = activity?.agentId
       ? agentsById.get(activity.agentId)
       : target.kind === "agent"
         ? target
         : undefined;
-    return activity || sending ? (
-      <View
-        className="flex-row items-center gap-2 px-1 py-2"
-        accessible
-        accessibilityLiveRegion="polite"
-        accessibilityRole="text"
-        key={activity?.agentId ?? "sending"}
-        accessibilityLabel={`${activityAgent?.name ?? target.name}: ${activityLabel}`}
-      >
-        {activityAgent ? (
-          <BloubAvatarPreview
-            agentId={activityAgent.id}
-            serverId={activityAgent.serverId}
-            hue={activityAgent.avatarHue}
-            seed={activityAgent.avatarSeed}
-            size={36}
-            disconnected={!online}
-            mood={animateMessages ? agentActivityMood(activity) : "idle"}
-            animateIdle={animateMessages}
-          />
-        ) : null}
-        <StreamRevealProvider>
-          <ThinkingTextGradient
-            text={activityLabel}
-            foreground={foreground ?? themeForeground}
-            muted={muted ?? themeMuted}
-            enabled={
-              animateMessages &&
-              motion.historyVisible &&
-              motion.responseVisible &&
-              !reducedMotion &&
-              activity?.phase !== "waiting"
-            }
-          >
-            <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-              <StreamingTailText
-                key={
-                  thinkingDetail && latestThinking?.kind === "thinking"
-                    ? latestThinking.steps.at(-1)?.id
-                    : activityLabel
-                }
-                body={activityLabel}
-                type="body-sm"
-                style={{ color: muted }}
-                enabled={animateMessages && motion.historyVisible && motion.responseVisible && !reducedMotion}
-              />
-            </Typography.Paragraph>
-          </ThinkingTextGradient>
-        </StreamRevealProvider>
-      </View>
-    ) : null;
+    if (!(activity || sending || messages.some(isStreamingReply) || pendingReveal)) return null;
+    return {
+      // The agent, not the signal that reported it: a turn moves from the local send flag to the
+      // host's activity to the reply without remounting the avatar.
+      key: activity?.agentId ?? activityAgent?.id ?? target.id,
+      label: activityLabel,
+      labelKey:
+        (thinkingDetail && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1)?.id : activityLabel) ??
+        activityLabel,
+      accessibilityLabel: `${activityAgent?.name ?? target.name}: ${activityLabel}`,
+      agent: activityAgent,
+      mood: animateMessages ? agentActivityMood(activity) : "idle",
+      online,
+      animateAvatar: animateMessages,
+      shimmer:
+        animateMessages &&
+        motion.historyVisible &&
+        motion.responseVisible &&
+        !reducedMotion &&
+        activity?.phase !== "waiting",
+      reveal: animateMessages && motion.historyVisible && motion.responseVisible && !reducedMotion,
+    };
   };
+  const activityRows = useActivityPresence(
+    (activities?.length ? activities : [activity]).flatMap((entry) => activitySpec(entry) ?? []),
+  );
 
   return (
     <Animated.View
@@ -530,7 +624,7 @@ export function ChatMessageList({
               {...props}
               motion={motion}
               automaticallyAdjustKeyboardInsets={false}
-              keyboardLiftBehavior="whenAtEnd"
+              keyboardLiftBehavior={motion.keyboardLiftBehavior}
               offset={keyboardOffset}
               applyWorkaroundForContentInsetHitTestBug
               blankSpace={motion.blankSpace}
@@ -554,6 +648,8 @@ export function ChatMessageList({
           }}
           onScroll={motion.onScroll}
           onScrollBeginDrag={motion.onScrollBeginDrag}
+          onScrollEndDrag={motion.onScrollEndDrag}
+          onMomentumScrollEnd={motion.onScrollEndDrag}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
@@ -600,7 +696,14 @@ export function ChatMessageList({
           ListFooterComponent={
             <>
               <Animated.View style={motion.responseStyle}>
-                {activities?.length ? activities.map(renderActivity) : renderActivity(activity)}
+                {activityRows.map((spec) => (
+                  <ChatActivityRow
+                    key={spec.key}
+                    spec={spec}
+                    foreground={foreground ?? themeForeground}
+                    muted={muted ?? themeMuted}
+                  />
+                ))}
               </Animated.View>
               {showStarter ? (
                 <View

@@ -50,22 +50,27 @@ describe("chat positioning", () => {
 });
 
 describe("streaming reveal work", () => {
-  it("bounds active nodes, exposes an oversized backlog, and releases the next work on completion", () => {
+  it("bounds active nodes and keeps revealing words even when completion callbacks are delayed", () => {
     vi.useFakeTimers();
     const pool = createStreamRevealPool();
     const skipped: number[] = [];
     const active = new Map<number, () => void>();
-    for (let id = 0; id < 20; id++) pool.add({ start: (done) => active.set(id, done), skip: () => skipped.push(id) });
-    vi.runOnlyPendingTimers();
-    vi.runOnlyPendingTimers();
+    for (let id = 0; id < 20; id++)
+      pool.add({
+        start: (done) => active.set(id, done),
+        skip: () => {
+          skipped.push(id);
+          active.delete(id);
+        },
+      });
+    for (let tick = 0; tick < 4; tick += 1) vi.runOnlyPendingTimers();
     expect({ skipped, active: [...active.keys()] }).toEqual({
       skipped: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
       active: [10, 11, 12, 13],
     });
-    active.get(10)?.();
-    active.delete(10);
     vi.runOnlyPendingTimers();
     expect([...active.keys()]).toEqual([11, 12, 13, 14]);
+    expect(skipped).toContain(10);
     pool.clear();
   });
   it("does not run queued work after it is removed or its conversation is closed", () => {

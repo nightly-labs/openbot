@@ -177,6 +177,50 @@ describe("mobile session revocation", () => {
   });
 });
 
+describe("Mobile Connect redemption", () => {
+  it("rejects a concurrent redemption from any caller and preserves the first session", async () => {
+    native.storage.clear();
+    native.storage.set("openbot.mobile.device-id.v1", "existing-device");
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<Response>();
+    native.fetch.mockImplementationOnce(() => {
+      started.resolve();
+      return response.promise;
+    });
+    const qrLogin = redeemMobileConnectUrl(qrCode);
+    await started.promise;
+    const otherCode = createMobileConnectUrl({ apiUrl: session.apiUrl, ticket: "u".repeat(32), host: session.host });
+    await expect(redeemMobileConnectUrl(otherCode)).rejects.toThrow("Another connection is in progress.");
+    expect(native.fetch).toHaveBeenCalledTimes(1);
+    expect(native.storage.has(key)).toBe(false);
+    response.resolve(Response.json(session));
+    await expect(qrLogin).resolves.toEqual(session);
+    expect(await readMobileSession()).toEqual(session);
+    // The QR animation may not have called connect yet. Saved credentials still win.
+    await expect(redeemMobileConnectUrl(otherCode)).rejects.toThrow("You are already signed in.");
+    expect(native.fetch).toHaveBeenCalledTimes(1);
+    expect(await readMobileSession()).toEqual(session);
+    native.fetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await logoutMobileSession(session);
+    await retryMobileSessionRevocations();
+    const replacement = { ...session, sessionToken: "replacement-token" };
+    native.fetch.mockResolvedValueOnce(Response.json(replacement));
+    await expect(redeemMobileConnectUrl(otherCode)).resolves.toEqual(replacement);
+    expect(await readMobileSession()).toEqual(replacement);
+  });
+
+  it("releases the shared lock after validation and network failures", async () => {
+    native.storage.clear();
+    native.storage.set("openbot.mobile.device-id.v1", "existing-device");
+    await expect(redeemMobileConnectUrl("invalid")).rejects.toThrow("not a valid OpenBot Mobile Connect code");
+    native.fetch.mockRejectedValueOnce(new Error("Offline"));
+    await expect(redeemMobileConnectUrl(qrCode)).rejects.toThrow("could not reach the account service");
+    native.fetch.mockResolvedValueOnce(Response.json(session));
+    await expect(redeemMobileConnectUrl(qrCode)).resolves.toEqual(session);
+    expect(await readMobileSession()).toEqual(session);
+  });
+});
+
 describe("stored mobile desktop binding", () => {
   it.each([
     [null, "user"],

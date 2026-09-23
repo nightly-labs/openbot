@@ -268,6 +268,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     ).map((server) => ({ ...server, notificationsMuted: this.#store.isMuted(server.id) }));
   }
 
+  /**
+   * The account service says this user's server list changed, and it reached this computer through
+   * Signal rather than through a poll. The refresh itself belongs to the caller that owns the
+   * account check, so this only says the stored list can no longer be trusted.
+   */
+  invalidateDirectory(): void {
+    this.emit("directoryInvalidated");
+  }
+
   async syncRemoteHosts(): Promise<ServerSummary[]> {
     await this.#syncWebRtcHosts();
     if (this.#events.enabled) this.startEventConnections();
