@@ -5,6 +5,7 @@ import {
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
   type AttachmentSummary,
+  agentAutoApprovalEnabled,
   canPreviewAttachment,
   channelRoutingConversationEvent,
   channelRoutingConversationEventItemType,
@@ -979,5 +980,21 @@ describe("MCP server contracts", () => {
     expect(() => decodeMcpServerConfigs(config)).toThrow();
     expect(() => decodeMcpServerConfigs([{ ...config, transport: "websocket" }])).toThrow();
     expect(() => decodeMcpServerConfigs(new Array(INPUT_LIMITS.mcpServers + 1).fill(config))).toThrow();
+  });
+});
+
+describe("agent auto-approval", () => {
+  const preference = { turbo: false, defaultAutoApprove: true, autoApproveOverrides: { chief: false } };
+
+  it("uses the agent override, then the default, and ignores inherited keys", () => {
+    expect(agentAutoApprovalEnabled(preference, "chief")).toBe(false);
+    expect(agentAutoApprovalEnabled(preference, "writer")).toBe(true);
+    expect(agentAutoApprovalEnabled(preference, "toString")).toBe(true);
+    expect(agentAutoApprovalEnabled({ ...preference, turbo: true }, "chief")).toBe(true);
+  });
+
+  it("does not approve when an override is present but not true", () => {
+    const unvalidated = JSON.parse('{"turbo":false,"defaultAutoApprove":true,"autoApproveOverrides":{"chief":null}}');
+    expect(agentAutoApprovalEnabled(unvalidated, "chief")).toBe(false);
   });
 });
