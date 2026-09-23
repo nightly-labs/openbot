@@ -28,7 +28,7 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
-import { isUsageLimitDiagnostic } from "./provider-runtime";
+import { isUsageLimitDiagnostic, PROVIDER_IDLE_RELEASE_MS } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -1953,5 +1953,51 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
     // Signed out, OpenCode keeps no client. A save must not read as a failure: the next spawn - the
     // next Connect press - reads the config.
     await expect(running.reloadOpenCodeConfig()).resolves.toBe("not-running");
+  });
+});
+
+describe.sequential("ProviderRuntime: idle release", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stops an idle provider process and resumes the same thread on the next message", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    const started = await startService(root, { provider: "codex", output: "DONE" });
+    service = started.service;
+    const running = service;
+    const first = started.client;
+    await service.sendMessage({ agentId: "chief", text: "First task." });
+    await waitFor(() => running.listQueue("chief").deliveries[0]?.status === "completed");
+    expect(first.requests.map((request) => request.method)).toContain("thread/start");
+    const session = started.store.activeProviderSession("chief")?.externalSessionId;
+    expect(session).toBeTruthy();
+
+    await vi.advanceTimersByTimeAsync(PROVIDER_IDLE_RELEASE_MS + 2 * 60_000);
+    await waitFor(() => !first.running);
+    const firstRequests = first.requests.length;
+    expect(service.getStatus().providers?.find((row) => row.id === "codex")?.state).toBe("available");
+    expect(service.getStatus().phase).toBe("ready");
+
+    // The fake hands out the same client object again, so only the requests after the restart count.
+    const afterRelease = () => first.requests.slice(firstRequests).map((request) => request.method);
+    await service.sendMessage({ agentId: "chief", text: "Second task." });
+    await waitFor(() => afterRelease().includes("turn/start"));
+    expect(started.clients.filter((made) => made.provider === "codex")).toHaveLength(2);
+    const resumed = first.requests.slice(firstRequests).find((request) => request.method === "thread/resume");
+    expect(getString(resumed?.params, "threadId")).toBe(session);
+    expect(afterRelease()).not.toContain("thread/start");
+  });
+
+  it("keeps a provider process that is running a turn", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    const started = await startService(root, { provider: "codex", output: "", autoComplete: false });
+    service = started.service;
+    const running = service;
+    await service.sendMessage({ agentId: "chief", text: "Keep working." });
+    await waitFor(async () => Boolean((await running.readConversation("chief")).activeTurnId));
+
+    await vi.advanceTimersByTimeAsync(PROVIDER_IDLE_RELEASE_MS + 2 * 60_000);
+    expect(started.client.running).toBe(true);
   });
 });
