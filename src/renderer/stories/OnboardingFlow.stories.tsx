@@ -5,6 +5,7 @@ import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { OnboardingFlow } from "../src/features/onboarding/OnboardingFlow";
+import { providerKeyApi } from "../src/features/settings/provider-key-api";
 import { createFakeCodeLogin } from "./code-login-fixture";
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
@@ -135,10 +136,37 @@ function RefreshResettingFlow(props: { args: Parameters<typeof OnboardingFlow>[0
   );
 }
 
-function LazyProviderDownloadsFlow(props: { args: Parameters<typeof OnboardingFlow>[0]; failGrokOnce?: boolean }) {
-  const [agentStatus, setAgentStatus] = createSignal(lazyProviderAgentStatus);
-  const [runtimeStatuses, setRuntimeStatuses] = createSignal(initialRuntimeStatuses());
+/** ChatGPT, Claude and Grok downloaded and waiting to connect; OpenCode still to download. */
+const downloadedAgentStatus: AgentStatus = {
+  ...lazyProviderAgentStatus,
+  providers: lazyProviderAgentStatus.providers?.map((provider) =>
+    provider.id === "opencode" ? provider : { ...provider, state: "sign-in-required" },
+  ),
+};
+
+const downloadedRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStatus> => ({
+  ...initialRuntimeStatuses(),
+  codex: { phase: "ready", progress: 100, message: null, version: "0.149.1" },
+  claude: { phase: "ready", progress: 100, message: null, version: "2.1.246" },
+  grok: { phase: "ready", progress: 100, message: null, version: "1.0.5" },
+});
+
+function LazyProviderDownloadsFlow(props: {
+  args: Parameters<typeof OnboardingFlow>[0];
+  failGrokOnce?: boolean;
+  downloaded?: boolean;
+}) {
+  const [agentStatus, setAgentStatus] = createSignal(
+    props.downloaded ? downloadedAgentStatus : lazyProviderAgentStatus,
+  );
+  const [runtimeStatuses, setRuntimeStatuses] = createSignal(
+    props.downloaded ? downloadedRuntimeStatuses() : initialRuntimeStatuses(),
+  );
   const [grokFailed, setGrokFailed] = createSignal(false);
+  // One offer, so the row actions menu shows both an Update and an "Up to date".
+  const [availableVersions, setAvailableVersions] = createSignal<Partial<Record<AgentProviderId, string | null>>>({
+    claude: "2.1.250",
+  });
   const providerTimers = new Map<AgentProviderId, Set<number>>();
 
   function rememberTimer(provider: AgentProviderId, timer: number): number {
@@ -212,6 +240,25 @@ function LazyProviderDownloadsFlow(props: { args: Parameters<typeof OnboardingFl
     rememberTimer(provider, interval);
   }
 
+  function installUpdate(provider: AgentProviderId): void {
+    const version = availableVersions()[provider] ?? null;
+    clearProviderTimers(provider);
+    setAvailableVersions((current) => ({ ...current, [provider]: null }));
+    updateRuntime(provider, { phase: "downloading", progress: 0 });
+    let progress = 0;
+    const interval = window.setInterval(() => {
+      progress = Math.min(100, progress + 10);
+      if (progress < 100) {
+        updateRuntime(provider, { phase: "downloading", progress });
+        return;
+      }
+      window.clearInterval(interval);
+      providerTimers.delete(provider);
+      updateRuntime(provider, { phase: "ready", progress: 100, version });
+    }, 160);
+    rememberTimer(provider, interval);
+  }
+
   function cancelProviderDownload(provider: AgentProviderId): void {
     clearProviderTimers(provider);
     updateRuntime(provider, { phase: "not-downloaded", progress: null });
@@ -239,11 +286,15 @@ function LazyProviderDownloadsFlow(props: { args: Parameters<typeof OnboardingFl
         ...props.args,
         agentStatus: agentStatus(),
         providerRuntimeStatuses: runtimeStatuses(),
+        providerAvailableVersions: availableVersions(),
+        onUpdateProvider: installUpdate,
         onDownloadProvider: downloadProvider,
         onCancelProviderDownload: cancelProviderDownload,
         onConnectProvider: connectProvider,
         onInstallProvider: fn(),
         onRefreshProviders: undefined,
+        providerKeys: providerKeyApi,
+        codeLogin: createFakeCodeLogin({ finishAfterMs: 0 }),
       }}
     />
   );
@@ -361,7 +412,7 @@ export const NoProvidersConnected: Story = {
     await expect(storyArgs.onConnectProvider).toHaveBeenCalledWith("claude");
     await expect(storyArgs.onConnectProvider).toHaveBeenCalledWith("grok");
     await expect(storyArgs.onRefreshProviders).toHaveBeenCalledOnce();
-    await expect(canvas.getByRole("button", { name: "Next" })).toBeDisabled();
+    await expect(canvas.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   },
 };
 
@@ -378,7 +429,7 @@ export const SignInWithCode: Story = {
     codeLogin: createFakeCodeLogin({ finishAfterMs: 0 }),
   },
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "More ways to log in to ChatGPT" }));
+    await userEvent.click(canvas.getByRole("button", { name: "More actions for ChatGPT" }));
     const body = within(document.body);
     await userEvent.click(await body.findByRole("menuitem", { name: "Log in with code" }));
     await expect(await body.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
@@ -401,7 +452,7 @@ export const RefreshingProviders: Story = {
     await expect(canvas.getByRole("button", { name: "Connect Grok" })).toBeDisabled();
     await expect(within(providers).getByRole("radio", { name: /ChatGPT/ })).toBeEnabled();
     await expect(within(providers).getByRole("radio", { name: /Claude/ })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Next" })).toBeDisabled();
+    await expect(canvas.getByRole("button", { name: "Connect" })).toBeEnabled();
   },
 };
 
@@ -438,7 +489,7 @@ export const ConnectingChatGPT: Story = {
     await expect(canvas.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
     await expect(canvas.getByRole("button", { name: "Connect Claude" })).toBeEnabled();
     await expect(canvas.getByRole("button", { name: "Refresh providers" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Next" })).toBeDisabled();
+    await expect(canvas.getByRole("button", { name: "Connect" })).toBeEnabled();
   },
 };
 
@@ -457,7 +508,7 @@ export const ConnectingClaude: Story = {
     await expect(canvas.getByRole("button", { name: "Restart Claude" })).toBeEnabled();
     await expect(canvas.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled();
     await expect(canvas.getByRole("button", { name: "Refresh providers" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Next" })).toBeDisabled();
+    await expect(canvas.getByRole("button", { name: "Connect" })).toBeEnabled();
   },
 };
 
@@ -519,4 +570,15 @@ export const LazyProviderDownloadsWithFailure: Story = {
     agentStatus: lazyProviderAgentStatus,
   },
   render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} failGrokOnce />,
+};
+
+/**
+ * The whole step to press through: the rows connect after a short wait, OpenCode still downloads,
+ * and the main button connects the selected provider and says so in a toast.
+ */
+export const Interactive: Story = {
+  args: {
+    agentStatus: downloadedAgentStatus,
+  },
+  render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} downloaded />,
 };

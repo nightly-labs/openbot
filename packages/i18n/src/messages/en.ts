@@ -156,7 +156,8 @@ export const en = {
   "provider.action.reconnect": "Reconnect",
   "provider.action.restart": "Restart",
   "provider.action.retry": "Retry",
-  "provider.action.update": "Update",
+  "provider.action.updateTo": "Update to {version}",
+  "provider.action.upToDate": "Up to date",
   "provider.action.install": "Install",
   "provider.action.signIn": "Sign in",
   "provider.action.signInWithCode": "Log in with code",
@@ -167,10 +168,9 @@ export const en = {
   "provider.aria.reconnect": "Reconnect {name}",
   "provider.aria.restart": "Restart {name}",
   "provider.aria.retry": "Retry {name}",
-  "provider.aria.update": "Update {name} to {version}",
   "provider.aria.install": "Install {name}",
   "provider.aria.signIn": "Sign in to {name}",
-  "provider.aria.moreSignIn": "More ways to log in to {name}",
+  "provider.aria.moreActions": "More actions for {name}",
   "provider.aria.signInWithCode": "Log in to {name} with a code on another device",
 } as const satisfies MessageCatalog;
 
