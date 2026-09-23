@@ -3,16 +3,10 @@ import { onCleanup } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
-import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-function requireStoryAgent() {
-  const [agent] = STORY_AGENTS;
-  if (!agent) throw new Error("The story fixtures have no agent.");
-  return agent;
-}
-
-const storyAgent = requireStoryAgent();
+const storyAgent = STORY_AGENT;
 
 const chiefMemories: AgentMemory[] = [
   {

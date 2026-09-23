@@ -7,7 +7,7 @@ import { createSignal, untrack } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
-import { STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
+import { requireFixture, STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
 
 const agentStates: Record<string, SidebarAgentState> = {
   chief: { kind: "working" },
@@ -83,9 +83,7 @@ const stressAgents = [
   }),
 ];
 function stressSectionId(index: number): string {
-  const sectionId = stressSectionIds[index % stressSectionIds.length];
-  if (!sectionId) throw new Error("The stress layout has no sections.");
-  return sectionId;
+  return requireFixture(stressSectionIds[index % stressSectionIds.length], "Stress section");
 }
 const stressLayout: SidebarLayoutSnapshot = {
   revision: 1,

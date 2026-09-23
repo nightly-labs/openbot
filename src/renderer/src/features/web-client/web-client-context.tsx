@@ -821,6 +821,11 @@ export function createWebWorkspace(props: {
         try {
           const attachment = await runtime.upload(file);
           if (current !== generation || disposed) return;
+          // The agent was removed during the upload, so the host must not keep the file.
+          if (!state.conversations[id]) {
+            await runtime.discard(attachment.id);
+            return;
+          }
           setState((draft) => {
             draft.conversations[id]?.attachments.push(attachment);
           });

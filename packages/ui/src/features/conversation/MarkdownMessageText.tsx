@@ -591,10 +591,9 @@ function incompleteEmphasisMarkerTokenIndexes(tokens: Token[]): Set<number> {
     (start, end) => owners[start] !== -1 && owners[start] === owners[end - 1],
   );
   return new Set(
-    markers.flatMap((marker) => {
-      const owner = owners[marker.index];
-      return owner === undefined || owner === -1 ? [] : [owner];
-    }),
+    markers
+      .map((marker) => owners[marker.index])
+      .filter((owner): owner is number => owner !== undefined && owner !== -1),
   );
 }
 

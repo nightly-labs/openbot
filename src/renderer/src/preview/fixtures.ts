@@ -113,10 +113,14 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   preview: agent.preview,
 }));
 
-const [firstStoryAgent] = STORY_AGENTS;
-if (!firstStoryAgent) throw new Error("Story agent fixtures are empty.");
+/** Returns a fixture item that a story reads by index. A missing item means a fixture edit broke the story. */
+export function requireFixture<T>(value: T | undefined, name: string): T {
+  if (value === undefined) throw new Error(`${name} is missing from the story fixtures.`);
+  return value;
+}
+
 /** The agent that single-agent stories show. */
-export const STORY_AGENT: AgentProfile = firstStoryAgent;
+export const STORY_AGENT: AgentProfile = requireFixture(STORY_AGENTS[0], "Story agent");
 
 export const STORY_SHARED_TABLES: SharedTable[] = [
   { name: "citations", ownerAgentId: "research", rowCount: null },

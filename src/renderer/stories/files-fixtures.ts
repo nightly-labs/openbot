@@ -7,7 +7,7 @@ import type {
   StoredFileSource,
   StoredFileStatus,
 } from "@openbot/ui/features/files/files-view";
-import { STORY_AGENTS } from "./fixtures";
+import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 /** The fixed clock of every Files story, so "Today" and "Yesterday" do not move with the run date. */
 export const FILES_NOW = new Date("2026-09-23T15:00:00");
@@ -390,9 +390,7 @@ export const FILES_STATUS_ROWS: StoredFileRow[] = [
 ];
 
 function filesRow(index: number): StoredFileRow {
-  const row = FILES_ROWS[index];
-  if (!row) throw new Error(`Files fixture row ${index} is missing.`);
-  return row;
+  return requireFixture(FILES_ROWS[index], `Files row ${index}`);
 }
 
 export const FILES_LONG_NAME_ROWS: StoredFileRow[] = [

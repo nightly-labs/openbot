@@ -3,15 +3,10 @@ import { DirectConversation } from "@openbot/ui/features/conversation/DirectConv
 import { createEffect, createSignal } from "solid-js";
 import { expect, fireEvent, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { STORY_DIRECT_SNAPSHOTS, STORY_PRESENCE } from "./fixtures";
+import { requireFixture, STORY_DIRECT_SNAPSHOTS, STORY_PRESENCE } from "./fixtures";
 
-function required<T>(value: T | undefined, name: string): T {
-  if (value === undefined) throw new Error(`${name} is missing.`);
-  return value;
-}
-
-const member = required(STORY_PRESENCE.members[1], "Story presence member");
-const memberSnapshot = required(STORY_DIRECT_SNAPSHOTS[member.id], "Story direct snapshot");
+const member = requireFixture(STORY_PRESENCE.members[1], "Story presence member");
+const memberSnapshot = requireFixture(STORY_DIRECT_SNAPSHOTS[member.id], "Story direct snapshot");
 const unreadDirectMessages: DirectMessage[] = [
   ...Array.from({ length: 12 }, (_, index): DirectMessage => {
     const own = index % 2 === 0;

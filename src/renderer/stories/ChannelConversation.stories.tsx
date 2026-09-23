@@ -10,7 +10,7 @@ import type { JSX } from "@solidjs/web";
 import { createStore, For, Show } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { STORY_AGENTS } from "./fixtures";
+import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 /*
  * The channel transcript, drawn from the shared row.
@@ -27,15 +27,9 @@ import { STORY_AGENTS } from "./fixtures";
  * agree.
  */
 
-function storyAgent(index: number) {
-  const agent = STORY_AGENTS[index];
-  if (!agent) throw new Error(`Story agent ${index} is missing.`);
-  return agent;
-}
-
-const chief = storyAgent(0);
-const sales = storyAgent(1);
-const research = storyAgent(2);
+const chief = requireFixture(STORY_AGENTS[0], "Story agent 0");
+const sales = requireFixture(STORY_AGENTS[1], "Story agent 1");
+const research = requireFixture(STORY_AGENTS[2], "Story agent 2");
 
 interface Row {
   id: string;

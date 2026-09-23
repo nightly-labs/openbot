@@ -5,7 +5,7 @@ import type { MessageCitation } from "@openbot/ui/data";
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { STORY_AGENTS, STORY_ATTACHMENTS, STORY_INSTALLED_SKILLS } from "./fixtures";
+import { requireFixture, STORY_AGENTS, STORY_ATTACHMENTS, STORY_INSTALLED_SKILLS } from "./fixtures";
 
 const args: Parameters<typeof RichMessageText>[0] = {
   body: "Ask @Research to review https://openbot.run/docs before the launch.",
@@ -73,16 +73,10 @@ const fileTypeAttachments: AttachmentSummary[] = fileTypeInputs.map(
   }),
 );
 
-function requireAttachment(items: readonly AttachmentSummary[], index: number): AttachmentSummary {
-  const attachment = items[index];
-  if (!attachment) throw new Error(`Story attachment ${index} is missing.`);
-  return attachment;
-}
-
-const firstStoryAttachment = requireAttachment(STORY_ATTACHMENTS, 0);
-const secondStoryAttachment = requireAttachment(STORY_ATTACHMENTS, 1);
-const secondFileTypeAttachment = requireAttachment(fileTypeAttachments, 1);
-const fourthFileTypeAttachment = requireAttachment(fileTypeAttachments, 3);
+const firstStoryAttachment = requireFixture(STORY_ATTACHMENTS[0], "Story attachment 0");
+const secondStoryAttachment = requireFixture(STORY_ATTACHMENTS[1], "Story attachment 1");
+const secondFileTypeAttachment = requireFixture(fileTypeAttachments[1], "File type attachment 1");
+const fourthFileTypeAttachment = requireFixture(fileTypeAttachments[3], "File type attachment 3");
 
 const meta = {
   title: "Conversation/RichMessageText",

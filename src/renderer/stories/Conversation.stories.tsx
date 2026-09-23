@@ -26,6 +26,7 @@ import { UsageProvider } from "../src/features/usage/usage-context";
 import { PlatformProvider } from "../src/platform";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import {
+  requireFixture,
   STORY_AGENT_STATUS,
   STORY_AGENTS,
   STORY_ATTACHMENTS,
@@ -37,13 +38,7 @@ import {
 } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-function requireFirst<T>(items: readonly T[], name: string): T {
-  const [first] = items;
-  if (first === undefined) throw new Error(`${name} is missing.`);
-  return first;
-}
-
-const storyAttachment = requireFirst(STORY_ATTACHMENTS, "Story attachment");
+const storyAttachment = requireFixture(STORY_ATTACHMENTS[0], "Story attachment");
 
 const messages: RendererAgentMessage[] = STORY_CONVERSATION_MESSAGES.map((message) => ({
   id: message.id,

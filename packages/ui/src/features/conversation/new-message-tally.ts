@@ -57,8 +57,8 @@ export function tallyNewMessages(
   if (anchorIndex < 0) return { count: previous.count, anchorId: latestId };
   let arrived = 0;
   // A body that grows while it streams, and an older page that only prepends, both add nothing.
-  for (const row of rows.slice(anchorIndex + 1)) {
-    if (row.countable) arrived += 1;
+  for (let index = anchorIndex + 1; index < rows.length; index += 1) {
+    if (rows[index]?.countable) arrived += 1;
   }
   return { count: previous.count + arrived, anchorId: latestId };
 }
