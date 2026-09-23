@@ -163,7 +163,7 @@ function LazyProviderDownloadsFlow(props: {
     props.downloaded ? downloadedRuntimeStatuses() : initialRuntimeStatuses(),
   );
   const [grokFailed, setGrokFailed] = createSignal(false);
-  // One offer, so the row actions menu shows both an Update and an "Up to date".
+  // One offer, so the row actions menu shows both an Update and a "Check for updates".
   const [availableVersions, setAvailableVersions] = createSignal<Partial<Record<AgentProviderId, string | null>>>({
     claude: "2.1.250",
   });

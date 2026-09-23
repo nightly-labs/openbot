@@ -105,6 +105,92 @@ describe("ProviderRuntimeManager", () => {
     },
   );
 
+  /*
+   * The lock is only where a first install starts. A check asks upstream, and a newer release is
+   * offered and installed without a new OpenBot build. x.ai publishes no hash for Grok, so this is
+   * the path with TLS alone behind it; the record written at install is what a restart checks.
+   */
+  it("installs the latest upstream release and verifies it again after a restart", async () => {
+    const root = await temporaryRoot();
+    const fixture = latestGrokFixture("1.0.30");
+    const manager = latestGrokManager(root, fixture);
+    await manager.initialize();
+    manager.setSystemVersion("grok", fixture.lock.grok.version);
+    expect(manager.getStatus().providers.grok.availableVersion).toBeNull();
+
+    const checked = await manager.checkForUpdates();
+    expect(checked.providers.grok.availableVersion).toBe("1.0.30");
+    await manager.downloadAndWait("grok");
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.30" });
+    await manager.stop();
+
+    const restarted = latestGrokManager(root, fixture);
+    expect((await restarted.initialize()).providers.grok).toMatchObject({ phase: "ready", version: "1.0.30" });
+    const executable = restarted.executablePath("grok");
+    if (!executable) throw new Error("The managed Grok path is missing.");
+    expect(executable).toBe(join(root, "grok", "darwin-arm64", "1.0.30", "bin", "grok"));
+
+    // A file added after install is not in the record, so the install is not used.
+    const added = join(root, "grok", "darwin-arm64", "1.0.30", "bin", "added");
+    await writeFile(added, "#!/bin/sh\n");
+    const extended = latestGrokManager(root, fixture);
+    expect((await extended.initialize()).providers.grok.phase).not.toBe("ready");
+    await rm(added);
+
+    // A binary changed after install no longer matches its record, so it is not started.
+    await writeFile(executable, "#!/bin/sh\necho 1.0.30\n# changed\n");
+    const tampered = latestGrokManager(root, fixture);
+    expect((await tampered.initialize()).providers.grok.phase).not.toBe("ready");
+  });
+
+  it("does not offer a release the block list names", async () => {
+    const root = await temporaryRoot();
+    const fixture = latestGrokFixture("1.0.30", ["1.0.30"]);
+    const manager = latestGrokManager(root, fixture);
+    await manager.initialize();
+    manager.setSystemVersion("grok", "1.0.21");
+
+    const checked = await manager.checkForUpdates();
+
+    expect(checked.providers.grok.availableVersion).toBe(fixture.lock.grok.version);
+  });
+
+  it("does not retry a failed update back to an older version once the newer one is blocked", async () => {
+    const root = await temporaryRoot();
+    const fixture = latestGrokFixture("1.0.30");
+    const manager = latestGrokManager(root, fixture);
+    await manager.initialize();
+    await manager.checkForUpdates();
+    await manager.downloadAndWait("grok");
+
+    // 1.0.31 reports another version, so its install fails and 1.0.30 stays.
+    fixture.version = "1.0.31";
+    fixture.executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.30\n${"# runtime\n".repeat(1_000)}`);
+    await manager.checkForUpdates();
+    await expect(manager.downloadAndWait("grok")).rejects.toThrow();
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "download-error", version: "1.0.30" });
+
+    fixture.blocked = ["1.0.31"];
+    await manager.checkForUpdates();
+    await manager.downloadAndWait("grok");
+
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.30" });
+    expect(manager.executablePath("grok")).toBe(join(root, "grok", "darwin-arm64", "1.0.30", "bin", "grok"));
+  });
+
+  it("reports a check that no release source answered", async () => {
+    const root = await temporaryRoot();
+    const manager = new ProviderRuntimeManager({
+      root,
+      platform: "darwin",
+      architecture: "arm64",
+      fetchImpl: async () => new Response(null, { status: 503 }),
+    });
+    await manager.initialize();
+
+    await expect(manager.checkForUpdates()).rejects.toThrow("could not reach the provider release sources");
+  });
+
   it("offers the pinned version to an older CLI the user installed", async () => {
     const root = await temporaryRoot();
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64" });
@@ -1123,6 +1209,41 @@ function grokFixture(): {
   lock.grok.licenseSha256 = digest(license);
   lock.grok.noticesSha256 = digest(notices);
   return { executable, license, notices, lock };
+}
+
+/** Grok's pinned fixture, with x.ai announcing `version` as stable and every other source down. */
+function latestGrokFixture(version: string, blocked: string[] = []) {
+  const fixture = grokFixture();
+  const executable = new TextEncoder().encode(`#!/bin/sh\necho ${version}\n${"# runtime\n".repeat(1_000)}`);
+  return { ...fixture, version, executable, blocked };
+}
+
+function latestGrokManager(root: string, fixture: ReturnType<typeof latestGrokFixture>): ProviderRuntimeManager {
+  return new ProviderRuntimeManager({
+    root,
+    platform: "darwin",
+    architecture: "arm64",
+    lock: fixture.lock,
+    fetchImpl: async (input, init) => {
+      const url = String(input);
+      if (url === "https://x.ai/cli/stable") return new Response(`${fixture.version}\n`);
+      if (url.endsWith("/provider-runtime-blocklist.json")) {
+        return Response.json({ schemaVersion: 1, blocked: { grok: fixture.blocked } });
+      }
+      if (url.endsWith("/LICENSE")) return new Response(fixture.license);
+      if (url.endsWith("/THIRD-PARTY-NOTICES")) return new Response(fixture.notices);
+      if (url === `https://x.ai/cli/grok-${fixture.version}-macos-aarch64`) {
+        if (new Headers(init?.headers).get("Range") === "bytes=0-0") {
+          return new Response(fixture.executable.slice(0, 1), {
+            status: 206,
+            headers: { "content-range": `bytes 0-0/${fixture.executable.byteLength}` },
+          });
+        }
+        return chunkedResponse(fixture.executable, 1_024);
+      }
+      return new Response(null, { status: 404 });
+    },
+  });
 }
 
 /** Six hours is the staging threshold and thirty days the version one; both are cleared here. */

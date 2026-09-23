@@ -144,7 +144,6 @@ explicit threat-model note in the pull request.
 
 Prefer the platform and existing dependencies. A new runtime dependency should remove more
 complexity than it adds, have a compatible open-source license, and be justified in the pull request.
-Keep tool versions pinned; compatibility upgrades should be isolated and verified by the full check.
 
 ## Licensing
 

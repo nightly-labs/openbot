@@ -40,6 +40,7 @@ export const IPC_CHANNELS = {
   providerRuntimesGetStatus: "provider-runtimes:get-status",
   providerRuntimesDownload: "provider-runtimes:download",
   providerRuntimesCancel: "provider-runtimes:cancel",
+  providerRuntimesCheckForUpdates: "provider-runtimes:check-for-updates",
   providerRuntimesEvent: "provider-runtimes:event",
   openUrl: "app:open-url",
   voiceGetModelStatus: "voice:get-model-status",

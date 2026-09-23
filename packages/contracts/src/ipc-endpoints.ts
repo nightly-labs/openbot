@@ -71,6 +71,7 @@ export const IPC_ENDPOINTS = {
     getStatus: request(IPC_CHANNELS.providerRuntimesGetStatus),
     download: request(IPC_CHANNELS.providerRuntimesDownload),
     cancel: request(IPC_CHANNELS.providerRuntimesCancel),
+    checkForUpdates: request(IPC_CHANNELS.providerRuntimesCheckForUpdates),
     event: event(IPC_CHANNELS.providerRuntimesEvent),
   },
   voice: {

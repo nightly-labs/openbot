@@ -281,10 +281,26 @@ would refuse.
 
 ## Provider CLI updates
 
-The runtime manager downloads and verifies the CLI version pinned by OpenBot. The provider runtime
-holds new turns while it installs and activates that managed executable. It keeps the previous client
-until the candidate is ready; activation failure removes the rejected artifact and preserves the old
-runtime. Download status stays `finishing` until activation succeeds.
+The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
+every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
+`releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, and `x.ai/cli/stable`
+for Grok. The version in `native-runtime.lock.json` is what a first install uses before a check has
+answered, and Bun, which is a tool runtime and not a provider, stays on it.
+
+Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
+Codex and npm `dist.integrity` for Claude and OpenCode. x.ai publishes no hash, so a Grok release
+is trusted on TLS alone. An upstream install writes `openbot-install.json` with the SHA-256 of each
+file it installed, and every start verifies that record and the binary's `--version` before the
+install is used. The newest version in the store that verifies is the one that runs.
+
+`provider-runtime-blocklist.json` on `main` names versions no installation may offer. It stops a
+broken upstream release without an OpenBot release. It suppresses an offer only: it does not remove
+a version a user already installed. A list that cannot be read blocks nothing.
+
+The provider runtime holds new turns while it installs and activates that managed executable. It
+keeps the previous client until the candidate is ready; activation failure removes the rejected
+artifact and preserves the old runtime, so a release that does not start leaves the last working CLI
+in use. Download status stays `finishing` until activation succeeds.
 
 CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
 automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
@@ -293,7 +309,7 @@ suppresses managed update offers. Startup uses the same selection and reads the 
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
 per renderer port and per `--isolated` worktree, so a store inside `userData` started empty in each
-one, fell back to the user's own CLI, and offered and downloaded the pinned copy again. An explicit
+one, fell back to the user's own CLI, and offered and downloaded the managed copy again. An explicit
 `--user-data-dir` still keeps its own store, so automation and packaged smoke checks stay
 self-contained. Partial downloads stay in the profile: two instances appending to one `.partial`
 would interleave their bytes.
@@ -303,7 +319,7 @@ released build sweeps every `.installing-` directory it finds when it starts, wh
 whoever is filling it, so this build stages under `.staging-` and keeps the older prefix only to
 collect what those builds abandon.
 
-Installing a pinned version is idempotent, so a commit that finds the destination occupied verifies
+Installing a version is idempotent, so a commit that finds the destination occupied verifies
 it and adopts it instead of replacing it, and only a destination that fails verification is moved
 aside. That replacement is claimed first, with a lock directory beside the staging ones. The claim
 is built away from the path, with the name of its owner already inside it, and moved onto the path

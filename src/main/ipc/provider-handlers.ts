@@ -61,6 +61,7 @@ export function providerIpcHandlers({
       getStatus: handler(() => providerRuntimes.getStatus()),
       download: payloadHandler(parseManagedProviderId, (parsed) => providerRuntimes.download(parsed)),
       cancel: payloadHandler(parseManagedProviderId, (parsed) => providerRuntimes.cancel(parsed)),
+      checkForUpdates: handler(() => providerRuntimes.checkForUpdates()),
     },
   };
 }

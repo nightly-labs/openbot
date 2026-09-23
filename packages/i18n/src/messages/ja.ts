@@ -164,7 +164,7 @@ export const ja = {
   "provider.action.restart": "再起動",
   "provider.action.retry": "再試行",
   "provider.action.updateTo": "{version} にアップデート",
-  "provider.action.upToDate": "最新です",
+  "provider.action.checkForUpdates": "アップデートを確認",
   "provider.action.install": "インストール",
   "provider.action.signIn": "サインイン",
   "provider.action.signInWithCode": "コードでログイン",

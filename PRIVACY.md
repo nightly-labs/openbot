@@ -263,6 +263,11 @@ Network traffic can also occur when:
   the grant the browser returns, and to renew the token. Nothing about the user's agents,
   conversations or files is sent in those requests;
 - an installed build checks GitHub Releases for updates;
+- OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
+  `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude and
+  OpenCode, and `x.ai/cli` for Grok, and it reads a list of blocked versions from
+  `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
+  conversation or file data;
 - a user opens an explicitly labeled external support or setup link.
 
 Plugin pages on openbot.run show each listing's own icon. The page asks `openbot.run` for that
@@ -345,7 +350,7 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 
 ### OpenCode
 
-OpenBot downloads the pinned OpenCode CLI from `registry.npmjs.org` and its license from
+OpenBot downloads the OpenCode CLI from `registry.npmjs.org` and its license from
 `github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
 results go to that local process. OpenCode can send them to the model provider selected in its
 configuration. OpenCode's free models are the default, and they reach OpenCode Go with no account,
