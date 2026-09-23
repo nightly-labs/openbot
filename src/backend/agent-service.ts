@@ -102,7 +102,6 @@ import {
   responseAttachmentMessageId,
 } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
-import { DEVELOPMENT_DEFAULT_PROVIDER, developmentStartingModel } from "./agent/development-defaults";
 import { DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./agent/drain-scheduler";
 import { DuplicationGate } from "./agent/duplication-gate";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
@@ -110,6 +109,7 @@ import { isHostedSiteMutationTool } from "./agent/hosted-site-events";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
+import { creationModel, type ProviderPreference, startingChoice, startingModel } from "./agent/model-choice";
 import { ProfileClients } from "./agent/profile-clients";
 import { generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
 import { ProfileSave } from "./agent/profile-save";
@@ -1014,7 +1014,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const models = this.#availableModels();
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
-      : this.#startingModel(provider, models);
+      : startingModel(provider, models, this.#preference());
     if (!model) throw new Error("The selected provider has no available model.");
     if (this.#stopping) throw new Error("OpenBot is shutting down.");
     if (this.#profileClients.busy()) throw new Error("Profile generation is busy. Try again shortly.");
@@ -1033,76 +1033,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.preferredProvider();
   }
 
-  /**
-   * The model a new agent, or a profile draft with no agent, starts on for `provider`.
-   *
-   * Setup records a model beside the preferred provider, so that model comes first -- but only while
-   * the CLI still lists it, because the list is the provider's answer and a saved id can name an
-   * endpoint or a model that is gone. After it come the provider's own default and then whatever it
-   * does list; `null` means it listed nothing at all.
-   */
-  #startingModel(provider: AgentProvider, models: AgentModelOption[]): AgentModelOption | null {
-    const listed = (id: AgentModelId) => models.find((model) => model.provider === provider && model.id === id);
-    const preferred = this.#providers.preferredModel();
-    const chosen = preferred !== null && provider === this.#providers.preferredProvider() ? listed(preferred) : null;
-    return (
-      chosen ?? listed(defaultProviderModel(provider)) ?? models.find((model) => model.provider === provider) ?? null
-    );
-  }
-
-  /**
-   * The provider and model a creation request names, resolved against what the CLIs list right now,
-   * or `null` when the request names neither. A named model must be listed for the named provider;
-   * a lone provider takes its default when listed, else whatever it lists first.
-   */
-  #creationModel(input: CreateAgentInput): { provider: AgentProvider; model: AgentModelOption } | null {
-    const { provider, model: requestedId } = input;
-    if (provider === undefined && requestedId === undefined) return null;
-    const models = this.#availableModels();
-    if (requestedId !== undefined) {
-      const model = models.find(
-        (candidate) => candidate.id === requestedId && (provider === undefined || candidate.provider === provider),
-      );
-      if (!model) throw new Error("The selected agent model is unavailable.");
-      if (provider !== undefined && model.provider !== provider) {
-        throw new Error("The selected model does not belong to that provider.");
-      }
-      return { provider: model.provider, model };
-    }
-    if (provider === undefined) return null;
-    const model =
-      models.find((candidate) => candidate.provider === provider && candidate.id === defaultProviderModel(provider)) ??
-      models.find((candidate) => candidate.provider === provider) ??
-      null;
-    if (!model) throw new Error(`${providerLabel(provider)} has no available model.`);
-    return { provider, model };
-  }
-
-  /**
-   * The provider and model a new agent starts on, or `null` when the preferred provider lists
-   * nothing at all.
-   *
-   * `#startingModel` answers for one provider; this one chooses the provider too, which is what a
-   * development default needs: the model it names belongs to OpenCode, and a preferred provider of
-   * Codex would never list it.
-   *
-   * That default stands in for the built-in one and nothing else. A preferred provider that is not
-   * the built-in one, or a model recorded beside it, is the developer's own choice and is left as
-   * it is.
-   */
-  #startingChoice(models: AgentModelOption[]): { provider: AgentProvider; model: AgentModelOption } | null {
-    const preferredProvider = this.#providers.preferredProvider();
-    const development =
-      preferredProvider === DEFAULT_AGENT_PROVIDER && this.#providers.preferredModel() === null
-        ? developmentStartingModel({
-            enabled: this.#developmentDefaults,
-            models,
-            providerAvailable: (provider) => this.#providerAvailable(provider),
-          })
-        : null;
-    if (development) return { provider: DEVELOPMENT_DEFAULT_PROVIDER, model: development };
-    const model = this.#startingModel(preferredProvider, models);
-    return model ? { provider: preferredProvider, model } : null;
+  /** The provider and model setup or Settings recorded. */
+  #preference(): ProviderPreference {
+    return { provider: this.#providers.preferredProvider(), model: this.#providers.preferredModel() };
   }
 
   async createAgent(
@@ -1118,7 +1051,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       await this.#prepareAgentWorkspace(agent);
       // A named pair lands before the initial message is queued: a provider change afterwards is
       // rejected while the delivery or turn is active, so a follow-up update could never apply it.
-      const requested = this.#creationModel(input);
+      const requested = creationModel(input, this.#availableModels());
       if (requested) {
         agent = await this.#store.updateAgent({
           agentId: agent.id,
@@ -1130,7 +1063,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               : requested.model.defaultReasoningEffort,
         });
       } else {
-        const starting = this.#startingChoice(this.#availableModels());
+        const starting = startingChoice(this.#availableModels(), this.#preference(), {
+          enabled: this.#developmentDefaults,
+          providerAvailable: (provider) => this.#providerAvailable(provider),
+        });
         // The provider a start lands on, even when it lists no model: the throw below names the
         // provider the developer expected, and a preferred provider that equals the record's own is
         // still the no-op it always was.
@@ -1611,8 +1547,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // there. That would trap a user who runs custom endpoints only, because the last endpoint could
     // never be removed while an agent still names one of its models.
     const fallback =
-      this.#startingModel("opencode", remaining) ??
-      (this.#providerAvailable(DEFAULT_AGENT_PROVIDER) ? this.#startingModel(DEFAULT_AGENT_PROVIDER, remaining) : null);
+      startingModel("opencode", remaining, this.#preference()) ??
+      (this.#providerAvailable(DEFAULT_AGENT_PROVIDER)
+        ? startingModel(DEFAULT_AGENT_PROVIDER, remaining, this.#preference())
+        : null);
     // Nothing is listed, so there is no model to move to. The removal still goes ahead: refusing it
     // would trap the user on an endpoint that may be the reason no model is listed.
     if (!fallback) return;
