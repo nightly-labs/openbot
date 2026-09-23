@@ -555,6 +555,14 @@ describe("directory refresh", () => {
     expect(load).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(15 * 60_000);
     expect(load).toHaveBeenCalledTimes(2);
+    // A check deferred before shutdown must not run against services the teardown stopped.
+    await refresh.foreground();
+    expect(load).toHaveBeenCalledTimes(3);
+    await refresh.foreground();
+    refresh.dispose();
+    await vi.advanceTimersByTimeAsync(15 * 60_000);
+    await refresh.foreground();
+    expect(load).toHaveBeenCalledTimes(3);
     vi.useRealTimers();
   });
 });

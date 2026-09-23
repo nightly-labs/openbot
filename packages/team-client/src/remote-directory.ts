@@ -434,7 +434,9 @@ export function createRemoteDirectoryRefresh(load: () => Promise<void>, now = Da
   let pending: Promise<void> | null = null;
   let lastAttempt = Number.NEGATIVE_INFINITY;
   let deferred: ReturnType<typeof setTimeout> | null = null;
+  let disposed = false;
   function refresh(force = false): Promise<void> {
+    if (disposed) return Promise.resolve();
     if (pending) return pending;
     if (!force && now() - lastAttempt < REMOTE_ACCOUNT_CHECK_INTERVAL_MS) return Promise.resolve();
     lastAttempt = now();
@@ -452,6 +454,7 @@ export function createRemoteDirectoryRefresh(load: () => Promise<void>, now = Da
     /** The window came to the front: check for a server the user joined on another device. */
     foreground(): Promise<void> {
       const due = lastAttempt + REMOTE_ACCOUNT_FOREGROUND_INTERVAL_MS;
+      if (disposed) return Promise.resolve();
       if (now() >= due) return refresh(true);
       // Asked too soon. Dropping it would leave the window on an old list until the poll a quarter
       // of an hour away, and a user who moves between windows never focuses at the right moment.
@@ -467,6 +470,12 @@ export function createRemoteDirectoryRefresh(load: () => Promise<void>, now = Da
     invalidate(): void {
       pending = null;
       lastAttempt = Number.NEGATIVE_INFINITY;
+    },
+    /** The deferred check must not reach the services that the caller's teardown stopped. */
+    dispose(): void {
+      disposed = true;
+      if (deferred !== null) clearTimeout(deferred);
+      deferred = null;
     },
   };
 }

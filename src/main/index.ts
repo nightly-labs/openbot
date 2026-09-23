@@ -714,6 +714,7 @@ if (!hasSingleInstanceLock) {
       startDirectoryWatch();
       teardown.push(0, "joined-server directory refresh", () => {
         stopDirectoryWatch();
+        directoryRefresh.dispose();
         remoteServers.off("directoryInvalidated", refreshMemberships);
       });
 
