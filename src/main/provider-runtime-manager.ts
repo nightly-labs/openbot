@@ -352,8 +352,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (this.#tasks.has(runtime)) return this.getStatus();
     const spec = this.#targetSpec(runtime, this.#target);
     const current = this.#statuses[runtime];
-    // A ready runtime downloads only toward a newer version, never back to an older one.
-    if (current.phase === "ready" && !(current.version && olderVersion(current.version, spec.version))) {
+    // A download goes only toward a newer version, never back to an older one. A failed update keeps
+    // the version still installed, so its Retry follows the same rule: when the block list has taken
+    // the newer version away, the Retry ends the error on the installed one instead.
+    if (current.version && !olderVersion(current.version, spec.version)) {
+      if (current.phase !== "ready") this.#setStatus(runtime, await this.#inspect(runtime));
       return this.getStatus();
     }
 

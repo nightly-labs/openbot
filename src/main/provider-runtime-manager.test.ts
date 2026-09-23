@@ -148,6 +148,29 @@ describe("ProviderRuntimeManager", () => {
     expect(checked.providers.grok.availableVersion).toBe(fixture.lock.grok.version);
   });
 
+  it("does not retry a failed update back to an older version once the newer one is blocked", async () => {
+    const root = await temporaryRoot();
+    const fixture = latestGrokFixture("1.0.30");
+    const manager = latestGrokManager(root, fixture);
+    await manager.initialize();
+    await manager.checkForUpdates();
+    await manager.downloadAndWait("grok");
+
+    // 1.0.31 reports another version, so its install fails and 1.0.30 stays.
+    fixture.version = "1.0.31";
+    fixture.executable = new TextEncoder().encode(`#!/bin/sh\necho 1.0.30\n${"# runtime\n".repeat(1_000)}`);
+    await manager.checkForUpdates();
+    await expect(manager.downloadAndWait("grok")).rejects.toThrow();
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "download-error", version: "1.0.30" });
+
+    fixture.blocked = ["1.0.31"];
+    await manager.checkForUpdates();
+    await manager.downloadAndWait("grok");
+
+    expect(manager.getStatus().providers.grok).toMatchObject({ phase: "ready", version: "1.0.30" });
+    expect(manager.executablePath("grok")).toBe(join(root, "grok", "darwin-arm64", "1.0.30", "bin", "grok"));
+  });
+
   it("reports a check that no release source answered", async () => {
     const root = await temporaryRoot();
     const manager = new ProviderRuntimeManager({
