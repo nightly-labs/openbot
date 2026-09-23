@@ -14,6 +14,7 @@
 // change on one side is a type error on the other. The types are phantom members: they exist only
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
+import type { ManagedProviderId } from "./agent-providers";
 import type { AgentIpcRequest } from "./ipc-agent-events";
 import type {
   AgentMemory,
@@ -21,7 +22,21 @@ import type {
   DeleteAgentMemoryInput,
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
-import type { ExportResult } from "./ipc-app-auth";
+import type {
+  AgentProviderId,
+  AgentStatus,
+  ProviderApiKeyState,
+  ProviderCodeLoginStart,
+  SetProviderApiKeyInput,
+} from "./ipc-agent-status";
+import type {
+  ComputerUseHighlightPlacement,
+  ComputerUsePermissionApp,
+  ComputerUseState,
+  ExportResult,
+  MacPermissionId,
+  ProviderRuntimeSnapshot,
+} from "./ipc-app-auth";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -45,11 +60,37 @@ import type {
   SaveCustomProviderInput,
 } from "./ipc-custom-providers";
 import type {
+  DynamicIslandAction,
+  DynamicIslandGeometry,
+  DynamicIslandPreference,
+  DynamicIslandPresentation,
+  SetDynamicIslandInteractiveInput,
+  SetDynamicIslandPreferenceInput,
+} from "./ipc-dynamic-island";
+import type {
   DeleteHostedSiteInput,
   HostedSiteSummary,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
 } from "./ipc-hosted-sites";
+import type {
+  AgentPublicationPreview,
+  AgentSubmission,
+  InstallMarketplaceAgentInput,
+  InstallMarketplaceAgentResult,
+  MarketplaceAgentDetail,
+  MarketplaceAgentPage,
+  MarketplaceAgentQuery,
+  SubmitMarketplaceAgentInput,
+} from "./ipc-marketplace-agents";
+import type {
+  McpServerConfig,
+  McpTestResult,
+  RemoveMcpServerInput,
+  SaveMcpServerInput,
+  SetMcpServerEnabledInput,
+  TestMcpServerInput,
+} from "./ipc-mcp-servers";
 import type {
   CreateRoutineInput,
   DeleteRoutineInput,
@@ -60,6 +101,30 @@ import type {
   UpdateRoutineInput,
 } from "./ipc-routines";
 import type { DeleteSharedTableInput, SharedTable } from "./ipc-shared-tables";
+import type {
+  CreateLocalSkillInput,
+  InstalledSkill,
+  InstallLocalSkillInput,
+  InstallSkillInput,
+  LocalSkillRevisionInput,
+  MarketplaceSkillDetail,
+  MarketplaceSkillPage,
+  MarketplaceSkillQuery,
+  ReviseLocalSkillInput,
+  SetEnabledSkillInput,
+  SkillPackagePreview,
+  SkillSubmission,
+  SubmitSkillInput,
+  UninstallSkillInput,
+} from "./ipc-skills";
+import type {
+  ClearStorageInput,
+  DeleteStoredFileInput,
+  GetStorageUsageInput,
+  OpenStorageLocationInput,
+  OpenStoredFileInput,
+  StorageUsage,
+} from "./ipc-storage";
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
 
 declare const payloadType: unique symbol;
@@ -139,21 +204,21 @@ export const IPC_ENDPOINTS = {
     exportDiagnostics: request<undefined, ExportResult>()(IPC_CHANNELS.maintenanceExportDiagnostics),
   },
   providers: {
-    connectProvider: untypedRequest(IPC_CHANNELS.connectProvider),
-    refreshAgentProviders: untypedRequest(IPC_CHANNELS.refreshAgentProviders),
-    updateProviderCli: untypedRequest(IPC_CHANNELS.updateProviderCli),
-    setProviderApiKey: untypedRequest(IPC_CHANNELS.setProviderApiKey),
-    clearProviderApiKey: untypedRequest(IPC_CHANNELS.clearProviderApiKey),
-    getProviderApiKeyState: untypedRequest(IPC_CHANNELS.getProviderApiKeyState),
-    startProviderCodeLogin: untypedRequest(IPC_CHANNELS.startProviderCodeLogin),
-    cancelProviderCodeLogin: untypedRequest(IPC_CHANNELS.cancelProviderCodeLogin),
+    connectProvider: request<AgentProviderId, AgentStatus>()(IPC_CHANNELS.connectProvider),
+    refreshAgentProviders: request<undefined, AgentStatus>()(IPC_CHANNELS.refreshAgentProviders),
+    updateProviderCli: request<ManagedProviderId, AgentStatus>()(IPC_CHANNELS.updateProviderCli),
+    setProviderApiKey: request<SetProviderApiKeyInput, AgentStatus>()(IPC_CHANNELS.setProviderApiKey),
+    clearProviderApiKey: request<AgentProviderId, AgentStatus>()(IPC_CHANNELS.clearProviderApiKey),
+    getProviderApiKeyState: request<AgentProviderId, ProviderApiKeyState>()(IPC_CHANNELS.getProviderApiKeyState),
+    startProviderCodeLogin: request<AgentProviderId, ProviderCodeLoginStart>()(IPC_CHANNELS.startProviderCodeLogin),
+    cancelProviderCodeLogin: request<AgentProviderId, AgentStatus>()(IPC_CHANNELS.cancelProviderCodeLogin),
   },
   providerRuntimes: {
-    getStatus: untypedRequest(IPC_CHANNELS.providerRuntimesGetStatus),
-    download: untypedRequest(IPC_CHANNELS.providerRuntimesDownload),
-    cancel: untypedRequest(IPC_CHANNELS.providerRuntimesCancel),
-    checkForUpdates: untypedRequest(IPC_CHANNELS.providerRuntimesCheckForUpdates),
-    event: untypedEvent(IPC_CHANNELS.providerRuntimesEvent),
+    getStatus: request<undefined, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesGetStatus),
+    download: request<ManagedProviderId, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesDownload),
+    cancel: request<ManagedProviderId, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesCancel),
+    checkForUpdates: request<undefined, ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesCheckForUpdates),
+    event: event<ProviderRuntimeSnapshot>()(IPC_CHANNELS.providerRuntimesEvent),
   },
   voice: {
     getModelStatus: request<undefined, VoiceModelStatus>()(IPC_CHANNELS.voiceGetModelStatus),
@@ -162,43 +227,45 @@ export const IPC_ENDPOINTS = {
     modelStatus: event<VoiceModelStatus>()(IPC_CHANNELS.voiceModelStatus),
   },
   dynamicIsland: {
-    getPreference: untypedRequest(IPC_CHANNELS.dynamicIslandGetPreference),
-    setPreference: untypedRequest(IPC_CHANNELS.dynamicIslandSetPreference),
-    publishPresentation: untypedRequest(IPC_CHANNELS.dynamicIslandPublishPresentation),
-    getPresentation: untypedRequest(IPC_CHANNELS.dynamicIslandGetPresentation),
-    presentation: untypedEvent(IPC_CHANNELS.dynamicIslandPresentation),
-    preference: untypedEvent(IPC_CHANNELS.dynamicIslandPreference),
-    geometry: untypedEvent(IPC_CHANNELS.dynamicIslandGeometry),
-    performAction: untypedRequest(IPC_CHANNELS.dynamicIslandPerformAction),
-    performHaptic: untypedRequest(IPC_CHANNELS.dynamicIslandPerformHaptic),
-    action: untypedEvent(IPC_CHANNELS.dynamicIslandAction),
-    setInteractive: untypedRequest(IPC_CHANNELS.dynamicIslandSetInteractive),
+    getPreference: request<undefined, DynamicIslandPreference>()(IPC_CHANNELS.dynamicIslandGetPreference),
+    setPreference: request<SetDynamicIslandPreferenceInput, DynamicIslandPreference>()(
+      IPC_CHANNELS.dynamicIslandSetPreference,
+    ),
+    publishPresentation: request<DynamicIslandPresentation, void>()(IPC_CHANNELS.dynamicIslandPublishPresentation),
+    getPresentation: request<undefined, DynamicIslandPresentation>()(IPC_CHANNELS.dynamicIslandGetPresentation),
+    presentation: event<DynamicIslandPresentation>()(IPC_CHANNELS.dynamicIslandPresentation),
+    preference: event<DynamicIslandPreference>()(IPC_CHANNELS.dynamicIslandPreference),
+    geometry: event<DynamicIslandGeometry>()(IPC_CHANNELS.dynamicIslandGeometry),
+    performAction: request<DynamicIslandAction, void>()(IPC_CHANNELS.dynamicIslandPerformAction),
+    performHaptic: request<undefined, void>()(IPC_CHANNELS.dynamicIslandPerformHaptic),
+    action: event<DynamicIslandAction>()(IPC_CHANNELS.dynamicIslandAction),
+    setInteractive: request<SetDynamicIslandInteractiveInput, void>()(IPC_CHANNELS.dynamicIslandSetInteractive),
   },
   computerUse: {
-    getState: untypedRequest(IPC_CHANNELS.computerUseGetState),
-    openPermissionPane: untypedRequest(IPC_CHANNELS.computerUseOpenPermissionPane),
-    closePermissionHelp: untypedRequest(IPC_CHANNELS.computerUseClosePermissionHelp),
-    getPermissionApp: untypedRequest(IPC_CHANNELS.computerUseGetPermissionApp),
-    startPermissionAppDrag: untypedRequest(IPC_CHANNELS.computerUseStartPermissionAppDrag),
-    revealPermissionApp: untypedRequest(IPC_CHANNELS.computerUseRevealPermissionApp),
-    highlightPlacement: untypedEvent(IPC_CHANNELS.computerUseHighlightPlacement),
+    getState: request<undefined, ComputerUseState>()(IPC_CHANNELS.computerUseGetState),
+    openPermissionPane: request<MacPermissionId, ComputerUseState>()(IPC_CHANNELS.computerUseOpenPermissionPane),
+    closePermissionHelp: request<undefined, void>()(IPC_CHANNELS.computerUseClosePermissionHelp),
+    getPermissionApp: request<undefined, ComputerUsePermissionApp | null>()(IPC_CHANNELS.computerUseGetPermissionApp),
+    startPermissionAppDrag: request<undefined, void>()(IPC_CHANNELS.computerUseStartPermissionAppDrag),
+    revealPermissionApp: request<undefined, void>()(IPC_CHANNELS.computerUseRevealPermissionApp),
+    highlightPlacement: event<ComputerUseHighlightPlacement>()(IPC_CHANNELS.computerUseHighlightPlacement),
   },
   skills: {
-    localList: untypedRequest(IPC_CHANNELS.skillsLocalList),
-    localGet: untypedRequest(IPC_CHANNELS.skillsLocalGet),
-    localCreate: untypedRequest(IPC_CHANNELS.skillsLocalCreate),
-    localRevise: untypedRequest(IPC_CHANNELS.skillsLocalRevise),
-    localInstall: untypedRequest(IPC_CHANNELS.skillsLocalInstall),
+    localList: request<undefined, MarketplaceSkillDetail[]>()(IPC_CHANNELS.skillsLocalList),
+    localGet: request<LocalSkillRevisionInput, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsLocalGet),
+    localCreate: request<CreateLocalSkillInput, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsLocalCreate),
+    localRevise: request<ReviseLocalSkillInput, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsLocalRevise),
+    localInstall: request<InstallLocalSkillInput, InstalledSkill>()(IPC_CHANNELS.skillsLocalInstall),
 
-    list: untypedRequest(IPC_CHANNELS.skillsList),
-    get: untypedRequest(IPC_CHANNELS.skillsGet),
-    listMine: untypedRequest(IPC_CHANNELS.skillsListMine),
-    choosePackage: untypedRequest(IPC_CHANNELS.skillsChoosePackage),
-    submit: untypedRequest(IPC_CHANNELS.skillsSubmit),
-    listInstalled: untypedRequest(IPC_CHANNELS.skillsListInstalled),
-    install: untypedRequest(IPC_CHANNELS.skillsInstall),
-    uninstall: untypedRequest(IPC_CHANNELS.skillsUninstall),
-    setEnabled: untypedRequest(IPC_CHANNELS.skillsSetEnabled),
+    list: request<MarketplaceSkillQuery | undefined, MarketplaceSkillPage>()(IPC_CHANNELS.skillsList),
+    get: request<string, MarketplaceSkillDetail>()(IPC_CHANNELS.skillsGet),
+    listMine: request<undefined, SkillSubmission[]>()(IPC_CHANNELS.skillsListMine),
+    choosePackage: request<undefined, SkillPackagePreview | null>()(IPC_CHANNELS.skillsChoosePackage),
+    submit: request<SubmitSkillInput, SkillSubmission>()(IPC_CHANNELS.skillsSubmit),
+    listInstalled: request<string, InstalledSkill[]>()(IPC_CHANNELS.skillsListInstalled),
+    install: request<InstallSkillInput, InstalledSkill>()(IPC_CHANNELS.skillsInstall),
+    uninstall: request<UninstallSkillInput, void>()(IPC_CHANNELS.skillsUninstall),
+    setEnabled: request<SetEnabledSkillInput, InstalledSkill>()(IPC_CHANNELS.skillsSetEnabled),
   },
   // No event channel: the renderer is the only writer, and the models a saved endpoint adds arrive
   // through the ready `status` event the provider restart already emits.
@@ -215,12 +282,14 @@ export const IPC_ENDPOINTS = {
     delete: request<DeleteHostedSiteInput, void>()(IPC_CHANNELS.hostedSitesDelete),
   },
   marketplaceAgents: {
-    list: untypedRequest(IPC_CHANNELS.marketplaceAgentsList),
-    get: untypedRequest(IPC_CHANNELS.marketplaceAgentsGet),
-    listMine: untypedRequest(IPC_CHANNELS.marketplaceAgentsListMine),
-    preview: untypedRequest(IPC_CHANNELS.marketplaceAgentsPreview),
-    submit: untypedRequest(IPC_CHANNELS.marketplaceAgentsSubmit),
-    install: untypedRequest(IPC_CHANNELS.marketplaceAgentsInstall),
+    list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()(IPC_CHANNELS.marketplaceAgentsList),
+    get: request<string, MarketplaceAgentDetail>()(IPC_CHANNELS.marketplaceAgentsGet),
+    listMine: request<undefined, AgentSubmission[]>()(IPC_CHANNELS.marketplaceAgentsListMine),
+    preview: request<string, AgentPublicationPreview>()(IPC_CHANNELS.marketplaceAgentsPreview),
+    submit: request<SubmitMarketplaceAgentInput, AgentSubmission>()(IPC_CHANNELS.marketplaceAgentsSubmit),
+    install: request<InstallMarketplaceAgentInput, InstallMarketplaceAgentResult>()(
+      IPC_CHANNELS.marketplaceAgentsInstall,
+    ),
   },
   auth: {
     getState: untypedRequest(IPC_CHANNELS.authGetState),
@@ -415,19 +484,21 @@ export const IPC_ENDPOINTS = {
   // A separate group, not part of `servers`: a group is what one registrar covers in full, and
   // `servers` is bound against `RemoteServerManager` while these are bound against `AgentService`.
   mcpServers: {
-    list: untypedRequest(IPC_CHANNELS.serversListMcpServers),
-    save: untypedRequest(IPC_CHANNELS.serversSaveMcpServer),
-    remove: untypedRequest(IPC_CHANNELS.serversRemoveMcpServer),
-    setEnabled: untypedRequest(IPC_CHANNELS.serversSetMcpServerEnabled),
-    test: untypedRequest(IPC_CHANNELS.serversTestMcpServer),
+    list: request<AgentIpcRequest<null>, McpServerConfig[]>()(IPC_CHANNELS.serversListMcpServers),
+    save: request<AgentIpcRequest<SaveMcpServerInput>, McpServerConfig[]>()(IPC_CHANNELS.serversSaveMcpServer),
+    remove: request<AgentIpcRequest<RemoveMcpServerInput>, McpServerConfig[]>()(IPC_CHANNELS.serversRemoveMcpServer),
+    setEnabled: request<AgentIpcRequest<SetMcpServerEnabledInput>, McpServerConfig[]>()(
+      IPC_CHANNELS.serversSetMcpServerEnabled,
+    ),
+    test: request<AgentIpcRequest<TestMcpServerInput>, McpTestResult>()(IPC_CHANNELS.serversTestMcpServer),
   },
   // Bound against the storage service, not `AgentService`, so it is its own group.
   storage: {
-    getUsage: untypedRequest(IPC_CHANNELS.storageGetUsage),
-    deleteFile: untypedRequest(IPC_CHANNELS.storageDeleteFile),
-    clear: untypedRequest(IPC_CHANNELS.storageClear),
-    openFile: untypedRequest(IPC_CHANNELS.storageOpenFile),
-    openLocation: untypedRequest(IPC_CHANNELS.storageOpenLocation),
+    getUsage: request<AgentIpcRequest<GetStorageUsageInput>, StorageUsage | null>()(IPC_CHANNELS.storageGetUsage),
+    deleteFile: request<AgentIpcRequest<DeleteStoredFileInput>, void>()(IPC_CHANNELS.storageDeleteFile),
+    clear: request<AgentIpcRequest<ClearStorageInput>, void>()(IPC_CHANNELS.storageClear),
+    openFile: request<AgentIpcRequest<OpenStoredFileInput>, void>()(IPC_CHANNELS.storageOpenFile),
+    openLocation: request<OpenStorageLocationInput, void>()(IPC_CHANNELS.storageOpenLocation),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived

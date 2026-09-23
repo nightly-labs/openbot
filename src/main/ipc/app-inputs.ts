@@ -18,6 +18,7 @@ import type {
   SetAnalyticsPreferenceInput,
   SetAppLanguagePreferenceInput,
   SetApprovalAutomationInput,
+  SetDynamicIslandInteractiveInput,
   SetEnabledSkillInput,
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
@@ -96,7 +97,7 @@ export function parseDynamicIslandPreference(input: unknown): DynamicIslandPrefe
   return input;
 }
 
-export function parseDynamicIslandInteractive(input: unknown): { interactive: boolean } {
+export function parseDynamicIslandInteractive(input: unknown): SetDynamicIslandInteractiveInput {
   if (!isDynamicIslandInteractive(input)) {
     throw new Error("Dynamic Island interaction state is required.");
   }

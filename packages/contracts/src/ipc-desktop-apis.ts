@@ -8,7 +8,7 @@ import type {
   SaveAgentProfileInput,
   SaveAgentProfileResult,
 } from "./ipc-agent-profile";
-import type { AccountUsage, AgentProviderId, AgentStatus } from "./ipc-agent-status";
+import type { AccountUsage, AgentStatus } from "./ipc-agent-status";
 import type {
   AgentSummary,
   CreateAgentInput,
@@ -21,12 +21,7 @@ import type {
   AppInfo,
   AppSetupState,
   CentralAuthDesktopApi,
-  ComputerUseHighlightPlacement,
-  ComputerUsePermissionApp,
-  ComputerUseState,
   ExternalDestination,
-  MacPermissionId,
-  ProviderRuntimeSnapshot,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
   UpdatePreference,
@@ -75,26 +70,9 @@ import type {
   SendMessageInput,
   SetMessageReactionInput,
 } from "./ipc-conversations";
-import type {
-  DynamicIslandAction,
-  DynamicIslandGeometry,
-  DynamicIslandPreference,
-  DynamicIslandPresentation,
-  SetDynamicIslandInteractiveInput,
-  SetDynamicIslandPreferenceInput,
-} from "./ipc-dynamic-island";
 import type { Invoke, IPC_ENDPOINTS, Subscribe } from "./ipc-endpoints";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
-import type {
-  AgentPublicationPreview,
-  AgentSubmission,
-  InstallMarketplaceAgentInput,
-  InstallMarketplaceAgentResult,
-  MarketplaceAgentDetail,
-  MarketplaceAgentPage,
-  MarketplaceAgentQuery,
-  SubmitMarketplaceAgentInput,
-} from "./ipc-marketplace-agents";
+import type { MarketplaceAgentPage, MarketplaceAgentQuery } from "./ipc-marketplace-agents";
 import type {
   McpServerConfig,
   McpTestResult,
@@ -121,26 +99,11 @@ import type {
   RemoteDesktopTestStatus,
 } from "./ipc-remote-desktop-setup";
 import type { SidebarLayoutAction, SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
-import type {
-  CreateLocalSkillInput,
-  InstalledSkill,
-  InstallSkillInput,
-  LocalSkillRevisionInput,
-  MarketplaceSkillDetail,
-  MarketplaceSkillPage,
-  MarketplaceSkillQuery,
-  ReviseLocalSkillInput,
-  SetEnabledSkillInput,
-  SkillPackagePreview,
-  SkillSubmission,
-  SubmitSkillInput,
-  UninstallSkillInput,
-} from "./ipc-skills";
+import type { InstalledSkill, MarketplaceSkillPage, MarketplaceSkillQuery } from "./ipc-skills";
 import type {
   ClearStorageInput,
   DeleteStoredFileInput,
   GetStorageUsageInput,
-  OpenStorageLocationInput,
   OpenStoredFileInput,
   StorageUsage,
 } from "./ipc-storage";
@@ -272,11 +235,11 @@ export interface AgentDesktopApi {
 
 export interface MarketplaceAgentsDesktopApi {
   list: (query?: MarketplaceAgentQuery) => Promise<MarketplaceAgentPage>;
-  get: (agentId: string) => Promise<MarketplaceAgentDetail>;
-  listMine: () => Promise<AgentSubmission[]>;
-  preview: (agentId: string) => Promise<AgentPublicationPreview>;
-  submit: (input: SubmitMarketplaceAgentInput) => Promise<AgentSubmission>;
-  install: (input: InstallMarketplaceAgentInput) => Promise<InstallMarketplaceAgentResult>;
+  get: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.get>;
+  listMine: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.listMine>;
+  preview: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.preview>;
+  submit: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.submit>;
+  install: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.install>;
 }
 
 export interface BrowserDesktopApi {
@@ -325,50 +288,13 @@ export interface NotificationsDesktopApi {
   onOpened: (listener: (event: NotificationOpenedEvent) => void) => () => void;
 }
 
-export interface SetProviderApiKeyInput {
-  provider: AgentProviderId;
-  key: string;
-}
-
-/**
- * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
- * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
- */
-export type ProviderApiKeyStatus = "missing" | "saved" | "unreadable";
-
-/** What the renderer may know about a stored key: its status. Never the key. */
-export interface ProviderApiKeyState {
-  provider: AgentProviderId;
-  status: ProviderApiKeyStatus;
-}
-
-/**
- * What a started code sign-in gives the renderer: a code to show, or nothing left to do.
- *
- * `connected` is the provider that turned out to be signed in already, which the user reaches by
- * asking for a code on a computer where the account arrived some other way. The token traded for
- * the code never crosses this boundary; how the sign-in ends arrives as a provider status, the same
- * way the browser sign-in's does.
- */
-export type ProviderCodeLoginStart =
-  | {
-      kind: "code";
-      /** The one-time code the user types on the other device. Safe to show and to read out. */
-      userCode: string;
-      /** The page to type it on. Always https. */
-      verificationUrl: string;
-      /** Epoch milliseconds. When OpenBot gives up on this code, which is what the dialog counts down to. */
-      expiresAt: number;
-    }
-  | { kind: "connected" };
-
 export interface ProviderRuntimesDesktopApi {
-  getStatus: () => Promise<ProviderRuntimeSnapshot>;
-  download: (provider: AgentProviderId) => Promise<ProviderRuntimeSnapshot>;
-  cancel: (provider: AgentProviderId) => Promise<ProviderRuntimeSnapshot>;
+  getStatus: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.getStatus>;
+  download: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.download>;
+  cancel: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.cancel>;
   /** Asks each provider's upstream for its latest release. Rejects when no source answered. */
-  checkForUpdates: () => Promise<ProviderRuntimeSnapshot>;
-  onEvent: (listener: (snapshot: ProviderRuntimeSnapshot) => void) => () => void;
+  checkForUpdates: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.checkForUpdates>;
+  onEvent: Subscribe<typeof IPC_ENDPOINTS.providerRuntimes.event>;
 }
 
 export interface MaintenanceDesktopApi {
@@ -377,17 +303,17 @@ export interface MaintenanceDesktopApi {
 }
 
 export interface DynamicIslandDesktopApi {
-  getPreference: () => Promise<DynamicIslandPreference>;
-  setPreference: (input: SetDynamicIslandPreferenceInput) => Promise<DynamicIslandPreference>;
-  publishPresentation: (presentation: DynamicIslandPresentation) => Promise<void>;
-  getPresentation: () => Promise<DynamicIslandPresentation>;
-  onPreference: (listener: (preference: DynamicIslandPreference) => void) => () => void;
-  onPresentation: (listener: (presentation: DynamicIslandPresentation) => void) => () => void;
-  onGeometry: (listener: (geometry: DynamicIslandGeometry) => void) => () => void;
-  performAction: (action: DynamicIslandAction) => Promise<void>;
-  performHaptic: () => Promise<void>;
-  onAction: (listener: (action: DynamicIslandAction) => void) => () => void;
-  setInteractive: (input: SetDynamicIslandInteractiveInput) => Promise<void>;
+  getPreference: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.getPreference>;
+  setPreference: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.setPreference>;
+  publishPresentation: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.publishPresentation>;
+  getPresentation: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.getPresentation>;
+  onPreference: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.preference>;
+  onPresentation: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.presentation>;
+  onGeometry: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.geometry>;
+  performAction: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.performAction>;
+  performHaptic: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.performHaptic>;
+  onAction: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.action>;
+  setInteractive: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.setInteractive>;
 }
 
 export interface ServersDesktopApi {
@@ -480,21 +406,21 @@ export interface VoiceDesktopApi {
 }
 
 export interface SkillsDesktopApi {
-  localList: () => Promise<MarketplaceSkillDetail[]>;
-  localGet: (input: LocalSkillRevisionInput) => Promise<MarketplaceSkillDetail>;
-  localCreate: (input: CreateLocalSkillInput) => Promise<MarketplaceSkillDetail>;
-  localRevise: (input: ReviseLocalSkillInput) => Promise<MarketplaceSkillDetail>;
-  localInstall: (input: LocalSkillRevisionInput & { agentId: string; revision: number }) => Promise<InstalledSkill>;
+  localList: Invoke<typeof IPC_ENDPOINTS.skills.localList>;
+  localGet: Invoke<typeof IPC_ENDPOINTS.skills.localGet>;
+  localCreate: Invoke<typeof IPC_ENDPOINTS.skills.localCreate>;
+  localRevise: Invoke<typeof IPC_ENDPOINTS.skills.localRevise>;
+  localInstall: Invoke<typeof IPC_ENDPOINTS.skills.localInstall>;
 
   list: (query?: MarketplaceSkillQuery) => Promise<MarketplaceSkillPage>;
-  get: (skillId: string) => Promise<MarketplaceSkillDetail>;
-  listMine: () => Promise<SkillSubmission[]>;
-  choosePackage: () => Promise<SkillPackagePreview | null>;
-  submit: (input: SubmitSkillInput) => Promise<SkillSubmission>;
-  listInstalled: (agentId: string) => Promise<InstalledSkill[]>;
-  install: (input: InstallSkillInput) => Promise<InstalledSkill>;
-  uninstall: (input: UninstallSkillInput) => Promise<void>;
-  setEnabled: (input: SetEnabledSkillInput) => Promise<InstalledSkill>;
+  get: Invoke<typeof IPC_ENDPOINTS.skills.get>;
+  listMine: Invoke<typeof IPC_ENDPOINTS.skills.listMine>;
+  choosePackage: Invoke<typeof IPC_ENDPOINTS.skills.choosePackage>;
+  submit: Invoke<typeof IPC_ENDPOINTS.skills.submit>;
+  listInstalled: Invoke<typeof IPC_ENDPOINTS.skills.listInstalled>;
+  install: Invoke<typeof IPC_ENDPOINTS.skills.install>;
+  uninstall: Invoke<typeof IPC_ENDPOINTS.skills.uninstall>;
+  setEnabled: Invoke<typeof IPC_ENDPOINTS.skills.setEnabled>;
 }
 
 export interface HostedSitesDesktopApi {
@@ -526,7 +452,7 @@ export interface StorageDesktopApi {
   clear: (input: ClearStorageInput, serverId: string) => Promise<void>;
   openFile: (input: OpenStoredFileInput, serverId: string) => Promise<void>;
   /** Opens an agent workspace folder. Only the local host has a folder this computer can open. */
-  openLocation: (input: OpenStorageLocationInput) => Promise<void>;
+  openLocation: Invoke<typeof IPC_ENDPOINTS.storage.openLocation>;
 }
 
 export interface OpenBotDesktopApi {
@@ -542,29 +468,29 @@ export interface OpenBotDesktopApi {
   onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
   onOpenSettings: (listener: () => void) => () => void;
   dynamicIsland: DynamicIslandDesktopApi;
-  getComputerUseState: () => Promise<ComputerUseState>;
-  openComputerUsePermissionPane: (permission: MacPermissionId) => Promise<ComputerUseState>;
-  closeComputerUsePermissionHelp: () => Promise<void>;
-  getComputerUsePermissionApp: () => Promise<ComputerUsePermissionApp | null>;
+  getComputerUseState: Invoke<typeof IPC_ENDPOINTS.computerUse.getState>;
+  openComputerUsePermissionPane: Invoke<typeof IPC_ENDPOINTS.computerUse.openPermissionPane>;
+  closeComputerUsePermissionHelp: Invoke<typeof IPC_ENDPOINTS.computerUse.closePermissionHelp>;
+  getComputerUsePermissionApp: Invoke<typeof IPC_ENDPOINTS.computerUse.getPermissionApp>;
   /** Starts the native drag. Only the help window may call it; every other sender is refused. */
-  startComputerUsePermissionAppDrag: () => Promise<void>;
-  revealComputerUsePermissionApp: () => Promise<void>;
+  startComputerUsePermissionAppDrag: Invoke<typeof IPC_ENDPOINTS.computerUse.startPermissionAppDrag>;
+  revealComputerUsePermissionApp: Invoke<typeof IPC_ENDPOINTS.computerUse.revealPermissionApp>;
   /**
    * Where to draw the rim over the window an agent works in. Only the overlay surface listens.
    *
    * It is pushed rather than asked for: the overlay carries no control and invokes nothing, so a
    * window that floats over another application's has no channel it could be driven through.
    */
-  onComputerUseHighlightPlacement: (listener: (placement: ComputerUseHighlightPlacement) => void) => () => void;
+  onComputerUseHighlightPlacement: Subscribe<typeof IPC_ENDPOINTS.computerUse.highlightPlacement>;
   openExternal: (destination: ExternalDestination) => Promise<void>;
-  connectProvider: (provider: AgentProviderId) => Promise<AgentStatus>;
-  refreshAgentProviders: () => Promise<AgentStatus>;
+  connectProvider: Invoke<typeof IPC_ENDPOINTS.providers.connectProvider>;
+  refreshAgentProviders: Invoke<typeof IPC_ENDPOINTS.providers.refreshAgentProviders>;
   /**
    * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
    * so the version they end on is whatever that updater fetches, which owes nothing to the version
    * OpenBot pins for the runtime it manages.
    */
-  updateProviderCli: (provider: AgentProviderId) => Promise<AgentStatus>;
+  updateProviderCli: Invoke<typeof IPC_ENDPOINTS.providers.updateProviderCli>;
   /**
    * Stores the optional API key a provider's paid catalog needs, and reconnects the provider.
    *
@@ -572,17 +498,17 @@ export interface OpenBotDesktopApi {
    * `getProviderApiKeyState` answers with a status, because a renderer that can read a key back
    * puts it in every crash report, export and screenshot that follows.
    */
-  setProviderApiKey: (input: SetProviderApiKeyInput) => Promise<AgentStatus>;
-  clearProviderApiKey: (provider: AgentProviderId) => Promise<AgentStatus>;
-  getProviderApiKeyState: (provider: AgentProviderId) => Promise<ProviderApiKeyState>;
+  setProviderApiKey: Invoke<typeof IPC_ENDPOINTS.providers.setProviderApiKey>;
+  clearProviderApiKey: Invoke<typeof IPC_ENDPOINTS.providers.clearProviderApiKey>;
+  getProviderApiKeyState: Invoke<typeof IPC_ENDPOINTS.providers.getProviderApiKeyState>;
   /**
    * Starts a sign-in the user finishes on another device, for a provider whose descriptor says
    * `codeSignIn`. Cancel it with `cancelProviderCodeLogin`; leaving it running holds one provider
    * process open until the code expires.
    */
-  startProviderCodeLogin: (provider: AgentProviderId) => Promise<ProviderCodeLoginStart>;
+  startProviderCodeLogin: Invoke<typeof IPC_ENDPOINTS.providers.startProviderCodeLogin>;
   /** Abandons a code sign-in: the provider is told, the code is dead, and the provider goes idle. */
-  cancelProviderCodeLogin: (provider: AgentProviderId) => Promise<AgentStatus>;
+  cancelProviderCodeLogin: Invoke<typeof IPC_ENDPOINTS.providers.cancelProviderCodeLogin>;
   providerRuntimes: ProviderRuntimesDesktopApi;
   openUrl: (url: string) => Promise<void>;
   voice: VoiceDesktopApi;
