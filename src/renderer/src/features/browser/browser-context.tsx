@@ -1,4 +1,4 @@
-import type { BrowserControlState, BrowserTab, ServerSummary } from "@openbot/contracts/ipc";
+import type { BrowserControlState, BrowserDisplayState, BrowserTab, ServerSummary } from "@openbot/contracts/ipc";
 import { createSignal } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { usePlatform } from "../../platform";
@@ -9,12 +9,6 @@ import { useServerSwitch } from "../servers/server-switch";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { activeTabAfterLoad, browserTabsAfterClose } from "./browser-tab-reconciliation";
-
-/** What `browser.getDisplayState()` answers, and what a remote list is folded into. */
-interface BrowserDisplayState {
-  tabs: BrowserTab[];
-  activeTabId: string | null;
-}
 
 /**
  * The built-in browser's tabs and the control sessions attached to them.

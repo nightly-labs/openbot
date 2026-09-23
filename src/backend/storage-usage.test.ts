@@ -87,6 +87,9 @@ async function host() {
   await file(join(root, "logs", "remote", "remote.log"), 4);
   await file(join(root, "logs", "remote", "remote.log.1"), 2);
   await file(join(root, "logs", "remote", "transfers", "journal.json"), 10);
+  // A stored path that is a link counts as missing, so the scan never reports a file outside its roots.
+  await mkdir(join(root, "transfers", "generated"), { recursive: true });
+  await symlink(join(root, "outside", "large.bin"), join(root, "transfers", "generated", "drawn.png"));
 
   const storageRoots: StorageRoots = {
     database: database.path,
