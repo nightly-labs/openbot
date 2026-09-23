@@ -1,3 +1,8 @@
+import type {
+  HostedSiteSummary as HostedSiteClientSummary,
+  HostedSiteFramework,
+  HostedSiteStatus,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { hmacSha256, sha256 } from "./crypto";
 import {
@@ -14,9 +19,9 @@ interface SiteRow {
   hostname: string;
   title: string;
   description: string;
-  framework: "vanilla" | "astro";
+  framework: HostedSiteFramework;
   spa_fallback: number;
-  status: "uploading" | "active" | "deleted" | "expired" | "blocked";
+  status: "uploading" | HostedSiteStatus;
   current_deployment_id: string | null;
   created_at: number;
   updated_at: number;
@@ -46,18 +51,9 @@ interface DeploymentRow {
   upload_bytes_claimed: number;
 }
 
-export interface HostedSiteSummary {
-  id: string;
-  hostname: string;
-  url: string;
-  title: string;
-  description: string;
-  framework: "vanilla" | "astro";
+/** The desktop summary, plus `uploading`: an upload session reports it for a new site. */
+export interface HostedSiteSummary extends Omit<HostedSiteClientSummary, "status"> {
   status: SiteRow["status"];
-  fileCount: number;
-  size: number;
-  expiresAt: string | null;
-  updatedAt: string;
 }
 
 export interface HostedSiteUploadSession {

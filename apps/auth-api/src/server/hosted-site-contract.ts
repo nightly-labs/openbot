@@ -1,3 +1,4 @@
+import type { HostedSiteFramework } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
 export const HOSTED_SITE_LIMITS = {
@@ -14,8 +15,6 @@ export const HOSTED_SITE_LIMITS = {
   siteLifetimeMs: 30 * 24 * 60 * 60_000,
   tombstoneLifetimeMs: 90 * 24 * 60 * 60_000,
 } as const;
-
-export type HostedSiteFramework = "vanilla" | "astro";
 
 export interface HostedSiteFileManifest {
   path: string;
