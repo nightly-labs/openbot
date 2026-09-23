@@ -925,6 +925,18 @@ The desktop chart adapts Zaidan's chart and interactive area composition. The pi
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
+### Agent import
+
+Server Settings > Import moves agents from a `.zip` export into the local host only; a remote host has
+no Import section and no Team API route. The format is `openbot-import.json` plus `agents/<key>/`
+folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
+reads it; both are a product contract, so add only optional fields and raise `version` for a change
+of meaning. The renderer never names a path: `agent-import:choose` opens the dialog in main, and
+`AgentImportService` keeps the checked export under a single-use token. `stage` measures entries
+without inflating them and rejects paths that `isUnsafeArchivePath` in `skill-package.ts` refuses.
+`apply` creates each agent through `AgentService` and publishes skills through the local skill
+library; an agent whose step fails is deleted, and the others continue. No schema change is needed.
+
 ### Storage and files
 
 Three surfaces show what a host keeps on disk: Server Settings > Storage (scope `host`), Agent

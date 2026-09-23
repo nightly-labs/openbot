@@ -241,6 +241,11 @@ export const IPC_CHANNELS = {
   storageClear: "storage:clear",
   storageOpenFile: "storage:open-file",
   storageOpenLocation: "storage:open-location",
+  // Agent import into the local host. `choose` opens the file dialog in main and keeps the archive
+  // under a token; the renderer only names the token and the agents to import.
+  agentImportChoose: "agent-import:choose",
+  agentImportApply: "agent-import:apply",
+  agentImportDiscard: "agent-import:discard",
   // The plugin deep link. `openbot://plugins/<slug>` opens a listing and nothing more, so there is
   // no install channel beside these two: the user still presses Install inside the dialog and picks
   // an agent. The pair mirrors the invitation's, because it solves the same problem - a link can

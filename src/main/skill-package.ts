@@ -73,25 +73,28 @@ export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
   let size = 0;
   for (const [rawName, data] of entries) {
     const name = (wrapper ? rawName.slice((wrapper?.length ?? 0) + 1) : rawName).replaceAll("\\", "/");
-    const parts = name.split("/");
-    const file = parts.at(-1)?.toLowerCase() ?? "";
-    if (
-      !name ||
-      name.startsWith("/") ||
-      parts.some((part) => !part || part === "." || part === "..") ||
-      parts.includes(".git") ||
-      parts.includes("node_modules") ||
-      file.startsWith(".env") ||
-      /private.*key/iu.test(file) ||
-      /\.(?:zip|tar|tgz|gz|7z|rar)$/iu.test(file)
-    ) {
-      throw new Error(`The skill package contains an unsafe file: ${name}`);
-    }
+    if (isUnsafeArchivePath(name)) throw new Error(`The skill package contains an unsafe file: ${name}`);
     size += data.byteLength;
     if (size > MAX_BYTES) throw new Error("The expanded skill must be under 10 MB.");
     result[name] = data;
   }
   return result;
+}
+
+/** A path that escapes its folder, or a file that must not travel: secrets, VCS data, nested archives. */
+export function isUnsafeArchivePath(name: string): boolean {
+  const parts = name.split("/");
+  const file = parts.at(-1)?.toLowerCase() ?? "";
+  return (
+    !name ||
+    name.startsWith("/") ||
+    parts.some((part) => !part || part === "." || part === "..") ||
+    parts.includes(".git") ||
+    parts.includes("node_modules") ||
+    file.startsWith(".env") ||
+    /private.*key/iu.test(file) ||
+    /\.(?:zip|tar|tgz|gz|7z|rar)$/iu.test(file)
+  );
 }
 
 function slugify(name: string): string {

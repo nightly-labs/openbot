@@ -232,18 +232,19 @@ function ServerSettings() {
   const canUseMcp = (server: ServerSummary) =>
     server.kind === "local" || (serverSupportsCapability(server, MCP_SERVERS_CAPABILITY) && server.role !== "member");
 
+  // The workspace belongs to the selected server. For another server, the switch comes first and
+  // the agent is published for the scope it lands in; a message there opens as its agent's chat.
+  const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {
+    setServerSettingsOpen(false);
+    if (server.active) return open();
+    void selectServer(server.id).then((selected) => {
+      if (selected) setPendingAgentSelection(agentId);
+    });
+  };
+
   /** A remote host without `storage-v1` has no Storage section at all. */
   const storageOptions = (server: ServerSummary): ServerStorageOptions | undefined => {
     if (!serverHasStorage(server)) return undefined;
-    // The workspace belongs to the selected server. For another server, the switch comes first and
-    // the agent is published for the scope it lands in; a message there opens as its agent's chat.
-    const openOnServer = (agentId: string, open: () => void) => {
-      setServerSettingsOpen(false);
-      if (server.active) return open();
-      void selectServer(server.id).then((selected) => {
-        if (selected) setPendingAgentSelection(agentId);
-      });
-    };
     return {
       hostName:
         server.kind === "local"
@@ -252,8 +253,9 @@ function ServerSettings() {
             : "This computer"
           : server.name,
       canManage: canManageStorage(server),
-      onOpenAgent: (agentId) => openOnServer(agentId, () => selectAgent(agentId)),
-      onShowMessage: (agentId, messageId) => openOnServer(agentId, () => selectGlobalSearchMessage(agentId, messageId)),
+      onOpenAgent: (agentId) => openOnServer(server, agentId, () => selectAgent(agentId)),
+      onShowMessage: (agentId, messageId) =>
+        openOnServer(server, agentId, () => selectGlobalSearchMessage(agentId, messageId)),
     };
   };
 
@@ -295,6 +297,12 @@ function ServerSettings() {
             onSetMcpServerEnabled={setMcpServerEnabled}
             onTestMcpServer={testMcpServer}
             storage={storageOptions(server())}
+            // Agents import into this computer only; a remote host has no Import section.
+            agentImport={
+              server().kind === "local"
+                ? { onOpenAgent: (agentId) => openOnServer(server(), agentId, () => selectAgent(agentId)) }
+                : undefined
+            }
           />
         </Loading>
       )}

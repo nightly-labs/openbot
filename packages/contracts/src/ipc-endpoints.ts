@@ -332,6 +332,12 @@ export const IPC_ENDPOINTS = {
     openFile: request(IPC_CHANNELS.storageOpenFile),
     openLocation: request(IPC_CHANNELS.storageOpenLocation),
   },
+  // Bound against the agent import service, which holds the staged archives.
+  agentImport: {
+    choose: request(IPC_CHANNELS.agentImportChoose),
+    apply: request(IPC_CHANNELS.agentImportApply),
+    discard: request(IPC_CHANNELS.agentImportDiscard),
+  },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived
   // asks for; `openListing` is the same slug pushed to a window that was already there.

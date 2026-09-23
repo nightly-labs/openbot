@@ -86,6 +86,7 @@ import {
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
+import { AGENT_IMPORT_PREVIEW } from "../../stories/agent-import-fixtures";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { filePreviewForPath } from "../../stories/file-previews";
 import {
@@ -2172,6 +2173,19 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     storage: createMockStorage(),
+    agentImport: {
+      choose: async () => clone(AGENT_IMPORT_PREVIEW),
+      apply: async ({ token, keys }) => {
+        if (token !== AGENT_IMPORT_PREVIEW.token) throw new Error("The export is no longer open. Choose it again.");
+        const imported = AGENT_IMPORT_PREVIEW.agents
+          .filter((agent) => keys.includes(agent.key))
+          .map((agent) => createAgentSummary({ name: agent.name, title: agent.title, description: agent.description }));
+        agents = [...agents, ...imported];
+        emitAgentEvent({ type: "agents-changed", agents });
+        return clone({ agents: imported, skipped: [], warnings: [] });
+      },
+      discard: async () => undefined,
+    },
     remoteDesktop: {
       checkSetup: async () => ({
         platform: "darwin",

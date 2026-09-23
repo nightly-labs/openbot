@@ -290,6 +290,8 @@ export type ExternalDestination =
   | "claude-install"
   | "feedback"
   | "message"
+  // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.
+  | "grok-bot-export"
   // Not a page: the macOS pane that grants OpenBot screen recording. It is here rather than behind
   // its own endpoint because the destination is still a fixed address the renderer only names.
   | "mac-screen-recording";

@@ -26,6 +26,13 @@ describe("external destinations", () => {
     expect(parseExternalDestination("mac-screen-recording")).toBe("mac-screen-recording");
   });
 
+  it("sends the agent import guide to the Grok Bot export listing", () => {
+    // The Import tab tells the user to install this agent. A wrong address installs some other agent
+    // with access to their Grok Bot data.
+    expect(EXTERNAL_DESTINATIONS["grok-bot-export"]).toBe("https://x.ai/bot/SeMqhg9bPD4Qd_8i7I-vN");
+    expect(parseExternalDestination("grok-bot-export")).toBe("grok-bot-export");
+  });
+
   it("opens no address the renderer invents", () => {
     expect(parseExternalDestination("opencode-auth")).toBe("opencode-auth");
     expect(() => parseExternalDestination("https://opencode.ai/auth")).toThrowError("Unknown external destination.");

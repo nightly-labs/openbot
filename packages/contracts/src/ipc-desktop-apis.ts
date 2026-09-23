@@ -2,6 +2,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
+import type { AgentImportPreview, AgentImportResult, ApplyAgentImportInput } from "./ipc-agent-import";
 import type {
   AgentMemory,
   CreateAgentMemoryInput,
@@ -573,6 +574,16 @@ export interface StorageDesktopApi {
   openLocation: (input: OpenStorageLocationInput) => Promise<void>;
 }
 
+/**
+ * Agent import into the local host. `choose` opens the file dialog and answers null when the user
+ * cancels. A token is used once: `apply` and `discard` both release the staged archive.
+ */
+export interface AgentImportDesktopApi {
+  choose: () => Promise<AgentImportPreview | null>;
+  apply: (input: ApplyAgentImportInput) => Promise<AgentImportResult>;
+  discard: (token: string) => Promise<void>;
+}
+
 export interface OpenBotDesktopApi {
   getAppInfo: () => Promise<AppInfo>;
   getSetupState: () => Promise<AppSetupState>;
@@ -633,6 +644,7 @@ export interface OpenBotDesktopApi {
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
   storage: StorageDesktopApi;
+  agentImport: AgentImportDesktopApi;
   hostedSites: HostedSitesDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
   auth: CentralAuthDesktopApi;

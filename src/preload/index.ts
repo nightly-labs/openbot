@@ -30,6 +30,8 @@ import {
   type DynamicIslandGeometry,
   type DynamicIslandPreference,
   type DynamicIslandPresentation,
+  decodeAgentImportPreview,
+  decodeAgentImportResult,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelMemories,
@@ -1042,6 +1044,11 @@ const openbotApi: OpenBotDesktopApi = {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.customProvidersList).then(decodeCustomProviders),
     save: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersSave, input).then(decodeCustomProviderResult),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersDelete, input).then(decodeCustomProviderResult),
+  },
+  agentImport: {
+    choose: () => ipcRenderer.invoke(IPC_CHANNELS.agentImportChoose).then(decodeAgentImportPreview),
+    apply: (input) => ipcRenderer.invoke(IPC_CHANNELS.agentImportApply, input).then(decodeAgentImportResult),
+    discard: (token) => ipcRenderer.invoke(IPC_CHANNELS.agentImportDiscard, token).then(decodeVoid),
   },
   marketplaceAgents: {
     list: (query) =>

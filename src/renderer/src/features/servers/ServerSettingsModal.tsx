@@ -28,6 +28,7 @@ import {
   ChevronRight,
   ConfirmDialog,
   CopyButton,
+  Download,
   DropdownMenu,
   Ellipsis,
   Field,
@@ -74,6 +75,7 @@ import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Sh
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
+import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { serverSupportsCapability } from "./server-capabilities";
 
@@ -129,9 +131,11 @@ export interface ServerSettingsModalProps {
    * `storage-v1` passes nothing. Every member reads it; `canManage` adds Clear and Delete.
    */
   storage?: ServerStorageOptions;
+  /** The Import section appears only when a caller supplies this: agents import into the local server. */
+  agentImport?: ServerImportOptions;
 }
 
-type Section = "general" | "members" | "desktop" | "mcp" | "storage";
+type Section = "general" | "members" | "desktop" | "mcp" | "storage" | "import";
 type InviteMode = "link" | "email" | "perma";
 type InviteRole = Exclude<TeamRole, "owner">;
 
@@ -148,6 +152,10 @@ const sections: Record<Section, { title: string; description: string }> = {
   storage: {
     title: "Storage",
     description: "See what OpenBot keeps on this server’s disk, and free space.",
+  },
+  import: {
+    title: "Import",
+    description: "Move your agents from Grok Bot to this computer.",
   },
 };
 
@@ -596,7 +604,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     orientation: "vertical" as const,
     activationMode: "automatic" as const,
     onChange(value: string) {
-      if (value === "general" || value === "members" || value === "desktop" || value === "mcp" || value === "storage")
+      if (
+        value === "general" ||
+        value === "members" ||
+        value === "desktop" ||
+        value === "mcp" ||
+        value === "storage" ||
+        value === "import"
+      )
         setSection(value);
     },
   };
@@ -778,6 +793,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>Storage</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.agentImport}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="import">
+                <Download aria-hidden="true" />
+                <span>Import</span>
+              </Tabs.Trigger>
+            </Show>
           </Tabs.List>
         }
       >
@@ -817,6 +838,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           {(storage) => (
             <Tabs.Content value="storage" class="settings-modal-tab-panel server-settings-panel" data-tab="storage">
               <ServerStoragePanel serverId={props.server.id} {...storage()} />
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={props.agentImport}>
+          {(agentImport) => (
+            <Tabs.Content value="import" class="settings-modal-tab-panel server-settings-panel" data-tab="import">
+              <ServerImportPanel {...agentImport()} />
             </Tabs.Content>
           )}
         </Show>

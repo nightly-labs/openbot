@@ -40,6 +40,7 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "claude-install": "https://code.claude.com/docs",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
   message: "https://x.com/norbertbodziony",
+  "grok-bot-export": "https://x.ai/bot/SeMqhg9bPD4Qd_8i7I-vN",
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 
