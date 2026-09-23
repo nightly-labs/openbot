@@ -10,6 +10,7 @@ import {
   type NewMessageTally,
   tallyNewMessages,
 } from "../new-message-tally";
+import { summarizeRoutineRunMessages } from "../routine-run-timeline";
 import { scrollToUnreadBoundary, unreadMessagesDividerIsVisible } from "../UnreadMessages";
 
 export interface ScrollElements {
@@ -45,7 +46,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
   let talliedConversationIdentity: string | undefined;
 
-  const timelineMessages = createMemo(() => deps.props.messages.filter((message) => message.kind !== "thinking"));
+  const timelineMessages = createMemo(() =>
+    summarizeRoutineRunMessages(deps.props.messages.filter((message) => message.kind !== "thinking")),
+  );
   /* Every row anchors the count, but only some rows add to it. */
   const timelineRows = createMemo(() =>
     deps.props.messages.map((message) => ({ id: message.id, countable: countableTimelineMessage(message) })),

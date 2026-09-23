@@ -3882,6 +3882,233 @@
   gap: var(--openbot-space-1);
 }
 
+.chat-action-marker-summary {
+  /* The reveal's own timings. They sit above the `--openbot-duration-*` scale,
+     which tops out at an overlay fade: this is a panel of rows that has to read
+     as unrolling, and the palette has no token for that. */
+  --chat-action-history-open: 340ms;
+  /* The shared eases are quint curves: `--openbot-ease-in-out` holds the panel
+     almost still for 50ms and then moves 25px in two frames, which reads as a
+     lurch in everything below it. This one spreads the distance evenly and
+     settles, so the messages under the marker travel at one speed. */
+  --chat-action-history-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  /* The close is shorter than the open: leaving needs no reading time, and a
+     long collapse holds the messages below in motion for no reason. */
+  --chat-action-history-close: 200ms;
+  /* The close curve decelerates from the first frame. The open's ease holds the
+     panel almost still for the first 20ms, which reads as a click the panel did
+     not answer, and then drops the box fast. */
+  --chat-action-history-close-ease: cubic-bezier(0.32, 0.08, 0.24, 1);
+  /* The rows have to stay faintly visible until the box is nearly shut. A
+     shorter fade empties the panel at the halfway point and leaves blank space
+     closing on its own. */
+  --chat-action-history-lift: 170ms;
+  /* How much of the box's bottom edge dissolves while it closes. One row's
+     worth, so the edge takes a row out at a time. */
+  --chat-action-history-fade: 22px;
+  --chat-action-history-entry: 260ms;
+  /* Each state waits this much longer than the one above it. */
+  --chat-action-history-stagger: 60ms;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ui-button.chat-action-history-toggle {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.chat-action-history-toggle svg {
+  transition: transform var(--chat-action-history-close) var(--openbot-ease-out);
+}
+
+.chat-action-history-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* The panel is a single grid track, so `0fr` to `1fr` animates the list's real
+   height with no measured pixel value - the same technique as `.t-acc` in
+   transitions.css. The height has to move for the row below to follow it; a
+   paint-only reveal leaves the space behind and drops it in one step at the end.
+   A `from` or `to` alone leaves the other end on the element's own style, so
+   these rules stay the single source of the resting state. */
+.chat-action-history-panel {
+  display: grid;
+  width: 100%;
+  grid-template-rows: 1fr;
+}
+
+.chat-action-history-panel[data-state="open"] {
+  animation: chat-action-history-open var(--chat-action-history-open) var(--chat-action-history-ease);
+}
+
+/* The close runs the same track backwards and holds `0fr` until the panel leaves
+   the tree, so the messages below travel the whole distance under one curve
+   instead of standing still and then closing the gap in a single step. */
+.chat-action-history-panel[data-state="closed"] {
+  animation: chat-action-history-close var(--chat-action-history-close) var(--chat-action-history-close-ease) forwards;
+}
+
+@keyframes chat-action-history-open {
+  from {
+    grid-template-rows: 0fr;
+  }
+}
+
+@keyframes chat-action-history-close {
+  to {
+    grid-template-rows: 0fr;
+  }
+}
+
+/* On the way in the box grows under rows that are still fading up, so its edge
+   never cuts anything solid. */
+.chat-action-history-panel[data-state="open"] .chat-action-history {
+  animation: chat-action-history-settle var(--chat-action-history-open) var(--openbot-ease-out);
+}
+
+/* The rows fade out just before the box finishes closing, so the clip edge never
+   cuts through anything solid and the panel is never an empty box shrinking on
+   its own. The panel leaves the tree on the collapse's end, not on this one's. */
+.chat-action-history-panel[data-state="closed"] .chat-action-history {
+  animation: chat-action-history-lift var(--chat-action-history-lift) var(--openbot-ease-out) forwards;
+}
+
+/* No fade on the way in: the rows already carry their own, and stacking a second
+   one over them washes the whole panel out. */
+@keyframes chat-action-history-settle {
+  from {
+    transform: translateY(-25%);
+  }
+}
+
+/* The lift stays small on the way out: the collapsing box already carries the
+   rows upward, and a longer travel makes them outrun it and arrive early. */
+@keyframes chat-action-history-lift {
+  to {
+    transform: translateY(-8%);
+    opacity: 0;
+  }
+}
+
+/* `min-height: 0` lets the track win over the list's content height, and the
+   clip keeps the rows inside the shrinking box. */
+.chat-action-history-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The closing box passes its edge over rows that are still readable and cuts
+   them through the middle of the glyphs. The mask softens that edge, so a row
+   dissolves as the edge reaches it instead of being sliced. Below the fade
+   distance the whole list is inside the gradient and leaves on its own. The way
+   in needs none of this: there the box grows ahead of rows that are still
+   arriving. */
+.chat-action-history-panel[data-state="closed"] .chat-action-history-clip {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) calc(100% - var(--chat-action-history-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) calc(100% - var(--chat-action-history-fade)),
+    transparent
+  );
+}
+
+.chat-action-history {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  gap: var(--openbot-space-1);
+  margin: var(--openbot-space-1) 0 0;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  border-inline-start: 1px solid var(--openbot-border-grouped);
+  list-style: none;
+  text-align: left;
+}
+
+.chat-action-history-entry {
+  display: grid;
+  grid-template-columns: var(--openbot-icon-xs) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-secondary);
+}
+
+/* `backwards` holds the entry hidden through its delay, so a late state never
+   shows at full strength before its turn. The exit leaves the rows alone: the
+   list fades as one piece. */
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry {
+  animation: chat-action-history-entry-in var(--chat-action-history-entry) var(--openbot-ease-out) backwards;
+}
+
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry:nth-child(2) {
+  animation-delay: var(--chat-action-history-stagger);
+}
+
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry:nth-child(3) {
+  animation-delay: calc(var(--chat-action-history-stagger) * 2);
+}
+
+/* The stagger stops growing here: a long run should not open in slow motion. */
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry:nth-child(n + 4) {
+  animation-delay: calc(var(--chat-action-history-stagger) * 3);
+}
+
+@keyframes chat-action-history-entry-in {
+  from {
+    transform: translateX(calc(var(--openbot-space-1) * -1));
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+.chat-action-history-entry time {
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.chat-action-history-icon,
+.chat-action-history-icon svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.chat-action-history-status-completed .chat-action-history-icon {
+  color: var(--openbot-success);
+}
+
+.chat-action-history-status-failed .chat-action-history-icon,
+.chat-action-history-status-interrupted .chat-action-history-icon,
+.chat-action-history-status-cancelled .chat-action-history-icon {
+  color: var(--openbot-danger);
+}
+
+.chat-action-history-status-needs-attention .chat-action-history-icon {
+  color: var(--openbot-warning);
+}
+
+.chat-action-history-status-in-progress .chat-action-history-icon {
+  color: var(--openbot-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-action-history-panel,
+  .chat-action-history,
+  .chat-action-history-entry {
+    animation: none;
+  }
+
+  .chat-action-history-toggle svg {
+    transition: none;
+  }
+}
+
 .chat-action-marker-label,
 .chat-action-marker-time {
   flex: 0 0 auto;
