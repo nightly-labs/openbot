@@ -847,6 +847,7 @@ jobs:
 
           set +e
           : > "$last_message_file"
+          review_started=$SECONDS
           timeout 900 codex exec \
             ${mcp_args[@]+"${mcp_args[@]}"} \
             --ephemeral \
@@ -858,6 +859,9 @@ jobs:
             - < "$prompt_file" 2>&1 | tee "$live_file"
           exit_code=${PIPESTATUS[0]}
           set -e
+          # Recorded in the comment so the cost of a review can be followed without the logs.
+          review_seconds=$(( SECONDS - review_started ))
+          tokens_used=$(awk '/^tokens used$/ { getline; value = $0 } END { gsub(/[^0-9]/, "", value); print value }' "$live_file")
 
           start_line=$(grep -n '^## Verdict' "$last_message_file" | tail -1 | cut -d: -f1 || true)
           resolved_line=$(grep -n '^## Resolved Since Previous Review[[:space:]]*$' "$last_message_file" | tail -1 | cut -d: -f1 || true)
@@ -912,6 +916,8 @@ jobs:
             echo "large_pr=$large_pr"
             echo "failure_reason=$reason"
             echo "scope=$scope"
+            echo "review_seconds=$review_seconds"
+            echo "tokens_used=$tokens_used"
             echo "reviewed_since=$reviewed_sha"
           } >> "$GITHUB_OUTPUT"
 
@@ -935,6 +941,8 @@ jobs:
           LARGE_PR: ${{ steps.review.outputs.large_pr }}
           REVIEWER: ${{ steps.reviewer.outputs.reviewer }}
           SCOPE: ${{ steps.review.outputs.scope }}
+          REVIEW_SECONDS: ${{ steps.review.outputs.review_seconds }}
+          TOKENS_USED: ${{ steps.review.outputs.tokens_used }}
           REVIEWED_SINCE: ${{ steps.review.outputs.reviewed_since }}
           RUN_ID: ${{ github.run_id }}
         run: |
@@ -948,6 +956,11 @@ jobs:
           if [ "${SCOPE:-}" = since ]; then
             scope_line="Scope: changes since \`${REVIEWED_SINCE:0:12}\`"
           fi
+          cost_line="Time: unknown"
+          if [ -n "${REVIEW_SECONDS:-}" ]; then
+            cost_line="Time: $(( REVIEW_SECONDS / 60 ))m $(( REVIEW_SECONDS % 60 ))s"
+          fi
+          cost_line="${cost_line}, tokens: ${TOKENS_USED:-unknown}"
 
           review_ids=$(
             gh api --paginate \
@@ -997,6 +1010,7 @@ jobs:
             - Diff size: ${DIFF_BYTES:-unknown} bytes
             - Reviewer: ${REVIEWER:-unknown}
             - ${scope_line}
+            - ${cost_line}
             - Status: success
             - [Workflow run](${run_url})
 
@@ -1030,7 +1044,7 @@ jobs:
 
             ${reason}
 
-            [Workflow run](${run_url})
+            ${cost_line}. [Workflow run](${run_url})
 
             The latest successful NorbiAI review remains available above.
 

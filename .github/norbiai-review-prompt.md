@@ -14,6 +14,7 @@ Your context window is the budget for the whole review. When it fills, the run c
 - `## Repository instructions` below carries the `AGENTS.md` files for the touched directories, and `## Domain review instructions` the review rules for them. Do not read an `AGENTS.md` from the checkout.
 - `## Review scope` says whether this run reviews the whole PR or only what changed since the last successful review. Follow it.
 - Read surrounding code with line ranges (`sed -n '120,180p' path`), never a whole file, and search with `rg -n` limited to the directories in play. Do not print a file or a search result you have already seen.
+- Run one read command per tool call. Do not join commands with `&&`, `;` or `||`: the runner can block a combined command, and a blocked command costs a turn.
 - After a compaction, continue from the summary. Do not re-read the diff or the instructions.
 
 ## Review priorities
