@@ -109,8 +109,6 @@ export interface MobileWorkspaceContextValue {
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
-  /** Check the account for servers joined on another device. Throttled, so a caller may repeat it. */
-  checkServerDirectory: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   createAgent: (input: CreateAgentInput) => Promise<void>;

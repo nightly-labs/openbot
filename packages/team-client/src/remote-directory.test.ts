@@ -539,32 +539,6 @@ describe("directory refresh", () => {
     await refresh.refresh(true).catch(() => undefined);
     expect(load).toHaveBeenCalledTimes(3);
   });
-
-  it("looks for a server joined on another device when the window returns to the front", async () => {
-    vi.useFakeTimers();
-    const load = vi.fn(async () => {});
-    const refresh = createRemoteDirectoryRefresh(load);
-    await refresh.foreground();
-    expect(load).toHaveBeenCalledTimes(1);
-    // Every focus in the same minute costs one check, and the check still happens.
-    await refresh.foreground();
-    await refresh.foreground();
-    await vi.advanceTimersByTimeAsync(59_999);
-    expect(load).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(load).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(15 * 60_000);
-    expect(load).toHaveBeenCalledTimes(2);
-    // A check deferred before shutdown must not run against services the teardown stopped.
-    await refresh.foreground();
-    expect(load).toHaveBeenCalledTimes(3);
-    await refresh.foreground();
-    refresh.dispose();
-    await vi.advanceTimersByTimeAsync(15 * 60_000);
-    await refresh.foreground();
-    expect(load).toHaveBeenCalledTimes(3);
-    vi.useRealTimers();
-  });
 });
 
 it("finds memberships accepted on another device and stops polling on cleanup", async () => {

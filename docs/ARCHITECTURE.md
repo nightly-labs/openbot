@@ -542,12 +542,12 @@ account rather than to a host: accepting an invitation, changing a membership, a
 host this account did not have all queue one for the member whose server list changed. Republishing
 an existing host rotates its credential without changing a list, and queues nothing. Signal forwards it to every authenticated socket that account
 holds, and the frame names no server. That is how a server joined on one device reaches the other
-devices of the same account; a device holding no Signal socket falls back to the checks below.
+devices of the same account. Desktop window focus does not trigger an automatic account or directory
+check; a device holding no Signal socket finds the change at its next 15-minute check.
 Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
-A foreground return, and desktop window focus, check the directory when the last check is older than
-one minute; a return inside that minute defers one check to that deadline rather than dropping it.
-Automatic checks stay at 15 minutes for an app left in front, and background time counts toward that
-deadline. Failed mobile checks retry after one minute while foregrounded. Concurrent requests share one promise; invalidations received during
+A foreground return checks absolute freshness: successful account and directory responses stay fresh
+for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
+one minute while foregrounded. Concurrent requests share one promise; invalidations received during
 a request cause one follow-up after success. iOS `inactive` alone does not reset these deadlines.
 Stored mobile sessions become available before startup validation completes; network failures retain
 them, and validation results apply only to the initiating login.

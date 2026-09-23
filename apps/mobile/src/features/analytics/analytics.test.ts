@@ -393,7 +393,6 @@ it("instruments message commands without sending their contents or changing the 
     selectServer: () => {},
     leaveServer: unexpected,
     refreshServers: unexpected,
-    checkServerDirectory: unexpected,
     refreshServer: unexpected,
     addRemoteServer: unexpected,
     setAgentAvatar: async () => {},

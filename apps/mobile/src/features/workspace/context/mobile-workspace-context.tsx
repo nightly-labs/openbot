@@ -273,7 +273,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [directory, installHosts],
   );
   const refreshHosts = useCallback(() => directoryRefresh.refresh(true), [directoryRefresh]);
-  const checkServerDirectory = useCallback(() => directoryRefresh.foreground(), [directoryRefresh]);
   const refreshMemberships = useCallback(() => {
     directoryGeneration.current += 1;
     directoryRefresh.invalidate();
@@ -435,8 +434,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       conversationStore.flush();
     }
     directoryRefresh.setActive(foreground);
-    // A server joined on another device is not pushed here, so a return to the app looks for one.
-    if (foreground) void directoryRefresh.foreground().catch(() => undefined);
   }, [foreground, directoryRefresh, conversationStore]);
 
   const loadConversation = useCallback(
@@ -780,7 +777,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         for (const connection of connections.current.values()) connection.refresh();
         await refreshHosts();
       },
-      checkServerDirectory,
       addRemoteServer: async ({ inviteUrl }) => {
         const host = await directory.acceptInvite(inviteUrl);
         directoryGeneration.current += 1;
@@ -1220,7 +1216,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     pinnedChannelIds,
     hiddenChannelIds,
     refreshHosts,
-    checkServerDirectory,
     readRefresh,
     request,
     serverDirectoryError,
