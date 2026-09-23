@@ -72,10 +72,9 @@ requests use a closed list of `/api/browser/*` operations. They cannot carry cha
 Browser tickets and session termination require the same account-session hash that created the
 remote session. Existing bearer-token endpoints retain their behavior.
 
-The `WEB_CLIENT_ENABLED` Worker variable defaults to off. Only the exact value `true` enables
-browser sign-in, account reads, and new connection tickets. Logout remains available when the
-flag is off. No host or D1 migration is needed. See [web client delivery](web-client.md) for the
-seven review scopes, local commands, and release checks.
+Browser sign-in, account reads, and connection tickets are always available. No host or D1
+migration is needed. See [web client delivery](web-client.md) for the seven review scopes, local
+commands, and release checks.
 
 Browser chat pages, drafts, file bytes, and chat visibility preferences stay in memory. A protected
 cookie holds the account credential. Local storage holds account-scoped trusted host public keys

@@ -7,7 +7,6 @@ const token = "a".repeat(43);
 const user = { id: "account-one", email: "one@example.test", name: null, avatarUrl: null };
 function setup() {
   const services: BrowserApiServices = {
-    enabled: true,
     auth: {
       startEmailSignIn: vi.fn().mockResolvedValue({ challengeId: "challenge", expiresAt: 100, resendAt: 50 }),
       verifyEmailCode: vi.fn().mockResolvedValue({ sessionToken: token, user }),
@@ -107,24 +106,6 @@ describe("browser account boundary", () => {
     const response = await handleBrowserApi(request("logout", { cookie, body: {} }), services);
     expect(services.remote.endAccountSession).toHaveBeenCalledWith(user.id, await sha256(token));
     expect(response.headers.get("Set-Cookie")).toContain("Max-Age=0");
-  });
-  it("disables new sign-ins and tickets while still allowing logout", async () => {
-    const services = setup();
-    services.enabled = false;
-    const cookie = `__Host-openbot-web=${token}`;
-    expect((await handleBrowserApi(request("email/start", { body: { email: user.email } }), services)).status).toBe(
-      404,
-    );
-    expect(
-      (
-        await handleBrowserApi(
-          request("v2/remote/sessions/s/ticket", { cookie, body: { clientPublicKey: "key" } }),
-          services,
-        )
-      ).status,
-    ).toBe(404);
-    expect(services.remote.issueSessionTicket).not.toHaveBeenCalled();
-    expect((await handleBrowserApi(request("logout", { cookie, body: {} }), services)).status).toBe(200);
   });
   it("does not proxy arbitrary account or host operations", async () => {
     const services = setup();

@@ -18,7 +18,6 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     account: BrowserAccount | null;
     loaded: boolean;
     login: CentralAuthState;
-    unavailable: boolean;
     resendAt: number;
     busy: boolean;
     error: string | null;
@@ -26,7 +25,6 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     account: null,
     loaded: false,
     login: { status: "signed_out" },
-    unavailable: false,
     resendAt: 0,
     busy: false,
     error: null,
@@ -47,15 +45,12 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     if (
       !disposed &&
       generation === sessionGeneration &&
-      ((response.status === 401 && input !== "/api/browser/email/start" && input !== "/api/browser/email/verify") ||
-        response.headers.get("X-OpenBot-Web-Disabled") === "1")
+      response.status === 401 &&
+      input !== "/api/browser/email/start" &&
+      input !== "/api/browser/email/verify"
     ) {
       if (state.account) channel?.postMessage("session-changed");
       clearSession();
-      if (response.headers.get("X-OpenBot-Web-Disabled") === "1")
-        setState((draft) => {
-          draft.unavailable = true;
-        });
     }
     return response;
   };
@@ -215,50 +210,39 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       <Toaster />
       <Show when={state.loaded} fallback={<p role="status">Loading OpenBot…</p>}>
         <Show
-          when={!state.unavailable}
+          keyed
+          when={state.account?.id}
           fallback={
-            <main class="web-sign-in">
-              <h1>OpenBot web</h1>
-              <p>Browser access is not available yet.</p>
-              <a href="/">Back to OpenBot</a>
-            </main>
+            <AccountLogin
+              variant="production"
+              state={state.login}
+              onRetry={checkSession}
+              onRequestEmailCode={start}
+              onVerifyEmailCode={verify}
+              onReset={async () => {
+                clearSession();
+                setState((draft) => {
+                  draft.resendAt = 0;
+                });
+              }}
+            />
           }
         >
-          <Show
-            keyed
-            when={state.account?.id}
-            fallback={
-              <AccountLogin
-                variant="production"
-                state={state.login}
-                onRetry={checkSession}
-                onRequestEmailCode={start}
-                onVerifyEmailCode={verify}
-                onReset={async () => {
-                  clearSession();
-                  setState((draft) => {
-                    draft.resendAt = 0;
-                  });
-                }}
+          {(accountId) => (
+            <>
+              <Show when={state.error}>
+                <p role="alert">{state.error}</p>
+              </Show>
+              <WebWorkspace
+                accountId={accountId}
+                accountEmail={state.account?.email ?? ""}
+                accountFetch={accountFetch}
+                onSessionCheck={checkSession}
+                onLogout={() => action(logout)}
+                createRuntime={props.createRuntime}
               />
-            }
-          >
-            {(accountId) => (
-              <>
-                <Show when={state.error}>
-                  <p role="alert">{state.error}</p>
-                </Show>
-                <WebWorkspace
-                  accountId={accountId}
-                  accountEmail={state.account?.email ?? ""}
-                  accountFetch={accountFetch}
-                  onSessionCheck={checkSession}
-                  onLogout={() => action(logout)}
-                  createRuntime={props.createRuntime}
-                />
-              </>
-            )}
-          </Show>
+            </>
+          )}
         </Show>
       </Show>
     </div>
