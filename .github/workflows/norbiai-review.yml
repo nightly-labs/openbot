@@ -1192,10 +1192,11 @@ jobs:
           fi
 
           # Only the Findings section counts. Resolved and withdrawn items sit in their own
-          # sections and carry their own priority label.
+          # sections and carry their own priority label. The reviewer sometimes escapes the
+          # brackets as Markdown, `\[NEW\]\[P1\]`, and a P1 written that way passed the gate.
           blocking=$(
             awk '/^## Findings[[:space:]]*$/ { findings = 1; next } findings' "$REVIEW_FILE" |
-              grep -c -E '\[(NEW|REMAINS)\]\[P[01]\]' || true
+              grep -c -E '\\?\[(NEW|REMAINS)\\?\][[:space:]]*\\?\[P[01]\\?\]' || true
           )
 
           if [ "$blocking" -gt 0 ]; then

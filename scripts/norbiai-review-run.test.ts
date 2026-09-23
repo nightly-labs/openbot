@@ -16,6 +16,7 @@ const PROMPT = join(import.meta.dirname, "../.github/norbiai-review-prompt.md");
 type Step = { name: string; run?: string; env?: Record<string, string> };
 const steps: Step[] = parse(readFileSync(WORKFLOW, "utf8")).jobs.review.steps;
 const step = steps.find((candidate) => candidate.name === "Run NorbiAI review");
+const gate = steps.find((candidate) => candidate.name === "Block on unresolved P0 and P1 findings");
 
 const CLEAN = "## Verdict\n\nNo actionable findings exist.\n\n";
 const BLIND =
@@ -184,5 +185,33 @@ describe("NorbiAI review run", () => {
 
     const busy = review({ error: "ERROR: unexpected status 429: 5 simultaneous browser turns are running.\n" });
     expect(busy.calls).toBe(3);
+  });
+});
+
+/** Runs the gate step on a published review, and says whether it blocked. */
+function blocks(findings: string): boolean {
+  const temp = mkdtempSync(join(tmpdir(), "norbiai-gate-"));
+  const reviewPath = join(temp, "review.txt");
+  const scriptPath = join(temp, "gate.sh");
+  writeFileSync(reviewPath, `${CLEAN}## Resolved Since Previous Review\n\nNone.\n\n## Findings\n\n${findings}\n`);
+  writeFileSync(scriptPath, gate?.run ?? "");
+  try {
+    execFileSync("bash", [scriptPath], {
+      env: { ...process.env, REVIEW_FILE: reviewPath, REVIEW_STATUS: "success", PUBLISH_OUTCOME: "success" },
+      stdio: "pipe",
+    });
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+describe("NorbiAI gate", () => {
+  it("blocks on a P0 or P1 finding, also when the reviewer escaped its brackets", () => {
+    expect(blocks("1. **[NEW][P1] Short title** - `a.ts:1`")).toBe(true);
+    expect(blocks("1. **\\[NEW\\]\\[P1\\] Storage scan follows attachment symlinks** - `a.ts:1`")).toBe(true);
+    expect(blocks("1. **[REMAINS] [P0] Short title** - `a.ts:1`")).toBe(true);
+    expect(blocks("1. **\\[NEW\\]\\[P2\\] Short title** - `a.ts:1`")).toBe(false);
+    expect(blocks("No actionable findings.")).toBe(false);
   });
 });
