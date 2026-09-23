@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentProvider } from "../agent-client";
+import { AgentProcessExitError, type AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
 import {
   CREATE_AGENT_INPUT,
@@ -23,7 +23,7 @@ import {
   waitFor,
 } from "../agent-service-test-harness";
 import type { AgentStore } from "../agent-store";
-
+import { McpServerStore } from "../mcp-server-store";
 import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
@@ -1002,6 +1002,75 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(clients[1]?.running).toBe(false);
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "claude", version: "2.1.246", state: "available" }),
+    );
+  });
+
+  it("reports an updated CLI that stops at start as broken, with its reason, not as signed out", async () => {
+    const managed = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    const exit = new AgentProcessExitError("Claude stopped before it answered (exit code 3).", "Error: bad config");
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "claude",
+      clientFactory: (provider) =>
+        new FakeAgentClient(provider, "", true, true, {}, async (method, from) => {
+          if (from === "claude" && method === "initialize") throw exit;
+        }),
+      bundledExecutables: { claude: managed },
+    });
+    await service.initialize();
+
+    const message =
+      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3). Error: bad config";
+    await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(message);
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "error", message }),
+    );
+  });
+
+  it("keeps an MCP secret the stopped CLI quoted out of the update failure", async () => {
+    const managed = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    let claudeClients = 0;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "claude",
+      // The running client starts; its replacement stops and quotes the server's secret on stderr.
+      clientFactory: (provider) => {
+        const replacement = provider === "claude" && ++claudeClients > 1;
+        return new FakeAgentClient(provider, "", true, true, {}, async (method) => {
+          if (replacement && method === "initialize") {
+            // Past the shortening, so a cut before redaction would leave a prefix of the secret.
+            throw new AgentProcessExitError(
+              "Claude stopped before it answered (exit code 3).",
+              `${"x".repeat(285)} rejected abcdef123456`,
+            );
+          }
+        });
+      },
+      bundledExecutables: { claude: managed },
+    });
+    await service.initialize();
+    new McpServerStore(store.database).save({
+      id: "",
+      name: "Filesystem",
+      transport: "stdio",
+      enabled: true,
+      command: "/bin/echo",
+      args: [],
+      env: [{ key: "API_KEY", value: "abcdef123456" }],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "",
+      headers: [],
+    });
+
+    const message = `OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3). ${"x".repeat(285)} rejected •••`;
+    await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(message);
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "available", message }),
     );
   });
 

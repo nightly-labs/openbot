@@ -21,7 +21,7 @@ import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
-import type { AgentProvider } from "./agent-client";
+import { AgentProcessExitError, type AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
@@ -76,11 +76,23 @@ const MODEL_REASONING_CLEANUP_MS = 1_000;
  */
 const MODEL_DISCOVERY_RETURN_MS = 250;
 
+/**
+ * How long a failed request waits for the process to report its exit. Stdout ends first, and the
+ * exit follows within milliseconds; a CLI that closed stdout and kept running is reported as it was.
+ */
+const EXIT_REPORT_WAIT_MS = 2_000;
+
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
   exit: [error: Error];
   diagnostic: [message: string];
+}
+
+interface ProcessEnd {
+  ending: string;
+  /** The last stderr line, after `redactText` only. `AgentProcessExitError` keeps it private. */
+  detail: string | null;
 }
 
 interface PendingServerRequest {
@@ -175,6 +187,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   #process: ChildProcessWithoutNullStreams | null = null;
   #connection: ClientSideConnection | null = null;
+  /** How the current process ended, and its last stderr line, once its output is read to the end. */
+  #ended: Promise<ProcessEnd> | null = null;
   #initialized: Promise<void> | null = null;
   #initialization: InitializeResponse | null = null;
   #models: AcpModel[] = [];
@@ -223,12 +237,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
     // One record at a time, never one chunk at a time: a chunk can end inside a JSON record, and a
     // record read in halves keeps the credential in its second half.
+    let lastDiagnostic: string | null = null;
     const diagnostics = createDiagnosticStream({
       redact: redactText,
-      emit: (message) => this.emit("diagnostic", message),
+      emit: (message) => {
+        lastDiagnostic = message;
+        this.emit("diagnostic", message);
+      },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
-    child.once("close", () => diagnostics.flush());
+    // Read at `close`, not `exit`: only then is stderr read to its end, and a CLI that fails at start
+    // writes the reason as its last line.
+    this.#ended = new Promise((resolve) => {
+      child.once("error", (error) => resolve({ ending: "it could not start", detail: redactText(error.message) }));
+      child.once("close", (code, signal) => {
+        diagnostics.flush();
+        resolve({ ending: signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`, detail: lastDiagnostic });
+      });
+    });
     child.once("error", (error) => this.#fail(error, child));
     child.once("exit", (code, signal) => {
       const suffix = signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;
@@ -277,6 +303,40 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
+    const ended = this.#ended;
+    try {
+      return await this.#request(method, params, decoder, timeoutMs);
+    } catch (error) {
+      throw await this.#explainEnd(error, ended);
+    }
+  }
+
+  /**
+   * The error to report for a request that failed. The ACP SDK rejects every open request with a
+   * bare "ACP connection closed" as soon as the CLI's stdout ends, before the process reports its
+   * exit, so a CLI that fails at start read to the user as that phrase and nothing else. When the
+   * process ended on its own, this waits for its exit and reports it with the CLI's last stderr line.
+   */
+  async #explainEnd(error: unknown, ended: Promise<ProcessEnd> | null): Promise<unknown> {
+    if (!ended || this.#stopping) return error;
+    const message = error instanceof Error ? error.message : "";
+    if (message !== "ACP connection closed" && message !== "ACP client is not running.") return error;
+    let timer: NodeJS.Timeout | undefined;
+    const ending = await Promise.race([
+      ended,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), EXIT_REPORT_WAIT_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
+    if (ending === null) return error;
+    return new AgentProcessExitError(
+      `${agentProviderName(this.provider)} stopped before it answered (${ending.ending}).`,
+      ending.detail,
+      { cause: error },
+    );
+  }
+
+  async #request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
     if (!this.running) throw new Error("ACP client is not running.");
     switch (method) {
       case "initialize":

@@ -1,6 +1,7 @@
 import { webContents } from "electron";
 import type { BrowserHost } from "../src/backend/browser-host";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
+import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 /** HTTPS is served inside this isolated session. No credentials or network service are used. */
 export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin: string): Promise<void> {
@@ -35,6 +36,10 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       ["password", "native-submit"],
     ] as const) {
       const tab = await browser.open(`https://authentication.openbot.test/${path}`, "secret-thread", "secret-agent");
+      // The submission clicks Sign in; a tab with no frame yet would drop that click.
+      const tabContents = webContents.getAllWebContents().find((contents) => contents.getURL() === tab.url);
+      if (!tabContents) throw new Error(`Missing ${path} fixture.`);
+      await waitForPresentedFrame(tabContents);
       const params: DynamicToolCallParams = {
         namespace: "openbot_browser",
         tool: "submit_secret",

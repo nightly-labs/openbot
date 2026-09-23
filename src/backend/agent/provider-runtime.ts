@@ -19,7 +19,7 @@ import {
   isReasoningEffort,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
-import type { AgentClient, AgentProvider } from "./../agent-client";
+import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
   type AgentCliInfo,
@@ -820,8 +820,10 @@ export class ProviderRuntime implements ProviderPort {
       this.#setProviderConnectionState(provider, "connecting");
       this.#replacingCli.add(provider);
       recordRestartActivity();
+      let installed = false;
       try {
         const executable = await install();
+        installed = true;
         this.#bundledExecutables[provider] = executable;
         const cli = await this.#resolveProviderCli(provider);
         if (cli.source !== "managed" || cli.executable !== executable) {
@@ -834,7 +836,9 @@ export class ProviderRuntime implements ProviderPort {
           `OpenBot could not update the ${providerLabel(provider)} CLI. ${error instanceof Error ? redactText(error.message) : "Try again."}`,
           { cause: error },
         );
-        this.#setProviderConnectionFailure(provider, failure, previousVersion);
+        // A failed download leaves the previous CLI as it was. An installed CLI that does not start
+        // is a broken CLI, which no sign-in fixes.
+        this.#setProviderConnectionFailure(provider, failure, previousVersion, installed);
         throw failure;
       } finally {
         this.#replacingCli.delete(provider);
@@ -1060,6 +1064,11 @@ export class ProviderRuntime implements ProviderPort {
     return this.status();
   }
 
+  /** A CLI exit with its last stderr line in the message, after the MCP values are out of it. */
+  #withExitDetail(error: unknown): unknown {
+    return error instanceof AgentProcessExitError ? error.withDetail(this.#redactMcp) : error;
+  }
+
   async #createAuthenticatedProviderClient(
     provider: AgentProvider,
     cli: AgentCliInfo,
@@ -1091,7 +1100,9 @@ export class ProviderRuntime implements ProviderPort {
       return { client, account: account.account };
     } catch (error) {
       await client.stop().catch(() => undefined);
-      throw error;
+      // The CLI's last stderr line can quote an MCP secret that `redactText` does not know, and this
+      // message reaches the status, the IPC answer and the runtime download error.
+      throw this.#withExitDetail(error);
     }
   }
 
@@ -1201,7 +1212,17 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
-  #setProviderConnectionFailure(provider: AgentProvider, error: unknown, version?: string | null): void {
+  /**
+   * `cliFailed` is for a failure of the CLI itself, such as an update that installed a CLI which does
+   * not start. A CLI that stopped before it answered is one as well. Such a provider needs the CLI
+   * fixed, not a sign-in, so its status says so.
+   */
+  #setProviderConnectionFailure(
+    provider: AgentProvider,
+    error: unknown,
+    version?: string | null,
+    cliFailed = error instanceof AgentProcessExitError,
+  ): void {
     const hasActiveClient = this.#clients.has(provider);
     const fallbackMessage = `OpenBot could not connect ${providerLabel(provider)}. Try again.`;
     const rawMessage = error instanceof Error ? error.message : String(error);
@@ -1213,7 +1234,7 @@ export class ProviderRuntime implements ProviderPort {
           message,
           email: this.#accounts.get(provider)?.email ?? null,
         }
-      : error instanceof CodexCliError
+      : error instanceof CodexCliError || cliFailed
         ? providerFailureStatus(provider, error, version)
         : {
             state: "sign-in-required" as const,
@@ -1602,8 +1623,9 @@ export class ProviderRuntime implements ProviderPort {
             }),
           });
           return null;
-        } catch (error) {
+        } catch (thrown) {
           if (client) await client.stop().catch(() => undefined);
+          const error = this.#withExitDetail(thrown);
           // The CLI's own words reach the status message and the joined start failure below, so
           // the MCP values go first. `providerFailureStatus` applies only the generic redaction.
           const message = this.#redactMcp(error instanceof Error ? error.message : String(error));
