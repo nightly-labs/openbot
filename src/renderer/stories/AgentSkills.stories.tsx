@@ -219,7 +219,7 @@ export const RemoveConfirm: Story = {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "More for Inbox triage" }));
     await userEvent.click(await body.findByRole("menuitem", { name: "Uninstall" }));
-    await expect(await body.findByRole("dialog", { name: "Remove this skill?" })).toBeVisible();
+    await expect(await body.findByRole("alertdialog", { name: "Remove this skill?" })).toBeVisible();
   },
 };
 

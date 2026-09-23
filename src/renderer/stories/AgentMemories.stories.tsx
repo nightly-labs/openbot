@@ -177,7 +177,7 @@ export const ClearConfirmation: Story = {
     await userEvent.click(await canvas.findByRole("button", { name: /Memories/ }));
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Clear all memories" }));
-    await expect(await body.findByRole("dialog", { name: "Clear all memories?" })).toBeVisible();
+    await expect(await body.findByRole("alertdialog", { name: "Clear all memories?" })).toBeVisible();
     await expect(document.querySelector(".agent-memories-modal")).toBeVisible();
   },
 };

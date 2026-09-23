@@ -18,6 +18,7 @@
     "./chart": "./src/chart.tsx",
     "./radial-progress": "./src/radial-progress.tsx",
     "./complex": "./src/complex.tsx",
+    "./confirm-dialog": "./src/confirm-dialog.tsx",
     "./utils": "./src/utils.ts",
     "./dynamic-island-identity": "./src/dynamic-island-identity.tsx",
     "./bubble": "./src/bubble.tsx",
