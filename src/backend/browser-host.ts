@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { isIP } from "node:net";
 import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -37,6 +37,7 @@ import {
   WebContentsView,
   webContents,
 } from "electron";
+import { writeJsonFileAtomically } from "./atomic-json-file";
 import {
   BrowserCdpEngine,
   type BrowserScreencastFrame,
@@ -2168,16 +2169,7 @@ export class BrowserHost {
     this.#persistQueue = this.#persistQueue
       .catch(() => undefined)
       .then(async () => {
-        const temporaryPath = `${this.#statePath}.${randomUUID()}.tmp`;
-        try {
-          await writeFile(temporaryPath, `${JSON.stringify(state)}\n`, {
-            encoding: "utf8",
-            mode: 0o600,
-          });
-          await rename(temporaryPath, this.#statePath);
-        } finally {
-          await rm(temporaryPath, { force: true }).catch(() => undefined);
-        }
+        await writeJsonFileAtomically(this.#statePath, state);
       });
     return this.#persistQueue;
   }

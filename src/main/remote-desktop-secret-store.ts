@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
 import { z } from "zod";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 
 const storedSecretSchema = z.object({ version: z.literal(1), value: z.string() });
 const runtimeCredentialsSchema = z.object({ username: z.string().min(1), password: z.string().min(1) });
@@ -23,11 +23,6 @@ export async function loadOrCreateRemoteDesktopCredentials(
   }
   const credentials = { username: "openbot", password: randomBytes(32).toString("base64url") };
   const encrypted = cipher.encrypt(JSON.stringify(credentials));
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  const temporaryPath = `${path}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify({ version: 1, value: encrypted.toString("base64") })}\n`, {
-    mode: 0o600,
-  });
-  await rename(temporaryPath, path);
+  await writeJsonFileAtomically(path, { version: 1, value: encrypted.toString("base64") }, { createDirectory: true });
   return credentials;
 }

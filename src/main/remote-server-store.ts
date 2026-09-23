@@ -13,11 +13,11 @@
 // roll the selection back when the write fails. That is why `persist` is public. Do not add a second
 // exception -- a mutation whose write is somebody else's job is the hazard this module exists to end.
 
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import {
   emptyStoredRemoteServers,
   readStoredRemoteServers,
@@ -369,16 +369,7 @@ export class RemoteServerStore implements RemoteServerDirectory {
   }
 
   async #writeSnapshot(snapshot: StoredRemoteServers): Promise<void> {
-    const temporary = `${this.#path}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporary, `${JSON.stringify(serializeStoredRemoteServers(snapshot))}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-      });
-      await rename(temporary, this.#path);
-    } finally {
-      await rm(temporary, { force: true });
-    }
+    await writeJsonFileAtomically(this.#path, serializeStoredRemoteServers(snapshot));
   }
 }
 

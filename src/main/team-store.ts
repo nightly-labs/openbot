@@ -24,6 +24,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress, slugifyTeamServerName } from "@openbot/contracts/validation";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 
 const scrypt = promisify(scryptCallback);
 const INVITE_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -1174,15 +1175,7 @@ export class TeamStore {
       );
     }
     const snapshot = structuredClone(this.#file);
-    const operation = this.#writeChain.then(async () => {
-      const temporary = `${this.#path}.${randomUUID()}.tmp`;
-      try {
-        await writeFile(temporary, `${JSON.stringify(snapshot)}\n`, { encoding: "utf8", mode: 0o600 });
-        await rename(temporary, this.#path);
-      } finally {
-        await rm(temporary, { force: true });
-      }
-    });
+    const operation = this.#writeChain.then(() => writeJsonFileAtomically(this.#path, snapshot));
     this.#writeChain = operation.catch(() => undefined);
     await operation;
   }

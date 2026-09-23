@@ -1,9 +1,9 @@
 // The OAuth registrations and tokens of the http MCP servers this machine has signed in to,
 // encrypted at rest by the operating system.
 
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile, rm } from "node:fs/promises";
 import { z } from "zod";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { type McpOAuthRecord, type McpOAuthStorage, mcpOAuthRecordSchema } from "../backend/mcp-oauth-provider";
 import type { SecretCipher } from "./provider-credential-store";
 
@@ -215,11 +215,8 @@ export class McpOAuthStore implements McpOAuthStorage {
     for (const [resource, record] of records) {
       servers[resource] = this.#cipher.encrypt(JSON.stringify(record)).toString("base64");
     }
-    await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
-    const temporaryPath = `${this.#path}.tmp`;
     // Write then rename, so a crash in the middle leaves the previous envelope readable rather than
     // a truncated one: half a token set is six sign-ins the user has to do again.
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 1, servers })}\n`, { mode: 0o600 });
-    await rename(temporaryPath, this.#path);
+    await writeJsonFileAtomically(this.#path, { version: 1, servers }, { createDirectory: true });
   }
 }
