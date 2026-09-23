@@ -587,6 +587,8 @@ jobs:
           RESPONSES_FILE: ${{ steps.previous.outputs.responses_file }}
           MODEL: ${{ steps.reviewer.outputs.model }}
           EFFORT: ${{ steps.reviewer.outputs.effort }}
+          # About 50k tokens. Above this the reviewer reads the diff itself.
+          INLINE_DIFF_MAX_BYTES: 200000
         run: |
           set -euo pipefail
 
@@ -605,6 +607,29 @@ jobs:
           if [ "$files_changed" -gt 50 ] || [ "$changed_lines" -gt 5000 ]; then
             large_pr=true
           fi
+
+          # Handing the reviewer the diff saves the first several turns of every run, each a
+          # model round trip spent paging through `git diff`. Wide context first, because the
+          # reviewer otherwise reopens each file for the code around a hunk; then the default
+          # context; then nothing, and the reviewer reads the diff itself as before.
+          diff_file="$RUNNER_TEMP/norbiai-diff.txt"
+          : > "$diff_file"
+          diff_context=""
+          for context in 40 3; do
+            git diff --find-renames --unified="$context" "$BASE_SHA...$HEAD_SHA" > "$diff_file"
+            if [ "$(wc -c < "$diff_file")" -le "$INLINE_DIFF_MAX_BYTES" ]; then
+              diff_context=$context
+              break
+            fi
+            : > "$diff_file"
+          done
+          # The diff is untrusted and may hold its own backtick fences; a longer fence keeps
+          # it from closing this one and writing outside `## PR context`.
+          diff_fence='```'
+          longest_run=$({ grep -o '`\+' "$diff_file" || true; } | awk '{ if (length($0) > n) n = length($0) } END { print n + 0 }')
+          while [ "${#diff_fence}" -le "$longest_run" ]; do
+            diff_fence="${diff_fence}\`"
+          done
 
           if git cat-file -e "$BASE_SHA:.github/norbiai-review-prompt.md" 2>/dev/null; then
             git show "$BASE_SHA:.github/norbiai-review-prompt.md" > "$prompt_file"
@@ -663,7 +688,14 @@ jobs:
             printf 'Files changed: %s\n' "$files_changed"
             printf 'Lines added: %s\n' "$lines_added"
             printf 'Lines removed: %s\n' "$lines_removed"
-            printf '\nReview the full current PR with `git diff --find-renames %s...%s`.\n' "$BASE_SHA" "$HEAD_SHA"
+            if [ -s "$diff_file" ]; then
+              printf '\nThe full current diff is below, with %s lines of context. It is the output of `git diff --find-renames --unified=%s %s...%s`: read it here rather than running that again, and open files only for code outside it.\n\n' "$diff_context" "$diff_context" "$BASE_SHA" "$HEAD_SHA"
+              printf '%s diff\n' "$diff_fence"
+              cat "$diff_file"
+              printf '%s\n' "$diff_fence"
+            else
+              printf '\nReview the full current PR with `git diff --find-renames %s...%s`.\n' "$BASE_SHA" "$HEAD_SHA"
+            fi
             printf '\n## Previous active findings\n\n'
             if [ -s "$PREVIOUS_FILE" ]; then
               cat "$PREVIOUS_FILE"
