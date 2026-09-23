@@ -23,7 +23,7 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
       };
     }
     if (
-      (parsed.version !== 3 && parsed.version !== 4) ||
+      parsed.version !== 3 ||
       !isBoolean(parsed.hapticsEnabled) ||
       !isBoolean(parsed.idleVisible) ||
       !isBoolean(parsed.additionalDisplaysEnabled)
@@ -35,8 +35,9 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
       hapticsEnabled: parsed.hapticsEnabled,
       idleVisible: parsed.idleVisible,
       additionalDisplaysEnabled: parsed.additionalDisplaysEnabled,
-      // Version 3 has no size. A size outside the limits resets only the size, so a bad value
-      // cannot make the island too small to find and does not discard the switches beside it.
+      // The size is optional so that 0.18.0 and earlier, which refuse any version but 3, still read
+      // this file. A missing or out-of-range size resets only the size, so a bad value cannot make
+      // the island too small to find and does not discard the switches beside it.
       widthPercent: isDynamicIslandSizePercent(parsed.widthPercent, DYNAMIC_ISLAND_SIZE_LIMITS.widthPercent)
         ? parsed.widthPercent
         : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent,
@@ -56,7 +57,7 @@ export async function writeDynamicIslandPreference(
 ): Promise<DynamicIslandPreference> {
   const temporaryPath = `${path}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 4, ...preference })}\n`, {
+    await writeFile(temporaryPath, `${JSON.stringify({ version: 3, ...preference })}\n`, {
       encoding: "utf8",
       mode: 0o600,
     });

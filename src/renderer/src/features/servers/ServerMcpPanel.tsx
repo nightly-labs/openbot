@@ -1,9 +1,9 @@
 import {
-  AlertDialog,
   Badge,
   Blocks,
   Button,
   buttonVariants,
+  ConfirmDialog,
   DropdownMenu,
   Ellipsis,
   Field,
@@ -131,7 +131,6 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     formTest: null,
     formTestConfig: null,
   });
-  let removeTrigger: HTMLElement | undefined;
   // Counts the form's tests, so an answer that arrives after the user left is dropped.
   let draftTestRun = 0;
 
@@ -401,7 +400,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         onTest={() => void testRow(config())}
                         onEdit={() => openForm(config())}
                         onRemove={(trigger) => {
-                          removeTrigger = trigger;
+                          // The confirmation returns focus to the element focused when it opens.
+                          trigger.focus({ preventScroll: true });
                           setState((current) => {
                             current.removeId = config().id;
                           });
@@ -791,69 +791,33 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
         </div>
       </Show>
 
-      <AlertDialog.Root
-        open={Boolean(removeTarget())}
-        onOpenChange={(open) => {
-          if (!open && state.busy === null)
-            setState((current) => {
-              current.removeId = null;
-            });
-        }}
-      >
-        <Show when={removeTarget()}>
-          {(config) => (
-            <AlertDialog.Portal>
-              <AlertDialog.Overlay class="server-settings-confirm-backdrop">
-                <AlertDialog.Content
-                  class="server-settings-confirm-dialog"
-                  onCloseAutoFocus={(event) => {
-                    event.preventDefault();
-                    queueMicrotask(() => removeTrigger?.focus({ preventScroll: true }));
-                  }}
-                >
-                  <span class="server-settings-confirm-icon" aria-hidden="true">
-                    <Trash2 />
-                  </span>
-                  <AlertDialog.Title>Remove {config().name}?</AlertDialog.Title>
-                  <AlertDialog.Description>
-                    Its tools stop being offered to this server’s agents. The configuration is not kept.
-                  </AlertDialog.Description>
-                  <div class="server-settings-confirm-actions">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={state.busy !== null}
-                      onClick={() =>
-                        setState((current) => {
-                          current.removeId = null;
-                        })
-                      }
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      loading={state.busy === `remove:${config().id}`}
-                      loadingLabel="Removing…"
-                      onClick={() =>
-                        void run(`remove:${config().id}`, async () => {
-                          await props.onRemove(config().id);
-                          setState((current) => {
-                            current.removeId = null;
-                          });
-                        })
-                      }
-                    >
-                      Remove MCP server
-                    </Button>
-                  </div>
-                </AlertDialog.Content>
-              </AlertDialog.Overlay>
-            </AlertDialog.Portal>
-          )}
-        </Show>
-      </AlertDialog.Root>
+      {/* The dialog unmounts with its target, so its title never shows an empty name while it closes. */}
+      <Show when={removeTarget()}>
+        {(config) => (
+          <ConfirmDialog
+            open
+            initialFocus="cancel"
+            pending={state.busy === `remove:${config().id}`}
+            title={`Remove ${config().name}?`}
+            description="Its tools stop being offered to this server’s agents. The configuration is not kept."
+            confirmLabel="Remove MCP server"
+            pendingLabel="Removing…"
+            onCancel={() =>
+              setState((current) => {
+                current.removeId = null;
+              })
+            }
+            onConfirm={async () => {
+              await run(`remove:${config().id}`, async () => {
+                await props.onRemove(config().id);
+                setState((current) => {
+                  current.removeId = null;
+                });
+              });
+            }}
+          />
+        )}
+      </Show>
     </div>
   );
 }

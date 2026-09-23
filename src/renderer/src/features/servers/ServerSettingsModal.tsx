@@ -17,7 +17,6 @@ import {
   AlertActions,
   AlertContent,
   AlertDescription,
-  AlertDialog,
   AlertIcon,
   AlertTitle,
   Badge,
@@ -27,6 +26,7 @@ import {
   Card,
   Check,
   ChevronRight,
+  ConfirmDialog,
   CopyButton,
   DropdownMenu,
   Ellipsis,
@@ -228,7 +228,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const [toastHeight, setToastHeight] = createSignal(0);
   let logoInput: HTMLInputElement | undefined;
   let nameInput: HTMLInputElement | undefined;
-  let removeMemberTrigger: HTMLElement | undefined;
   let inviteLinkInput: HTMLInputElement | undefined;
   let syncedServerId = "";
   let expiryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -797,69 +796,33 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
       </SettingsDialogShell>
 
-      <AlertDialog.Root
-        open={Boolean(removeMember())}
-        onOpenChange={(open) => {
-          if (!open && busy() !== `remove:${panels.members.removeId}`)
-            setPanels((state) => {
-              state.members.removeId = null;
-            });
-        }}
-      >
-        <Show when={removeMember()}>
-          {(member) => (
-            <AlertDialog.Portal>
-              <AlertDialog.Overlay class="server-settings-confirm-backdrop">
-                <AlertDialog.Content
-                  class="server-settings-confirm-dialog"
-                  onCloseAutoFocus={(event) => {
-                    event.preventDefault();
-                    queueMicrotask(() => removeMemberTrigger?.focus({ preventScroll: true }));
-                  }}
-                >
-                  <span class="server-settings-confirm-icon" aria-hidden="true">
-                    <Trash2 />
-                  </span>
-                  <AlertDialog.Title>Remove {teamMemberName(member())}?</AlertDialog.Title>
-                  <AlertDialog.Description>
-                    This person will lose access to the server and its shared conversations.
-                  </AlertDialog.Description>
-                  <div class="server-settings-confirm-actions">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy() === `remove:${member().id}`}
-                      onClick={() =>
-                        setPanels((state) => {
-                          state.members.removeId = null;
-                        })
-                      }
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      loading={busy() === `remove:${member().id}`}
-                      loadingLabel="Removing…"
-                      onClick={() =>
-                        void run(`remove:${member().id}`, async () => {
-                          await props.onRemoveMember(member().id);
-                          setPanels((state) => {
-                            state.members.removeId = null;
-                          });
-                        })
-                      }
-                    >
-                      Remove member
-                    </Button>
-                  </div>
-                </AlertDialog.Content>
-              </AlertDialog.Overlay>
-            </AlertDialog.Portal>
-          )}
-        </Show>
-      </AlertDialog.Root>
+      {/* The dialog unmounts with its target, so its title never shows an empty name while it closes. */}
+      <Show when={removeMember()}>
+        {(member) => (
+          <ConfirmDialog
+            open
+            initialFocus="cancel"
+            pending={busy() === `remove:${member().id}`}
+            title={`Remove ${teamMemberName(member())}?`}
+            description="This person will lose access to the server and its shared conversations."
+            confirmLabel="Remove member"
+            pendingLabel="Removing…"
+            onCancel={() =>
+              setPanels((state) => {
+                state.members.removeId = null;
+              })
+            }
+            onConfirm={async () => {
+              await run(`remove:${member().id}`, async () => {
+                await props.onRemoveMember(member().id);
+                setPanels((state) => {
+                  state.members.removeId = null;
+                });
+              });
+            }}
+          />
+        )}
+      </Show>
     </Tabs.Root>
   );
 
@@ -1415,7 +1378,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, role }))
                 }
                 onRemove={(trigger) => {
-                  removeMemberTrigger = trigger;
+                  // The confirmation returns focus to the element focused when it opens.
+                  trigger.focus({ preventScroll: true });
                   setPanels((state) => {
                     state.members.removeId = member.id;
                   });

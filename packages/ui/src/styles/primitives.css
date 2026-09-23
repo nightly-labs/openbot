@@ -1918,6 +1918,200 @@
   border-radius: 0;
   box-shadow: none;
 }
+
+/* The standard confirmation: the icon beside a left-aligned title and description, and the actions
+ * on a footer below a divider. The surface uses the dialog ring and shadow of the other dialogs.
+ * A confirmation always answers the surface that opened it, so it takes the top nested dialog step:
+ * it also opens over the marketplace and skills modals on `--openbot-layer-dialog-host`. */
+.ui-confirm-dialog-overlay {
+  position: fixed;
+  z-index: calc(var(--openbot-layer-dialog-host) + 2);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+  animation: ui-confirm-dialog-fade-in var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.ui-dialog-content.ui-confirm-dialog {
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 2 * var(--openbot-space-6));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  outline: 0;
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+  box-shadow:
+    0 0 0 1px var(--openbot-dialog-ring),
+    0 24px 64px var(--openbot-shadow-dialog);
+  animation: ui-confirm-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+.ui-confirm-dialog-main {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-6);
+}
+
+.ui-confirm-dialog-icon {
+  width: var(--openbot-control-xl);
+  height: var(--openbot-control-xl);
+  display: grid;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
+}
+
+.ui-confirm-dialog-icon svg {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.ui-confirm-dialog[data-tone="destructive"] .ui-confirm-dialog-icon {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger-text);
+}
+
+.ui-confirm-dialog-media {
+  display: grid;
+  place-items: center;
+}
+
+.ui-confirm-dialog-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  padding-top: var(--openbot-space-1-5);
+}
+
+.ui-confirm-dialog-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-xl);
+  letter-spacing: var(--openbot-tracking-tight);
+  overflow-wrap: anywhere;
+}
+
+.ui-confirm-dialog-description {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.ui-confirm-dialog-body {
+  margin-top: var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.ui-confirm-dialog-body :where(ul, ol) {
+  display: grid;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-8);
+  list-style: disc;
+}
+
+.ui-confirm-dialog-body :where(li)::marker {
+  color: var(--openbot-text-dim);
+}
+
+.ui-confirm-dialog-error.ui-alert {
+  margin-top: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.ui-confirm-dialog-error .ui-alert-icon {
+  color: var(--openbot-danger-text);
+}
+
+.ui-confirm-dialog-actions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-dialog-ring);
+  padding: var(--openbot-space-4) var(--openbot-space-6);
+}
+
+.ui-confirm-dialog-actions .ui-button svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+/* Status text on a tinted fill reads the text step of its colour: the solid danger step measures
+ * 3.7:1 on its own soft fill, under the 4.5:1 a label needs. */
+.ui-confirm-dialog-confirm.ui-button-variant-destructive {
+  color: var(--openbot-danger-text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-confirm-dialog-confirm.ui-button-variant-destructive:hover:not(:disabled):not([data-disabled]) {
+    color: var(--openbot-danger-text);
+  }
+}
+
+.ui-confirm-dialog-actions .ui-button:active:not(:disabled):not([data-disabled]) {
+  transform: scale(0.97);
+}
+
+@keyframes ui-confirm-dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ui-confirm-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+}
+
+@media (max-width: 560px) {
+  .ui-confirm-dialog-overlay {
+    padding: var(--openbot-space-3);
+  }
+
+  .ui-dialog-content.ui-confirm-dialog {
+    max-height: calc(100dvh - 2 * var(--openbot-space-3));
+  }
+
+  .ui-confirm-dialog-main {
+    padding: var(--openbot-space-4);
+  }
+
+  .ui-confirm-dialog-actions {
+    padding: var(--openbot-space-3) var(--openbot-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-dialog-content.ui-confirm-dialog {
+    animation-name: ui-confirm-dialog-fade-in;
+  }
+
+  .ui-confirm-dialog-actions .ui-button:active {
+    transform: none;
+  }
+}
 .ui-bubble-group {
   display: flex;
   min-width: 0;
