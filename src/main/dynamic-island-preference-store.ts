@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DYNAMIC_ISLAND_SIZE_LIMITS,
@@ -7,6 +6,7 @@ import {
   isDynamicIslandSizePercent,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 
 export async function readDynamicIslandPreference(path: string): Promise<DynamicIslandPreference> {
   try {
@@ -55,17 +55,8 @@ export async function writeDynamicIslandPreference(
   path: string,
   preference: DynamicIslandPreference,
 ): Promise<DynamicIslandPreference> {
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 3, ...preference })}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await rename(temporaryPath, path);
-    return { ...preference };
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
+  await writeJsonFileAtomically(path, { version: 3, ...preference });
+  return { ...preference };
 }
 
 function isMissing(error: unknown): error is NodeJS.ErrnoException {

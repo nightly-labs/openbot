@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename } from "node:fs/promises";
 import { dirname } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
+import { writeJsonFileAtomically } from "./atomic-json-file";
 
 interface StoredSidebarLayout extends SidebarLayoutSnapshot {
   version: 2;
@@ -202,10 +203,8 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   }
 
   async #commit(next: SidebarLayoutSnapshot): Promise<void> {
-    const temporary = `${this.#path}.${randomUUID()}.tmp`;
     const stored: StoredSidebarLayout = { version: 2, ...next };
-    await writeFile(temporary, `${JSON.stringify(stored)}\n`, { encoding: "utf8", mode: 0o600 });
-    await rename(temporary, this.#path);
+    await writeJsonFileAtomically(this.#path, stored);
     this.#layout = next;
     this.emit("changed", this.getSnapshot());
   }

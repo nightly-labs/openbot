@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import type { AnalyticsPreference } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 
 const DEFAULT_PREFERENCE: AnalyticsPreference = { enabled: true };
 
@@ -21,17 +21,8 @@ export async function readAnalyticsPreference(path: string): Promise<AnalyticsPr
 
 export async function writeAnalyticsPreference(path: string, enabled: boolean): Promise<AnalyticsPreference> {
   const preference = { enabled };
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 1, enabled })}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await rename(temporaryPath, path);
-    return preference;
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
+  await writeJsonFileAtomically(path, { version: 1, enabled });
+  return preference;
 }
 
 function isMissing(error: unknown): error is NodeJS.ErrnoException {

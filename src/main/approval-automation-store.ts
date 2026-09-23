@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type ApprovalAutomationPreference,
@@ -9,6 +8,7 @@ import {
   type SetApprovalAutomationInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 
 /** Missing settings use the product default; invalid settings always require approval. */
 export async function readApprovalAutomation(
@@ -55,15 +55,8 @@ export async function writeApprovalAutomation(
   path: string,
   preference: ApprovalAutomationPreference,
 ): Promise<ApprovalAutomationPreference> {
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  const payload = { version: 2, ...preference };
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify(payload)}\n`, { encoding: "utf8", mode: 0o600 });
-    await rename(temporaryPath, path);
-    return { ...preference, autoApproveOverrides: { ...preference.autoApproveOverrides } };
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
+  await writeJsonFileAtomically(path, { version: 2, ...preference });
+  return { ...preference, autoApproveOverrides: { ...preference.autoApproveOverrides } };
 }
 
 export interface ApprovalAutomationOptions {
