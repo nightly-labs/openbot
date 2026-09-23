@@ -88,3 +88,12 @@ export const SubmittingPassword: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Submit" }));
   },
 };
+
+export const SubmittingCode: Story = {
+  args: { onRespond: () => new Promise<void>(() => {}) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByLabelText("6-digit code"), "123456");
+    await userEvent.click(canvas.getByRole("button", { name: "Submit" }));
+  },
+};
