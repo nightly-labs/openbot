@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
 import { type FileHandle, mkdir, open, readFile, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -11,6 +10,7 @@ import {
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
   TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES,
 } from "@openbot/contracts/team-protocol/v2";
+import { sha256File } from "../backend/file-hash";
 import { recordRestartActivity } from "../backend/restart-activity";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 
@@ -518,10 +518,4 @@ function fileTransferId(data: string | ArrayBuffer): string | null {
   } catch {
     return null;
   }
-}
-
-async function sha256File(path: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(path)) hash.update(chunk);
-  return hash.digest("hex");
 }
