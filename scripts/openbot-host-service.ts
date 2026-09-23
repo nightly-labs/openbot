@@ -336,8 +336,15 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS &&
     !waitingOnUnregistered;
   // #tick applies no phase rule while management is off, so no tenant blocks and no countdown runs.
+  // A stopped daemon counts no idle grace either: the host keeps that count in memory only.
   const tenants = input.tenants.map((entry) =>
-    describeTenant(entry, managed ? state : null, input.processes, now, stateStale || waitingOnUnregistered),
+    describeTenant(
+      entry,
+      managed ? state : null,
+      input.processes,
+      now,
+      !input.daemonRunning || stateStale || waitingOnUnregistered,
+    ),
   );
   const partial = {
     managed,

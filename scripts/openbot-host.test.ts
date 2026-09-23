@@ -429,7 +429,9 @@ describe("host status reporting", () => {
   });
 
   it("reports a stopped daemon and an unmanaged host before any update text", () => {
-    expect(describeHostStatus({ ...statusInput(), daemonRunning: false }).summary).toContain("LaunchDaemon is not");
+    const stopped = describeHostStatus({ ...statusInput(), daemonRunning: false });
+    expect(stopped.summary).toContain("LaunchDaemon is not");
+    expect(stopped.tenants.map((tenant) => tenant.readyInMs)).toEqual([null, null]);
     const unmanaged = describeHostStatus({
       ...statusInput(),
       config: { managed: false, tenants: [501] },
