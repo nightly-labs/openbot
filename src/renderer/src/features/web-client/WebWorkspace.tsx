@@ -278,6 +278,7 @@ export function WebWorkspace(props: {
           appInfo={{ name: "OpenBot", version: "web", platform: "darwin", variant: "production" }}
           agentStatus={status()}
           accountUsage={accountUsage()}
+          usageProvider={workspace.selected()?.provider ?? null}
           usageTargetKey={
             workspace.runtime.accountUsage && workspace.state.status === "online"
               ? (workspace.state.host?.hostId ?? null)
