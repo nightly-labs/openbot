@@ -188,14 +188,25 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
     expect(availableOrder).toEqual(["claude", "grok", "codex"]);
 
-    // The CLI also reports gpt-reserve, gpt-5.5, gpt-5.4-mini and codex-auto-review, the models
-    // this product does not offer.
+    // Every model the CLI reports is offered, newest first. A name with no version goes last, and
+    // the CLI's order stays between models of one version.
     expect(
       service
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.id),
-    ).toEqual(["gpt-6-luna", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
+    ).toEqual([
+      "gpt-6-luna",
+      "gpt-5.6-luna",
+      "gpt-5.6-terra",
+      "gpt-5.6-sol",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex-spark",
+      "gpt-reserve",
+      "codex-auto-review",
+    ]);
   });
   async function opencodeModelIds(storedKey: string | null, catalog?: string[]): Promise<string[]> {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
@@ -255,7 +266,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     // An agent that has chosen no model runs whatever comes first, and OpenCode reports the
     // services the user signed in to before its own. So the order carries four claims: Muse leads,
     // no billed model outranks a free one, OpenCode's own paid models outrank a third-party
-    // sign-in OpenBot cannot refresh, and the CLI's order survives inside one tier.
+    // sign-in OpenBot cannot refresh, and the newest version leads inside one tier.
     expect(
       await opencodeModelIds(null, [
         "openai/gpt-5.3-codex-spark",
@@ -266,9 +277,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       ]),
     ).toEqual([
       "opencode/muse-spark-1.3-contributor-free",
-      "opencode/big-pickle",
       "opencode/nemotron-3.5-lightning-free",
       "opencode/mimo-v2.5-free",
+      "opencode/big-pickle",
       "openai/gpt-5.3-codex-spark",
     ]);
   });
@@ -466,7 +477,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.name),
-    ).toEqual(["GPT-5.6 Sol", "GPT-6 Astra"]);
+    ).toEqual(["GPT-6 Astra", "GPT-5.6 Sol"]);
   });
 
   it("names a Claude model by the model, not by the pick Claude Code calls it", async () => {
@@ -493,7 +504,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "claude")
         .map((model) => model.name),
-    ).toEqual(["Claude Sonnet 5", "Claude Haiku 4.5", "Claude Fable 5.1 (1M context)", "Next"]);
+    ).toEqual(["Claude Fable 5.1 (1M context)", "Claude Sonnet 5", "Claude Haiku 4.5", "Next"]);
   });
 
   it("collects all ChatGPT pages and keeps the previous catalog when pagination fails", async () => {
@@ -518,7 +529,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.id),
-    ).toEqual(["gpt-5.6-sol", "gpt-6-astra"]);
+    ).toEqual(["gpt-6-astra", "gpt-5.6-sol"]);
     expect(client.requests).toContainEqual({
       method: "model/list",
       params: { limit: 100, includeHidden: true, cursor: "page-2" },

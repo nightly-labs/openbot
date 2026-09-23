@@ -269,18 +269,6 @@ const INITIAL_STATUS: AgentStatus = {
 };
 
 /**
- * Models a provider CLI lists that an OpenBot agent is not meant to run. `codex-auto-review` and
- * `gpt-reserve` are Codex picks for its own use -- a review pass and spare capacity -- and
- * `gpt-5.5` and `gpt-5.4-mini` are older models this product does not offer. Everything else the
- * CLI reports reaches the picker, the models it marks hidden included, so this list and
- * the stored-key drop in `#refreshModelCatalog` are the only things that keep a model out, and adding to
- * either is a product decision, not a guess about a flag.
- */
-const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
-  ["codex", new Set(["gpt-reserve", "gpt-5.5", "gpt-5.4-mini", "codex-auto-review"])],
-]);
-
-/**
  * A model name the contract guards accept. `isAgentModelOption` bounds the name, and both the IPC
  * and the Team API list decoders reject the whole array when one option fails, so a name that is one
  * character too long does not shorten a label - it empties the model picker.
@@ -323,6 +311,7 @@ function isOpencodeModelUnusableWithStoredKey(id: string, name: string): boolean
  * family the stored key buys, and any `opencode/` model behind the user's own OpenCode sign-in --
  * and last the models behind a separate sign-in, whose token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
  * at all; it is the difference between a bad default and an unusable one.
+ * Inside one tier the newest version leads, which still keeps a free model first.
  */
 function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
   // Names, not ids, because the price is a naming convention and `isFreeOpencodeModel` is what
@@ -336,6 +325,27 @@ function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
 const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentModelOption) => number> = new Map([
   ["opencode", opencodeModelRank],
 ]);
+
+/** The first version number in a model name: `[5, 6]` for `GPT-5.6 Sol`, `null` for `gpt-reserve`. */
+function modelVersion(name: string): number[] | null {
+  const match = /\d+(?:\.\d+)*/u.exec(name);
+  return match ? match[0].split(".").map(Number) : null;
+}
+
+/**
+ * Newest version first, so the picker leads with the latest model. A name with no version goes
+ * last, and equal versions compare equal so the CLI's own order stays between them.
+ */
+function compareModelVersions(left: AgentModelOption, right: AgentModelOption): number {
+  const a = modelVersion(left.name);
+  const b = modelVersion(right.name);
+  if (!a || !b) return Number(!a) - Number(!b);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const difference = (b[index] ?? 0) - (a[index] ?? 0);
+    if (difference) return difference;
+  }
+  return 0;
+}
 
 /**
  * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
@@ -399,17 +409,17 @@ const FALLBACK_MODELS: AgentModelOption[] = [
   },
   {
     provider: "claude",
-    id: "claude-fable-5",
-    name: "Claude Fable 5",
-    description: "Fast Claude model for everyday agent work.",
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    description: "Most capable Claude model for complex work.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
   {
     provider: "claude",
-    id: "claude-opus-5-5",
-    name: "Claude Opus 5.5",
-    description: "Most capable Claude model for complex work.",
+    id: "claude-fable-5",
+    name: "Claude Fable 5",
+    description: "Fast Claude model for everyday agent work.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
@@ -1929,7 +1939,6 @@ export class ProviderRuntime implements ProviderPort {
           const previous = this.#models.filter((model) => model.provider === provider);
           const client = this.#clients.get(provider);
           if (!client) return { provider, models: previous, fresh: false };
-          const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
           // Read once per pass, not per model: a stored key cannot change inside one refresh, and
           // a model is unusable only because OpenBot is what put that key in the environment.
           const hasStoredKey = Boolean(this.#credentials.apiKey(provider));
@@ -1944,8 +1953,8 @@ export class ProviderRuntime implements ProviderPort {
                 decodeModelListResponse,
                 5_000,
               );
-              // Every model the CLI reports is offered apart from SUPPRESSED_MODEL_IDS, the ones it
-              // marks hidden included. A CLI hides a model it still accepts -- a new release such
+              // Every model the CLI reports is offered, the ones it marks hidden included; only the
+              // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such
               // as `gpt-6-astra` is hidden until its own launch -- and this app has no way to tell
               // that apart from a model the account cannot use, so a hidden flag was the only
               // reason a working model was missing from the picker while the same CLI ran it
@@ -1954,7 +1963,7 @@ export class ProviderRuntime implements ProviderPort {
                 // The trimmed id is what is kept: `isAgentModel` allows no whitespace, so a padded
                 // id would fail the contract guard downstream and take the whole list with it.
                 const id = item.model?.trim();
-                if (!id || suppressed.has(id.toLowerCase())) continue;
+                if (!id) continue;
                 serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;
@@ -2005,10 +2014,13 @@ export class ProviderRuntime implements ProviderPort {
                   : (fallback?.supportedReasoningEfforts ?? ["medium"]),
               });
             }
-            const rank = PREFERRED_MODEL_ORDER.get(client.provider);
-            if (!rank) return { provider, models, fresh: true };
-            // Sort is stable, so the CLI's own order still decides inside one tier.
-            return { provider, models: [...models].sort((left, right) => rank(left) - rank(right)), fresh: true };
+            const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
+            // Tier first, then newest first. Sort is stable, so the CLI's own order still decides
+            // between models of one version.
+            const sorted = [...models].sort(
+              (left, right) => rank(left) - rank(right) || compareModelVersions(left, right),
+            );
+            return { provider, models: sorted, fresh: true };
           } catch {
             return { provider, models: previous, fresh: false };
           }
