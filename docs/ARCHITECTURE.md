@@ -675,9 +675,10 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 
 ## Required verification
 
-Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough
-to run whole, and CI owns the minutes-long suites. See [AGENTS.md, Checks](../AGENTS.md#checks)
-for the division of labour and what each CI job covers.
+Run the narrowest relevant test and lint the changed files. The pre-commit hook runs `check:ui` and
+`bun run typecheck`, and CI runs the remaining checks. See [AGENTS.md, Checks](../AGENTS.md#checks)
+for the local rules, and [check design notes](development-checks.md#check-coverage) for what each CI
+job covers.
 
 The Storybook CI job builds all stories with `OPENBOT_STORYBOOK_CHECK=true`. This skips Solid's
 automatic prop documentation analysis. The job checks compilation and does not publish its output.

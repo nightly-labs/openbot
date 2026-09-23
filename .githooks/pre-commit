@@ -11,8 +11,23 @@ if git diff --cached --name-only --diff-filter=ACMR | grep -q .; then
   git diff --cached --name-only -z --diff-filter=ACMR | xargs -0 git add --
 fi
 
-echo "Running UI foundation check..."
-bun run check:ui
+staged_paths=$(git diff --cached --name-only --diff-filter=ACMRD)
 
-echo "Running type checks..."
-bun run typecheck
+# Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule.
+code_pattern='\.(ts|tsx|mts|cts|js|mjs|cjs|css|json|jsonc|grit)$|(^|/)bun\.lock$'
+if printf '%s\n' "$staged_paths" | grep -Eq "$code_pattern"; then
+  echo "Running UI foundation check..."
+  bun run check:ui
+
+  echo "Running type checks..."
+  bun run typecheck
+else
+  echo "Skipping UI and type checks: no staged code, style, or configuration files."
+fi
+
+# Migrations cannot be undone on a user's computer, so a schema change runs its parity test here.
+schema_pattern='^src/backend/(openbot-database-schema|openbot-database-schema-parity\.test|channel-schema|mcp-schema)\.ts$'
+if printf '%s\n' "$staged_paths" | grep -Eq "$schema_pattern"; then
+  echo "Running the database schema parity test..."
+  bun run test:desktop -- src/backend/openbot-database-schema-parity.test.ts
+fi

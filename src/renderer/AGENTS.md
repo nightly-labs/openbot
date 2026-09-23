@@ -24,8 +24,8 @@ skills for the component patterns, not the imports.
 - `bun run storybook` verifies isolated components. CI builds it; do not run `build-storybook`.
 - `bun run check:ui` is the design-system guard for this directory: shared primitives over native
   controls, Kobalte and Lucide only inside `@openbot/ui`, and palette tokens instead of colour,
-  size, radius and transition literals. It reads the whole renderer in 60 ms, so run it on any
-  change here rather than waiting for CI — its budgets only ever go down. All of them sit at zero
+  size, radius and transition literals. The pre-commit hook runs it on each commit that stages
+  code, so do not run it by hand — its budgets only ever go down. All of them sit at zero
   except the `data-testid` hook count, frozen at the five already in the tree;
   [check design notes](../../docs/development-checks.md#lint-and-ui-rules) say why that one is a
   ratchet instead of a ban.
@@ -67,7 +67,8 @@ wiring (`App.tsx`, `AppView.tsx`, `app-providers.tsx`, `app-bootstrap.tsx`, `Wor
 owns (`navigation.tsx`, `layout.tsx`, `turns.tsx`, `providers.tsx`,
 `simple-context.tsx`, `scope-lifetime.ts`), `preview/` — whose mocks are the second implementation
 of the IPC surface and belong beside `mock-openbot.ts` — and the base stylesheets
-(`base.css`, `transitions.css`, `action-menu.css`, `sliding-tabs.css`) —
+(`base.css`, `transitions.css`; `action-menu.css` and `sliding-tabs.css` are now in
+`packages/ui/src/styles/`) —
 plus `app-shell.css`, which ends in a theme layer that assigns the palette across every domain
 at once and cannot be split until that layer is lifted out; its header says so. Stories stay in
 `src/renderer/stories/`, where the test rules relax.
@@ -82,9 +83,9 @@ domains stays flat rather than being imported sideways out of one of them.
 **Prefer one `createStore` per concern over a row of `createSignal` calls.** Fields that change
 together are one record — a saved-and-draft form pair, a `data`/`loaded`/`loading`/`error` quad, a
 phase plus the numbers only one phase uses, several `Record`s keyed by the same `agentId`. Declare the
-shape up front, so replacing one field re-renders only what read that field; `FirstAgentSetup.tsx` is
-the form version. Keep the setter private behind named mutations where the store *is* a module's or
-a hook's exported surface, as `app-stored-values.ts` and `createAsyncPanel.ts` do. Inside a
+shape up front, so replacing one field re-renders only what read that field;
+`packages/ui/src/features/agents/FirstAgentSetup.tsx` is the form version. Keep the setter private
+behind named mutations where the store *is* a module's or a hook's exported surface, as `app-stored-values.ts` and `createAsyncPanel.ts` do. Inside a
 component, write the field where it changes — `setPanels((state) => { state.x = value; })` at the
 call site, as `SettingsModal.tsx` does — and let a named mutation there earn its name: more than one
 field, a guard or a side effect, or enough call sites that the name deduplicates something. A

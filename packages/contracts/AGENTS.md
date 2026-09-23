@@ -37,7 +37,7 @@ error TS2344: Type '{ channelsMissingFromEveryGroup: "app:brand-new-thing"; }'
 ```
 
 It costs nothing at runtime. There is no generator, no committed output and no check to remember to
-run — `bun run typecheck` already runs it.
+run — the typecheck in the pre-commit hook and in CI already runs it.
 
 Two files still mirror the list by hand, and they are not enforced the same way.
 
@@ -58,11 +58,12 @@ invokes exactly the request endpoints and subscribes to exactly the event ones.
 
 The mock needs no test. Both it and the preload bridge are annotated `: OpenBotDesktopApi`, so a
 missing method is `TS2741` and a method the interface never declared is `TS2353` — the type checker
-already covers both directions, and under Tests rule 3 that is the end of it. What it cannot cover is
+already covers both directions, and the root Tests rule against assertions that TypeScript already
+enforces ends it there. What it cannot cover is
 the *behaviour*: `mock-openbot.ts` is a product surface, not a test double, and it is what the preview
 and every Storybook story exercise. A method that satisfies the type by returning an empty array is a
 story that silently shows nothing.
 
 Adding a channel means `ipc-channels.ts`, `ipc-endpoints.ts`, its registrar, the preload and the mock
-in the same change. You do not have to remember that list: add the channel, run `bun run typecheck`,
-and every step but the preload names itself.
+in the same change. You do not have to remember that list: add the channel, and the typecheck in the
+pre-commit hook or in CI names every step but the preload.

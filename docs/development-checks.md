@@ -31,6 +31,13 @@ The Signal Dockerfile installs from a pruned checkout with one manifest copy per
 CI does not build that image. `scripts/dependency-catalog.test.ts` checks that the copied manifests
 cover the workspace dependency graph; keep that check when changing workspace dependencies.
 
+The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:ui` and
+`bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
+`bun.lock` files, so a commit of only text is fast. In CI, `check:desktop:static` (the UI check,
+lint, desktop typecheck and build) takes about a minute, and each other typecheck takes a few
+seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts` or the parity test
+is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
+
 The source of truth for CI is [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 Its main jobs are:
 
@@ -38,12 +45,14 @@ Its main jobs are:
 | --- | --- | --- |
 | Check | `ubuntu-latest` | `bun run check:desktop:static` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
-| Tests | `ubuntu-latest` | `bun run test:desktop`, `bun run test:sites`, `bun run test:remote` |
+| Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
+| Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
+| Tests (remote) | `ubuntu-latest` | `bun run test:remote` |
 | Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
 
-All six gate Cloudflare production deployment on `main`. Surfaces was previously missing from
+All of these jobs gate Cloudflare production deployment on `main`. Surfaces was previously missing from
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 

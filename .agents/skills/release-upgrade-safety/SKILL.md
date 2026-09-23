@@ -20,11 +20,11 @@ This runs *before* `docs/RELEASING.md`, which stays authoritative for the publis
   you are separately asked to.
 - It never runs `bun run check`, `check:desktop`, `test`, or `build-storybook` — each takes minutes,
   CI owns them, and the desktop suite flakes under load, so a red result would tell you nothing.
-  Run the narrowest test file named by a gate, then `bun run lint` and `bun run typecheck`.
-- **If gate C or D fired, add `bun run mobile:typecheck`.** `bun run typecheck` is `typecheck:*` and
-  the mobile script is named `mobile:typecheck`, so the aggregate misses it — and `apps/mobile`
-  depends on `@openbot/contracts`, which is exactly what those two gates change. A contract export
-  change passes the aggregate and still breaks the mobile app.
+  Run the narrowest test file named by a gate and lint the changed files. Do not run the repo-wide
+  `bun run lint` or `bun run typecheck`: the pre-commit hook and CI run them.
+- **If gate C or D fired, confirm the mobile typecheck passed.** `apps/mobile` depends on
+  `@openbot/contracts`, which is exactly what those two gates change. `bun run typecheck` includes
+  `typecheck:mobile`, so the pre-commit hook and the CI Surfaces job cover it.
 - It never runs `bun run dev:seed` or `dev:reset` — both destroy the developer's own profile — and
   never `pkill -f`, which kills other sessions' work mid-write.
 

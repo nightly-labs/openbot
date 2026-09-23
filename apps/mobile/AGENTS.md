@@ -4,8 +4,8 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 - Do not run broad checks locally. The user reports that they overload the computer. Follow the
   root check policy: lint changed files and run one relevant test file, one check at a time.
-- Do not run whole-workspace or parallel typechecks, including the full mobile project. Leave
-  broad type validation to CI. Use one test worker where supported and report what remains unverified.
+- Do not run whole-workspace or parallel typechecks, including the full mobile project. The root
+  pre-commit hook runs them, and CI runs them again. Use one test worker where supported and report what remains unverified.
 - Builds, packaging, signing, deployment, EAS commands, simulator or emulator runs, and native
   development clients require an explicit user request. Do not start them as routine checks.
 
@@ -63,7 +63,7 @@ Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 bunx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
 bun run start                # start the dev server
 bun run lint                 # lint and format-check with Biome
-bun run typecheck            # typecheck with TypeScript 7
+bun run typecheck            # typecheck with TypeScript 7 (the root pre-commit hook runs it)
 bun run doctor               # diagnose dependency and config issues
 bunx expo install --fix      # fix incompatible package versions
 ```
