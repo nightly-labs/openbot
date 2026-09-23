@@ -101,22 +101,24 @@ export function BrowserSecretCard(props: {
       <Show
         when={password()}
         fallback={
-          <div class="browser-secret-code">
-            <span class="browser-secret-label">{digits()}-digit code</span>
-            <OtpInput
-              value={value()}
-              length={digits()}
-              numeric
-              masked
-              label={`${digits()}-digit code`}
-              status={pending() ? "verifying" : error() ? "error" : "idle"}
-              errorMessage={error()}
-              onChange={(next) => {
-                setValue(next);
-                setError("");
-              }}
-            />
-          </div>
+          <Show when={!pending()}>
+            <div class="browser-secret-code">
+              <span class="browser-secret-label">{digits()}-digit code</span>
+              <OtpInput
+                value={value()}
+                length={digits()}
+                numeric
+                masked
+                label={`${digits()}-digit code`}
+                status={error() ? "error" : "idle"}
+                errorMessage={error()}
+                onChange={(next) => {
+                  setValue(next);
+                  setError("");
+                }}
+              />
+            </div>
+          </Show>
         }
       >
         <Show when={!pending()}>
