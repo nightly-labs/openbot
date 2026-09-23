@@ -13,6 +13,9 @@ of something remote — which is what makes the first section below non-negotiab
   continues.
 - Never edit or delete a migration that may have shipped, including the frozen version 8 baseline.
   Append the next contiguous version and update the separate latest schema for new databases.
+  Add the new version to `openbot-database-schema-history.json`: the parity test fails and prints
+  the entry to add. A red test on a recorded version means a shipped migration changed. Change the
+  migration back; do not change its entry.
 - A migration change needs data-preservation fixtures for every affected released schema, plus
   failure, rollback, retry, downgrade, missing-version, foreign-key and integrity coverage at the
   stable database boundary.

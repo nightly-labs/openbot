@@ -35,8 +35,8 @@ The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:u
 `bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
 `bun.lock` files, so a commit of only text is fast. In CI, `check:desktop:static` (the UI check,
 lint, desktop typecheck and build) takes about a minute, and each other typecheck takes a few
-seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts` or the parity test
-is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
+seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
+`openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
 
 The source of truth for CI is [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 Its main jobs are:
