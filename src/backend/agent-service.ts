@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { realpath, stat } from "node:fs/promises";
-import { basename } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
@@ -76,7 +74,6 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_TEXT_LIMIT } from "@openbot/contracts/ipc";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { createOpenBotLogger } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
@@ -106,7 +103,7 @@ import { ProfileSave } from "./agent/profile-save";
 import { type AgentClientFactory, ProviderRuntime } from "./agent/provider-runtime";
 import { QueueControls } from "./agent/queue-controls";
 import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-scheduler";
-import { fitRuntimeSnapshot } from "./agent/runtime-snapshot";
+import { buildRuntimeSnapshot } from "./agent/runtime-snapshot";
 import type { AgentSidebar } from "./agent/sidebar-tools";
 import type { LocalSkillTools } from "./agent/skill-tools";
 import { isRequestTimeout, providerForAgent, providerLabel } from "./agent/thread-items";
@@ -121,12 +118,12 @@ import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { MailboxStore } from "./mailbox-store";
 import { McpServerStore } from "./mcp-server-store";
-import { decodeRecordResponse, isRecord } from "./protocol";
+import { decodeRecordResponse } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext } from "./provider-drivers";
 import { recordAgentRestartActivity } from "./restart-activity";
 import { RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
-import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "./workspace-paths";
+import { type ResolvedSharedFile, resolveSharedFile, resolveWorkspaceFile } from "./workspace-paths";
 
 const logger = createOpenBotLogger("agent-service");
 
@@ -143,15 +140,10 @@ export type { TestMcpServerOptions } from "./agent/mcp-gateway";
 // them now. `Pick<AgentService, ...>` in team-api-server.ts does not cover exported types.
 export type { AgentClientFactory } from "./agent/provider-runtime";
 export type { RoutineMutationOptions } from "./agent/routine-scheduler";
+export type { ResolvedSharedFile } from "./workspace-paths";
 
 interface AgentServiceEvents {
   event: [event: AgentEvent];
-}
-
-export interface ResolvedSharedFile {
-  path: string;
-  name: string;
-  size: number;
 }
 
 export interface AgentServiceOptions {
@@ -774,58 +766,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   getRuntimeSnapshot(): AgentRuntimeSnapshot {
-    const agents = this.listAgents();
-    const runtimeAgents: AgentRuntimeSnapshot["agents"] = agents.map((agent) => ({
-      id: agent.id,
-      name: agent.name,
-      notifications: agent.notifications,
-      preview: agent.preview.slice(0, AGENT_RUNTIME_TEXT_LIMIT),
-      updatedAt: agent.updatedAt,
-      avatarSeed: agent.avatarSeed,
-      avatarHue: agent.avatarHue,
-      avatarUrl: agent.avatarUrl,
-    }));
-    const activeTurns: AgentRuntimeSnapshot["activeTurns"] = [];
-    const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
-    for (const agent of agents) {
-      const live = this.#conversation.snapshot(agent.id);
-      const liveLatest = [...(live?.messages ?? [])]
-        .reverse()
-        .find(
-          (message) =>
-            (message.author === "assistant" || message.author === "agent") &&
-            message.itemType !== "commentary" &&
-            message.itemType !== "question_prompt" &&
-            message.itemType !== "agent_attachment",
-        );
-      const persisted =
-        !live || !liveLatest
-          ? this.#store.database.readConversationRuntime(agent.id, agent.threadId)
-          : { activeTurnId: null, latestMessage: null };
-      const activeTurnId = live ? live.activeTurnId : persisted.activeTurnId;
-      if (activeTurnId && agent.threadId) {
-        activeTurns.push({ agentId: agent.id, threadId: agent.threadId, turnId: activeTurnId });
-      }
-      const latest = liveLatest ?? persisted.latestMessage;
-      if (latest) {
-        latestMessages.push({
-          agentId: agent.id,
-          id: latest.id,
-          text: latest.text.slice(0, AGENT_RUNTIME_TEXT_LIMIT),
-          createdAt: latest.createdAt,
-        });
-      }
-    }
-    return fitRuntimeSnapshot({
-      agents: runtimeAgents,
-      activeTurns,
-      work: this.#mailbox.listRuntimeWork(
-        agents.map((agent) => agent.id),
-        this.#turn.failedTurns(),
-      ),
-      latestMessages,
-      ...this.#attention.runtimeAttention(),
-      failedTurns: [...this.#turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
+    return buildRuntimeSnapshot({
+      agents: this.listAgents(),
+      conversation: this.#conversation,
+      database: this.#store.database,
+      mailbox: this.#mailbox,
+      turn: this.#turn,
+      attention: this.#attention,
     });
   }
 
@@ -1236,39 +1183,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#store.resolveAvatar(agentId);
   }
 
-  async resolveSharedFile(inputPath: string): Promise<ResolvedSharedFile> {
-    const sharedRoot = await realpath(this.#store.sharedRoot);
-    const candidatePath = sharedPathFromInput(this.#store.sharedRoot, inputPath);
-    const resolvedPath = await realpath(candidatePath);
-    if (!isWithin(sharedRoot, resolvedPath)) {
-      throw new Error("Shared file must be inside the shared directory.");
-    }
-    const metadata = await stat(resolvedPath);
-    if (!metadata.isFile()) throw new Error("Shared path is not a file.");
-    return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
+  resolveSharedFile(inputPath: string): Promise<ResolvedSharedFile> {
+    return resolveSharedFile(this.#store.sharedRoot, inputPath);
   }
 
   async resolveWorkspaceFile(agentId: string, inputPath: string): Promise<ResolvedSharedFile> {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(`Unknown agent: ${agentId}`);
-    const workspaceRoot = await realpath(agent.workspacePath);
-    const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
-    const resolvedPath = await realpath(candidatePath).catch(async (error: unknown) => {
-      // The file may be one the provider's own transcript still names under this agent's pre-rename
-      // workspace root. The containment check below is unchanged and runs on whatever comes back.
-      const rebased =
-        isRecord(error) && error.code === "ENOENT"
-          ? rebaseLegacyWorkspacePath(agent.workspacePath, agent.id, candidatePath)
-          : null;
-      if (rebased === null) throw error;
-      return await realpath(rebased);
-    });
-    if (!isWithin(workspaceRoot, resolvedPath)) {
-      throw new Error("Workspace file must be inside the agent workspace.");
-    }
-    const metadata = await stat(resolvedPath);
-    if (!metadata.isFile()) throw new Error("Workspace path is not a file.");
-    return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
+    return resolveWorkspaceFile(agent, inputPath);
   }
 
   deleteAgent(agentId: string): Promise<void> {
