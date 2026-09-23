@@ -90,9 +90,12 @@
   color: inherit;
 }
 
+/*
+ * The keyframes alone hide a new row, so a row whose animation is off (reduced motion, which
+ * Windows reports while its animation effects are off) still shows.
+ */
 .message-entry-animated {
-  opacity: 0;
-  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 .message-entry-agent {
@@ -347,8 +350,7 @@
 
 .chat-action-entry-animated {
   width: 100%;
-  opacity: 0;
-  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 .agent-activity-slot[data-reserved="true"] {
