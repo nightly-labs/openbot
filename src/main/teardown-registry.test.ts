@@ -30,6 +30,26 @@ describe("TeardownRegistry", () => {
     expect(reportError).toHaveBeenCalledWith("host", failure);
   });
 
+  it("moves past a step that never finishes so the process can still exit", async () => {
+    vi.useFakeTimers();
+    try {
+      const stopped: string[] = [];
+      const reportError = vi.fn();
+      const registry = new TeardownRegistry({ reportError, stepTimeoutMs: 1_000 });
+
+      registry.push(10, "remote servers", () => new Promise(() => undefined));
+      registry.push(20, "agents", () => void stopped.push("agents"));
+      const shutdown = registry.runAll();
+      await vi.advanceTimersByTimeAsync(1_000);
+      await shutdown;
+
+      expect(stopped).toEqual(["agents"]);
+      expect(reportError).toHaveBeenCalledWith("remote servers", expect.any(Error));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("runs each step once when shutdown is requested twice", async () => {
     const stop = vi.fn();
     const registry = new TeardownRegistry({ reportError: () => undefined });

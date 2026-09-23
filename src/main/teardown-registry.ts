@@ -25,7 +25,16 @@
 
 export interface TeardownRegistryOptions {
   reportError: (name: string, error: unknown) => void;
+  /**
+   * How long one step may run before the drain moves on. A step that never settles would otherwise
+   * keep a windowless process alive: it holds the single-instance lock, so every later launch hands
+   * off to it and exits, and the user can only end it from the task manager.
+   */
+  stepTimeoutMs?: number;
 }
+
+/** Well above the two-second kill grace that provider processes get before `SIGKILL`. */
+const DEFAULT_STEP_TIMEOUT_MS = 10_000;
 
 interface TeardownStep {
   order: number;
@@ -35,14 +44,16 @@ interface TeardownStep {
 
 export class TeardownRegistry {
   readonly #reportError: (name: string, error: unknown) => void;
+  readonly #stepTimeoutMs: number;
   #steps: TeardownStep[] = [];
   /** The sorted steps a drain in progress has not reached yet. Late pushes are spliced into it. */
   #pending: TeardownStep[] | null = null;
   #closed = false;
   #tail: Promise<void> = Promise.resolve();
 
-  constructor({ reportError }: TeardownRegistryOptions) {
+  constructor({ reportError, stepTimeoutMs = DEFAULT_STEP_TIMEOUT_MS }: TeardownRegistryOptions) {
     this.#reportError = reportError;
+    this.#stepTimeoutMs = stepTimeoutMs;
   }
 
   /** `order` is the position in the shutdown sequence, not the position in this call sequence. */
@@ -87,10 +98,20 @@ export class TeardownRegistry {
   }
 
   async #runStep(step: TeardownStep): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<void>((resolve) => {
+      timer = setTimeout(() => {
+        this.#reportError(step.name, new Error(`It did not stop within ${this.#stepTimeoutMs} ms.`));
+        resolve();
+      }, this.#stepTimeoutMs);
+    });
     try {
-      await step.run();
+      // The step is abandoned, not cancelled: it keeps running, but the steps after it no longer wait.
+      await Promise.race([Promise.resolve().then(() => step.run()), timedOut]);
     } catch (error) {
       this.#reportError(step.name, error);
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

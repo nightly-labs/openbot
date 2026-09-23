@@ -50,7 +50,7 @@ import {
   createMainWindowHolder,
   showMainWindow,
 } from "./main-window";
-import { ensureMacApplicationPresence } from "./main-window-state";
+import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
@@ -156,6 +156,7 @@ let isQuitting = false;
 let shutdownStarted = false;
 let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
+let relaunchRequested = false;
 /**
  * The link kinds a renderer is ever told about.
  *
@@ -569,8 +570,23 @@ if (!hasSingleInstanceLock) {
     const deepLink = findDeepLink(argv, developmentInviteLinkOptions);
     if (deepLink) acceptDeepLink(deepLink);
     const window = windowHolder.current;
-    if (!window || window.isDestroyed()) return;
-    showMainWindow(window);
+    const hasMainWindow = Boolean(window && !window.isDestroyed());
+    const response = secondLaunchResponse({
+      sessionEnding: systemSessionEnding,
+      quitting: isQuitting,
+      hasMainWindow,
+      started: services !== null,
+    });
+    if (response === "present" && window) showMainWindow(window);
+    else if (response === "reopen") reopenMainWindow();
+    else if (response === "relaunch" && !relaunchRequested) {
+      relaunchRequested = true;
+      // The new instance takes this launch's link, not the one this process may have started with.
+      const isLink = (value: string) => parseDeepLink(value, developmentInviteLinkOptions) !== null;
+      const link = argv.find(isLink);
+      const args = process.argv.slice(1).filter((value) => !isLink(value));
+      app.relaunch({ args: link ? [...args, link] : args });
+    }
   });
 
   void app
@@ -751,10 +767,7 @@ if (!hasSingleInstanceLock) {
           showMainWindow(window);
           return;
         }
-        void windows
-          .ensureMainWindow()
-          .then(showMainWindow)
-          .catch((error) => logger.error("Unable to open the main window:", toLogValue(error)));
+        reopenMainWindow();
       });
     })
     .catch((error) => {
@@ -784,6 +797,27 @@ app.on("before-quit", (event) => {
   void prepareForShutdown().finally(() => app.quit());
 });
 
+function reopenMainWindow(): void {
+  void windows
+    .ensureMainWindow()
+    .then(showMainWindow)
+    .catch((error) => logger.error("Unable to open the main window:", toLogValue(error)));
+}
+
+/**
+ * The teardown gives up on each step after its own limit, but steps run one after another, and
+ * something outside it can still hold the quit. A process that outlives its window keeps the
+ * single-instance lock, so every later launch exits without opening anything.
+ */
+const SHUTDOWN_DEADLINE_MS = 30_000;
+
+function forceExitAfterShutdownDeadline(): void {
+  setTimeout(() => {
+    logger.error(`OpenBot did not quit within ${SHUTDOWN_DEADLINE_MS} ms and will exit now.`);
+    app.exit(0);
+  }, SHUTDOWN_DEADLINE_MS);
+}
+
 async function prepareForUpdateInstall(): Promise<void> {
   await (services?.browser.flushPersistentStorage() ?? Promise.resolve());
   await prepareForShutdown();
@@ -800,6 +834,7 @@ async function prepareForShutdown(): Promise<void> {
   if (shutdownStarted) return;
   shutdownStarted = true;
   isQuitting = true;
+  forceExitAfterShutdownDeadline();
   services?.updater.stop();
   await windows
     .flushMainWindowBounds()
