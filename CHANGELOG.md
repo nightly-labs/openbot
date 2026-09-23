@@ -5,6 +5,14 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-09-23
+
+### Fixed
+
+- Keep an animated WebP avatar animated after upload. Before, OpenBot kept only the first frame.
+- Hide the secret code input while OpenBot sends the code. The input shows again if the code fails.
+- Wrap long text in the avatar upload control.
+
 ## [0.20.0] - 2026-09-23
 
 ### Added
