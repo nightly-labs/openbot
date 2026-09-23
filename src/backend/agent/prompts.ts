@@ -259,10 +259,12 @@ export function browserTakeoverResult(decision: RespondToBrowserTakeoverInput["d
   };
 }
 
-export function browserTakeoverError(): DynamicToolResult {
+export function browserTakeoverError(
+  message = "OpenBot could not create a browser takeover request.",
+): DynamicToolResult {
   return {
     success: false,
-    contentItems: [{ type: "inputText", text: "OpenBot could not create a browser takeover request." }],
+    contentItems: [{ type: "inputText", text: message }],
   };
 }
 
