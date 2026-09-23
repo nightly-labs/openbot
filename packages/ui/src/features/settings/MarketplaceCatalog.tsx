@@ -11,6 +11,72 @@ import { errorMessage } from "../../error-message";
 
 export const CATEGORY_LABELS: Record<SkillCategory, string> = SKILL_CATEGORY_LABELS;
 
+/** The rows each category shows on the overview; a category with more offers its own page. */
+const HOME_ROWS_PER_CATEGORY = 6;
+const HOME_PAGE_SIZE = 50;
+const HOME_CACHE_MS = 5 * 60_000;
+
+type CatalogPage<T> = { items: T[]; nextCursor: string | null };
+type CatalogList<T> = (query: MarketplaceSkillQuery) => Promise<CatalogPage<T>>;
+/** The overview rows, and the categories that hold more than the overview shows. */
+type HomePage<T> = { items: T[]; moreCategories: SkillCategory[] };
+
+function inCategory<T extends CatalogItem>(items: T[], category: SkillCategory): T[] {
+  return items.filter((item) => (item.category ?? "other") === category);
+}
+
+/**
+ * The overview in one request while the whole catalog fits in one page. A larger catalog can leave a
+ * category short of rows, so only those categories then ask for their own first rows, as each
+ * category did before.
+ */
+async function loadHomePage<T extends CatalogItem>(list: CatalogList<T>): Promise<HomePage<T>> {
+  const page = await list({ sort: "installs", limit: HOME_PAGE_SIZE });
+  if (!page.nextCursor) {
+    return {
+      items: page.items,
+      moreCategories: SKILL_CATEGORIES.filter(
+        (category) => inCategory(page.items, category).length > HOME_ROWS_PER_CATEGORY,
+      ),
+    };
+  }
+  const short = SKILL_CATEGORIES.filter((category) => inCategory(page.items, category).length < HOME_ROWS_PER_CATEGORY);
+  const pages = await Promise.all(
+    short.map((category) => list({ category, sort: "installs", limit: HOME_ROWS_PER_CATEGORY })),
+  );
+  return {
+    items: [...page.items, ...pages.flatMap((categoryPage) => categoryPage.items)],
+    moreCategories: SKILL_CATEGORIES.filter((category) => {
+      const index = short.indexOf(category);
+      return index === -1 || Boolean(pages[index]?.nextCursor);
+    }),
+  };
+}
+
+/**
+ * Each account Worker request costs money, and the dialog loads the overview again on each open and
+ * tab switch. The overview is one request, and this keeps its answer for a few minutes. The caller
+ * owns the cache, so Refresh can forget it and a different source never reads it.
+ */
+export class MarketplaceHomeCache<T extends CatalogItem> {
+  #entry: { loadedAt: number; page: Promise<HomePage<T>> } | null = null;
+
+  load(list: CatalogList<T>): Promise<HomePage<T>> {
+    if (this.#entry && Date.now() - this.#entry.loadedAt < HOME_CACHE_MS) return this.#entry.page;
+    const entry = { loadedAt: Date.now(), page: loadHomePage(list) };
+    this.#entry = entry;
+    entry.page.catch(() => {
+      if (this.#entry === entry) this.#entry = null;
+    });
+    return entry.page;
+  }
+
+  /** Makes the next overview load ask again, for a user who asked to refresh. */
+  forget(): void {
+    this.#entry = null;
+  }
+}
+
 /** Whether an answer's row is the row already on screen, so the list can keep the element it has. */
 function same(a: CatalogItem, b: CatalogItem) {
   return (
@@ -51,6 +117,8 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
   query: string;
   refreshVersion: number;
   list: (query: MarketplaceSkillQuery) => Promise<{ items: T[]; nextCursor: string | null }>;
+  /** Keeps the overview for a few minutes. Omit it for a list that is not a network call. */
+  homeCache?: MarketplaceHomeCache<T>;
   icon: (item: T) => JSX.Element;
   onOpen: (item: T) => void | Promise<void>;
 }) {
@@ -105,12 +173,12 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
         sort: "installs" as const,
       };
       const home = !category && !query.trim();
-      const pages = home
-        ? await Promise.all(SKILL_CATEGORIES.map((category) => props.list({ category, sort: "installs", limit: 6 })))
-        : [await props.list({ ...filters, limit: 50, ...(cursor ? { cursor } : {}) })];
+      const homeCache = props.homeCache;
+      const homePage = home ? await (homeCache ? homeCache.load(props.list) : loadHomePage(props.list)) : null;
+      const page = homePage ? null : await props.list({ ...filters, limit: 50, ...(cursor ? { cursor } : {}) });
       if (version !== requestVersion) return;
       setState((s) => {
-        const allItems = pages.flatMap((page) => page.items);
+        const allItems = homePage?.items ?? page?.items ?? [];
         const items = allItems
           .filter((item, index) => allItems.findIndex((current) => current.id === item.id) === index)
           /*
@@ -122,8 +190,8 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
         s.items = cursor
           ? [...s.items, ...items.filter((item) => !s.items.some((current) => current.id === item.id))]
           : items;
-        s.nextCursor = home ? null : (pages[0]?.nextCursor ?? null);
-        if (home) s.moreCategories = SKILL_CATEGORIES.filter((_, index) => pages[index]?.nextCursor);
+        s.nextCursor = page?.nextCursor ?? null;
+        if (homePage) s.moreCategories = homePage.moreCategories;
         s.loadedQuery = query.trim();
       });
     } catch (error) {
@@ -333,7 +401,11 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
                             </Button>
                           </Show>
                         </div>
-                        {rows(() => items().filter((item) => (item.category ?? "other") === category))}
+                        {rows(() =>
+                          items()
+                            .filter((item) => (item.category ?? "other") === category)
+                            .slice(0, HOME_ROWS_PER_CATEGORY),
+                        )}
                       </section>
                     </Show>
                   )}

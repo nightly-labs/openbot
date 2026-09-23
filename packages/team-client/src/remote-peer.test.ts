@@ -675,7 +675,7 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
-  it("ends an unrecoverable RTC session after the resume grace period", async () => {
+  it("keeps an unrecoverable RTC session for the next attempt and ends it on disconnect", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const endSession = vi.fn(async () => {});
     const network = await setupNetwork({ endSession });
@@ -688,9 +688,44 @@ describe("browser remote peer recovery", () => {
     const reconnect = network.connect();
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(reconnect).resolves.toMatchObject({ ok: false });
-    expect(endSession).toHaveBeenCalledTimes(1);
+    // Each recovery attempt would otherwise create and end a session on the account Worker.
+    expect(endSession).not.toHaveBeenCalled();
     await expect(network.connect()).resolves.toMatchObject({ ok: true });
     expect(network.bootstraps()).toBe(2);
+    expect(network.keptSessions).toEqual([null, "session-1"]);
+    await network.runtime.execute({ id: "disconnect", type: "disconnect" });
+    expect(endSession).toHaveBeenCalledWith("session-1");
+    await network.runtime.dispose();
+  });
+
+  it("keeps the session when the account API cannot issue a ticket", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const endSession = vi.fn(async () => {});
+    let accountUnavailable = false;
+    let failedBootstraps = 0;
+    const network = await setupNetwork({
+      endSession,
+      beforeBootstrap: async () => {
+        if (!accountUnavailable) return;
+        failedBootstraps += 1;
+        throw new Error("The account API is unavailable.");
+      },
+    });
+    await network.connect();
+    network.runtime.setActive(false);
+    network.connection().drop("disconnected");
+    await vi.advanceTimersByTimeAsync(60_000);
+    network.runtime.setActive(true);
+    const reconnect = network.connect();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(reconnect).resolves.toMatchObject({ ok: false });
+    accountUnavailable = true;
+    await expect(network.connect()).resolves.toMatchObject({ ok: false });
+    expect(failedBootstraps).toBe(1);
+    accountUnavailable = false;
+    await expect(network.connect()).resolves.toMatchObject({ ok: true });
+    expect(network.keptSessions).toEqual([null, "session-1"]);
+    expect(endSession).not.toHaveBeenCalled();
     await network.runtime.dispose();
   });
 
@@ -864,6 +899,8 @@ async function setupNetwork(
   const updates: RemoteTeamConnectionUpdate[] = [];
   const uploadProgress: RemoteUploadProgress[] = [];
   let bootstrapCount = 0;
+  const keptSessions: (string | null)[] = [];
+  let currentSessionId = "";
   let currentHostId = "host";
   const slowRequest = deferred();
   const callbacks = { onOffline: () => {}, onReset: () => {} };
@@ -943,7 +980,7 @@ async function setupNetwork(
         const hostNonce = "h".repeat(43);
         const transcript = teamProtocolV2AuthenticationTranscript({
           hostId: currentHostId,
-          sessionId: `session-${bootstrapCount}`,
+          sessionId: currentSessionId,
           ticket: frame.ticket,
           clientPublicKey: frame.clientPublicKey,
           clientNonce,
@@ -1038,13 +1075,14 @@ async function setupNetwork(
   vi.stubGlobal("RTCPeerConnection", TestConnection);
   const runtime = createRemoteTeamPeer({
     current: {
-      getBootstrap: async (hostId) => {
+      getBootstrap: async (hostId, _clientPublicKey, existingSessionId) => {
         await options.beforeBootstrap?.(hostId);
         currentHostId = hostId;
         bootstrapCount += 1;
+        keptSessions.push(existingSessionId);
+        currentSessionId = existingSessionId ?? `session-${bootstrapCount}`;
         return {
-          sessionId: `session-${bootstrapCount}`,
-          expiresAt: Date.now() + 60_000,
+          sessionId: currentSessionId,
           signalUrl: "wss://signal",
           ticket: "ticket",
         };
@@ -1074,6 +1112,7 @@ async function setupNetwork(
     connection,
     socket,
     bootstraps: () => bootstrapCount,
+    keptSessions,
     connect: (hostId = "host") =>
       runtime.execute({
         id: `connect-${bootstrapCount}`,

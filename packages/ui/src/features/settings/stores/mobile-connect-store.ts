@@ -4,7 +4,6 @@ import { errorMessage } from "../../../error-message";
 
 const MOBILE_CONNECT_SUCCESS_FEEDBACK_MS = 900;
 const MOBILE_CONNECT_COLLAPSE_MS = 240;
-const MOBILE_DEVICES_REFRESH_INTERVAL_MS = 60_000;
 const MOBILE_CONNECT_PENDING_REFRESH_INTERVAL_MS = 5_000;
 
 interface MobileConnectStoreProps {
@@ -59,6 +58,10 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
   });
   /** A clock, not panel state: it ticks the code's countdown and the device list's "3m ago" labels. */
   const [now, setNow] = createSignal(Date.now());
+  const [pageVisible, setPageVisible] = createSignal(document.visibilityState !== "hidden");
+  const updatePageVisible = () => setPageVisible(document.visibilityState !== "hidden");
+  document.addEventListener("visibilitychange", updatePageVisible);
+  onCleanup(() => document.removeEventListener("visibilitychange", updatePageVisible));
   let devicesRequestRevision = 0;
   let baselineSessionIds = new Set<string>();
   let successTimer: number | undefined;
@@ -68,25 +71,25 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     () => ({
       open: props.open,
       active: isActive(),
+      visible: pageVisible(),
       list: props.onListMobileConnectedDevices,
       ticketExpiresAt: panels.connect.session?.ticket.expiresAt ?? null,
     }),
-    ({ open, active, list }) => {
+    ({ open, active, visible, list }) => {
       devicesRequestRevision += 1;
-      if (!open || !active || !list) return;
+      if (!open || !active || !visible || !list) return;
       let running = true;
       let timer: number | undefined;
 
+      // Only a live code polls, to see the phone that uses it. Otherwise the list loads when the tab
+      // opens or the window is shown again: an idle poll cost one account Worker request a minute.
       const scheduleRefresh = () => {
         const ticket = panels.connect.session?.ticket;
-        const refreshInterval =
-          ticket && ticket.expiresAt > Date.now()
-            ? MOBILE_CONNECT_PENDING_REFRESH_INTERVAL_MS
-            : MOBILE_DEVICES_REFRESH_INTERVAL_MS;
+        if (!ticket || ticket.expiresAt <= Date.now()) return;
         timer = window.setTimeout(async () => {
           await refreshDevices(false);
           if (running) scheduleRefresh();
-        }, refreshInterval);
+        }, MOBILE_CONNECT_PENDING_REFRESH_INTERVAL_MS);
       };
 
       void refreshDevices(true);

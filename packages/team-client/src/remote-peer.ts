@@ -44,7 +44,6 @@ export type RemoteTeamCommand =
 
 export interface RemoteTeamBootstrapPayload {
   sessionId: string;
-  expiresAt: number;
   signalUrl: string;
   ticket: string;
 }
@@ -121,7 +120,12 @@ export interface RemoteTeamPeerActions {
   onAccountProfileChanged?: () => Promise<void>;
   /** The account's server list changed on another device of this account. */
   onAccountServersChanged?: () => Promise<void>;
-  getBootstrap: (hostId: string, clientPublicKey: string) => Promise<RemoteTeamBootstrapPayload>;
+  /** `existingSessionId` is a session kept from a failed attempt on the same host; reuse it when it is still active. */
+  getBootstrap: (
+    hostId: string,
+    clientPublicKey: string,
+    existingSessionId: string | null,
+  ) => Promise<RemoteTeamBootstrapPayload>;
   endSession: (sessionId: string) => Promise<void>;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => Promise<void>;
   onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
@@ -198,6 +202,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     await sendPayload(state, "files", data);
   });
   const closingSessions = new Map<string, Promise<void>>();
+  // A failed attempt keeps its session for the next attempt on the same host. Ending it each time
+  // made every recovery attempt a create, a ticket and an end on the account Worker.
+  let retainedSession: { hostId: string; sessionId: string } | null = null;
 
   return {
     async sendHostStreamData(data: string | ArrayBuffer) {
@@ -207,9 +214,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     },
     cancelUpload: () => files.cancelUpload(),
     execute: (command: RemoteTeamCommand) => executeCommand(command, actions),
-    dispose: () => {
+    dispose: async () => {
       active = false;
-      return closePeer(actions.current.endSession);
+      await closePeer(actions.current.endSession);
+      await releaseRetainedSession(actions.current.endSession);
     },
     setActive(value: boolean) {
       active = value;
@@ -309,6 +317,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       }
       if (command.type === "disconnect") {
         await closePeer(actions.current.endSession);
+        await releaseRetainedSession(actions.current.endSession);
         return { commandId: command.id, ok: true };
       }
       let reported = -1;
@@ -343,7 +352,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     while (closingSessions.has(hostId)) await closingSessions.get(hostId);
     if (currentGeneration !== generation || !active) throw new Error("The connection was replaced.");
     const clientPublicKey = identity.publicKeyPem;
-    const bootstrap = await actions.current.getBootstrap(hostId, clientPublicKey);
+    const existingSessionId = retainedSession?.hostId === hostId ? retainedSession.sessionId : null;
+    // Cleanup for a different host must never block switching servers.
+    void releaseRetainedSession(actions.current.endSession, hostId);
+    // A failed bootstrap keeps the session for the next attempt.
+    const bootstrap = await actions.current.getBootstrap(hostId, clientPublicKey, existingSessionId);
+    if (retainedSession?.sessionId === existingSessionId) retainedSession = null;
     if (currentGeneration !== generation || !active) {
       await actions.current.endSession(bootstrap.sessionId).catch(() => undefined);
       throw new Error("The connection was replaced.");
@@ -986,7 +1000,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       message,
       ...(code ? { code } : {}),
     });
-    void closePeer(actions.current.endSession);
+    // A revoked session or a host that broke the protocol starts again from a new session.
+    void closePeer(actions.current.endSession, code === undefined);
   }
 
   function rejectRequests(error: Error, readsOnly = false): void {
@@ -998,7 +1013,18 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }
   }
 
-  async function closePeer(endSession: (sessionId: string) => Promise<void>): Promise<void> {
+  /** Ends a kept session, unless it belongs to `keepHostId`. */
+  async function releaseRetainedSession(
+    endSession: (sessionId: string) => Promise<void>,
+    keepHostId?: string,
+  ): Promise<void> {
+    const retained = retainedSession;
+    if (!retained || retained.hostId === keepHostId) return;
+    retainedSession = null;
+    await endSession(retained.sessionId).catch(() => undefined);
+  }
+
+  async function closePeer(endSession: (sessionId: string) => Promise<void>, retainSession = false): Promise<void> {
     files.cancel();
     downloads.clear();
     const state = peer;
@@ -1016,6 +1042,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     state.channelChains = {};
     rejectRequests(new Error("The server disconnected."));
     rejectConnection(state, new Error("The server disconnected."));
+    if (retainSession) {
+      retainedSession = { hostId: state.hostId, sessionId: state.sessionId };
+      return;
+    }
     const cleanup = (closingSessions.get(state.hostId) ?? Promise.resolve())
       .then(() => endSession(state.sessionId))
       .catch(() => undefined);

@@ -239,6 +239,54 @@ describe("RemoteTeamDirectoryClient", () => {
     ]);
   });
 
+  it("asks only for a ticket on a kept session and replaces it only when it ended", async () => {
+    const paths: string[] = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (input) => {
+        const path = new URL(input.toString()).pathname;
+        paths.push(path);
+        if (path === "/v2/remote/sessions/") {
+          return Response.json(
+            { sessionId: "session-2", hostId: HOST_ID, expiresAt: Date.now() + 60_000 },
+            { status: 201 },
+          );
+        }
+        if (path === "/v2/remote/sessions/ended/ticket") {
+          return Response.json({ error: "The remote session is not active." }, { status: 403 });
+        }
+        if (path === "/v2/remote/sessions/unreachable/ticket") {
+          return Response.json({ error: "Try again." }, { status: 503 });
+        }
+        return Response.json({
+          signalUrl: "wss://signal.example.test/v1/signal",
+          ticket: "remote-ticket",
+          expiresAt: Date.now() + 60_000,
+        });
+      },
+    });
+
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "session-1")).resolves.toMatchObject({
+      sessionId: "session-1",
+    });
+    expect(paths).toEqual(["/v2/remote/sessions/session-1/ticket"]);
+
+    paths.length = 0;
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "ended")).resolves.toMatchObject({
+      sessionId: "session-2",
+    });
+    expect(paths).toEqual([
+      "/v2/remote/sessions/ended/ticket",
+      "/v2/remote/sessions/",
+      "/v2/remote/sessions/session-2/ticket",
+    ]);
+
+    paths.length = 0;
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "unreachable")).rejects.toThrow("Try again.");
+    expect(paths).toEqual(["/v2/remote/sessions/unreachable/ticket"]);
+  });
+
   it("accepts an unencrypted Signal URL only on a private development network", async () => {
     const client = new RemoteTeamDirectoryClient({
       apiUrl: API_URL,

@@ -42,7 +42,11 @@ import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
 import { routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { AgentSelect } from "@openbot/ui/features/settings/AgentSelect";
-import { CATEGORY_LABELS, MarketplaceCatalog } from "@openbot/ui/features/settings/MarketplaceCatalog";
+import {
+  CATEGORY_LABELS,
+  MarketplaceCatalog,
+  MarketplaceHomeCache,
+} from "@openbot/ui/features/settings/MarketplaceCatalog";
 import { MarketplaceDetail } from "@openbot/ui/features/settings/MarketplaceDetail";
 import { MarketplacePluginDetail, PluginIcon } from "@openbot/ui/features/settings/MarketplacePluginDetail";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
@@ -108,6 +112,33 @@ interface SkillsMarketplaceModalProps {
 
 type Tab = "discover" | "mine";
 type MarketplaceKind = "agents" | "plugins" | "skills";
+
+/*
+ * The overview caches outlive the dialog, so opening it again does not ask again. Each one belongs to
+ * one list function, so a story or a test that replaces the API never reads another one's answer.
+ */
+const skillHomeCaches = new WeakMap<typeof window.openbot.skills.list, MarketplaceHomeCache<MarketplaceSkillSummary>>();
+const agentHomeCaches = new WeakMap<
+  typeof window.openbot.marketplaceAgents.list,
+  MarketplaceHomeCache<MarketplaceAgentSummary>
+>();
+
+function homeCacheFor<K extends WeakKey, C>(caches: WeakMap<K, C>, key: K, create: () => C): C {
+  const cached = caches.get(key);
+  if (cached) return cached;
+  const created = create();
+  caches.set(key, created);
+  return created;
+}
+
+const skillHomeCache = () =>
+  homeCacheFor(skillHomeCaches, window.openbot.skills.list, () => new MarketplaceHomeCache<MarketplaceSkillSummary>());
+const agentHomeCache = () =>
+  homeCacheFor(
+    agentHomeCaches,
+    window.openbot.marketplaceAgents.list,
+    () => new MarketplaceHomeCache<MarketplaceAgentSummary>(),
+  );
 
 function isMarketplaceKind(value: string): value is MarketplaceKind {
   return value === "agents" || value === "plugins" || value === "skills";
@@ -837,6 +868,8 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                         <DropdownMenu.Item
                           onSelect={() => {
                             leaveActiveDetail();
+                            if (market.browse.kind === "skills") skillHomeCache().forget();
+                            if (market.browse.kind === "agents") agentHomeCache().forget();
                             if (market.browse.kind === "skills") refresh();
                             else setAgentRefreshVersion((version) => version + 1);
                           }}
@@ -894,6 +927,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                           kind="skills"
                           query={searchQuery()}
                           refreshVersion={skillRefreshVersion()}
+                          homeCache={skillHomeCache()}
                           list={async (query) => {
                             const page = await window.openbot.skills.list(query);
                             return { items: page.skills, nextCursor: page.nextCursor };
@@ -1506,6 +1540,7 @@ function AgentMarketplacePanel(props: {
             kind="agents"
             query={props.query}
             refreshVersion={catalogRefresh()}
+            homeCache={agentHomeCache()}
             list={async (query) => {
               const page = await window.openbot.marketplaceAgents.list(query);
               return { items: page.agents, nextCursor: page.nextCursor };

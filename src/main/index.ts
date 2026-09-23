@@ -724,8 +724,10 @@ if (!hasSingleInstanceLock) {
       app.on("browser-window-focus", (_event, window) => {
         if (window === windowHolder.current) {
           startDirectoryWatch();
+          remoteServers.setAppFocused(true);
         }
       });
+      app.on("browser-window-blur", () => remoteServers.setAppFocused(BrowserWindow.getFocusedWindow() !== null));
       const refreshMemberships = () => void directoryRefresh.refresh(true);
       remoteServers.on("directoryInvalidated", refreshMemberships);
       let stopDirectoryWatch = () => {};

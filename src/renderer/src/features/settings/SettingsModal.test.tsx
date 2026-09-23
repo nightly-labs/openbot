@@ -763,7 +763,7 @@ describe("SettingsModal", () => {
     }
   });
 
-  it("refreshes connected mobile devices once per minute while no QR code is active", async () => {
+  it("does not poll connected mobile devices without a QR code and refreshes when the window is shown", async () => {
     vi.useFakeTimers({ now: 1_000_000 });
     const onListMobileConnectedDevices = vi.fn(async () => []);
     const view = render(() => (
@@ -787,11 +787,16 @@ describe("SettingsModal", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(onListMobileConnectedDevices).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(59_999);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
       expect(onListMobileConnectedDevices).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(1);
+      const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.advanceTimersByTimeAsync(0);
       expect(onListMobileConnectedDevices).toHaveBeenCalledTimes(2);
+      visibility.mockRestore();
     } finally {
       view.unmount();
       vi.useRealTimers();

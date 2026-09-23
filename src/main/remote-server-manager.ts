@@ -237,6 +237,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
+      if (code === "host_unavailable") this.#events.markHostOffline(serverId);
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
     });
@@ -285,7 +286,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
    * account check, so this only says the stored list can no longer be trusted.
    */
   invalidateDirectory(): void {
+    this.#events.retryOfflineHosts();
     this.emit("directoryInvalidated");
+  }
+
+  /** Without app focus, an offline host retries rarely; with focus, it retries at once and then normally. */
+  setAppFocused(focused: boolean): void {
+    this.#events.setAppFocused(focused);
   }
 
   async syncRemoteHosts(): Promise<ServerSummary[]> {
