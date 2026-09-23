@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
 
 const roots: string[] = [];
@@ -734,8 +734,10 @@ describe("CentralAuthManager", () => {
 
     await expect(initialization).resolves.toEqual({ status: "signed_out" });
     expect(attempts).toHaveLength(3);
-    expect(attempts[1] - attempts[0]).toBeGreaterThanOrEqual(8);
-    expect(attempts[2] - attempts[1]).toBeGreaterThanOrEqual(18);
+    const [first, second, third] = attempts;
+    assert(first !== undefined && second !== undefined && third !== undefined);
+    expect(second - first).toBeGreaterThanOrEqual(8);
+    expect(third - second).toBeGreaterThanOrEqual(18);
   });
 
   it("retries session restoration without discarding the stored token", async () => {

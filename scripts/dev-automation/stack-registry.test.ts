@@ -9,7 +9,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it } from "vitest";
 import { isProcessAlive } from "./registry-files";
 import {
   conflictingDevStacks,
@@ -66,14 +66,18 @@ describe("parseDevStackRecord", () => {
 describe("dev stack liveness", () => {
   it("keeps a stack live while a child it started still holds the ports", () => {
     const record = stack();
+    const [child] = record.processes;
+    assert(child);
 
-    expect(isDevStackLive(record, alive([record.processes[0].pid]))).toBe(true);
-    expect(isOrphanedDevStack(record, alive([record.processes[0].pid]))).toBe(true);
+    expect(isDevStackLive(record, alive([child.pid]))).toBe(true);
+    expect(isOrphanedDevStack(record, alive([child.pid]))).toBe(true);
   });
 
   it("does not call a supervised stack orphaned", () => {
     const record = stack();
-    const both = alive([record.supervisorPid, record.processes[0].pid]);
+    const [child] = record.processes;
+    assert(child);
+    const both = alive([record.supervisorPid, child.pid]);
 
     expect(isDevStackLive(record, both)).toBe(true);
     expect(isOrphanedDevStack(record, both)).toBe(false);

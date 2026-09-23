@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { zipSync } from "fflate";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it } from "vitest";
 import { CentralAuthManager } from "./central-auth-manager";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 
@@ -123,7 +123,9 @@ describe("SkillMarketplaceService", () => {
       "This skill needs repair before it can be disabled.",
     );
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe(skillContents);
-    expect((await service.listInstalled(agent.id))[0].enabled).not.toBe(false);
+    const [installed] = await service.listInstalled(agent.id);
+    assert(installed);
+    expect(installed.enabled).not.toBe(false);
     await writeFile(agentsSkill, skillContents);
     await writeFile(claudeSkill, "Claude edits");
     const agentsReference = join(

@@ -849,7 +849,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       } catch (error) {
         if (!isTransientStartupError(error)) throw error;
         const delayMs = Math.min(
-          this.#options.startupRetryDelaysMs[Math.min(retryIndex, this.#options.startupRetryDelaysMs.length - 1)],
+          this.#options.startupRetryDelaysMs[Math.min(retryIndex, this.#options.startupRetryDelaysMs.length - 1)] ?? 0,
           Math.max(0, deadline - Date.now()),
         );
         if (delayMs <= 0) throw error;

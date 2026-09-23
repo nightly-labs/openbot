@@ -110,7 +110,9 @@ export type IpcGroupHandlers = { readonly [Group in keyof IpcEndpoints]: GroupHa
 function bindGroup(group: IpcEndpointGroup, handlers: Readonly<Record<string, UntypedHandler>>): void {
   for (const [name, endpoint] of Object.entries(group)) {
     if (endpoint.kind !== "request") continue;
-    handlers[name](endpoint.channel);
+    const handler = handlers[name];
+    if (!handler) throw new Error(`The IPC endpoint ${name} has no handler.`);
+    handler(endpoint.channel);
   }
 }
 
@@ -125,8 +127,10 @@ export function registerIpcGroup<Name extends keyof IpcEndpoints>(
   handlers: GroupHandlers<IpcEndpoints[Name]>,
 ): void;
 export function registerIpcGroup(name: string, handlers: Readonly<Record<string, UntypedHandler>>): void {
-  const groups: Readonly<Record<string, IpcEndpointGroup>> = IPC_ENDPOINTS;
-  bindGroup(groups[name], handlers);
+  const groups: Readonly<Record<string, IpcEndpointGroup | undefined>> = IPC_ENDPOINTS;
+  const group = groups[name];
+  if (!group) throw new Error(`The IPC group ${name} does not exist.`);
+  bindGroup(group, handlers);
 }
 
 /**
@@ -137,5 +141,9 @@ export function registerIpcGroup(name: string, handlers: Readonly<Record<string,
 export function registerIpcGroups(handlers: IpcGroupHandlers): void;
 export function registerIpcGroups(handlers: Readonly<Record<string, Readonly<Record<string, UntypedHandler>>>>): void {
   const groups: Readonly<Record<string, IpcEndpointGroup>> = IPC_ENDPOINTS;
-  for (const name of Object.keys(groups)) bindGroup(groups[name], handlers[name]);
+  for (const [name, group] of Object.entries(groups)) {
+    const groupHandlers = handlers[name];
+    if (!groupHandlers) throw new Error(`The IPC group ${name} has no handlers.`);
+    bindGroup(group, groupHandlers);
+  }
 }

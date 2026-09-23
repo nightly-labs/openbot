@@ -1,5 +1,5 @@
 import type { MacPermissionId } from "@openbot/contracts/ipc";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { ComputerUsePermissionHelpWindowController } from "./computer-use-permission-help-window";
 
 let nextWebContentsId = 1;
@@ -56,7 +56,7 @@ describe("ComputerUsePermissionHelpWindowController", () => {
 
     expect(windows).toHaveLength(1);
     expect(loaded).toEqual(["screen-recording", "accessibility"]);
-    expect(windows[0].show).toHaveBeenCalledTimes(2);
+    expect(windows[0]?.show).toHaveBeenCalledTimes(2);
   });
 
   // The user presses one row and then the other. The first load finishes last, and a window that
@@ -72,12 +72,14 @@ describe("ComputerUsePermissionHelpWindowController", () => {
 
     const first = help.show("screen-recording");
     const second = help.show("accessibility");
-    releases[1]();
+    const [releaseFirst, releaseSecond] = releases;
+    assert(releaseFirst && releaseSecond);
+    releaseSecond();
     await second;
-    releases[0]();
+    releaseFirst();
     await first;
 
-    expect(windows[0].show).toHaveBeenCalledTimes(1);
+    expect(windows[0]?.show).toHaveBeenCalledTimes(1);
   });
 
   // The window floats over everything, so one left behind by a load still running at teardown would
@@ -93,11 +95,13 @@ describe("ComputerUsePermissionHelpWindowController", () => {
 
     const pending = help.show("accessibility");
     help.close();
-    releases[0]();
+    const [release] = releases;
+    assert(release);
+    release();
     await pending;
 
-    expect(windows[0].close).toHaveBeenCalledTimes(1);
-    expect(windows[0].show).not.toHaveBeenCalled();
+    expect(windows[0]?.close).toHaveBeenCalledTimes(1);
+    expect(windows[0]?.show).not.toHaveBeenCalled();
     expect(help.open).toBe(false);
   });
 
@@ -123,9 +127,11 @@ describe("ComputerUsePermissionHelpWindowController", () => {
     const { controller: help, windows } = controller();
     await help.show("accessibility");
     const startDrag = vi.fn();
+    const [helpWindow] = windows;
+    assert(helpWindow);
 
-    await help.startDrag({ id: windows[0].webContents.id, startDrag });
-    await expect(help.startDrag({ id: windows[0].webContents.id + 1000, startDrag })).rejects.toThrow(
+    await help.startDrag({ id: helpWindow.webContents.id, startDrag });
+    await expect(help.startDrag({ id: helpWindow.webContents.id + 1000, startDrag })).rejects.toThrow(
       /must start in the help window/u,
     );
 
@@ -146,7 +152,9 @@ describe("ComputerUsePermissionHelpWindowController", () => {
   it("uses Sunshine only in its helper and restores the Computer Use bundle when reopened", async () => {
     const { controller: help, windows, revealed } = controller();
     await help.show("accessibility", "/runtime/Sunshine.app");
-    const senderId = windows[0].webContents.id;
+    const [helpWindow] = windows;
+    assert(helpWindow);
+    const senderId = helpWindow.webContents.id;
     expect(await help.permissionApp(senderId)).toMatchObject({ name: "Sunshine" });
     expect(await help.permissionApp(senderId + 1000)).toMatchObject({ name: "OpenBot" });
     const startDrag = vi.fn();
@@ -170,9 +178,13 @@ describe("ComputerUsePermissionHelpWindowController", () => {
     );
     await help.show("accessibility", "/runtime/Sunshine.app");
     const startDrag = vi.fn();
-    const pending = help.startDrag({ id: windows[0].webContents.id, startDrag });
+    const [helpWindow] = windows;
+    assert(helpWindow);
+    const pending = help.startDrag({ id: helpWindow.webContents.id, startDrag });
     await help.show("screen-recording");
-    releases[0]("icon");
+    const [release] = releases;
+    assert(release);
+    release("icon");
     await expect(pending).rejects.toThrow("changed before the drag started");
     expect(startDrag).not.toHaveBeenCalled();
   });

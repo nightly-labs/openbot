@@ -320,7 +320,7 @@ describe("TeamApiServer routing", () => {
     // notices, because the frozen adapter does not move with them.
     const unclassified = routes
       .filter((route) => !ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY.has(route.name))
-      .filter((route) => !teamProtocolV1HttpRoute(ROUTE_METHODS[route.name], route.path))
+      .filter((route) => !teamProtocolV1HttpRoute(ROUTE_METHODS[route.name] ?? "", route.path))
       .map((route) => `${ROUTE_METHODS[route.name]} ${route.path} (${route.name})`);
     expect(unclassified).toEqual([]);
 

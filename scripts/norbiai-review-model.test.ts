@@ -301,7 +301,7 @@ describe("NorbiAI reviewer selection", () => {
     expect(job.env.CAPPED_MODEL).toBe("gpt-6-astra");
     expect(job.env.CAPPED_MODEL_EFFORT).toBe("low");
     // Capping a model that never reads the effort would cap nothing.
-    expect(job.env.EFFORT_MODELS.split(" ")).toContain(job.env.CAPPED_MODEL);
+    expect(job.env.EFFORT_MODELS?.split(" ")).toContain(job.env.CAPPED_MODEL);
   });
 
   // The effort only reaches gpt-6-astra: a chatgpt-web slug carries its own level. The list
@@ -309,9 +309,9 @@ describe("NorbiAI reviewer selection", () => {
   // the assertion is exact rather than a subset check, and putting one back has to be a
   // decision made here too.
   it("offers exactly the reasoning levels gpt-6-astra supports", () => {
-    expect(job.env.ALLOWED_EFFORTS.split(" ")).toEqual(["low", "medium", "high", "xhigh"]);
-    expect(job.env.ALLOWED_MODELS.split(" ")).toContain("gpt-6-astra");
-    expect(job.env.ALLOWED_MODELS.split(" ")).toContain(job.env.DEFAULT_MODEL);
-    expect(job.env.ALLOWED_EFFORTS.split(" ")).toContain(job.env.DEFAULT_EFFORT);
+    expect(job.env.ALLOWED_EFFORTS?.split(" ")).toEqual(["low", "medium", "high", "xhigh"]);
+    expect(job.env.ALLOWED_MODELS?.split(" ")).toContain("gpt-6-astra");
+    expect(job.env.ALLOWED_MODELS?.split(" ")).toContain(job.env.DEFAULT_MODEL);
+    expect(job.env.ALLOWED_EFFORTS?.split(" ")).toContain(job.env.DEFAULT_EFFORT);
   });
 });
