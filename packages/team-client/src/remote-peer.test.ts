@@ -690,6 +690,37 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
+  it("keeps the session when the account API cannot issue a ticket", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const endSession = vi.fn(async () => {});
+    let accountUnavailable = false;
+    let failedBootstraps = 0;
+    const network = await setupNetwork({
+      endSession,
+      beforeBootstrap: async () => {
+        if (!accountUnavailable) return;
+        failedBootstraps += 1;
+        throw new Error("The account API is unavailable.");
+      },
+    });
+    await network.connect();
+    network.runtime.setActive(false);
+    network.connection().drop("disconnected");
+    await vi.advanceTimersByTimeAsync(60_000);
+    network.runtime.setActive(true);
+    const reconnect = network.connect();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(reconnect).resolves.toMatchObject({ ok: false });
+    accountUnavailable = true;
+    await expect(network.connect()).resolves.toMatchObject({ ok: false });
+    expect(failedBootstraps).toBe(1);
+    accountUnavailable = false;
+    await expect(network.connect()).resolves.toMatchObject({ ok: true });
+    expect(network.keptSessions).toEqual([null, "session-1"]);
+    expect(endSession).not.toHaveBeenCalled();
+    await network.runtime.dispose();
+  });
+
   it("leaves resume reads to the recovery owner without replacing the healthy peer", async () => {
     const network = await setupNetwork();
     await network.connect();

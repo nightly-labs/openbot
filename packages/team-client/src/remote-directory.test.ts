@@ -239,7 +239,7 @@ describe("RemoteTeamDirectoryClient", () => {
     ]);
   });
 
-  it("asks only for a ticket on a kept session and starts a session when it ended", async () => {
+  it("asks only for a ticket on a kept session and replaces it only when it ended", async () => {
     const paths: string[] = [];
     const client = new RemoteTeamDirectoryClient({
       apiUrl: API_URL,
@@ -254,7 +254,10 @@ describe("RemoteTeamDirectoryClient", () => {
           );
         }
         if (path === "/v2/remote/sessions/ended/ticket") {
-          return Response.json({ error: "Remote session not found." }, { status: 404 });
+          return Response.json({ error: "The remote session is not active." }, { status: 403 });
+        }
+        if (path === "/v2/remote/sessions/unreachable/ticket") {
+          return Response.json({ error: "Try again." }, { status: 503 });
         }
         return Response.json({
           signalUrl: "wss://signal.example.test/v1/signal",
@@ -278,6 +281,10 @@ describe("RemoteTeamDirectoryClient", () => {
       "/v2/remote/sessions/",
       "/v2/remote/sessions/session-2/ticket",
     ]);
+
+    paths.length = 0;
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "unreachable")).rejects.toThrow("Try again.");
+    expect(paths).toEqual(["/v2/remote/sessions/unreachable/ticket"]);
   });
 
   it("accepts an unencrypted Signal URL only on a private development network", async () => {

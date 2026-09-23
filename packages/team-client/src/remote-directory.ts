@@ -237,8 +237,9 @@ export class RemoteTeamDirectoryClient {
           }),
         );
         return { sessionId: existingSessionId, signalUrl: ticket.signalUrl, ticket: ticket.ticket };
-      } catch {
-        // The kept session ended. Starting a session returns the active one if it did not.
+      } catch (error) {
+        // Only an ended session is replaced. Another failure keeps it, so a retry does not leave it active.
+        if (!(error instanceof RemoteDirectoryError) || (error.status !== 403 && error.status !== 404)) throw error;
       }
     }
     const session = decodeRemoteSession(

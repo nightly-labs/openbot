@@ -340,8 +340,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     const existingSessionId = retainedSession?.hostId === hostId ? retainedSession.sessionId : null;
     // Cleanup for a different host must never block switching servers.
     void releaseRetainedSession(actions.current.endSession, hostId);
-    retainedSession = null;
+    // A failed bootstrap keeps the session for the next attempt.
     const bootstrap = await actions.current.getBootstrap(hostId, clientPublicKey, existingSessionId);
+    if (retainedSession?.sessionId === existingSessionId) retainedSession = null;
     if (currentGeneration !== generation || !active) {
       await actions.current.endSession(bootstrap.sessionId).catch(() => undefined);
       throw new Error("The connection was replaced.");
