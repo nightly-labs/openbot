@@ -411,8 +411,9 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
    either survives a switch it should not or dies in one it should not, and no list of setters can
    fix it. A context reaches another one with `use*()` only downwards, in the nesting order of
    `app-providers.tsx`, or through a provider prop; a command that writes to several domains lives
-   in a leaf context or a bridge component mounted under all of them. `window.openbot.*` is not a
-   dependency. Cycles are rejected by `noImportCycles`, so an upward edge must be `import type`.
+   in a leaf context or a bridge component mounted under all of them. Only a `<domain>-port.ts`
+   module reads `window.openbot`; it lists the bridge calls its domain makes. Cycles are rejected
+   by `noImportCycles`, so an upward edge must be `import type`.
    Prefer one store per concern inside a context over a signal per field: a row of parallel signals
    is what lets a screen be loading, loaded, and errored at once.
 8. Read those contexts from the smallest component that needs them. A pane calls the `use*()` of the

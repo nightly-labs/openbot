@@ -51,6 +51,7 @@ features/<domain>/
   <domain>-scope.ts      the view-side composer, where one exists
   <Domain>*.tsx          entry component and rendered regions, PascalCase
   <domain>-*.ts          DOM-free logic, kebab-case
+  <domain>-port.ts       the bridge calls this domain makes
   <domain>.css           the stylesheet partial, @import-ed from styles.css in cascade order
   stores/                one create*Store per concern, plus *-actions.ts command bundles
 ```
