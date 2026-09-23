@@ -193,7 +193,24 @@ describe("describeMcpError", () => {
 
   it("reports an http status rather than the transport's own words", () => {
     expect(describeMcpError(new Error("Error POSTing to endpoint (HTTP 401)"), config({}), 10_000)).toBe(
-      "The server answered 401.",
+      "The server answered 401. Check the API key or other credentials.",
     );
+    expect(describeMcpError(new Error("Error POSTing to endpoint (HTTP 404)"), config({}), 10_000)).toBe(
+      "The server answered 404. Check the URL. The link may be wrong, expired, or deleted.",
+    );
+  });
+
+  // A Composio link carries the user and session in its query, so the URL is a credential too.
+  it("removes the query of the server URL", () => {
+    const withLink = config({
+      transport: "http",
+      url: "https://backend.composio.dev/v3/mcp/server-id?user_id=private-user",
+    });
+    const message = describeMcpError(
+      new Error("fetch failed for https://backend.composio.dev/v3/mcp/server-id?user_id=private-user"),
+      withLink,
+      10_000,
+    );
+    expect(message).not.toContain("private-user");
   });
 });

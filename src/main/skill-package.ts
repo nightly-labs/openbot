@@ -1,6 +1,6 @@
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import type { SkillPackagePreview } from "@openbot/contracts/ipc";
+import { SKILL_DESCRIPTION_MAX_LENGTH, type SkillPackagePreview } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { unzipSync, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
@@ -42,7 +42,7 @@ export function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "dr
   if (!isDynamicRecord(metadata)) throw new Error("SKILL.md metadata is invalid.");
   const name = isString(metadata.name) ? metadata.name.trim() : "";
   const description = isString(metadata.description) ? metadata.description.trim() : "";
-  if (!name || name.length > 80 || !description || description.length > 500)
+  if (!name || name.length > 80 || !description || description.length > SKILL_DESCRIPTION_MAX_LENGTH)
     throw new Error("SKILL.md needs a valid name and description.");
   return { name, description, slug: slugify(name), files: Object.keys(files).sort() };
 }

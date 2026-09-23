@@ -295,7 +295,8 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     render(() => <App />);
-    const usageButton = await screen.findByRole("button", { name: "Usage, Claude 0% left" });
+    // The active agent runs on ChatGPT, so a spent Claude quota stays out of the chip.
+    const usageButton = await screen.findByRole("button", { name: "Usage, ChatGPT 85% left" });
     await fireEvent.click(usageButton);
     const usageDialog = screen.getByRole("dialog", { name: "Usage" });
     expect(within(usageDialog).getByRole("listitem", { name: /Claude, 0% left/ })).toBeInTheDocument();
@@ -312,7 +313,7 @@ describe("OpenBot connected desktop shell", () => {
       .mockResolvedValueOnce({
         limits: [
           {
-            id: "claude",
+            id: "codex",
             primary: null,
             secondary: { usedPercent: 82, windowDurationMins: 10_080, resetsAt: null },
           },
@@ -327,20 +328,20 @@ describe("OpenBot connected desktop shell", () => {
       usage: {
         limits: [
           {
-            id: "claude",
+            id: "codex",
             primary: null,
             secondary: { usedPercent: 82, windowDurationMins: 10_080, resetsAt: null },
           },
         ],
       },
     });
-    expect(await screen.findByRole("button", { name: "Usage, Claude 18% left" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Usage, ChatGPT 18% left" })).toBeInTheDocument();
     expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1);
 
     resolveInitialUsage({
       limits: [
         {
-          id: "codex",
+          id: "claude",
           primary: null,
           secondary: { usedPercent: 41, windowDurationMins: 10_080, resetsAt: null },
         },
@@ -349,7 +350,7 @@ describe("OpenBot connected desktop shell", () => {
     await initialUsageRequest;
     await Promise.resolve();
 
-    expect(screen.getByRole("button", { name: "Usage, Claude 18% left" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Usage, ChatGPT 18% left" })).toBeInTheDocument();
   });
 
   it("replaces an in-flight usage request after usage is invalidated", async () => {

@@ -47,6 +47,34 @@ describe("account usage view", () => {
     expect(accountUsageRowLabel(rows[0])).toContain("Claude, 0% left");
   });
 
+  it("summarizes only the active agent's provider", () => {
+    const rows = accountUsageProviderRows(
+      {
+        limits: [
+          {
+            id: "grok",
+            primary: null,
+            secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: null },
+          },
+          {
+            id: "codex",
+            primary: null,
+            secondary: { usedPercent: 40, windowDurationMins: 10_080, resetsAt: null },
+          },
+        ],
+      },
+      [
+        { id: "claude", state: "available" },
+        { id: "codex", state: "available" },
+        { id: "grok", state: "available" },
+      ],
+    );
+    expect(accountUsageSummary(rows, "codex")).toMatchObject({ provider: "codex", remainingPercent: 60 });
+    expect(accountUsageSummary(rows, "claude")).toMatchObject({ provider: "claude", remainingPercent: null });
+    expect(accountUsageSummary(rows, "opencode")).toBeNull();
+    expect(accountUsageSummary(rows, null)).toMatchObject({ provider: "grok", remainingPercent: 0 });
+  });
+
   it("keeps connected providers visible when they have not reported a limit yet", () => {
     const rows = accountUsageProviderRows(
       {

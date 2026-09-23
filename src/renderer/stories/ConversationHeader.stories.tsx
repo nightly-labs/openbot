@@ -28,6 +28,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+export const WorkspaceOnly: Story = { args: { agent: { ...STORY_AGENTS[0], access: "workspace" } } };
 export const RemoteControl: Story = {
   args: { remoteControl: { enabled: true, active: true, visible: false, onOpen: fn() } },
 };

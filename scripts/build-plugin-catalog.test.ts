@@ -18,11 +18,11 @@ afterEach(async () => {
 });
 
 describe("plugin catalog source", () => {
-  it("loads fourteen listings in catalog order", async () => {
+  it("loads fifteen listings in catalog order", async () => {
     const { spec, plugins } = await loadPluginCatalog(paths.sourceRoot);
     expect(spec.catalogVersion).toBe("v1");
     expect(plugins.map((plugin) => plugin.slug)).toEqual(spec.order);
-    expect(plugins).toHaveLength(14);
+    expect(plugins).toHaveLength(15);
   });
 
   it("matches the checked-in outputs byte for byte, without touching the repository", async () => {
@@ -50,7 +50,7 @@ describe("plugin catalog source", () => {
   });
 
   it("passes --check on the checked-in tree", async () => {
-    await expect(buildPluginCatalog({ check: true })).resolves.toMatchObject({ plugins: 14 });
+    await expect(buildPluginCatalog({ check: true })).resolves.toMatchObject({ plugins: 15 });
   });
 });
 

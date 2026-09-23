@@ -1,4 +1,5 @@
 import type {
+  AgentAccess,
   AgentExchangeSummary,
   AgentModelId,
   AgentProviderId,
@@ -148,6 +149,8 @@ export interface AgentProfile {
   provider: AgentProviderId;
   model: AgentModelId;
   reasoningEffort: AgentReasoningEffort;
+  /** Absent for an agent on a remote host, which does not share it; the host then decides. */
+  access?: AgentAccess;
   threadId: string | null;
   /** The agent's working directory. Absent for profiles built before it was tracked. */
   workspacePath?: string;

@@ -1077,6 +1077,56 @@ describe("MailboxStore", () => {
     await expect(store.listExportAttachments()).resolves.toEqual([]);
   });
 
+  it("deletes a sent file from Storage and keeps the message that carried it", async () => {
+    const source = join(root, "report.txt");
+    await writeFile(source, "report");
+    const [draft] = await store.prepareAttachments([source]);
+    const receipt = await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Review",
+      draftIds: [draft.id],
+    });
+    const [file] = store.listStoredFiles();
+    expect(file).toMatchObject({ source: "attachment", messageId: receipt.messageId, agentId: "chief" });
+
+    await store.deleteStoredFile(file.attachment.id);
+
+    await expect(access(file.path)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(store.resolveAttachment(file.attachment.id)).resolves.toBeNull();
+    expect(store.listStoredFiles()).toEqual([]);
+    const delivery = store.getDelivery(receipt.deliveries[0].id)?.delivery;
+    expect(delivery?.attachments.map((attachment) => attachment.id)).toEqual([file.attachment.id]);
+    await expect(store.deleteStoredFile(file.attachment.id)).rejects.toThrow("already deleted");
+
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.listStoredFiles()).toEqual([]);
+    await expect(restored.resolveAttachment(file.attachment.id)).resolves.toBeNull();
+  });
+
+  it("marks a file deleted from Storage without following a symlink out of the transfer root", async () => {
+    const source = join(root, "inside.txt");
+    const outside = join(root, "outside.txt");
+    await writeFile(source, "original");
+    await writeFile(outside, "keep me");
+    const [draft] = await store.prepareAttachments([source]);
+    await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Review",
+      draftIds: [draft.id],
+    });
+    const [file] = store.listStoredFiles();
+    await rm(file.path);
+    await symlink(outside, file.path);
+
+    await store.deleteStoredFile(file.attachment.id);
+
+    await expect(readFile(outside, "utf8")).resolves.toBe("keep me");
+    expect(store.listStoredFiles()).toEqual([]);
+  });
+
   it("keeps the persisted MIME type as the single source for attachment serving", async () => {
     const [draft] = await store.prepareImportedAttachments(
       [],

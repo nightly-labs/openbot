@@ -16,6 +16,7 @@ const meta = {
     agentStatus: STORY_AGENT_STATUS,
     modelOptions: STORY_MODELS,
     working: false,
+    accessEditable: true,
     width: 296,
     maxWidth: () => 640,
     onClose: fn(),
@@ -38,6 +39,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Working: Story = { args: { working: true } };
+export const WorkspaceOnly: Story = { args: { agent: { ...STORY_AGENTS[0], access: "workspace" } } };
 export const SaveFailure: Story = {
   args: {
     onUpdateAgent: fn(async () => {

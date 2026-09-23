@@ -293,6 +293,14 @@ export function parseBunVersion(output: string): string {
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
+/**
+ * Whether this Claude Code takes `--system-prompt-snapshot`. Checked in 2.1.263, the version the
+ * lock falls back to; an older CLI above the minimum would reject the unknown flag and not start.
+ */
+export function claudeTakesPromptSnapshotFlag(version: string): boolean {
+  return isMinimumVersion(version, [2, 1, 263]);
+}
+
 function isMinimumVersion(version: string, minimum: readonly number[]): boolean {
   const parts = version.split(".").map(Number);
   for (let index = 0; index < minimum.length; index += 1) {

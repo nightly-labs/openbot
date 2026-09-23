@@ -66,8 +66,15 @@ function usageRow(provider: AgentProviderId, limit: AccountUsageLimit | null): A
   };
 }
 
-/** The lowest remaining row, which is what the dock chip warns about. */
-export function accountUsageSummary(rows: AccountUsageProviderRow[]): AccountUsageProviderRow | null {
+/**
+ * The row the dock chip shows. With an active agent it is that agent's provider only, so a spent
+ * Grok quota does not show as the limit of a ChatGPT agent. With no agent it is the lowest row.
+ */
+export function accountUsageSummary(
+  rows: AccountUsageProviderRow[],
+  provider?: AgentProviderId | null,
+): AccountUsageProviderRow | null {
+  if (provider) return rows.find((row) => row.provider === provider) ?? null;
   let lowest: AccountUsageProviderRow | null = null;
   for (const row of rows) {
     if (row.remainingPercent === null) continue;

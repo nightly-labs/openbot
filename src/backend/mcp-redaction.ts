@@ -45,7 +45,26 @@ export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
   for (const config of configs) {
     for (const value of Object.values(mcpEnvironment(config))) values.add(value);
     for (const pair of config.headers) values.add(pair.value);
+    for (const value of urlQueryValues(config.url)) values.add(value);
   }
   // A short value is left alone - masking a two-character value would hide ordinary words.
   return [...values].filter((value) => value.length >= 4);
+}
+
+/**
+ * A link from a service such as Composio names the user or the session in its query, and anyone
+ * with the link can use it. The whole query is masked as a transport quotes it. Each value alone is
+ * not: a value such as `default` would then be masked in every error. The path is left alone so the
+ * error still says which server failed.
+ */
+function urlQueryValues(url: string): string[] {
+  if (!url) return [];
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return [];
+  }
+  if (!parsed.search) return [];
+  return [parsed.search.slice(1)];
 }

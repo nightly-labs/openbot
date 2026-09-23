@@ -4,11 +4,14 @@ import type { AgentProfile } from "@openbot/ui/data";
 import SharedAgentSettingsPanel, {
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
+import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
+import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
-import { AgentSkillsModal, type AgentSkillsMode, userAssignedSkills } from "./AgentSkillsModal";
+import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./AgentSkillsModal";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
@@ -34,6 +37,8 @@ interface AgentSettingsPanelProps
   onCreateSkill?: () => void;
   onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
+  /** The Files row. Left out for a remote server without `storage-v1`. */
+  files?: AgentFilesOptions;
 }
 
 export type { AgentSkillsMode };
@@ -44,11 +49,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     tables: { count: 0, open: false },
     memories: { count: 0, open: false },
     routines: { count: 0, open: false },
+    files: { open: false },
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
   const routinesPort = createMemo(() => agentRoutinesPort(props.agent.id));
   const skillsMode = () => props.skillsMode ?? "mutable";
+  const storage = createStorageUsage(() => {
+    const files = props.files;
+    return files ? { serverId: files.serverId, input: { scope: "agent", agentId: props.agent.id } } : null;
+  });
   let lastSkillsMarketplaceOpen = props.skillsMarketplaceOpen === true;
   createEffect(
     () => panelWidth(),
@@ -64,6 +74,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.tables.open = false;
         state.memories.open = false;
         state.routines.open = false;
+        state.files.open = false;
         state.skills.open = false;
         state.skills.reopenAfterMarketplace = false;
       });
@@ -110,7 +121,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           ? await window.openbot.agent.listInstalledSkills(agentId)
           : await window.openbot.skills.listInstalled(agentId);
       setDraft((state) => {
-        state.skills.count = userAssignedSkills(items).length;
+        state.skills.count = assignedSkillCount(items);
       });
     } catch {
       setDraft((state) => {
@@ -159,7 +170,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
-      detailOpen={draft.routines.open}
+      detailOpen={draft.routines.open || draft.files.open}
       links={
         <Show when={!props.remoteClient}>
           <SettingsLinkGroup>
@@ -197,6 +208,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }
               />
             </Show>
+            <Show when={props.files}>
+              <SettingsLinkRow
+                label="Files"
+                value={storage.state.usage ? agentFilesLinkValue(storage.state.usage.breakdown) : undefined}
+                onClick={() =>
+                  setDraft((state) => {
+                    state.files.open = true;
+                  })
+                }
+              />
+            </Show>
             <SettingsLinkRow
               label="Routines"
               value={`${draft.routines.count} configured`}
@@ -210,6 +232,21 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         </Show>
       }
     >
+      <Show when={draft.files.open && props.files}>
+        {(files) => (
+          <AgentFilesSettings
+            {...files()}
+            agentName={props.agent.name}
+            storage={storage}
+            onBack={() =>
+              setDraft((state) => {
+                state.files.open = false;
+              })
+            }
+            onClose={props.onClose}
+          />
+        )}
+      </Show>
       <Show when={draft.routines.open}>
         <div class="agent-routines-overlay">
           <AgentRoutinesSettings

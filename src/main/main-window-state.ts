@@ -36,6 +36,31 @@ export function presentMainWindow(
   window.focus();
 }
 
+export interface SecondLaunchState {
+  /** Windows is ending the session; nothing may start again. */
+  sessionEnding: boolean;
+  quitting: boolean;
+  hasMainWindow: boolean;
+  /** Startup has built the services, so a closed main window can be built again. */
+  started: boolean;
+}
+
+/**
+ * - `present`: show and focus the main window that exists.
+ * - `reopen`: build the main window again. Outside macOS, closing it destroys it.
+ * - `relaunch`: start a new instance once this one exits. The launch that asked has already exited
+ *   because this process holds the single-instance lock, so without this nothing would open.
+ * - `ignore`: startup is still building the window and will show it.
+ */
+export type SecondLaunchResponse = "present" | "reopen" | "relaunch" | "ignore";
+
+export function secondLaunchResponse(state: SecondLaunchState): SecondLaunchResponse {
+  if (state.sessionEnding) return "ignore";
+  if (state.quitting) return "relaunch";
+  if (state.hasMainWindow) return "present";
+  return state.started ? "reopen" : "ignore";
+}
+
 export async function readMainWindowBounds(path: string): Promise<Rectangle | null> {
   try {
     const parsed = JSON.parse(await readFile(path, "utf8"));

@@ -925,6 +925,38 @@ The desktop chart adapts Zaidan's chart and interactive area composition. The pi
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
+### Storage and files
+
+Three surfaces show what a host keeps on disk: Server Settings > Storage (scope `host`), Agent
+settings > Files (scope `agent`) and the chat Files panel (scope `conversation`). They share
+`src/renderer/src/features/files/storage-usage.ts`, which names the server explicitly, because Server
+Settings can be open for a server that is not the selected one.
+
+`src/backend/storage-usage.ts` owns the scan and has no Electron imports. Sent and generated files
+come from the mailbox state in memory, with their chat from paged read-only queries in
+`database/storage-usage-queries.ts`; a file's status comes from `stat`, not from
+`resolveAttachment`, which hashes the file. Workspaces, shared files, downloads, caches, logs and
+runtimes are measured by a bounded walk: `lstat`, no symlinks followed, a stop at 100,000 entries,
+and a yield between pages, because `DatabaseSync` and the walk run on the main thread. A result is
+cached for 60 seconds per scope, a scan in progress is shared, and a delete, clear or agent delete
+drops the cache. Lists stop at `STORAGE_LIMITS` and set `truncated`; the breakdown still counts
+every byte.
+
+A delete does not change the schema. `MailboxStore.deleteStoredFile` sets `deletedAt` on the stored
+attachment, persists, and queues the file path, not the transfer folder, in the file-deletion outbox.
+It keeps a path that another live record uses, and it deletes only a real path under the Transfers
+folder. `resolveAttachment` then returns null, so a file card shows "File not found" and a generated image
+shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote` and
+`logs/update` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
+
+`storage:*` IPC reaches the local service or a joined server. The optional `storage-v1` capability
+exposes `POST /v1/storage/usage`, `/v1/storage/delete-file` and `/v1/storage/clear` with the frozen
+codec in `team-protocol/storage-v1.ts`. The host advertises it only when its storage service
+exists. Every member reads usage; delete and clear need an owner or admin (`requireAdmin`), and the
+renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
+download files travel only as category totals. A host without the capability reads as null, and the
+surface asks for an update; a change is refused before any request.
+
 ### OpenCode and ACP
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
@@ -1068,6 +1100,47 @@ Mobile channel settings use one native sheet with a nested stack for memories an
 memory and routine editors share their controls with agent settings and use channel API operations.
 Channel settings have no provider or model controls because each member retains its own runtime.
 No account API, Signal, IPC contract, or database migration changes are required for mobile channels.
+
+## Skill folders and MCP configuration
+
+A skill follows the [Agent Skills specification](https://agentskills.io/specification): a folder
+`<name>/` with a `SKILL.md` file. The YAML frontmatter has `name`, which is the folder name, and a
+`description` of 1 to 1024 characters. Each provider CLI finds skills in its own folders:
+
+| Folder | Written by | Read by |
+| --- | --- | --- |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode |
+| `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode |
+| `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
+| `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
+| `~/.claude/skills/` | the user | Claude Code, OpenCode |
+| `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
+
+OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
+`.claude/skills/<slug>`, because Claude Code does not read `.agents/skills`. It copies the files and
+does not make links. `.openbot/skills-lock.json` in the workspace records the file hashes, and
+`.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
+marker.
+
+`src/main/skill-folder-discovery.ts` lists all other skills in the three workspace folders as
+`workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
+they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
+skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a
+folder that the agent's provider does not read. An agent keeps its workspace when its provider
+changes, so a skill in `.agents/skills` stops working after a change to Claude Code. A skill with a
+problem is not offered as a chat tag.
+
+OpenBot does not list the home-directory folders. They hold the host user's skills, which are the
+same for every agent, and each provider CLI changes its home-folder rules without notice.
+
+MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
+whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
+`~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor and Gemini
+CLI read their own folders. OpenBot writes none of these files. It gives the servers to each
+provider when the session starts. Claude starts with `strictMcpConfig`, so it ignores `.mcp.json`
+and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The panel masks header and
+environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
+`safeStorage`.
 
 ## Local skill library
 

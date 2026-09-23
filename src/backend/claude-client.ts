@@ -17,7 +17,7 @@ import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
-import type { ClaudeCliInfo } from "./cli";
+import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
 import {
   claudeMcpServers,
   type McpAuthorizationSource,
@@ -462,6 +462,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           preset: "claude_code",
           append: config.developerInstructions,
         },
+        // The developer instructions carry the profile and the memories, and `thread/resume` above
+        // restarts the query when they change. A recorded prompt would be sent instead of them on
+        // every later request and resume, so the agent kept an edited profile's old text. The CLI
+        // flag, not the SDK's `systemPromptSnapshot` option: the CLI records by default and ignores
+        // that option.
+        ...(claudeTakesPromptSnapshotFlag(this.#cli.version) ? { extraArgs: { "system-prompt-snapshot": "off" } } : {}),
         ...(config.profileGeneration ? { tools: [] } : {}),
         settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
         // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user

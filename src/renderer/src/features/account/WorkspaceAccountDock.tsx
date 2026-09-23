@@ -23,7 +23,7 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
   const auth = useAuth();
   const setup = useSetup();
   const updates = useUpdates();
-  const { agentStatus } = useAgents();
+  const { activeAgent, agentStatus } = useAgents();
   const { activeServerId } = useServers();
   const { openAppSettings, setSkillsMarketplaceOpen } = useSettings();
   const usageReady = createMemo(() => {
@@ -65,6 +65,7 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
         appInfo={platform.appInfo()}
         agentStatus={agentStatus()}
         accountUsage={auth.accountUsage()}
+        usageProvider={activeAgent()?.provider ?? null}
         usageTargetKey={usageTargetKey()}
         usageRefreshRevision={auth.accountUsageRefreshRevision()}
         usageReady={usageReady()}

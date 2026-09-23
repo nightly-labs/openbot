@@ -6,7 +6,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { parse as parseYaml } from "yaml";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
-const OWNERSHIP_MARKER = ".openbot-managed.json";
+export const OWNERSHIP_MARKER = ".openbot-managed.json";
 
 const logger = createOpenBotLogger("managed-skill-service");
 

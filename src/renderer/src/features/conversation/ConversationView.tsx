@@ -20,6 +20,7 @@ export function ConversationView(props: ConversationProps) {
     browserSidebarOpen,
     dropActive,
     filePreviewOpen,
+    filesOpen,
     handleChatSearchShortcut,
     sendSelectionInstruction,
     setConversationPanelElement,
@@ -43,7 +44,7 @@ export function ConversationView(props: ConversationProps) {
           "conversation-panel",
           {
             "conversation-drop-active": dropActive(),
-            "browser-panel-active": browserSidebarOpen() || filePreviewOpen(),
+            "browser-panel-active": browserSidebarOpen() || filePreviewOpen() || filesOpen(),
           },
         ]}
         style={`--settings-panel-width: ${settingsPanelWidth()}px; --browser-panel-width: ${browserPanelWidth()}px`}

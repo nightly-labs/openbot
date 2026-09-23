@@ -645,6 +645,11 @@ describe("agent IPC input parsing", () => {
     expect(() => parseUpdateAgent({ agentId: "bot-1", notifications: "yes" })).toThrowError(
       "Invalid notifications value.",
     );
+    expect(parseUpdateAgent({ agentId: "bot-1", access: "workspace" })).toEqual({
+      agentId: "bot-1",
+      access: "workspace",
+    });
+    expect(() => parseUpdateAgent({ agentId: "bot-1", access: "read-only" })).toThrowError("Invalid agent access.");
     expect(() => parseImportAttachments({ paths: [""], data: [] })).toThrowError("Invalid attachment path.");
     expect(() => parseChooseAttachments({ filter: "documents" })).toThrowError("Invalid attachment picker filter.");
     expect(() => parseOpenAttachment({ attachmentId: "attachment-1", action: "delete" })).toThrowError(

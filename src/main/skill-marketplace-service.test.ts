@@ -185,7 +185,10 @@ describe("SkillMarketplaceService", () => {
     await writeFile(claudeSkill, "Unowned files after disable");
     await service.uninstall({ agentId: agent.id, skillId: "skill-1" });
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Unowned files after disable");
-    await expect(service.listInstalled(agent.id)).resolves.toEqual([]);
+    // The files the user kept are still in a folder the provider reads, so the list shows them.
+    await expect(service.listInstalled(agent.id)).resolves.toEqual([
+      expect.objectContaining({ origin: "workspace", location: ".claude/skills/release-notes" }),
+    ]);
   });
   /*
    * A plugin listing pins the version of each skill it brings, so the install must ask for that

@@ -5,6 +5,46 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-23
+
+### Added
+
+- Show the skills in an agent's workspace skill folders that OpenBot did not install, such as
+  `.agents/skills`. OpenBot does not change these folders. A skill shows a problem when its
+  `SKILL.md` is not valid, or when the agent's provider does not read its folder.
+- Show disk use and files in a Storage tab in Server Settings, a Files view in agent settings, and a
+  Files panel in the chat. An owner or an admin can delete a file and clear caches and logs.
+- Mute a server for a set time or until you turn it back on, and set its notification level: all
+  activity, only when it needs you, or nothing.
+- Send a test notification and open the system notification settings from Settings.
+- Mark an agent as Workspace only in the agent settings. The setting is not enforced yet.
+- Check for provider CLI updates from a provider's actions menu. OpenBot offers the latest upstream
+  release of Codex, Claude, OpenCode, and Grok without a new OpenBot version.
+- Add Linux arm64 builds.
+- Add a Composio listing that takes your own MCP link.
+- Show file type, size, previews, and upload progress for attachments on mobile, and show images
+  that an agent generates.
+
+### Changed
+
+- Accept a skill description of up to 1024 characters, as the Agent Skills specification allows.
+- Desktop notifications now appear. **If you turned off desktop notifications, turn them off again
+  in Settings.**
+- Show the open agent's provider in the usage chip.
+- Apply edited agent instructions to Codex and Claude sessions. The agent keeps its thread.
+- Ask for confirmation in one shared dialog everywhere.
+- Hide the query string of an MCP URL in logs, and mask MCP header and environment values in the
+  server MCP panel.
+- Send fewer requests to the account service. Without app focus, an offline host retries after 15
+  minutes.
+
+### Fixed
+
+- Make Apple and Google sign-in work in the embedded browser.
+- Open OpenBot on a second launch after a quit that did not finish on Windows.
+- Show new chat replies when reduced motion is on.
+- Center the idle emoji in the Dynamic Island.
+
 ## [0.19.0] - 2026-09-23
 
 ### Added
