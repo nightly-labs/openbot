@@ -1,7 +1,7 @@
+import { Heading, SliderField } from "@openbot/ui";
 import { createSignal } from "solid-js";
 import { expect, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Heading, SliderField } from "@openbot/ui";
 
 const meta = {
   title: "Foundations/Slider",

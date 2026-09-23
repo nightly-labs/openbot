@@ -4,9 +4,9 @@ import {
   IDLE_DYNAMIC_ISLAND_PRESENTATION,
 } from "@openbot/contracts/ipc";
 import { Button, ItemGroup, SettingsSection, SliderField, SwitchField } from "@openbot/ui";
-import { useI18n } from "../../i18n-context";
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { useI18n } from "../../i18n-context";
 
 export interface SettingsDynamicIslandTabProps {
   value: GeneralSettingsValue;
