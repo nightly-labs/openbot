@@ -162,7 +162,7 @@ describe("ProviderPicker", () => {
     ).toBeNull();
   });
 
-  it("offers Update in every downloaded row's actions menu, enabled only for a newer version", async () => {
+  it("offers Update in every downloaded row's actions menu, and a check where no newer version is known", async () => {
     const onUpdateProvider = vi.fn();
     const view = render(() => (
       <ProviderPicker
@@ -190,8 +190,8 @@ describe("ProviderPicker", () => {
     expect(view.queryByRole("button", { name: "More actions for Grok" })).toBeNull();
 
     await openMenu("OpenCode");
-    expect(await screen.findByRole("menuitem", { name: "Up to date" })).toHaveAttribute("aria-disabled", "true");
-    await fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Check for updates" }), { button: 0 });
+    await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("opencode"));
 
     await openMenu("Claude");
     await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Update to 2.1.250" }), { button: 0 });

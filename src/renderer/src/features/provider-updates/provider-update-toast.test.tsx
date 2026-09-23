@@ -51,6 +51,7 @@ function runtimeHarness() {
     getStatus: async () => snapshot,
     download: vi.fn(async () => emit({ phase: "downloading", progress: 0, message: null })),
     cancel: async () => emit({ phase: "not-downloaded", progress: null }),
+    checkForUpdates: vi.fn(async () => snapshot),
     onEvent: (next) => {
       listener = next;
       return () => {
@@ -130,4 +131,16 @@ it("offers retry when the update request fails before progress starts", async ()
   await store.cancelProviderRuntimeDownload("claude");
   await waitFor(() => expect(screen.queryByText("Updating Claude")).not.toBeInTheDocument());
   expect(store.providerAvailableVersions().claude).toBe("2.1.250");
+});
+
+it("checks for a newer version when none is offered, and offers what the check finds", async () => {
+  const { store, api, emit } = runtimeHarness();
+  await waitFor(() => expect(store.providerAvailableVersions().claude).toBe("2.1.250"));
+  emit({ phase: "ready", version: "2.1.250", availableVersion: null });
+  dismissProviderUpdateToast("claude");
+  vi.mocked(api.checkForUpdates).mockImplementationOnce(async () => emit({ availableVersion: "2.1.260" }));
+  await store.startProviderUpdate("claude");
+  expect(await screen.findByText("Claude update available")).toBeInTheDocument();
+  expect(screen.getByText("v2.1.250 → v2.1.260")).toBeInTheDocument();
+  expect(api.download).not.toHaveBeenCalled();
 });

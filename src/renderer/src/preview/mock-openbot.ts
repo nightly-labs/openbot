@@ -687,6 +687,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     }),
     providerRuntimes: {
       getStatus: async () => clone(runtimeSnapshot),
+      // The preview has no upstream to ask: every offer it makes is already in the snapshot.
+      checkForUpdates: async () => clone(runtimeSnapshot),
       download: async (provider) => {
         if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
         const installed = runtimeSnapshot.providers[provider];

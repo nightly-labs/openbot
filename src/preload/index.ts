@@ -965,6 +965,8 @@ const openbotApi: OpenBotDesktopApi = {
       ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesDownload, provider).then(decodeProviderRuntimeSnapshot),
     cancel: (provider) =>
       ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesCancel, provider).then(decodeProviderRuntimeSnapshot),
+    checkForUpdates: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesCheckForUpdates).then(decodeProviderRuntimeSnapshot),
     onEvent: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, snapshot: unknown) =>
         listener(decodeProviderRuntimeSnapshot(snapshot));

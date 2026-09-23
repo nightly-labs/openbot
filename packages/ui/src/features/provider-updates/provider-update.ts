@@ -21,6 +21,8 @@ export interface ProviderUpdate {
   name: string;
   runtime: ProviderRuntimeStatus;
   availableVersion: string | null;
+  /** The user asked main whether a newer version exists, and the answer has not arrived. */
+  checking?: boolean;
 }
 
 export interface ProviderUpdatePresentation {
@@ -57,7 +59,7 @@ export function providerUpdateAvailable(runtime: ProviderRuntimeStatus, availabl
 export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePresentation {
   const { name, runtime, availableVersion } = update;
   const updatable = providerUpdateAvailable(runtime, availableVersion);
-  const busy = runtime.phase === "downloading" || runtime.phase === "finishing";
+  const busy = update.checking === true || runtime.phase === "downloading" || runtime.phase === "finishing";
   const failed = runtime.phase === "download-error";
 
   let actionLabel: ProviderUpdatePresentation["actionLabel"];
@@ -65,7 +67,8 @@ export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePre
   else if (failed) actionLabel = "Retry";
 
   let title = `${name} is up to date`;
-  if (updatable) title = `${name} update available`;
+  if (update.checking) title = `Checking for ${name} updates`;
+  else if (updatable) title = `${name} update available`;
   else if (busy) title = `Updating ${name}`;
   else if (failed) title = `${name} update failed`;
 
@@ -76,7 +79,7 @@ export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePre
     actionLabel,
     title,
     detail: updateDetail(update, updatable),
-    progress: runtime.phase === "downloading" ? clampProgress(runtime.progress) : null,
+    progress: !update.checking && runtime.phase === "downloading" ? clampProgress(runtime.progress) : null,
   };
 }
 

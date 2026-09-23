@@ -176,7 +176,7 @@ export const fr = {
   "provider.action.restart": "Redémarrer",
   "provider.action.retry": "Réessayer",
   "provider.action.updateTo": "Mettre à jour vers {version}",
-  "provider.action.upToDate": "À jour",
+  "provider.action.checkForUpdates": "Rechercher des mises à jour",
   "provider.action.install": "Installer",
   "provider.action.signIn": "Se connecter",
   "provider.action.signInWithCode": "Se connecter avec un code",

@@ -20,6 +20,12 @@ checks their SHA-256 values, versions, licenses, and vendor signatures without c
 OpenBot. Linux has no code-signature contract to check, so its provider artifacts are verified by
 SHA-256 and version only.
 
+Installed apps do not wait for a release to get a new provider CLI: they offer the latest upstream
+release (see [Provider CLI updates](ARCHITECTURE.md#provider-cli-updates)). The pinned version is the
+first-install fallback. To stop a broken upstream release, add its version to the provider's list in
+`provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
+blocked version is no longer offered, but it stays on the computers that already installed it.
+
 ## One-time GitHub setup
 
 Create the `release` environment in `nightly-labs/openbot`, then add these environment secrets:
@@ -132,7 +138,7 @@ on Linux.
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode
-provider, by npm platform package, asset SHA-256, extracted binary SHA-256, byte counts, and the
+provider before its first update check answers, by npm platform package, asset SHA-256, extracted binary SHA-256, byte counts, and the
 MIT license file it fetches from `github.com/anomalyco/opencode`. Codex, Claude, and Grok are pinned
 in the same file by hand; OpenCode has a script, because the version, both platform packages, and
 the license have to agree:
