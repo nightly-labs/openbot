@@ -1052,9 +1052,7 @@ export class ProviderRuntime implements ProviderPort {
 
   /** A CLI exit with its last stderr line in the message, after the MCP values are out of it. */
   #withExitDetail(error: unknown): unknown {
-    return error instanceof AgentProcessExitError && error.detail
-      ? error.withDetail(this.#redactMcp(error.detail))
-      : error;
+    return error instanceof AgentProcessExitError ? error.withDetail(this.#redactMcp) : error;
   }
 
   async #createAuthenticatedProviderClient(

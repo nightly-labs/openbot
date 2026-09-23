@@ -91,7 +91,7 @@ interface ClientEvents {
 
 interface ProcessEnd {
   ending: string;
-  /** The last stderr line, after `redactText` only. See `AgentProcessExitError`. */
+  /** The last stderr line, after `redactText` only. `AgentProcessExitError` keeps it private. */
   detail: string | null;
 }
 
