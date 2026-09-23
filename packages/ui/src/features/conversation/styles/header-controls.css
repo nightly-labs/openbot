@@ -124,10 +124,6 @@
   box-shadow: none;
 }
 
-.agent-settings-model .provider-model-trigger-field {
-  border-radius: var(--openbot-radius-md) var(--openbot-radius-md) 0 0;
-}
-
 .provider-model-trigger-field:hover:not(:disabled),
 .provider-model-trigger-field[aria-expanded="true"] {
   border-color: transparent;
@@ -190,11 +186,6 @@
   box-shadow:
     0 22px 60px var(--openbot-bg-overlay),
     0 3px 12px var(--openbot-shadow-popover-ambient);
-}
-
-.agent-settings-model .provider-model-popover {
-  width: var(--kb-popper-anchor-width);
-  min-width: 0;
 }
 
 .provider-model-layout {

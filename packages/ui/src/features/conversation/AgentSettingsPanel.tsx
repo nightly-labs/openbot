@@ -24,7 +24,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SettingsSection,
   Switch,
+  Text,
   Textarea,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
@@ -736,111 +738,99 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
           </SettingsField>
           {props.links}
-          <section class="agent-settings-model" aria-labelledby="agent-model-heading">
-            <div class="agent-settings-section-heading">
-              <strong id="agent-model-heading">Runtime</strong>
-              <span>Choose how this agent runs</span>
-            </div>
-            <div class="agent-settings-model-controls">
-              <div class="agent-settings-model-option">
-                <ProviderModelPicker
-                  variant="field"
-                  ariaLabel="Agent model"
-                  provider={draft.runtime.provider}
-                  value={draft.runtime.model}
-                  agentStatus={props.agentStatus}
-                  modelOptions={props.modelOptions}
-                  runtimeStatuses={props.providerRuntimeStatuses}
-                  customProviders={props.customProviders}
-                  onDownloadProvider={props.onDownloadProvider}
-                  onCancelProviderDownload={props.onCancelProviderDownload}
-                  onConnectProvider={props.onConnectProvider}
-                  disabled={props.working}
-                  disabledReason={
-                    props.working
-                      ? "Wait for the current work to finish before changing models."
-                      : "Models are available after an agent CLI connects."
-                  }
-                  onChange={(nextModel, provider) => void selectModel(nextModel, provider)}
-                />
-              </div>
-              <div class="agent-settings-model-row agent-settings-thinking-row">
-                <span>Reasoning</span>
-                <Select<AgentReasoningEffort>
-                  class="agent-settings-reasoning-control"
-                  options={reasoningOptions()}
-                  value={draft.runtime.reasoningEffort}
-                  onChange={(nextReasoning) => {
-                    if (!nextReasoning || nextReasoning === draft.runtime.reasoningEffort) return;
-                    void selectReasoning(nextReasoning);
+          <SettingsSection class="agent-settings-runtime" title="Runtime">
+            <div class="agent-settings-runtime-rows">
+              <ProviderModelPicker
+                variant="field"
+                ariaLabel="Agent model"
+                provider={draft.runtime.provider}
+                value={draft.runtime.model}
+                agentStatus={props.agentStatus}
+                modelOptions={props.modelOptions}
+                runtimeStatuses={props.providerRuntimeStatuses}
+                customProviders={props.customProviders}
+                onDownloadProvider={props.onDownloadProvider}
+                onCancelProviderDownload={props.onCancelProviderDownload}
+                onConnectProvider={props.onConnectProvider}
+                disabled={props.working}
+                disabledReason={
+                  props.working
+                    ? "Wait for the current work to finish before changing models."
+                    : "Models are available after an agent CLI connects."
+                }
+                onChange={(nextModel, provider) => void selectModel(nextModel, provider)}
+              />
+              <Select<AgentReasoningEffort>
+                class="agent-settings-runtime-select"
+                options={reasoningOptions()}
+                value={draft.runtime.reasoningEffort}
+                onChange={(nextReasoning) => {
+                  if (!nextReasoning || nextReasoning === draft.runtime.reasoningEffort) return;
+                  void selectReasoning(nextReasoning);
+                }}
+                itemComponent={(item) => <SelectItem item={item.item}>{reasoningLabel(item.item.rawValue)}</SelectItem>}
+              >
+                <SelectTrigger class="agent-settings-runtime-row" aria-label="Agent reasoning level">
+                  <span class="agent-settings-runtime-label">Reasoning</span>
+                  <SelectValue<AgentReasoningEffort>>
+                    {(state) => {
+                      const effort = state.selectedOption();
+                      return effort ? reasoningLabel(effort) : "Select reasoning";
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+              <Show when={props.accessEditable}>
+                <Select<AgentAccess>
+                  class="agent-settings-runtime-select"
+                  options={[...AGENT_ACCESS_MODES]}
+                  value={draft.access}
+                  onChange={(nextAccess) => {
+                    if (!nextAccess || nextAccess === draft.access) return;
+                    // Widening is the move that needs the warning. Narrowing is never something a
+                    // user needs protecting from, so it is written straight away.
+                    if (nextAccess === "full") {
+                      setDraft((state) => {
+                        state.confirmingFullAccess = true;
+                      });
+                    } else void saveAccess(nextAccess);
                   }}
-                  itemComponent={(item) => (
-                    <SelectItem item={item.item}>{reasoningLabel(item.item.rawValue)}</SelectItem>
-                  )}
+                  itemComponent={(item) => <SelectItem item={item.item}>{accessLabel(item.item.rawValue)}</SelectItem>}
                 >
-                  <SelectTrigger size="sm" class="agent-settings-reasoning-select" aria-label="Agent reasoning level">
-                    <SelectValue<AgentReasoningEffort>>
-                      {(state) => {
-                        const effort = state.selectedOption();
-                        return effort ? reasoningLabel(effort) : "Select reasoning";
-                      }}
+                  <SelectTrigger class="agent-settings-runtime-row" aria-label="Agent access">
+                    <span class="agent-settings-runtime-label">Access</span>
+                    <SelectValue<AgentAccess>>
+                      {(state) => accessLabel(state.selectedOption() ?? DEFAULT_AGENT_ACCESS)}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent />
                 </Select>
-              </div>
-              <div class="agent-settings-model-row agent-settings-workspace-row">
-                <span>Working directory</span>
-                <span>{props.agent.workspacePath ?? "Not available yet"}</span>
-              </div>
-              <Show when={props.accessEditable}>
-                <div class="agent-settings-model-row">
-                  <span>Access</span>
-                  <Select<AgentAccess>
-                    class="agent-settings-reasoning-control"
-                    options={[...AGENT_ACCESS_MODES]}
-                    value={draft.access}
-                    onChange={(nextAccess) => {
-                      if (!nextAccess || nextAccess === draft.access) return;
-                      // Widening is the move that needs the warning. Narrowing is never something a
-                      // user needs protecting from, so it is written straight away.
-                      if (nextAccess === "full") {
-                        setDraft((state) => {
-                          state.confirmingFullAccess = true;
-                        });
-                      } else void saveAccess(nextAccess);
-                    }}
-                    itemComponent={(item) => (
-                      <SelectItem item={item.item}>{accessLabel(item.item.rawValue)}</SelectItem>
-                    )}
-                  >
-                    <SelectTrigger size="sm" class="agent-settings-reasoning-select" aria-label="Agent access">
-                      <SelectValue<AgentAccess>>
-                        {(state) => accessLabel(state.selectedOption() ?? DEFAULT_AGENT_ACCESS)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent />
-                  </Select>
-                </div>
               </Show>
-              <p class="agent-settings-access-note">
-                <Show
-                  when={draft.access === "workspace"}
-                  fallback={
-                    <>
-                      The agent runs with full computer access from its workspace and the shared folder.{" "}
-                      {draft.runtime.provider === "claude"
-                        ? "Claude acts without asking for approval, except for questions it puts to you."
-                        : "Depending on the provider, sensitive commands may ask for approval first."}
-                    </>
-                  }
-                >
-                  Workspace only limits writes to this agent's workspace and the shared folder. Reads and network stay
-                  available. Not enforced yet: this agent still has full access in this version.
-                </Show>
-              </p>
+              <div class="agent-settings-runtime-path">
+                <span class="agent-settings-runtime-label">Working directory</span>
+                <span>
+                  {props.agent.workspacePath ? breakablePath(props.agent.workspacePath) : "Not available yet"}
+                </span>
+              </div>
             </div>
-          </section>
+            <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
+              <Show
+                when={draft.access === "workspace"}
+                fallback={
+                  <>
+                    The agent runs with full computer access from its workspace and the shared folder.{" "}
+                    {draft.runtime.provider === "claude"
+                      ? "Claude acts without asking for approval, except for questions it puts to you."
+                      : "Depending on the provider, sensitive commands may ask for approval first."}
+                  </>
+                }
+              >
+                Workspace only limits writes to this agent's workspace and the shared folder. Reads and network stay
+                available. Not enforced yet: this agent still has full access in this version.
+              </Show>
+            </Text>
+          </SettingsSection>
           <Show when={draft.saveError}>
             {(message) => (
               <p class="agent-settings-save-error" role="alert">
@@ -889,6 +879,20 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       </Show>
       {props.children}
     </SettingsPanel>
+  );
+}
+
+/** Lets a long path wrap after a slash instead of inside a folder name. */
+function breakablePath(path: string) {
+  return path.split("/").map((part, index) =>
+    index === 0 ? (
+      part
+    ) : (
+      <>
+        /<wbr />
+        {part}
+      </>
+    ),
   );
 }
 
