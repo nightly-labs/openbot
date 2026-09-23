@@ -2,8 +2,12 @@
 
 ## Communication
 
-Use ASD-STE100 Simplified Technical English for questions, updates, explanations, and final answers.
-Keep quotations, code, commands, paths, identifiers, and required technical terms unchanged.
+Use ASD-STE100 Simplified Technical English for all text you write: questions, updates,
+explanations, final answers, commit messages, PR descriptions, and review comments. Be as concise as
+possible. Keep quotations, code, commands, paths, identifiers, and required technical terms unchanged.
+
+Do not add an agent or model as author or co-author. Do not add `Co-Authored-By:` trailers or
+"Generated with" lines to commits or PRs.
 
 **Non-negotiable** rules protect user data, released contracts, and security. Change them only on
 an explicit developer decision. All other rules are defaults: follow the developer's preference
