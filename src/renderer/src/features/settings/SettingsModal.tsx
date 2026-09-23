@@ -91,6 +91,9 @@ export interface SettingsModalProps {
   hostedSitesApi?: HostedSitesDesktopApi;
   /** The agents granted a standing approval, so the user can see and undo each one. */
   turboModePending?: boolean;
+  onTestNotification?: () => void | Promise<void>;
+  /** Opens the operating system notification settings. Shown only on macOS and Windows. */
+  onOpenNotificationSettings?: () => void | Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
 }
 
@@ -367,6 +370,12 @@ export function SettingsModal(props: SettingsModalProps) {
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
             turboModePending={props.turboModePending}
+            onTestNotification={props.onTestNotification}
+            onOpenNotificationSettings={
+              props.appInfo?.platform === "darwin" || props.appInfo?.platform === "win32"
+                ? props.onOpenNotificationSettings
+                : undefined
+            }
           />
         </Tabs.Content>
 

@@ -19,6 +19,9 @@ export const en = {
   "notification.needsInput": "Needs your input.",
   "notification.needsApproval": "Needs your approval.",
   "notification.finished": "Finished working.",
+  "notification.failed": "Stopped with an error.",
+  "notification.test": "Notifications are working.",
+  "notification.welcome": "OpenBot will tell you here when an agent needs you.",
 
   // Native file pickers.
   "dialog.chooseSiteDirectory": "Choose a static site directory",
@@ -82,6 +85,13 @@ export const en = {
   "settings.notifications.title": "Notifications",
   "settings.desktopNotifications.title": "Desktop notifications",
   "settings.desktopNotifications.description": "Show a notification when an agent needs attention.",
+  "settings.testNotification.title": "Test notification",
+  "settings.testNotification.description":
+    "Show one now. If it does not appear, allow OpenBot notifications in your system settings.",
+  "settings.testNotification.action": "Send test",
+  "settings.testNotification.failed": "Could not show a notification.",
+  "settings.testNotification.openSettings": "Open system settings",
+  "settings.testNotification.openSettingsFailed": "Could not open the system settings.",
   "settings.taskSound.title": "Play a sound when a task finishes",
   "settings.taskSound.description": "Use a short sound for completed tasks.",
   "settings.notch.title": "Behavior",

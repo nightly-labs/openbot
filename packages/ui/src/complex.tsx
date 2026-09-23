@@ -159,6 +159,8 @@ interface ContextMenuApi {
   SubTrigger: typeof ContextMenuPrimitive.SubTrigger;
   SubContent: typeof ContextMenuPrimitive.SubContent;
   Item: typeof ContextMenuPrimitive.Item;
+  RadioGroup: typeof ContextMenuPrimitive.RadioGroup;
+  RadioItem: typeof ContextMenuPrimitive.RadioItem;
   Separator: typeof ContextMenuPrimitive.Separator;
 }
 
@@ -173,6 +175,8 @@ export const ContextMenu: ContextMenuApi = {
   SubTrigger: ContextMenuPrimitive.SubTrigger,
   SubContent: ContextMenuPrimitive.SubContent,
   Item: (props) => <ContextMenuPrimitive.Item {...props} />,
+  RadioGroup: (props) => <ContextMenuPrimitive.RadioGroup {...props} />,
+  RadioItem: (props) => <ContextMenuPrimitive.RadioItem {...props} />,
   Separator: (props) => <ContextMenuPrimitive.Separator {...props} />,
 };
 
