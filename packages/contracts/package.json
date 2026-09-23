@@ -44,7 +44,7 @@
     "./team-protocol/remote-stream-v1": "./src/team-protocol/remote-stream-v1.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts src"
   },
   "dependencies": {
