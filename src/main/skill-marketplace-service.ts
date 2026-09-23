@@ -17,12 +17,13 @@ import type {
   SubmitSkillInput,
   UninstallSkillInput,
 } from "@openbot/contracts/ipc";
-import { isSkillCategory } from "@openbot/contracts/ipc";
+import { isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { parse as parseYaml } from "yaml";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { listManagedSkillsForChat } from "./managed-skill-service";
+import { listFolderSkills } from "./skill-folder-discovery";
 import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
@@ -151,6 +152,7 @@ export class SkillMarketplaceService {
         toInstalledSkill(entry, availableVersion, state, await installedSkillDescription(agent.workspacePath, entry)),
       );
     }
+    installed.push(...(await listFolderSkills(agent, lockedSlugs(lock))));
     return installed.sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -158,6 +160,7 @@ export class SkillMarketplaceService {
     const agent = this.requireAgent(agentId);
     const lock = await readLock(agent.workspacePath);
     const installed: InstalledSkill[] = await listManagedSkillsForChat(agent);
+    for (const skill of await listFolderSkills(agent, lockedSlugs(lock))) if (!skill.problem) installed.push(skill);
     for (const entry of Object.values(lock.skills)) {
       if (entry.enabled === false) continue;
       installed.push(
@@ -480,7 +483,7 @@ async function installedSkillDescription(workspace: string, entry: LockEntry): P
 function trimmedSkillDescription(value: unknown): string | undefined {
   if (!isString(value)) return undefined;
   const description = value.trim();
-  return description && description.length <= 500 ? description : undefined;
+  return description && description.length <= SKILL_DESCRIPTION_MAX_LENGTH ? description : undefined;
 }
 
 function parseSkillMarkdownDescription(text: string): string | undefined {
@@ -591,6 +594,10 @@ async function installedState(workspace: string, entry: LockEntry): Promise<"ins
   }
   const expected = entry.enabled === false ? 1 : 2;
   return complete === expected && !missing ? "installed" : "needs-repair";
+}
+
+function lockedSlugs(lock: SkillsLock): Set<string> {
+  return new Set(Object.values(lock.skills).map((entry) => entry.slug));
 }
 
 function lockPath(workspace: string): string {

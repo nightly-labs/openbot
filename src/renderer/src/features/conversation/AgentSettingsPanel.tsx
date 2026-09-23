@@ -8,7 +8,7 @@ import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
-import { AgentSkillsModal, type AgentSkillsMode, userAssignedSkills } from "./AgentSkillsModal";
+import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./AgentSkillsModal";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
@@ -110,7 +110,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           ? await window.openbot.agent.listInstalledSkills(agentId)
           : await window.openbot.skills.listInstalled(agentId);
       setDraft((state) => {
-        state.skills.count = userAssignedSkills(items).length;
+        state.skills.count = assignedSkillCount(items);
       });
     } catch {
       setDraft((state) => {

@@ -1,4 +1,9 @@
-import { decodeAgentAnalytics, decodeHostAnalytics } from "@openbot/contracts/ipc";
+import {
+  decodeAgentAnalytics,
+  decodeHostAnalytics,
+  INSTALLED_SKILL_ORIGINS,
+  SKILL_DESCRIPTION_MAX_LENGTH,
+} from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
 // See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
 
@@ -155,16 +160,22 @@ export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] 
       availableVersion: requiredNumber(skill, "availableVersion"),
       state,
       ...(skill.enabled === false ? { enabled: false } : skill.enabled === true ? { enabled: true } : {}),
-      ...(skill.origin === "managed" || skill.origin === "marketplace" ? { origin: skill.origin } : {}),
+      ...(isOneOf(INSTALLED_SKILL_ORIGINS, skill.origin) ? { origin: skill.origin } : {}),
       ...(description ? { description } : {}),
+      ...(isSkillNote(skill.location) ? { location: skill.location } : {}),
+      ...(isSkillNote(skill.problem) ? { problem: skill.problem } : {}),
     };
   });
+}
+
+function isSkillNote(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= SKILL_DESCRIPTION_MAX_LENGTH;
 }
 
 function optionalSkillDescription(value: unknown): string | undefined {
   if (!isString(value)) return undefined;
   const description = value.trim();
-  return description && description.length <= 500 ? description : undefined;
+  return description && description.length <= SKILL_DESCRIPTION_MAX_LENGTH ? description : undefined;
 }
 
 export function decodeAgentMemory(value: unknown): AgentMemory {

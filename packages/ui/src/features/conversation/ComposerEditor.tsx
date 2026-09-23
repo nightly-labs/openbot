@@ -119,6 +119,8 @@ function pickerOptionBadge(option: PickerOption): { label: string; icon: typeof 
       return { label: "Custom", icon: Folder };
     case "managed":
       return { label: "System", icon: ShieldCheck };
+    case "workspace":
+      return { label: "Workspace", icon: Folder };
     default:
       return { label: "Marketplace", icon: Store };
   }

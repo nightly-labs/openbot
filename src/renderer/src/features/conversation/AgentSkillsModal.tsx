@@ -65,7 +65,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   let confirmationTrigger: HTMLButtonElement | undefined;
   const skillsMode = () => props.skillsMode ?? "mutable";
   const mutable = () => skillsMode() === "mutable";
-  const assignmentCount = createMemo(() => skills().length);
+  const assignmentCount = createMemo(() => assignedSkillCount(skills()));
   const atCap = createMemo(() => assignmentCount() >= INPUT_LIMITS.agentSkills);
   const canAdd = createMemo(() => mutable() && !atCap() && props.onAddFromMarketplace !== undefined && !loading());
   const selectedSkill = createMemo(() => {
@@ -92,7 +92,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       );
       if (request !== listRequest || agentId !== props.agentId || !props.open) return;
       setSkills(next);
-      props.onCountChange(next.length);
+      props.onCountChange(assignedSkillCount(next));
       const targetId = props.selectionRequest?.skillId;
       if (showLoading && targetId) {
         const target = next.find((skill) => skill.skillId === targetId);
@@ -157,7 +157,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setDetail(null);
     setDetailLoading(true);
     setError(null);
-    if (!mutable() && skill.skillId.startsWith("local-skill-")) {
+    if (isFolderSkill(skill) || (!mutable() && skill.skillId.startsWith("local-skill-"))) {
       setDetailLoading(false);
       return;
     }
@@ -323,7 +323,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
               <div class="agent-memories-header-actions">
                 <Show when={selectedSkill()}>
                   {(skill) => (
-                    <Show when={mutable()}>
+                    <Show when={mutable() && !isFolderSkill(skill())}>
                       <SkillMoreMenu
                         skill={skill()}
                         disabled={savingId() === skill().skillId}
@@ -470,11 +470,13 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                                 <strong>{skill().name}</strong>
                                               </div>
                                               <small>
-                                                {catalog()[skill().skillId]?.description ?? skillMeta(skill())}
+                                                {isFolderSkill(skill())
+                                                  ? (skill().problem ?? skill().description ?? skill().location)
+                                                  : (catalog()[skill().skillId]?.description ?? skillMeta(skill()))}
                                               </small>
                                             </div>
                                           </Button>
-                                          <Show when={mutable()}>
+                                          <Show when={mutable() && !isFolderSkill(skill())}>
                                             <Show when={skill().state === "update-available"}>
                                               <Button
                                                 size="sm"
@@ -526,6 +528,17 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                   data-page-id="2"
                                   onScroll={scrollFades.measure}
                                 >
+                                  <Show when={isFolderSkill(skill())}>
+                                    <Show when={skill().problem}>
+                                      {(problem) => <p class="agent-memory-error">{problem()}</p>}
+                                    </Show>
+                                    <Show when={skill().description}>
+                                      {(description) => <p class="agent-memory-state">{description()}</p>}
+                                    </Show>
+                                    <p class="agent-memory-state">
+                                      OpenBot did not install this skill. Edit or remove it in {skill().location}.
+                                    </p>
+                                  </Show>
                                   <Show when={!mutable() && skill().skillId.startsWith("local-skill-")}>
                                     <p class="agent-memory-state" role="status">
                                       This local skill is stored on the host. Open its details on that computer.
@@ -650,15 +663,25 @@ function isBuiltInSkill(skill: InstalledSkill): boolean {
   );
 }
 
+/** A skill in a skill folder that OpenBot lists but does not manage. */
+function isFolderSkill(skill: InstalledSkill): boolean {
+  return skill.origin === "workspace";
+}
+
 function isEnabled(skill: InstalledSkill): boolean {
   return skill.enabled !== false;
 }
 
-export function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
+function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
   return skills
     .filter((skill) => !isBuiltInSkill(skill))
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/** A skill in a folder OpenBot did not write is not an assignment, so it does not count toward the cap. */
+export function assignedSkillCount(skills: InstalledSkill[]): number {
+  return skills.filter((skill) => !isBuiltInSkill(skill) && !isFolderSkill(skill)).length;
 }
 
 function skillMeta(skill: InstalledSkill): string {
