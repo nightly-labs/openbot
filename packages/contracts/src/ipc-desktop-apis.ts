@@ -1,4 +1,3 @@
-import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentEvent, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
@@ -16,23 +15,8 @@ import type {
   SetAgentAvatarInput,
   UpdateAgentInput,
 } from "./ipc-agents";
-import type {
-  AnalyticsPreference,
-  AppInfo,
-  AppSetupState,
-  CentralAuthDesktopApi,
-  ExternalDestination,
-  SaveSetupInput,
-  SetAnalyticsPreferenceInput,
-  UpdatePreference,
-  UpdateStatus,
-} from "./ipc-app-auth";
-import type {
-  ApprovalAutomationPreference,
-  RespondToApprovalInput,
-  RespondToBrowserTakeoverInput,
-  SetApprovalAutomationInput,
-} from "./ipc-approvals";
+import type { CentralAuthState } from "./ipc-app-auth";
+import type { RespondToApprovalInput, RespondToBrowserTakeoverInput } from "./ipc-approvals";
 import type {
   AttachmentImportEvent,
   ChooseAttachmentsInput,
@@ -81,7 +65,6 @@ import type {
   SetMcpServerEnabledInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
-import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   AcknowledgeFailedTurnInput,
   CancelQueuedMessageInput,
@@ -266,26 +249,42 @@ export interface BrowserDesktopApi {
   onPictureInPictureEvent: (listener: (event: BrowserPictureInPictureEvent) => void) => () => void;
 }
 
+export interface CentralAuthDesktopApi {
+  getState: Invoke<typeof IPC_ENDPOINTS.auth.getState>;
+  retry: Invoke<typeof IPC_ENDPOINTS.auth.retry>;
+  requestEmailCode: Invoke<typeof IPC_ENDPOINTS.auth.requestEmailCode>;
+  verifyEmailCode: (challengeId: string, code: string) => Promise<CentralAuthState>;
+  updateName: Invoke<typeof IPC_ENDPOINTS.auth.updateName>;
+  updateAvatar: Invoke<typeof IPC_ENDPOINTS.auth.updateAvatar>;
+  createMobileConnect: Invoke<typeof IPC_ENDPOINTS.auth.createMobileConnect>;
+  listMobileConnectedDevices: Invoke<typeof IPC_ENDPOINTS.auth.listMobileConnectedDevices>;
+  listAccountSessions: Invoke<typeof IPC_ENDPOINTS.auth.listAccountSessions>;
+  revokeAccountSession: Invoke<typeof IPC_ENDPOINTS.auth.revokeAccountSession>;
+  revokeMobileConnectedDevice: Invoke<typeof IPC_ENDPOINTS.auth.revokeMobileConnectedDevice>;
+  logout: Invoke<typeof IPC_ENDPOINTS.auth.logout>;
+  onEvent: Subscribe<typeof IPC_ENDPOINTS.auth.event>;
+}
+
 export interface UpdateDesktopApi {
-  getStatus: () => Promise<UpdateStatus>;
-  check: () => Promise<UpdateStatus>;
-  download: () => Promise<UpdateStatus>;
-  install: () => Promise<void>;
-  getPreference: () => Promise<UpdatePreference>;
-  setPreference: (input: UpdatePreference) => Promise<UpdatePreference>;
-  onEvent: (listener: (status: UpdateStatus) => void) => () => void;
+  getStatus: Invoke<typeof IPC_ENDPOINTS.update.getStatus>;
+  check: Invoke<typeof IPC_ENDPOINTS.update.check>;
+  download: Invoke<typeof IPC_ENDPOINTS.update.download>;
+  install: Invoke<typeof IPC_ENDPOINTS.update.install>;
+  getPreference: Invoke<typeof IPC_ENDPOINTS.update.getPreference>;
+  setPreference: Invoke<typeof IPC_ENDPOINTS.update.setPreference>;
+  onEvent: Subscribe<typeof IPC_ENDPOINTS.update.event>;
 }
 
 export interface NotificationsDesktopApi {
-  getPreference: () => Promise<NotificationPreference>;
-  setPreference: (input: NotificationPreference) => Promise<NotificationPreference>;
+  getPreference: Invoke<typeof IPC_ENDPOINTS.notifications.getPreference>;
+  setPreference: Invoke<typeof IPC_ENDPOINTS.notifications.setPreference>;
   // Shows one OS notification now, even when the window has focus, so the user can check that the
   // operating system lets OpenBot show them.
-  test: () => Promise<void>;
+  test: Invoke<typeof IPC_ENDPOINTS.notifications.test>;
   // Opens the operating system page where the user allows OpenBot notifications. It rejects on a
   // system that has no such page.
-  openSettings: () => Promise<void>;
-  onOpened: (listener: (event: NotificationOpenedEvent) => void) => () => void;
+  openSettings: Invoke<typeof IPC_ENDPOINTS.notifications.openSettings>;
+  onOpened: Subscribe<typeof IPC_ENDPOINTS.notifications.openedEvent>;
 }
 
 export interface ProviderRuntimesDesktopApi {
@@ -456,17 +455,17 @@ export interface StorageDesktopApi {
 }
 
 export interface OpenBotDesktopApi {
-  getAppInfo: () => Promise<AppInfo>;
-  getSetupState: () => Promise<AppSetupState>;
-  saveSetup: (input: SaveSetupInput) => Promise<AppSetupState>;
-  getAnalyticsPreference: () => Promise<AnalyticsPreference>;
-  setAnalyticsPreference: (input: SetAnalyticsPreferenceInput) => Promise<AnalyticsPreference>;
-  getApprovalAutomation: () => Promise<ApprovalAutomationPreference>;
-  setApprovalAutomation: (input: SetApprovalAutomationInput) => Promise<ApprovalAutomationPreference>;
-  getAppLanguagePreference: () => Promise<AppLanguagePreference>;
-  setAppLanguagePreference: (input: SetAppLanguagePreferenceInput) => Promise<AppLanguagePreference>;
-  onAppLanguagePreference: (listener: (preference: AppLanguagePreference) => void) => () => void;
-  onOpenSettings: (listener: () => void) => () => void;
+  getAppInfo: Invoke<typeof IPC_ENDPOINTS.app.getAppInfo>;
+  getSetupState: Invoke<typeof IPC_ENDPOINTS.app.getSetupState>;
+  saveSetup: Invoke<typeof IPC_ENDPOINTS.app.saveSetup>;
+  getAnalyticsPreference: Invoke<typeof IPC_ENDPOINTS.app.getAnalyticsPreference>;
+  setAnalyticsPreference: Invoke<typeof IPC_ENDPOINTS.app.setAnalyticsPreference>;
+  getApprovalAutomation: Invoke<typeof IPC_ENDPOINTS.app.getApprovalAutomation>;
+  setApprovalAutomation: Invoke<typeof IPC_ENDPOINTS.app.setApprovalAutomation>;
+  getAppLanguagePreference: Invoke<typeof IPC_ENDPOINTS.app.getAppLanguagePreference>;
+  setAppLanguagePreference: Invoke<typeof IPC_ENDPOINTS.app.setAppLanguagePreference>;
+  onAppLanguagePreference: Subscribe<typeof IPC_ENDPOINTS.app.appLanguagePreference>;
+  onOpenSettings: Subscribe<typeof IPC_ENDPOINTS.app.openSettings>;
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseState: Invoke<typeof IPC_ENDPOINTS.computerUse.getState>;
   openComputerUsePermissionPane: Invoke<typeof IPC_ENDPOINTS.computerUse.openPermissionPane>;
@@ -482,7 +481,7 @@ export interface OpenBotDesktopApi {
    * window that floats over another application's has no channel it could be driven through.
    */
   onComputerUseHighlightPlacement: Subscribe<typeof IPC_ENDPOINTS.computerUse.highlightPlacement>;
-  openExternal: (destination: ExternalDestination) => Promise<void>;
+  openExternal: Invoke<typeof IPC_ENDPOINTS.app.openExternal>;
   connectProvider: Invoke<typeof IPC_ENDPOINTS.providers.connectProvider>;
   refreshAgentProviders: Invoke<typeof IPC_ENDPOINTS.providers.refreshAgentProviders>;
   /**
@@ -510,7 +509,7 @@ export interface OpenBotDesktopApi {
   /** Abandons a code sign-in: the provider is told, the code is dead, and the provider goes idle. */
   cancelProviderCodeLogin: Invoke<typeof IPC_ENDPOINTS.providers.cancelProviderCodeLogin>;
   providerRuntimes: ProviderRuntimesDesktopApi;
-  openUrl: (url: string) => Promise<void>;
+  openUrl: Invoke<typeof IPC_ENDPOINTS.app.openUrl>;
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;

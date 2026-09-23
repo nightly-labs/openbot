@@ -48,6 +48,12 @@ export function nullableString(record: DynamicRecord, field: string): string | n
   throw new Error(`Invalid ${field}.`);
 }
 
+export function nullableNumber(record: DynamicRecord, field: string): number | null {
+  const value = record[field];
+  if (value === null || isNumber(value)) return value;
+  throw new Error(`Invalid ${field}.`);
+}
+
 // A decoder is a `(value: unknown) => T` callback, so the label cannot be a parameter of the decoder
 // itself without every call site wrapping it in a lambda. These build one instead, which keeps each
 // boundary's own wording - the message is what tells a reader which side rejected the payload.

@@ -15,6 +15,7 @@
 // for the checker, and the runtime value is still `{ kind, channel }`.
 
 import type { ManagedProviderId } from "./agent-providers";
+import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AgentIpcRequest } from "./ipc-agent-events";
 import type {
   AgentMemory,
@@ -29,14 +30,26 @@ import type {
   ProviderCodeLoginStart,
   SetProviderApiKeyInput,
 } from "./ipc-agent-status";
+import type { AvatarImageInput } from "./ipc-agents";
 import type {
+  AnalyticsPreference,
+  AppInfo,
+  AppSetupState,
+  CentralAuthState,
   ComputerUseHighlightPlacement,
   ComputerUsePermissionApp,
   ComputerUseState,
   ExportResult,
+  ExternalDestination,
   MacPermissionId,
   ProviderRuntimeSnapshot,
+  SaveSetupInput,
+  SetAnalyticsPreferenceInput,
+  UpdatePreference,
+  UpdateStatus,
+  VerifyEmailCodeInput,
 } from "./ipc-app-auth";
+import type { ApprovalAutomationPreference, SetApprovalAutomationInput } from "./ipc-approvals";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -91,6 +104,7 @@ import type {
   SetMcpServerEnabledInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   CreateRoutineInput,
   DeleteRoutineInput,
@@ -126,6 +140,7 @@ import type {
   StorageUsage,
 } from "./ipc-storage";
 import type { VoiceModelStatus, VoiceTranscriptionInput, VoiceTranscriptionResult } from "./ipc-voice";
+import type { AccountSession, MobileConnectedDevice, MobileConnectTicket } from "./mobile-connect";
 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
@@ -179,25 +194,31 @@ function untypedEvent<Channel extends string>(channel: Channel): EventEndpoint<C
 
 export const IPC_ENDPOINTS = {
   app: {
-    getAppInfo: untypedRequest(IPC_CHANNELS.getAppInfo),
-    getSetupState: untypedRequest(IPC_CHANNELS.getSetupState),
-    saveSetup: untypedRequest(IPC_CHANNELS.saveSetup),
-    getAnalyticsPreference: untypedRequest(IPC_CHANNELS.getAnalyticsPreference),
-    setAnalyticsPreference: untypedRequest(IPC_CHANNELS.setAnalyticsPreference),
-    getApprovalAutomation: untypedRequest(IPC_CHANNELS.getApprovalAutomation),
-    setApprovalAutomation: untypedRequest(IPC_CHANNELS.setApprovalAutomation),
-    getAppLanguagePreference: untypedRequest(IPC_CHANNELS.getAppLanguagePreference),
-    setAppLanguagePreference: untypedRequest(IPC_CHANNELS.setAppLanguagePreference),
+    getAppInfo: request<undefined, AppInfo>()(IPC_CHANNELS.getAppInfo),
+    getSetupState: request<undefined, AppSetupState>()(IPC_CHANNELS.getSetupState),
+    saveSetup: request<SaveSetupInput, AppSetupState>()(IPC_CHANNELS.saveSetup),
+    getAnalyticsPreference: request<undefined, AnalyticsPreference>()(IPC_CHANNELS.getAnalyticsPreference),
+    setAnalyticsPreference: request<SetAnalyticsPreferenceInput, AnalyticsPreference>()(
+      IPC_CHANNELS.setAnalyticsPreference,
+    ),
+    getApprovalAutomation: request<undefined, ApprovalAutomationPreference>()(IPC_CHANNELS.getApprovalAutomation),
+    setApprovalAutomation: request<SetApprovalAutomationInput, ApprovalAutomationPreference>()(
+      IPC_CHANNELS.setApprovalAutomation,
+    ),
+    getAppLanguagePreference: request<undefined, AppLanguagePreference>()(IPC_CHANNELS.getAppLanguagePreference),
+    setAppLanguagePreference: request<SetAppLanguagePreferenceInput, AppLanguagePreference>()(
+      IPC_CHANNELS.setAppLanguagePreference,
+    ),
     // Every window draws its own text, so the choice is broadcast rather than returned: the
     // Dynamic Island overlay has no Settings of its own and would otherwise stay in the old
     // language until it was next recreated.
-    appLanguagePreference: untypedEvent(IPC_CHANNELS.appLanguagePreference),
+    appLanguagePreference: event<AppLanguagePreference>()(IPC_CHANNELS.appLanguagePreference),
     // The native Preferences menu item and its shortcut live in main, while the dialog lives in
     // the renderer, so the menu click is broadcast rather than handled: every window opens its
     // own Settings.
-    openSettings: untypedEvent(IPC_CHANNELS.openSettings),
-    openExternal: untypedRequest(IPC_CHANNELS.openExternal),
-    openUrl: untypedRequest(IPC_CHANNELS.openUrl),
+    openSettings: event<undefined>()(IPC_CHANNELS.openSettings),
+    openExternal: request<ExternalDestination, void>()(IPC_CHANNELS.openExternal),
+    openUrl: request<string, void>()(IPC_CHANNELS.openUrl),
   },
   maintenance: {
     exportData: request<undefined, ExportResult>()(IPC_CHANNELS.maintenanceExportData),
@@ -292,35 +313,37 @@ export const IPC_ENDPOINTS = {
     ),
   },
   auth: {
-    getState: untypedRequest(IPC_CHANNELS.authGetState),
-    retry: untypedRequest(IPC_CHANNELS.authRetry),
-    requestEmailCode: untypedRequest(IPC_CHANNELS.authRequestEmailCode),
-    verifyEmailCode: untypedRequest(IPC_CHANNELS.authVerifyEmailCode),
-    updateName: untypedRequest(IPC_CHANNELS.authUpdateName),
-    updateAvatar: untypedRequest(IPC_CHANNELS.authUpdateAvatar),
-    createMobileConnect: untypedRequest(IPC_CHANNELS.authCreateMobileConnect),
-    listMobileConnectedDevices: untypedRequest(IPC_CHANNELS.authListMobileConnectedDevices),
-    listAccountSessions: untypedRequest(IPC_CHANNELS.authListAccountSessions),
-    revokeAccountSession: untypedRequest(IPC_CHANNELS.authRevokeAccountSession),
-    revokeMobileConnectedDevice: untypedRequest(IPC_CHANNELS.authRevokeMobileConnectedDevice),
-    logout: untypedRequest(IPC_CHANNELS.authLogout),
-    event: untypedEvent(IPC_CHANNELS.authEvent),
+    getState: request<undefined, CentralAuthState>()(IPC_CHANNELS.authGetState),
+    retry: request<undefined, CentralAuthState>()(IPC_CHANNELS.authRetry),
+    requestEmailCode: request<string, CentralAuthState>()(IPC_CHANNELS.authRequestEmailCode),
+    verifyEmailCode: request<VerifyEmailCodeInput, CentralAuthState>()(IPC_CHANNELS.authVerifyEmailCode),
+    updateName: request<string, CentralAuthState>()(IPC_CHANNELS.authUpdateName),
+    updateAvatar: request<AvatarImageInput | null, CentralAuthState>()(IPC_CHANNELS.authUpdateAvatar),
+    createMobileConnect: request<undefined, MobileConnectTicket>()(IPC_CHANNELS.authCreateMobileConnect),
+    listMobileConnectedDevices: request<undefined, MobileConnectedDevice[]>()(
+      IPC_CHANNELS.authListMobileConnectedDevices,
+    ),
+    listAccountSessions: request<undefined, AccountSession[]>()(IPC_CHANNELS.authListAccountSessions),
+    revokeAccountSession: request<string, void>()(IPC_CHANNELS.authRevokeAccountSession),
+    revokeMobileConnectedDevice: request<string, void>()(IPC_CHANNELS.authRevokeMobileConnectedDevice),
+    logout: request<undefined, CentralAuthState>()(IPC_CHANNELS.authLogout),
+    event: event<CentralAuthState>()(IPC_CHANNELS.authEvent),
   },
   update: {
-    getStatus: untypedRequest(IPC_CHANNELS.updateGetStatus),
-    check: untypedRequest(IPC_CHANNELS.updateCheck),
-    download: untypedRequest(IPC_CHANNELS.updateDownload),
-    install: untypedRequest(IPC_CHANNELS.updateInstall),
-    getPreference: untypedRequest(IPC_CHANNELS.updateGetPreference),
-    setPreference: untypedRequest(IPC_CHANNELS.updateSetPreference),
-    event: untypedEvent(IPC_CHANNELS.updateEvent),
+    getStatus: request<undefined, UpdateStatus>()(IPC_CHANNELS.updateGetStatus),
+    check: request<undefined, UpdateStatus>()(IPC_CHANNELS.updateCheck),
+    download: request<undefined, UpdateStatus>()(IPC_CHANNELS.updateDownload),
+    install: request<undefined, void>()(IPC_CHANNELS.updateInstall),
+    getPreference: request<undefined, UpdatePreference>()(IPC_CHANNELS.updateGetPreference),
+    setPreference: request<UpdatePreference, UpdatePreference>()(IPC_CHANNELS.updateSetPreference),
+    event: event<UpdateStatus>()(IPC_CHANNELS.updateEvent),
   },
   notifications: {
-    getPreference: untypedRequest(IPC_CHANNELS.notificationsGetPreference),
-    setPreference: untypedRequest(IPC_CHANNELS.notificationsSetPreference),
-    test: untypedRequest(IPC_CHANNELS.notificationsTest),
-    openSettings: untypedRequest(IPC_CHANNELS.notificationsOpenSettings),
-    openedEvent: untypedEvent(IPC_CHANNELS.notificationsOpenedEvent),
+    getPreference: request<undefined, NotificationPreference>()(IPC_CHANNELS.notificationsGetPreference),
+    setPreference: request<NotificationPreference, NotificationPreference>()(IPC_CHANNELS.notificationsSetPreference),
+    test: request<undefined, void>()(IPC_CHANNELS.notificationsTest),
+    openSettings: request<undefined, void>()(IPC_CHANNELS.notificationsOpenSettings),
+    openedEvent: event<NotificationOpenedEvent>()(IPC_CHANNELS.notificationsOpenedEvent),
   },
   agent: {
     getStatus: untypedRequest(IPC_CHANNELS.agentGetStatus),

@@ -24,6 +24,7 @@ import type {
   SubmitSkillInput,
   UninstallSkillInput,
   UpdatePreference,
+  VerifyEmailCodeInput,
 } from "@openbot/contracts/ipc";
 import {
   isAgentModel,
@@ -136,7 +137,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
   return input;
 }
 
-export function parseEmailCodeVerification(input: unknown): { challengeId: string; code: string } {
+export function parseEmailCodeVerification(input: unknown): VerifyEmailCodeInput {
   if (!isObject(input)) throw new Error("Sign-in code details are required.");
   return {
     challengeId: requireString(input.challengeId, "challengeId", INPUT_LIMITS.identifier),
