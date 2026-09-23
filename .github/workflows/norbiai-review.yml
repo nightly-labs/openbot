@@ -835,7 +835,7 @@ jobs:
           mcp_disabled=""
           mcp_errors="$RUNNER_TEMP/norbiai-mcp-errors.txt"
           if mcp_names=$(codex mcp list --json 2> "$mcp_errors" |
-            bun -e 'for (const server of JSON.parse(await Bun.stdin.text())) if (server.enabled !== false) console.log(server.name)' 2>&1); then
+            bun --config="$composer_bunfig" --no-install -e 'for (const server of JSON.parse(await Bun.stdin.text())) if (server.enabled !== false) console.log(server.name)' 2>&1); then
             while IFS= read -r name; do
               case "$name" in
                 "" | *[!A-Za-z0-9_-]*) ;;
