@@ -136,6 +136,28 @@ export function isToolCallDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether a provider diagnostic reports a background refresh that the CLI retries by itself.
+ *
+ * Codex refreshes its model list and its remote settings on a timer, and logs each failed attempt
+ * on stderr. A computer that wakes without internet access writes one line per attempt, and the user
+ * met them as a stack of "Provider error" toasts to close one by one (#717). No turn reads either
+ * refresh: OpenBot reads the model catalogue itself and reports that failure where it happens.
+ *
+ * Only these two refreshes count. Any other failure, a network failure included, stays visible.
+ */
+export function isBackgroundRefreshDiagnostic(message: string): boolean {
+  if (/openbot/i.test(message)) return false;
+  return /\bcodex_models_manager\b.*\bfailed to refresh available models\b|\bSettings fetch failed\b/.test(message);
+}
+
+/**
+ * The timestamp a CLI's log formatter writes before a record, as in
+ * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not
+ * something to act on, and it makes every repeat of one failure a new message.
+ */
+const LOG_TIMESTAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+/;
+
+/**
  * Whether a provider says that the account's paid usage is exhausted.
  *
  * This is narrower than an HTTP status check. A 429 can be a short request-rate throttle, and a
@@ -1723,12 +1745,18 @@ export class ProviderRuntime implements ProviderPort {
         logger.warn("A provider reported a failed tool call.", { provider: client.provider, message });
         return;
       }
+      if (isBackgroundRefreshDiagnostic(message)) {
+        logger.warn("A provider reported a failed background refresh.", { provider: client.provider, message });
+        return;
+      }
       if (isUsageLimitDiagnostic(message)) {
         logger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
         this.refreshUsageAfterLimit(client);
         return;
       }
-      this.#emitError(`${client.provider}_diagnostic`, message);
+      // Without the timestamp, a repeat of one failure is the same message, and the renderer shows
+      // it once rather than once per attempt.
+      this.#emitError(`${client.provider}_diagnostic`, message.replace(LOG_TIMESTAMP_PREFIX, ""));
     });
     client.once("exit", (error) => this.#handleExit(client, error));
   }
