@@ -26,3 +26,15 @@ export interface AgentClient {
   on(event: "diagnostic", listener: (message: string) => void): this;
   once(event: "exit", listener: (error: Error) => void): this;
 }
+
+/**
+ * The provider CLI ended while OpenBot waited for an answer. The message names how it ended and the
+ * last line it wrote to stderr, already redacted, because that line is usually the only cause a user
+ * can act on: a config the CLI refuses, a CPU it cannot run on, a file it cannot open.
+ */
+export class AgentProcessExitError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AgentProcessExitError";
+  }
+}

@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentProvider } from "../agent-client";
+import { AgentProcessExitError, type AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
 import {
   CREATE_AGENT_INPUT,
@@ -1002,6 +1002,35 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(clients[1]?.running).toBe(false);
     expect(service.getStatus().providers).toContainEqual(
       expect.objectContaining({ id: "claude", version: "2.1.246", state: "available" }),
+    );
+  });
+
+  it("reports an updated CLI that stops at start as broken, with its reason, not as signed out", async () => {
+    const managed = await createFakeClaude(root);
+    const { store, mailbox } = stores(root);
+    const exit = new AgentProcessExitError("Claude stopped before it answered (exit code 3: Error: bad config).");
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "claude",
+      clientFactory: (provider) =>
+        new FakeAgentClient(provider, "", true, true, {}, async (method, from) => {
+          if (from === "claude" && method === "initialize") throw exit;
+        }),
+      bundledExecutables: { claude: managed },
+    });
+    await service.initialize();
+
+    await expect(service.updateProviderCli("claude", async () => managed)).rejects.toThrow(
+      "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: Error: bad config).",
+    );
+    expect(service.getStatus().providers).toContainEqual(
+      expect.objectContaining({
+        id: "claude",
+        state: "error",
+        message:
+          "OpenBot could not update the Claude CLI. Claude stopped before it answered (exit code 3: Error: bad config).",
+      }),
     );
   });
 
