@@ -21,6 +21,7 @@ import {
   TriangleAlert,
   X,
 } from "../../components/ui";
+import { prefersReducedMotion } from "../../components/ui/utils";
 import type {
   AgentProfile,
   ChatActionMarkerModel,
@@ -56,6 +57,14 @@ const STATUS_LABELS: Record<ChatActionMarkerStatus, string> = {
 export function ChatActionMarker(props: ChatActionMarkerProps) {
   const label = () => markerLabel(props.marker);
   const [historyExpanded, setHistoryExpanded] = createSignal(false);
+  /* The list leaves with an animation of its own, so it stays mounted until that
+     animation ends. Without motion there is nothing to wait for. */
+  const [historyMounted, setHistoryMounted] = createSignal(false);
+  const toggleHistory = (): void => {
+    const opening = !historyExpanded();
+    setHistoryExpanded(opening);
+    if (opening || prefersReducedMotion()) setHistoryMounted(opening);
+  };
   const routineHistory = () => (props.marker.kind === "routine-run" ? props.marker.previousTransitions : undefined);
   const historyId = () =>
     props.marker.kind === "routine-run" ? `routine-run-history-${props.marker.runId}` : undefined;
@@ -131,39 +140,65 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
               aria-label={`${historyExpanded() ? "Hide" : "Show"} history for ${
                 props.marker.kind === "routine-run" ? props.marker.routineName : "routine"
               }`}
-              onClick={() => setHistoryExpanded((expanded) => !expanded)}
+              onClick={toggleHistory}
             >
               <ChevronDown aria-hidden="true" />
             </Button>
           </Show>
         </MarkerContent>
-        <Show when={historyExpanded() && routineHistory()}>
-          {(transitions) => <RoutineRunHistory id={historyId()} transitions={transitions()} />}
+        <Show when={historyMounted() && routineHistory()}>
+          {(transitions) => (
+            <RoutineRunHistory
+              id={historyId()}
+              transitions={transitions()}
+              open={historyExpanded()}
+              onClosed={() => setHistoryMounted(historyExpanded())}
+            />
+          )}
         </Show>
       </div>
     </Marker>
   );
 }
 
-function RoutineRunHistory(props: { id: string | undefined; transitions: RoutineRunMarkerTransition[] }) {
+function RoutineRunHistory(props: {
+  id: string | undefined;
+  transitions: RoutineRunMarkerTransition[];
+  open: boolean;
+  onClosed: () => void;
+}) {
   return (
-    <ol id={props.id} class="chat-action-history" aria-label="Earlier routine states">
-      <For each={props.transitions}>
-        {(transition, index) => {
-          const previous = () => props.transitions[index() - 1];
-          const status = () => routineMarkerStatus(transition.status);
-          return (
-            <li class={`chat-action-history-entry chat-action-history-status-${status()}`}>
-              <MarkerIcon class="chat-action-history-icon">
-                <Dynamic component={routineHistoryIcon(transition.status)} aria-hidden="true" />
-              </MarkerIcon>
-              <span>{routineHistoryLabel(transition.status, previous()?.status)}</span>
-              <time datetime={transition.timestamp}>{formatMarkerTime(transition.timestamp)}</time>
-            </li>
-          );
-        }}
-      </For>
-    </ol>
+    <div
+      class="chat-action-history-panel"
+      data-state={props.open ? "open" : "closed"}
+      inert={!props.open}
+      /* The collapse is the last part of the exit, so the panel leaves on its
+         own animation's end. The rows' animations bubble through here and end
+         earlier, so only this element's own end counts. */
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget && !props.open) props.onClosed();
+      }}
+    >
+      <div class="chat-action-history-clip">
+        <ol id={props.id} class="chat-action-history" aria-label="Earlier routine states">
+          <For each={props.transitions}>
+            {(transition, index) => {
+              const previous = () => props.transitions[index() - 1];
+              const status = () => routineMarkerStatus(transition.status);
+              return (
+                <li class={`chat-action-history-entry chat-action-history-status-${status()}`}>
+                  <MarkerIcon class="chat-action-history-icon">
+                    <Dynamic component={routineHistoryIcon(transition.status)} aria-hidden="true" />
+                  </MarkerIcon>
+                  <span>{routineHistoryLabel(transition.status, previous()?.status)}</span>
+                  <time datetime={transition.timestamp}>{formatMarkerTime(transition.timestamp)}</time>
+                </li>
+              );
+            }}
+          </For>
+        </ol>
+      </div>
+    </div>
   );
 }
 
