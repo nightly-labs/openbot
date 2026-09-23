@@ -57,6 +57,12 @@ export function nullableNumber(record: DynamicRecord, field: string): number | n
 // A decoder is a `(value: unknown) => T` callback, so the label cannot be a parameter of the decoder
 // itself without every call site wrapping it in a lambda. These build one instead, which keeps each
 // boundary's own wording - the message is what tells a reader which side rejected the payload.
+/** Decodes an array whose items are each records, with one decoder for every item. */
+export function decodeList<T>(value: unknown, label: string, decodeItem: (item: DynamicRecord) => T): T[] {
+  if (!Array.isArray(value)) throw new Error(`Invalid ${label}.`);
+  return value.map((item) => decodeItem(decodeRecord(item, label)));
+}
+
 export function guardedDecoder<T>(guard: (value: unknown) => value is T, label: string): (value: unknown) => T {
   return (value) => {
     if (!guard(value)) throw new Error(`Invalid ${label}.`);

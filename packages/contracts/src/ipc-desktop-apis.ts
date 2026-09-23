@@ -41,12 +41,6 @@ import type {
   QueueSnapshot,
   UpdateQueuedMessageInput,
 } from "./ipc-queue";
-import type {
-  RemoteDesktopSetupAction,
-  RemoteDesktopSetupStatus,
-  RemoteDesktopTestInput,
-  RemoteDesktopTestStatus,
-} from "./ipc-remote-desktop-setup";
 import type { MarketplaceSkillPage, MarketplaceSkillQuery } from "./ipc-skills";
 import type {
   ClearStorageInput,
@@ -56,7 +50,6 @@ import type {
   StorageUsage,
 } from "./ipc-storage";
 import type {
-  ConfigureHostInput,
   CreateTeamInviteInput,
   DirectConversationPage,
   DirectConversationReadState,
@@ -66,17 +59,12 @@ import type {
   DirectThreadSummary,
   DirectTypingInput,
   DirectTypingRealtimeEvent,
-  HostStatus,
   InvitePreview,
   InviteSummary,
   JoinServerInput,
   LoginServerInput,
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
-  RemoteDesktopConnectInput,
-  RemoteDesktopConnectResult,
-  RemoteDesktopSelectDisplayInput,
-  RemoteDesktopSession,
   ReorderServersInput,
   SendDirectMessageInput,
   ServerSummary,
@@ -86,8 +74,6 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
-  TeamSessionSummary,
-  UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
 
@@ -324,12 +310,12 @@ export interface PluginsDesktopApi {
 }
 
 export interface HostDesktopApi {
-  getStatus: () => Promise<HostStatus>;
-  configure: (input: ConfigureHostInput) => Promise<HostStatus>;
-  updateIdentity: (input: UpdateHostIdentityInput) => Promise<HostStatus>;
-  getPresence: () => Promise<TeamPresenceSnapshot>;
-  start: () => Promise<HostStatus>;
-  stop: () => Promise<HostStatus>;
+  getStatus: Invoke<typeof IPC_ENDPOINTS.host.getStatus>;
+  configure: Invoke<typeof IPC_ENDPOINTS.host.configure>;
+  updateIdentity: Invoke<typeof IPC_ENDPOINTS.host.updateIdentity>;
+  getPresence: Invoke<typeof IPC_ENDPOINTS.host.getPresence>;
+  start: Invoke<typeof IPC_ENDPOINTS.host.start>;
+  stop: Invoke<typeof IPC_ENDPOINTS.host.stop>;
   /**
    * Asks the screen sharing runtime again whether the operating system lets it record, and answers
    * the status that holds the result.
@@ -338,27 +324,27 @@ export interface HostDesktopApi {
    * attempt reads a new grant. Without this call only another member's attempt could clear it, and
    * the host owner who just gave the grant would keep reading that they had not.
    */
-  recheckScreenRecording: () => Promise<HostStatus>;
-  listMembers: () => Promise<TeamMemberSummary[]>;
-  updateMember: (input: UpdateTeamMemberInput) => Promise<TeamMemberSummary>;
-  removeMember: (memberId: string) => Promise<void>;
-  listSessions: () => Promise<TeamSessionSummary[]>;
-  revokeSession: (sessionId: string) => Promise<void>;
-  listInvites: () => Promise<TeamInviteSummary[]>;
-  revokeInvite: (inviteId: string) => Promise<void>;
-  createInvite: (input: CreateTeamInviteInput) => Promise<InviteSummary>;
-  onEvent: (listener: (status: HostStatus) => void) => () => void;
+  recheckScreenRecording: Invoke<typeof IPC_ENDPOINTS.host.recheckScreenRecording>;
+  listMembers: Invoke<typeof IPC_ENDPOINTS.host.listMembers>;
+  updateMember: Invoke<typeof IPC_ENDPOINTS.host.updateMember>;
+  removeMember: Invoke<typeof IPC_ENDPOINTS.host.removeMember>;
+  listSessions: Invoke<typeof IPC_ENDPOINTS.host.listSessions>;
+  revokeSession: Invoke<typeof IPC_ENDPOINTS.host.revokeSession>;
+  listInvites: Invoke<typeof IPC_ENDPOINTS.host.listInvites>;
+  revokeInvite: Invoke<typeof IPC_ENDPOINTS.host.revokeInvite>;
+  createInvite: Invoke<typeof IPC_ENDPOINTS.host.createInvite>;
+  onEvent: Subscribe<typeof IPC_ENDPOINTS.host.event>;
 }
 
 export interface RemoteDesktopDesktopApi {
-  checkSetup: (serverId: string) => Promise<RemoteDesktopSetupStatus>;
-  openSetup: (action: RemoteDesktopSetupAction) => Promise<void>;
-  test: (input: RemoteDesktopTestInput) => Promise<RemoteDesktopTestStatus>;
-  list: () => Promise<RemoteDesktopSession[]>;
-  connect: (input: RemoteDesktopConnectInput) => Promise<RemoteDesktopConnectResult>;
-  selectDisplay: (input: RemoteDesktopSelectDisplayInput) => Promise<void>;
-  disconnect: (sessionId: string) => Promise<void>;
-  onEvent: (listener: (sessions: RemoteDesktopSession[]) => void) => () => void;
+  checkSetup: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.checkSetup>;
+  openSetup: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.openSetup>;
+  test: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.test>;
+  list: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.list>;
+  connect: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.connect>;
+  selectDisplay: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.selectDisplay>;
+  disconnect: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.disconnect>;
+  onEvent: Subscribe<typeof IPC_ENDPOINTS.remoteDesktop.event>;
 }
 
 export interface VoiceDesktopApi {

@@ -144,6 +144,17 @@ import {
 } from "./app-decoding";
 import { clipboardFiles } from "./clipboard-files";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
+import {
+  decodeHostStatus,
+  decodeInviteSummary,
+  decodeRemoteDesktopConnectResult,
+  decodeRemoteDesktopSessions,
+  decodeTeamInvites,
+  decodeTeamMember,
+  decodeTeamMembers,
+  decodeTeamPresenceSnapshot,
+  decodeTeamSessions,
+} from "./team-decoding";
 
 const attachmentImportListeners = new Set<(event: AttachmentImportEvent) => void>();
 let selectedServerId: string = LOCAL_SERVER_ID;
@@ -1388,23 +1399,23 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   host: {
-    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.hostGetStatus),
-    configure: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostConfigure, input),
-    updateIdentity: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostUpdateIdentity, input),
-    getPresence: () => ipcRenderer.invoke(IPC_CHANNELS.hostGetPresence),
-    start: () => ipcRenderer.invoke(IPC_CHANNELS.hostStart),
-    stop: () => ipcRenderer.invoke(IPC_CHANNELS.hostStop),
-    recheckScreenRecording: () => ipcRenderer.invoke(IPC_CHANNELS.hostRecheckScreenRecording),
-    listMembers: () => ipcRenderer.invoke(IPC_CHANNELS.hostListMembers),
-    updateMember: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostUpdateMember, input),
-    removeMember: (memberId) => ipcRenderer.invoke(IPC_CHANNELS.hostRemoveMember, memberId),
-    listSessions: () => ipcRenderer.invoke(IPC_CHANNELS.hostListSessions),
-    revokeSession: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.hostRevokeSession, sessionId),
-    listInvites: () => ipcRenderer.invoke(IPC_CHANNELS.hostListInvites),
-    revokeInvite: (inviteId) => ipcRenderer.invoke(IPC_CHANNELS.hostRevokeInvite, inviteId),
-    createInvite: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostCreateInvite, input),
+    getStatus: () => invokeRequest(IPC_CHANNELS.hostGetStatus, decodeHostStatus),
+    configure: (input) => invokeRequest(IPC_CHANNELS.hostConfigure, decodeHostStatus, input),
+    updateIdentity: (input) => invokeRequest(IPC_CHANNELS.hostUpdateIdentity, decodeHostStatus, input),
+    getPresence: () => invokeRequest(IPC_CHANNELS.hostGetPresence, decodeTeamPresenceSnapshot),
+    start: () => invokeRequest(IPC_CHANNELS.hostStart, decodeHostStatus),
+    stop: () => invokeRequest(IPC_CHANNELS.hostStop, decodeHostStatus),
+    recheckScreenRecording: () => invokeRequest(IPC_CHANNELS.hostRecheckScreenRecording, decodeHostStatus),
+    listMembers: () => invokeRequest(IPC_CHANNELS.hostListMembers, decodeTeamMembers),
+    updateMember: (input) => invokeRequest(IPC_CHANNELS.hostUpdateMember, decodeTeamMember, input),
+    removeMember: (memberId) => invokeRequest(IPC_CHANNELS.hostRemoveMember, decodeVoid, memberId),
+    listSessions: () => invokeRequest(IPC_CHANNELS.hostListSessions, decodeTeamSessions),
+    revokeSession: (sessionId) => invokeRequest(IPC_CHANNELS.hostRevokeSession, decodeVoid, sessionId),
+    listInvites: () => invokeRequest(IPC_CHANNELS.hostListInvites, decodeTeamInvites),
+    revokeInvite: (inviteId) => invokeRequest(IPC_CHANNELS.hostRevokeInvite, decodeVoid, inviteId),
+    createInvite: (input) => invokeRequest(IPC_CHANNELS.hostCreateInvite, decodeInviteSummary, input),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) => listener(status);
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) => listener(decodeHostStatus(status));
       ipcRenderer.on(IPC_CHANNELS.hostEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.hostEvent, handler);
     },
@@ -1421,16 +1432,16 @@ const openbotApi: OpenBotDesktopApi = {
   },
   remoteDesktop: {
     checkSetup: (serverId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopCheckSetup, serverId).then(decodeRemoteDesktopSetupFromMain),
-    openSetup: (action) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopOpenSetup, action).then(decodeVoid),
-    test: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopTest, input).then(decodeRemoteDesktopTestFromMain),
-    list: () => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopList),
-    connect: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopConnect, input),
-    selectDisplay: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopSelectDisplay, input),
-    disconnect: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopDisconnect, sessionId),
+      invokeRequest(IPC_CHANNELS.remoteDesktopCheckSetup, decodeRemoteDesktopSetupFromMain, serverId),
+    openSetup: (action) => invokeRequest(IPC_CHANNELS.remoteDesktopOpenSetup, decodeVoid, action),
+    test: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopTest, decodeRemoteDesktopTestFromMain, input),
+    list: () => invokeRequest(IPC_CHANNELS.remoteDesktopList, decodeRemoteDesktopSessions),
+    connect: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopConnect, decodeRemoteDesktopConnectResult, input),
+    selectDisplay: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopSelectDisplay, decodeVoid, input),
+    disconnect: (sessionId) => invokeRequest(IPC_CHANNELS.remoteDesktopDisconnect, decodeVoid, sessionId),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, sessions: Parameters<typeof listener>[0]) =>
-        listener(sessions);
+      const handler = (_event: Electron.IpcRendererEvent, sessions: unknown) =>
+        listener(decodeRemoteDesktopSessions(sessions));
       ipcRenderer.on(IPC_CHANNELS.remoteDesktopEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.remoteDesktopEvent, handler);
     },

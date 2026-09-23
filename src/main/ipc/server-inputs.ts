@@ -7,6 +7,8 @@ import type {
   LoginServerInput,
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
+  RemoteDesktopConnectInput,
+  RemoteDesktopSelectDisplayInput,
   RemoteDesktopSetupAction,
   RemoteDesktopTestInput,
   ReorderServersInput,
@@ -187,12 +189,12 @@ export function parseDirectTyping(value: unknown): DirectTypingInput {
   };
 }
 
-export function parseRemoteDesktopConnect(input: unknown): { serverId: string } {
+export function parseRemoteDesktopConnect(input: unknown): RemoteDesktopConnectInput {
   if (!isObject(input)) throw new Error("Remote control details are required.");
   return { serverId: requireString(input.serverId, "serverId") };
 }
 
-export function parseRemoteDesktopDisplay(input: unknown): { serverId: string; displayId: string } {
+export function parseRemoteDesktopDisplay(input: unknown): RemoteDesktopSelectDisplayInput {
   if (!isObject(input)) throw new Error("Remote display details are required.");
   return {
     serverId: requireString(input.serverId, "serverId"),

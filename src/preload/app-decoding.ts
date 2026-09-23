@@ -26,6 +26,7 @@ import {
   type UpdateStatus,
 } from "@openbot/contracts/ipc";
 import {
+  decodeList,
   decodeRecord,
   guardedDecoder,
   nullableNumber,
@@ -34,7 +35,7 @@ import {
   requiredNumber,
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
-import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
@@ -188,9 +189,4 @@ export function decodeNotificationOpenedEvent(value: unknown): NotificationOpene
     agentId: requiredString(opened, "agentId"),
     threadId: nullableString(opened, "threadId"),
   };
-}
-
-function decodeList<T>(value: unknown, label: string, decodeItem: (item: DynamicRecord) => T): T[] {
-  if (!Array.isArray(value)) throw new Error(`Invalid ${label}.`);
-  return value.map((item) => decodeItem(decodeRecord(item, label)));
 }
