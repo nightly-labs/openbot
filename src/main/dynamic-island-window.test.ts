@@ -30,6 +30,8 @@ function preference(overrides: Partial<DynamicIslandPreference> = {}): DynamicIs
     hapticsEnabled: true,
     idleVisible: true,
     additionalDisplaysEnabled: true,
+    widthPercent: 100,
+    heightPercent: 100,
     ...overrides,
   };
 }
@@ -438,6 +440,9 @@ describe("dynamic island window geometry", () => {
     await controller.setPreference(preference());
     controller.performHaptic();
     expect(performHaptic).toHaveBeenCalledTimes(2);
+    // A taller island keeps its hover growth inside the compact window: 32 points at 125% is 40.
+    await controller.setPreference(preference({ heightPercent: 125 }));
+    expect(windows[3]?.setBounds).toHaveBeenLastCalledWith(expect.objectContaining({ height: 58 }), false);
   });
 
   it("removes external display overlays independently of the built-in display", async () => {

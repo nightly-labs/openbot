@@ -1,6 +1,5 @@
 import type {
   AgentProviderId,
-  AppInfo,
   CustomProviderRestart,
   CustomProviderSummary,
   SaveCustomProviderInput,
@@ -49,7 +48,6 @@ interface SettingsGeneralTabProps {
   store: SettingsGeneralStore;
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
-  platform: AppInfo["platform"] | undefined;
   /** The dialog element the Select popovers portal into, captured when this tab was created. */
   selectMount: HTMLElement | undefined;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -289,40 +287,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           />
         </ItemGroup>
       </SettingsSection>
-
-      <Show when={props.platform === "darwin"}>
-        <SettingsSection title={i18n.t("settings.notch.title")}>
-          <ItemGroup class="settings-modal-card">
-            <SwitchField
-              checked={props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
-              label={i18n.t("settings.notch.show.title")}
-              description={i18n.t("settings.notch.show.description")}
-            />
-            <SwitchField
-              checked={props.value.macBookNotchIdle}
-              disabled={!props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotchIdle", checked)}
-              label={i18n.t("settings.notch.idle.title")}
-              description={i18n.t("settings.notch.idle.description")}
-            />
-            <SwitchField
-              checked={props.value.macBookNotchAdditionalDisplays}
-              disabled={!props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotchAdditionalDisplays", checked)}
-              label={i18n.t("settings.notch.displays.title")}
-              description={i18n.t("settings.notch.displays.description")}
-            />
-            <SwitchField
-              checked={props.value.macBookNotchHaptics}
-              disabled={!props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
-              label={i18n.t("settings.notch.haptics.title")}
-              description={i18n.t("settings.notch.haptics.description")}
-            />
-          </ItemGroup>
-        </SettingsSection>
-      </Show>
 
       <SettingsSection title={i18n.t("settings.privacy.title")}>
         <ItemGroup class="settings-modal-card">

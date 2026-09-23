@@ -20,6 +20,8 @@ describe("dynamic island preference store", () => {
       hapticsEnabled: true,
       idleVisible: true,
       additionalDisplaysEnabled: true,
+      widthPercent: 100,
+      heightPercent: 100,
     });
   });
 
@@ -32,6 +34,8 @@ describe("dynamic island preference store", () => {
       hapticsEnabled: true,
       idleVisible: true,
       additionalDisplaysEnabled: true,
+      widthPercent: 100,
+      heightPercent: 100,
     });
   });
 
@@ -44,6 +48,8 @@ describe("dynamic island preference store", () => {
       hapticsEnabled: true,
       idleVisible: true,
       additionalDisplaysEnabled: true,
+      widthPercent: 100,
+      heightPercent: 100,
     });
   });
 
@@ -56,10 +62,46 @@ describe("dynamic island preference store", () => {
       hapticsEnabled: false,
       idleVisible: true,
       additionalDisplaysEnabled: true,
+      widthPercent: 100,
+      heightPercent: 100,
     });
   });
 
-  it("persists a version 3 preference atomically", async () => {
+  it("migrates version 3 preferences with the default size", async () => {
+    const root = await temporaryRoot();
+    const path = join(root, "dynamic-island.json");
+    await writeFile(
+      path,
+      '{"version":3,"enabled":true,"hapticsEnabled":false,"idleVisible":false,"additionalDisplaysEnabled":false}\n',
+    );
+    await expect(readDynamicIslandPreference(path)).resolves.toEqual({
+      enabled: true,
+      hapticsEnabled: false,
+      idleVisible: false,
+      additionalDisplaysEnabled: false,
+      widthPercent: 100,
+      heightPercent: 100,
+    });
+  });
+
+  it("resets only an out-of-range size and keeps the switches", async () => {
+    const root = await temporaryRoot();
+    const path = join(root, "dynamic-island.json");
+    await writeFile(
+      path,
+      '{"version":4,"enabled":true,"hapticsEnabled":false,"idleVisible":true,"additionalDisplaysEnabled":false,"widthPercent":5,"heightPercent":110}\n',
+    );
+    await expect(readDynamicIslandPreference(path)).resolves.toEqual({
+      enabled: true,
+      hapticsEnabled: false,
+      idleVisible: true,
+      additionalDisplaysEnabled: false,
+      widthPercent: 100,
+      heightPercent: 110,
+    });
+  });
+
+  it("persists a version 4 preference atomically", async () => {
     const root = await temporaryRoot();
     const path = join(root, "dynamic-island.json");
     const preference = {
@@ -67,6 +109,8 @@ describe("dynamic island preference store", () => {
       hapticsEnabled: false,
       idleVisible: false,
       additionalDisplaysEnabled: false,
+      widthPercent: 80,
+      heightPercent: 90,
     };
     await expect(writeDynamicIslandPreference(path, preference)).resolves.toEqual(preference);
     await expect(readDynamicIslandPreference(path)).resolves.toEqual(preference);

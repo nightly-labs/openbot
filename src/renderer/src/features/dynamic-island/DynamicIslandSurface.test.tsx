@@ -83,6 +83,8 @@ describe("DynamicIslandSurface", () => {
         hapticsEnabled: true,
         idleVisible: false,
         additionalDisplaysEnabled: true,
+        widthPercent: 100,
+        heightPercent: 100,
       }),
     );
     expect(screen.queryByRole("button", { name: "Expand Open OpenBot" })).not.toBeInTheDocument();
