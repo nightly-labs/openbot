@@ -451,6 +451,8 @@ respective products and services.
 For one native Standard user per tenant, install the normal OpenBot DMG and the optional
 `OpenBot-Host-<VERSION>-arm64.pkg` from the same release. The Host package provides
 `sudo openbot-host setup --create-user client-acme --create-user client-bravo` and
-`sudo openbot-host verify`. No Git checkout, Bun, or compilation is required on the host.
+`sudo openbot-host verify`. `sudo openbot-host status [--json]` and `sudo openbot-host watch`
+show the update phase, the staged version, and each tenant's work state. No Git checkout, Bun,
+or compilation is required on the host.
 Normal desktop users need only the DMG. See the [host deployment guide](docs/multi-tenant-hosting.md)
 for existing-user enrollment, password handling, package upgrades, and required target-host checks.
