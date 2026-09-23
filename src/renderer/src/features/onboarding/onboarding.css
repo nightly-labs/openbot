@@ -569,3 +569,79 @@
     transform: translate(18px, 8px);
   }
 }
+
+/* The OpenCode note sits outside the list, so the list lets it through and its first and last rows
+   round their own corners instead of relying on the clip. */
+.onboarding-provider .provider-picker-list {
+  overflow: visible;
+}
+
+.onboarding-provider .provider-picker-list > :first-child,
+.onboarding-provider .provider-picker-list > :first-child > .provider-picker-option:first-child {
+  border-top-left-radius: calc(var(--openbot-radius-md) - 1px);
+  border-top-right-radius: calc(var(--openbot-radius-md) - 1px);
+}
+
+.onboarding-provider .provider-picker-list > :last-child,
+.onboarding-provider .provider-picker-list > :last-child > .provider-picker-option:last-child {
+  border-bottom-left-radius: calc(var(--openbot-radius-md) - 1px);
+  border-bottom-right-radius: calc(var(--openbot-radius-md) - 1px);
+}
+
+.onboarding-provider .provider-picker-option-with-callout {
+  position: relative;
+}
+
+/* Drawn like the drag hint of the macOS installer: a note, then a thin arrow into the row. */
+.provider-picker-callout {
+  position: absolute;
+  right: calc(100% + 10px);
+  bottom: 50%;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--openbot-onboarding-desktop-indigo);
+  pointer-events: none;
+  animation: provider-picker-callout-in 420ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.provider-picker-callout-title {
+  font-size: var(--openbot-text-md);
+  font-weight: 620;
+  line-height: 18px;
+}
+
+.provider-picker-callout-detail {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+}
+
+.provider-picker-callout-arrow {
+  width: 92px;
+  height: 40px;
+  align-self: flex-end;
+  margin-top: 2px;
+  margin-bottom: -20px;
+}
+
+@keyframes provider-picker-callout-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-picker-callout {
+    animation: none;
+  }
+}
+
+/* No room beside the list: the row's own description says the same. */
+@media (max-width: 860px) {
+  .provider-picker-callout {
+    display: none;
+  }
+}

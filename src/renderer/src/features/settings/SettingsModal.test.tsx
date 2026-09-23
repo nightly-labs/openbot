@@ -213,7 +213,11 @@ describe("SettingsModal", () => {
       />
     ));
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Update ChatGPT to 0.153.4" }));
+    // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
+    const moreActions = await screen.findByRole("button", { name: "More actions for ChatGPT" });
+    fireEvent.pointerDown(moreActions, { button: 0 });
+    fireEvent.click(moreActions);
+    fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Update to 0.153.4" }), { button: 0 });
     await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("codex"));
   });
 
@@ -1112,7 +1116,7 @@ describe("SettingsModal", () => {
     ));
 
     // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
-    const moreActions = await screen.findByRole("button", { name: "More ways to log in to ChatGPT" });
+    const moreActions = await screen.findByRole("button", { name: "More actions for ChatGPT" });
     fireEvent.pointerDown(moreActions, { button: 0 });
     fireEvent.click(moreActions);
     fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Log in with code" }), { button: 0 });
