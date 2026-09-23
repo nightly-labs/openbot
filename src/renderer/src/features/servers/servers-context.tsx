@@ -1,9 +1,9 @@
-import type { HostStatus, ServerSummary } from "@openbot/contracts/ipc";
+import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
-import { toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "./server-capabilities";
 
@@ -174,9 +174,24 @@ const Servers = createSimpleContext({
       }
     }
 
-    async function setServerMuted(serverId: string, muted: boolean): Promise<void> {
+    // No duration mutes until the user unmutes.
+    async function setServerMuted(serverId: string, muted: boolean, durationMs?: number): Promise<void> {
       try {
-        applyServerSummaries(await window.openbot.servers.setMuted({ serverId, muted }));
+        applyServerSummaries(
+          await window.openbot.servers.setMuted(
+            durationMs === undefined ? { serverId, muted } : { serverId, muted, durationMs },
+          ),
+        );
+      } catch (error) {
+        toast.error("Could not change server notifications", {
+          description: errorMessage(error, "Could not save the setting. Try again."),
+        });
+      }
+    }
+
+    async function setServerNotificationLevel(serverId: string, level: ServerNotificationLevel): Promise<void> {
+      try {
+        applyServerSummaries(await window.openbot.servers.setNotificationLevel({ serverId, level }));
       } catch (error) {
         toast.error("Could not change server notifications", {
           description: errorMessage(error, "Could not save the setting. Try again."),
@@ -214,6 +229,7 @@ const Servers = createSimpleContext({
       setJoinServerOpen,
       reorderServers,
       setServerMuted,
+      setServerNotificationLevel,
       retryServerConnection,
       serverLoadRequest,
       initialServersReady,

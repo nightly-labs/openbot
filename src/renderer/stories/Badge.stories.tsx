@@ -1,5 +1,5 @@
+import { Badge, Heading } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Badge, Heading } from "../src/components/ui";
 
 const meta = {
   title: "Foundations/Badge",

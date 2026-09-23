@@ -1,5 +1,5 @@
+import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
 import { describe, expect, it } from "vitest";
-import type { AgentMessage, ChatActionMarkerModel } from "../../data";
 import { summarizeRoutineRunMessages } from "./routine-run-timeline";
 
 describe("summarizeRoutineRunMessages", () => {

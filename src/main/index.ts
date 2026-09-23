@@ -4,10 +4,11 @@ import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
-import { app, BrowserWindow, dialog, powerMonitor, protocol, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, Notification, powerMonitor, protocol, screen, shell } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
+import { requestNotificationPermission, showRetainedNotification } from "./desktop-notifications";
 import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
@@ -32,6 +33,7 @@ import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
+import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
@@ -215,6 +217,7 @@ const {
   // An agent event cannot arrive before the services that raise it, so the fallback stands only so
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
+  desktopNotificationsEnabled: () => services?.notificationPreference.get().desktopNotifications ?? true,
 });
 
 // Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
@@ -309,6 +312,7 @@ function registerIpcHandlers({
   updatePreferenceFile,
   approvalAutomation,
   language,
+  notificationPreference,
   agentInitialization,
   sidebarLayout,
   host,
@@ -361,6 +365,12 @@ function registerIpcHandlers({
     ...customProviderIpcHandlers({ service, customProviders }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...updateIpcHandlers({ updater, updatePreferenceFile }),
+    ...notificationIpcHandlers({
+      notificationPreference,
+      translate: language.translate,
+      requestPermission: () => requestDesktopNotificationPermission(notificationPreference, language.translate),
+      openExternal: (url) => shell.openExternal(url),
+    }),
     ...teamIpcHandlers({
       host,
       remoteDesktop,
@@ -385,6 +395,20 @@ function registerIpcHandlers({
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView }),
+  });
+}
+
+function requestDesktopNotificationPermission(
+  preference: ApplicationServices["notificationPreference"],
+  translate: ApplicationServices["language"]["translate"],
+): Promise<void> {
+  return requestNotificationPermission({
+    platform: process.platform,
+    preference,
+    showWelcome: () => {
+      if (!Notification.isSupported()) return;
+      showRetainedNotification(new Notification({ title: "OpenBot", body: translate("notification.welcome") }));
+    },
   });
 }
 
@@ -644,6 +668,9 @@ if (!hasSingleInstanceLock) {
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
+      void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
+        logger.warn("Unable to ask for notification permission:", toLogValue(error)),
+      );
       configureApplicationMenu(service, updater, language.translate);
       // One place turns a language change into every visible consequence: the menu is built again
       // because a native label cannot be changed in place, and every window is told, including the

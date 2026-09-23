@@ -4,7 +4,6 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
-import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
 import {
   ArrowUp,
   Button,
@@ -17,16 +16,16 @@ import {
   Mic,
   Plus,
   Puzzle,
-} from "../../components/ui";
-import { usePlatform } from "../../platform";
-import { fileBadge, formatFileSize } from "./AttachmentCards";
-import { attachmentReferenceTone } from "./AttachmentReference";
-import { ComposerEditor } from "./ComposerEditor";
-import { ComposerErrorBanner } from "./ComposerErrorBanner";
-import { ComposerSignInNotice, ComposerUsageLimitNotice } from "./ComposerNotice";
-import { CloseIcon, MoreIcon, StopIcon } from "./ConversationIcons";
+} from "@openbot/ui";
+import { fileBadge, formatFileSize } from "@openbot/ui/features/conversation/AttachmentCards";
+import { attachmentReferenceTone } from "@openbot/ui/features/conversation/AttachmentReference";
+import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
+import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
+import { ComposerSignInNotice, ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import { CloseIcon, MoreIcon, StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
+import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
+import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
 import { useConversationViewScope } from "./conversation-scope";
-import { RichMessageText } from "./RichMessageText";
 import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-status";
 
 /** @internal Stable HMR boundary for conversation composer. */
@@ -73,13 +72,12 @@ export function ConversationComposer() {
     voicePhase,
     voiceModelProgress,
   } = useConversationViewScope();
-  const platform = usePlatform();
   const [pickerOpen, setPickerOpen] = createSignal(false);
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
   // The mention picker grows out of the same edge as the queue, so only one of them holds it.
   const queueVisible = () => queuePanelVisible() && !pickerOpen();
-  const voiceAvailable = () => voiceSupported(platform.appInfo()?.platform);
+  const voiceAvailable = () => !props.runtime && voiceSupported(props.platform);
   /**
    * The provider status is the only source of truth for a signed-out provider, so the notice and the
    * model picker's "Sign in required" label can never disagree, and the notice is shown before the
@@ -276,7 +274,11 @@ export function ConversationComposer() {
               }
               placeholder={
                 !agentReady()
-                  ? "Complete agent CLI setup to start"
+                  ? props.runtime
+                    ? props.server?.state === "online"
+                      ? "Complete provider setup on your host to start"
+                      : "Connect to your host to start"
+                    : "Complete agent CLI setup to start"
                   : replyTarget()
                     ? "Reply…"
                     : `Message ${props.agent?.name ?? "agent"}`
@@ -304,7 +306,11 @@ export function ConversationComposer() {
               multiple
               hidden
               tabindex={-1}
-              data-openbot-attachment-picker="true"
+              data-openbot-attachment-picker={props.runtime ? undefined : "true"}
+              onChange={(event) => {
+                if (props.runtime?.importFiles)
+                  void props.runtime.importFiles(Array.from(event.currentTarget.files ?? []));
+              }}
             />
             <Input
               ref={setContextAttachmentPickerElement}
@@ -313,7 +319,11 @@ export function ConversationComposer() {
               multiple
               hidden
               tabindex={-1}
-              data-openbot-attachment-picker="true"
+              data-openbot-attachment-picker={props.runtime ? undefined : "true"}
+              onChange={(event) => {
+                if (props.runtime?.importFiles)
+                  void props.runtime.importFiles(Array.from(event.currentTarget.files ?? []));
+              }}
             />
             <DropdownMenu.Root
               open={showComposerActions()}
@@ -366,6 +376,13 @@ export function ConversationComposer() {
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
             <div class="composer-primary-actions">
+              <Show when={attachmentBusy() && props.runtime?.cancelImportFiles} keyed>
+                {(cancelImportFiles) => (
+                  <Button variant="ghost" type="button" onClick={() => void cancelImportFiles()}>
+                    Cancel upload
+                  </Button>
+                )}
+              </Show>
               <Show when={voiceAvailable()}>
                 <Show when={voicePhase() === "preparing"}>
                   <span class="voice-model-progress" role="status">
@@ -469,4 +486,6 @@ export function ConversationComposer() {
   );
 }
 
-const QueuePanel = lazy(() => import("./QueuePanel").then((module) => ({ default: module.QueuePanel })));
+const QueuePanel = lazy(() =>
+  import("@openbot/ui/features/conversation/QueuePanel").then((module) => ({ default: module.QueuePanel })),
+);

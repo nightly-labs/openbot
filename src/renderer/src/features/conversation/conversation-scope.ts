@@ -12,6 +12,7 @@ import {
 import { createScopeGuard } from "../../scope-lifetime";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
+import { conversationRuntime } from "./conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "./conversation-types";
 import { createActivityStore } from "./stores/activity-store";
 import { createBrowserStore } from "./stores/browser-store";
@@ -239,10 +240,13 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddress,
     setBrowserAddressEditing,
     setComposerError: setScopedComposerError,
-    panels: { setActiveRightPanel, screenOpen: () => screenOpen() },
+    panels: { activeRightPanel, setActiveRightPanel },
   });
   const {
-    browserInteractionAvailable,
+    browserSidebarOpen,
+    browserExpandedOpen,
+    browserPipOpen,
+    screenOpen,
     browserTabs,
     activeBrowserTab,
     browserTakeoverTab,
@@ -261,10 +265,6 @@ export function createConversationViewScope(props: ConversationProps) {
     reloadBrowserTab,
     navigateBrowserTab,
   } = browser;
-  const browserSidebarOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser";
-  const browserExpandedOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser-expanded";
-  const browserPipOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser-pip";
-  const screenOpen = () => browserSidebarOpen() || browserExpandedOpen() || browserPipOpen();
   function showBrowserPanel() {
     setActiveRightPanel("browser");
     if (browserTabs().length === 0) void openBrowserAddress();
@@ -522,7 +522,7 @@ export function createConversationViewScope(props: ConversationProps) {
   }
 
   onSettled(() => {
-    const unsubscribeImport = window.openbot.agent.onAttachmentImport((event) => {
+    const unsubscribeImport = conversationRuntime(props).agent.onAttachmentImport((event) => {
       if (event.type === "started") {
         const target = currentTarget();
         if (target?.serverId === event.serverId) {
@@ -551,7 +551,7 @@ export function createConversationViewScope(props: ConversationProps) {
         } else {
           setAttachmentBusy(resources.importTargetAgents.size > 0);
           for (const attachment of event.attachments) {
-            void window.openbot.agent.discardDraftAttachment(attachment.id, event.serverId);
+            void conversationRuntime(props).agent.discardDraftAttachment(attachment.id, event.serverId);
           }
         }
       }
@@ -837,7 +837,7 @@ export function createConversationViewScope(props: ConversationProps) {
       if (browserBoundsFrame !== undefined) cancelAnimationFrame(browserBoundsFrame);
       browserBoundsFrame = undefined;
       if (!visible) {
-        void window.openbot.browser.setVisible({ visible: false });
+        void conversationRuntime(props).browser.setVisible({ visible: false });
         return;
       }
       browserVisibilityFrame = requestAnimationFrame(() => {
@@ -860,7 +860,7 @@ export function createConversationViewScope(props: ConversationProps) {
             return;
           }
           const bounds = surface.getBoundingClientRect();
-          void window.openbot.browser.setVisible({
+          void conversationRuntime(props).browser.setVisible({
             visible: true,
             target: "main",
             bounds: {
@@ -893,16 +893,16 @@ export function createConversationViewScope(props: ConversationProps) {
     ({ open }) => {
       if (props.browserEnabled === false) return;
       if (!open) {
-        void window.openbot.browser.closePictureInPicture();
+        void conversationRuntime(props).browser.closePictureInPicture();
         return;
       }
-      void window.openbot.browser
-        .openPictureInPicture(untrack(browserPipBounds) ?? undefined)
+      void conversationRuntime(props)
+        .browser.openPictureInPicture(untrack(browserPipBounds) ?? undefined)
         .then(saveBrowserPipBounds);
     },
   );
 
-  const removeBrowserPictureInPictureListener = window.openbot.browser.onPictureInPictureEvent((event) => {
+  const removeBrowserPictureInPictureListener = conversationRuntime(props).browser.onPictureInPictureEvent((event) => {
     if (event.type === "bounds-changed") {
       saveBrowserPipBounds(event.bounds);
       return;
@@ -918,15 +918,15 @@ export function createConversationViewScope(props: ConversationProps) {
     if (browserWindowResizeHandler) window.removeEventListener("resize", browserWindowResizeHandler);
     removeBrowserPictureInPictureListener();
     if (props.browserEnabled !== false) {
-      void window.openbot.browser.setVisible({ visible: false });
-      void window.openbot.browser.closePictureInPicture();
+      void conversationRuntime(props).browser.setVisible({ visible: false });
+      void conversationRuntime(props).browser.closePictureInPicture();
     }
   });
 
   async function openExternalMessageUrl(url: string) {
     const target = currentTarget();
     try {
-      await window.openbot.openUrl(url);
+      await conversationRuntime(props).openUrl(url);
     } catch {
       setScopedComposerError("Could not open the link in the external browser.", target);
     }

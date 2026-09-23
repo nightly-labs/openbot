@@ -1,7 +1,7 @@
+import type { AgentMessage } from "@openbot/ui/data";
 import { createSignal } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { toAgentMessage } from "./app-message-projection";
-import type { AgentMessage } from "./data";
 import { useAgents } from "./features/agents/agents-context";
 import { useChannels } from "./features/channels/channels-context";
 import { useConversation } from "./features/conversation/conversation-context";

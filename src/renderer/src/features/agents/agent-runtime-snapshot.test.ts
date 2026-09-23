@@ -1,5 +1,5 @@
 import type { AgentApproval, AgentRuntimeApproval, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
-import type { AgentMessage } from "../../data";
+import type { AgentMessage } from "@openbot/ui/data";
 import { promptRequestKey } from "../conversation/conversation-keys";
 import {
   appendLatestRuntimeMessages,

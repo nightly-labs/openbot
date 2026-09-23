@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   accountUsageProviderRows,
   accountUsageRowLabel,
@@ -6,7 +5,8 @@ import {
   usageRemainingPercent,
   usageTone,
   usageWindowLabel,
-} from "./account-usage-view";
+} from "@openbot/ui/features/account/account-usage-view";
+import { describe, expect, it } from "vitest";
 
 describe("account usage view", () => {
   it("keeps one named row per provider and warns from the tightest window", () => {

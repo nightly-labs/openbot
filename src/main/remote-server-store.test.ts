@@ -251,3 +251,41 @@ it("keeps the prior mute preference when the write fails", async () => {
   await expect(store.setMuted(LOCAL_SERVER_ID, false)).rejects.toThrow();
   expect(store.isMuted(LOCAL_SERVER_ID)).toBe(true);
 });
+
+it("keeps timed mutes and notification levels through restart", async () => {
+  const path = await storePath({
+    version: 3,
+    activeServerId: "alpha",
+    servers: [storedServer("alpha"), storedServer("beta")],
+    mutedServerIds: ["beta"],
+  });
+  const store = newStore(path);
+  await store.load();
+  expect([store.isMuted("beta"), store.notificationLevel("alpha")]).toEqual([true, "all"]);
+  await store.setMuted("alpha", true, 2_000);
+  await store.setNotificationLevel("alpha", "needs-me");
+  const restarted = newStore(path);
+  await restarted.load();
+  expect(restarted.muteState("alpha", 1_000)).toEqual({ muted: true, mutedUntil: 2_000 });
+  expect(restarted.muteState("alpha", 2_000)).toEqual({ muted: false, mutedUntil: null });
+  expect(restarted.nextMuteExpiry(1_000)).toBe(2_000);
+  expect(restarted.notificationLevel("alpha")).toBe("needs-me");
+  await restarted.setMuted("alpha", false);
+  await restarted.setMuted("beta", false);
+  expect([restarted.isMuted("alpha", 1_000), restarted.isMuted("beta", 1_000)]).toEqual([false, false]);
+  await expect(restarted.setNotificationLevel("missing", "nothing")).rejects.toThrow("Remote server not found.");
+});
+
+it("skips a bad notification entry and still loads the servers", async () => {
+  const path = await storePath({
+    version: 3,
+    activeServerId: "alpha",
+    servers: [storedServer("alpha")],
+    serverNotifications: { alpha: { level: "loud", mutedUntil: "soon" }, [LOCAL_SERVER_ID]: { level: "nothing" } },
+  });
+  const store = newStore(path);
+  await store.load();
+  expect(store.require("alpha").name).toBe("Server alpha");
+  expect([store.notificationLevel("alpha"), store.isMuted("alpha")]).toEqual(["all", false]);
+  expect(store.notificationLevel(LOCAL_SERVER_ID)).toBe("nothing");
+});

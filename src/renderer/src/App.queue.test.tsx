@@ -513,13 +513,13 @@ describe("OpenBot connected desktop shell", () => {
       ).toEqual(["Queued message 1, editing: Edited on phone", "Queued message 2: Next work"]),
     );
     await fireEvent.click(screen.getByRole("button", { name: "Delete queued message 1" }));
-    const confirmation = await screen.findByRole("dialog", { name: "Delete queued message?" });
+    const confirmation = await screen.findByRole("alertdialog", { name: "Delete queued message?" });
     expect(window.openbot.agent.cancelQueuedMessage).not.toHaveBeenCalled();
     await fireEvent.click(within(confirmation).getByRole("button", { name: "Keep" }));
     expect(window.openbot.agent.cancelQueuedMessage).not.toHaveBeenCalled();
     await fireEvent.click(screen.getByRole("button", { name: "Delete queued message 1" }));
     await fireEvent.click(
-      within(await screen.findByRole("dialog", { name: "Delete queued message?" })).getByRole("button", {
+      within(await screen.findByRole("alertdialog", { name: "Delete queued message?" })).getByRole("button", {
         name: "Delete",
       }),
     );

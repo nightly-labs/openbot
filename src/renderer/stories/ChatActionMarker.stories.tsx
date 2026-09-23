@@ -1,10 +1,10 @@
+import { Heading, Text } from "@openbot/ui";
+import type { AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { createSignal } from "solid-js";
 import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Heading, Text } from "../src/components/ui";
-import type { AgentProfile, ChatActionMarkerModel } from "../src/data";
 import { AgentSkillsModal } from "../src/features/conversation/AgentSkillsModal";
-import { ChatActionMarker } from "../src/features/conversation/ChatActionMarker";
 
 const agents: AgentProfile[] = [
   agent("research", "Research"),

@@ -4,13 +4,13 @@ import type {
   DynamicIslandPresentation,
   DynamicIslandQuestionItem,
 } from "@openbot/contracts/ipc";
+import type { DynamicIslandViewState } from "@openbot/ui";
+import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DynamicIslandViewState } from "../../components/ui";
 import { createMockOpenBot } from "../../preview/mock-openbot";
 import { DynamicIslandSurface } from "./DynamicIslandSurface";
-import { OpenBotDynamicIsland } from "./OpenBotDynamicIsland";
 
 const RESEARCH = {
   id: "research",
@@ -83,6 +83,8 @@ describe("DynamicIslandSurface", () => {
         hapticsEnabled: true,
         idleVisible: false,
         additionalDisplaysEnabled: true,
+        widthPercent: 100,
+        heightPercent: 100,
       }),
     );
     expect(screen.queryByRole("button", { name: "Expand Open OpenBot" })).not.toBeInTheDocument();

@@ -244,7 +244,7 @@ describe.sequential("AgentService: queue", () => {
     // Same catalog, no development build: the built-in default stands.
     await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
       provider: "codex",
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
     });
 
     // And a provider the developer chose is theirs, development build or not.
@@ -253,7 +253,7 @@ describe.sequential("AgentService: queue", () => {
       service.createAgent({ ...CREATE_AGENT_INPUT, name: "Chosen Agent", avatarSeed: "setup:chosen" }),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-sonnet-5",
+      model: "claude-opus-5-5",
     });
   });
 
@@ -330,7 +330,7 @@ describe.sequential("AgentService: queue", () => {
         avatarSeed: "setup:claude-planning",
       }),
     ).resolves.toMatchObject({
-      model: "claude-sonnet-5",
+      model: "claude-opus-5-5",
       reasoningEffort: "high",
     });
     await service.setPreferredProvider("codex");
@@ -341,7 +341,7 @@ describe.sequential("AgentService: queue", () => {
     // The store default, which is what a new agent on the default provider keeps: `low`, not the
     // `medium` the Codex CLI reports for every GPT-5.6 model.
     await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
       reasoningEffort: "low",
     });
     // Setup can record a model beside the provider, which is how a custom endpoint becomes the
@@ -360,7 +360,7 @@ describe.sequential("AgentService: queue", () => {
       service.createAgent({ ...CREATE_AGENT_INPUT, name: "Fallback Agent", avatarSeed: "setup:fallback" }),
     ).resolves.toMatchObject({
       provider: "claude",
-      model: "claude-sonnet-5",
+      model: "claude-opus-5-5",
     });
   });
 
@@ -610,7 +610,7 @@ describe.sequential("AgentService: queue", () => {
       service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" }),
     ).rejects.toThrow("included Claude runtime");
     expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
       threadId,
     });
   });

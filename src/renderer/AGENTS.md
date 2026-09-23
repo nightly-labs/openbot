@@ -23,7 +23,7 @@ skills for the component patterns, not the imports.
   together. `bun run dev:api` is for API-only debugging.
 - `bun run storybook` verifies isolated components. CI builds it; do not run `build-storybook`.
 - `bun run check:ui` is the design-system guard for this directory: shared primitives over native
-  controls, Kobalte and Lucide only inside `components/ui`, and palette tokens instead of colour,
+  controls, Kobalte and Lucide only inside `@openbot/ui`, and palette tokens instead of colour,
   size, radius and transition literals. It reads the whole renderer in 60 ms, so run it on any
   change here rather than waiting for CI — its budgets only ever go down. All of them sit at zero
   except the `data-testid` hook count, frozen at the five already in the tree;
@@ -37,11 +37,13 @@ skills for the component patterns, not the imports.
 
 ## Where a file goes
 
-A domain lives in one directory: `src/renderer/src/features/<domain>/`, flat except for `stores/`.
+App-specific domains live in `src/renderer/src/features/<domain>/`, flat except for `stores/`.
+Shared feature components live in `packages/ui/src/features/<domain>/`; see
+[shared UI instructions](../../packages/ui/AGENTS.md). Import them from `@openbot/ui` package
+subpaths. Keep application contexts, persistence, and platform adapters in the renderer.
 Its context, its DOM-free logic, its pane, its components, its tests and its stylesheet are
 siblings, so "fix the pin ordering" is answerable by opening one path. There is no barrel —
-`components/ui/index.ts` is still the only one — and every import stays relative, which is what
-makes `tsc` an exhaustive check after a move.
+`packages/ui/src/index.ts` is still the only one — and feature-local imports stay relative. Import shared primitives from `@openbot/ui`.
 
 ```
 features/<domain>/
@@ -59,13 +61,13 @@ are the same filename on case-insensitive APFS. That breaks the `Check` job on `
 while every ubuntu job stays green, so the suffix is uniform rather than applied where a collision
 happens to exist today.
 
-**Outside a feature:** `components/ui` (the shared patched-Kobalte layer), the app shell and its
+**Outside a feature:** `@openbot/ui` (the shared patched-Kobalte layer), the app shell and its
 wiring (`App.tsx`, `AppView.tsx`, `app-providers.tsx`, `app-bootstrap.tsx`, `WorkspaceShell.tsx`,
 `WorkspaceOverlays.tsx`, `lazy-views.ts`), the cross-domain modules every feature reads and none
-owns (`navigation.tsx`, `layout.tsx`, `turns.tsx`, `providers.tsx`, `data.ts`,
+owns (`navigation.tsx`, `layout.tsx`, `turns.tsx`, `providers.tsx`,
 `simple-context.tsx`, `scope-lifetime.ts`), `preview/` — whose mocks are the second implementation
 of the IPC surface and belong beside `mock-openbot.ts` — and the base stylesheets
-(`primitives.css`, `base.css`, `transitions.css`, `action-menu.css`, `sliding-tabs.css`) —
+(`base.css`, `transitions.css`, `action-menu.css`, `sliding-tabs.css`) —
 plus `app-shell.css`, which ends in a theme layer that assigns the palette across every domain
 at once and cannot be split until that layer is lifted out; its header says so. Stories stay in
 `src/renderer/stories/`, where the test rules relax.
@@ -99,7 +101,7 @@ reference is the reactive unit: write a collection held in a signal by copying
 ## Component reuse
 
 Search for an existing component, hook, style, utility or story first, and prefer reuse, composition
-or a small extension. The shared layer is `src/renderer/src/components/ui` over patched Kobalte:
+or a small extension. The shared layer is `packages/ui/src` over patched Kobalte:
 extend a primitive there rather than copying one into a feature, and update its story when it gains
 a visual or interactive state. Build from scratch only after the search comes up empty, and keep it
 reusable. The [Zaidan catalog](https://zaidan.carere.dev/docs/components) is a source of reference

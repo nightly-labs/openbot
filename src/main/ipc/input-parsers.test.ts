@@ -68,6 +68,7 @@ import {
   parseMarkDirectRead,
   parseReorderServers,
   parseSetServerMuted,
+  parseSetServerNotificationLevel,
   parseUpdateTeamMember,
 } from "./server-inputs";
 import { nullishPayload, optionalPayload, requireString } from "./validation";
@@ -238,16 +239,40 @@ describe("app IPC input parsing", () => {
         hapticsEnabled: false,
         idleVisible: false,
         additionalDisplaysEnabled: true,
+        widthPercent: 85,
+        heightPercent: 110,
       }),
     ).toEqual({
       enabled: true,
       hapticsEnabled: false,
       idleVisible: false,
       additionalDisplaysEnabled: true,
+      widthPercent: 85,
+      heightPercent: 110,
     });
     expect(() => parseDynamicIslandPreference({ enabled: true })).toThrowError(
       "Dynamic Island preference is required.",
     );
+    expect(() =>
+      parseDynamicIslandPreference({
+        enabled: true,
+        hapticsEnabled: true,
+        idleVisible: true,
+        additionalDisplaysEnabled: true,
+        widthPercent: 20,
+        heightPercent: 100,
+      }),
+    ).toThrowError("Dynamic Island preference is required.");
+    expect(() =>
+      parseDynamicIslandPreference({
+        enabled: true,
+        hapticsEnabled: true,
+        idleVisible: true,
+        additionalDisplaysEnabled: true,
+        widthPercent: 72,
+        heightPercent: 100,
+      }),
+    ).toThrowError("Dynamic Island preference is required.");
     expect(parseDynamicIslandInteractive({ interactive: false })).toEqual({ interactive: false });
     expect(parseDynamicIslandPresentation(presentation)).toEqual(presentation);
     const takeoverPresentation = {
@@ -968,14 +993,31 @@ describe("custom provider input parsing", () => {
 it("validates the server mute request", () => {
   expect(parseSetServerMuted({ serverId: "local", muted: true })).toEqual({ serverId: "local", muted: true });
   expect(parseSetServerMuted({ serverId: "remote", muted: false })).toEqual({ serverId: "remote", muted: false });
+  expect(parseSetServerMuted({ serverId: "remote", muted: true, durationMs: 3_600_000 })).toEqual({
+    serverId: "remote",
+    muted: true,
+    durationMs: 3_600_000,
+  });
   for (const input of [
     null,
     {},
     { serverId: "local", muted: "true" },
     { serverId: "", muted: true },
     { serverId: 1, muted: true },
+    { serverId: "local", muted: true, durationMs: 1000 },
+    { serverId: "local", muted: false, durationMs: 3_600_000 },
   ]) {
     expect(() => parseSetServerMuted(input)).toThrow();
+  }
+});
+
+it("validates the server notification level request", () => {
+  expect(parseSetServerNotificationLevel({ serverId: "local", level: "needs-me" })).toEqual({
+    serverId: "local",
+    level: "needs-me",
+  });
+  for (const input of [null, { serverId: "local" }, { serverId: "local", level: "mentions" }, { level: "all" }]) {
+    expect(() => parseSetServerNotificationLevel(input)).toThrow();
   }
 });
 

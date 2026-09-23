@@ -7,7 +7,7 @@
  */
 
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import type { MarketplacePluginApp, MarketplacePluginDetail } from "./marketplace-plugins";
+import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
 /**
  * The configuration an app installs as. The catalog states the name and how the server is reached -

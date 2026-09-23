@@ -1,7 +1,7 @@
 import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
+import type { AgentProfile } from "@openbot/ui/data";
 import { describe, expect, it } from "vitest";
-import type { AgentProfile } from "../../data";
 import { mergeChannelPage } from "./channel-page-merge";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 

@@ -1,9 +1,10 @@
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
-import { toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import { useNavigation } from "../../navigation";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
@@ -15,7 +16,6 @@ import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { createAgentInitialMessage } from "./agent-initial-message";
 import { useAgents } from "./agents-context";
-import type { FirstAgentDraft } from "./FirstAgentSetup";
 
 /**
  * Creating, editing, duplicating and deleting an agent.

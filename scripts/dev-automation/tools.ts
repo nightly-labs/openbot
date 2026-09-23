@@ -232,7 +232,12 @@ export async function clickByRole(
   timeoutMs: number,
   exact = false,
 ): Promise<void> {
-  await page.getByRole(role, { name, exact }).click({ timeout: timeoutMs });
+  const control = page.getByRole(role, { name, exact });
+  if (role === "switch") {
+    await control.press("Space", { timeout: timeoutMs });
+    return;
+  }
+  await control.click({ timeout: timeoutMs });
 }
 
 export async function typeByRole(

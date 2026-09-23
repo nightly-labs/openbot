@@ -159,6 +159,11 @@ interface InternalTab {
   ownerAgentId: string | null;
   revision: number;
   queue: Promise<unknown>;
+  /**
+   * The first load of a tab restored from disk, held back until the tab is shown or used. Each loaded
+   * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.
+   */
+  pendingRestore?: () => Promise<void>;
   focusOnVisible: boolean;
   environment: BrowserEnvironment;
   engine: BrowserCdpEngine;
@@ -278,13 +283,22 @@ export class BrowserHost {
       await tab.engine.navigate(tab.requestedUrl);
       tab.contents.navigationHistory.clear();
     };
+    for (const tab of tabs) tab.pendingRestore = () => restoreTab(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    const activeReady = activeTab ? restoreTab(activeTab).catch(() => undefined) : Promise.resolve();
-    if (activeTab) activeTab.queue = activeReady;
+    if (activeTab) this.#wake(activeTab);
+    // A view that never navigated is a debugger target that never answers, which stops a CDP client
+    // from attaching to the app. A blank page answers, and costs far less than the saved page.
     for (const tab of tabs) {
-      if (tab === activeTab) continue;
-      tab.queue = activeReady.then(() => restoreTab(tab)).catch(() => undefined);
+      if (tab.pendingRestore) void tab.contents.loadURL("about:blank").catch(() => undefined);
     }
+  }
+
+  /** Starts the held-back first load of a restored tab, once, ahead of anything else queued on it. */
+  #wake(tab: InternalTab): void {
+    const pending = tab.pendingRestore;
+    if (!pending) return;
+    tab.pendingRestore = undefined;
+    tab.queue = tab.queue.then(pending).catch(() => undefined);
   }
 
   onChanged(listener: (...args: BrowserHostEvents["changed"]) => void): () => void {
@@ -1934,6 +1948,7 @@ export class BrowserHost {
 
   #syncAttachedView(): void {
     const tab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : null;
+    if (tab) this.#wake(tab);
     const targetWindow = this.#target === "picture-in-picture" ? this.#pictureInPictureWindow : this.#window;
     if (
       !this.#visible ||
@@ -2025,6 +2040,7 @@ export class BrowserHost {
   #requireTab(tabId: string): InternalTab {
     const tab = this.#tabs.get(tabId);
     if (!tab) throw new Error(`Unknown browser tab: ${tabId}`);
+    this.#wake(tab);
     return tab;
   }
 
@@ -2404,7 +2420,7 @@ function toPublicTab(tab: InternalTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    title: tab.secret ? "Secure authentication" : tab.contents.getTitle() || "New tab",
+    title: tab.secret ? "Secure authentication" : restoredTabTitle(tab) || tab.contents.getTitle() || "New tab",
     url: tab.secret?.origin ?? currentTabUrl(tab),
     loading: tab.contents.isLoading(),
     ownerThreadId: tab.ownerThreadId,
@@ -2426,6 +2442,16 @@ function approximateSite(origin: string): string {
   const hostname = new URL(origin).hostname;
   if (isIP(hostname.replace(/^\[|\]$/gu, "")) !== 0) return hostname;
   return hostname.split(".").slice(-2).join(".");
+}
+
+/** A restored tab that has not loaded yet shows a blank page; its host name stands in for its title. */
+function restoredTabTitle(tab: InternalTab): string | null {
+  if (!tab.pendingRestore) return null;
+  try {
+    return new URL(tab.requestedUrl).hostname || null;
+  } catch {
+    return null;
+  }
 }
 
 function currentTabUrl(tab: InternalTab): string {

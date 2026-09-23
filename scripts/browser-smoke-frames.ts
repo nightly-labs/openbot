@@ -6,8 +6,11 @@ import type { WebContents } from "electron";
  * opened or resized can have none yet: Chromium then drops the click with no pointer event at all.
  * A capture is read from that presented frame, so a capture the size of the page's viewport is the
  * state to wait for.
+ *
+ * The first view shown after startup is slow: in 30 CI runs it took 3 to 5 seconds, and once 19. Other
+ * tabs took less than 1.5 seconds. The limit matches `waitForMouseInput`, which waits for the same state.
  */
-export async function waitForPresentedFrame(contents: WebContents, timeoutMs = 10_000): Promise<void> {
+export async function waitForPresentedFrame(contents: WebContents, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let last = "no capture";
   while (Date.now() < deadline) {

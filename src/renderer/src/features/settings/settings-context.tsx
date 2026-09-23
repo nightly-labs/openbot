@@ -1,12 +1,12 @@
 import { type ApprovalAutomationPreference, agentAutoApprovalEnabled } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { toast } from "../../components/ui";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
-import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "./app-settings";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
@@ -53,6 +53,7 @@ const Settings = createSimpleContext({
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
     let autoDownloadUpdatesChanged = false;
+    let desktopNotificationsChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
 
@@ -90,6 +91,8 @@ const Settings = createSimpleContext({
         });
       },
     );
+
+    let dynamicIslandSaveCount = 0;
 
     function updateGeneralSettings(value: GeneralSettingsValue): void {
       const previous = generalSettings();
@@ -141,37 +144,61 @@ const Settings = createSimpleContext({
             setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: previous.autoDownloadUpdates })),
           );
       }
+      if (previous.desktopNotifications !== value.desktopNotifications) {
+        desktopNotificationsChanged = true;
+        void window.openbot.notifications
+          .setPreference({ desktopNotifications: value.desktopNotifications })
+          .then((preference) =>
+            setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications })),
+          )
+          .catch(() =>
+            setGeneralSettings((current) => ({ ...current, desktopNotifications: previous.desktopNotifications })),
+          );
+      }
       if (
         previous.macBookNotch !== value.macBookNotch ||
         previous.macBookNotchHaptics !== value.macBookNotchHaptics ||
         previous.macBookNotchIdle !== value.macBookNotchIdle ||
-        previous.macBookNotchAdditionalDisplays !== value.macBookNotchAdditionalDisplays
+        previous.macBookNotchAdditionalDisplays !== value.macBookNotchAdditionalDisplays ||
+        previous.macBookNotchWidthPercent !== value.macBookNotchWidthPercent ||
+        previous.macBookNotchHeightPercent !== value.macBookNotchHeightPercent
       ) {
+        // A slider drag sends one save per step. Only the reply to the newest save may change the
+        // form, or an older reply would move the slider back while the user drags.
+        const save = ++dynamicIslandSaveCount;
         void window.openbot.dynamicIsland
           .setPreference({
             enabled: value.macBookNotch,
             hapticsEnabled: value.macBookNotchHaptics,
             idleVisible: value.macBookNotchIdle,
             additionalDisplaysEnabled: value.macBookNotchAdditionalDisplays,
+            widthPercent: value.macBookNotchWidthPercent,
+            heightPercent: value.macBookNotchHeightPercent,
           })
-          .then((preference) =>
+          .then((preference) => {
+            if (save !== dynamicIslandSaveCount) return;
             setGeneralSettings((current) => ({
               ...current,
               macBookNotch: preference.enabled,
               macBookNotchHaptics: preference.hapticsEnabled,
               macBookNotchIdle: preference.idleVisible,
               macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
-            })),
-          )
-          .catch(() =>
+              macBookNotchWidthPercent: preference.widthPercent,
+              macBookNotchHeightPercent: preference.heightPercent,
+            }));
+          })
+          .catch(() => {
+            if (save !== dynamicIslandSaveCount) return;
             setGeneralSettings((current) => ({
               ...current,
               macBookNotch: previous.macBookNotch,
               macBookNotchHaptics: previous.macBookNotchHaptics,
               macBookNotchIdle: previous.macBookNotchIdle,
               macBookNotchAdditionalDisplays: previous.macBookNotchAdditionalDisplays,
-            })),
-          );
+              macBookNotchWidthPercent: previous.macBookNotchWidthPercent,
+              macBookNotchHeightPercent: previous.macBookNotchHeightPercent,
+            }));
+          });
       }
     }
 
@@ -247,6 +274,13 @@ const Settings = createSimpleContext({
           setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: preference.autoDownload }));
         })
         .catch(() => undefined);
+      void window.openbot.notifications
+        .getPreference()
+        .then((preference) => {
+          if (desktopNotificationsChanged) return;
+          setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications }));
+        })
+        .catch(() => undefined);
       void window.openbot.dynamicIsland
         .getPreference()
         .then((preference) =>
@@ -256,16 +290,23 @@ const Settings = createSimpleContext({
             macBookNotchHaptics: preference.hapticsEnabled,
             macBookNotchIdle: preference.idleVisible,
             macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
+            macBookNotchWidthPercent: preference.widthPercent,
+            macBookNotchHeightPercent: preference.heightPercent,
           })),
         )
         .catch(() => undefined);
     });
+
+    const sendTestNotification = () => window.openbot.notifications.test();
+    const openNotificationSettings = () => window.openbot.notifications.openSettings();
 
     return {
       analyticsPreferenceLoaded,
       generalSettings,
       turboModePending,
       updateGeneralSettings,
+      sendTestNotification,
+      openNotificationSettings,
       setAgentAutoApprove,
       agentAutoApproves,
       appSettingsOpen,

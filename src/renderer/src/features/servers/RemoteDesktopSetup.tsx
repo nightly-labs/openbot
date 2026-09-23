@@ -8,7 +8,6 @@ import {
   type RemoteDesktopTestStatus,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
-import { createStore, For, onSettled, Show } from "solid-js";
 import {
   Alert,
   AlertContent,
@@ -22,9 +21,10 @@ import {
   ItemGroup,
   ItemTitle,
   Text,
-} from "../../components/ui";
-import { errorMessage } from "../../error-message";
-import { RemoteDesktopWorkspace } from "../remote-desktop/RemoteDesktopWorkspace";
+} from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import { RemoteDesktopWorkspace } from "@openbot/ui/features/remote-desktop/RemoteDesktopWorkspace";
+import { createStore, For, onSettled, Show } from "solid-js";
 import { serverSupportsCapability } from "./server-capabilities";
 
 const CHECKS = [

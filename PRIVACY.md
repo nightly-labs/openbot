@@ -5,6 +5,20 @@ browser data, and team data stay on the computer that runs OpenBot. The optional
 service stores the minimum central data needed for email sign-in, account avatars, remote host
 configuration, memberships, invitations, and logical sessions.
 
+The optional browser client at `/app` connects to the computer that runs OpenBot. Conversation
+and attachment data travel through the existing encrypted host connection, not through the
+account Worker. The browser keeps chat pages, drafts, search results, and file previews in memory;
+it does not create a persistent offline chat cache. Files that the user downloads are saved by
+their browser. The host must stay online.
+
+Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSite=Lax` cookie.
+Browser JavaScript cannot read the account credential. Trusted host public keys are stored in
+local storage separately for each account. The shared file preview can also store its panel width.
+Signing out revokes that credential's remote sessions and tells other open tabs to clear private
+state. Host identity pins remain so a later sign-in cannot silently trust a replacement host key.
+The web client adds no chat or account analytics events. It does not send email codes, credentials,
+message content, file content, or search queries to telemetry.
+
 Production builds of OpenBot desktop, the configured mobile app, and the website use a self-hosted OpenPanel service for product
 analytics. Development builds, previews, tests, and Storybook do not send analytics.
 

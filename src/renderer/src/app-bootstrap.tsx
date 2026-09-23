@@ -1,5 +1,5 @@
+import { toast } from "@openbot/ui";
 import { createEffect, flush, onSettled } from "solid-js";
-import { toast } from "./components/ui";
 import { useAuth } from "./features/account/account-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { takeMcpConfigDoorNotice } from "./features/servers/mcp-servers";

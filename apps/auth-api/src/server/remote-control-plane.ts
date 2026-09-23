@@ -797,12 +797,20 @@ export class RemoteControlPlane {
     return { sessionId: active.session_id, hostId, expiresAt: active.expires_at };
   }
 
-  async endSession(userId: string, sessionId: string): Promise<void> {
+  async endSession(userId: string, sessionId: string, authSessionHash?: string): Promise<void> {
     const session = await this.#database
-      .prepare("SELECT host_id, user_id FROM remote_sessions WHERE session_id = ? AND ended_at IS NULL LIMIT 1")
+      .prepare(
+        "SELECT host_id, user_id, auth_session_hash FROM remote_sessions WHERE session_id = ? AND ended_at IS NULL LIMIT 1",
+      )
       .bind(sessionId)
-      .first<{ host_id: string; user_id: string }>();
+      .first<{ host_id: string; user_id: string; auth_session_hash: string | null }>();
     if (!session) return;
+    if (authSessionHash !== undefined && (session.user_id !== userId || session.auth_session_hash !== authSessionHash))
+      throw new RemoteControlPlaneError(
+        403,
+        "session_inactive",
+        "The remote session does not belong to this browser session.",
+      );
     if (session.user_id !== userId) await this.#requireRole(session.host_id, userId, ["owner"]);
     const now = this.#now();
     const event = { type: "remote-session-ended" as const, hostId: session.host_id, sessionId };
@@ -890,7 +898,7 @@ export class RemoteControlPlane {
     );
   }
 
-  async issueSessionTicket(userId: string, sessionId: string, clientPublicKey: string) {
+  async issueSessionTicket(userId: string, sessionId: string, clientPublicKey: string, authSessionHash?: string) {
     const boundClientPublicKey = requiredText(clientPublicKey, 8_192, "client public key");
     const now = this.#now();
     const session = await this.#database
@@ -900,12 +908,12 @@ export class RemoteControlPlane {
          FROM remote_sessions s
          JOIN remote_memberships m ON m.membership_id = s.membership_id
          JOIN remote_hosts h ON h.host_id = s.host_id
-         WHERE s.session_id = ? AND s.user_id = ? AND (s.auth_session_hash IS NULL OR EXISTS(
+         WHERE s.session_id = ? AND s.user_id = ? AND (? IS NULL OR s.auth_session_hash = ?) AND (s.auth_session_hash IS NULL OR EXISTS(
            SELECT 1 FROM auth_sessions a WHERE a.token_hash = s.auth_session_hash
              AND a.user_id = s.user_id AND a.revoked_at IS NULL AND a.expires_at > ?
          )) LIMIT 1`,
       )
-      .bind(sessionId, userId, now)
+      .bind(sessionId, userId, authSessionHash ?? null, authSessionHash ?? null, now)
       .first<RemoteSessionRow>();
     if (!session || session.ended_at || session.expires_at <= now || session.status !== "active") {
       throw new RemoteControlPlaneError(403, "session_inactive", "The remote session is not active.");

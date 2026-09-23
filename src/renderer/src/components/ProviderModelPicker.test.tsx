@@ -1,9 +1,9 @@
 import type { AgentModelOption, AgentProviderStatus, AgentStatus } from "@openbot/contracts/ipc";
+import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
 import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { STORY_MODELS } from "../preview/fixtures";
-import { ProviderModelPicker } from "./ProviderModelPicker";
 
 const agentStatus: AgentStatus = {
   phase: "ready",
@@ -187,7 +187,7 @@ describe("ProviderModelPicker", () => {
     );
 
     await fireEvent.click(within(dialog).getByRole("tab", { name: /Claude:/ }));
-    expect(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" })).toBeDisabled();
+    expect(within(dialog).getByRole("option", { name: "Claude Opus 5.5, default" })).toBeDisabled();
     expect(onChange).not.toHaveBeenCalled();
   });
 

@@ -5,12 +5,13 @@ import type {
   AvatarImageInput,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import type { AgentProfile } from "@openbot/ui/data";
+import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_STATUS } from "../../app-defaults";
 import { agentProfilesEqual, toAgentProfile } from "../../app-message-projection";
 import { createStoredProfile, updateStored } from "../../app-stored-values";
-import type { AgentProfile } from "../../data";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useUiErrors } from "../../ui-errors";
@@ -18,7 +19,6 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { readAgentSelection, writeAgentSelection } from "./agent-selection";
-import { createFirstAgentDraft, type FirstAgentDraft } from "./FirstAgentSetup";
 
 /**
  * The agents on the active server: the roster, which one is open, the provider

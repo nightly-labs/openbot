@@ -1,7 +1,7 @@
 import type { RemoteDesktopConnectResult, RemoteDesktopErrorCode, RemoteDesktopSession } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";

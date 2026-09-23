@@ -1,6 +1,6 @@
 import type { CustomProviderRestart, CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createStore } from "solid-js";
-import { errorMessage } from "../../error-message";
 import { customProviderRestartMessage } from "./custom-provider-restart";
 
 interface CustomProviderHostState {
@@ -30,9 +30,8 @@ interface CustomProviderHostOptions {
 /**
  * The dialog state both hosts of the custom provider surfaces need: Settings and onboarding.
  *
- * It is shared for the removal alone. That path carries a sentence the user must recognise in both
- * places, a busy ID and two message fallbacks, and a second copy of it would drift silently - only
- * one of the two hosts has a test that reads the confirmation word for word.
+ * It is shared for the removal alone. That path carries a busy ID and two message fallbacks, and a
+ * second copy of it would drift silently. The removal question itself is in the shared list dialog.
  *
  * Each host builds its own instance, so no submit state is shared, and the two dialogs cannot open
  * at once: a stacked pair of overlays traps focus between them.
@@ -104,14 +103,8 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
     }
   }
 
+  /** Runs after the user accepts the removal question, which `CustomProviderListDialog` asks. */
   async function remove(provider: CustomProviderSummary): Promise<void> {
-    if (
-      !window.confirm(
-        `Remove ${provider.name}? Its API key is discarded, its models disappear from the picker, and any agent using one falls back to a default model.`,
-      )
-    ) {
-      return;
-    }
     setState((current) => {
       current.removing = provider.id;
       current.note = null;

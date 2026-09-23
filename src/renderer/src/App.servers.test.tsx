@@ -1,4 +1,4 @@
-import type { AgentEvent, ServerSummary } from "@openbot/contracts/ipc";
+import type { AgentEvent, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -20,7 +20,7 @@ import {
   trackAnalytics,
 } from "./app-test-harness";
 import { useServers } from "./features/servers/servers-context";
-import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
+import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
 import { useUsage } from "./features/usage/usage-context";
 import { TestResizeObserver } from "./setupTests";
 
@@ -803,6 +803,8 @@ describe("OpenBot connected desktop shell", () => {
           name: "Studio Mac",
           logoUrl: null,
           notificationsMuted: false,
+          notificationsMutedUntil: null,
+          notificationLevel: "all",
           kind: "remote",
           state: "online",
           apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run",
@@ -1406,20 +1408,62 @@ describe("OpenBot connected desktop shell", () => {
   });
 });
 
-it("mutes and unmutes a server without changing other servers", async () => {
+it("mutes a server for a chosen time, unmutes it, and sets its notification level", async () => {
   installOpenbotStub();
   let servers = [testServer("local", true), testServer("remote-1", false)];
   vi.mocked(window.openbot.servers.list).mockResolvedValue(servers);
-  vi.mocked(window.openbot.servers.setMuted).mockImplementation(async ({ serverId, muted }) => {
-    servers = servers.map((server) => (server.id === serverId ? { ...server, notificationsMuted: muted } : server));
+  vi.mocked(window.openbot.servers.setMuted).mockImplementation(async ({ serverId, muted, durationMs }) => {
+    servers = servers.map((server) =>
+      server.id === serverId
+        ? { ...server, notificationsMuted: muted, notificationsMutedUntil: durationMs ? Date.now() + durationMs : null }
+        : server,
+    );
+    return servers;
+  });
+  vi.mocked(window.openbot.servers.setNotificationLevel).mockImplementation(async ({ serverId, level }) => {
+    servers = servers.map((server) => (server.id === serverId ? { ...server, notificationLevel: level } : server));
     return servers;
   });
   render(() => <App />);
   await fireEvent.contextMenu(await screen.findByRole("button", { name: "Studio Mac server" }));
-  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Mute notifications" }), { button: 0 });
+  await fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Mute server" }), { key: "ArrowRight" });
+  const muteMenu = await screen.findByRole("menu", { name: "Mute server" });
+  await fireEvent.pointerUp(within(muteMenu).getByRole("menuitem", { name: "For 1 hour" }), { button: 0 });
+  expect(window.openbot.servers.setMuted).toHaveBeenCalledWith({
+    serverId: "remote-1",
+    muted: true,
+    durationMs: 3_600_000,
+  });
   const muted = await screen.findByRole("button", { name: "Studio Mac server, notifications muted" });
   expect(screen.getByRole("button", { name: "Local server" })).toBeVisible();
   await fireEvent.contextMenu(muted);
-  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Unmute notifications" }), { button: 0 });
-  expect(await screen.findByRole("button", { name: "Studio Mac server" })).toBeVisible();
+  await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: /Unmute server/ }), { button: 0 });
+  await fireEvent.contextMenu(await screen.findByRole("button", { name: "Studio Mac server" }));
+  await fireEvent.keyDown(await screen.findByRole("menuitem", { name: /Notification settings/ }), {
+    key: "ArrowRight",
+  });
+  const levelMenu = await screen.findByRole("menu", { name: /Notification settings/ });
+  await fireEvent.pointerUp(within(levelMenu).getByRole("menuitemradio", { name: "Only when it needs me" }), {
+    button: 0,
+  });
+  expect(window.openbot.servers.setNotificationLevel).toHaveBeenCalledWith({ serverId: "remote-1", level: "needs-me" });
+});
+
+it("opens the agent from a clicked notification, switching to its server first", async () => {
+  installOpenbotStub();
+  vi.mocked(window.openbot.servers.list).mockResolvedValue([testServer("local", true), testServer("remote-1", false)]);
+  vi.mocked(window.openbot.servers.select).mockImplementation(async (serverId) => [
+    testServer("local", serverId === "local"),
+    testServer("remote-1", serverId === "remote-1"),
+  ]);
+  let openNotification: ((event: NotificationOpenedEvent) => void) | undefined;
+  vi.mocked(window.openbot.notifications.onOpened).mockImplementation((listener) => {
+    openNotification = listener;
+    return () => undefined;
+  });
+  render(() => <App />);
+  await screen.findByRole("heading", { name: "Chief" });
+  openNotification?.({ serverId: "remote-1", agentId: "sales-outbound", threadId: null });
+  await waitFor(() => expect(window.openbot.servers.select).toHaveBeenCalledWith("remote-1"));
+  expect(await screen.findByRole("heading", { name: "Sales Outbound" })).toBeVisible();
 });

@@ -1,6 +1,6 @@
+import { Toaster } from "@openbot/ui";
 import { AppAccessGate } from "./AppView";
 import { type AppProps, AppProviders } from "./app-providers";
-import { Toaster } from "./components/ui";
 
 export function App(props: AppProps = {}) {
   return (

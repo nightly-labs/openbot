@@ -3,21 +3,20 @@ import type {
   AvatarImageInput,
   HostStatus,
   InviteSummary,
+  ServerNotificationLevel,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
   TeamRole,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
-import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
-import { normalizeAvatarFile } from "../../avatar-image";
 import {
   Alert,
   AlertActions,
   AlertContent,
   AlertDescription,
-  AlertDialog,
   AlertIcon,
   AlertTitle,
   Badge,
@@ -27,6 +26,7 @@ import {
   Card,
   Check,
   ChevronRight,
+  ConfirmDialog,
   CopyButton,
   DropdownMenu,
   Ellipsis,
@@ -62,11 +62,14 @@ import {
   toast,
   UserRound,
   UsersRound,
-} from "../../components/ui";
-import { truncateMiddle } from "../../components/ui/utils";
-import { errorMessage } from "../../error-message";
-import { SaveBarDock, SettingsDialogShell } from "../settings/SettingsDialogShell";
-import { teamMemberName } from "../team/TeamPersonAvatar";
+} from "@openbot/ui";
+import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
+import { errorMessage } from "@openbot/ui/error-message";
+import { SERVER_NOTIFICATION_LEVEL_LABELS, serverMuteDescription } from "@openbot/ui/features/servers/ServerRail";
+import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
+import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
+import { truncateMiddle } from "@openbot/ui/utils";
+import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
@@ -87,6 +90,7 @@ export interface ServerSettingsModalProps {
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
   onSetPublished: (published: boolean) => Promise<void>;
   onSetMuted: (muted: boolean) => Promise<void>;
+  onSetNotificationLevel: (level: ServerNotificationLevel) => Promise<void>;
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
@@ -224,7 +228,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const [toastHeight, setToastHeight] = createSignal(0);
   let logoInput: HTMLInputElement | undefined;
   let nameInput: HTMLInputElement | undefined;
-  let removeMemberTrigger: HTMLElement | undefined;
   let inviteLinkInput: HTMLInputElement | undefined;
   let syncedServerId = "";
   let expiryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -793,69 +796,33 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         </Show>
       </SettingsDialogShell>
 
-      <AlertDialog.Root
-        open={Boolean(removeMember())}
-        onOpenChange={(open) => {
-          if (!open && busy() !== `remove:${panels.members.removeId}`)
-            setPanels((state) => {
-              state.members.removeId = null;
-            });
-        }}
-      >
-        <Show when={removeMember()}>
-          {(member) => (
-            <AlertDialog.Portal>
-              <AlertDialog.Overlay class="server-settings-confirm-backdrop">
-                <AlertDialog.Content
-                  class="server-settings-confirm-dialog"
-                  onCloseAutoFocus={(event) => {
-                    event.preventDefault();
-                    queueMicrotask(() => removeMemberTrigger?.focus({ preventScroll: true }));
-                  }}
-                >
-                  <span class="server-settings-confirm-icon" aria-hidden="true">
-                    <Trash2 />
-                  </span>
-                  <AlertDialog.Title>Remove {teamMemberName(member())}?</AlertDialog.Title>
-                  <AlertDialog.Description>
-                    This person will lose access to the server and its shared conversations.
-                  </AlertDialog.Description>
-                  <div class="server-settings-confirm-actions">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy() === `remove:${member().id}`}
-                      onClick={() =>
-                        setPanels((state) => {
-                          state.members.removeId = null;
-                        })
-                      }
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      loading={busy() === `remove:${member().id}`}
-                      loadingLabel="Removing…"
-                      onClick={() =>
-                        void run(`remove:${member().id}`, async () => {
-                          await props.onRemoveMember(member().id);
-                          setPanels((state) => {
-                            state.members.removeId = null;
-                          });
-                        })
-                      }
-                    >
-                      Remove member
-                    </Button>
-                  </div>
-                </AlertDialog.Content>
-              </AlertDialog.Overlay>
-            </AlertDialog.Portal>
-          )}
-        </Show>
-      </AlertDialog.Root>
+      {/* The dialog unmounts with its target, so its title never shows an empty name while it closes. */}
+      <Show when={removeMember()}>
+        {(member) => (
+          <ConfirmDialog
+            open
+            initialFocus="cancel"
+            pending={busy() === `remove:${member().id}`}
+            title={`Remove ${teamMemberName(member())}?`}
+            description="This person will lose access to the server and its shared conversations."
+            confirmLabel="Remove member"
+            pendingLabel="Removing…"
+            onCancel={() =>
+              setPanels((state) => {
+                state.members.removeId = null;
+              })
+            }
+            onConfirm={async () => {
+              await run(`remove:${member().id}`, async () => {
+                await props.onRemoveMember(member().id);
+                setPanels((state) => {
+                  state.members.removeId = null;
+                });
+              });
+            }}
+          />
+        )}
+      </Show>
     </Tabs.Root>
   );
 
@@ -1072,8 +1039,39 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               disabled={Boolean(busy())}
               onChange={(value) => void run("mute", () => props.onSetMuted(value))}
               label="Mute notifications"
-              description="Stop desktop notifications and MacBook notch updates from this server."
+              description={
+                props.server.notificationsMutedUntil === null
+                  ? "Stop desktop notifications and MacBook notch updates from this server."
+                  : `${serverMuteDescription(props.server)}. Turn off to unmute now.`
+              }
             />
+            <Item>
+              <ItemContent>
+                <ItemTitle id="server-settings-notification-level-label">Notify me about</ItemTitle>
+                <ItemDescription>Which agent events show a desktop notification.</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Select<ServerNotificationLevel>
+                  options={[...SERVER_NOTIFICATION_LEVELS]}
+                  value={props.server.notificationLevel}
+                  disabled={Boolean(busy())}
+                  placement="bottom-end"
+                  onChange={(level) => {
+                    if (level) void run("notification-level", () => props.onSetNotificationLevel(level));
+                  }}
+                  itemComponent={(item) => (
+                    <SelectItem item={item.item}>{SERVER_NOTIFICATION_LEVEL_LABELS[item.item.rawValue]}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger size="sm" aria-labelledby="server-settings-notification-level-label">
+                    <SelectValue<ServerNotificationLevel>>
+                      {(state) => SERVER_NOTIFICATION_LEVEL_LABELS[state.selectedOption()]}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+              </ItemActions>
+            </Item>
           </ItemGroup>
         </SettingsSection>
       </>
@@ -1380,7 +1378,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   void run(`member:${member.id}`, () => props.onUpdateMember({ memberId: member.id, role }))
                 }
                 onRemove={(trigger) => {
-                  removeMemberTrigger = trigger;
+                  // The confirmation returns focus to the element focused when it opens.
+                  trigger.focus({ preventScroll: true });
                   setPanels((state) => {
                     state.members.removeId = member.id;
                   });

@@ -16,6 +16,13 @@ export interface RemoteFileUpload {
 export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Promise<void>, createId: () => string) {
   const pending = new Map<string, { opened: () => void; reject: (error: Error) => void; error: Error | null }>();
   return {
+    async cancelUpload() {
+      for (const [transferId, transfer] of pending) {
+        transfer.error = new Error("The attachment upload was cancelled.");
+        transfer.reject(transfer.error);
+        await send(encodeTeamProtocolV2Frame({ version: 2, type: "file-cancel", transferId, reason: "Cancelled" }));
+      }
+    },
     receive(data: string) {
       const frame = decodeTeamProtocolV2FileControlFrame(data);
       const transfer = pending.get(frame.transferId);

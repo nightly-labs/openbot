@@ -11,18 +11,19 @@ import {
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import { ArrowUp, Button, Plus, toast } from "@openbot/ui";
+import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import { freeModelsReady, type ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { errorMessage } from "@openbot/ui/error-message";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
+import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
+import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
-import { freeModelsReady, ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
+import { ProviderPicker } from "../../components/ProviderPicker";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
-import { ArrowUp, Button, Plus, toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
-import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
-import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
-import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
-import { OpenCodeKeyDialog, type ProviderKeyApi } from "../settings/OpenCodeKeyDialog";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
 export interface OnboardingFlowProps {

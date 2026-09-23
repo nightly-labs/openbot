@@ -1,9 +1,4 @@
 import type { AttachmentSummary, MessageReaction } from "@openbot/contracts/ipc";
-import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, Show } from "solid-js";
-import { expect, fn, waitFor, within } from "storybook/test";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { toAgentMessage } from "../src/app-message-projection";
 import {
   Bubble,
   BubbleContent,
@@ -19,10 +14,15 @@ import {
   MessageGroup,
   MessageHeader,
   Text,
-} from "../src/components/ui";
-import type { AgentMessage } from "../src/data";
-import { ChoiceCard } from "../src/features/conversation/ConversationPrompts";
-import { MessageActions, MessageBody } from "../src/features/conversation/MessageRendering";
+} from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
+import { ChoiceCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { MessageActions, MessageBody } from "@openbot/ui/features/conversation/MessageRendering";
+import type { JSX } from "@solidjs/web";
+import { createMemo, createSignal, Show } from "solid-js";
+import { expect, fn, waitFor, within } from "storybook/test";
+import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { toAgentMessage } from "../src/app-message-projection";
 import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
 
 const previewImage = new URL("../src/assets/openbot-logo-production.png", import.meta.url).href;

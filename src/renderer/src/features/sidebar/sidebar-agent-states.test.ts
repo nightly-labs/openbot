@@ -1,6 +1,9 @@
 import type { QueueDelivery, QueueDeliveryStatus, QueueSnapshot } from "@openbot/contracts/ipc";
-import { computeSidebarAgentStates, type SidebarAgentStatesInput } from "./sidebar-agent-states";
-import { sidebarAgentStateLabel } from "./sidebar-filtering";
+import {
+  computeSidebarAgentStates,
+  type SidebarAgentStatesInput,
+} from "@openbot/ui/features/sidebar/sidebar-agent-states";
+import { sidebarAgentStateLabel } from "@openbot/ui/features/sidebar/sidebar-filtering";
 
 function queue(agentId: string, ...statuses: QueueDeliveryStatus[]): QueueSnapshot {
   const deliveries: QueueDelivery[] = statuses.map((status, index) => ({

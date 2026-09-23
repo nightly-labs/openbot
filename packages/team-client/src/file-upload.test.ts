@@ -3,13 +3,31 @@ import {
   decodeTeamProtocolV2FileControlFrame,
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createRemoteFileSender } from "./file-upload";
 
 const transferId = "b6396068-3405-4e51-9b42-d97bfd1e2f33";
 const input = { name: "note.txt", mimeType: "text/plain", base64: btoa("hello") };
 
 describe("mobile file upload", () => {
+  it("cancels an upload before acknowledgement and lets the next upload finish", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const sender = createRemoteFileSender(send, () => transferId);
+    const uploading = sender.upload(input);
+    const rejected = expect(uploading).rejects.toThrow("cancelled");
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+    await sender.cancelUpload();
+    await rejected;
+    expect(decodeTeamProtocolV2FileControlFrame(send.mock.calls[1][0])).toMatchObject({
+      type: "file-cancel",
+      transferId,
+    });
+    send.mockImplementation(async (data) => {
+      if (typeof data === "string" && decodeTeamProtocolV2FileControlFrame(data).type === "file-open")
+        sender.receive(encodeTeamProtocolV2Frame({ version: 2, type: "file-ack", transferId, receivedThrough: 0 }));
+    });
+    await expect(sender.upload(input)).resolves.toBe(transferId);
+  });
   it("sends the existing file protocol with the exact bytes and digest before completing", async () => {
     const received: Array<string | ArrayBuffer> = [];
     const sender = createRemoteFileSender(

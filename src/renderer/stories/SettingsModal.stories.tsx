@@ -8,12 +8,12 @@ import type {
   ProviderRuntimeSnapshot,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { Button, Heading, Text, Toaster, toast } from "@openbot/ui";
+import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
-import { DEFAULT_GENERAL_SETTINGS } from "../src/features/settings/app-settings";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import { createFakeCodeLogin } from "./code-login-fixture";
 import { createMockOpenBot } from "./mock-openbot";
@@ -376,19 +376,17 @@ export const CustomProviderList: Story = {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Manage 2 endpoints" }));
     await expect(body.findByRole("button", { name: "Delete Studio Local" })).resolves.toBeTruthy();
-    // The removal asks first. Storybook has no dialog to answer, so the answer is given here.
-    const previousConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      await userEvent.click(body.getByRole("button", { name: "Delete House Router" }));
-      await waitFor(() => expect(body.queryByRole("button", { name: "Delete House Router" })).toBeNull());
-      await expect(body.getByRole("button", { name: "Delete Studio Local" })).toBeVisible();
-      // The last endpoint leaves the dialog on its empty state rather than closing under the hand.
-      await userEvent.click(body.getByRole("button", { name: "Delete Studio Local" }));
-      await expect(body.findByText("No custom endpoints yet.")).resolves.toBeTruthy();
-    } finally {
-      window.confirm = previousConfirm;
-    }
+    // The removal asks first, in a confirmation dialog above the list.
+    await userEvent.click(body.getByRole("button", { name: "Delete House Router" }));
+    const first = await body.findByRole("alertdialog", { name: "Remove House Router?" });
+    await userEvent.click(within(first).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(body.queryByRole("button", { name: "Delete House Router" })).toBeNull());
+    await expect(body.getByRole("button", { name: "Delete Studio Local" })).toBeVisible();
+    // The last endpoint leaves the dialog on its empty state rather than closing under the hand.
+    await userEvent.click(body.getByRole("button", { name: "Delete Studio Local" }));
+    const last = await body.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    await userEvent.click(within(last).getByRole("button", { name: "Remove" }));
+    await expect(body.findByText("No custom endpoints yet.")).resolves.toBeTruthy();
   },
 };
 
@@ -465,6 +463,15 @@ export const Profile: Story = {
   play: async ({ userEvent }) => {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("tab", { name: "Profile" }));
+  },
+};
+
+export const DynamicIsland: Story = {
+  render: () => <SettingsModalStory initialOpen />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Dynamic Island" }));
+    await expect(body.findByRole("slider", { name: "Width" })).resolves.toBeEnabled();
   },
 };
 

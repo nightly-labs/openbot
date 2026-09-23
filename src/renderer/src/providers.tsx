@@ -1,9 +1,9 @@
 import { type AgentProviderId, type AgentStatus, agentProviderDescriptor } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
-import type { ProviderCodeLoginState } from "./components/ProviderCodeLoginDialog";
 import type { ProviderCodeLoginApi } from "./components/provider-code-login-api";
-import { toast } from "./components/ui";
 import { useAgents } from "./features/agents/agents-context";
 import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
 import { useServers } from "./features/servers/servers-context";

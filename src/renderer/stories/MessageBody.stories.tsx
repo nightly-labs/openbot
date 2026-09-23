@@ -1,8 +1,8 @@
+import { Bubble, BubbleContent, type BubbleVariant } from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
+import { MessageBody } from "@openbot/ui/features/conversation/MessageRendering";
 import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Bubble, BubbleContent, type BubbleVariant } from "../src/components/ui";
-import type { AgentMessage } from "../src/data";
-import { MessageBody } from "../src/features/conversation/MessageRendering";
 import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
 
 const message: AgentMessage = {

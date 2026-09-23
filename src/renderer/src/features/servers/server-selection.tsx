@@ -1,4 +1,5 @@
-import type { AgentProviderId, AgentSummary, ServerSummary } from "@openbot/contracts/ipc";
+import type { AgentProviderId, AgentSummary, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
+import { onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
 import { useAgents } from "../agents/agents-context";
@@ -117,6 +118,19 @@ const ServerSelection = createSimpleContext({
       setPendingAgentSelection(agent.id);
       setSkillsMarketplaceOpen(false);
     }
+
+    async function openNotifiedAgent(event: NotificationOpenedEvent): Promise<void> {
+      const onServer = servers().find((server) => server.active)?.id === event.serverId;
+      if (!onServer && !(await selectServer(event.serverId, false))) return;
+      // Published for the same reason as the marketplace agent above.
+      setPendingAgentSelection(event.agentId);
+    }
+
+    onSettled(() =>
+      window.openbot.notifications.onOpened((event) => {
+        void openNotifiedAgent(event).catch(() => undefined);
+      }),
+    );
 
     async function joinServer(input: { inviteUrl: string }): Promise<void> {
       const analytics = desktopAnalytics.scope();

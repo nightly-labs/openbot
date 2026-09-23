@@ -1,4 +1,5 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
+import { StaticAccountDock } from "@openbot/ui/features/account/StaticAccountDock";
 import { createEffect, createMemo, Loading } from "solid-js";
 import { useLayout } from "../../layout";
 import { AccountDock } from "../../lazy-views";
@@ -9,7 +10,6 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useUpdates } from "../updates/updates-context";
 import { useAuth } from "./account-context";
-import { StaticAccountDock } from "./StaticAccountDock";
 
 /**
  * The signed-in account, its usage and the update state, at the bottom of the

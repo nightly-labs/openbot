@@ -5,10 +5,11 @@ import {
 } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
+import type { AgentMessage } from "@openbot/ui/data";
+import { errorMessage } from "@openbot/ui/error-message";
 import { desktopAnalytics } from "../../../analytics";
-import type { AgentMessage } from "../../../data";
-import { errorMessage } from "../../../error-message";
 import type { StoredQueueEdit } from "../composer-draft";
+import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 
 export interface MessageActionsDeps {
@@ -44,7 +45,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
     deps.setOpenReactionMessageId(null);
     deps.setExpandedEmojiMessageId(null);
     try {
-      await window.openbot.agent.setMessageReaction({
+      await conversationRuntime(deps.props).agent.setMessageReaction({
         agentId,
         messageId: message.id,
         emoji,
@@ -117,7 +118,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
       attachments: deps.currentDraft().attachments.filter((attachment) => attachment.id !== id),
       text: removeAttachmentReferences(deps.currentDraft().text, id),
     });
-    void window.openbot.agent.discardDraftAttachment(id, serverId);
+    void conversationRuntime(deps.props).agent.discardDraftAttachment(id, serverId);
   }
 
   function draftAttachmentIds(): Set<string> {

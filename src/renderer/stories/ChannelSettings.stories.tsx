@@ -1,6 +1,4 @@
-import { onCleanup } from "solid-js";
-import { expect, fn } from "storybook/test";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { Button, buttonVariants, Input, ItemActions, ItemGroup, Plus, Textarea } from "@openbot/ui";
 import {
   SettingsField,
   SettingsLinkGroup,
@@ -8,9 +6,12 @@ import {
   SettingsPanel,
   SettingsPanelContent,
   SettingsPanelHeader,
-} from "../src/components/SettingsPanel";
-import { Button, buttonVariants, Input, ItemActions, ItemGroup, Plus, Textarea } from "../src/components/ui";
-import { ChannelMemberRow } from "../src/features/channels/ChannelMemberRow";
+} from "@openbot/ui/components/SettingsPanel";
+import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
+import { onCleanup } from "solid-js";
+import { expect, fn } from "storybook/test";
+import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { saveSettingsPanelWidth } from "../src/components/settings-panel-width";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
@@ -79,7 +80,14 @@ function ChannelPanelBody() {
 function ChannelPanelStory(props: { title: string; body: () => ReturnType<typeof ChannelPanelBody> }) {
   return (
     <main class="conversation-panel agent-memories-story-stage" style="--settings-panel-width: 296px">
-      <SettingsPanel id="channel-side-panel" label="Channel panel" width={296} maxWidth={640} onResize={fn()}>
+      <SettingsPanel
+        onResizeEnd={saveSettingsPanelWidth}
+        id="channel-side-panel"
+        label="Channel panel"
+        width={296}
+        maxWidth={640}
+        onResize={fn()}
+      >
         <SettingsPanelHeader title={props.title} onClose={fn()} closeLabel="Close channel panel" />
         {props.body()}
       </SettingsPanel>

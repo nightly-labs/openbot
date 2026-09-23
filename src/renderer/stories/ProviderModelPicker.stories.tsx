@@ -1,6 +1,6 @@
+import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ProviderModelPicker } from "../src/components/ProviderModelPicker";
 import { STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 
 const args: Parameters<typeof ProviderModelPicker>[0] = {

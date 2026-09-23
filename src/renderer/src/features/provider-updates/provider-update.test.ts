@@ -1,11 +1,11 @@
 import type { ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import { describe, expect, it } from "vitest";
 import {
   type ProviderUpdate,
   presentProviderUpdate,
   providerUpdatesToAnnounce,
   providerVersionLabel,
-} from "./provider-update";
+} from "@openbot/ui/features/provider-updates/provider-update";
+import { describe, expect, it } from "vitest";
 
 function runtime(patch: Partial<ProviderRuntimeStatus> = {}): ProviderRuntimeStatus {
   return { phase: "ready", progress: null, message: null, version: "2.1.246", ...patch };

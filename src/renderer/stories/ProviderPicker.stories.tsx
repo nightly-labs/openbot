@@ -1,6 +1,7 @@
+import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ProviderPicker, type ProviderPickerOption } from "../src/components/ProviderPicker";
+import { ProviderPicker } from "../src/components/ProviderPicker";
 
 const options: ProviderPickerOption[] = [
   {

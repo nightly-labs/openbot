@@ -3,82 +3,14 @@ import { createRoot, createSignal } from "solid-js";
 import { describe, expect, it } from "vitest";
 import { appendPluginPrompt, appendSkillCreationRequest, appendSkillExample, EMPTY_DRAFT } from "./composer-draft";
 import { composerDraftKey } from "./conversation-keys";
-import type { ComposerDraft, ConversationProps, ConversationTarget } from "./conversation-types";
+import { testConversationProps } from "./conversation-test-props";
+import type { ComposerDraft, ConversationTarget } from "./conversation-types";
 import { createComposerStore } from "./stores/composer-store";
 
 const chatA: ConversationTarget = { agentId: "agent-a", serverId: "local" };
 const chatB: ConversationTarget = { agentId: "agent-b", serverId: "local" };
 const keyA = composerDraftKey(chatA);
 const keyB = composerDraftKey(chatB);
-
-function testProps(agentId: string): ConversationProps {
-  return {
-    agentStatus: {
-      phase: "ready",
-      cliVersion: null,
-      auth: { kind: "unknown" },
-      capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
-      message: null,
-      fullAccess: true,
-    },
-    agent: {
-      id: agentId,
-      name: "Test agent",
-      title: "",
-      description: "",
-      notifications: false,
-      provider: "codex",
-      model: "gpt-5.6-luna",
-      reasoningEffort: "medium",
-      threadId: null,
-      avatarSeed: "seed",
-      avatarHue: null,
-      avatarUrl: null,
-      time: "",
-      preview: "",
-    },
-    agents: [],
-    modelOptions: [],
-    messages: [],
-    unreadCount: 0,
-    firstUnreadMessageId: null,
-    loaded: true,
-    activeTurnId: null,
-    globalOverlayOpen: false,
-    settingsRequest: null,
-    messageFocusRequest: null,
-    queue: undefined,
-    browserTabs: [],
-    activeBrowserTabId: null,
-    browserVisibilitySuspended: false,
-    browserControlState: { sessions: [] },
-    server: undefined,
-    presence: { serverId: null, members: [], updatedAt: "" },
-    currentUserEmail: "",
-    remoteDesktopSessionActive: false,
-    remoteDesktopVisible: false,
-    prompt: undefined,
-    approval: undefined,
-    browserTakeover: undefined,
-    onSelectAgent: () => {},
-    onUpdateAgent: async () => {},
-    onSetAgentAvatar: async () => {},
-    onSendMessage: async () => true,
-    onMarkRead: async () => {},
-    onTypingChange: () => {},
-    onAnswerPrompt: async () => true,
-    onRespondToApproval: async () => true,
-    onRespondToBrowserTakeover: async () => true,
-    onCancelQueuedMessage: () => {},
-    onSteerQueuedMessage: () => {},
-    onUpdateQueuedMessage: async () => true,
-    onReorderQueue: () => {},
-    onActivateBrowserTab: () => {},
-    onCloseBrowserTab: () => {},
-    onOpenRemoteDesktop: async () => {},
-    onStop: () => {},
-  };
-}
 
 function setup(
   agentId: string,
@@ -95,7 +27,7 @@ function setup(
     const [editingDeliveryId] = createSignal<string | null>(null);
     const [editingPendingSave] = createSignal<null>(null);
     const store = createComposerStore({
-      props: testProps(agentId),
+      props: testConversationProps(agentId),
       drafts,
       setDrafts,
       conversationErrors,

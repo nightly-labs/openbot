@@ -580,6 +580,15 @@ describe("RemoteControlPlane", () => {
       .run();
     const otherPhone = await controlPlane.startSession(owner.id, "host-1", "other-phone");
     expect(otherPhone.sessionId).not.toBe(session.sessionId);
+    await expect(
+      controlPlane.issueSessionTicket(owner.id, session.sessionId, "public-key", "other-phone"),
+    ).rejects.toMatchObject({ code: "session_inactive" });
+    await expect(controlPlane.endSession(owner.id, session.sessionId, "other-phone")).rejects.toMatchObject({
+      code: "session_inactive",
+    });
+    await expect(
+      controlPlane.issueSessionTicket(owner.id, session.sessionId, "public-key", "owner-auth"),
+    ).resolves.toMatchObject({ ticket: expect.any(String) });
     await controlPlane.endAccountSession(owner.id, "other-phone");
     await expect(controlPlane.issueSessionTicket(owner.id, otherPhone.sessionId, "public-key")).rejects.toMatchObject({
       code: "session_inactive",

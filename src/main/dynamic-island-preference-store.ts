@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, type DynamicIslandPreference } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  DYNAMIC_ISLAND_SIZE_LIMITS,
+  type DynamicIslandPreference,
+  isDynamicIslandSizePercent,
+} from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
 export async function readDynamicIslandPreference(path: string): Promise<DynamicIslandPreference> {
@@ -30,6 +35,15 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
       hapticsEnabled: parsed.hapticsEnabled,
       idleVisible: parsed.idleVisible,
       additionalDisplaysEnabled: parsed.additionalDisplaysEnabled,
+      // The size is optional so that 0.18.0 and earlier, which refuse any version but 3, still read
+      // this file. A missing or out-of-range size resets only the size, so a bad value cannot make
+      // the island too small to find and does not discard the switches beside it.
+      widthPercent: isDynamicIslandSizePercent(parsed.widthPercent, DYNAMIC_ISLAND_SIZE_LIMITS.widthPercent)
+        ? parsed.widthPercent
+        : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent,
+      heightPercent: isDynamicIslandSizePercent(parsed.heightPercent, DYNAMIC_ISLAND_SIZE_LIMITS.heightPercent)
+        ? parsed.heightPercent
+        : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent,
     };
   } catch (error) {
     if (isMissing(error) || error instanceof SyntaxError) return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };

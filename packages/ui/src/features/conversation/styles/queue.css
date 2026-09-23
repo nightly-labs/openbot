@@ -1,0 +1,297 @@
+.composer-wrap:has(.composer-attachment) .agent-queue-panel {
+  margin-bottom: 0;
+}
+
+.agent-queue-panel-list {
+  /* Seven rows, then the list scrolls. */
+  max-height: calc(7 * var(--queue-row-height) + 2 * var(--queue-row-gutter));
+  overflow-y: auto;
+  padding: var(--queue-row-gutter) var(--queue-row-inset-end) var(--queue-row-gutter) var(--queue-row-inset-start);
+  overscroll-behavior: contain;
+}
+
+.agent-queue-item {
+  --queue-drag-step: 0;
+
+  position: relative;
+  display: grid;
+  height: var(--queue-row-height);
+  min-height: 0;
+  min-width: 0;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-queue-text);
+  cursor: grab;
+  outline: 0;
+  transform: translate3d(0, calc(var(--queue-drag-step) * var(--queue-row-height)), 0);
+  transition:
+    height var(--openbot-duration-slow) var(--openbot-ease-out),
+    opacity var(--openbot-duration-fast) ease,
+    transform var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+.agent-queue-item-entering {
+  animation: queue-item-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
+.agent-queue-item-removing {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, -4px, 0) scale(0.985);
+  will-change: height, opacity, transform;
+}
+
+.agent-queue-panel-dragging .agent-queue-item {
+  will-change: transform;
+}
+
+/* The fill reaches past the row to the gutter, which the two insets above leave unequal. */
+.agent-queue-item::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0 calc(var(--queue-row-gutter) - var(--queue-row-inset-end)) 0
+    calc(var(--queue-row-gutter) - var(--queue-row-inset-start));
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  content: "";
+  pointer-events: none;
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.agent-queue-item > * {
+  position: relative;
+  z-index: 1;
+}
+
+.agent-queue-item:hover,
+.agent-queue-item:focus-visible,
+.agent-queue-item-drag-over {
+  z-index: 1;
+}
+
+.agent-queue-item:hover::before,
+.agent-queue-item:focus-visible::before {
+  background: var(--openbot-hover);
+}
+
+.agent-queue-panel-dragging .agent-queue-item:not(.agent-queue-item-dragging):hover::before {
+  background: transparent;
+}
+
+.agent-queue-item:focus-visible {
+  box-shadow: 0 0 0 2px var(--openbot-border-focus);
+}
+
+.agent-queue-item-dragging {
+  z-index: 0;
+  cursor: grabbing;
+  opacity: 0;
+}
+
+.agent-queue-item-dragging::before {
+  background: transparent;
+  box-shadow: none;
+}
+
+.agent-queue-drag-preview {
+  position: fixed;
+  z-index: var(--openbot-layer-dropdown);
+  box-sizing: border-box;
+  min-height: 31px;
+  margin: 0;
+  border: 1px solid var(--openbot-border-strong);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  opacity: 0.96;
+  pointer-events: none;
+  transform: none;
+}
+
+.agent-queue-drag-preview::before {
+  display: none;
+}
+
+.agent-queue-item-steering {
+  color: var(--openbot-text-muted);
+}
+
+.agent-queue-item-editing {
+  color: var(--openbot-text-muted);
+}
+
+.agent-queue-editing-badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.agent-queue-item-has-attachment {
+  grid-template-columns: 14px 24px minmax(0, 1fr) auto;
+}
+
+.agent-queue-icon {
+  display: grid;
+  place-items: center;
+  color: var(--openbot-queue-action);
+}
+
+.agent-queue-icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.agent-queue-attachment {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-queue-action);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-glyph-xs);
+  line-height: 1;
+}
+
+.agent-queue-attachment img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-queue-steer svg,
+.agent-queue-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.agent-queue-icon-button .conversation-more-icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+.agent-queue-message {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--openbot-queue-action);
+}
+
+.agent-queue-steer,
+.agent-queue-icon-button {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  padding: 0 4px;
+  color: inherit;
+  font-size: var(--openbot-text-lg);
+  line-height: 18px;
+  transition:
+    background var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease;
+}
+
+.agent-queue-steer:hover:not(:disabled),
+.agent-queue-steer:focus-visible,
+.agent-queue-icon-button:hover:not(:disabled),
+.agent-queue-icon-button:focus-visible {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+  outline: 0;
+}
+
+.agent-queue-steer:disabled,
+.agent-queue-icon-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.agent-queue-icon-button {
+  width: 26px;
+  padding: 0;
+}
+
+.agent-queue-icon-button.agent-queue-delete:hover:not(:disabled),
+.agent-queue-icon-button.agent-queue-delete:focus-visible {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
+  opacity: 1;
+}
+
+@media (max-width: 620px) {
+  .agent-queue-panel {
+    margin-right: 2px;
+    margin-left: 2px;
+  }
+
+  .agent-queue-steer {
+    width: 26px;
+    padding: 0;
+  }
+
+  .agent-queue-steer span {
+    display: none;
+  }
+}
+
+@keyframes queue-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes queue-item-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}

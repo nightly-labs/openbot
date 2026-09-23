@@ -31,9 +31,9 @@ import type {
   TeamSessionSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "../data";
+import type { AgentProfile } from "@openbot/ui/data";
+import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import type { McpServerConfig } from "../features/servers/mcp-servers";
-import type { MarketplacePluginDetail } from "../features/settings/marketplace-plugins";
 
 export const STORY_NOW = "2026-08-19T10:00:00.000Z";
 
@@ -121,6 +121,14 @@ export const STORY_SHARED_TABLES: SharedTable[] = [
 export const STORY_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
+    id: "gpt-6-luna",
+    name: "GPT-6 Luna",
+    description: "Fast and efficient for everyday agent work.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "codex",
     id: "gpt-5.6-luna",
     name: "GPT-5.6 Luna",
     description: "Fast and efficient for everyday agent work.",
@@ -142,6 +150,14 @@ export const STORY_MODELS: AgentModelOption[] = [
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["medium", "high", "xhigh"],
+  },
+  {
+    provider: "claude",
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    description: "Most capable Claude model for complex work.",
+    defaultReasoningEffort: "high",
+    supportedReasoningEfforts: ["low", "medium", "high"],
   },
   {
     provider: "claude",
@@ -423,6 +439,8 @@ export const STORY_SERVERS: ServerSummary[] = [
     name: "Local",
     logoUrl: null,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
     kind: "local",
     state: "online",
     apiUrl: null,
@@ -435,6 +453,8 @@ export const STORY_SERVERS: ServerSummary[] = [
     name: "OpenBot team",
     logoUrl: null,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
     kind: "remote",
     state: "online",
     apiUrl: "https://team.example.com",

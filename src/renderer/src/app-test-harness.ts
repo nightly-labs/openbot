@@ -294,6 +294,8 @@ export function testServer(id: string, active: boolean): ServerSummary {
     name: local ? "Local" : "Studio Mac",
     logoUrl: null,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
     kind: local ? "local" : "remote",
     state: "online",
     apiUrl: local ? null : "https://studio.example.com",
@@ -441,6 +443,8 @@ export function installOpenbotStub(): void {
           hapticsEnabled: true,
           idleVisible: true,
           additionalDisplaysEnabled: true,
+          widthPercent: 100,
+          heightPercent: 100,
         }),
         setPreference: vi.fn(async (preference) => ({ ...preference })),
         publishPresentation: vi.fn().mockResolvedValue(undefined),
@@ -825,6 +829,13 @@ export function installOpenbotStub(): void {
         setPreference: vi.fn(async (input) => input),
         onEvent: vi.fn(updateStatusBridge.subscribe),
       },
+      notifications: {
+        getPreference: vi.fn().mockResolvedValue({ desktopNotifications: true }),
+        setPreference: vi.fn(async (input) => input),
+        test: vi.fn().mockResolvedValue(undefined),
+        openSettings: vi.fn().mockResolvedValue(undefined),
+        onOpened: vi.fn(() => () => undefined),
+      },
       maintenance: {
         exportData: vi.fn().mockResolvedValue({ saved: true }),
         exportDiagnostics: vi.fn().mockResolvedValue({ saved: true }),
@@ -835,12 +846,19 @@ export function installOpenbotStub(): void {
           .mockImplementation(async ({ serverId, muted }) => [
             { ...testServer(serverId, true), notificationsMuted: muted },
           ]),
+        setNotificationLevel: vi
+          .fn()
+          .mockImplementation(async ({ serverId, level }) => [
+            { ...testServer(serverId, true), notificationLevel: level },
+          ]),
         list: vi.fn().mockResolvedValue([
           {
             id: "local",
             name: "Local",
             logoUrl: null,
             notificationsMuted: false,
+            notificationsMutedUntil: null,
+            notificationLevel: "all",
             kind: "local",
             state: "online",
             apiUrl: null,
@@ -855,6 +873,8 @@ export function installOpenbotStub(): void {
             name: "Local",
             logoUrl: null,
             notificationsMuted: false,
+            notificationsMutedUntil: null,
+            notificationLevel: "all",
             kind: "local",
             state: "online",
             apiUrl: null,

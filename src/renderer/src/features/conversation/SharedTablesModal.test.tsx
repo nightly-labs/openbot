@@ -1,8 +1,8 @@
 import type { DeleteSharedTableInput, SharedTable } from "@openbot/contracts/ipc";
+import type { AgentProfile } from "@openbot/ui/data";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentProfile } from "../../data";
 import { STORY_AGENTS } from "../../preview/fixtures";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
 import { SharedTablesModal } from "./SharedTablesModal";

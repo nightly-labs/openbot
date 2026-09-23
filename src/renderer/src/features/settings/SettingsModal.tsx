@@ -17,35 +17,37 @@ import type {
 } from "@openbot/contracts/ipc";
 import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createEffect, createSignal, Show } from "solid-js";
-import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
-import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import {
   Button,
   CircleArrowDown,
   Globe2,
   MousePointer2,
+  PanelTop,
   Settings,
   Smartphone,
   Tabs,
   Text,
   UserRound,
-} from "../../components/ui";
+} from "@openbot/ui";
+import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
+import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
+import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
+import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
+import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
+import { createSettingsMobileConnectStore } from "@openbot/ui/features/settings/stores/mobile-connect-store";
+import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
+import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores/updates-store";
+import { createEffect, createSignal, Show } from "solid-js";
+import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
-import type { GeneralSettingsValue } from "./app-settings";
-import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
-import { SaveBarDock, SettingsDialogShell } from "./SettingsDialogShell";
+import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsHostedSitesTab } from "./SettingsHostedSitesTab";
-import { SettingsMobileConnectTab } from "./SettingsMobileConnectTab";
-import { SettingsProfileTab } from "./SettingsProfileTab";
-import { SettingsUpdatesTab } from "./SettingsUpdatesTab";
 import { createSettingsGeneralStore } from "./stores/general-store";
 import { createSettingsHostedSitesStore } from "./stores/hosted-sites-store";
-import { createSettingsMobileConnectStore } from "./stores/mobile-connect-store";
-import { createSettingsProfileStore } from "./stores/profile-store";
-import { createSettingsUpdatesStore } from "./stores/updates-store";
 
 export interface SettingsModalProps {
   open: boolean;
@@ -89,10 +91,20 @@ export interface SettingsModalProps {
   hostedSitesApi?: HostedSitesDesktopApi;
   /** The agents granted a standing approval, so the user can see and undo each one. */
   turboModePending?: boolean;
+  onTestNotification?: () => void | Promise<void>;
+  /** Opens the operating system notification settings. Shown only on macOS and Windows. */
+  onOpenNotificationSettings?: () => void | Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
 }
 
-type SettingsTab = "general" | "computer-use" | "profile" | "mobile-connect" | "updates" | "hosted-sites";
+type SettingsTab =
+  | "general"
+  | "dynamic-island"
+  | "computer-use"
+  | "profile"
+  | "mobile-connect"
+  | "updates"
+  | "hosted-sites";
 
 /**
  * A tab holds the keys of its label and its header text, not the text itself. The list is read at
@@ -112,6 +124,12 @@ const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.general.title",
     descriptionKey: "settings.tab.general.description",
     icon: Settings,
+  },
+  {
+    value: "dynamic-island",
+    titleKey: "settings.tab.dynamicIsland.title",
+    descriptionKey: "settings.tab.dynamicIsland.description",
+    icon: PanelTop,
   },
   {
     value: "computer-use",
@@ -205,6 +223,10 @@ export function SettingsModal(props: SettingsModalProps) {
   const updates = createSettingsUpdatesStore(props);
   const hostedSites = createSettingsHostedSitesStore(props, () => activeTab() === "hosted-sites");
 
+  // The Dynamic Island exists only on macOS, so other platforms get no tab for it.
+  const isMac = () => props.appInfo?.platform === "darwin";
+  const visibleNavItems = () => navItems.filter((item) => item.value !== "dynamic-island" || isMac());
+
   const title = () => i18n.t(navItem(activeTab()).titleKey);
   const description = () => i18n.t(navItem(activeTab()).descriptionKey);
 
@@ -215,6 +237,7 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
+        (value === "dynamic-island" && isMac()) ||
         value === "computer-use" ||
         value === "profile" ||
         value === "mobile-connect" ||
@@ -235,6 +258,10 @@ export function SettingsModal(props: SettingsModalProps) {
 
   function updateSetting<Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]): void {
     props.onValueChange({ ...props.value, [key]: value });
+  }
+
+  function updateSettings(patch: Partial<GeneralSettingsValue>): void {
+    props.onValueChange({ ...props.value, ...patch });
   }
 
   return (
@@ -310,7 +337,7 @@ export function SettingsModal(props: SettingsModalProps) {
         }
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
-            {navItems.map((item) => {
+            {visibleNavItems().map((item) => {
               const NavIcon = item.icon;
               return (
                 <Tabs.Trigger
@@ -331,7 +358,6 @@ export function SettingsModal(props: SettingsModalProps) {
             store={general}
             value={props.value}
             onUpdateSetting={updateSetting}
-            platform={props.appInfo?.platform}
             selectMount={modalElement}
             onDownloadProvider={props.onDownloadProvider}
             onCancelProviderDownload={props.onCancelProviderDownload}
@@ -344,8 +370,24 @@ export function SettingsModal(props: SettingsModalProps) {
             onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
             turboModePending={props.turboModePending}
+            onTestNotification={props.onTestNotification}
+            onOpenNotificationSettings={
+              props.appInfo?.platform === "darwin" || props.appInfo?.platform === "win32"
+                ? props.onOpenNotificationSettings
+                : undefined
+            }
           />
         </Tabs.Content>
+
+        <Show when={isMac()}>
+          <Tabs.Content value="dynamic-island" class="settings-modal-tab-panel" data-tab="dynamic-island">
+            <SettingsDynamicIslandTab
+              value={props.value}
+              onUpdateSetting={updateSetting}
+              onUpdateSettings={updateSettings}
+            />
+          </Tabs.Content>
+        </Show>
 
         <Tabs.Content value="computer-use" class="settings-modal-tab-panel" data-tab="computer-use">
           <ComputerUseSetup variant="settings" />

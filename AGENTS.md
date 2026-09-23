@@ -38,6 +38,21 @@ adding a module or moving ownership between workspaces.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
 
+## Shared UI
+
+`packages/ui` (`@openbot/ui`) owns shared SolidJS controls and feature components used by
+desktop, public web, and Storybook. Reuse these components before adding UI. Import primitives
+from `@openbot/ui` and feature components from explicit subpaths such as
+`@openbot/ui/features/sidebar/Sidebar`. Do not copy them back into an app.
+
+Keep shared components independent of application contexts, desktop storage, host connections,
+and `window.openbot`. Pass data and actions through typed props. Platform adapters and the main
+conversation controller stay in the renderer. Component extraction must preserve the existing
+UI, styles, and behavior unless the user requests a design change. Native mobile shares brand
+tokens and contracts; it does not render SolidJS DOM components.
+
+Read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) before changing shared UI.
+
 ## Checks
 
 Do not run broad checks locally. They overload the user's computer. This explicit user preference

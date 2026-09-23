@@ -1295,6 +1295,29 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  it("moves an agent onto the provider default when its CLI stops listing the agent's model", async () => {
+    let listed = ["gpt-6-luna", "gpt-5.6-sol"];
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "codex") client.modelList = () => ({ data: listed.map((model) => ({ model })) });
+        return client;
+      },
+      preferredProvider: "codex",
+    });
+    service = agentService;
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" });
+
+    listed = ["gpt-6-luna"];
+    await service.stop();
+    await service.initialize();
+
+    // The provider stays, so the agent keeps its thread; only the model it can no longer run changes.
+    await waitFor(() => service?.listAgents().find((agent) => agent.id === "chief")?.model === "gpt-6-luna");
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ provider: "codex" });
+  });
+
   // The catalogue is the running CLI's answer, and a removal during a turn does not restart it. The
   // models of an endpoint already removed are therefore still listed, and must not be chosen.
   it("never falls back onto an endpoint removed earlier in the same OpenCode process", async () => {
@@ -2308,7 +2331,7 @@ describe.sequential("AgentService: providers", () => {
       const params = paramsRecord(start.params);
       if (!params) throw new Error("The fake thread request has no parameters.");
       expect(params).toMatchObject({
-        model: "gpt-5.6-luna",
+        model: "gpt-6-luna",
         approvalPolicy: "on-request",
         sandbox: "danger-full-access",
         ephemeral: false,
@@ -2386,7 +2409,7 @@ describe.sequential("AgentService: providers", () => {
       const params = paramsRecord(turn.params);
       if (!params) throw new Error("The fake turn request has no parameters.");
       expect(params).toMatchObject({
-        model: "gpt-5.6-luna",
+        model: "gpt-6-luna",
         effort: "low",
         approvalPolicy: "on-request",
         sandboxPolicy: { type: "dangerFullAccess" },

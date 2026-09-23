@@ -1,4 +1,4 @@
-import type { ProviderKeyApi } from "./OpenCodeKeyDialog";
+import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 
 /**
  * The four calls the OpenCode key dialog makes, bound once.

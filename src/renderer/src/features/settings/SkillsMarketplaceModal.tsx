@@ -16,23 +16,6 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isSkillCategory, mcpConfigErrors, SKILL_CATEGORIES } from "@openbot/contracts/ipc";
 import {
-  createEffect,
-  createMemo,
-  createSignal,
-  createStore,
-  For,
-  Match,
-  onSettled,
-  Show,
-  Switch,
-  snapshot,
-} from "solid-js";
-import { desktopAnalytics } from "../../analytics";
-import { normalizeAvatarFile } from "../../avatar-image";
-import { createAsyncPanel } from "../../components/createAsyncPanel";
-import { createScrollFades } from "../../components/createScrollFades";
-import { SkillPreview } from "../../components/SkillPreview";
-import {
   Button,
   Check,
   ChevronDown,
@@ -51,26 +34,43 @@ import {
   SlidingTabs,
   Upload,
   X,
-} from "../../components/ui";
-import { errorMessage } from "../../error-message";
-import { AgentAvatar } from "../agents/AgentAvatar";
-import { safeBrowserUrl } from "../conversation/RichMessageText";
-import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
-import { AgentSelect } from "./AgentSelect";
-import { CATEGORY_LABELS, MarketplaceCatalog } from "./MarketplaceCatalog";
-import { MarketplaceDetail } from "./MarketplaceDetail";
-import { MarketplacePluginDetail, PluginIcon } from "./MarketplacePluginDetail";
-import type { McpConnectSubject } from "./McpConnectShell";
-import { McpKeyDialog } from "./McpKeyDialog";
-import { McpSignInDialog } from "./McpSignInDialog";
-import { createPluginAppConfig } from "./marketplace-plugin-catalog";
+} from "@openbot/ui";
+import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { errorMessage } from "@openbot/ui/error-message";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
+import { routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
+import { AgentSelect } from "@openbot/ui/features/settings/AgentSelect";
+import { CATEGORY_LABELS, MarketplaceCatalog } from "@openbot/ui/features/settings/MarketplaceCatalog";
+import { MarketplaceDetail } from "@openbot/ui/features/settings/MarketplaceDetail";
+import { MarketplacePluginDetail, PluginIcon } from "@openbot/ui/features/settings/MarketplacePluginDetail";
+import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
+import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
+import { McpSignInDialog } from "@openbot/ui/features/settings/McpSignInDialog";
 import type {
   MarketplacePluginApp,
   MarketplacePluginPrompt,
   MarketplacePluginDetail as PluginDetail,
-} from "./marketplace-plugins";
-import { createPluginShareUrl, isPluginAppConfig } from "./marketplace-plugins";
-import type { McpConnectFlow } from "./mcp-connect-auth";
+} from "@openbot/ui/features/settings/marketplace-plugins";
+import { createPluginShareUrl, isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
+import type { McpConnectFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  Match,
+  onSettled,
+  Show,
+  Switch,
+  snapshot,
+} from "solid-js";
+import { desktopAnalytics } from "../../analytics";
+import { createAsyncPanel } from "../../components/createAsyncPanel";
+import { SkillPreview } from "../../components/SkillPreview";
+import { createPluginAppConfig } from "./marketplace-plugin-catalog";
 import type { PluginUninstallPlan } from "./PluginUninstallDialog";
 import { PluginUninstallDialog } from "./PluginUninstallDialog";
 

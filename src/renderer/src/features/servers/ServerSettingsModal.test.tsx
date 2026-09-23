@@ -6,10 +6,10 @@ import type {
   TeamInviteSummary,
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
+import { Toaster } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Toaster } from "../../components/ui";
 import { createMockOpenBot } from "../../preview/mock-openbot";
 import { mcpToolRuntimeNote as note } from "./mcp-servers";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "./ServerSettingsModal";
@@ -21,6 +21,8 @@ const localServer: ServerSummary = {
   name: "Local",
   logoUrl: null,
   notificationsMuted: false,
+  notificationsMutedUntil: null,
+  notificationLevel: "all",
   kind: "local",
   state: "online",
   apiUrl: null,
@@ -34,6 +36,8 @@ const remoteServer: ServerSummary = {
   name: "Studio Team",
   logoUrl: null,
   notificationsMuted: false,
+  notificationsMutedUntil: null,
+  notificationLevel: "all",
   kind: "remote",
   state: "online",
   apiUrl: "https://studio.example.com",
@@ -124,6 +128,7 @@ function props(overrides: Partial<ServerSettingsModalProps> = {}): ServerSetting
     onSaveIdentity: vi.fn(async () => undefined),
     onSetPublished: vi.fn(async () => undefined),
     onSetMuted: vi.fn(async () => undefined),
+    onSetNotificationLevel: vi.fn(async () => undefined),
     onCreateInvite: vi.fn(async (input) => ({
       id: "invite-new",
       role: input.role,

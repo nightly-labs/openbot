@@ -17,6 +17,7 @@ import {
   type CpuReport,
   type CpuSample,
   collectDescendants,
+  PROCESS_TABLE_PS_ARGS,
   type ProcessSnapshot,
   parseProcessTable,
   snapshotProcesses,
@@ -90,7 +91,7 @@ async function sampleOverCdp(session: CDPSession): Promise<ProcessSnapshot[]> {
 }
 
 async function sampleOverPs(rootPid: number): Promise<ProcessSnapshot[]> {
-  const { stdout } = await run("ps", ["-o", "pid=,ppid=,cputime=,command=", "-ax"], { maxBuffer: 16 * 1_024 * 1_024 });
+  const { stdout } = await run("ps", PROCESS_TABLE_PS_ARGS, { maxBuffer: 16 * 1_024 * 1_024 });
   return snapshotProcesses(collectDescendants(parseProcessTable(stdout), rootPid));
 }
 

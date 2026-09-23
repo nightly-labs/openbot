@@ -2111,6 +2111,9 @@ async function runDoubleClickScenario(browser: BrowserHost, origin: string): Pro
   })()`,
       true,
     );
+    // The tab was just opened, so it may have no presented frame yet. Chromium would drop the first
+    // click and the double-click would arrive without the selection before it.
+    await waitForPresentedFrame(doubleContents);
     const doubleClicked = await callBrowserTool(browser, "click", {
       tabId: doubleTab.id,
       target: { kind: "role", role: "button", name: "Double-click item", exact: true },

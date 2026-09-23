@@ -184,7 +184,7 @@ describe("AgentMemoriesModal", () => {
     expect(await screen.findByText("Uses metric units.")).toBeInTheDocument();
     const clearButton = screen.getByRole("button", { name: "Clear all memories" });
     await fireEvent.click(clearButton);
-    const confirmation = await screen.findByRole("dialog", { name: "Clear all memories?" });
+    const confirmation = await screen.findByRole("alertdialog", { name: "Clear all memories?" });
     // The confirmation opens on top of the memories modal rather than replacing
     // it, so the list it was opened from is still rendered underneath.
     expect(screen.getByText("Uses metric units.")).toBeInTheDocument();
@@ -192,13 +192,26 @@ describe("AgentMemoriesModal", () => {
     expect(within(confirmation).getByText(/Original messages will stay/)).toBeInTheDocument();
     expect(clearMemories).not.toHaveBeenCalled();
 
-    await fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    // Escape closes only the confirmation; the memories modal stays open behind it.
+    await fireEvent.keyDown(within(confirmation).getByRole("button", { name: "Cancel" }), { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog", { name: "Clear all memories?" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("dialog", { name: "Memories" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Clear all memories" })).toHaveFocus());
+
+    await fireEvent.click(screen.getByRole("button", { name: "Clear all memories" }));
+    await fireEvent.click(
+      within(await screen.findByRole("alertdialog", { name: "Clear all memories?" })).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
     const restoredModal = await screen.findByRole("dialog", { name: "Memories" });
     const restoredClearButton = within(restoredModal).getByRole("button", { name: "Clear all memories" });
 
     await fireEvent.click(restoredClearButton);
     await fireEvent.click(
-      within(await screen.findByRole("dialog", { name: "Clear all memories?" })).getByRole("button", {
+      within(await screen.findByRole("alertdialog", { name: "Clear all memories?" })).getByRole("button", {
         name: "Clear all memories",
       }),
     );

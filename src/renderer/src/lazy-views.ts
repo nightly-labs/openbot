@@ -12,28 +12,30 @@ import { lazy } from "solid-js";
  * it), so the wrappers live here and each chunk has exactly one.
  */
 export const AccountDock = lazy(() =>
-  import("./features/account/AccountDock").then((module) => ({ default: module.AccountDock })),
+  import("@openbot/ui/features/account/AccountDock").then((module) => ({ default: module.AccountDock })),
 );
 export const AccountLogin = lazy(() =>
-  import("./features/account/AccountLogin").then((module) => ({ default: module.AccountLogin })),
+  import("@openbot/ui/features/account/AccountLogin").then((module) => ({ default: module.AccountLogin })),
 );
 export const DirectConversation = lazy(() =>
-  import("./features/conversation/DirectConversation").then((module) => ({ default: module.DirectConversation })),
+  import("@openbot/ui/features/conversation/DirectConversation").then((module) => ({
+    default: module.DirectConversation,
+  })),
 );
 export const GlobalSearch = lazy(() =>
-  import("./components/GlobalSearch").then((module) => ({ default: module.GlobalSearch })),
+  import("@openbot/ui/components/GlobalSearch").then((module) => ({ default: module.GlobalSearch })),
 );
 export const InitialSetup = lazy(() =>
   import("./features/onboarding/InitialSetup").then((module) => ({ default: module.InitialSetup })),
 );
 export const JoinServerDialog = lazy(() =>
-  import("./features/servers/JoinServerDialog").then((module) => ({ default: module.JoinServerDialog })),
+  import("@openbot/ui/features/servers/JoinServerDialog").then((module) => ({ default: module.JoinServerDialog })),
 );
 export const OnboardingFlow = lazy(() =>
   import("./features/onboarding/OnboardingFlow").then((module) => ({ default: module.OnboardingFlow })),
 );
 export const RemoteDesktopWorkspace = lazy(() =>
-  import("./features/remote-desktop/RemoteDesktopWorkspace").then((module) => ({
+  import("@openbot/ui/features/remote-desktop/RemoteDesktopWorkspace").then((module) => ({
     default: module.RemoteDesktopWorkspace,
   })),
 );

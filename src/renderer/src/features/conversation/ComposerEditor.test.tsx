@@ -1,9 +1,9 @@
 import type { DraftAttachment, InstalledSkill, McpServerConfig } from "@openbot/contracts/ipc";
+import type { AgentProfile } from "@openbot/ui/data";
+import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AgentProfile } from "../../data";
-import { ComposerEditor } from "./ComposerEditor";
 
 const originalMatchMedia = window.matchMedia;
 
@@ -82,6 +82,36 @@ async function typeQuery(editor: HTMLElement, text: string) {
 }
 
 describe("ComposerEditor", () => {
+  it("does not insert text or submit after the editor becomes disabled", async () => {
+    const onValueChange = vi.fn();
+    const onSubmit = vi.fn();
+    let disable = () => {};
+    render(() => {
+      const [disabled, setDisabled] = createSignal(false);
+      disable = () => setDisabled(true);
+      return (
+        <ComposerEditor
+          agentId="chief"
+          agents={[]}
+          value=""
+          placeholder="Connect to your host to start"
+          ariaLabel="Message"
+          disabled={disabled()}
+          onValueChange={onValueChange}
+          onSubmit={onSubmit}
+        />
+      );
+    });
+    const editor = screen.getByRole("textbox", { name: "Message" });
+    editor.focus();
+    disable();
+    await waitFor(() => expect(editor).toHaveAttribute("aria-disabled", "true"));
+    await fireEvent.keyDown(editor, { key: "a" });
+    await fireEvent.keyDown(editor, { key: "Enter" });
+    expect(editor).toHaveTextContent("");
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
   it("does not submit when Enter confirms IME composition", async () => {
     const { editor, onSubmit } = renderComposer();
 

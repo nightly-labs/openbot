@@ -11,7 +11,7 @@ import type {
   DynamicIslandTakeoverItem,
   QueueSnapshot,
 } from "@openbot/contracts/ipc";
-import { errorMessage } from "../../error-message";
+import { errorMessage } from "@openbot/ui/error-message";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;

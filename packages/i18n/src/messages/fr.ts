@@ -21,6 +21,9 @@ export const fr = {
   "notification.needsInput": "Nécessite votre réponse.",
   "notification.needsApproval": "Nécessite votre approbation.",
   "notification.finished": "Travail terminé.",
+  "notification.failed": "Arrêté à cause d’une erreur.",
+  "notification.test": "Les notifications fonctionnent.",
+  "notification.welcome": "OpenBot vous préviendra ici quand un agent aura besoin de vous.",
 
   // Native file pickers.
   "dialog.chooseSiteDirectory": "Choisir un dossier de site statique",
@@ -86,9 +89,16 @@ export const fr = {
   "settings.notifications.title": "Notifications",
   "settings.desktopNotifications.title": "Notifications du bureau",
   "settings.desktopNotifications.description": "Afficher une notification lorsqu’un agent a besoin d’attention.",
+  "settings.testNotification.title": "Notification de test",
+  "settings.testNotification.description":
+    "En afficher une maintenant. Si elle n’apparaît pas, autorisez les notifications d’OpenBot dans les réglages du système.",
+  "settings.testNotification.action": "Envoyer un test",
+  "settings.testNotification.failed": "Impossible d’afficher une notification.",
+  "settings.testNotification.openSettings": "Ouvrir les réglages du système",
+  "settings.testNotification.openSettingsFailed": "Impossible d’ouvrir les réglages du système.",
   "settings.taskSound.title": "Émettre un son à la fin d’une tâche",
   "settings.taskSound.description": "Utiliser un son court pour les tâches terminées.",
-  "settings.notch.title": "Encoche du MacBook",
+  "settings.notch.title": "Comportement",
   "settings.notch.show.title": "Afficher l’état dans l’encoche du MacBook",
   "settings.notch.show.description":
     "Afficher l’activité des agents et les éléments nécessitant votre attention en haut de chaque écran.",
@@ -99,6 +109,13 @@ export const fr = {
   "settings.notch.haptics.title": "Retour haptique",
   "settings.notch.haptics.description":
     "Utiliser le trackpad Force Touch pour confirmer les interactions avec l’îlot dynamique.",
+  "settings.notch.size.title": "Taille",
+  "settings.notch.size.description": "Sur un écran avec encoche, l’îlot n’est jamais plus petit que l’encoche.",
+  "settings.notch.size.reset": "Rétablir la valeur par défaut",
+  "settings.notch.size.width": "Largeur",
+  "settings.notch.size.height": "Hauteur",
+  "settings.notch.size.previewNotch": "Écran intégré",
+  "settings.notch.size.previewIsland": "Écran externe",
   "settings.privacy.title": "Confidentialité",
   "settings.analytics.title": "Partager les données analytiques du produit",
   "settings.analytics.description":
@@ -113,6 +130,8 @@ export const fr = {
   "settings.tab.profile.description": "Gérer votre apparence dans OpenBot.",
   "settings.tab.mobileConnect.title": "Connexion mobile",
   "settings.tab.mobileConnect.description": "Se connecter en toute sécurité depuis votre téléphone.",
+  "settings.tab.dynamicIsland.title": "Îlot dynamique",
+  "settings.tab.dynamicIsland.description": "Choisir quand l’îlot s’affiche et sa taille.",
   "settings.tab.updates.title": "Mises à jour",
   "settings.tab.updates.description": "Garder OpenBot à jour sur cet ordinateur.",
   "settings.tab.hostedSites.title": "Sites hébergés",

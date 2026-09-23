@@ -1,0 +1,280 @@
+/* transitions.dev panel reveal for the file preview. The panel enters from
+   the right edge, so it travels on X. `.browser-panel` declares its own
+   transition later in the cascade than the `.t-panel-slide` snippet, so both
+   property lists are restated here at a higher specificity. */
+.file-preview-panel.t-panel-slide {
+  --panel-translate-x: 24px;
+  --panel-translate-y: 0px;
+
+  transition:
+    transform var(--panel-close-dur) var(--panel-ease),
+    opacity var(--panel-close-dur) var(--panel-ease),
+    filter var(--panel-close-dur) var(--panel-ease),
+    border-color var(--openbot-duration-slow) ease,
+    box-shadow var(--openbot-duration-slow) ease;
+}
+
+.file-preview-panel.t-panel-slide[data-open="true"] {
+  transition:
+    transform var(--panel-open-dur) var(--panel-ease),
+    opacity var(--panel-open-dur) var(--panel-ease),
+    filter var(--panel-open-dur) var(--panel-ease),
+    border-color var(--openbot-duration-slow) ease,
+    box-shadow var(--openbot-duration-slow) ease;
+}
+
+.file-preview-header {
+  display: flex;
+  height: 39px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--openbot-border);
+  padding: 0 7px 0 11px;
+}
+
+.file-preview-header h2 {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-preview-file-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.file-preview-content {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  background: var(--openbot-bg-canvas);
+}
+
+.markdown-file-preview {
+  min-width: 0;
+}
+
+.file-preview-markdown {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 26px 48px;
+  color: var(--openbot-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.file-preview-markdown > .message-markdown {
+  font-size: var(--openbot-text-md);
+  line-height: 1.6;
+}
+
+.file-preview-markdown-status {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: 18px 20px;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.file-preview-text {
+  min-width: min-content;
+  min-height: 100%;
+  margin: 0;
+  padding: 18px 20px 48px;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.file-preview-image-wrap {
+  display: grid;
+  min-height: 100%;
+  padding: 20px;
+  place-items: center;
+}
+
+.file-preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.file-preview-pdf {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--openbot-bg-canvas);
+}
+
+.file-preview-audio {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 20px;
+}
+
+.file-preview-video {
+  display: block;
+  width: 100%;
+  max-height: 100%;
+  background: var(--openbot-bg-canvas);
+  object-fit: contain;
+}
+
+.file-preview-spreadsheet {
+  min-width: 0;
+  min-height: 100%;
+  padding: 20px;
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-status {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-mono);
+  white-space: pre-wrap;
+}
+
+.file-preview-spreadsheet-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.file-preview-spreadsheet-tabs button {
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-control);
+  padding: 6px 10px;
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.file-preview-spreadsheet-tabs button[aria-pressed="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.file-preview-spreadsheet-table-wrap {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+}
+
+.file-preview-spreadsheet-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: var(--openbot-text-sm);
+}
+
+.file-preview-spreadsheet-table caption {
+  padding: 10px 12px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: left;
+}
+
+.file-preview-spreadsheet-table th,
+.file-preview-spreadsheet-table td {
+  border-top: 1px solid var(--openbot-border);
+  border-right: 1px solid var(--openbot-border);
+  padding: 8px 12px;
+  text-align: left;
+  white-space: pre;
+}
+
+.file-preview-spreadsheet-table th {
+  background: var(--openbot-bg-control);
+  font-weight: 600;
+}
+
+.file-preview-spreadsheet-table td:last-child,
+.file-preview-spreadsheet-table th:last-child {
+  border-right: 0;
+}
+
+.file-preview-spreadsheet-note {
+  margin: 10px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+.file-preview-unsupported {
+  display: grid;
+  min-height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--openbot-text-muted);
+  text-align: center;
+}
+
+.file-preview-unsupported > svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
+}
+
+.file-preview-unsupported strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+}
+
+.file-preview-unsupported span {
+  max-width: 260px;
+  font-size: var(--openbot-text-sm);
+  line-height: 1.45;
+}
+
+.file-preview-unsupported button {
+  margin-top: 6px;
+}
+
+.file-preview-truncated {
+  position: sticky;
+  bottom: 0;
+  margin: 0;
+  border-top: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-control);
+  padding: 7px 12px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}
+.browser-pip-window {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+.browser-pip-surface {
+  width: 100%;
+  height: 100%;
+}

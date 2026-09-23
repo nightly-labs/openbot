@@ -27,6 +27,7 @@ import { BrowserWindow, Notification } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import { notificationForAgentEvent } from "./agent-notifications";
 import type { HostAnalytics } from "./analytics";
+import { showRetainedNotification } from "./desktop-notifications";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
 import { decodeAgentSummaries } from "./remote-agent-decoding";
@@ -42,6 +43,8 @@ export interface RendererForwarderDependencies {
   showMainWindow: (window: BrowserWindow) => void;
   /** The language every desktop notification is written in, read at the moment one is raised. */
   getTranslate: () => AppTranslate;
+  /** The Settings switch for every desktop notification, read at the moment one is raised. */
+  desktopNotificationsEnabled: () => boolean;
 }
 
 /**
@@ -56,6 +59,7 @@ export function createRendererForwarders({
   getRemoteServerManager,
   showMainWindow,
   getTranslate,
+  desktopNotificationsEnabled,
 }: RendererForwarderDependencies) {
   function forwardAgentEvent(serverId: string, event: AgentEvent, bufferedLive = false): void {
     if (serverId === LOCAL_SERVER_ID) getHostAnalytics()?.handleAgentEvent(event);
@@ -71,29 +75,42 @@ export function createRendererForwarders({
 
   async function notifyAgentEvent(serverId: string, event: AgentEvent): Promise<void> {
     if (event.type !== "turn-completed" && event.type !== "prompt" && event.type !== "approval") return;
-    if (event.type === "turn-completed" && event.status !== "completed") return;
-    const canNotify = () => {
+    if (event.type === "turn-completed" && event.status !== "completed" && event.status !== "failed") return;
+    // Like Discord, nothing pops up while the user is looking at the app. The level is read again
+    // after the lookup, with the rest, because the user can change it while the lookup runs.
+    const notifyLevel = () => {
       const window = getMainWindow();
       const server = getRemoteServerManager()
         ?.list()
         .find((candidate) => candidate.id === serverId);
-      return window && !window.isDestroyed() && !window.isFocused() && server && !server.notificationsMuted;
+      if (!window || window.isDestroyed() || window.isFocused() || !server || server.notificationsMuted) return null;
+      if (!desktopNotificationsEnabled() || server.notificationLevel === "nothing") return null;
+      return server.notificationLevel;
     };
-    if (!canNotify() || !Notification.isSupported()) return;
+    const initialLevel = notifyLevel();
+    if (!initialLevel || !Notification.isSupported()) return;
+    // Skip the remote agent lookup for an event the level already rules out.
+    if (initialLevel === "needs-me" && event.type === "turn-completed") return;
     const agents =
       serverId === LOCAL_SERVER_ID
         ? (getAgentService()?.listAgents() ?? [])
         : ((await getRemoteServerManager()?.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)) ?? []);
-    const content = notificationForAgentEvent(event, agents, getTranslate());
-    if (!content || !canNotify()) return;
-    const notification = new Notification(content);
+    const level = notifyLevel();
+    const content = level ? notificationForAgentEvent(event, agents, getTranslate(), level) : null;
+    if (!content) return;
+    const notification = new Notification({ title: content.title, body: content.body });
     notification.on("click", () => {
       // Re-read the window because it can change after the notification is shown.
       const current = getMainWindow();
       if (!current || current.isDestroyed()) return;
       showMainWindow(current);
+      sendToRenderer(current, IPC_CHANNELS.notificationsOpenedEvent, {
+        serverId,
+        agentId: content.agentId,
+        threadId: content.threadId,
+      });
     });
-    notification.show();
+    showRetainedNotification(notification);
   }
 
   function forwardBrowserDisplayState(state: BrowserDisplayState): void {

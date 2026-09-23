@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertSupportedBunVersion,
+  copyWorktreeIncludes,
   type DevelopmentCommandRunner,
   prepareDevelopmentEnvironment,
   prepareDevelopmentWorktree,
@@ -30,7 +31,13 @@ describe("development environment preparation", () => {
     const run: DevelopmentCommandRunner = () =>
       envFilePresent.push(existsSync(join(root, "apps", "auth-api", ".env.dev")));
 
-    const outcome = prepareDevelopmentEnvironment({ projectRoot: root, executable: "bun", bunVersion: "1.4.0", run });
+    const outcome = prepareDevelopmentEnvironment({
+      projectRoot: root,
+      mainCheckoutRoot: root,
+      executable: "bun",
+      bunVersion: "1.4.0",
+      run,
+    });
 
     expect(envFilePresent).toEqual([true, true]);
     expect(outcome).toBe("created");
@@ -41,7 +48,13 @@ describe("development environment preparation", () => {
     const calls: string[][] = [];
     const run: DevelopmentCommandRunner = (_executable, args) => calls.push(args);
 
-    prepareDevelopmentEnvironment({ projectRoot: root, executable: "bun", bunVersion: "1.4.0", run });
+    prepareDevelopmentEnvironment({
+      projectRoot: root,
+      mainCheckoutRoot: root,
+      executable: "bun",
+      bunVersion: "1.4.0",
+      run,
+    });
 
     expect(calls).toEqual([
       ["install", "--frozen-lockfile"],
@@ -55,7 +68,13 @@ describe("development environment preparation", () => {
     const run: DevelopmentCommandRunner = (_executable, args, options) =>
       calls.push({ args, instanceId: options.env?.OPENBOT_DEV_INSTANCE_ID });
 
-    prepareDevelopmentWorktree({ projectRoot: root, executable: "bun", bunVersion: "1.4.0", run });
+    prepareDevelopmentWorktree({
+      projectRoot: root,
+      mainCheckoutRoot: root,
+      executable: "bun",
+      bunVersion: "1.4.0",
+      run,
+    });
 
     expect(calls.map((call) => call.args)).toEqual([
       ["install", "--frozen-lockfile"],
@@ -64,6 +83,32 @@ describe("development environment preparation", () => {
       ["run", "marketplace:seed:local"],
     ]);
     expect(calls[2]?.instanceId).toMatch(/^wt-[a-f0-9]{64}$/u);
+  });
+
+  it("copies missing listed files from the main checkout and keeps existing ones", () => {
+    // Each checkout sits one folder deep, so a "../" entry has a real file to reach.
+    const mainParent = createTemporaryRoot();
+    const main = join(mainParent, "main");
+    const worktree = join(createTemporaryRoot(), "worktree");
+    mkdirSync(join(main, "apps", "auth-api"), { recursive: true });
+    mkdirSync(join(worktree, "apps", "auth-api"), { recursive: true });
+    writeFileSync(
+      join(worktree, ".worktreeinclude"),
+      "# Keys\n.env.keys\nremote/.env.keys\napps/auth-api/.env.dev\n../outside.keys\nremote/../../outside.keys\n/etc/hosts\n",
+    );
+    writeFileSync(join(main, ".env.keys"), "main keys");
+    writeFileSync(join(mainParent, "outside.keys"), "outside keys");
+    mkdirSync(join(main, "remote"));
+    writeFileSync(join(main, "remote", ".env.keys"), "remote keys");
+    writeFileSync(join(main, "apps", "auth-api", ".env.dev"), "main identity");
+    writeFileSync(join(worktree, "apps", "auth-api", ".env.dev"), "worktree identity");
+
+    expect(copyWorktreeIncludes(worktree, main)).toEqual([".env.keys", "remote/.env.keys"]);
+    expect(readFileSync(join(worktree, ".env.keys"), "utf8")).toBe("main keys");
+    expect(readFileSync(join(worktree, "remote", ".env.keys"), "utf8")).toBe("remote keys");
+    expect(readFileSync(join(worktree, "apps", "auth-api", ".env.dev"), "utf8")).toBe("worktree identity");
+    expect(existsSync(join(worktree, "..", "outside.keys"))).toBe(false);
+    expect(copyWorktreeIncludes(main, main)).toEqual([]);
   });
 });
 

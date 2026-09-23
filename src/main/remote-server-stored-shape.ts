@@ -24,8 +24,8 @@
 // is a re-tag. A version this build does not know is refused outright: it was written by a newer
 // OpenBot, and guessing at it would replace a file that build can still read.
 
-import type { TeamRole } from "@openbot/contracts/ipc";
-import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
+import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
+import { LOCAL_SERVER_ID, SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export interface StoredRemoteServer {
@@ -51,12 +51,22 @@ export interface PreservedRemoteServer {
   entry: DynamicRecord;
 }
 
+// Per-server notification choices beyond the permanent mute, which stays in `mutedServerIds` so an
+// older build still reads it. An older build drops this key on its next write; that loses only these
+// choices, never a server.
+export interface StoredServerNotifications {
+  level?: ServerNotificationLevel;
+  // Epoch milliseconds. A past value means the mute has ended.
+  mutedUntil?: number;
+}
+
 export interface StoredRemoteServers {
   version: 3;
   activeServerId: string;
   servers: StoredRemoteServer[];
   hiddenHostIds: string[];
   mutedServerIds: string[];
+  serverNotifications: Record<string, StoredServerNotifications>;
   // Entries kept verbatim for whoever can read them, each with the slot it occupied. In memory only:
   // `serializeStoredRemoteServers` puts them back in `servers`, because a key of its own would be
   // invisible to the older build that is the whole reason for keeping them -- and puts them back
@@ -76,6 +86,7 @@ export function emptyStoredRemoteServers(): StoredRemoteServers {
     servers: [],
     hiddenHostIds: [],
     mutedServerIds: [],
+    serverNotifications: {},
     unreadableServers: [],
     unreadableActiveServerId: null,
   };
@@ -118,6 +129,7 @@ export function readStoredRemoteServers(value: unknown): StoredRemoteServers | n
     servers,
     hiddenHostIds,
     mutedServerIds: Array.isArray(value.mutedServerIds) ? value.mutedServerIds.filter(isString) : [],
+    serverNotifications: readServerNotifications(value.serverNotifications),
     unreadableServers,
     unreadableActiveServerId: !selectable && preservedActive ? value.activeServerId : null,
   };
@@ -145,6 +157,7 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
   servers: (StoredRemoteServer | DynamicRecord)[];
   hiddenHostIds: string[];
   mutedServerIds: string[];
+  serverNotifications: Record<string, StoredServerNotifications>;
 } {
   const readableIds = new Set(state.servers.map((server) => server.id));
   // A preserved entry whose id a readable server now holds is written where that server sits, so the
@@ -178,7 +191,28 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
     servers,
     hiddenHostIds: state.hiddenHostIds,
     mutedServerIds: state.mutedServerIds,
+    serverNotifications: state.serverNotifications,
   };
+}
+
+// A bad field drops only that field, and a bad entry only that entry: these are preferences, and the
+// rest of the file must still load.
+function readServerNotifications(value: unknown): Record<string, StoredServerNotifications> {
+  if (!isDynamicRecord(value)) return {};
+  // `fromEntries` defines own properties, so an id such as `__proto__` cannot reach the prototype.
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([serverId, entry]): [string, StoredServerNotifications][] => {
+      if (!isDynamicRecord(entry)) return [];
+      const notifications: StoredServerNotifications = {};
+      if (isOneOf(SERVER_NOTIFICATION_LEVELS, entry.level)) notifications.level = entry.level;
+      if (typeof entry.mutedUntil === "number" && Number.isFinite(entry.mutedUntil)) {
+        notifications.mutedUntil = entry.mutedUntil;
+      }
+      return notifications.level === undefined && notifications.mutedUntil === undefined
+        ? []
+        : [[serverId, notifications]];
+    }),
+  );
 }
 
 function idOf(entry: DynamicRecord): string | null {
