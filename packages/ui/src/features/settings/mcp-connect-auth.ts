@@ -21,6 +21,11 @@ export interface McpAuthField {
   id: string;
   /** What the input is called on screen, as the server's own documentation calls it. */
   label: string;
+  /**
+   * The value is the server's own address, for a service that gives each user a link, such as
+   * Composio. It replaces the listing's URL and must stay on the listing's host or a subdomain of it.
+   */
+  url?: boolean;
   /** The http header the value is sent in. */
   header?: string;
   /** The environment variable the value is set as, for a stdio server. */
@@ -33,6 +38,8 @@ export interface McpAuthField {
   placeholder?: string;
   /** Where this value is found, in the user's own account. */
   hint?: string;
+  /** The server can connect without it, such as a key that only some accounts require. */
+  optional?: boolean;
 }
 
 interface McpConnectFlowBase {
@@ -64,9 +71,41 @@ export type McpAuth = McpConnectFlow[];
 /** What the user has typed in the current flow, keyed by field id. */
 export type McpAuthValues = Record<string, string>;
 
-/** The flow's fields all have a value. A flow with no fields is complete by asking for nothing. */
+/** The flow's required fields all have a value. A flow with no fields is complete by asking for nothing. */
 export function mcpFlowComplete(flow: McpConnectFlow | null | undefined, values: McpAuthValues): boolean {
-  return mcpFlowFields(flow).every((field) => (values[field.id] ?? "").trim().length > 0);
+  return mcpFlowFields(flow).every((field) => field.optional || (values[field.id] ?? "").trim().length > 0);
+}
+
+/**
+ * What is wrong with a typed link, in the words the dialog shows, or null.
+ *
+ * The host is held to the listing's so that a plugin row stays recognizable as the plugin's:
+ * `isPluginAppConfig` matches a user's link by host, not by the exact address.
+ */
+export function mcpFlowError(
+  config: McpServerConfig,
+  flow: McpConnectFlow | null | undefined,
+  values: McpAuthValues,
+): string | null {
+  for (const field of mcpFlowFields(flow)) {
+    const value = (values[field.id] ?? "").trim();
+    if (field.url && value && !isListingUrl(value, config.url)) {
+      return `Enter an https link from ${new URL(config.url).hostname}.`;
+    }
+  }
+  return null;
+}
+
+/** The address is https and on the listing's host, or on a subdomain of it. */
+export function isListingUrl(value: string, listingUrl: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  const host = new URL(listingUrl).hostname;
+  return url.protocol === "https:" && (url.hostname === host || url.hostname.endsWith(`.${host}`));
 }
 
 /** What this flow asks the user to type. A sign-in asks for nothing here; the browser asks. */
@@ -91,13 +130,20 @@ export function applyMcpFlow(
   values: McpAuthValues,
 ): McpServerConfig {
   const stdio = config.transport === "stdio";
+  // A link is trimmed, unlike a credential: a space pasted around an address is never part of it.
+  const link = mcpFlowFields(flow)
+    .filter((field) => field.url)
+    .map((field) => (values[field.id] ?? "").trim())
+    .find(Boolean);
+  const base = link && !stdio ? { ...config, url: link } : config;
   const written = mcpFlowFields(flow).flatMap((field) => {
+    if (field.url) return [];
     const key = stdio ? field.env : field.header;
     const value = values[field.id] ?? "";
     return key && value ? [{ key, value: `${field.prefix ?? ""}${value}` }] : [];
   });
   const kept = (pairs: McpKeyValue[]) => pairs.filter((pair) => !written.some((wrote) => wrote.key === pair.key));
   return stdio
-    ? { ...config, env: [...kept(config.env), ...written] }
-    : { ...config, headers: [...kept(config.headers), ...written] };
+    ? { ...base, env: [...kept(base.env), ...written] }
+    : { ...base, headers: [...kept(base.headers), ...written] };
 }

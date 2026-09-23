@@ -10,7 +10,7 @@
  */
 
 import type { McpServerConfig, McpTransport, SkillCategory } from "@openbot/contracts/ipc";
-import type { McpAuth } from "./mcp-connect-auth";
+import { isListingUrl, type McpAuth, mcpFlowFields } from "./mcp-connect-auth";
 
 /**
  * Where a shared plugin link points. Derived from the slug rather than carried as catalog data, so
@@ -73,7 +73,11 @@ interface MarketplacePluginServerBase {
 export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): boolean {
   const server = app.server;
   if (config.name !== server.name || config.transport !== server.transport) return false;
-  if (server.transport === "http") return config.url === server.url;
+  if (server.transport === "http") {
+    // A listing that asks for the user's own link cannot know the address, only its host.
+    const userLink = (server.auth ?? []).some((flow) => mcpFlowFields(flow).some((field) => field.url));
+    return userLink ? isListingUrl(config.url, server.url) : config.url === server.url;
+  }
   return (
     config.command === server.command &&
     config.args.length === server.args.length &&

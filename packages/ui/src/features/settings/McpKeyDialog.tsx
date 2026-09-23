@@ -6,7 +6,7 @@
 import { Button, ExternalLink, Field, Input, ShieldCheck, Text } from "@openbot/ui";
 import { createMemo, createStore, For, Show } from "solid-js";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
-import { applyMcpFlow, type McpAuthValues, type McpKeyFlow, mcpFlowComplete } from "./mcp-connect-auth";
+import { applyMcpFlow, type McpAuthValues, type McpKeyFlow, mcpFlowComplete, mcpFlowError } from "./mcp-connect-auth";
 
 export interface McpKeyDialogProps extends McpConnectBaseProps {
   /** The credentials this server asks for, as its listing declares them. */
@@ -40,7 +40,11 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
       current.touched = true;
     });
     if (!complete()) return;
-    void attempt(async () => applyMcpFlow(props.subject.config, props.flow, form.values));
+    void attempt(async () => {
+      const error = mcpFlowError(props.subject.config, props.flow, form.values);
+      if (error) throw new Error(error);
+      return applyMcpFlow(props.subject.config, props.flow, form.values);
+    });
   }
 
   return (
@@ -67,7 +71,7 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
       }
     >
       {/* The card is what this way in asks for, and nothing else. The address the server answers
-          on is the listing's business, not a fact the user acts on here. */}
+          on is the listing's business, unless the listing asks the user for their own link. */}
       <Show when={props.flow.fields.length > 0}>
         <div class="mcp-connect-card">
           <For each={props.flow.fields}>
@@ -76,11 +80,14 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
                 <Field
                   label={field.label}
                   description={field.hint}
-                  required={true}
-                  error={form.touched && !(form.values[field.id] ?? "").trim() ? "Required." : undefined}
+                  required={!field.optional}
+                  error={
+                    form.touched && !field.optional && !(form.values[field.id] ?? "").trim() ? "Required." : undefined
+                  }
                 >
+                  {/* A link is shown so the user can check what they pasted; a credential is not. */}
                   <Input
-                    type="password"
+                    type={field.url ? "url" : "password"}
                     autocomplete="off"
                     spellcheck={false}
                     placeholder={field.placeholder}
