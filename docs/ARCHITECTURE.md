@@ -506,6 +506,9 @@ Mobile external links enter through Expo Router's `+native-intent` and the links
 Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
 local request ID. Invitations wait through sign-in and show a verified host preview before an
 explicit join. Mobile Connect links require confirmation and cannot replace a signed-in account.
+The one exception is development builds: `bun run dev:mobile` opens the link with `simctl openurl`,
+and a `__DEV__` build redeems it without confirmation only when its account service is a loopback
+or private-network `http:` origin. Release builds always use the confirmed flow.
 Plugin links open their validated public page in the in-app browser. Unsupported links show a
 safe fallback. Permanent invitation metadata comes from the shared Team client; revocation stops
 new joins without removing existing members.
