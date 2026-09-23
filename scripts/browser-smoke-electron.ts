@@ -2733,7 +2733,9 @@ async function runPopupScenario(browser: BrowserHost, origin: string): Promise<v
         async () => (await contents.executeJavaScript("document.querySelector('#result').textContent")) === "Signed in",
         "OAuth callback",
       );
-      if (browser.activeTabId !== parent.id) throw new Error("Popup did not return to opener.");
+      // listTabs() hides the popup on its "close" event, but the host hands the active tab back to the
+      // opener only after "destroyed", so a slow runner can observe the gap.
+      await waitFor(async () => browser.activeTabId === parent.id, `${button}: popup return to opener`);
     }
     const blocked = await callBrowserTool(browser, "click", {
       tabId: parent.id,
