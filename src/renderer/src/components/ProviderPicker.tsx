@@ -41,6 +41,16 @@ export interface ProviderPickerOption {
    * than a wrong one.
    */
   keyStatus?: ProviderApiKeyStatus;
+  /**
+   * Whether the row runs free models with no account, so a downloaded row needs no Connect.
+   * Onboarding sets it for OpenCode, whose first-run choice needs no key.
+   */
+  freeModels?: boolean;
+  /**
+   * A short note drawn beside the row with an arrow pointing at it, like the drag hint of a macOS
+   * installer. It repeats what the row already says, so assistive technology does not read it.
+   */
+  callout?: { title: string; detail: string } | null;
   /** The newer runtime main says exists. The renderer never works this out itself. */
   availableVersion?: string | null;
 }
@@ -318,6 +328,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 return runtime ? providerVersionLabel(runtime) : null;
               };
               const visualState = () => providerVisualState(state(), connecting(), runtimeStatus(), updatable());
+              /**
+               * A downloaded row that runs free models needs no sign-in, so its Connect is an option
+               * rather than the step the row waits for: it stays outlined, and it opens the key
+               * dialog when the caller has one. The caller starts the provider when it is chosen.
+               */
+              const connectOptional = () =>
+                freeModelsReady(option()) &&
+                providerRuntimeAction(state(), connecting(), runtimeStatus()) === "connect";
               const runtimeAction = () =>
                 updatable() && props.onUpdateProvider && runtimeStatus()?.phase === "not-downloaded"
                   ? undefined
@@ -333,6 +351,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 Boolean(props.onSignInWithCodeProvider) &&
                 agentProviderDescriptor(option().id).codeSignIn &&
                 (runtimeStatus()?.phase ?? "ready") === "ready";
+              /**
+               * Every row with a runtime on the computer offers Update in the same place, so the user
+               * looks for it in one menu. It is enabled only while a newer version waits; the badge
+               * says so, and the menu names the version it installs.
+               */
+              const updateOffered = () =>
+                Boolean(props.onUpdateProvider) && (runtimeStatus()?.phase === "ready" || updatable());
+              const actionsMenu = () => codeSignInOffered() || updateOffered();
               const inputId = () => `${pickerId}-${option().id}`;
               return (
                 <div
@@ -344,10 +370,24 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       "provider-picker-option-runtime": Boolean(runtimeStatus()),
                       "provider-picker-option-selectable-unavailable":
                         !available() && Boolean(props.allowUnavailableSelection),
+                      "provider-picker-option-with-callout": Boolean(option().callout),
                     },
                   ]}
                   title={option().message ?? undefined}
                 >
+                  <Show when={option().callout}>
+                    {(callout) => (
+                      <span class="provider-picker-callout" aria-hidden="true">
+                        <span class="provider-picker-callout-title">{callout().title}</span>
+                        <span class="provider-picker-callout-detail">{callout().detail}</span>
+                        <svg class="provider-picker-callout-arrow" viewBox="0 0 92 40" fill="none" aria-hidden="true">
+                          <circle cx="4" cy="6" r="3" fill="currentColor" />
+                          <path d="M4 6C20 34 56 38 81 31" stroke="currentColor" stroke-width="1.6" />
+                          <path d="M89 28.5L81.6 34.7L79.2 27Z" fill="currentColor" />
+                        </svg>
+                      </span>
+                    )}
+                  </Show>
                   <label for={inputId()} class="provider-picker-option-selection">
                     <Input
                       id={inputId()}
@@ -402,17 +442,25 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       {(action) => (
                         <Button
                           type="button"
-                          variant={action() === "download" ? "default" : "outline"}
+                          variant={
+                            action() === "download" || (action() === "connect" && !connectOptional())
+                              ? "default"
+                              : "outline"
+                          }
                           size="xs"
-                          class="provider-picker-install"
+                          class={connectOptional() ? "provider-picker-install" : providerActionClass(action())}
                           aria-label={i18n.t(PROVIDER_ACTION_LABEL[action()], { name: option().name })}
                           disabled={props.disabled || (props.refreshingProviders && !runtimeStoreAction(action()))}
                           onClick={() => {
                             if (action() === "cancel") {
                               void props.onCancelProviderDownload?.(option().id);
                             } else if (action() !== "download" && action() !== "retry") {
-                              // Only Reconnect opens the key dialog; Connect/Restart stay on onConnectProvider.
-                              if (option().id === "opencode" && action() === "reconnect" && props.onSignInProvider) {
+                              // Reconnect and an optional Connect open the key dialog; the rest stay on onConnectProvider.
+                              if (
+                                option().id === "opencode" &&
+                                (action() === "reconnect" || connectOptional()) &&
+                                props.onSignInProvider
+                              ) {
                                 void props.onSignInProvider(option().id);
                               } else {
                                 void props.onConnectProvider?.(option().id);
@@ -425,23 +473,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           {i18n.t(PROVIDER_ACTION_TEXT[action()])}
                         </Button>
                       )}
-                    </Show>
-                    {/* Update sits last, never replaces runtime action. */}
-                    <Show when={updatable() && props.onUpdateProvider}>
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="xs"
-                        class="provider-picker-install"
-                        aria-label={i18n.t("provider.aria.update", {
-                          name: option().name,
-                          version: option().availableVersion ?? "",
-                        })}
-                        disabled={props.disabled || props.refreshingProviders || connecting()}
-                        onClick={() => void props.onUpdateProvider?.(option().id)}
-                      >
-                        {i18n.t("provider.action.update")}
-                      </Button>
                     </Show>
                     <Show
                       when={
@@ -467,9 +498,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
                     <Show when={!runtimeStatus() && props.onConnectProvider}>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant={providerAction(state(), connecting()) === "connect" ? "default" : "outline"}
                         size="xs"
-                        class="provider-picker-install"
+                        class={providerActionClass(providerAction(state(), connecting()))}
                         aria-label={i18n.t(PROVIDER_ACTION_LABEL[providerAction(state(), connecting())], {
                           name: option().name,
                         })}
@@ -491,6 +522,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                     <Show
                       when={
                         props.onSignInProvider &&
+                        !connectOptional() &&
                         (option().id === "opencode"
                           ? runtimeAction() === undefined ||
                             runtimeAction() === "connect" ||
@@ -513,27 +545,41 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         {i18n.t("provider.action.signIn")}
                       </Button>
                     </Show>
-                    {/* The second way in, for the computer the first one cannot serve: no browser,
-                      a remote session, or a browser signed in to the wrong account.
+                    {/* The row's secondary actions: Update on every downloaded runtime, and the code
+                      sign-in for the computer the browser hand-off cannot serve (no browser, a
+                      remote session, or a browser signed in to the wrong account).
 
-                      Behind a menu rather than beside Connect: it is the rarer way in, and a second
-                      button on every row would make the rows argue about which one to press. The
-                      menu holds whatever else a row offers later. */}
-                    <Show when={codeSignInOffered()}>
+                      Behind a menu rather than beside Connect: a second button on every row would
+                      make the rows argue about which one to press, and the "Update available" badge
+                      already points at the offer. */}
+                    <Show when={actionsMenu()}>
                       <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                         <DropdownMenu.Trigger
                           class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
-                          aria-label={i18n.t("provider.aria.moreSignIn", { name: option().name })}
+                          aria-label={i18n.t("provider.aria.moreActions", { name: option().name })}
                           disabled={props.disabled || props.refreshingProviders}
                         >
                           <Ellipsis aria-hidden="true" />
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Portal mount={props.menuMount}>
                           <DropdownMenu.Content>
-                            <DropdownMenu.Item onSelect={() => void props.onSignInWithCodeProvider?.(option().id)}>
-                              <Smartphone aria-hidden="true" />
-                              {i18n.t("provider.action.signInWithCode")}
-                            </DropdownMenu.Item>
+                            <Show when={updateOffered()}>
+                              <DropdownMenu.Item
+                                disabled={!updatable() || connecting()}
+                                onSelect={() => void props.onUpdateProvider?.(option().id)}
+                              >
+                                <RefreshCw aria-hidden="true" />
+                                {updatable()
+                                  ? i18n.t("provider.action.updateTo", { version: option().availableVersion ?? "" })
+                                  : i18n.t("provider.action.upToDate")}
+                              </DropdownMenu.Item>
+                            </Show>
+                            <Show when={codeSignInOffered()}>
+                              <DropdownMenu.Item onSelect={() => void props.onSignInWithCodeProvider?.(option().id)}>
+                                <Smartphone aria-hidden="true" />
+                                {i18n.t("provider.action.signInWithCode")}
+                              </DropdownMenu.Item>
+                            </Show>
                           </DropdownMenu.Content>
                         </DropdownMenu.Portal>
                       </DropdownMenu.Root>
@@ -635,6 +681,26 @@ const PROVIDER_ACTION_LABEL = {
   restart: "provider.aria.restart",
   retry: "provider.aria.retry",
 } as const satisfies Record<ProviderAction, keyof AppMessages>;
+
+/**
+ * Connect is the step a row is waiting for, so it takes the accent colour. An outlined Connect read
+ * as a disabled button beside a "Ready" badge (issue #643). Reconnect and Restart repeat a step
+ * already done, so they stay outlined.
+ */
+function providerActionClass(action: ProviderAction) {
+  return action === "connect" ? "provider-picker-install provider-picker-connect" : "provider-picker-install";
+}
+
+/**
+ * Whether a free-models row can be used without Connect: its runtime is on disk and nothing reports
+ * it broken. The provider state can still say signed out or unchecked, because free models need no
+ * sign-in and the first connection only asks the CLI for its models. An error or an outdated CLI
+ * keeps Connect, which is how the user retries.
+ */
+export function freeModelsReady(option: ProviderPickerOption): boolean {
+  if (!option.freeModels || option.state === "error" || option.state === "outdated") return false;
+  return option.runtimeStatus ? option.runtimeStatus.phase === "ready" : option.state === "sign-in-required";
+}
 
 /**
  * Whether the action reaches main's managed runtime store rather than a provider CLI.

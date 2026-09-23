@@ -1,5 +1,5 @@
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import { fireEvent, render } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 import { ProviderPicker, type ProviderPickerOption } from "./ProviderPicker";
 
@@ -128,7 +128,7 @@ describe("ProviderPicker", () => {
           onSignInProvider={vi.fn()}
           onSignInWithCodeProvider={onSignInWithCodeProvider}
         />
-      )).queryByRole("button", { name: "More ways to log in to ChatGPT" });
+      )).queryByRole("button", { name: "More actions for ChatGPT" });
 
     // Signed in is not a reason to hide it: this is the way to a second account.
     expect(menu(codex)).toBeTruthy();
@@ -149,8 +149,44 @@ describe("ProviderPicker", () => {
           onSignInProvider={vi.fn()}
           onSignInWithCodeProvider={onSignInWithCodeProvider}
         />
-      )).queryByRole("button", { name: "More ways to log in to Claude" }),
+      )).queryByRole("button", { name: "More actions for Claude" }),
     ).toBeNull();
+  });
+
+  it("offers Update in every downloaded row's actions menu, enabled only for a newer version", async () => {
+    const onUpdateProvider = vi.fn();
+    const view = render(() => (
+      <ProviderPicker
+        value="claude"
+        options={[
+          {
+            ...claude,
+            state: "available",
+            runtimeStatus: runtime({ version: "2.1.246" }),
+            availableVersion: "2.1.250",
+          },
+          { ...openCode, state: "available", runtimeStatus: runtime({}), availableVersion: null },
+          { ...openCode, id: "grok", name: "Grok", runtimeStatus: runtime({ phase: "not-downloaded", version: null }) },
+        ]}
+        ariaLabel="AI providers"
+        allowUnavailableSelection
+        onChange={vi.fn()}
+        onUpdateProvider={onUpdateProvider}
+      />
+    ));
+    const openMenu = (name: string) =>
+      fireEvent.pointerDown(view.getByRole("button", { name: `More actions for ${name}` }), { button: 0 });
+
+    // Nothing on the computer to update yet.
+    expect(view.queryByRole("button", { name: "More actions for Grok" })).toBeNull();
+
+    await openMenu("OpenCode");
+    expect(await screen.findByRole("menuitem", { name: "Up to date" })).toHaveAttribute("aria-disabled", "true");
+    await fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+
+    await openMenu("Claude");
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Update to 2.1.250" }), { button: 0 });
+    await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("claude"));
   });
 
   it("badges the tier and connection state without doubling them", () => {

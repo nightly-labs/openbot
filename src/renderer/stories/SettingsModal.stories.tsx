@@ -419,7 +419,7 @@ export const CodeSignIn: Story = {
   render: () => <SettingsModalStory initialOpen codeSignIn />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
-    await userEvent.click(await body.findByRole("button", { name: "More ways to log in to ChatGPT" }));
+    await userEvent.click(await body.findByRole("button", { name: "More actions for ChatGPT" }));
     await userEvent.click(await body.findByRole("menuitem", { name: "Log in with code" }));
     await expect(await body.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
   },
@@ -438,9 +438,10 @@ export const ProviderDownloads: Story = {
 /** The durable surface: the update the toast offers is still here after the toast is gone. */
 export const ProviderUpdateAvailable: Story = {
   render: () => <SettingsModalStory initialOpen providerUpdate />,
-  play: async () => {
+  play: async ({ userEvent }) => {
     const body = within(document.body);
-    await expect(body.findByRole("button", { name: "Update Claude to 2.1.250" })).resolves.toBeEnabled();
+    await userEvent.click(await body.findByRole("button", { name: "More actions for Claude" }));
+    await expect(body.findByRole("menuitem", { name: "Update to 2.1.250" })).resolves.toBeEnabled();
   },
 };
 
@@ -448,7 +449,8 @@ export const ProviderUpdateFromSettings: Story = {
   render: () => <SettingsModalStory initialOpen providerUpdate />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
-    await userEvent.click(await body.findByRole("button", { name: "Update Claude to 2.1.250" }));
+    await userEvent.click(await body.findByRole("button", { name: "More actions for Claude" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "Update to 2.1.250" }));
     await expect(body.findByText("Updating Claude")).resolves.toBeInTheDocument();
     await expect(body.findByText("Claude is up to date", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
   },

@@ -662,6 +662,17 @@
   padding-inline: 9px;
 }
 
+.ui-button.provider-picker-connect {
+  background: var(--openbot-accent);
+  color: var(--openbot-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-button.provider-picker-connect:hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-accent-hover);
+  }
+}
+
 .provider-picker-logo {
   width: 18px;
   height: 18px;

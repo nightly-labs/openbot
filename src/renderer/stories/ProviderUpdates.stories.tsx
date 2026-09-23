@@ -217,7 +217,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Drive it yourself. Nothing runs on its own here: the offer arrives on mount and the update starts
- * only when you press Update, on the notification or on the row. "Offer the update again" puts
+ * only when you press Update, on the notification or in the row's actions menu. "Offer the update again" puts
  * Claude back on the version it started from, so the whole flow can be watched more than once, and
  * the switch beside it interrupts the next run to make the Retry path reachable.
  */
@@ -227,10 +227,11 @@ export const Playground: Story = {
 
 /** The offer, on both surfaces at once. */
 export const UpdateAvailable: Story = {
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, userEvent }) => {
     const body = within(canvasElement.ownerDocument.body);
-    await expect(body.findByRole("button", { name: "Update Claude to 2.1.250" })).resolves.toBeEnabled();
     await expect(body.findByRole("button", { name: "Update" })).resolves.toBeEnabled();
+    await userEvent.click(await body.findByRole("button", { name: "More actions for Claude" }));
+    await expect(body.findByRole("menuitem", { name: "Update to 2.1.250" })).resolves.toBeEnabled();
   },
 };
 
@@ -242,9 +243,8 @@ export const UpdateFromToast: Story = {
 
     await waitFor(() => expect(body.getByRole("button", { name: "Cancel Claude" })).toBeEnabled());
     await expect(body.findByText("Claude is up to date", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
-    // Neither surface still offers an update the user already took. Sonner merges by toast id, so
-    // the settled notification keeps the offer's Update button unless the action is cleared by name.
-    await expect(body.queryByRole("button", { name: "Update Claude to 2.1.250" })).toBeNull();
+    // The notification no longer offers an update the user already took. Sonner merges by toast id,
+    // so the settled notification keeps the offer's Update button unless the action is cleared by name.
     await expect(body.queryByRole("button", { name: "Update" })).toBeNull();
   },
 };
@@ -254,7 +254,8 @@ export const UpdateFails: Story = {
   render: () => <ProviderUpdateFlow failOnce />,
   play: async ({ canvasElement, userEvent }) => {
     const body = within(canvasElement.ownerDocument.body);
-    await userEvent.click(await body.findByRole("button", { name: "Update Claude to 2.1.250" }));
+    await userEvent.click(await body.findByRole("button", { name: "More actions for Claude" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "Update to 2.1.250" }));
 
     await expect(body.findByText("Claude update failed", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
     await userEvent.click(await body.findByRole("button", { name: "Retry" }));
