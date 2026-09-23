@@ -1,5 +1,6 @@
 import { onSettled } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
+import { customProvidersPort } from "./custom-providers-port";
 import { createCustomProvidersStore } from "./stores/custom-providers-store";
 
 /**
@@ -13,7 +14,7 @@ import { createCustomProvidersStore } from "./stores/custom-providers-store";
 const CustomProviders = createSimpleContext({
   name: "Custom providers",
   init: () => {
-    const store = createCustomProvidersStore(() => window.openbot.customProviders);
+    const store = createCustomProvidersStore(() => customProvidersPort().customProviders);
     onSettled(() => {
       // A failure here leaves the list empty and `loaded` false. The Settings tab reloads on the
       // next open, so there is nothing to retry from a mount nobody is looking at.

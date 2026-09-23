@@ -16,6 +16,7 @@ import {
   writeSidebarPeopleOrder,
 } from "./sidebar-people-order";
 import { readSidebarPins, type SidebarPinsByServer, writeSidebarPins } from "./sidebar-pins-storage";
+import { sidebarPort } from "./sidebar-port";
 import { defaultSidebarLayout } from "./sidebar-sections";
 import { readSidebarCollapsed, type SidebarCollapsedByServer, writeSidebarCollapsed } from "./sidebar-sections-storage";
 
@@ -57,7 +58,7 @@ const Sidebar = createSimpleContext({
     /** The layout read for a server load, answering the default where the host has no layout to give. */
     function loadLayout(server: ServerSummary | undefined): Promise<SidebarLayoutSnapshot> {
       return serverSupportsCapability(server, "sidebar-layout")
-        ? window.openbot.agent.getSidebarLayout()
+        ? sidebarPort().agent.getSidebarLayout()
         : Promise.resolve(defaultSidebarLayout());
     }
 
@@ -65,7 +66,7 @@ const Sidebar = createSimpleContext({
       if (!activeServerSupportsCapability("sidebar-layout")) {
         throw new Error("This host does not support sidebar layout changes.");
       }
-      const layout = await window.openbot.agent.mutateSidebarLayout(action);
+      const layout = await sidebarPort().agent.mutateSidebarLayout(action);
       setSidebarLayout(layout);
     }
 
