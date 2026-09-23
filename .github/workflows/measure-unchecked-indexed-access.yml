@@ -57,9 +57,11 @@ jobs:
           for entry in "${projects[@]}"; do
             IFS='|' read -r name directory tsconfig <<< "$entry"
             echo "::group::$name"
+            # GitHub runs bash with `-e`; a failed tsc must not stop the loop.
+            status=0
             bun run --cwd "$directory" tsc --noEmit -p "$tsconfig" \
-              --noUncheckedIndexedAccess --pretty false > "tsc-logs/$name.log" 2>&1
-            echo "$?" > "tsc-logs/$name.exit"
+              --noUncheckedIndexedAccess --pretty false > "tsc-logs/$name.log" 2>&1 || status=$?
+            echo "$status" > "tsc-logs/$name.exit"
             if [ "$directory" = "." ]; then prefix=""; else prefix="$directory/"; fi
             # tsc prints paths relative to its working directory. The prefix
             # makes them relative to the repository root, so that projects
