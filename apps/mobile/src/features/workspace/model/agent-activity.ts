@@ -100,8 +100,9 @@ export function reduceAgentActivity(
     const request = event.type === "approval" ? event.approval : event.type === "prompt" ? event : event.request;
     return { ...current, [request.agentId]: { turnId: request.turnId, phase: "waiting", detail: null } };
   }
-  if (event.type === "agent-input-resolved" && current[event.agentId]) {
-    return { ...current, [event.agentId]: { ...current[event.agentId], phase: "working", detail: null } };
+  if (event.type === "agent-input-resolved") {
+    const activity = current[event.agentId];
+    if (activity) return { ...current, [event.agentId]: { ...activity, phase: "working", detail: null } };
   }
   return current;
 }

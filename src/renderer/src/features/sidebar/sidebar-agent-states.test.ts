@@ -4,6 +4,7 @@ import {
   type SidebarAgentStatesInput,
 } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { sidebarAgentStateLabel } from "@openbot/ui/features/sidebar/sidebar-filtering";
+import { assert } from "vitest";
 
 function queue(agentId: string, ...statuses: QueueDeliveryStatus[]): QueueSnapshot {
   const deliveries: QueueDelivery[] = statuses.map((status, index) => ({
@@ -173,6 +174,7 @@ describe("computeSidebarAgentStates", () => {
     );
 
     expect(states).toEqual({ chief: { kind: "routine", phase: "running", count: 2 } });
+    assert(states.chief);
     expect(sidebarAgentStateLabel(states.chief)).toBe("2 routines running");
   });
 
@@ -181,6 +183,7 @@ describe("computeSidebarAgentStates", () => {
       input({ queues: { chief: snapshot("chief", routineDelivery("chief", "queued")) } }),
     );
     expect(waiting.chief).toEqual({ kind: "routine", phase: "queued", count: 1 });
+    assert(waiting.chief);
     expect(sidebarAgentStateLabel(waiting.chief)).toBe("Routine waiting");
 
     const started = computeSidebarAgentStates(
@@ -207,6 +210,7 @@ describe("computeSidebarAgentStates", () => {
     );
 
     expect(states.chief).toEqual({ kind: "routine", phase: "needs-attention", count: 1 });
+    assert(states.chief);
     expect(sidebarAgentStateLabel(states.chief)).toBe("Routine needs attention");
   });
 

@@ -7,7 +7,8 @@ export function nextUnansweredQuestion(
 ): number | null {
   for (let step = 1; step <= questions.length; step += 1) {
     const index = (currentIndex + step) % questions.length;
-    if (!Object.hasOwn(answers, questions[index].id)) return index;
+    const question = questions[index];
+    if (question && !Object.hasOwn(answers, question.id)) return index;
   }
   return null;
 }

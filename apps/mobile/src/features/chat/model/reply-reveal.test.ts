@@ -54,7 +54,7 @@ it.each([
 ])("keeps code complete for copying from the first visible playback step: %s", (body) => {
   const tokens = parseChatMarkdown(body);
   const code = tokens[0];
-  if (code.type !== "code") throw new Error("Expected a code block");
+  if (code?.type !== "code") throw new Error("Expected a code block");
   const plan = createReplyReveal(tokens);
   expect(plan.at(0)).toEqual([]);
   expect(plan.at(1)).toEqual([code]);

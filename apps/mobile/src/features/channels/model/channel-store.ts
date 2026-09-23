@@ -156,7 +156,7 @@ export class MobileChannelStore {
           const current = entry.state.pages.get(channelId);
           if (current) {
             const messages = current.messages.slice(-50);
-            pages.set(channelId, { ...current, messages, olderCursor: messages[0].sequence });
+            pages.set(channelId, { ...current, messages, olderCursor: messages[0]?.sequence ?? current.olderCursor });
           }
           this.publish(entry, { pages });
         }

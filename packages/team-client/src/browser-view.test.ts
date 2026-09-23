@@ -8,7 +8,7 @@ import {
   encodeRemoteDesktopSignalBinary,
   encodeRemoteDesktopSignalControl,
 } from "@openbot/contracts/team-protocol/remote-stream-v1";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { createRemoteBrowserView } from "./browser-view";
 
 const sessionId = "11111111-1111-4111-8111-111111111111";
@@ -21,7 +21,9 @@ describe("remote browser view", () => {
     const frame = vi.fn();
     const ended = vi.fn();
     const view = await client.open(tabId, frame, ended);
-    const control = decodeRemoteDesktopSignalControl(send.mock.calls[0][0]);
+    const [openCall] = send.mock.calls;
+    assert(openCall);
+    const control = decodeRemoteDesktopSignalControl(openCall[0]);
     const bytes = encodeBrowserViewFrame({ sequence: 1, width: 10, height: 20, image: new Uint8Array([1, 2, 3]) });
     client.receive(encodeRemoteDesktopSignalBinary(control.streamId, bytes));
     expect(frame).not.toHaveBeenCalled();
@@ -78,8 +80,10 @@ describe("remote browser view", () => {
     opened?.();
     const view = await opening;
     await view.close();
-    const streamId = decodeRemoteDesktopSignalControl(send.mock.calls[0][0]).streamId;
-    expect(decodeRemoteDesktopSignalControl(send.mock.calls[1][0])).toEqual({ type: "close", streamId });
+    const [openCall] = send.mock.calls;
+    assert(openCall);
+    const streamId = decodeRemoteDesktopSignalControl(openCall[0]).streamId;
+    expect(decodeRemoteDesktopSignalControl(send.mock.calls[1]?.[0])).toEqual({ type: "close", streamId });
     expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`);
   });
   it("names frames only to a host that advertises frame points", async () => {
@@ -88,7 +92,9 @@ describe("remote browser view", () => {
       const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
       const client = createRemoteBrowserView(send, request, () => namesFrames);
       const view = await client.open(tabId, vi.fn(), vi.fn());
-      const control = decodeRemoteDesktopSignalControl(send.mock.calls[0][0]);
+      const [openCall] = send.mock.calls;
+      assert(openCall);
+      const control = decodeRemoteDesktopSignalControl(openCall[0]);
       client.receive(encodeRemoteDesktopSignalControl({ type: "opened", streamId: control.streamId }));
       await view.input({ type: "ack", sequence: 3 });
       await view.input({

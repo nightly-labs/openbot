@@ -27,10 +27,10 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
   for (const model of options) {
     if (model.provider !== "opencode") continue;
     const match = /^(.*)\/(none|minimal|low|medium|high|xhigh|max|ultra)$/.exec(model.id);
-    const base = match && byId.get(match[1]);
-    if (!base || model.name !== `${base.name} (${match[2]})`) continue;
-    const effort = match[2];
-    const name = effort === "xhigh" ? "Extra high" : effort[0].toUpperCase() + effort.slice(1);
+    const [, baseId, effort] = match ?? [];
+    const base = baseId === undefined ? undefined : byId.get(baseId);
+    if (!base || effort === undefined || model.name !== `${base.name} (${effort})`) continue;
+    const name = effort === "xhigh" ? "Extra high" : effort.charAt(0).toUpperCase() + effort.slice(1);
     variants.set(base.id, [...(variants.get(base.id) ?? []), { id: model.id, name }]);
     variantIds.add(model.id);
   }

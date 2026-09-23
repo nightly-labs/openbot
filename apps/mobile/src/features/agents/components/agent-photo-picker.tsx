@@ -38,7 +38,8 @@ export function AgentPhotoPicker({
         quality: 0.3,
       });
       if (result.canceled) return;
-      const asset = result.assets[0];
+      const [asset] = result.assets;
+      if (!asset) throw new Error("Could not open this photo. Try again.");
       const file = new File(asset.uri);
       const mimeType = isAvatarMimeType(file.type) ? file.type : (asset.mimeType ?? "");
       if (!isAvatarMimeType(mimeType)) throw new Error("Choose a JPEG, PNG, or WebP photo.");

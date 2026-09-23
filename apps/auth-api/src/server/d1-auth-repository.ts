@@ -448,7 +448,7 @@ export class D1AuthRepository implements AuthRepository {
         )
         .bind(input.now, input.ticketHash, input.serverId, input.now),
     ]);
-    if (created.meta.changes !== 1 || registered.meta.changes !== 1 || consumed.meta.changes !== 1) return null;
+    if (created?.meta.changes !== 1 || registered?.meta.changes !== 1 || consumed?.meta.changes !== 1) return null;
     const user = await this.authenticate(input.session.token, input.now);
     return user
       ? {

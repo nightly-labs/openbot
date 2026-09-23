@@ -55,6 +55,7 @@ const CONCEPT_AGENTS: AgentSummary[] = [
   ...STORY_AGENT_SUMMARIES,
   ...CONCEPT_AGENT_NAMES.map((name, index) => {
     const source = STORY_AGENT_SUMMARIES[index % STORY_AGENT_SUMMARIES.length];
+    if (!source) throw new Error("Story agent summaries are empty.");
     const id = `dock-concept-agent-${index + 1}`;
     return {
       ...source,

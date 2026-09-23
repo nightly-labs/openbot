@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { AgentSkillsModal } from "../features/conversation/AgentSkillsModal";
 import { STORY_MARKETPLACE_SKILL_DETAILS } from "../preview/fixtures";
 import { createMockOpenBot, type MockOpenBotControls } from "../preview/mock-openbot";
@@ -11,6 +11,7 @@ afterEach(() => {
   mock = undefined;
 });
 const skill = STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"];
+assert(skill);
 
 function installSkillMock(): void {
   mock = createMockOpenBot();

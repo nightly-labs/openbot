@@ -3,6 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "incremental": true,
+    "noUncheckedIndexedAccess": true,
     "paths": {
       "@/*": ["./src/*"],
       "@/assets/*": ["./assets/*"]

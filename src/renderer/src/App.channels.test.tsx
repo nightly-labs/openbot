@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { beforeAll, beforeEach, expect, it, vi } from "vitest";
+import { assert, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { emitAgentEvent, installOpenbotStub, testServer } from "./app-test-harness";
 import { CHANNEL_SELECTION_STORAGE_KEY } from "./features/channels/channel-selection";
@@ -176,7 +176,9 @@ it.each([0, 1])("opens the agent chat from author control %i", async (control) =
   }));
   const chat = await openSavedChannel();
   const controls = await within(chat).findAllByRole("button", { name: "Open Chief's chat" });
-  await fireEvent.click(controls[control]);
+  const authorControl = controls[control];
+  assert(authorControl);
+  await fireEvent.click(authorControl);
   const conversation = await screen.findByRole("main", { name: "Conversation" });
   expect(within(conversation).getByRole("heading", { name: "Chief", level: 1 })).toBeVisible();
 });
@@ -478,7 +480,7 @@ it("keeps a queued settings save on the channel it was made in", async () => {
   for (const [channelId, name] of [
     ["channel-test", "Project room"],
     ["channel-other", "Release room"],
-  ]) {
+  ] satisfies [string, string][]) {
     await window.openbot.agent.channelCommand({
       type: "save",
       operationId: `create-${channelId}`,

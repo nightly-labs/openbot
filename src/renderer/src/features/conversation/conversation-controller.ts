@@ -28,8 +28,8 @@ function readBrowserPipBounds(): BrowserBounds | null {
   const values = (window.localStorage.getItem(BROWSER_PIP_STORAGE_KEY) ?? "")
     .split(",")
     .map((value) => Number.parseFloat(value));
-  const [x, y, width, height] = values;
-  return values.length === 4 && values.every(Number.isFinite) ? { x, y, width, height } : null;
+  const [x = Number.NaN, y = Number.NaN, width = Number.NaN, height = Number.NaN] = values;
+  return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
 }
 
 interface ConversationResources {
