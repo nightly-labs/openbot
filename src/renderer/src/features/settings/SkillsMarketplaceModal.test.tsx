@@ -109,7 +109,11 @@ describe("SkillsMarketplaceModal", () => {
       localCreate: vi.fn(),
       localRevise: vi.fn(),
       localInstall: vi.fn(),
-      list: vi.fn(async (query) => (query?.category === "documents" ? page : { skills: [], nextCursor: null })),
+      list: vi.fn(async (query) =>
+        query?.category === "documents" || (!query?.category && !query?.query)
+          ? page
+          : { skills: [], nextCursor: null },
+      ),
       get: vi.fn(async () => {
         const skill = page.skills[0];
         if (!skill) throw new Error("Missing test skill.");
@@ -561,10 +565,16 @@ describe("SkillsMarketplaceModal", () => {
     const detail = await window.openbot.skills.get("release-notes");
     window.openbot.skills.list = vi.fn<OpenBotDesktopApi["skills"]["list"]>(async (query) => ({
       skills:
-        query?.category === "documents"
-          ? [{ ...detail, id: query.cursor ? "second" : detail.id, name: query.cursor ? "Second skill" : detail.name }]
+        query?.category === "documents" || !query?.category
+          ? [
+              {
+                ...detail,
+                id: query?.cursor ? "second" : detail.id,
+                name: query?.cursor ? "Second skill" : detail.name,
+              },
+            ]
           : [],
-      nextCursor: query?.category === "documents" && !query.cursor ? "next-page" : null,
+      nextCursor: query?.category !== "design" && !query?.cursor ? "next-page" : null,
     }));
     renderMarketplace();
     openSkillsTab();
@@ -584,21 +594,46 @@ describe("SkillsMarketplaceModal", () => {
 
   it("offers a category page only when the overview does not already show every listing", async () => {
     const detail = await window.openbot.skills.get("release-notes");
-    window.openbot.skills.list = vi.fn<OpenBotDesktopApi["skills"]["list"]>(async (query) => {
-      if (query?.category === "documents") return { skills: [detail], nextCursor: null };
-      if (query?.category === "design")
-        return {
-          skills: [{ ...detail, id: "overview-design", category: "design", name: "Overview design" }],
-          nextCursor: "next-page",
-        };
-      return { skills: [], nextCursor: null };
-    });
+    // The overview is one page; only a category with more rows than it shows offers its own page.
+    const design = Array.from({ length: 7 }, (_, index) => ({
+      ...detail,
+      id: `overview-design-${index}`,
+      category: "design" as const,
+      name: `Overview design ${index}`,
+    }));
+    window.openbot.skills.list = vi.fn<OpenBotDesktopApi["skills"]["list"]>(async () => ({
+      skills: [detail, ...design],
+      nextCursor: null,
+    }));
     renderMarketplace();
     openSkillsTab();
 
     await screen.findByRole("button", { name: "View all Design skills" });
     expect(screen.getByRole("heading", { name: "Documents" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "View all Documents skills" })).toBeNull();
+  });
+
+  it("asks only the categories the overview leaves short when the catalog is larger than one page", async () => {
+    const detail = await window.openbot.skills.get("release-notes");
+    const documents = Array.from({ length: 6 }, (_, index) => ({
+      ...detail,
+      id: `doc-${index}`,
+      name: `Doc ${index}`,
+    }));
+    const list = vi.fn<OpenBotDesktopApi["skills"]["list"]>(async (query) => {
+      if (!query?.category) return { skills: documents, nextCursor: "next-page" };
+      if (query.category === "design")
+        return { skills: [{ ...detail, id: "design", category: "design", name: "Small design" }], nextCursor: null };
+      return { skills: [], nextCursor: null };
+    });
+    window.openbot.skills.list = list;
+    renderMarketplace();
+    openSkillsTab();
+
+    await screen.findByRole("button", { name: "View Small design details" });
+    expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ category: "documents" }));
+    expect(screen.getByRole("button", { name: "View all Documents skills" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View all Design skills" })).toBeNull();
   });
 
   it("keeps newer category results when an older request finishes last", async () => {
@@ -610,8 +645,8 @@ describe("SkillsMarketplaceModal", () => {
     window.openbot.skills.list = vi.fn<OpenBotDesktopApi["skills"]["list"]>(async (query) => {
       if (query?.limit === 50 && query.category === "design") return oldPage;
       return {
-        skills: query?.category === "design" ? [{ ...detail, category: "design", name: "Overview design" }] : [],
-        nextCursor: query?.category === "design" ? "next-page" : null,
+        skills: [{ ...detail, category: "design", name: "Overview design" }],
+        nextCursor: "next-page",
       };
     });
     renderMarketplace();
@@ -647,6 +682,27 @@ describe("SkillsMarketplaceModal", () => {
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ query: "solana" }));
   });
 
+  it("loads the overview with one request, keeps it when the marketplace opens again, and asks again on Refresh", async () => {
+    const list = vi.mocked(window.openbot.skills.list);
+    const first = renderMarketplace();
+    openSkillsTab();
+    await screen.findByRole("button", { name: "View Release Notes details" });
+    expect(list).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    renderMarketplace();
+    openSkillsTab();
+    await screen.findByRole("button", { name: "View Release Notes details" });
+    expect(list).toHaveBeenCalledTimes(1);
+
+    await fireEvent.pointerDown(screen.getByRole("button", { name: "Marketplace menu" }), {
+      pointerType: "mouse",
+      button: 0,
+    });
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Refresh" }), { button: 0 });
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+  });
+
   it("narrows the loaded listings while the search request is still open", async () => {
     const listed = (id: string, name: string) => ({
       id,
@@ -667,7 +723,7 @@ describe("SkillsMarketplaceModal", () => {
     };
     window.openbot.skills.list = vi.fn(async (query) => {
       if (query?.query) return new Promise<MarketplaceSkillPage>(() => undefined);
-      return query?.category === "documents" ? loaded : { skills: [], nextCursor: null };
+      return query?.category === "documents" || !query?.category ? loaded : { skills: [], nextCursor: null };
     });
     renderMarketplace();
     openSkillsTab();
@@ -1057,7 +1113,7 @@ describe("SkillsMarketplaceModal", () => {
     const search = Promise.withResolvers<MarketplaceSkillPage>();
     window.openbot.skills.list = vi.fn(async (query) => {
       if (query?.query) return search.promise;
-      return query?.category === "documents"
+      return query?.category === "documents" || !query?.category
         ? { skills: [listed], nextCursor: "next-page" }
         : { skills: [], nextCursor: null };
     });

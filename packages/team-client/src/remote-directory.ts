@@ -36,7 +36,6 @@ export interface RemoteTeamInvite {
 
 export interface RemoteTeamBootstrap {
   sessionId: string;
-  expiresAt: number;
   signalUrl: string;
   ticket: string;
 }
@@ -224,7 +223,24 @@ export class RemoteTeamDirectoryClient {
     // Keep the identity pin: leaving a team must not silently trust a substituted key on rejoin.
   }
 
-  async createBootstrap(hostId: string, clientPublicKey: string): Promise<RemoteTeamBootstrap> {
+  async createBootstrap(
+    hostId: string,
+    clientPublicKey: string,
+    existingSessionId: string | null = null,
+  ): Promise<RemoteTeamBootstrap> {
+    if (existingSessionId) {
+      try {
+        const ticket = decodeRemoteSessionTicket(
+          await this.#request(`/v2/remote/sessions/${encodeURIComponent(existingSessionId)}/ticket`, {
+            method: "POST",
+            body: { clientPublicKey },
+          }),
+        );
+        return { sessionId: existingSessionId, signalUrl: ticket.signalUrl, ticket: ticket.ticket };
+      } catch {
+        // The kept session ended. Starting a session returns the active one if it did not.
+      }
+    }
     const session = decodeRemoteSession(
       await this.#request("/v2/remote/sessions/", { method: "POST", body: { hostId } }),
     );
@@ -237,7 +253,6 @@ export class RemoteTeamDirectoryClient {
       );
       return {
         sessionId: session.sessionId,
-        expiresAt: session.expiresAt,
         signalUrl: ticket.signalUrl,
         ticket: ticket.ticket,
       };

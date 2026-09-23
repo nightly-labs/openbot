@@ -126,7 +126,7 @@ export function createWebWorkspaceRuntime(
   });
   const peer = dependencies.createPeer({
     current: {
-      getBootstrap: (id, key) => directory.createBootstrap(id, key),
+      getBootstrap: (id, key, sessionId) => directory.createBootstrap(id, key, sessionId),
       endSession: (id) => directory.endSession(id),
       onConnectionUpdate: async (update) => {
         if (update.state !== "online") {

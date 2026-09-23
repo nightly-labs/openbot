@@ -122,7 +122,9 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           style: { flex: 0, height: 1, width: 1 },
         }}
         endSession={(sessionId) => directory.endSession(sessionId)}
-        getBootstrap={(hostId, clientPublicKey) => directory.createBootstrap(hostId, clientPublicKey)}
+        getBootstrap={(hostId, clientPublicKey, existingSessionId) =>
+          directory.createBootstrap(hostId, clientPublicKey, existingSessionId)
+        }
         onCommandResult={handleCommandResult}
         onAccountProfileChanged={refreshProfile}
         onAccountServersChanged={onMembershipChanged}

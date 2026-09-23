@@ -239,6 +239,47 @@ describe("RemoteTeamDirectoryClient", () => {
     ]);
   });
 
+  it("asks only for a ticket on a kept session and starts a session when it ended", async () => {
+    const paths: string[] = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (input) => {
+        const path = new URL(input.toString()).pathname;
+        paths.push(path);
+        if (path === "/v2/remote/sessions/") {
+          return Response.json(
+            { sessionId: "session-2", hostId: HOST_ID, expiresAt: Date.now() + 60_000 },
+            { status: 201 },
+          );
+        }
+        if (path === "/v2/remote/sessions/ended/ticket") {
+          return Response.json({ error: "Remote session not found." }, { status: 404 });
+        }
+        return Response.json({
+          signalUrl: "wss://signal.example.test/v1/signal",
+          ticket: "remote-ticket",
+          expiresAt: Date.now() + 60_000,
+        });
+      },
+    });
+
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "session-1")).resolves.toMatchObject({
+      sessionId: "session-1",
+    });
+    expect(paths).toEqual(["/v2/remote/sessions/session-1/ticket"]);
+
+    paths.length = 0;
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "ended")).resolves.toMatchObject({
+      sessionId: "session-2",
+    });
+    expect(paths).toEqual([
+      "/v2/remote/sessions/ended/ticket",
+      "/v2/remote/sessions/",
+      "/v2/remote/sessions/session-2/ticket",
+    ]);
+  });
+
   it("accepts an unencrypted Signal URL only on a private development network", async () => {
     const client = new RemoteTeamDirectoryClient({
       apiUrl: API_URL,
