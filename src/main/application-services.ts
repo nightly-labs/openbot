@@ -50,6 +50,7 @@ import { BrowserHost } from "../backend/browser-host";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
+import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
@@ -221,6 +222,7 @@ export interface ApplicationServices {
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   mailbox: MailboxStore;
+  storageUsage: StorageUsageService;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
   browserView: BrowserViewClient;
@@ -792,6 +794,30 @@ export async function createApplicationServices({
   providerRuntimes.on("ready", (runtime) => {
     if (isManagedToolRuntime(runtime)) service.refreshAllAgentRuntimes();
   });
+  const userData = app.getPath("userData");
+  const storageSources = {
+    roots: {
+      database: store.database.path,
+      downloads: store.downloadsRoot,
+      caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
+        join(userData, name),
+      ),
+      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update")],
+      runtimes: providerRuntimeRoot({
+        appData: app.getPath("appData"),
+        userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
+      }),
+      data: userData,
+    },
+    database: () => store.database.connection,
+    mailbox,
+    agents: () => service.listAgents(),
+  };
+  const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
+  // A deleted or renamed agent changes every scope, so no surface keeps its old answer.
+  service.on("event", (event) => {
+    if (event.type === "agents-changed") storageUsage.invalidate();
+  });
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),
@@ -836,6 +862,8 @@ export async function createApplicationServices({
     channels: service.channels,
     // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
     mcpServers: service,
+    // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
+    storage: storageUsage,
     // The host's Team API routes share the IPC handlers' runtime preparation: a first server
     // saved, enabled, or tested remotely must start and await the managed download like a local one.
     mcpToolRuntimePreparation: {
@@ -1138,6 +1166,7 @@ export async function createApplicationServices({
     providerCredentials,
     mcpOAuth,
     mailbox,
+    storageUsage,
     browser,
     browserPictureInPicture,
     browserView,

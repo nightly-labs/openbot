@@ -1,4 +1,4 @@
-import { Button, Lock } from "@openbot/ui";
+import { Button, Folder, Lock } from "@openbot/ui";
 import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -16,6 +16,11 @@ export interface ConversationHeaderProps {
     active: boolean;
     visible: boolean;
     onOpen: (trigger: HTMLButtonElement) => void;
+  };
+  /** The Files panel of this chat. Left out when the host cannot list them. */
+  files?: {
+    open: boolean;
+    onToggle: () => void;
   };
   browser?: {
     acting: boolean;
@@ -77,6 +82,20 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               <Show when={control().active}>
                 <span class="remote-desktop-button-dot" aria-hidden="true" />
               </Show>
+            </Button>
+          )}
+        </Show>
+        <Show when={props.files}>
+          {(files) => (
+            <Button
+              variant="ghost"
+              type="button"
+              class="header-panel-toggle"
+              aria-label={files().open ? "Hide files" : "Show files"}
+              aria-expanded={files().open ? "true" : "false"}
+              onClick={() => files().onToggle()}
+            >
+              <Folder aria-hidden="true" class="size-[14px]" />
             </Button>
           )}
         </Show>

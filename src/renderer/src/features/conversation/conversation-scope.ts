@@ -170,6 +170,8 @@ export function createConversationViewScope(props: ConversationProps) {
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
+    filesOpen,
+    toggleFilesPanel,
     filePreviewOpen,
     setActiveRightPanel,
     openRoutineSettings,
@@ -782,7 +784,8 @@ export function createConversationViewScope(props: ConversationProps) {
         setSidebarFilePreview(null);
         setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
       }
-      if (!previousAgentId || !agentId || (panel !== "settings" && panel !== "file-preview")) return;
+      if (!previousAgentId || !agentId || (panel !== "settings" && panel !== "file-preview" && panel !== "files"))
+        return;
       setRightPanels((current) => ({ ...current, [agentId]: "none" }));
     },
   );
@@ -1054,6 +1057,8 @@ export function createConversationViewScope(props: ConversationProps) {
     editingPendingSave,
     expandedEmojiMessageId,
     scrollFades,
+    filesOpen,
+    toggleFilesPanel,
     filePreviewOpen,
     handleChatSearchShortcut,
     hideBrowserPanel,

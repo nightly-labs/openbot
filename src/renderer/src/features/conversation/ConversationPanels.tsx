@@ -1,3 +1,8 @@
+import type { ServerSummary } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import type { AgentFilesOptions } from "../files/AgentFilesSettings";
+import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
@@ -35,10 +40,12 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     revealSidebarFile,
     conversationPanelElement,
     filePreviewOpen,
+    filesOpen,
     openBrowserAddress,
     openExternalMessageUrl,
     openRoutineRunMessage,
     openSharedFile,
+    previewAttachment,
     openSidebarFileExternally,
     openWorkspaceFile,
     navigateBrowserTab,
@@ -62,6 +69,28 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     updateRuntimeSettings,
   } = useConversationViewScope();
   let browserPreviewTrigger: HTMLButtonElement | undefined;
+  /** Agent settings > Files. */
+  const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
+    // The web client reaches a host through `runtime`, which has no storage methods.
+    if (props.runtime || !serverHasStorage(server)) return undefined;
+    return {
+      serverId: server.id,
+      canManage: canManageStorage(server),
+      onOpenWorkspace:
+        server.kind === "local"
+          ? () =>
+              void window.openbot.storage.openLocation({ agentId }).catch((error) =>
+                toast.error("Could not open the workspace folder", {
+                  description: errorMessage(error, "Try again."),
+                }),
+              )
+          : undefined,
+      onPreviewFile: (file) => void previewAttachment(file),
+      onShowMessage: (messageId) => openRoutineRunMessage(messageId),
+      // The agent's chat is behind the settings, so closing them opens it.
+      onOpenConversation: () => setActiveRightPanel("none"),
+    };
+  };
   createEffect(
     () => ({ expanded: browserExpandedOpen(), suspended: props.globalOverlayOpen || props.remoteDesktopVisible }),
     ({ expanded, suspended }) => {
@@ -117,6 +146,26 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
             </Loading>
           );
         }}
+      </Show>
+
+      <Show when={filesOpen() && !props.runtime && serverHasStorage(props.server) && props.server}>
+        {(server) => (
+          <Show when={props.agent?.threadId}>
+            {(threadId) => (
+              <Loading>
+                <ChatFilesPanel
+                  serverId={server().id}
+                  conversationId={threadId()}
+                  conversationTitle={props.agent?.name ?? "this chat"}
+                  canManage={canManageStorage(server())}
+                  onClose={() => setActiveRightPanel("none")}
+                  onPreviewFile={(file) => void previewAttachment(file)}
+                  onShowMessage={(messageId) => void props.onOpenSearchMessage?.(messageId)}
+                />
+              </Loading>
+            )}
+          </Show>
+        )}
       </Show>
 
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>
@@ -257,6 +306,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               }
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
+              files={agentFiles(props.server, agent().id)}
             />
           </Loading>
         )}
@@ -268,5 +318,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
 const BrowserPanel = lazy(() => import("@openbot/ui/features/browser/BrowserPanel"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
+const ChatFilesPanel = lazy(() => import("../files/ChatFilesPanel"));
 
 const BrowserPreviewSidebar = lazy(() => import("./BrowserPreviewSidebar"));

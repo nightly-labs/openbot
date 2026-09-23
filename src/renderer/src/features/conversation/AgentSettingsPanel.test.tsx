@@ -163,6 +163,43 @@ describe("AgentSettingsPanel", () => {
     }
   });
 
+  // The Files row and the view it opens share one read, so the row's total is the view's total.
+  it("opens an agent's files from its settings and returns to them", async () => {
+    mock = createMockOpenBot();
+    window.openbot = mock.api;
+    const getUsage = vi.spyOn(mock.api.storage, "getUsage");
+    render(() => (
+      <AgentSettingsPanel
+        agent={STORY_AGENTS[0]}
+        runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
+        agentStatus={STORY_AGENT_STATUS}
+        modelOptions={STORY_MODELS}
+        working={false}
+        maxWidth={() => 640}
+        onClose={vi.fn()}
+        onWidthChange={vi.fn()}
+        onUpdateAgent={vi.fn(async () => undefined)}
+        onUpdateRuntimeSettings={vi.fn(async () => true)}
+        onSetAgentAvatar={vi.fn(async () => undefined)}
+        files={{
+          serverId: "local",
+          canManage: true,
+          onPreviewFile: vi.fn(),
+          onShowMessage: vi.fn(),
+          onOpenConversation: vi.fn(),
+        }}
+      />
+    ));
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^Files/u }));
+    expect(await screen.findByRole("region", { name: `Files of ${STORY_AGENTS[0].name}` })).toBeInTheDocument();
+    expect(getUsage).toHaveBeenCalledOnce();
+    expect(getUsage).toHaveBeenCalledWith({ scope: "agent", agentId: STORY_AGENTS[0].id }, "local");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Back to settings" }));
+    expect(await screen.findByRole("button", { name: /^Files/u })).toBeInTheDocument();
+  });
+
   it("opens a requested skill in the existing management modal", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;

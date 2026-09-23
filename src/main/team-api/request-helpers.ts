@@ -1,5 +1,6 @@
 import { channelRequest, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import { isMcpRoute, mcpRequest } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isStorageRoute, storageRequest } from "@openbot/contracts/team-protocol/storage-v1";
 import { decodeTeamProtocolV4CurrentHttpRequest } from "@openbot/contracts/team-protocol/v4-adapter";
 // Reading a Team API request: the parsers, the validators and the capability filters that every
 // route module needs and none of them owns.
@@ -186,6 +187,11 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
     if (isMcpRoute(request.url ?? "/")) {
       const input = mcpRequest(request.url ?? "/", value);
       if (!isDynamicRecord(input)) throw new Error("Invalid MCP request.");
+      return input;
+    }
+    if (isStorageRoute(request.url ?? "/")) {
+      const input = storageRequest(request.url ?? "/", value);
+      if (!isDynamicRecord(input)) throw new Error("Invalid storage request.");
       return input;
     }
     if (isChannelRoute(request.url ?? "/")) {

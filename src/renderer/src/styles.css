@@ -22,6 +22,7 @@
 @import "@openbot/ui/features/conversation/conversation.css";
 @import "./features/channels/channels.css";
 @import "./features/usage/usage.css";
+@import "@openbot/ui/features/files/files.css";
 @import "./features/settings/settings-modal.css";
 @import "./features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";

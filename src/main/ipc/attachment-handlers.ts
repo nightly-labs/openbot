@@ -17,6 +17,7 @@ import {
   type FilePreview,
   type ImportAttachmentsInput,
   LOCAL_SERVER_ID,
+  type OpenAttachmentInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -135,44 +136,13 @@ export function attachmentIpcHandlers({
             }),
         );
       }),
-      openAttachment: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseOpenAttachment(scoped.payload);
-        return routeToServer<void>(scoped.serverId, {
-          local: async () => {
-            const attachment = await mailbox.resolveAttachment(parsed.attachmentId);
-            if (!attachment) throw new Error("Attachment was not found.");
-            if (parsed.action === "download") {
-              const safeId = basename(parsed.attachmentId).replace(/[^a-z0-9_-]/gi, "-") || "attachment";
-              const suggestedName = basename(attachment.name) || `attachment-${safeId}`;
-              const filePath = await chooseSavePath(getMainWindow(), suggestedName);
-              if (!filePath) return;
-              await copyFile(attachment.path, filePath);
-              return;
-            }
-            if (parsed.action === "reveal") {
-              shell.showItemInFolder(attachment.path);
-              return;
-            }
-            await openPath(attachment.path);
-          },
-          remote: async (serverId) => {
-            const downloaded = await remoteServers.downloadAttachment(parsed.attachmentId, serverId);
-            const suggestedName = basename(downloaded.name) || `attachment-${parsed.attachmentId}`;
-            if (parsed.action === "download") {
-              const filePath = await chooseSavePath(getMainWindow(), suggestedName);
-              if (!filePath) return;
-              await writeFile(filePath, downloaded.bytes, { mode: 0o600 });
-              return;
-            }
-            const cacheRoot = join(app.getPath("userData"), "remote-attachments");
-            await mkdir(cacheRoot, { recursive: true });
-            const target = join(cacheRoot, `${parsed.attachmentId}-${suggestedName}`);
-            await writeFile(target, downloaded.bytes, { mode: 0o600 });
-            if (parsed.action === "reveal") shell.showItemInFolder(target);
-            else await openPath(target);
-          },
-        });
-      }),
+      openAttachment: payloadHandler(parseAgentRequest, (scoped) =>
+        openAttachmentForServer(
+          { mailbox, remoteServers, getMainWindow },
+          scoped.serverId,
+          parseOpenAttachment(scoped.payload),
+        ),
+      ),
       openSharedFile: payloadHandler(parseAgentRequest, (scoped) => {
         const parsed = parseOpenSharedFile(scoped.payload);
         return routeToServer<void>(scoped.serverId, {
@@ -230,6 +200,57 @@ export function attachmentIpcHandlers({
       }),
     },
   };
+}
+
+export type OpenAttachmentDependencies = Pick<AttachmentIpcDependencies, "getMainWindow"> & {
+  mailbox: Pick<MailboxStore, "resolveAttachment">;
+  remoteServers: Pick<RemoteServerManager, "downloadAttachment">;
+};
+
+/**
+ * Opens, reveals or saves one sent or generated file of the local host or a joined server. The
+ * chat and the storage surfaces both reach a file by its attachment id, so they share this.
+ */
+export function openAttachmentForServer(
+  { mailbox, remoteServers, getMainWindow }: OpenAttachmentDependencies,
+  serverId: string,
+  input: OpenAttachmentInput,
+): Promise<void> {
+  return routeToServer<void>(serverId, {
+    local: async () => {
+      const attachment = await mailbox.resolveAttachment(input.attachmentId);
+      if (!attachment) throw new Error("This file is no longer available.");
+      if (input.action === "download") {
+        const safeId = basename(input.attachmentId).replace(/[^a-z0-9_-]/gi, "-") || "attachment";
+        const suggestedName = basename(attachment.name) || `attachment-${safeId}`;
+        const filePath = await chooseSavePath(getMainWindow(), suggestedName);
+        if (!filePath) return;
+        await copyFile(attachment.path, filePath);
+        return;
+      }
+      if (input.action === "reveal") {
+        shell.showItemInFolder(attachment.path);
+        return;
+      }
+      await openPath(attachment.path);
+    },
+    remote: async (target) => {
+      const downloaded = await remoteServers.downloadAttachment(input.attachmentId, target);
+      const suggestedName = basename(downloaded.name) || `attachment-${input.attachmentId}`;
+      if (input.action === "download") {
+        const filePath = await chooseSavePath(getMainWindow(), suggestedName);
+        if (!filePath) return;
+        await writeFile(filePath, downloaded.bytes, { mode: 0o600 });
+        return;
+      }
+      const cacheRoot = join(app.getPath("userData"), "remote-attachments");
+      await mkdir(cacheRoot, { recursive: true });
+      const cached = join(cacheRoot, `${input.attachmentId}-${suggestedName}`);
+      await writeFile(cached, downloaded.bytes, { mode: 0o600 });
+      if (input.action === "reveal") shell.showItemInFolder(cached);
+      else await openPath(cached);
+    },
+  });
 }
 
 // A remote file has to land on disk before the OS can open it. Owner-only, under a per-server and
