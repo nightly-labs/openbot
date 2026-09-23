@@ -63,7 +63,7 @@ Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 bunx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
 bun run start                # start the dev server
 bun run lint                 # lint and format-check with Biome
-bun run typecheck            # typecheck with TypeScript 7 (the root pre-commit hook runs it)
+bun run typecheck            # full mobile typecheck: do not run it by hand; the root pre-commit hook runs it
 bun run doctor               # diagnose dependency and config issues
 bunx expo install --fix      # fix incompatible package versions
 ```

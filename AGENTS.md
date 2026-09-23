@@ -63,15 +63,19 @@ as a routine completion or PR step.
 1. In a fresh worktree, run `bun install --frozen-lockfile` first.
 2. Run only the narrowest relevant test file and lint the changed files. Run checks one at a time, with one test worker where supported.
    Use `bun run test:desktop -- <path>` for one desktop or mobile test file.
-3. Do not run whole-workspace TypeScript checks, `typecheck:*`, or parallel checks. Do not
-   replace an aggregate command with its constituent checks. Leave broad type validation to CI
-   and state what remains unverified.
+3. To check types, run one project for the code you changed, one at a time:
+   `bun run typecheck:node` (`src/main`, `src/backend`, `src/preload`, `scripts`),
+   `bun run typecheck:renderer` (`src/renderer`, `packages/ui`), or the `typecheck` script of the
+   one package or app you changed. Each takes under 10 seconds. Do not run `bun run typecheck`, the
+   mobile typecheck, or parallel checks. Leave broad type validation to CI and state what remains
+   unverified.
 4. Do not run `bun run format`: it rewrites the whole repository. Use
    `biome check --write --max-diagnostics=none <paths>` for changed files.
 5. The pre-commit hook (`.githooks/pre-commit`) runs `check:staged`, `check:ui`, and
    `bun run typecheck` when the commit stages code. This is the only exception to rule 3. Do not run
    these checks by hand, and do not bypass the hook with `--no-verify`. The hook also runs the schema
-   parity test when a database schema file in `src/backend` is staged.
+   parity test when a database schema file in `src/backend` is staged. It stops the commit if Biome
+   fixes a file that also has unstaged changes; stage the fixes you want and commit again.
 
 [Check design notes](docs/development-checks.md#check-coverage) explain CI coverage, command aliases,
 and the separate Node and Bun type environments. Read them when changing checks or dependencies.
