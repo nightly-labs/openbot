@@ -963,6 +963,95 @@
   background: var(--openbot-text-on-light);
 }
 
+.ui-slider-field {
+  width: 100%;
+  display: grid;
+  gap: var(--openbot-space-1-5);
+}
+
+.ui-slider-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.ui-slider-label {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+}
+
+.ui-slider-value {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-sm);
+}
+
+.ui-slider-description {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.ui-slider-track {
+  position: relative;
+  height: 4px;
+  margin-block: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border-strong);
+  cursor: pointer;
+}
+
+/* The drawn track is 4px high, too thin to hit. A press on this area belongs to the track, so it
+   still sets the value from the pointer position and starts a drag. */
+.ui-slider-track::before {
+  content: "";
+  position: absolute;
+  inset: -10px 0;
+}
+
+/* Kobalte places the fill and the thumb with inline `left`/`right` percentages. */
+.ui-slider-fill {
+  position: absolute;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--openbot-text-secondary);
+}
+
+/* Kobalte owns the inline `transform` that centres the thumb on its value, so the vertical centring
+   uses `top` instead. */
+.ui-slider-thumb {
+  top: calc(50% - (var(--openbot-switch-thumb) / 2));
+  width: var(--openbot-switch-thumb);
+  height: var(--openbot-switch-thumb);
+  display: block;
+  border-radius: var(--openbot-radius-pill);
+  outline: none;
+  background: var(--openbot-text-primary);
+  box-shadow: 0 1px 2px var(--openbot-shadow-ring);
+  cursor: grab;
+}
+
+.ui-slider-thumb:focus-visible {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+.ui-slider-thumb[data-dragging] {
+  cursor: grabbing;
+}
+
+.ui-slider-field[data-disabled] {
+  opacity: 0.5;
+}
+
+.ui-slider-field[data-disabled] .ui-slider-track,
+.ui-slider-field[data-disabled] .ui-slider-thumb {
+  cursor: not-allowed;
+}
+
 .ui-switch[data-disabled] {
   opacity: 0.5;
 }

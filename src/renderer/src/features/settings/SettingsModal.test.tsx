@@ -138,13 +138,6 @@ describe("SettingsModal", () => {
     await fireEvent.click(launchSwitch);
     expect(value().launchAtLogin).toBe(false);
 
-    await fireEvent.click(screen.getByRole("switch", { name: "Show status in the MacBook notch" }));
-    expect(value().macBookNotch).toBe(false);
-    for (const dependent of ["Haptic feedback", "Show idle island", "Show on additional displays"]) {
-      expect(await screen.findByRole("switch", { name: dependent })).toBeChecked();
-      expect(screen.getByRole("switch", { name: dependent })).toBeDisabled();
-    }
-
     const select = screen.getByRole("button", { name: /^Open external links in/ });
     await fireEvent.pointerDown(select, { pointerType: "mouse", button: 0 });
     await fireEvent.click(screen.getByRole("option", { name: "OpenBot" }));
@@ -173,6 +166,24 @@ describe("SettingsModal", () => {
     await fireEvent.click(await screen.findByRole("tab", { name: "Updates" }));
 
     expect(await screen.findByRole("switch", { name: "Automatically download updates" })).not.toBeChecked();
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Dynamic Island" }));
+    const width = await screen.findByRole("slider", { name: "Width" });
+    await fireEvent.keyDown(width, { key: "ArrowLeft" });
+    await fireEvent.keyUp(width, { key: "ArrowLeft" });
+    await waitFor(() => expect(value().macBookNotchWidthPercent).toBe(95));
+    expect(width).toHaveAttribute("aria-valuetext", "95%");
+    await fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
+    expect(value().macBookNotchWidthPercent).toBe(100);
+    expect(screen.getByRole("button", { name: "Reset to default" })).toBeDisabled();
+
+    await fireEvent.click(screen.getByRole("switch", { name: "Show status in the MacBook notch" }));
+    expect(value().macBookNotch).toBe(false);
+    for (const dependent of ["Haptic feedback", "Show idle island", "Show on additional displays"]) {
+      expect(await screen.findByRole("switch", { name: dependent })).toBeChecked();
+      expect(screen.getByRole("switch", { name: dependent })).toBeDisabled();
+    }
+    expect(screen.getByRole("slider", { name: "Height" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("offers an update for a CLI the user installed, which has no managed download", async () => {

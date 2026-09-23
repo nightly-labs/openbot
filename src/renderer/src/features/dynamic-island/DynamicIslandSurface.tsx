@@ -177,6 +177,8 @@ export function DynamicIslandSurface() {
             state={viewState()}
             displayMode={displayMode}
             notchSize={displayMode === "notch" ? notchSize() : undefined}
+            widthPercent={preference().widthPercent}
+            heightPercent={preference().heightPercent}
             extendedHoverArea
             onStateChange={changeViewState}
             onAction={perform}

@@ -33,6 +33,8 @@ export interface DynamicIslandProps {
   compactLeading?: JSX.Element;
   compactTrailing?: JSX.Element;
   compactWidth?: number;
+  /** Overrides the compact height a notch or the default sets, for a user-chosen island size. */
+  compactHeight?: number;
   expandedContent: JSX.Element;
   state: DynamicIslandViewState;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;
@@ -82,7 +84,7 @@ const DEFAULT_HOVER_CONTENT_MOTION: DynamicIslandHoverContentMotion = {
   translateY: 6,
 };
 
-const COMPACT_EAR_TRACK_WIDTH = 38;
+export const DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH = 38;
 
 /**
  * A macOS-notch adaptation of SmoothUI's Dynamic Island pattern.
@@ -414,12 +416,13 @@ function dynamicIslandStyle(props: DynamicIslandProps): string | undefined {
   const compactWidth =
     props.compactWidth ??
     (props.displayMode !== "island" && props.notchSize !== undefined
-      ? props.notchSize.width + COMPACT_EAR_TRACK_WIDTH * 2
+      ? props.notchSize.width + DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH * 2
       : undefined);
+  const compactHeight = props.compactHeight ?? props.notchSize?.height;
   const styles = [
     compactWidth === undefined ? undefined : `--dynamic-island-compact-width: ${compactWidth}px`,
     props.notchSize === undefined ? undefined : `--dynamic-island-notch-width: ${props.notchSize.width}px`,
-    props.notchSize === undefined ? undefined : `--dynamic-island-notch-height: ${props.notchSize.height}px`,
+    compactHeight === undefined ? undefined : `--dynamic-island-notch-height: ${compactHeight}px`,
   ].filter((style): style is string => style !== undefined);
   return styles.length > 0 ? styles.join("; ") : undefined;
 }

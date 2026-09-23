@@ -8,10 +8,12 @@ import type {
   DynamicIslandPromptItem,
   DynamicIslandTakeoverItem,
 } from "@openbot/contracts/ipc";
+import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, dynamicIslandCompactHeight } from "@openbot/contracts/ipc";
 import {
   Badge,
   Button,
   Check,
+  DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH,
   DynamicIsland,
   DynamicIslandIdentity,
   type DynamicIslandNotchSize,
@@ -60,6 +62,10 @@ export interface OpenBotDynamicIslandProps {
   state: DynamicIslandViewState;
   displayMode?: "notch" | "island";
   notchSize?: DynamicIslandNotchSize;
+  /** The user-chosen compact width, as a percent of the default. The physical notch never shrinks. */
+  widthPercent?: number;
+  /** The user-chosen compact height, as a percent of the default. */
+  heightPercent?: number;
   extendedHoverArea?: boolean;
   suppressInitialHover?: boolean;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;
@@ -295,6 +301,11 @@ function adjustSharedMotion(
   };
 }
 
+/** Scales the ears beside the notch and keeps the notch itself: `floor` is the part that stays. */
+function scaleCompactWidth(width: number, floor: number, percent: number): number {
+  return Math.ceil((floor + ((width - floor) * percent) / 100) / 2) * 2;
+}
+
 function clampCompactWidth(width: number, minimum: number, maximum: number): number {
   const evenWidth = Math.ceil(width / 2) * 2;
   return Math.min(maximum, Math.max(minimum, evenWidth));
@@ -334,11 +345,33 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   let modeTransitionVersion = 0;
   let modeTransitionFrame: number | undefined;
   let modeTransitionDisposed = false;
-  const compactGeometry = createMemo(() => compactStatusGeometry(compactLayoutPresentation(), props.notchSize?.width));
+  const widthPercent = () => props.widthPercent ?? DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent;
+  const heightPercent = () => props.heightPercent ?? DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent;
+  const physicalNotchWidth = () => props.notchSize?.width ?? STATUS_COMPACT_NOTCH_WIDTH;
+  // The shared motion below is placed from these widths, so the size is applied here rather than
+  // in the island primitive: the avatar and badge then land on the resized ears.
+  const compactGeometry = createMemo(() => {
+    const geometry = compactStatusGeometry(compactLayoutPresentation(), props.notchSize?.width);
+    const percent = widthPercent();
+    if (!geometry || percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return geometry;
+    return {
+      notch: { width: scaleCompactWidth(geometry.notch.width, physicalNotchWidth(), percent) },
+      island: { width: scaleCompactWidth(geometry.island.width, 0, percent) },
+    };
+  });
   const compactWidth = () => {
     const geometry = compactGeometry();
-    if (!geometry) return undefined;
-    return props.displayMode === "island" ? geometry.island.width : geometry.notch.width;
+    if (geometry) return props.displayMode === "island" ? geometry.island.width : geometry.notch.width;
+    const percent = widthPercent();
+    if (percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return undefined;
+    if (props.displayMode === "island") return scaleCompactWidth(STATUS_COMPACT_ISLAND_MIN_WIDTH, 0, percent);
+    const notchWidth = physicalNotchWidth();
+    return scaleCompactWidth(notchWidth + DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH * 2, notchWidth, percent);
+  };
+  const compactHeight = () => {
+    const percent = heightPercent();
+    if (percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent) return undefined;
+    return dynamicIslandCompactHeight(props.displayMode === "island" ? undefined : props.notchSize?.height, percent);
   };
   const sharedLeading = createMemo(() => {
     const mode = statusMode(visiblePresentation().mode);
@@ -478,6 +511,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
         suppressInitialHover={props.suppressInitialHover}
         onStateChange={changeState}
         compactWidth={compactWidth()}
+        compactHeight={compactHeight()}
         sharedMotion={{
           leading: sharedLeading()?.[props.displayMode === "island" ? "island" : "notch"],
           trailing: sharedTrailing()?.[props.displayMode === "island" ? "island" : "notch"],

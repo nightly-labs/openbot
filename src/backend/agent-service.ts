@@ -467,6 +467,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         captureConfigRevision: () => this.#committedEndpointRevision,
         onProviderActivated: (provider, configRevision) => {
           if (provider === "opencode") this.#clearReleasedCustomProviders(configRevision);
+          void this.#runEndpointExclusive(() => this.#moveAgentsOffUnlistedModels(provider));
         },
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
@@ -1772,6 +1773,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         model: fallback.id,
         reasoningEffort: fallback.defaultReasoningEffort,
       });
+    }
+  }
+
+  /**
+   * Moves each agent of `provider` whose model the provider no longer lists to the provider's default,
+   * or to the first model it lists when the default is gone too.
+   *
+   * Only called with a catalogue the provider has just reported, because a stale one is no proof that
+   * a model is gone. The provider stays the same, so the agent keeps its thread, and a running turn
+   * keeps the model it started with. An empty catalogue moves nobody: that is a provider with no
+   * usable account, not a provider with no models.
+   */
+  async #moveAgentsOffUnlistedModels(provider: AgentProvider): Promise<void> {
+    const models = this.#availableModels().filter((model) => model.provider === provider);
+    const fallback = models.find((model) => model.id === defaultProviderModel(provider)) ?? models[0];
+    if (!fallback) return;
+    const affected = this.#store
+      .list()
+      .filter((agent) => providerForAgent(agent) === provider && !models.some((model) => model.id === agent.model));
+    for (const agent of affected) {
+      try {
+        await this.#applyAgentUpdate({
+          agentId: agent.id,
+          model: fallback.id,
+          reasoningEffort: fallback.defaultReasoningEffort,
+        });
+      } catch (error) {
+        this.#emitError("agent_model_fallback_failed", error, agent.id);
+      }
     }
   }
 

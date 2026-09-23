@@ -468,6 +468,15 @@ export const Profile: Story = {
   },
 };
 
+export const DynamicIsland: Story = {
+  render: () => <SettingsModalStory initialOpen />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Dynamic Island" }));
+    await expect(body.findByRole("slider", { name: "Width" })).resolves.toBeEnabled();
+  },
+};
+
 export const ComputerUse: Story = {
   render: () => <SettingsModalStory initialOpen />,
   play: async ({ userEvent }) => {
