@@ -221,7 +221,17 @@ def table(scored: dict) -> str:
     return "\n".join(lines)
 
 
-TASK_DRIVERS = ["jev", "muse-minimal", "muse-low"]
+TASK_DRIVERS = ["jev", "muse-minimal", "muse-low", "jev+muse", "jev+opus"]
+
+
+def call_usd(call: dict) -> float:
+    """The price of one task call: the service's own figure if it gave one, else the list price of its model."""
+    if call.get("usd") is not None:
+        return call["usd"]
+    if call["kind"] == "text":
+        return 0.0  # the text helper is not priced
+    price_in, price_out = PRICES["jev" if call["model"].startswith("jev") else "muse-low"]
+    return (call["inputTokens"] * price_in + call["outputTokens"] * price_out) / 1e6
 
 
 def score_tasks(result: dict) -> dict:
@@ -231,8 +241,7 @@ def score_tasks(result: dict) -> dict:
     calls = [call for task in tasks for call in task["calls"]]
     decisions = [call for call in calls if call["kind"] == "decision"]
     helper = [call for call in calls if call["kind"] == "text"]
-    price_in, price_out = PRICES[result["driver"]]
-    decision_usd = sum(c["inputTokens"] * price_in + c["outputTokens"] * price_out for c in decisions) / 1e6
+    managers = [call for call in calls if call["kind"] == "manager"]
     passed = [task for task in tasks if task["success"]]
     return {
         "success": f"{len(passed)} / {len(tasks)}",
@@ -257,7 +266,10 @@ def score_tasks(result: dict) -> dict:
         "unusable_replies": sum(not c["valid"] for c in calls),
         "decision_tokens_per_step": f"{round(sum(c['inputTokens'] for c in decisions) / len(decisions))} / "
         f"{round(sum(c['outputTokens'] for c in decisions) / len(decisions))}",
-        "decision_usd_per_task": round(decision_usd / len(tasks), 5),
+        "manager_calls_per_task": round(len(managers) / len(tasks), 1),
+        "manager_ms_p50": percentile([c["ms"] for c in managers], 0.5),
+        "manager_ms_p95": percentile([c["ms"] for c in managers], 0.95),
+        "model_usd_per_task": round(sum(call_usd(c) for c in calls) / len(tasks), 5),
     }
 
 
@@ -278,9 +290,11 @@ TASK_ROWS = [
     ("Share of wall time in model calls", "model_share"),
     ("Decision call P50 / P95, ms", None),
     ("Text-helper calls / P50 ms", None),
+    ("Manager calls per task", "manager_calls_per_task"),
+    ("Manager call P50 / P95, ms", None),
     ("Unusable replies", "unusable_replies"),
     ("Decision tokens per step in / out", "decision_tokens_per_step"),
-    ("Decision cost per task, USD", "decision_usd_per_task"),
+    ("Model cost per task, USD (text helper not priced)", "model_usd_per_task"),
 ]
 
 
@@ -291,6 +305,8 @@ def task_table(scored: dict) -> str:
         def cell(m: dict) -> str:
             if title.startswith("Decision call"):
                 return f"{fmt(m['decision_ms_p50'])} / {fmt(m['decision_ms_p95'])}"
+            if title.startswith("Manager call P50"):
+                return f"{fmt(m['manager_ms_p50'])} / {fmt(m['manager_ms_p95'])}"
             if title.startswith("Text-helper"):
                 return f"{m['text_helper_calls']} / {fmt(m['text_helper_ms_p50'])}"
             return fmt(m[key])

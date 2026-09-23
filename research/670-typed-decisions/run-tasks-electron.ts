@@ -14,9 +14,12 @@ import {
   type Driver,
   type HistoryEntry,
   JevDriver,
+  ManagedJevDriver,
   MuseDriver,
+  MuseManager,
   type Observation,
   type ObservedElement,
+  OpusManager,
 } from "./task-drivers";
 
 interface EventRule {
@@ -40,7 +43,7 @@ interface PageEvent {
   step: number;
 }
 
-const DRIVERS = ["jev", "muse-minimal", "muse-low"] as const;
+const DRIVERS = ["jev", "muse-minimal", "muse-low", "jev+muse", "jev+opus"] as const;
 const OUTCOMES = ["done", "blocked"] as const;
 const MAX_STEPS = 25;
 const STUCK_ACTIONS = 3;
@@ -111,7 +114,14 @@ const server = createServer((request, response) => {
 
 async function main(): Promise<void> {
   if (!isOneOf(DRIVERS, driverName)) throw new Error(`--driver must be one of ${DRIVERS.join(", ")}.`);
-  const driver: Driver = driverName === "jev" ? new JevDriver() : new MuseDriver(driverName.slice("muse-".length));
+  const driver: Driver =
+    driverName === "jev"
+      ? new JevDriver()
+      : driverName === "jev+muse"
+        ? new ManagedJevDriver(new MuseManager())
+        : driverName === "jev+opus"
+          ? new ManagedJevDriver(new OpusManager())
+          : new MuseDriver(driverName.slice("muse-".length));
   const allTasks = readTasks(JSON.parse(await readFile(join(tasksRoot, "tasks.json"), "utf8")));
   const selected = onlyTasks ? new Set(onlyTasks.split(",")) : null;
   const tasks = allTasks.filter((task) => !selected || selected.has(task.id));

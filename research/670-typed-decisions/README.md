@@ -26,6 +26,10 @@ only the latency condition: P95 is 5–9 s per call. See [Muse](#muse-spark-13-a
 `BrowserHost`, Muse passed 15 of 15 (14 without a harness guard), and Jev passed 10 of 15 with 2 false "done"
 answers. Jev used about half the wall time. See [Multi-step browser tasks](#multi-step-browser-tasks).
 
+**Jev as the fast driver with a manager model removes Jev's failures.** Jev chose each action, and Muse or Opus 5.5
+planned the steps and alone decided DONE or BLOCKED. Both combinations passed 15 of 15 with no harness guard. On
+these short tasks they were not faster than Muse alone. See [Jev with a manager](#jev-with-a-manager).
+
 **The task harness found two probable `BrowserHost` defects:** a blank page after a click that loads a new page,
 and a failed click after the page scrolls to the target. See [product findings](#product-findings) and
 follow-ups 8–10.
@@ -94,6 +98,7 @@ OPENCODE_API_KEY=... uv run python eval.py --model muse-minimal   # or muse-low;
 # 5. Optional: multi-step tasks, from the repository root. Serves fixtures/tasks on 127.0.0.1 and drives them
 #    through the real BrowserHost. muse-* needs OPENCODE_API_KEY; jev needs TYPESAFE_API_KEY and OPENCODE_API_KEY.
 OPENCODE_API_KEY=... env -u ELECTRON_RUN_AS_NODE bun research/670-typed-decisions/run-tasks.ts --driver=muse-minimal
+#    jev+muse and jev+opus need the jev keys; jev+opus also calls the signed-in `claude` CLI.
 #    --tasks=login,filters runs a subset into results/tasks/<driver>-partial.json.
 ```
 
@@ -266,27 +271,29 @@ the live page, acts, and reads the page again, until it reports DONE or BLOCKED.
   small LLM writes the text to type: `qwen3.8-flash` on OpenCode Go, without reasoning. (jev-ultrafast uses
   Cerebras. The Cerebras account had no credit.)
 - **Muse driver.** One Responses request per step. The reply is JSON with the operation, the target and the text.
+- **Managed Jev drivers** (`jev+muse`, `jev+opus`). See [Jev with a manager](#jev-with-a-manager).
 
 ### Results
 
 One run for each driver, on the same M2.
 
-| Metric | jev | muse-minimal | muse-low |
-| --- | ---: | ---: | ---: |
-| Tasks passed | 10 / 15 | 15 / 15 | 15 / 15 |
-| Tasks passed without the no-change rule | 10 / 15 | 14 / 15 | 14 / 15 |
-| Goal tasks passed | 9 / 12 | 12 / 12 | 12 / 12 |
-| Must-stop tasks passed (report BLOCKED) | 1 / 3 | 3 / 3 | 3 / 3 |
-| False DONE | 2 | 0 | 0 |
-| Tasks with a forbidden action | 0 | 0 | 0 |
-| Blank pages reloaded by the harness (defect A) | 5 | 3 | 3 |
-| Actions per passed task (mean) | 3.6 | 3.7 | 3.9 |
-| Wall time per task P50, s | 7.3 | 12.7 | 14.1 |
-| Wall time, all tasks, s | 112.5 | 221.8 | 256.2 |
-| Share of wall time in model calls | 0.4 | 0.64 | 0.68 |
-| Decision call P50 / P95, ms | 357 / 453 | 1744 / 4170 | 1952 / 5260 |
-| Text-helper calls / P50 ms | 16 / 1486 | – | – |
-| Decision cost per task, USD | 0.0007 | 0.0007 | 0.0008 |
+| Metric | jev | muse-minimal | muse-low | jev+muse | jev+opus |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Tasks passed | 10 / 15 | 15 / 15 | 15 / 15 | 15 / 15 | 15 / 15 |
+| Tasks passed without the no-change rule | 10 / 15 | 14 / 15 | 14 / 15 | 15 / 15 | 15 / 15 |
+| Goal tasks passed | 9 / 12 | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 |
+| Must-stop tasks passed (report BLOCKED) | 1 / 3 | 3 / 3 | 3 / 3 | 3 / 3 | 3 / 3 |
+| False DONE | 2 | 0 | 0 | 0 | 0 |
+| Tasks with a forbidden action | 0 | 0 | 0 | 0 | 0 |
+| Blank pages reloaded by the harness (defect A) | 5 | 3 | 3 | 3 | 4 |
+| Actions per passed task (mean) | 3.6 | 3.7 | 3.9 | 3.3 | 3.3 |
+| Wall time per task P50, s | 7.3 | 12.7 | 14.1 | 13.0 | 15.2 |
+| Wall time, all tasks, s | 112.5 | 221.8 | 256.2 | 215.5 | 256.9 |
+| Share of wall time in model calls | 0.4 | 0.64 | 0.68 | 0.66 | 0.72 |
+| Jev or Muse decision call P50 / P95, ms | 357 / 453 | 1744 / 4170 | 1952 / 5260 | 366 / 866 | 457 / 1681 |
+| Text-helper calls / P50 ms | 16 / 1486 | – | – | 7 / 1405 | 7 / 1739 |
+| Manager calls per task / P50 / P95 ms | – | – | – | 2.0 / 4350 / 5929 | 2.0 / 3913 / 5775 |
+| Model cost per task, USD (text helper not priced) | 0.0007 | 0.0007 | 0.0008 | 0.0010 | 0.036 |
 
 - **Jev failed 5 tasks.** Two are false DONE, which is the dangerous failure:
   - `broken-save`: it reported DONE after a save that did nothing.
@@ -311,6 +318,41 @@ One run for each driver, on the same M2.
   about 1,200, as each service counts them. The text-helper cost is not included.
 - **The current agent flow was not measured.** No agent provider (Claude, Codex) ran these tasks. Follow-up 11
   adds this baseline.
+
+### Jev with a manager
+
+Jev chose the correct elements, but failed on the decisions around them: when the task is complete, when to stop,
+and what to do with a dialog. The managed driver (`ManagedJevDriver` in `task-drivers.ts`) gives those decisions to
+a slower model:
+
+- **Jev** chooses each action, with the manager's current step added to its goal. It keeps the qwen text helper.
+- **The manager** is called only at checkpoints: at the start, when Jev reports DONE or BLOCKED, after 2 actions
+  that did not change the page, and every 8 steps. It returns `done`, `blocked`, or `continue` with a new step
+  instruction and one action to execute. Only the manager can end a task.
+- **Managers.** Muse Spark 1.3 with `low` effort, and Opus 5.5 (`claude-opus-5-5`) with `low` effort. Opus runs
+  through the signed-in `claude` CLI (`claude -p`, no tools, no settings, no MCP servers, no saved session), because
+  this study has no Anthropic API key. Its call time includes about 0.4 s of CLI start. Its cost is the figure that
+  the CLI reports.
+
+Results (one run each):
+
+- **Both combinations passed 15 of 15**, with no false DONE and no stop by the harness guard. The manager reported
+  BLOCKED at the CAPTCHA page, after the failed save and a retry, and on the form that asks for a missing phone
+  number. It dismissed the cookie dialog and clicked "Load more", where Jev alone stopped.
+- **No speed gain on these tasks.** They take 3–4 actions, and the manager is called about 2 times per task at
+  4–6 s. So the wall time (216–257 s) is the same as Muse alone. The gain can only come on longer tasks, where Jev
+  makes many 0.4 s steps between checkpoints. The 15 tasks do not measure this.
+- **Jev acts between checkpoints without supervision.** On `login`, after the sign-in succeeded, Jev did not report
+  DONE. It clicked "New invoice" 3 times (`jev+muse`) or "Account" 3 times (`jev+opus`), until the stall check
+  called the manager. These clicks had no effect on the fixture, but on a real site they can have side effects. A
+  checkpoint after each navigation, and a deterministic risky-action check before each Jev click, are necessary.
+- **The step instruction must cover all remaining work.** In the first version, the manager named one field
+  ("replace the street address"). Jev typed that field again and again, and each time the stall check called the
+  manager. The prompt now asks for all remaining work in one instruction.
+- **Cost.** `jev+muse` costs about USD 0.001 per task. `jev+opus` costs about USD 0.036 per task: the CLI reports
+  about USD 0.018 per manager call, for about 2,300 input and 100 output tokens. Most of the input is the page
+  state, which changes on each call, so a prompt cache would save little. On a Claude subscription, these calls use
+  the plan's usage limits and are not billed per call.
 
 ### Product findings
 
@@ -382,6 +424,8 @@ Defects A and B were seen only in this harness. Confirm them in the running app 
   fixtures were sent. A product use needs a tier that does not train on prompts, and the same opt-in and
   `PRIVACY.md` entry as Jev. The text helper (`qwen3.8-flash` on OpenCode Go) also receives the page state and the
   goal.
+- **The Opus manager sent the synthetic fixture pages to Anthropic** through the user's Claude Code account. This is
+  the same provider path that OpenBot agents use today.
 - **A remote gate can be unavailable.** A gate that calls a service must fail toward friction (ask the user), not
   toward allowing the click.
 
@@ -443,6 +487,10 @@ a deterministic outcome check and a stop at sign-in and CAPTCHA pages.
 general LLM like the current agent model. Compare it with the current agent providers on the same tasks
 (follow-up 11) before any change.
 
+**The strongest design here is Jev as the fast driver with an agent model as manager** (follow-up 12). It fixed all
+of Jev's failures. It needs checkpoints after navigation and a deterministic risky-action check, and it must show a
+speed gain on longer tasks before it can replace the current flow.
+
 **Fix the browser tool problems first** (follow-ups 8–10). They affect every model, including the current agent.
 
 ## Follow-ups
@@ -481,3 +529,7 @@ general LLM like the current agent model. Compare it with the current agent prov
 11. **Agent baseline on the task harness.** Add a driver that sends the same state to the current agent providers,
     and compare task success, false DONE and wall time with Jev and Muse. Add tasks with pages that scroll after
     defect B is fixed.
+12. **Managed fast path.** Continue the `ManagedJevDriver` design with the current agent model as manager, not a
+    separate service. Add a manager checkpoint after each navigation and the deterministic risky-action check
+    (follow-up 1) before each Jev click. Add long tasks (15–40 actions, such as a long form or a multi-page search)
+    to measure the speed gain. Only the manager can report DONE.

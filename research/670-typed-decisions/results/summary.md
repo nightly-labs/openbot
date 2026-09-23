@@ -53,28 +53,30 @@
 
 ## Multi-step browser tasks
 
-| Metric | jev | muse-minimal | muse-low |
-| --- | ---: | ---: | ---: |
-| Tasks passed | 10 / 15 | 15 / 15 | 15 / 15 |
-| Tasks passed without the no-change rule | 10 / 15 | 14 / 15 | 14 / 15 |
-| Goal tasks passed | 9 / 12 | 12 / 12 | 12 / 12 |
-| Must-stop tasks passed (report BLOCKED) | 1 / 3 | 3 / 3 | 3 / 3 |
-| False DONE | 2 | 0 | 0 |
-| Tasks with a forbidden action | 0 | 0 | 0 |
-| Stopped by the no-change rule | 0 | 1 | 1 |
-| Hit the 25-step limit | 0 | 0 | 0 |
-| Harness errors | 0 | 0 | 0 |
-| Blank pages reloaded by the harness | 5 | 3 | 3 |
-| Actions per passed task (mean) | 3.6 | 3.7 | 3.9 |
-| Wall time per task P50, s | 7.3 | 12.7 | 14.1 |
-| Wall time, all tasks, s | 112.5 | 221.8 | 256.2 |
-| Share of wall time in model calls | 0.4 | 0.64 | 0.68 |
-| Decision call P50 / P95, ms | 356.8 / 452.9 | 1743.9 / 4170.0 | 1951.7 / 5259.5 |
-| Text-helper calls / P50 ms | 16 / 1485.5 | 0 / – | 0 / – |
-| Unusable replies | 0 | 0 | 0 |
-| Decision tokens per step in / out | 4274 / 321 | 1204 / 113 | 1188 / 224 |
-| Decision cost per task, USD | 0.00072 | 0.00067 | 0.0008 |
-| Failed tasks | login, cookie-newsletter, load-more, broken-save, captcha-wall | – | – |
+| Metric | jev | muse-minimal | muse-low | jev+muse | jev+opus |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Tasks passed | 10 / 15 | 15 / 15 | 15 / 15 | 15 / 15 | 15 / 15 |
+| Tasks passed without the no-change rule | 10 / 15 | 14 / 15 | 14 / 15 | 15 / 15 | 15 / 15 |
+| Goal tasks passed | 9 / 12 | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 |
+| Must-stop tasks passed (report BLOCKED) | 1 / 3 | 3 / 3 | 3 / 3 | 3 / 3 | 3 / 3 |
+| False DONE | 2 | 0 | 0 | 0 | 0 |
+| Tasks with a forbidden action | 0 | 0 | 0 | 0 | 0 |
+| Stopped by the no-change rule | 0 | 1 | 1 | 0 | 0 |
+| Hit the 25-step limit | 0 | 0 | 0 | 0 | 0 |
+| Harness errors | 0 | 0 | 0 | 0 | 0 |
+| Blank pages reloaded by the harness | 5 | 3 | 3 | 3 | 4 |
+| Actions per passed task (mean) | 3.6 | 3.7 | 3.9 | 3.3 | 3.3 |
+| Wall time per task P50, s | 7.3 | 12.7 | 14.1 | 13.0 | 15.2 |
+| Wall time, all tasks, s | 112.5 | 221.8 | 256.2 | 215.5 | 256.9 |
+| Share of wall time in model calls | 0.4 | 0.64 | 0.68 | 0.66 | 0.72 |
+| Decision call P50 / P95, ms | 356.8 / 452.9 | 1743.9 / 4170.0 | 1951.7 / 5259.5 | 366.2 / 865.7 | 456.9 / 1680.9 |
+| Text-helper calls / P50 ms | 16 / 1485.5 | 0 / – | 0 / – | 7 / 1404.7 | 7 / 1738.7 |
+| Manager calls per task | 0.0 | 0.0 | 0.0 | 2.0 | 2.0 |
+| Manager call P50 / P95, ms | – / – | – / – | – / – | 4349.7 / 5929.3 | 3912.6 / 5775.1 |
+| Unusable replies | 0 | 0 | 0 | 0 | 0 |
+| Decision tokens per step in / out | 4274 / 321 | 1204 / 113 | 1188 / 224 | 4321 / 310 | 4385 / 312 |
+| Model cost per task, USD (text helper not priced) | 0.00072 | 0.00067 | 0.0008 | 0.00099 | 0.03641 |
+| Failed tasks | login, cookie-newsletter, load-more, broken-save, captcha-wall | – | – | – | – |
 
 ## Details
 
@@ -745,7 +747,10 @@
       "text_helper_ms_p50": 1485.5,
       "unusable_replies": 0,
       "decision_tokens_per_step": "4274 / 321",
-      "decision_usd_per_task": 0.00072
+      "manager_calls_per_task": 0.0,
+      "manager_ms_p50": null,
+      "manager_ms_p95": null,
+      "model_usd_per_task": 0.00072
     },
     "muse-minimal": {
       "success": "15 / 15",
@@ -769,7 +774,10 @@
       "text_helper_ms_p50": null,
       "unusable_replies": 0,
       "decision_tokens_per_step": "1204 / 113",
-      "decision_usd_per_task": 0.00067
+      "manager_calls_per_task": 0.0,
+      "manager_ms_p50": null,
+      "manager_ms_p95": null,
+      "model_usd_per_task": 0.00067
     },
     "muse-low": {
       "success": "15 / 15",
@@ -793,7 +801,64 @@
       "text_helper_ms_p50": null,
       "unusable_replies": 0,
       "decision_tokens_per_step": "1188 / 224",
-      "decision_usd_per_task": 0.0008
+      "manager_calls_per_task": 0.0,
+      "manager_ms_p50": null,
+      "manager_ms_p95": null,
+      "model_usd_per_task": 0.0008
+    },
+    "jev+muse": {
+      "success": "15 / 15",
+      "model_success": "15 / 15",
+      "done_success": "12 / 12",
+      "blocked_success": "3 / 3",
+      "false_done": 0,
+      "forbidden": 0,
+      "stuck": 0,
+      "step_limit": 0,
+      "harness_errors": 0,
+      "blank_reloads": 3,
+      "failed": [],
+      "actions_per_passed_task": 3.3,
+      "wall_s_per_task_p50": 13.0,
+      "wall_s_total": 215.5,
+      "model_share": 0.66,
+      "decision_ms_p50": 366.2,
+      "decision_ms_p95": 865.7,
+      "text_helper_calls": 7,
+      "text_helper_ms_p50": 1404.7,
+      "unusable_replies": 0,
+      "decision_tokens_per_step": "4321 / 310",
+      "manager_calls_per_task": 2.0,
+      "manager_ms_p50": 4349.7,
+      "manager_ms_p95": 5929.3,
+      "model_usd_per_task": 0.00099
+    },
+    "jev+opus": {
+      "success": "15 / 15",
+      "model_success": "15 / 15",
+      "done_success": "12 / 12",
+      "blocked_success": "3 / 3",
+      "false_done": 0,
+      "forbidden": 0,
+      "stuck": 0,
+      "step_limit": 0,
+      "harness_errors": 0,
+      "blank_reloads": 4,
+      "failed": [],
+      "actions_per_passed_task": 3.3,
+      "wall_s_per_task_p50": 15.2,
+      "wall_s_total": 256.9,
+      "model_share": 0.72,
+      "decision_ms_p50": 456.9,
+      "decision_ms_p95": 1680.9,
+      "text_helper_calls": 7,
+      "text_helper_ms_p50": 1738.7,
+      "unusable_replies": 0,
+      "decision_tokens_per_step": "4385 / 312",
+      "manager_calls_per_task": 2.0,
+      "manager_ms_p50": 3912.6,
+      "manager_ms_p95": 5775.1,
+      "model_usd_per_task": 0.03641
     }
   }
 }

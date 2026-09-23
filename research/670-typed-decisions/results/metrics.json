@@ -628,7 +628,10 @@
       "text_helper_ms_p50": 1485.5,
       "unusable_replies": 0,
       "decision_tokens_per_step": "4274 / 321",
-      "decision_usd_per_task": 0.00072
+      "manager_calls_per_task": 0.0,
+      "manager_ms_p50": null,
+      "manager_ms_p95": null,
+      "model_usd_per_task": 0.00072
     },
     "muse-minimal": {
       "success": "15 / 15",
@@ -652,7 +655,10 @@
       "text_helper_ms_p50": null,
       "unusable_replies": 0,
       "decision_tokens_per_step": "1204 / 113",
-      "decision_usd_per_task": 0.00067
+      "manager_calls_per_task": 0.0,
+      "manager_ms_p50": null,
+      "manager_ms_p95": null,
+      "model_usd_per_task": 0.00067
     },
     "muse-low": {
       "success": "15 / 15",
@@ -676,7 +682,64 @@
       "text_helper_ms_p50": null,
       "unusable_replies": 0,
       "decision_tokens_per_step": "1188 / 224",
-      "decision_usd_per_task": 0.0008
+      "manager_calls_per_task": 0.0,
+      "manager_ms_p50": null,
+      "manager_ms_p95": null,
+      "model_usd_per_task": 0.0008
+    },
+    "jev+muse": {
+      "success": "15 / 15",
+      "model_success": "15 / 15",
+      "done_success": "12 / 12",
+      "blocked_success": "3 / 3",
+      "false_done": 0,
+      "forbidden": 0,
+      "stuck": 0,
+      "step_limit": 0,
+      "harness_errors": 0,
+      "blank_reloads": 3,
+      "failed": [],
+      "actions_per_passed_task": 3.3,
+      "wall_s_per_task_p50": 13.0,
+      "wall_s_total": 215.5,
+      "model_share": 0.66,
+      "decision_ms_p50": 366.2,
+      "decision_ms_p95": 865.7,
+      "text_helper_calls": 7,
+      "text_helper_ms_p50": 1404.7,
+      "unusable_replies": 0,
+      "decision_tokens_per_step": "4321 / 310",
+      "manager_calls_per_task": 2.0,
+      "manager_ms_p50": 4349.7,
+      "manager_ms_p95": 5929.3,
+      "model_usd_per_task": 0.00099
+    },
+    "jev+opus": {
+      "success": "15 / 15",
+      "model_success": "15 / 15",
+      "done_success": "12 / 12",
+      "blocked_success": "3 / 3",
+      "false_done": 0,
+      "forbidden": 0,
+      "stuck": 0,
+      "step_limit": 0,
+      "harness_errors": 0,
+      "blank_reloads": 4,
+      "failed": [],
+      "actions_per_passed_task": 3.3,
+      "wall_s_per_task_p50": 15.2,
+      "wall_s_total": 256.9,
+      "model_share": 0.72,
+      "decision_ms_p50": 456.9,
+      "decision_ms_p95": 1680.9,
+      "text_helper_calls": 7,
+      "text_helper_ms_p50": 1738.7,
+      "unusable_replies": 0,
+      "decision_tokens_per_step": "4385 / 312",
+      "manager_calls_per_task": 2.0,
+      "manager_ms_p50": 3912.6,
+      "manager_ms_p95": 5775.1,
+      "model_usd_per_task": 0.03641
     }
   }
 }
