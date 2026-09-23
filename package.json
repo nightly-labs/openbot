@@ -203,6 +203,7 @@
     "package:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun scripts/install-cua-driver.ts win32 x64 && bun run build && electron-builder --dir --win --x64 --publish never",
     "verify:package:win": "bun scripts/verify-windows-package.ts",
     "package:linux": "bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --dir --linux --x64 --publish never",
+    "package:linux:arm64": "bun scripts/install-cua-driver.ts linux arm64 && bun run build && electron-builder --dir --linux --arm64 --publish never",
     "verify:package:linux": "bun scripts/verify-linux-package.ts",
     "package:linux:verify": "bun run package:linux && bun run verify:package:linux",
     "verify:update-artifacts": "bun scripts/verify-update-artifacts.ts",
@@ -210,6 +211,7 @@
     "dist:mac": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --arm64 --config.mac.identity=null --config.mac.notarize=false",
     "dist:win": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows && bun scripts/install-cua-driver.ts win32 x64 && bun run build && electron-builder --win nsis --x64 --publish never",
     "dist:linux": "bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --linux AppImage --x64 --publish never",
+    "dist:linux:arm64": "bun scripts/install-cua-driver.ts linux arm64 && bun run build && electron-builder --linux AppImage --arm64 --publish never",
     "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --arm64 --publish never"
   },
   "dependencies": {
