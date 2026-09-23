@@ -240,16 +240,13 @@ export function createConversationViewScope(props: ConversationProps) {
     setBrowserAddress,
     setBrowserAddressEditing,
     setComposerError: setScopedComposerError,
-    panels: {
-      setActiveRightPanel,
-      screenOpen: () =>
-        props.browserEnabled !== false &&
-        !props.browserVisibilitySuspended &&
-        ["browser", "browser-expanded", "browser-pip"].includes(activeRightPanel()),
-    },
+    panels: { activeRightPanel, setActiveRightPanel },
   });
   const {
-    browserInteractionAvailable,
+    browserSidebarOpen,
+    browserExpandedOpen,
+    browserPipOpen,
+    screenOpen,
     browserTabs,
     activeBrowserTab,
     browserTakeoverTab,
@@ -268,10 +265,6 @@ export function createConversationViewScope(props: ConversationProps) {
     reloadBrowserTab,
     navigateBrowserTab,
   } = browser;
-  const browserSidebarOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser";
-  const browserExpandedOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser-expanded";
-  const browserPipOpen = () => browserInteractionAvailable() && activeRightPanel() === "browser-pip";
-  const screenOpen = () => browserSidebarOpen() || browserExpandedOpen() || browserPipOpen();
   function showBrowserPanel() {
     setActiveRightPanel("browser");
     if (browserTabs().length === 0) void openBrowserAddress();
