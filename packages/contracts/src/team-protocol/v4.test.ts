@@ -109,6 +109,12 @@ describe("Team protocol v4", () => {
     ).toThrow();
   });
 
+  it("lists an agent whose CLI model id carries a context suffix", () => {
+    const agents = [{ ...response[0], provider: "claude", model: "claude-opus-5-5[1m]" }];
+    expect(JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/agents", 200, agents))).toEqual(agents);
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", "/v1/agents", 200, agents)).toEqual(agents);
+  });
+
   it("carries an address and the active tab that the frozen browser routes cannot", () => {
     const load = { tabId: "tab-1", url: "https://example.com/next" };
     expect(JSON.parse(encodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", load))).toEqual(load);
