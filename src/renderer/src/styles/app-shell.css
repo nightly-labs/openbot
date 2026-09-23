@@ -1929,6 +1929,8 @@ textarea {
 .avatar-image-upload strong,
 .avatar-image-upload small {
   display: block;
+  white-space: normal;
+  text-wrap: pretty;
 }
 
 .avatar-image-upload strong {
