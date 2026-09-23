@@ -312,8 +312,7 @@ describe("OnboardingFlow", () => {
       />
     ));
 
-    const next = view.getByRole("button", { name: "Next" });
-    expect(next).toBeDisabled();
+    expect(view.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
     await fireEvent.click(view.getByRole("button", { name: "Download Grok" }));
     expect(
       within(view.getByRole("radiogroup", { name: "Default provider" })).getByRole("radio", { name: /Grok/ }),
@@ -324,14 +323,14 @@ describe("OnboardingFlow", () => {
     await fireEvent.click(view.getByRole("button", { name: "Cancel Grok" }));
     expect(onCancelProviderDownload).toHaveBeenCalledWith("grok");
     expect(view.getByRole("button", { name: "Cancel Claude" })).toBeEnabled();
-    expect(next).toBeDisabled();
+    expect(view.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
 
     setRuntimeStatuses((current) => ({
       ...current,
       claude: { phase: "ready", progress: 100, message: null, version: "2.1.246" },
     }));
     await fireEvent.click(await view.findByRole("button", { name: "Connect Claude" }));
-    await waitFor(() => expect(next).toBeEnabled());
+    await waitFor(() => expect(view.getByRole("button", { name: "Next" })).toBeEnabled());
     await fireEvent.click(view.getByRole("button", { name: "Reconnect Claude" }));
     expect(onConnectProvider).toHaveBeenCalledTimes(2);
   });
@@ -361,17 +360,20 @@ describe("OnboardingFlow", () => {
     };
     const onDownloadProvider = vi.fn();
     const view = render(() => (
-      <OnboardingFlow
-        state={{ completed: false, preferredProvider: null, preferredModel: null }}
-        agentStatus={agentStatus}
-        platform="darwin"
-        refreshingProviders
-        providerRuntimeStatuses={runtimeStatuses}
-        onDownloadProvider={onDownloadProvider}
-        onCancelProviderDownload={vi.fn()}
-        onConnectProvider={vi.fn()}
-        onSave={async () => undefined}
-      />
+      <>
+        <OnboardingFlow
+          state={{ completed: false, preferredProvider: null, preferredModel: null }}
+          agentStatus={agentStatus}
+          platform="darwin"
+          refreshingProviders
+          providerRuntimeStatuses={runtimeStatuses}
+          onDownloadProvider={onDownloadProvider}
+          onCancelProviderDownload={vi.fn()}
+          onConnectProvider={vi.fn()}
+          onSave={async () => undefined}
+        />
+        <Toaster />
+      </>
     ));
 
     const download = view.getByRole("button", { name: "Download ChatGPT" });
@@ -379,10 +381,105 @@ describe("OnboardingFlow", () => {
     await fireEvent.click(download);
     expect(onDownloadProvider).toHaveBeenCalledWith("codex");
 
-    // The refused button says what it is waiting for, rather than leaving the screen to be read as
-    // broken.
-    expect(view.getByRole("button", { name: "Next" })).toBeDisabled();
-    expect(view.getByText("Download ChatGPT to continue.")).toBeInTheDocument();
+    // The main button stays pressable and says what it is waiting for, rather than leaving the
+    // screen to be read as broken.
+    await fireEvent.click(view.getByRole("button", { name: "Connect" }));
+    expect(await view.findAllByText("Download ChatGPT to continue.")).toHaveLength(2);
+  });
+
+  it("connects the selected provider from the main button and says so", async () => {
+    activeMock = createMockOpenBot();
+    window.openbot = activeMock.api;
+    const agentStatus: AgentStatus = {
+      ...STORY_AGENT_STATUS,
+      providers: (STORY_AGENT_STATUS.providers ?? []).map((provider) => ({
+        ...provider,
+        state: "sign-in-required",
+        message: null,
+      })),
+    };
+    const onConnectProvider = vi.fn();
+    const view = render(() => (
+      <>
+        <OnboardingFlow
+          state={{ completed: false, preferredProvider: null, preferredModel: null }}
+          agentStatus={agentStatus}
+          platform="darwin"
+          onConnectProvider={onConnectProvider}
+          onSave={async () => undefined}
+        />
+        <Toaster />
+      </>
+    ));
+
+    await fireEvent.click(
+      within(view.getByRole("radiogroup", { name: "Default provider" })).getByRole("radio", { name: /ChatGPT/ }),
+    );
+    await fireEvent.click(view.getByRole("button", { name: "Connect" }));
+    expect(onConnectProvider).toHaveBeenCalledWith("codex");
+    expect(
+      await view.findByText("Connecting ChatGPT. Finish the sign-in if a browser window opens."),
+    ).toBeInTheDocument();
+  });
+
+  it("continues with downloaded OpenCode free models without a sign-in", async () => {
+    activeMock = createMockOpenBot();
+    window.openbot = activeMock.api;
+    const agentStatus: AgentStatus = {
+      ...STORY_AGENT_STATUS,
+      providers: [
+        ...(STORY_AGENT_STATUS.providers ?? []).map((provider) => ({
+          ...provider,
+          state: "not-installed" as const,
+          message: null,
+        })),
+        { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null, email: null },
+      ],
+    };
+    const runtimeStatuses: Record<ManagedProviderId, ProviderRuntimeStatus> = {
+      codex: { phase: "not-downloaded", progress: null, message: null, version: null },
+      claude: { phase: "not-downloaded", progress: null, message: null, version: null },
+      grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      opencode: { phase: "ready", progress: 100, message: null, version: "1.18.27" },
+    };
+    const onConnectProvider = vi.fn();
+    const onSave = vi.fn(async (_provider: AgentProviderId) => undefined);
+    const providerKeys = {
+      getProviderApiKeyState: vi.fn(async () => ({ provider: "opencode" as const, status: "missing" as const })),
+      setProviderApiKey: vi.fn(async () => undefined),
+      clearProviderApiKey: vi.fn(async () => undefined),
+      openExternal: vi.fn(async () => undefined),
+    };
+    const view = render(() => (
+      <OnboardingFlow
+        state={{ completed: false, preferredProvider: null, preferredModel: null }}
+        agentStatus={agentStatus}
+        platform="linux"
+        providerRuntimeStatuses={runtimeStatuses}
+        onDownloadProvider={vi.fn()}
+        onConnectProvider={onConnectProvider}
+        providerKeys={providerKeys}
+        onSave={onSave}
+      />
+    ));
+
+    // The only provider ready to use is chosen. Connect stays as a way to add an OpenCode Go key.
+    const providers = view.getByRole("radiogroup", { name: "Default provider" });
+    expect(within(providers).getByRole("radio", { name: /OpenCode/ })).toBeChecked();
+    await fireEvent.click(view.getByRole("button", { name: "Connect OpenCode" }));
+    expect(await screen.findByRole("dialog", { name: "Sign in to OpenCode Go" })).toBeInTheDocument();
+    expect(onConnectProvider).not.toHaveBeenCalled();
+    // Cancel waits for the saved-key read that the dialog starts on open.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled());
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    // Next starts the provider for its free models and moves on while it answers.
+    await fireEvent.click(view.getByRole("button", { name: "Next" }));
+    expect(onConnectProvider).toHaveBeenCalledWith("opencode");
+    await fireEvent.click(await view.findByRole("button", { name: "Next" }));
+    await fireEvent.click(view.getByRole("button", { name: "Open OpenBot" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith("opencode", null));
   });
 
   it("names the step Next is waiting for as the selected provider moves through it", async () => {
@@ -417,8 +514,10 @@ describe("OnboardingFlow", () => {
       />
     ));
 
-    // Nothing is connected, so nothing is chosen for the user, and the reason says that first.
+    // Nothing is connected, so nothing is chosen for the user, and the reason says that first. The
+    // free provider is pointed out as the way in that needs no account.
     expect(view.getByText("Select a provider to continue.")).toBeInTheDocument();
+    expect(view.getByText("Try it free")).toBeInTheDocument();
     await fireEvent.click(
       within(view.getByRole("radiogroup", { name: "Default provider" })).getByRole("radio", { name: /ChatGPT/ }),
     );
@@ -520,7 +619,7 @@ describe("OnboardingFlow", () => {
     ));
 
     // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
-    const moreActions = view.getByRole("button", { name: "More ways to log in to ChatGPT" });
+    const moreActions = view.getByRole("button", { name: "More actions for ChatGPT" });
     await fireEvent.pointerDown(moreActions, { button: 0 });
     await fireEvent.click(moreActions);
     await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Log in with code" }), { button: 0 });

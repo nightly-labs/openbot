@@ -512,6 +512,22 @@
   margin-right: 0;
 }
 
+/* Row actions keep the onboarding colours: Download and Update stay light and only Connect takes
+   the accent, so the modal's accent primary button does not repaint them. */
+.settings-modal .ui-button-variant-default.provider-picker-install:not(.provider-picker-connect) {
+  background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-modal
+    .ui-button-variant-default.provider-picker-install:not(.provider-picker-connect):hover:not(:disabled):not(
+      [data-disabled]
+    ) {
+    background: color-mix(in srgb, var(--openbot-surface-light) 82%, transparent);
+  }
+}
+
 .provider-picker-embedded .provider-picker-option:hover:not(.provider-picker-option-unavailable),
 .provider-picker-embedded .provider-picker-option:focus-within,
 .provider-picker-embedded .provider-picker-option-selected {
