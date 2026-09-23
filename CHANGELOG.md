@@ -5,6 +5,25 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-23
+
+### Added
+
+- Use OpenBot in a web browser at openbot.run/app with your account and your connected hosts.
+- Set the Dynamic Island width and height in the new Dynamic Island settings tab on macOS.
+
+### Changed
+
+- Show every model a provider reports, newest first. When a provider no longer lists an agent's
+  model, the agent moves to the provider's default model and keeps its thread.
+- Use less memory: close a provider CLI after 10 idle minutes and resume its session on the next
+  message, restore only the active browser tab at startup, and keep fewer messages of closed agents
+  in memory.
+
+### Fixed
+
+- Show one notice when a Codex plan reaches its usage limit, not an extra "could not continue" error.
+
 ## [0.18.0] - 2026-09-23
 
 ### Added
