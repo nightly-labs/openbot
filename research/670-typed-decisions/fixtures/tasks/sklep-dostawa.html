@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dostawa – Zamówienie – Herbaciarnia Liść</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #23261f; background: #f5f6f0; }
+  header { background: #2f4a22; color: #fff; }
+  .bar { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 14px 24px; }
+  .logo { font-weight: 800; font-size: 21px; color: #d9f2a6; text-decoration: none; }
+  nav a { color: #e1ead8; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  .right { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  .right a { color: #fff; }
+  .steps { max-width: 1060px; margin: 20px auto 0; padding: 0 24px; display: flex; gap: 10px; font-size: 14px; color: #6b7065; list-style: none; }
+  .steps li[aria-current] { color: #2f4a22; font-weight: 700; }
+  main { max-width: 1060px; margin: 0 auto; padding: 20px 24px 40px; display: grid; grid-template-columns: 1fr 320px; gap: 30px; }
+  .card { background: #fff; border: 1px solid #dfe3d6; border-radius: 10px; padding: 24px; }
+  fieldset { border: 0; padding: 0; margin: 0; }
+  legend { font-size: 20px; font-weight: 700; margin-bottom: 14px; }
+  .opt { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #dfe3d6; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+  .opt input { margin-top: 4px; }
+  .opt label { font-weight: 600; }
+  .opt .price { margin-left: auto; font-weight: 600; }
+  .opt p { margin: 3px 0 0; font-size: 13px; color: #6b7065; }
+  .locker { margin: 4px 0 12px 32px; }
+  .locker select { padding: 8px 10px; border: 1px solid #c9cfbd; border-radius: 6px; font-size: 14px; width: 100%; }
+  .buttons { display: flex; justify-content: space-between; margin-top: 20px; }
+  .next { background: #2f4a22; color: #fff; border: 0; border-radius: 6px; padding: 12px 28px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .back { background: #fff; border: 1px solid #c9cfbd; border-radius: 6px; padding: 12px 18px; font-size: 15px; cursor: pointer; }
+  aside .card { font-size: 14px; }
+  aside .line { display: flex; justify-content: space-between; margin: 8px 0; }
+  aside .total { border-top: 1px solid #dfe3d6; padding-top: 10px; font-weight: 700; font-size: 16px; }
+  aside a { color: #2f4a22; }
+  footer { background: #2f4a22; color: #cfdcc6; text-align: center; font-size: 13px; padding: 24px; }
+  footer a { color: #cfdcc6; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Herbaciarnia Liść</a>
+    <nav aria-label="Menu główne">
+      <a href="#">Strona główna</a>
+      <a href="#">Herbaty</a>
+      <a href="#">Akcesoria</a>
+      <a href="#">Promocje</a>
+      <a href="#">Pomoc</a>
+    </nav>
+    <div class="right"><a href="#">Moje konto</a><a href="#">Koszyk (3)</a></div>
+  </div>
+</header>
+<ol class="steps" aria-label="Etapy zamówienia">
+  <li>1. Koszyk ›</li>
+  <li>2. Dane ›</li>
+  <li aria-current="step">3. Dostawa ›</li>
+  <li>4. Podsumowanie</li>
+</ol>
+<main>
+  <section class="card">
+    <form id="delivery-form">
+      <fieldset>
+        <legend>Sposób dostawy</legend>
+        <div class="opt">
+          <input type="radio" name="delivery" id="d-kurier" value="kurier" checked>
+          <div><label for="d-kurier">Kurier DPD</label><p>Doręczenie w 1–2 dni robocze pod wskazany adres.</p></div>
+          <span class="price">14,99 zł</span>
+        </div>
+        <div class="opt">
+          <input type="radio" name="delivery" id="d-paczkomat" value="paczkomat">
+          <div><label for="d-paczkomat">Paczkomat InPost</label><p>Odbiór 24/7 w wybranym paczkomacie. Kod odbioru wyślemy SMS-em.</p></div>
+          <span class="price">11,99 zł</span>
+        </div>
+        <div class="locker" id="locker" hidden>
+          <label for="locker-point" style="font-size:14px;font-weight:600;display:block;margin-bottom:6px">Wybrany paczkomat</label>
+          <select id="locker-point">
+            <option value="KRA01M">KRA01M – ul. Długa 5, Kraków (120 m)</option>
+            <option value="KRA14N">KRA14N – ul. Karmelicka 30, Kraków (450 m)</option>
+            <option value="KRA22A">KRA22A – al. Słowackiego 12, Kraków (900 m)</option>
+          </select>
+        </div>
+        <div class="opt">
+          <input type="radio" name="delivery" id="d-odbior" value="odbior">
+          <div><label for="d-odbior">Odbiór osobisty</label><p>Sklep stacjonarny, ul. Floriańska 14, Kraków. Pon.–sob. 10–19.</p></div>
+          <span class="price">0,00 zł</span>
+        </div>
+      </fieldset>
+      <p><label style="font-size:14px"><input type="checkbox" id="gift"> Zapakuj na prezent (+5,00 zł)</label></p>
+      <div class="buttons">
+        <button type="button" class="back">Wróć do danych</button>
+        <button type="submit" class="next">Dalej</button>
+      </div>
+    </form>
+  </section>
+  <aside>
+    <div class="card">
+      <h2 style="font-size:17px;margin-top:0">Twoje zamówienie</h2>
+      <div class="line"><span>Sencha Kagoshima 100 g</span><span>54,00 zł</span></div>
+      <div class="line"><span>Earl Grey Kwiatowy 100 g</span><span>32,00 zł</span></div>
+      <div class="line"><span>Czajniczek żeliwny 0,6 l</span><span>31,01 zł</span></div>
+      <div class="line"><span>Dostawa</span><span id="ship-price">14,99 zł</span></div>
+      <div class="line total"><span>Razem</span><span id="total">132,00 zł</span></div>
+      <p><a href="#">Masz kod rabatowy?</a></p>
+    </div>
+  </aside>
+</main>
+<footer><a href="#">Regulamin</a><a href="#">Polityka prywatności</a><a href="#">Zwroty i reklamacje</a><a href="#">Kontakt</a><br><br>© 2026 Herbaciarnia Liść</footer>
+<script>
+  const PRICES = { kurier: 14.99, paczkomat: 11.99, odbior: 0 };
+  const GOODS = 117.01;
+  const fmt = (n) => n.toFixed(2).replace(".", ",") + " zł";
+  function update() {
+    const option = document.querySelector("input[name=delivery]:checked").value;
+    document.getElementById("locker").hidden = option !== "paczkomat";
+    const ship = PRICES[option];
+    const gift = document.getElementById("gift").checked ? 5 : 0;
+    document.getElementById("ship-price").textContent = fmt(ship);
+    document.getElementById("total").textContent = fmt(GOODS + ship + gift);
+  }
+  for (const input of document.querySelectorAll("input[name=delivery], #gift")) input.addEventListener("change", update);
+  update();
+  document.getElementById("delivery-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const option = document.querySelector("input[name=delivery]:checked").value;
+    const data = { option };
+    if (option === "paczkomat") data.locker = document.getElementById("locker-point").value;
+    report("delivery", data);
+    const gift = document.getElementById("gift").checked ? 5 : 0;
+    sessionStorage.setItem("lisc-delivery", JSON.stringify({ option, locker: data.locker || "", total: GOODS + PRICES[option] + gift }));
+    setTimeout(() => { location.href = "sklep-podsumowanie.html"; }, 120);
+  });
+</script>
+</body>
+</html>

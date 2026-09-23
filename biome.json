@@ -32,6 +32,7 @@
       "!tools/biome/anti-slop",
       "!tools/ui-foundation/fixtures",
       "!research/*/fixtures/pages",
+      "!research/*/fixtures/tasks",
       "!research/*/snapshots",
       "!!coverage",
       "!!.openbot-build",

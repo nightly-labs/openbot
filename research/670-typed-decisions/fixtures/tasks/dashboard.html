@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard – Ledgerly</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1c2430; background: #f4f6fa; }
+  header { background: #fff; border-bottom: 1px solid #e3e7ee; }
+  .bar { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 28px; padding: 14px 24px; }
+  .logo { font-weight: 700; font-size: 20px; color: #2b59c3; text-decoration: none; }
+  nav a { color: #44505f; text-decoration: none; margin-right: 18px; font-size: 15px; }
+  .right { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+  .ghost { background: none; border: 1px solid #c9d1dd; border-radius: 6px; padding: 7px 14px; font-size: 14px; cursor: pointer; }
+  main { max-width: 1080px; margin: 0 auto; padding: 32px 24px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
+  .tile { background: #fff; border: 1px solid #e3e7ee; border-radius: 10px; padding: 18px; }
+  .tile b { display: block; font-size: 26px; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 24px; border: 1px solid #e3e7ee; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #eef1f5; font-size: 14px; }
+  footer { border-top: 1px solid #e3e7ee; background: #fff; padding: 24px; font-size: 13px; color: #6b7684; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Ledgerly</a>
+    <nav aria-label="Main">
+      <a href="#">Dashboard</a>
+      <a href="#">Invoices</a>
+      <a href="#">Expenses</a>
+      <a href="#">Payroll</a>
+      <a href="#">Reports</a>
+    </nav>
+    <div class="right">
+      <button class="ghost" type="button">New invoice</button>
+      <a href="#">Account</a>
+      <a href="login.html">Sign out</a>
+    </div>
+  </div>
+</header>
+<main>
+  <h1 id="welcome">Welcome back</h1>
+  <p>Here is what changed in your books since your last visit.</p>
+  <div class="grid">
+    <div class="tile">Outstanding invoices<b>$4,210.00</b></div>
+    <div class="tile">Expenses this month<b>$1,386.40</b></div>
+    <div class="tile">Next payroll<b>Oct 1</b></div>
+  </div>
+  <table>
+    <caption style="text-align:left;padding:8px 0;font-weight:600">Recent activity</caption>
+    <thead><tr><th>Date</th><th>Item</th><th>Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Sep 21</td><td>Invoice #1042 paid by Northwind</td><td>$1,200.00</td></tr>
+      <tr><td>Sep 19</td><td>Expense: office supplies</td><td>$86.40</td></tr>
+      <tr><td>Sep 17</td><td>Invoice #1041 sent to Contoso</td><td>$930.00</td></tr>
+    </tbody>
+  </table>
+</main>
+<footer>© 2026 Ledgerly Ltd. · <a href="#">Help center</a> · <a href="#">Privacy</a></footer>
+<script>
+  const name = sessionStorage.getItem("ledgerly-user");
+  if (name) document.getElementById("welcome").textContent = "Welcome back, " + name;
+  report("dashboard_viewed", { signedIn: name ? "true" : "false" });
+</script>
+</body>
+</html>

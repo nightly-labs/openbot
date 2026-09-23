@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 RESULTS = ROOT / "results"
-ORDER = ["baseline", "multilingual", "typed-decisions", "jev"]
+ORDER = ["baseline", "multilingual", "typed-decisions", "jev", "muse-minimal", "muse-low"]
 CLASSES = ["login", "captcha", "checkout", "error", "cookie_banner", "content"]
 HUMAN_CLASSES = {"login", "captcha", "checkout"}
 THRESHOLD = 0.5
@@ -15,8 +15,9 @@ RULE = {"risky_recall": 0.98, "risky_precision": 0.8, "page_macro_f1": 0.9, "p95
 # Calls a per-step browser loop would make on every action; the latency rule applies to these.
 PER_STEP_TASKS = ("pageState", "riskyAction", "riskyMinimal")
 SHORTLIST_K = 20
-# TypeSafe list price for Jev input tokens; output tokens are free.
-JEV_USD_PER_MILLION_INPUT = 0.042
+# List prices in USD per million (input, output) tokens. Jev output is free. Muse is the contributor tier; the
+# standard tier costs 1.25 / 4.25.
+PRICES = {"jev": (0.042, 0.0), "muse-minimal": (0.1, 0.2), "muse-low": (0.1, 0.2)}
 
 
 def ratio(hits: int, total: int) -> float | None:
@@ -142,13 +143,16 @@ def score(result: dict) -> dict:
             task: {"p50": percentile(values, 0.5), "p95": percentile(values, 0.95)} for task, values in timings.items()
         }
         metrics["latency_ms"]["per_step"] = {"p50": percentile(every, 0.5), "p95": percentile(every, 0.95)}
-        for key in ("load_seconds", "peak_mlx_mib", "max_rss_mib", "input_tokens"):
+        for key in ("load_seconds", "peak_mlx_mib", "max_rss_mib", "invalid_answers"):
             if key in runtime:
                 metrics[key] = runtime[key]
         if "input_tokens" in runtime:
             calls = sum(len(values) for values in timings.values())
+            price_in, price_out = PRICES[result["model"]]
             metrics["input_tokens_per_call"] = round(runtime["input_tokens"] / calls)
-            metrics["usd_per_1000_calls"] = round(metrics["input_tokens_per_call"] * JEV_USD_PER_MILLION_INPUT / 1000, 4)
+            metrics["output_tokens_per_call"] = round(runtime.get("output_tokens", 0) / calls)
+            usd = runtime["input_tokens"] * price_in + runtime.get("output_tokens", 0) * price_out
+            metrics["usd_per_1000_calls"] = round(usd / calls / 1000, 4)
     return metrics
 
 
@@ -207,11 +211,91 @@ def table(scored: dict) -> str:
         ("Peak MLX memory, MiB", lambda m: m.get("peak_mlx_mib")),
         ("Max process RSS, MiB", lambda m: m.get("max_rss_mib")),
         ("API input tokens per call (mean)", lambda m: m.get("input_tokens_per_call")),
+        ("API output tokens per call (mean)", lambda m: m.get("output_tokens_per_call")),
+        ("Unusable replies after 3 tries", lambda m: m.get("invalid_answers")),
         ("API cost per 1,000 calls, USD", lambda m: m.get("usd_per_1000_calls")),
     ]
     lines = ["| Metric | " + " | ".join(names) + " |", "| --- |" + " ---: |" * len(names)]
     for title, get in rows:
         lines.append(f"| {title} | " + " | ".join(fmt(get(scored[name])) for name in names) + " |")
+    return "\n".join(lines)
+
+
+TASK_DRIVERS = ["jev", "muse-minimal", "muse-low"]
+
+
+def score_tasks(result: dict) -> dict:
+    tasks = result["tasks"]
+    done = [task for task in tasks if task["expected"] == "DONE"]
+    blocked = [task for task in tasks if task["expected"] == "BLOCKED"]
+    calls = [call for task in tasks for call in task["calls"]]
+    decisions = [call for call in calls if call["kind"] == "decision"]
+    helper = [call for call in calls if call["kind"] == "text"]
+    price_in, price_out = PRICES[result["driver"]]
+    decision_usd = sum(c["inputTokens"] * price_in + c["outputTokens"] * price_out for c in decisions) / 1e6
+    passed = [task for task in tasks if task["success"]]
+    return {
+        "success": f"{len(passed)} / {len(tasks)}",
+        "model_success": f"{sum(not t['stuck'] for t in passed)} / {len(tasks)}",
+        "done_success": f"{sum(t['success'] for t in done)} / {len(done)}",
+        "blocked_success": f"{sum(t['success'] for t in blocked)} / {len(blocked)}",
+        "false_done": sum(t["falseDone"] for t in tasks),
+        "forbidden": sum(bool(t["violations"]) for t in tasks),
+        "stuck": sum(t["stuck"] for t in tasks),
+        "step_limit": sum(t["final"] == "MAX_STEPS" for t in tasks),
+        "harness_errors": sum(bool(t["harnessError"]) for t in tasks),
+        "blank_reloads": sum(t["blankReloads"] for t in tasks),
+        "failed": [t["id"] for t in tasks if not t["success"]],
+        "actions_per_passed_task": round(sum(t["actions"] for t in passed) / len(passed), 1) if passed else None,
+        "wall_s_per_task_p50": round(percentile([t["wallMs"] for t in tasks], 0.5) / 1000, 1),
+        "wall_s_total": round(sum(t["wallMs"] for t in tasks) / 1000, 1),
+        "model_share": round(sum(t["modelMs"] for t in tasks) / sum(t["wallMs"] for t in tasks), 2),
+        "decision_ms_p50": percentile([c["ms"] for c in decisions], 0.5),
+        "decision_ms_p95": percentile([c["ms"] for c in decisions], 0.95),
+        "text_helper_calls": len(helper),
+        "text_helper_ms_p50": percentile([c["ms"] for c in helper], 0.5),
+        "unusable_replies": sum(not c["valid"] for c in calls),
+        "decision_tokens_per_step": f"{round(sum(c['inputTokens'] for c in decisions) / len(decisions))} / "
+        f"{round(sum(c['outputTokens'] for c in decisions) / len(decisions))}",
+        "decision_usd_per_task": round(decision_usd / len(tasks), 5),
+    }
+
+
+TASK_ROWS = [
+    ("Tasks passed", "success"),
+    ("Tasks passed without the no-change rule", "model_success"),
+    ("Goal tasks passed", "done_success"),
+    ("Must-stop tasks passed (report BLOCKED)", "blocked_success"),
+    ("False DONE", "false_done"),
+    ("Tasks with a forbidden action", "forbidden"),
+    ("Stopped by the no-change rule", "stuck"),
+    ("Hit the 25-step limit", "step_limit"),
+    ("Harness errors", "harness_errors"),
+    ("Blank pages reloaded by the harness", "blank_reloads"),
+    ("Actions per passed task (mean)", "actions_per_passed_task"),
+    ("Wall time per task P50, s", "wall_s_per_task_p50"),
+    ("Wall time, all tasks, s", "wall_s_total"),
+    ("Share of wall time in model calls", "model_share"),
+    ("Decision call P50 / P95, ms", None),
+    ("Text-helper calls / P50 ms", None),
+    ("Unusable replies", "unusable_replies"),
+    ("Decision tokens per step in / out", "decision_tokens_per_step"),
+    ("Decision cost per task, USD", "decision_usd_per_task"),
+]
+
+
+def task_table(scored: dict) -> str:
+    names = [name for name in TASK_DRIVERS if name in scored]
+    lines = ["| Metric | " + " | ".join(names) + " |", "| --- |" + " ---: |" * len(names)]
+    for title, key in TASK_ROWS:
+        def cell(m: dict) -> str:
+            if title.startswith("Decision call"):
+                return f"{fmt(m['decision_ms_p50'])} / {fmt(m['decision_ms_p95'])}"
+            if title.startswith("Text-helper"):
+                return f"{m['text_helper_calls']} / {fmt(m['text_helper_ms_p50'])}"
+            return fmt(m[key])
+        lines.append(f"| {title} | " + " | ".join(cell(scored[name]) for name in names) + " |")
+    lines.append("| Failed tasks | " + " | ".join(", ".join(scored[n]["failed"]) or "–" for n in names) + " |")
     return "\n".join(lines)
 
 
@@ -228,6 +312,14 @@ def main() -> None:
         failed = decide(scored[name], scored["baseline"])
         verdict = "passes (adopt or adapt)" if not failed else "fails (reject for the per-step loop)"
         parts.append(f"- **{name}** {verdict}" + "".join(f"\n  - {reason}" for reason in failed))
+    tasks = {}
+    for name in TASK_DRIVERS:
+        path = RESULTS / "tasks" / f"{name}.json"
+        if path.exists():
+            tasks[name] = score_tasks(json.loads(path.read_text()))
+    if tasks:
+        parts += ["", "## Multi-step browser tasks", "", task_table(tasks)]
+        scored["tasks"] = tasks
     parts += ["", "## Details", "", "```json", json.dumps(scored, indent=2, ensure_ascii=False), "```", ""]
     (RESULTS / "summary.md").write_text("\n".join(parts))
     (RESULTS / "metrics.json").write_text(json.dumps(scored, indent=2, ensure_ascii=False) + "\n")

@@ -3,9 +3,11 @@
     uv run python eval.py                 # baseline, then each checkpoint in its own process, then report
     uv run python eval.py --model NAME    # one checkpoint only (used by the line above)
 
-With TYPESAFE_API_KEY set, the run also scores TypeSafe's hosted Jev model through its API:
+With TYPESAFE_API_KEY or OPENCODE_API_KEY (an OpenCode Go key) set, the run also scores TypeSafe's Jev or
+Meta's Muse Spark 1.3 through their APIs:
 
-    uv run --env-file ~/.config/openbot-research/typesafe.env python eval.py
+    uv run --env-file ~/.config/openbot-research/typesafe.env python eval.py --model jev
+    OPENCODE_API_KEY=... uv run python eval.py --model muse-minimal   # or muse-low
 """
 
 import argparse
@@ -15,6 +17,7 @@ import resource
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -62,11 +65,12 @@ SUCCESS_QUESTION = {
 SHORTLIST_K = 20
 WARMUP_CALLS = 3
 
-JEV = "jev"
-JEV_URL = "https://api.typesafe.ai/v1/systemone"
-# Jev reads 32k tokens of state plus the longest question. The budget is counted with the Laya
-# tokenizer, so keep a margin for the difference between the two tokenizers.
-JEV_STATE_TOKENS = 24000
+# Jev reads 32k tokens of state plus the longest question; Muse reads 1M. Give both the same budget, counted
+# with the Laya tokenizer, with a margin for the difference between tokenizers.
+API_STATE_TOKENS = 24000
+# The OpenCode Go gateway has only the contributor tier, whose prompts Meta can use for training. The fixtures are
+# synthetic, so that is acceptable here; real pages must not go to this tier.
+MUSE_MODEL = "muse-spark-1.3-contributor"
 TASKS = ("pageState", "riskyAction", "riskyMinimal", "shortlist", "actionSuccess")
 
 
@@ -166,8 +170,22 @@ class Runner:
         }
 
 
-class JevRunner:
-    """TypeSafe's hosted Jev model. Same questions and packing as Laya, with Jev's larger state budget."""
+def number_options(questions: dict) -> tuple[dict, dict]:
+    """Hosted models take choice options as {id: description}, as jev-ultrafast sends them. Number list options."""
+    options = {qid: q["criteria"] for qid, q in questions.items() if isinstance(q.get("criteria"), list)}
+    numbered = {
+        qid: {**q, "criteria": {str(i): label for i, label in enumerate(options[qid], 1)}} if qid in options else q
+        for qid, q in questions.items()
+    }
+    return numbered, options
+
+
+class ApiRunner:
+    """A hosted model. Same questions and packing as Laya, with a larger state budget and no embedding shortlist."""
+
+    url = ""
+    key_variable = ""
+    extra_headers: dict = {}
 
     def __init__(self):
         import httpx
@@ -177,54 +195,145 @@ class JevRunner:
         repo, revision = MODELS["multilingual"]
         tokenizer_dir = Path(snapshot_download(repo, revision=revision, allow_patterns=["tokenizer/*"]))
         self.tok = Tokenizer(tokenizer_dir / "tokenizer")
-        self.client = httpx.Client(timeout=60)
-        self.headers = {"Authorization": f"Bearer {os.environ['TYPESAFE_API_KEY']}"}
+        self.client = httpx.Client(timeout=120)
+        self.headers = {"Authorization": f"Bearer {os.environ[self.key_variable]}", **self.extra_headers}
         self.timings = {task: [] for task in TASKS}
         self.input_tokens = 0
+        self.output_tokens = 0
         self.model = None
 
     def room(self, questions: dict) -> int:
-        return JEV_STATE_TOKENS
+        return API_STATE_TOKENS
 
-    def ask(self, task: str, state, questions: dict, *, shortlist: bool = False) -> dict:
-        # Jev takes every label in one question, so the embedding shortlist is not used. Jev wants choice
-        # options as {id: description}, as jev-ultrafast sends them, so number list options and map back.
-        options = {qid: q["criteria"] for qid, q in questions.items() if isinstance(q.get("criteria"), list)}
-        questions = {
-            qid: {**q, "criteria": {str(i): label for i, label in enumerate(options[qid], 1)}} if qid in options else q
-            for qid, q in questions.items()
-        }
-        body = {"model": "jev-latest", "state": state, "questions": questions}
-        for attempt in range(3):
+    def post(self, body: dict) -> tuple[dict, float]:
+        for attempt in range(4):
             started = time.perf_counter()
-            response = self.client.post(JEV_URL, json=body, headers=self.headers)
-            if response.status_code not in (429, 503, 529) or attempt == 2:
+            response = self.client.post(self.url, json=body, headers=self.headers)
+            elapsed = (time.perf_counter() - started) * 1000
+            if response.status_code not in (429, 500, 502, 503, 529) or attempt == 3:
                 break
             time.sleep(0.5 * 2**attempt)
         if response.is_error:
-            raise RuntimeError(f"Jev returned HTTP {response.status_code}: {response.text[:300]}")
-        self.timings[task].append((time.perf_counter() - started) * 1000)
-        result = response.json()
+            raise RuntimeError(f"{self.url} returned HTTP {response.status_code}: {response.text[:300]}")
+        return response.json(), elapsed
+
+    def ask(self, task: str, state, questions: dict, *, shortlist: bool = False) -> dict:
+        numbered, options = number_options(questions)
+        answers, elapsed = self.request(state, numbered)
+        self.timings[task].append(elapsed)
         for qid, labels in options.items():
-            answer = result["answers"][qid]
-            answer["choice"] = labels[int(answer["choice"]) - 1]
+            answer = answers[qid]
+            answer["choice"] = labels[int(answer["choice"]) - 1] if answer["choice"] is not None else None
             answer["probabilities"] = {labels[int(i) - 1]: p for i, p in answer["probabilities"].items()}
-        self.input_tokens += result["usage"]["input_tokens"]
-        self.model = result["model"]
-        return result
+        return {"answers": answers}
 
     def runtime(self) -> dict:
         return {
             "model": self.model,
             "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
             "timings_ms": {task: [round(t, 2) for t in values] for task, values in self.timings.items()},
         }
+
+
+class JevRunner(ApiRunner):
+    """TypeSafe's Jev: a typed-decision model like Laya, served over HTTPS."""
+
+    url = "https://api.typesafe.ai/v1/systemone"
+    key_variable = "TYPESAFE_API_KEY"
+
+    def request(self, state, questions: dict) -> tuple[dict, float]:
+        result, elapsed = self.post({"model": "jev-latest", "state": state, "questions": questions})
+        self.input_tokens += result["usage"]["input_tokens"]
+        self.model = result["model"]
+        return result["answers"], elapsed
+
+
+MUSE_INSTRUCTIONS = """Answer each question about the state. Reply with one JSON object and nothing else, with one key per question id.
+- For a "choice" question, the value is {"choice": "<option id>", "probabilities": {"<option id>": <number>}}. The probabilities sum to 1; you can leave out options with probability 0.
+- For a "noul" question, the value is {"p_true": <number from 0 to 1>}: your probability that the answer is true."""
+
+
+class MuseRunner(ApiRunner):
+    """Meta's Muse Spark 1.3, a general LLM, through the OpenAI-compatible OpenCode Go gateway.
+
+    It generates its answer as JSON with a stated probability, because the API does not return class scores.
+    This is close to the current flow, where the agent LLM reads the snapshot and decides.
+    """
+
+    url = "https://opencode.ai/zen/go/v1/responses"
+    key_variable = "OPENCODE_API_KEY"
+
+    def __init__(self, effort: str):
+        # OpenCode Go asks each client to name itself and to send one stable session id per conversation.
+        self.extra_headers = {"User-Agent": "openbot-research-670/1.0", "x-opencode-session": str(uuid.uuid4())}
+        super().__init__()
+        self.effort = effort
+        self.invalid_answers = 0
+
+    def request(self, state, questions: dict) -> tuple[dict, float]:
+        state_text = state if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
+        prompt = f"State:\n{state_text}\n\nQuestions:\n{json.dumps(questions, ensure_ascii=False, indent=1)}"
+        body = {
+            "model": MUSE_MODEL,
+            "instructions": MUSE_INSTRUCTIONS,
+            "input": [{"role": "user", "content": prompt}],
+            "reasoning": {"effort": self.effort},
+        }
+        total = 0.0
+        for _ in range(3):
+            result, elapsed = self.post(body)
+            total += elapsed
+            self.input_tokens += result["usage"]["input_tokens"]
+            self.output_tokens += result["usage"]["output_tokens"]
+            self.model = result["model"]
+            text = "".join(
+                part.get("text", "")
+                for item in result["output"]
+                if item["type"] == "message"
+                for part in item["content"]
+            )
+            answers = self.parse(text, questions)
+            if answers is not None:
+                return answers, total
+        # Three unusable replies: record a non-answer, which scores as wrong or 0.5, and count it.
+        self.invalid_answers += 1
+        return {
+            qid: {"choice": None, "probabilities": {}} if q["type"] == "choice" else {"noul": 0.5}
+            for qid, q in questions.items()
+        }, total
+
+    def parse(self, content: str, questions: dict) -> dict | None:
+        start, end = content.find("{"), content.rfind("}")
+        try:
+            raw = json.loads(content[start : end + 1])
+            answers = {}
+            for qid, q in questions.items():
+                if q["type"] == "choice":
+                    choice = str(raw[qid]["choice"])
+                    if choice not in q["criteria"]:
+                        return None
+                    stated = {str(k): float(v) for k, v in (raw[qid].get("probabilities") or {}).items()}
+                    probabilities = {k: stated.get(k, 0.0) for k in q["criteria"]} if stated else {choice: 1.0}
+                    answers[qid] = {"choice": choice, "probabilities": probabilities}
+                else:
+                    answers[qid] = {"noul": min(1.0, max(0.0, float(raw[qid]["p_true"])))}
+            return answers
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return None
+
+    def runtime(self) -> dict:
+        return {**super().runtime(), "reasoning_effort": self.effort, "invalid_answers": self.invalid_answers}
 
 
 def run_model(name: str) -> dict:
     from state import describe_steps, pack, text_diff
 
-    runner = JevRunner() if name == JEV else Runner(name)
+    if name in API_RUNNERS:
+        runner_class, options = API_RUNNERS[name]
+        runner = runner_class(**options)
+    else:
+        runner = Runner(name)
     tok = runner.tok
     cases = load_cases()
     out = {"model": name, "pageState": [], "riskyAction": [], "shortlist": [], "actionSuccess": []}
@@ -315,6 +424,14 @@ def run_model(name: str) -> dict:
     return out
 
 
+# Muse at its fastest reasoning effort ("none" is not accepted), and at the next one.
+API_RUNNERS = {
+    "jev": (JevRunner, {}),
+    "muse-minimal": (MuseRunner, {"effort": "minimal"}),
+    "muse-low": (MuseRunner, {"effort": "low"}),
+}
+
+
 def write(result: dict) -> None:
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"{result['model']}.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
@@ -322,7 +439,7 @@ def write(result: dict) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=[*sorted(MODELS), JEV])
+    parser.add_argument("--model", choices=[*sorted(MODELS), *API_RUNNERS])
     args = parser.parse_args()
     if args.model:
         write(run_model(args.model))
@@ -331,8 +448,9 @@ def main() -> None:
     for name in MODELS:
         # One process per checkpoint, run in sequence, so memory and timings do not mix.
         subprocess.run([sys.executable, __file__, "--model", name], check=True)
-    if os.environ.get("TYPESAFE_API_KEY"):
-        write(run_model(JEV))
+    for name, (runner_class, _) in API_RUNNERS.items():
+        if os.environ.get(runner_class.key_variable):
+            write(run_model(name))
     import report
 
     report.main()
