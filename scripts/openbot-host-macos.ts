@@ -10,6 +10,9 @@ import {
   HOST_MANAGER_DIRECTORY as ROOT,
   readHostConfig,
   readOwnedJson,
+  tenantStatusSchema,
+  verifyHostDirectory,
+  verifyTenantDirectory,
 } from "../src/main/host-update-files";
 import {
   HOST_AGENT_PLIST,
@@ -21,6 +24,7 @@ import {
   hostReleaseSchema,
 } from "./host-installation";
 import {
+  bundleProcesses,
   hostCommand,
   isNewerRelease,
   macHostOperations,
@@ -200,6 +204,8 @@ async function verifyIsolation(tenants: HostTenant[]): Promise<void> {
 
 export function macHostAdminOperations(): HostAdminOperations {
   let credentialFile: string | null = null;
+  // Account names do not change while one command runs, and watch would otherwise rescan on each refresh.
+  const names = new Map<number, string>();
   return {
     verifyInstallation,
     verifyApplication,
@@ -285,7 +291,34 @@ export function macHostAdminOperations(): HostAdminOperations {
         await unlink(credentialFile);
       }
     },
-    tenantForUid: async (uid) => ({ uid, name: await hostCommand("/usr/bin/id", ["-un", String(uid)]) }),
+    tenantForUid: async (uid) => {
+      const cached = names.get(uid);
+      if (cached !== undefined) return { uid, name: cached };
+      const name = await hostCommand("/usr/bin/id", ["-un", String(uid)]);
+      names.set(uid, name);
+      return { uid, name };
+    },
+    bundleProcesses,
+    readState: async () => {
+      try {
+        await verifyHostDirectory(ROOT);
+        return await readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema);
+      } catch (error) {
+        if (isMissingFile(error)) return null;
+        throw error;
+      }
+    },
+    readTenantStatus: async (uid) => {
+      // A logged-out, stopped or malformed tenant is a normal reading, not a command failure.
+      try {
+        const directory = await verifyTenantDirectory(ROOT, uid);
+        const status = await readOwnedJson(join(directory, "status.json"), uid, tenantStatusSchema);
+        // The host ignores a report that claims another UID. Never show it as that tenant's state.
+        return status.uid === uid ? status : null;
+      } catch {
+        return null;
+      }
+    },
     verifyState: async () => {
       await verifyHostPath(ROOT);
       await readOwnedJson(join(ROOT, "state.json"), 0, hostStateSchema);

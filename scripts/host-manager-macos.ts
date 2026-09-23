@@ -121,7 +121,7 @@ export async function bundleVersion(app = SHARED_APP): Promise<string> {
   ]);
 }
 
-async function bundleProcesses(): Promise<Array<{ uid: number; pid: number; main: boolean }>> {
+export async function bundleProcesses(): Promise<Array<{ uid: number; pid: number; main: boolean }>> {
   // comm reports executable paths, without workspace paths or prompts in command arguments.
   const output = await command("/bin/ps", ["-axo", "pid=,uid=,comm="]);
   if (!output) throw new Error("Process scan returned no processes.");
