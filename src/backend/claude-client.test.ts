@@ -9,7 +9,7 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AgentStore } from "./agent-store";
-import { ClaudeAgentClient } from "./claude-client";
+import { CLAUDE_THREAD_IDLE_RELEASE_MS, ClaudeAgentClient } from "./claude-client";
 import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
 import { loginShellPath } from "./mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
@@ -704,6 +704,39 @@ fi
       "<agent_memories>[]</agent_memories>",
       '<agent_memories>[{"text":"Uses metric units."}]</agent_memories>',
     ]);
+    await client.stop();
+  });
+
+  it("closes an idle thread's process and resumes the same session on the next turn", async () => {
+    root = await mkdtemp(join(tmpdir(), "openbot-claude-idle-release-"));
+    const spawned: Array<{ query: TestQuery; options: DynamicRecord | null }> = [];
+    const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.231" }, (params) => {
+      const query = new TestQuery(new TestQueue<TestStreamMessage>());
+      spawned.push({ query, options: isDynamicRecord(params.options) ? params.options : null });
+      return query;
+    });
+    client.start();
+    vi.useFakeTimers();
+    try {
+      const thread = await client.request(
+        "thread/start",
+        { cwd: root, model: "claude-sonnet-5", developerInstructions: "Be concise.", runtimeWorkspaceRoots: [root] },
+        decodeThreadResponse,
+      );
+      const threadId = thread.thread.id;
+
+      await vi.advanceTimersByTimeAsync(CLAUDE_THREAD_IDLE_RELEASE_MS);
+      expect(spawned[0]?.query.closed).toBe(true);
+
+      await startTurn(client, threadId, "66666666-6666-4666-8666-666666666666");
+      expect(spawned).toHaveLength(2);
+      expect(spawned[1]?.options).toMatchObject({ resume: threadId, cwd: root, model: "claude-sonnet-5" });
+      // A thread in a turn is never idle.
+      await vi.advanceTimersByTimeAsync(CLAUDE_THREAD_IDLE_RELEASE_MS);
+      expect(spawned[1]?.query.closed).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
     await client.stop();
   });
 

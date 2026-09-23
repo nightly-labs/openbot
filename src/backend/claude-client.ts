@@ -95,7 +95,15 @@ interface ThreadRuntime {
   query: ClaudeQuery;
   activeTurn: ActiveTurn | null;
   consume: Promise<void>;
+  idleRelease: ReturnType<typeof setTimeout> | null;
 }
+
+/**
+ * How long a thread with no turn keeps its `claude` process. Each process holds hundreds of MB with
+ * its MCP servers, and the SDK resumes the same session from disk, so an idle thread costs only a
+ * slower first message when the user comes back.
+ */
+export const CLAUDE_THREAD_IDLE_RELEASE_MS = 10 * 60_000;
 
 interface PendingServerRequest {
   resolve: (value: unknown) => void;
@@ -141,6 +149,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #mcpToolRuntimes: McpToolRuntimeSource | undefined;
   readonly #mcpAuthorization: McpAuthorizationSource | undefined;
   readonly #threads = new Map<string, ThreadRuntime>();
+  /** Threads whose process was closed for being idle, with the config that resumes them. */
+  readonly #releasedThreads = new Map<string, ThreadConfig>();
+  readonly #waking = new Map<string, Promise<void>>();
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
@@ -177,7 +188,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   async stop(): Promise<void> {
     this.#running = false;
+    this.#releasedThreads.clear();
     for (const runtime of this.#threads.values()) {
+      if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
       runtime.input.close();
       runtime.query.close();
     }
@@ -195,9 +208,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
    * thread: a turn that still runs would end with the query that carries it.
    */
   async releaseThread(threadId: string): Promise<void> {
+    this.#releasedThreads.delete(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
-    this.#threads.delete(threadId);
+    await this.#closeRuntime(runtime);
+  }
+
+  async #closeRuntime(runtime: ThreadRuntime): Promise<void> {
+    this.#threads.delete(runtime.id);
+    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
     runtime.input.close();
     runtime.query.close();
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
@@ -232,6 +251,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         if (current && JSON.stringify(current.config) !== JSON.stringify(config)) {
           if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
           this.#threads.delete(threadId);
+          if (current.idleRelease) clearTimeout(current.idleRelease);
           current.input.close();
           current.query.close();
           await current.consume;
@@ -248,7 +268,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "turn/steer":
         return decoder(await this.#steerTurn(params));
       case "turn/interrupt": {
-        const runtime = this.#requireThread(requiredString(params, "threadId"));
+        const threadId = requiredString(params, "threadId");
+        // A released thread has no turn to stop.
+        if (this.#releasedThreads.has(threadId) && !this.#threads.has(threadId)) return decoder({});
+        const runtime = this.#requireThread(threadId);
         await runtime.query.interrupt();
         return decoder({});
       }
@@ -466,15 +489,49 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       query: claudeQuery,
       activeTurn: null,
       consume: Promise.resolve(),
+      idleRelease: null,
     };
     runtime.consume = this.#consume(runtime);
     this.#threads.set(threadId, runtime);
+    this.#releasedThreads.delete(threadId);
+    this.#armIdleRelease(runtime);
+  }
+
+  /** Closes the thread's process once it has had no turn for `CLAUDE_THREAD_IDLE_RELEASE_MS`. */
+  #armIdleRelease(runtime: ThreadRuntime): void {
+    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
+    runtime.idleRelease = null;
+    // A session that is not persisted has nothing on disk to resume from.
+    if (!runtime.config.persistSession) return;
+    runtime.idleRelease = setTimeout(() => {
+      runtime.idleRelease = null;
+      if (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn) return;
+      this.#releasedThreads.set(runtime.id, runtime.config);
+      void this.#closeRuntime(runtime);
+    }, CLAUDE_THREAD_IDLE_RELEASE_MS);
+    runtime.idleRelease.unref?.();
+  }
+
+  /** The runtime of a thread, started again from its session when it was released for being idle. */
+  async #wakeThread(threadId: string): Promise<ThreadRuntime> {
+    const config = this.#releasedThreads.get(threadId);
+    if (config && !this.#threads.has(threadId)) {
+      let waking = this.#waking.get(threadId);
+      if (!waking) {
+        waking = this.#startThread(threadId, config, true).finally(() => this.#waking.delete(threadId));
+        this.#waking.set(threadId, waking);
+      }
+      await waking;
+    }
+    return this.#requireThread(threadId);
   }
 
   async #startTurn(params: unknown): Promise<TurnResponse> {
     const threadId = requiredString(params, "threadId");
-    const runtime = this.#requireThread(threadId);
+    const runtime = await this.#wakeThread(threadId);
     if (runtime.activeTurn) throw new Error("The Claude thread already has an active turn.");
+    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
+    runtime.idleRelease = null;
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -837,14 +894,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       params: { threadId: runtime.id, turn: { id: turn.id, status } },
     });
     runtime.activeTurn = null;
+    this.#armIdleRelease(runtime);
   }
 
   async #readThread(threadId: string): Promise<ThreadResponse> {
-    const runtime = this.#threads.get(threadId);
-    const messages = await this.#readSessionMessages(
-      threadId,
-      runtime?.config.cwd ? { dir: runtime.config.cwd } : undefined,
-    );
+    const cwd = this.#threads.get(threadId)?.config.cwd ?? this.#releasedThreads.get(threadId)?.cwd;
+    const messages = await this.#readSessionMessages(threadId, cwd ? { dir: cwd } : undefined);
     const turns: NonNullable<ThreadResponse["thread"]["turns"]> = [];
     let current: (typeof turns)[number] | null = null;
     let currentThinking: ThreadItem | null = null;

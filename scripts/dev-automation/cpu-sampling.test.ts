@@ -15,6 +15,7 @@ import {
   parseProcessTime,
   snapshotProcesses,
   summarize,
+  summarizeMemory,
 } from "./cpu-sampling";
 
 function snapshot(pid: number, cpuSeconds: number, type: ProcessSnapshot["type"] = "renderer"): ProcessSnapshot {
@@ -69,12 +70,12 @@ describe("classifyChromiumProcess", () => {
 
 describe("parseProcessTable and collectDescendants", () => {
   const table = [
-    "  100     1 0:10.00 /opt/homebrew/bin/bun scripts/dev-services.ts app",
-    "  101   100 1:00.00 /w/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /w/out/main/index.js",
-    "  102   101 0:30.00 /w/Electron Helper (Renderer) --type=renderer",
-    "  103   101 nonsense /w/Electron Helper (GPU) --type=gpu-process",
-    "  900     1 5:00.00 /Applications/Other.app/Contents/MacOS/Other",
-    "PID PPID TIME COMMAND",
+    "  100     1  51200 0:10.00 /opt/homebrew/bin/bun scripts/dev-services.ts app",
+    "  101   100 204800 1:00.00 /w/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /w/out/main/index.js",
+    "  102   101 102400 0:30.00 /w/Electron Helper (Renderer) --type=renderer",
+    "  103   101  10240 nonsense /w/Electron Helper (GPU) --type=gpu-process",
+    "  900     1  10240 5:00.00 /Applications/Other.app/Contents/MacOS/Other",
+    "PID PPID RSS TIME COMMAND",
   ].join("\n");
 
   it("drops a row whose time field cannot be read", () => {
@@ -90,6 +91,34 @@ describe("parseProcessTable and collectDescendants", () => {
 
   it("answers nothing when the published pid is gone", () => {
     expect(collectDescendants(parseProcessTable(table), 4_242)).toEqual([]);
+  });
+});
+
+describe("summarizeMemory", () => {
+  const table = [
+    "  100     1  51200 0:10.00 /opt/homebrew/bin/bun scripts/dev-services.ts app",
+    "  101   100 204800 1:00.00 /w/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /w/out/main/index.js",
+    "  102   101 102400 0:30.00 /w/Electron Helper (Renderer) --type=renderer",
+    "  103   101 307200 0:05.00 /Users/me/.local/bin/claude --output-format stream-json",
+    "  104   103  20480 0:01.00 /usr/local/bin/node /w/local-mcp-bridge.js",
+    "  105   101  71680 0:02.00 /Users/me/.local/bin/codex app-server --listen stdio://",
+  ].join("\n");
+
+  it("groups resident memory by kind and keeps dev tooling out of the app total", () => {
+    const report = summarizeMemory(collectDescendants(parseProcessTable(table), 100), "idle");
+    expect(report.buckets).toEqual([
+      { kind: "main", rssMb: 200, processes: 1 },
+      { kind: "renderer", rssMb: 100, processes: 1 },
+      { kind: "provider", rssMb: 390, processes: 3 },
+      { kind: "dev-tooling", rssMb: 50, processes: 1 },
+    ]);
+    expect(report.appRssMb).toBe(690);
+    expect(report.devToolingRssMb).toBe(50);
+  });
+
+  it("names a process by its executable only, never by its arguments", () => {
+    const report = summarizeMemory(collectDescendants(parseProcessTable(table), 100), "idle");
+    expect(report.processes.find((process) => process.pid === 103)?.name).toBe("claude");
   });
 });
 

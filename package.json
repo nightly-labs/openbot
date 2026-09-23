@@ -116,6 +116,7 @@
     "dev:seed": "tsx scripts/seed-dev-state.ts",
     "dev:automation": "bun scripts/dev-automation/cli.ts",
     "dev:cpu": "bun scripts/dev-automation/cli.ts cpu",
+    "dev:memory": "bun scripts/dev-automation/cli.ts memory",
     "dev:status": "bun scripts/dev-stack.ts status",
     "dev:verify": "bun scripts/dev-verify.ts",
     "dev:mobile": "bun scripts/dev-mobile.ts",
