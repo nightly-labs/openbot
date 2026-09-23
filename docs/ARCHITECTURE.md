@@ -502,6 +502,23 @@ the native/DOM bridge limits each file to 10 MB and cancels transfers when its c
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+Mobile external links enter through Expo Router's `+native-intent` and the links feature.
+Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
+local request ID. Invitations wait through sign-in and show a verified host preview before an
+explicit join. Mobile Connect links require confirmation and cannot replace a signed-in account.
+The one exception is development builds: `bun run dev:mobile` opens the link with `simctl openurl`,
+and a `__DEV__` build redeems it without confirmation only when its account service is a loopback
+or private-network `http:` origin. Release builds always use the confirmed flow.
+Plugin links open their validated public page in the in-app browser. Unsupported links show a
+safe fallback. Permanent invitation metadata comes from the shared Team client; revocation stops
+new joins without removing existing members.
+iOS associates only `https://openbot.run/join` with `run.openbot.mobile`. Changes to associated
+domains require a new native app build and deployment of the website association file. Android
+continues to open HTTPS invitations in the browser, whose button opens `openbot://join`. Enabling
+verified Android App Links requires the release app-signing certificate's SHA-256 fingerprint,
+`/.well-known/assetlinks.json`, and a matching verified `/join` intent filter. No certificate
+fingerprint is stored in this repository yet.
+
 Mobile Settings uses one native form sheet with stable detents and a nested Expo Router stack.
 Inner pages push within the sheet and use native back navigation; standalone forms remain
 fit-to-content sheets. Both reuse SheetScrollView. General, Profile, Connections and About use HeroUI typography and shared
@@ -523,7 +540,13 @@ account-to-Signal outbox before returning. Worker `waitUntil` delivers notificat
 profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
 the account API on notification, cold launch, and every 15 minutes while active.
-Desktop window focus does not trigger an automatic account or directory check.
+Membership writes enqueue an `account-servers-changed` invalidation the same way, addressed to the
+account rather than to a host: accepting an invitation, changing a membership, and registering a
+host this account did not have all queue one for the member whose server list changed. Republishing
+an existing host rotates its credential without changing a list, and queues nothing. Signal forwards it to every authenticated socket that account
+holds, and the frame names no server. That is how a server joined on one device reaches the other
+devices of the same account. Desktop window focus does not trigger an automatic account or directory
+check; a device holding no Signal socket finds the change at its next 15-minute check.
 Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
 A foreground return checks absolute freshness: successful account and directory responses stay fresh
 for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after

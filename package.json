@@ -113,6 +113,7 @@
     "dev:cpu": "bun scripts/dev-automation/cli.ts cpu",
     "dev:status": "bun scripts/dev-stack.ts status",
     "dev:verify": "bun scripts/dev-verify.ts",
+    "dev:mobile": "bun scripts/dev-mobile.ts",
     "dev:stop": "bun scripts/dev-stack.ts stop",
     "dev:forget": "bun scripts/dev-stack.ts forget",
     "dev:reset": "tsx scripts/reset-dev-state.ts",
@@ -269,7 +270,7 @@
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.15.7": "patches/dmg-builder@26.15.7.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
-    "expo-router@57.0.20": "patches/expo-router@57.0.20.patch",
+    "expo-router@57.0.22": "patches/expo-router@57.0.22.patch",
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch"

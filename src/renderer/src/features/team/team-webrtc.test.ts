@@ -138,6 +138,10 @@ it("routes two phones independently and disconnects or resumes only the addresse
   await vi.waitFor(() =>
     expect(posted("account-profile-changed")).toEqual([{ type: "account-profile-changed", peerId: "host-1" }]),
   );
+  signal.message({ type: "account-servers-changed", version: 1 });
+  await vi.waitFor(() =>
+    expect(posted("account-servers-changed")).toEqual([{ type: "account-servers-changed", peerId: "host-1" }]),
+  );
   for (const index of [1, 2])
     signal.message({
       type: "peer-ready",

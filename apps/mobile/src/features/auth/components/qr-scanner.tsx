@@ -27,7 +27,15 @@ type ScanState =
   | { status: "error"; source: "camera" | "connection"; message: string };
 const QR_SCANNER_SETTINGS: CameraViewProps["barcodeScannerSettings"] = { barcodeTypes: ["qr"] };
 
-function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: () => void }) {
+function ScannerStatus({
+  pairing,
+  scanState,
+  onRetry,
+}: {
+  pairing: boolean;
+  scanState: ScanState;
+  onRetry: () => void;
+}) {
   const [foreground, accent] = useThemeColor(["foreground", "accent"]);
 
   if (scanState.status === "error") {
@@ -36,7 +44,7 @@ function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: 
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Couldn’t connect</Alert.Title>
+            <Alert.Title>{pairing ? "Couldn’t connect" : "Couldn’t use this code"}</Alert.Title>
             <Alert.Description selectable>{scanState.message}</Alert.Description>
           </Alert.Content>
         </Alert>
@@ -61,11 +69,19 @@ function ScannerStatus({ scanState, onRetry }: { scanState: ScanState; onRetry: 
         )}
         <View className="min-w-0 flex-1 gap-0.5">
           <Card.Title className="font-sans text-body font-semibold">
-            {scanState.status === "connecting" ? "Connecting your phone…" : "Scan the desktop code"}
+            {scanState.status === "connecting"
+              ? pairing
+                ? "Connecting your phone…"
+                : "Reading the invitation…"
+              : pairing
+                ? "Scan the desktop code"
+                : "Scan the invitation code"}
           </Card.Title>
           <Card.Description className="font-sans text-caption">
             {scanState.status === "connecting"
-              ? "Verifying the one-time code."
+              ? pairing
+                ? "Verifying the one-time code."
+                : "Checking the server identity."
               : "Keep the QR code centered inside the frame."}
           </Card.Description>
         </View>
@@ -229,7 +245,9 @@ export function QrScanner({
                 </Card.Title>
                 <Card.Description className="font-sans text-body leading-6 text-text-secondary">
                   {canRequestPermission
-                    ? "OpenBot uses the camera only to scan the one-time QR code shown in the desktop app."
+                    ? pairing
+                      ? "OpenBot uses the camera only to scan the one-time QR code shown in the desktop app."
+                      : "OpenBot uses the camera only to scan the invitation QR code."
                     : "Camera access is blocked. Enable it for OpenBot in device settings, then return here to scan the code."}
                 </Card.Description>
               </Card.Body>
@@ -319,6 +337,7 @@ export function QrScanner({
           className={embedded ? "absolute inset-x-4 bottom-4" : "absolute inset-x-5 bottom-safe-offset-5"}
         >
           <ScannerStatus
+            pairing={pairing}
             scanState={scanState}
             onRetry={() => {
               if (scanState.status === "error" && scanState.source === "camera") {

@@ -208,6 +208,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
 | `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
+| `bun run dev:mobile` | Start or reuse this worktree's `bun run dev` stack, build and launch the iOS simulator app, and pair them without a QR scan. The desktop issues a Mobile Connect ticket over CDP, and `simctl openurl` opens the link in the development build, which accepts only loopback or private-network account services. Other arguments go to `bun mobile:ios`. `--pair-only` pairs an app that already runs; `--simulator=<udid>` chooses one of several booted simulators. It stops when the Metro port is already in use, because another worktree's Metro would serve the same app id; pass `--port=<n>` then. |
 | `bun run mobile:ios:build:local` | Build a production iOS `.ipa` locally for upload with Transporter. See [TestFlight setup](apps/mobile/README.md#local-testflight-build). |
 | `bun run mobile:ios:release:testflight` | Start the GitHub Actions iOS build from `main` and upload to TestFlight. Requires authenticated GitHub CLI. See [iOS release setup](apps/mobile/README.md#github-actions-testflight-release). |
 | `bun mobile:ios:rocketsim` | Start RocketSim and build and launch the iOS simulator app with RocketSim Connect. See [mobile setup](apps/mobile/README.md#development). |
@@ -451,6 +452,8 @@ respective products and services.
 For one native Standard user per tenant, install the normal OpenBot DMG and the optional
 `OpenBot-Host-<VERSION>-arm64.pkg` from the same release. The Host package provides
 `sudo openbot-host setup --create-user client-acme --create-user client-bravo` and
-`sudo openbot-host verify`. No Git checkout, Bun, or compilation is required on the host.
+`sudo openbot-host verify`. `sudo openbot-host status [--json]` and `sudo openbot-host watch`
+show the update phase, the staged version, and each tenant's work state. No Git checkout, Bun,
+or compilation is required on the host.
 Normal desktop users need only the DMG. See the [host deployment guide](docs/multi-tenant-hosting.md)
 for existing-user enrollment, password handling, package upgrades, and required target-host checks.
