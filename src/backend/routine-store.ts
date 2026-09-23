@@ -4,7 +4,12 @@ import type { RoutineFields, RoutineRunFields, RoutineRunStatus, RoutineSchedule
 import { isRoutineSchedule } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { OpenBotDatabase } from "./openbot-database";
-import { nextRoutineOccurrence, normalizeRoutineSchedule, validateRoutineSchedule } from "./routine-schedule";
+import {
+  nextRoutineOccurrence,
+  normalizeRoutineSchedule,
+  RoutineInputError,
+  validateRoutineSchedule,
+} from "./routine-schedule";
 
 /**
  * Three table names, one owner column and one handle column are the whole difference between an
@@ -108,7 +113,7 @@ export class RoutineStore {
 
   protected createRoutine(ownerId: string, input: RoutineInputFields, now = new Date()): OwnedRoutine {
     this.#validateInput(input.name, input.instruction, input.timezone, input.schedule);
-    if (this.listRoutines(ownerId).length >= this.tables.limit) throw new Error(this.tables.limitMessage);
+    if (this.listRoutines(ownerId).length >= this.tables.limit) throw new RoutineInputError(this.tables.limitMessage);
     const routineId = randomUUID();
     const createdAt = now.toISOString();
     const schedule = normalizeRoutineSchedule(input.schedule, now);
@@ -149,7 +154,7 @@ export class RoutineStore {
 
   protected updateRoutine(ownerId: string, input: RoutineUpdateFields, now = new Date()): OwnedRoutine {
     const current = this.getRoutine(ownerId, input.routineId);
-    if (!current) throw new Error("This routine no longer exists.");
+    if (!current) throw new RoutineInputError("This routine no longer exists.");
     const name = input.name ?? current.name;
     const instruction = input.instruction ?? current.instruction;
     const schedule = normalizeRoutineSchedule(input.schedule ?? current.trigger.schedule, now);
@@ -197,7 +202,7 @@ export class RoutineStore {
   }
 
   delete(ownerId: string, routineId: string): void {
-    if (!this.getRoutine(ownerId, routineId)) throw new Error("This routine no longer exists.");
+    if (!this.getRoutine(ownerId, routineId)) throw new RoutineInputError("This routine no longer exists.");
     const { commandPrefix, eventPrefix, routineAggregate, routineTable, ownerColumn } = this.tables;
     this.database.dispatch(
       `${commandPrefix}:delete:${routineId}:${randomUUID()}`,
@@ -579,10 +584,11 @@ export class RoutineStore {
   #validateInput(name: string, instruction: string, timezone: string, schedule: RoutineSchedule): void {
     const normalizedName = name.trim();
     const normalizedInstruction = instruction.trim();
-    if (!normalizedName) throw new Error("A routine name is required.");
-    if (name.length > INPUT_LIMITS.routineName) throw new Error("The routine name is too long.");
-    if (!normalizedInstruction) throw new Error("A routine instruction is required.");
-    if (instruction.length > INPUT_LIMITS.routineInstruction) throw new Error("The routine instruction is too long.");
+    if (!normalizedName) throw new RoutineInputError("A routine name is required.");
+    if (name.length > INPUT_LIMITS.routineName) throw new RoutineInputError("The routine name is too long.");
+    if (!normalizedInstruction) throw new RoutineInputError("A routine instruction is required.");
+    if (instruction.length > INPUT_LIMITS.routineInstruction)
+      throw new RoutineInputError("The routine instruction is too long.");
     validateRoutineSchedule(schedule, timezone);
   }
 }

@@ -325,6 +325,20 @@ export async function expectOpenBotToolError(
   expect(result.error?.message).toContain(message);
 }
 
+/** A tool that refuses with `openBotToolFailure`: the model reads the reason, no JSON-RPC fault. */
+export async function expectOpenBotToolFailure(
+  client: FakeAgentClient,
+  threadId: string,
+  tool: string,
+  args: unknown,
+  message: string,
+): Promise<void> {
+  const result = await callOpenBotTool(client, threadId, tool, args);
+  expect(result.error).toBeUndefined();
+  expect(paramsRecord(result.result)?.success).toBe(false);
+  expect(openBotToolPayload(result.result).error).toContain(message);
+}
+
 export function notification(method: string, params: unknown): AppServerNotification {
   return { method, params };
 }

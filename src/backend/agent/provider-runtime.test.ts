@@ -1372,6 +1372,42 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
   });
 
+  it("keeps Codex's background refresh failures out of the provider error toast", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("Codex did not start.");
+
+    // As reported in #717: a computer that woke without internet access, one line per retry.
+    client.emit(
+      "diagnostic",
+      "2026-09-23T06:52:48.272320Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit",
+    );
+    client.emit("diagnostic", "2026-09-23T06:55:18.925203Z ERROR Settings fetch failed max_attempts=3");
+    // Any other failure stays visible, and its repeats read the same, so the renderer shows it once.
+    client.emit("diagnostic", "2026-09-23T06:56:00.000001Z ERROR codex: the model endpoint could not be reached");
+    client.emit("diagnostic", "2026-09-23T06:57:00.000002Z ERROR codex: the model endpoint could not be reached");
+
+    await waitFor(() => events.filter((event) => event.type === "error").length === 2);
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "ERROR codex: the model endpoint could not be reached" }),
+      expect.objectContaining({ message: "ERROR codex: the model endpoint could not be reached" }),
+    ]);
+  });
+
   it("keeps Grok's failed tool call out of the provider error toast", async () => {
     process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
     const { store, mailbox } = stores(root);
