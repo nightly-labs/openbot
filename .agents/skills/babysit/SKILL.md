@@ -14,6 +14,8 @@ Do not use it for human reviews or for other bots.
 
 ## Before you start
 
+Do this once, not in each loop.
+
 - Read `AGENTS.md` and each nested `AGENTS.md` for a directory you change.
 - Read `.github/norbiai-review-prompt.md`. It defines `[NEW]`, `[REMAINS]`,
   `[RESOLVED]`, `[WITHDRAWN]` and what counts as a valid rebuttal.
@@ -24,8 +26,9 @@ Do not use it for human reviews or for other bots.
 
 ## Step 1 — Read the latest review
 
-1. Load PR comments with `gh api`. Find the newest comment from
-   `github-actions[bot]` with `<!-- norbiai-review -->` in the body.
+1. Load only the newest comment from `github-actions[bot]` with
+   `<!-- norbiai-review -->` in the body. Filter with `gh api --jq`; do not
+   print all PR comments.
 2. Record `Reviewed commit` from the comment. Compare it with the head SHA.
    Stop when the review is stale. Wait for a fresh review instead.
 3. Read `## Findings`, `## Resolved Since Previous Review`, and
@@ -75,9 +78,9 @@ cannot reproduce in order to turn the gate green.
 2. Obey the non-negotiable rules in `AGENTS.md`: keep migrations
    irreversible-safe, keep released Team API meaning unchanged, keep the
    renderer-to-main trust boundary, redact secrets, keep the license.
-3. Run the narrowest relevant test file first. Then run `bun run lint`
-   and `bun run typecheck`. Also run `bun run check:ui` for changes
-   in `src/renderer`. Fix what your change broke. Rerun the checks.
+3. Run the narrowest relevant test file and
+   `biome check --write --max-diagnostics=none <changed paths>`, as
+   `AGENTS.md` says. Leave broad checks to CI.
 4. Commit the fixes on the pull request branch.
 
 Do not weaken a test to satisfy a finding. Do not widen a type to
@@ -91,16 +94,17 @@ The reviewer withdraws a finding only for a concrete, checkable reason.
 Assertion without evidence does not work. A promise to fix it later
 does not work. Disagreement about priority does not work.
 
-Write one pull request comment that covers all rebuttals. For each
-finding give:
+Write one short comment for all rebuttals. Each response goes into the
+next review prompt, so every word costs tokens. Write one line for each
+finding, in ASD-STE100 Simplified Technical English:
 
-- The finding title, priority, and `path:line`.
-- The concrete reason it is wrong: the guard it misses, the line that
-  already handles it, or the contract it misreads.
-- The place where you verified the reason: file, line, and current head SHA.
+```
+P1 Short title: wrong, <guard or contract> at `path:line`.
+```
 
-Include `/norbiai review` in the same comment. That phrase asks for a
-recheck. Without it the reviewer never sees the rebuttal.
+Give only the reason and the line that proves it. No greeting, no fixes
+summary, no head SHA, no restated finding. The reviewer reads the fixes in
+the diff.
 
 Only a comment from someone who can merge counts as a rebuttal. The
 workflow ignores other comments. When you cannot post as such a user,
@@ -113,14 +117,19 @@ markers. Never edit another comment.
 
 One loop is one push plus one review run:
 
-1. Push the branch with the fixes.
-2. Post the rebuttal comment from Step 4 in the same round. The comment
-   must contain the fixes summary, each rebuttal, and `/norbiai review`.
-   As an alternative, apply the `norbiai` label. The label path also
-   asks for a review.
-3. Wait for the new `<!-- norbiai-review -->` comment and the new
-   `NorbiAI review` status on the new head SHA. Poll with `gh api`.
-   Do not start the next triage on the old SHA.
+Ask for one review only. Each extra request is a full review run.
+
+1. With fixes to push: post the rebuttal comment first, without
+   `/norbiai review`. Then push. The review for the push reads every
+   comment posted since the last review.
+2. With no fixes to push: add `/norbiai review` to the rebuttal comment.
+   That phrase asks for a recheck.
+3. Do not also apply the `norbiai` label. The label asks for a full
+   review of the whole PR.
+4. Wait for the new `<!-- norbiai-review -->` comment and the new
+   `NorbiAI review` status on the new head SHA. Poll with `gh api` at
+   most once each 2 minutes; a review takes 3 to 15 minutes. Do not start
+   the next triage on the old SHA.
 
 When the push itself triggers a review with no comment from you, still
 wait for that review before you continue.
@@ -148,11 +157,10 @@ Report the loop count, the fixes, the rebuttals, and the final status.
 
 ## Report format
 
-After each loop, report:
+Keep the report short. After each loop, report:
 
 | Finding | Verdict | Action |
 | --- | --- | --- |
 | Short title - `path:line` | fix / rebut | Commit or rebuttal line |
 
-Then state the head SHA, the checks you ran, how you asked for the
-next review, and what the next loop must check.
+Then state the head SHA and the checks you ran, in one line each.

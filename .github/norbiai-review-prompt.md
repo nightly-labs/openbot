@@ -48,7 +48,7 @@ Return at most 10 findings, ordered by priority:
 - P2: concrete defect or meaningful complexity that should be fixed.
 - P3: clear simplification with measurable code or dependency reduction.
 
-Keep each finding under 120 words. Each finding must include:
+Keep each finding under 80 words. Write all text in ASD-STE100 Simplified Technical English, and be as concise as possible. Do not restate the diff or the finding in the evidence. Each finding must include:
 
 - Priority and short title.
 - Exact changed file and line.
@@ -64,7 +64,7 @@ One sentence assessing whether actionable findings exist.
 ## Resolved Since Previous Review
 
 1. **[RESOLVED][P1] Short title** - `path/to/file.ts:123`
-   Brief evidence that the problem no longer exists.
+   One clause: what changed.
 
 Write `None.` when no previous finding was resolved.
 
@@ -78,7 +78,7 @@ Use `[REMAINS]` instead of `[NEW]` for a previous finding that is still actionab
 ## Withdrawn Findings
 
 1. **[WITHDRAWN][P1] Short title** - `path/to/file.ts:123`
-   The response's argument, and where you verified it in the code.
+   One clause: the verified reason and its line.
 
 Carry forward every entry from `## Previously withdrawn findings` and append any new withdrawal. Write `None.` when nothing has been withdrawn on this PR. Never put a `[WITHDRAWN]` entry under `## Findings`.
 
