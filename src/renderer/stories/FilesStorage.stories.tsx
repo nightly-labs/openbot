@@ -24,7 +24,7 @@ import {
   FILES_ROWS,
   FILES_STATUS_ROWS,
 } from "./files-fixtures";
-import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 
 const meta = {
   title: "Files/Storage",
@@ -260,11 +260,11 @@ export const StorageInRemoteServerSettings: Story = {
 // Agent settings > Files ---------------------------------------------------
 
 const agentPanelArgs = {
-  agent: STORY_AGENTS[0],
+  agent: STORY_AGENT,
   runtimeSettings: {
-    provider: STORY_AGENTS[0].provider,
-    model: STORY_AGENTS[0].model,
-    reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+    provider: STORY_AGENT.provider,
+    model: STORY_AGENT.model,
+    reasoningEffort: STORY_AGENT.reasoningEffort,
   },
   agentStatus: STORY_AGENT_STATUS,
   modelOptions: STORY_MODELS,
@@ -298,7 +298,7 @@ function AgentFilesStory(props: { initiallyOpen: boolean; loading?: boolean; emp
       >
         <Show when={open()}>
           <AgentFilesView
-            agentName={STORY_AGENTS[0].name}
+            agentName={STORY_AGENT.name}
             loading={props.loading}
             breakdown={breakdown()}
             conversations={props.empty ? [] : FILES_CHIEF_CONVERSATIONS}

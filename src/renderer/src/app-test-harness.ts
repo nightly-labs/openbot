@@ -250,7 +250,7 @@ export function subscriberCounts(): BridgeSubscriberCounts {
   };
 }
 
-export const AGENTS: AgentSummary[] = [
+export const AGENTS: [AgentSummary, AgentSummary] = [
   {
     id: "chief",
     provider: "codex",

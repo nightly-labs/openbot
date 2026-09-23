@@ -90,9 +90,9 @@ export function selectionActionsPosition(
   toolbar: Pick<SelectionRect, "width" | "height">,
   viewport: { width: number; height: number },
 ): SelectionActionsPosition {
-  if (rects.length === 0) return { top: VIEWPORT_MARGIN, left: VIEWPORT_MARGIN, placement: "bottom" };
   const firstLine = rects[0];
   const lastLine = rects[rects.length - 1];
+  if (!firstLine || !lastLine) return { top: VIEWPORT_MARGIN, left: VIEWPORT_MARGIN, placement: "bottom" };
   const leftEdge = Math.min(...rects.map((rect) => rect.left));
   const rightEdge = Math.max(...rects.map((rect) => rect.right));
   const idealLeft = leftEdge + (rightEdge - leftEdge - toolbar.width) / 2;

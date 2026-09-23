@@ -43,6 +43,15 @@ lint, desktop typecheck and build) takes about a minute, and each other typechec
 seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
 `openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
 
+`check:staged` lets Biome fix the working-tree copy of each staged file, and the hook then stages
+those files again. It stages again only the files that have no unstaged changes; otherwise the commit
+would also take the author's unstaged edits. When Biome changes a file that is only partly staged,
+the hook stops the commit and names the file. `scripts/pre-commit-hook.test.ts` covers the three cases.
+
+One project typecheck, such as `typecheck:node` or `typecheck:renderer`, takes under 10 seconds and
+less than 1.5 GB of memory. The load that the check rules prevent comes from the aggregate command,
+which starts all projects at the same time.
+
 The source of truth for CI is [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 Its main jobs are:
 

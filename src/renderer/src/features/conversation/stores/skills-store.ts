@@ -21,7 +21,7 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
   createEffect(
     () => `${deps.props.server?.id ?? "local"}\0${deps.props.server?.connectionSequence ?? 0}`,
     (source) => {
-      const [serverId, connectionSequenceText] = source.split("\0");
+      const [serverId = "", connectionSequenceText] = source.split("\0");
       const failedAttempt = failedInstalledSkillsAttempt;
       if (
         failedAttempt?.serverId === serverId &&
@@ -38,7 +38,7 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
   );
   createEffect(refreshKey, (source) => {
     const request = ++installedSkillsRequest;
-    const [serverId, agentId, support, visibility] = source.split("\0");
+    const [serverId = "", agentId, support, visibility] = source.split("\0");
     if (!agentId) {
       installedSkillsSourceId = undefined;
       failedInstalledSkillsAttempt = undefined;

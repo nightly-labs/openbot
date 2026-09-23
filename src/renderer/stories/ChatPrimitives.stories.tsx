@@ -25,6 +25,9 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { toAgentMessage } from "../src/app-message-projection";
 import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
 
+const [firstStoryAttachment] = STORY_ATTACHMENTS;
+if (!firstStoryAttachment) throw new Error("Story attachment fixtures are empty.");
+
 const previewImage = new URL("../src/assets/openbot-logo-production.png", import.meta.url).href;
 const generatedImage: AttachmentSummary = {
   id: "chat-primitives-generated-image",
@@ -118,7 +121,7 @@ const attachmentMessage: AgentMessage = {
   body: "",
   time: "10:08",
   kind: "text",
-  attachments: [STORY_ATTACHMENTS[0]],
+  attachments: [firstStoryAttachment],
 };
 
 const streamingMessage: AgentMessage = {

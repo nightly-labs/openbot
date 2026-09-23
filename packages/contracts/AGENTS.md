@@ -65,5 +65,5 @@ and every Storybook story exercise. A method that satisfies the type by returnin
 story that silently shows nothing.
 
 Adding a channel means `ipc-channels.ts`, `ipc-endpoints.ts`, its registrar, the preload and the mock
-in the same change. You do not have to remember that list: add the channel, and the typecheck in the
-pre-commit hook or in CI names every step but the preload.
+in the same change. You do not have to remember that list: add the channel, and
+`bun run typecheck:node` and `bun run typecheck:renderer` name every step but the preload.

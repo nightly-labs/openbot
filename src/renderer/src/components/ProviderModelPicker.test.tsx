@@ -218,13 +218,14 @@ describe("ProviderModelPicker", () => {
   });
 });
 
-const openCodeModels: AgentModelOption[] = [
+const openCodeModelNames: [string, string][] = [
   ["openai/gpt", "OpenAI/GPT"],
   ["opencode/free", "OpenCode Zen/Example Free"],
   ["opencode/free/low", "OpenCode Zen/Example Free (low)"],
   ["opencode/free/high", "OpenCode Zen/Example Free (high)"],
   ["opencode/unknown", "OpenCode Zen/Unknown price"],
-].map(([id, name]) => ({
+];
+const openCodeModels: AgentModelOption[] = openCodeModelNames.map(([id, name]) => ({
   provider: "opencode",
   id,
   name,
