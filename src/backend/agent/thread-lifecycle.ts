@@ -42,6 +42,11 @@ import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-i
  */
 const CODEX_MCP_ADAPTER_VERSION = 4;
 
+// A handoff can follow an edit of the profile. The earlier replies then show the old standing
+// remit, and without this line the model copies them instead of following the new one.
+const HANDOFF_PRECEDENCE =
+  "Your current profile and developer instructions take precedence over any different instructions or behavior in this transcript.";
+
 export interface ThreadLifecycleHooks {
   /** Keeps the `agent-service` logger (and its prefix) as the single writer. */
   logRecovery(agentId: string, provider: AgentProvider, outcome: "resumed" | "replaced"): void;
@@ -201,10 +206,16 @@ export class ThreadLifecycle {
       // Codex ignores dynamicTools on thread/resume. A replacement provider session is
       // required when tools change; the public thread and its history stay intact. The old
       // session is closed in the client as well, or it keeps the MCP servers it started with
-      // every further change adding another unreachable set of processes.
-      if (client.provider === "codex" && !(await this.hasCurrentTools(client, session.externalSessionId))) {
+      // every further change adding another unreachable set of processes. Changed standing
+      // instructions take the same path, for the reason given at `toolFingerprint`.
+      if (
+        client.provider === "codex" &&
+        !(await this.hasCurrentTools(currentAgent, client, session.externalSessionId))
+      ) {
         const replacement = await this.startProviderThread(currentAgent, client, publicThreadId);
-        this.#releaseProviderSession(session.externalSessionId);
+        // The client is named here: a profile edit has already dropped the loaded entry, and the
+        // lookup alone would leave the old session open inside Codex.
+        this.#releaseProviderSession(session.externalSessionId, client);
         this.retireProviderSession(currentAgent, session.externalSessionId);
         this.#hooks.logRecovery(currentAgent.id, client.provider, "replaced");
         return replacement;
@@ -290,7 +301,7 @@ export class ThreadLifecycle {
         await mkdir(this.toolManifestDirectory(), { recursive: true, mode: 0o700 });
         await writeFile(
           this.toolManifestPath(externalThreadId),
-          this.toolFingerprint(mcpServers, disabled, toolRuntimes),
+          this.toolFingerprint(agent, mcpServers, disabled, toolRuntimes),
           {
             mode: 0o600,
           },
@@ -394,8 +405,14 @@ export class ThreadLifecycle {
    * The adapter version rides along for the same reason: a session started before HTTP servers
    * reached the Codex payload holds the same stored set as today, so without it the old session
    * would resume forever with the servers it was given. Bump it when what Codex is sent changes.
+   *
+   * The profile the user edits is folded in as well. Codex keeps the developer instructions a
+   * session was started with, so a session resumed after an edit goes on following the old
+   * standing remit. Memories stay out: the agent saves them during its own turns, and a new
+   * session for each one would drop the provider history far too often.
    */
   private toolFingerprint(
+    agent: AgentSummary,
     configs: readonly McpServerConfig[],
     disabled: Record<string, CodexDisabledMcpServer>,
     toolRuntimes: McpToolRuntimes,
@@ -408,16 +425,18 @@ export class ThreadLifecycle {
           Object.keys(disabled).sort(),
           [toolRuntimes.binDirectories, toolRuntimes.commandAliases],
           CODEX_MCP_ADAPTER_VERSION,
+          [agent.name, agent.title, agent.description],
         ]),
       )
       .digest("hex");
   }
 
-  private async hasCurrentTools(client: AgentClient, sessionId: string): Promise<boolean> {
+  private async hasCurrentTools(agent: AgentSummary, client: AgentClient, sessionId: string): Promise<boolean> {
     try {
       const stored = await readFile(this.toolManifestPath(sessionId), "utf8");
       return (
-        stored === this.toolFingerprint(this.#mcpServers(), await this.codexOwnServers(client), this.#toolRuntimes())
+        stored ===
+        this.toolFingerprint(agent, this.#mcpServers(), await this.codexOwnServers(client), this.#toolRuntimes())
       );
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
@@ -561,8 +580,10 @@ export class ThreadLifecycle {
    * synchronous settings paths, and the close talks to a child process; the routing entries are
    * dropped either way, so the next turn starts a new session whatever the old one answers.
    */
-  #releaseProviderSession(externalThreadId: string): void {
-    const client = this.#conversation.loadedClientFor(externalThreadId);
+  #releaseProviderSession(
+    externalThreadId: string,
+    client = this.#conversation.loadedClientFor(externalThreadId),
+  ): void {
     if (!client?.releaseThread) return;
     void client.releaseThread(externalThreadId).catch((error: unknown) => {
       this.#hooks.logReleaseFailure(client.provider, error);
@@ -594,6 +615,7 @@ export class ThreadLifecycle {
     if (estimateTokens(fullText) <= budgetTokens) {
       return [
         "Continue this OpenBot conversation. The following transcript is user-visible history from the previous provider.",
+        HANDOFF_PRECEDENCE,
         "Do not repeat completed work unless the current message asks for it.",
         "--- previous transcript ---",
         fullText,
@@ -623,6 +645,7 @@ export class ThreadLifecycle {
     );
     return [
       "Continue this OpenBot conversation. The oldest visible history was summarized because the provider handoff exceeded its context budget.",
+      HANDOFF_PRECEDENCE,
       "--- saved summary of older history ---",
       summaryText,
       "--- full recent transcript ---",
