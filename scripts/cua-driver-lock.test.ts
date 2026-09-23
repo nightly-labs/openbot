@@ -94,7 +94,12 @@ describe("the packaged driver layout", () => {
       const { platform, architecture, executable } = CUA_DRIVER_TARGETS[target];
       const from = relative(resolve(import.meta.dirname, ".."), cuaDriverInstallRoot(".", target));
       const section = platform === "darwin" ? "mac" : platform === "win32" ? "win" : "linux";
-      expect(builder[section].extraResources).toContainEqual({ from, to: `cua-driver/${platform}/${architecture}` });
+      // electron-builder expands `${arch}` for the architecture it builds, so one Linux entry serves both.
+      const entries = builder[section].extraResources.map((entry: { from: string; to: string }) => ({
+        from: entry.from.replace(/\$\{arch\}/u, architecture),
+        to: entry.to.replace(/\$\{arch\}/u, architecture),
+      }));
+      expect(entries).toContainEqual({ from, to: `cua-driver/${platform}/${architecture}` });
 
       const resourcesPath = await makeTemporaryRoot();
       const installed = join(resourcesPath, "cua-driver", platform, architecture, executable);

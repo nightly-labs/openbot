@@ -43,7 +43,9 @@ import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { isStreamingReply } from "../model/reply-reveal";
+import { uploadProgressAt } from "../model/upload-progress";
 import { ChatAttachmentView } from "./chat-attachment";
+import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { useReplyHaptics } from "./use-reply-haptics";
 
@@ -194,9 +196,19 @@ interface ChatMessageListProps {
   onRetryHistory: () => void;
   onReply?: (message: ChatBubbleMessage) => void;
   onOpenActions: (message: ChatBubbleMessage) => void;
+  /** The message whose files are uploading, how many finished, and how to stop the rest. */
+  upload?: {
+    messageId: string;
+    completed: number;
+    /** The sent fraction of file number `completed`, from 0 to 1. */
+    current: number;
+    cancelling: boolean;
+    cancel: () => void;
+  } | null;
 }
 
 export function ChatMessageList({
+  upload,
   target,
   activity,
   activities,
@@ -439,14 +451,41 @@ export function ChatMessageList({
               </Typography.Paragraph>
             </View>
           ) : null}
-          {message.attachments?.map((attachment) => (
+          {message.imageGeneration ? (
+            <ChatImageGeneration
+              generation={message.imageGeneration}
+              status={imageGenerationStatus(message.streaming, message.status)}
+              attachment={message.attachments?.[0]}
+              serverId={target.serverId}
+            />
+          ) : null}
+          {/* A generation owns its first attachment, the image; any further files follow in order. */}
+          {(message.imageGeneration ? message.attachments?.slice(1) : message.attachments)?.map((attachment, index) => (
             <ChatAttachmentView
               key={attachment.id}
               attachment={attachment}
               serverId={target.serverId}
               alignment={message.author === "user" ? "right" : "left"}
+              upload={
+                upload?.messageId === message.id ? uploadProgressAt(index, upload.completed, upload.current) : undefined
+              }
             />
           ))}
+          {upload?.messageId === message.id && upload.completed < (message.attachments?.length ?? 0) ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-end"
+              isDisabled={upload.cancelling}
+              onPress={upload.cancel}
+            >
+              <Button.Label>
+                {upload.cancelling
+                  ? "Cancelling…"
+                  : `Cancel upload · ${upload.completed} of ${message.attachments?.length ?? 0}`}
+              </Button.Label>
+            </Button>
+          ) : null}
           {message.body.trim() ? (
             <ChatBubble
               agent={message.author === "agent"}

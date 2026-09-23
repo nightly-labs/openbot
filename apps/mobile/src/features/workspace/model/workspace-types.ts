@@ -1,3 +1,4 @@
+import type { AttachmentSupport } from "@openbot/contracts/attachment-files";
 import type {
   AgentAnalytics,
   AgentAnalyticsInput,
@@ -80,6 +81,8 @@ export interface MobileWorkspaceContextValue {
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
+  /** The files this host accepts beyond the base list, as the desktop picker reads them. */
+  attachmentSupport: (serverId: string) => AttachmentSupport;
   changeQueue: (
     agentId: string,
     serverId: string,
@@ -136,7 +139,13 @@ export interface MobileWorkspaceContextValue {
     replyToMessageId?: string | null,
     serverId?: string,
   ) => Promise<string>;
-  uploadAttachment: (agentId: string, input: RemoteFileUpload, serverId?: string) => Promise<DraftAttachment>;
+  uploadAttachment: (
+    agentId: string,
+    input: RemoteFileUpload,
+    serverId?: string,
+    /** Hears the fraction of the file sent so far, from 0 to 1. */
+    onProgress?: (fraction: number) => void,
+  ) => Promise<DraftAttachment>;
   downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hideAgent: (agentId: string) => void;

@@ -40,7 +40,8 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
       }
       pending.clear();
     },
-    async upload(input: RemoteFileUpload) {
+    /** `onProgress` hears the bytes sent after each chunk, for a person watching the file go. */
+    async upload(input: RemoteFileUpload, onProgress?: (sent: number, total: number) => void) {
       if (input.base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
         throw new Error("Attachments must be 10 MB or smaller.");
       const decoded = atob(input.base64);
@@ -88,6 +89,7 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
             bytes: bytes.slice(offset, offset + 60 * 1024),
           });
           await send(new Uint8Array(chunk).buffer);
+          onProgress?.(Math.min(offset + 60 * 1024, bytes.length), bytes.length);
         }
         if (transfer.error) throw transfer.error;
         await send(encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId }));

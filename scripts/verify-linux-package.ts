@@ -16,9 +16,22 @@ if (process.platform !== "linux") {
   throw new Error("The Linux package verifier must run on Linux.");
 }
 
+/** The verifier checks a build for the host it runs on: CI builds each architecture on its own runner. */
+const LINUX_ARCHITECTURES = {
+  x64: { label: "x86-64", elfMachine: 0x3e },
+  arm64: { label: "AArch64", elfMachine: 0xb7 },
+} as const;
+const architecture = process.arch;
+if (architecture !== "x64" && architecture !== "arm64") {
+  throw new Error(`The Linux package verifier does not support ${architecture}.`);
+}
+const target = LINUX_ARCHITECTURES[architecture];
+
 const requireUpdateMetadata = process.argv.includes("--require-update-metadata");
 const appPathArgument = process.argv.slice(2).find((argument) => !argument.startsWith("--"));
-const appPath = resolve(appPathArgument ?? "dist/linux-unpacked");
+const appPath = resolve(
+  appPathArgument ?? (architecture === "x64" ? "dist/linux-unpacked" : "dist/linux-arm64-unpacked"),
+);
 // electron-builder names the Linux binary after `name` in package.json, not `productName`.
 const executablePath = resolve(appPath, "openbot");
 const resourcesPath = resolve(appPath, "resources");
@@ -31,9 +44,9 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
   // Computer Use is the one native runtime the Linux build does ship.
-  access(resolve(resourcesPath, "cua-driver/linux/x64/cua-driver")),
-  access(resolve(resourcesPath, "cua-driver/linux/x64/wayland-helper/winrects@cua/extension.js")),
-  access(resolve(resourcesPath, "cua-driver/linux/x64/LICENSE.md")),
+  access(resolve(resourcesPath, `cua-driver/linux/${architecture}/cua-driver`)),
+  access(resolve(resourcesPath, `cua-driver/linux/${architecture}/wayland-helper/winrects@cua/extension.js`)),
+  access(resolve(resourcesPath, `cua-driver/linux/${architecture}/LICENSE.md`)),
 ]);
 await Promise.all(
   ["darwin", "win32"].map((name) =>
@@ -54,7 +67,7 @@ await Promise.all(
   ),
 );
 await assertAbsent(
-  resolve(resourcesPath, "app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64"),
+  resolve(resourcesPath, `app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-linux-${architecture}`),
   "The native Claude runtime must not be duplicated",
 );
 
@@ -74,8 +87,10 @@ const executable = await readFile(executablePath);
 if (executable.toString("binary", 0, 4) !== "\x7fELF") throw new Error("The executable has no ELF header.");
 if (executable[4] !== 2) throw new Error("Expected a 64-bit ELF executable.");
 const machine = executable.readUInt16LE(18);
-if (machine !== 0x3e) {
-  throw new Error(`Expected a Linux x86-64 executable, but its ELF machine type is 0x${machine.toString(16)}.`);
+if (machine !== target.elfMachine) {
+  throw new Error(
+    `Expected a Linux ${target.label} executable, but its ELF machine type is 0x${machine.toString(16)}.`,
+  );
 }
 
 const appImages = existsSync("dist") ? await findAppImages() : [];
@@ -117,7 +132,7 @@ await verifyLaunch(executablePath);
 
 logger.info(`Verified ${appPath}`);
 logger.info(
-  `OpenBot ${packageJson.version} · Linux x64 · manifest · no voice or remote desktop · ASAR integrity · hardened fuses · launch`,
+  `OpenBot ${packageJson.version} · Linux ${architecture} · manifest · no voice or remote desktop · ASAR integrity · hardened fuses · launch`,
 );
 
 function expectEqual(actual: unknown, expected: unknown, label: string): void {

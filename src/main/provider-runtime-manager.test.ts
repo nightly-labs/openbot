@@ -952,6 +952,7 @@ describe("ProviderRuntimeManager", () => {
   it.each([
     ["darwin", "arm64"],
     ["linux", "x64"],
+    ["linux", "arm64"],
     ["win32", "x64"],
   ] as const)("offers managed downloads on %s %s", async (platform, architecture) => {
     const root = await temporaryRoot();
@@ -969,7 +970,7 @@ describe("ProviderRuntimeManager", () => {
 
   it("reports an unsupported platform rather than a download that cannot work", async () => {
     const root = await temporaryRoot();
-    const manager = new ProviderRuntimeManager({ root, platform: "linux", architecture: "arm64" });
+    const manager = new ProviderRuntimeManager({ root, platform: "win32", architecture: "arm64" });
 
     const snapshot = await manager.initialize();
 

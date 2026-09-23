@@ -32,6 +32,7 @@ export async function pinCuaDriver(
   const artifacts = {
     "darwin-arm64": await pinArtifact(fetchImpl, "darwin-arm64", version, tag),
     "linux-x64": await pinArtifact(fetchImpl, "linux-x64", version, tag),
+    "linux-arm64": await pinArtifact(fetchImpl, "linux-arm64", version, tag),
     "win32-x64": await pinArtifact(fetchImpl, "win32-x64", version, tag),
   };
   return parseCuaDriverLock({

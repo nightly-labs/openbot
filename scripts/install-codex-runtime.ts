@@ -9,12 +9,17 @@ import { rejectNonRegularFiles, sha256 } from "./remote-desktop-runtime-release"
 
 const logger = createOpenBotLogger("install-codex-runtime");
 
-export type CodexRuntimeTarget = "darwin-arm64" | "linux-x64" | "win32-x64";
+export type CodexRuntimeTarget = "darwin-arm64" | "linux-x64" | "linux-arm64" | "win32-x64";
 
 const packageManifestSchema = z.object({
   layoutVersion: z.literal(1),
   version: z.string(),
-  target: z.enum(["aarch64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-musl"]),
+  target: z.enum([
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+  ]),
   variant: z.literal("codex"),
   entrypoint: z.string(),
   resourcesDir: z.literal("codex-resources"),
@@ -79,6 +84,7 @@ export async function installCodexRuntime(
 const CODEX_MANIFEST_TARGETS = {
   "darwin-arm64": "aarch64-apple-darwin",
   "linux-x64": "x86_64-unknown-linux-musl",
+  "linux-arm64": "aarch64-unknown-linux-musl",
   "win32-x64": "x86_64-pc-windows-msvc",
 } as const satisfies Record<CodexRuntimeTarget, string>;
 
@@ -87,13 +93,15 @@ export function codexRuntimeTarget(
   architecture: string = process.arch,
 ): CodexRuntimeTarget {
   const target = `${platform}-${architecture}`;
-  if (target === "darwin-arm64" || target === "linux-x64" || target === "win32-x64") return target;
+  if (target === "darwin-arm64" || target === "linux-x64" || target === "linux-arm64" || target === "win32-x64")
+    return target;
   throw new Error(`Unsupported bundled Codex target: ${target}`);
 }
 
 export function codexRuntimePath(root: string, target: CodexRuntimeTarget): string {
   if (target === "darwin-arm64") return join(root, "mac", "arm64");
   if (target === "linux-x64") return join(root, "linux", "x64");
+  if (target === "linux-arm64") return join(root, "linux", "arm64");
   return join(root, "win", "x64");
 }
 

@@ -1,6 +1,9 @@
 import {
+  type AttachmentSupport,
+  attachmentFileExtension,
   attachmentMimeTypeForName,
   isSupportedAttachmentName,
+  isSupportedAttachmentNameFor,
   SUPPORTED_ATTACHMENT_DESCRIPTION,
 } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -13,6 +16,7 @@ import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
 
 /**
  * Where the plus is drawn, from the screen's left and bottom edges. Measuring
@@ -30,7 +34,11 @@ export interface ChatAttachment extends RemoteFileUpload {
   id: string;
   size: number;
   uri?: string;
+  /** Read from the image header when the file is chosen, so every view reserves its shape. */
+  dimensions?: ImageDimensions;
 }
+
+const LIMIT_MESSAGE = "You can attach up to 10 files.";
 
 function base64(bytes: Uint8Array) {
   let binary = "";
@@ -41,6 +49,8 @@ function base64(bytes: Uint8Array) {
 export function useChatAttachments(
   initialItems: ChatAttachment[] = [],
   persist?: (items: ChatAttachment[]) => Promise<void>,
+  /** What the receiving host accepts. Read on each selection, because it loads with the connection. */
+  support?: () => AttachmentSupport,
 ) {
   // The plus's rect while the attachment card is open, and null while it is
   // not: one value, so the card can never be open without an anchor to grow
@@ -77,8 +87,17 @@ export function useChatAttachments(
     }
     replace(next);
   }
-  function add(input: RemoteFileUpload & { uri?: string }) {
-    if (!isSupportedAttachmentName(input.name)) throw new Error(`Choose ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
+  // The same checks as desktop, named per file: one selection can hold several, and the user
+  // needs to know which one to fix.
+  function assertSupported(name: string) {
+    if (!isSupportedAttachmentName(name)) throw new Error(`${name}: choose ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
+    if (support && !isSupportedAttachmentNameFor(name, support()))
+      throw new Error(
+        `${name}: the host computer does not accept ${attachmentFileExtension(name)?.toUpperCase() ?? "these"} files. Update OpenBot there to attach them.`,
+      );
+  }
+  function prepare(input: RemoteFileUpload & { uri?: string }): ChatAttachment {
+    assertSupported(input.name);
     if (!input.name.trim() || input.name.length > INPUT_LIMITS.attachmentName)
       throw new Error("Choose a file with a shorter name.");
     if (input.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(input.base64))
@@ -86,25 +105,74 @@ export function useChatAttachments(
     const size =
       Math.floor((input.base64.length * 3) / 4) -
       (input.base64.endsWith("==") ? 2 : input.base64.endsWith("=") ? 1 : 0);
-    if (size > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
-    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
-    const item = { ...input, size, id: `mobile-draft-attachment-${++sequence.current}` };
-    const saved = persistItems([...itemsRef.current, item]);
+    if (size > MOBILE_ATTACHMENT_BYTES) throw new Error(`${input.name} is larger than 10 MB.`);
+    const dimensions = input.mimeType.startsWith("image/") ? imageDimensions(input.base64) : null;
+    return {
+      ...input,
+      size,
+      id: `mobile-draft-attachment-${++sequence.current}`,
+      ...(dimensions ? { dimensions } : {}),
+    };
+  }
+  function trackSelected(size: number) {
     mobileAnalytics.track("attachment_action", {
       action: "select",
       result: "succeeded",
       attachment_count: 1,
       size_bucket: attachmentSizeBucket(size),
     });
+  }
+  function add(input: RemoteFileUpload & { uri?: string }) {
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
+    const item = prepare(input);
+    const saved = persistItems([...itemsRef.current, item]);
+    trackSelected(item.size);
     return saved;
   }
-  async function addFile(uri: string, name: string) {
-    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
+  async function readFile(uri: string, name: string): Promise<RemoteFileUpload & { uri: string }> {
     const file = new File(uri);
-    if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
     const safeName = name.replace(/[/\\]/gu, "_");
-    if (!isSupportedAttachmentName(safeName)) throw new Error(`Choose ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
-    await add({ name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await file.base64(), uri });
+    // Check before reading: a rejected file should not be copied into memory first.
+    if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(`${safeName} is larger than 10 MB.`);
+    assertSupported(safeName);
+    return { name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await file.base64(), uri };
+  }
+  async function addFile(uri: string, name: string) {
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
+    await add(await readFile(uri, name));
+  }
+  function photoName(asset: ImagePicker.ImagePickerAsset) {
+    const extension = asset.uri.split(".").at(-1)?.toLowerCase();
+    return asset.fileName && isSupportedAttachmentName(asset.fileName) ? asset.fileName : `photo.${extension ?? "jpg"}`;
+  }
+  /** Swap one file in place. The rest keep their order, and a cancelled picker changes nothing. */
+  async function replaceItem(id: string) {
+    const current = itemsRef.current.find((item) => item.id === id);
+    if (!current) return;
+    let picked: { uri: string; name: string } | null = null;
+    if (current.mimeType.startsWith("image/")) {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 1,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      });
+      const asset = result.canceled ? undefined : result.assets[0];
+      if (asset) picked = { uri: asset.uri, name: photoName(asset) };
+    } else {
+      const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
+      const asset = result.canceled ? undefined : result.assets[0];
+      if (asset) picked = { uri: asset.uri, name: asset.name };
+    }
+    if (!picked) {
+      mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
+      return;
+    }
+    const item = prepare(await readFile(picked.uri, picked.name));
+    // The list can change while the picker is open; replace the file where it is now.
+    const next = itemsRef.current.map((candidate) => (candidate.id === id ? item : candidate));
+    if (!next.includes(item)) return;
+    await persistItems(next);
+    trackSelected(item.size);
   }
   async function chooseFiles() {
     const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
@@ -116,7 +184,7 @@ export function useChatAttachments(
   // for the caller's error path to unwind.
   async function requestCamera(): Promise<boolean> {
     try {
-      if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
+      if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
       if (!(await ImagePicker.requestCameraPermissionsAsync()).granted)
         throw new Error("Allow camera access in Settings to take a photo.");
     } catch (error) {
@@ -131,7 +199,7 @@ export function useChatAttachments(
     return true;
   }
   async function choosePhotos() {
-    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error("You can attach up to 10 files.");
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
@@ -141,13 +209,7 @@ export function useChatAttachments(
     });
     if (result.canceled)
       mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
-    else
-      for (const asset of result.assets) {
-        const extension = asset.uri.split(".").at(-1)?.toLowerCase();
-        const name =
-          asset.fileName && isSupportedAttachmentName(asset.fileName) ? asset.fileName : `photo.${extension ?? "jpg"}`;
-        await addFile(asset.uri, name);
-      }
+    else for (const asset of result.assets) await addFile(asset.uri, photoName(asset));
   }
   function paste(data: Clipboard.PasteEventPayload, onText: (text: string) => void) {
     if (data.type === "image")
@@ -197,6 +259,7 @@ export function useChatAttachments(
     choosePhotos: () => report(choosePhotos),
     requestCamera,
     chooseFiles: () => report(chooseFiles),
+    replace: (id: string) => report(() => replaceItem(id)),
     paste,
     remove: (id: string) => {
       void report(() => persistItems(itemsRef.current.filter((item) => item.id !== id)));

@@ -121,8 +121,8 @@ linux:
   extraResources:
     - from: build/linux/openbot.apparmor
       to: linux/openbot.apparmor
-    - from: build/cua-driver/linux/x64
-      to: cua-driver/linux/x64
+    - from: build/cua-driver/linux/${arch}
+      to: cua-driver/linux/${arch}
   # Electron takes its Linux app id from `desktopName` in package.json, and the window manager
   # matches a running window to the launcher through `StartupWMClass`. Syncing the two from one
   # value is what makes the taskbar icon group with the window it belongs to.
@@ -131,6 +131,7 @@ linux:
     - target: AppImage
       arch:
         - x64
+        - arm64
 dmg:
   title: ${productName} ${version}
   background: build/dmg-background.png

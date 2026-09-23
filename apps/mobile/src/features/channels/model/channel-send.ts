@@ -5,6 +5,11 @@ import { channelRecipient } from "./channel-draft";
 import { ChannelHistoryRefreshError, type MobileChannelStore } from "./channel-store";
 
 type SendCommand = Extract<ChannelCommand, { type: "send" }>;
+type UploadControl = {
+  cancelled: () => boolean;
+  progress: (completed: number) => void;
+  fileProgress?: (fraction: number) => void;
+};
 
 /** Retain uploads and the operation ID when delivery is uncertain. */
 export class ChannelSend {
@@ -24,10 +29,11 @@ export class ChannelSend {
     files: ChatAttachment[],
     replyToMessageId: string | null,
     members: ChannelMember[],
+    upload?: UploadControl,
   ): Promise<ChatHistoryReceipt | null> {
     this.activeSends++;
     try {
-      return await this.performSend(text, files, replyToMessageId, members);
+      return await this.performSend(text, files, replyToMessageId, members, upload);
     } finally {
       this.activeSends--;
       if (this.disposed) this.dispose();
@@ -39,6 +45,7 @@ export class ChannelSend {
     files: ChatAttachment[],
     replyToMessageId: string | null,
     members: ChannelMember[],
+    upload?: UploadControl,
   ): Promise<ChatHistoryReceipt | null> {
     const recipientAgentId = channelRecipient(text, members);
     const previous = this.failed;
@@ -57,14 +64,20 @@ export class ChannelSend {
       this.failed = null;
     }
     const ids: string[] = [];
+    upload?.progress(0);
     for (const file of files) {
       let id = this.uploaded.get(file.id);
       if (!id) {
-        id = (await this.store.upload(this.serverId, file)).id;
+        // Finished uploads stay retained, so a send after a cancellation reuses them.
+        if (upload?.cancelled()) throw new Error("Attachment upload cancelled.");
+        upload?.fileProgress?.(0);
+        id = (await this.store.upload(this.serverId, file, upload?.fileProgress)).id;
         this.uploaded.set(file.id, id);
       }
       ids.push(id);
+      upload?.progress(ids.length);
     }
+    if (upload?.cancelled()) throw new Error("Attachment upload cancelled.");
     const command: SendCommand = {
       type: "send",
       channelId: this.channelId,
