@@ -640,6 +640,10 @@ jobs:
           FULL_REVIEW: ${{ github.event_name == 'pull_request_target' }}
           # About 50k tokens. Above this the reviewer reads the diff itself.
           INLINE_DIFF_MAX_BYTES: 200000
+          # The part of a larger diff that still goes in. The reviewer must then read the rest
+          # with tools, and a 200 KB part left no room for that: the bridge model ran out of
+          # context after two file reads.
+          PARTIAL_DIFF_MAX_BYTES: 60000
         run: |
           set -euo pipefail
 
@@ -712,8 +716,8 @@ jobs:
               break
             fi
           done
-          # Above the cap, as many whole files as fit still go in, in diff order, and the
-          # reviewer reads only the rest. With none of it in the prompt, a reviewer that made
+          # Above the cap, as many whole files as fit in the smaller partial cap still go in,
+          # in diff order, and the reviewer reads only the rest. With none of it in the prompt, a reviewer that made
           # no tool call saw no code at all and still reported no findings. The loop above
           # left the default-context diff and its fence length.
           omitted_file="$RUNNER_TEMP/norbiai-diff-omitted.txt"
@@ -721,7 +725,7 @@ jobs:
           diff_whole=true
           if [ -z "$diff_context" ]; then
             diff_whole=false
-            LC_ALL=C awk -v budget=$(( INLINE_DIFF_MAX_BYTES - 2 * fence_length )) -v omitted="$omitted_file" '
+            LC_ALL=C awk -v budget=$(( PARTIAL_DIFF_MAX_BYTES - 2 * fence_length )) -v omitted="$omitted_file" '
               function flush(   i) {
                 if (count == 0) return
                 if (used + size <= budget) {
@@ -911,8 +915,10 @@ jobs:
                 --output-last-message "$last_message_file" \
                 - < "$prompt_file" 2>&1 | tee "$live_file"
               exit_code=${PIPESTATUS[0]}
+              # Only an error line counts: the output starts with the prompt, and a diff that
+              # holds these words made every failed run wait and try again.
               if [ "$exit_code" -eq 0 ] || [ "$attempt" -eq 3 ] ||
-                ! grep -q 'simultaneous browser turns' "$live_file"; then
+                ! grep -qE '^ERROR: .*simultaneous browser turns' "$live_file"; then
                 break
               fi
               echo "::notice title=NorbiAI waiting for the bridge::All browser turns are busy. Attempt ${attempt} of 3 failed. Next attempt in 60 s."
