@@ -1,6 +1,7 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { StaticAccountDock } from "@openbot/ui/features/account/StaticAccountDock";
 import { createEffect, createMemo, Loading } from "solid-js";
+import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
 import { AccountDock } from "../../lazy-views";
 import { usePlatform } from "../../platform";
@@ -78,7 +79,7 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
         }}
         onUpdateAction={updates.runAction}
         onLogout={platform.landingPreview ? undefined : auth.logoutCentralAccount}
-        onOpenExternal={(destination) => window.openbot.openExternal(destination)}
+        onOpenExternal={(destination) => appPort().openExternal(destination)}
         onOpenPermissions={() => setup.setPermissionsOpen(true)}
         onOpenSettings={openAppSettings}
         onOpenSkills={() => setSkillsMarketplaceOpen(true)}

@@ -21,6 +21,7 @@ import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibr
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { SkillPreview } from "../../components/SkillPreview";
+import { skillsPort } from "../../skills-port";
 import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
 
 export type AgentSkillsMode = "mutable" | "readonly" | "hidden";
@@ -87,8 +88,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     try {
       const next = userAssignedSkills(
         skillsMode() === "readonly"
-          ? await window.openbot.agent.listInstalledSkills(agentId)
-          : await window.openbot.skills.listInstalled(agentId),
+          ? await skillsPort().agent.listInstalledSkills(agentId)
+          : await skillsPort().skills.listInstalled(agentId),
       );
       if (request !== listRequest || agentId !== props.agentId || !props.open) return;
       setSkills(next);
@@ -125,8 +126,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   async function loadCatalog(): Promise<void> {
     try {
       const [marketplace, local] = await Promise.allSettled([
-        window.openbot.skills.list({ limit: 50 }),
-        mutable() ? window.openbot.skills.localList() : Promise.resolve([]),
+        skillsPort().skills.list({ limit: 50 }),
+        mutable() ? skillsPort().skills.localList() : Promise.resolve([]),
       ]);
       const page = {
         skills: [
@@ -163,8 +164,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     }
     try {
       const next = skill.skillId.startsWith("local-skill-")
-        ? await window.openbot.skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
-        : await window.openbot.skills.get(skill.skillId);
+        ? await skillsPort().skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
+        : await skillsPort().skills.get(skill.skillId);
       if (request === detailRequest) setDetail(next);
     } catch (caught) {
       if (request === detailRequest) setError(errorMessage(caught, "Could not load skill details."));
@@ -193,7 +194,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await window.openbot.skills.setEnabled({ agentId: props.agentId, skillId: skill.skillId, enabled });
+      await skillsPort().skills.setEnabled({ agentId: props.agentId, skillId: skill.skillId, enabled });
       analytics.track("marketplace_action", { entity: "skill", action, result: "succeeded" });
       operationSucceeded = true;
       await loadSkills(false);
@@ -220,7 +221,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await window.openbot.skills.uninstall({
+      await skillsPort().skills.uninstall({
         agentId: props.agentId,
         skillId: skill.skillId,
         ...(removeModified ? { removeModified: true } : {}),
@@ -251,7 +252,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await window.openbot.skills.install({
+      await skillsPort().skills.install({
         agentId: props.agentId,
         skillId: skill.skillId,
         ...(replaceModified ? { replaceModified: true } : {}),

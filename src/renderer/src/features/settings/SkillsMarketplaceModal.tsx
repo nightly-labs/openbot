@@ -72,8 +72,10 @@ import {
   snapshot,
 } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { appPort } from "../../app-port";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
 import { SkillPreview } from "../../components/SkillPreview";
+import { type SkillsPort, skillsPort } from "../../skills-port";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
 import type { PluginUninstallPlan } from "./PluginUninstallDialog";
 import { PluginUninstallDialog } from "./PluginUninstallDialog";
@@ -117,9 +119,9 @@ type MarketplaceKind = "agents" | "plugins" | "skills";
  * The overview caches outlive the dialog, so opening it again does not ask again. Each one belongs to
  * one list function, so a story or a test that replaces the API never reads another one's answer.
  */
-const skillHomeCaches = new WeakMap<typeof window.openbot.skills.list, MarketplaceHomeCache<MarketplaceSkillSummary>>();
+const skillHomeCaches = new WeakMap<SkillsPort["skills"]["list"], MarketplaceHomeCache<MarketplaceSkillSummary>>();
 const agentHomeCaches = new WeakMap<
-  typeof window.openbot.marketplaceAgents.list,
+  SkillsPort["marketplaceAgents"]["list"],
   MarketplaceHomeCache<MarketplaceAgentSummary>
 >();
 
@@ -132,11 +134,11 @@ function homeCacheFor<K extends WeakKey, C>(caches: WeakMap<K, C>, key: K, creat
 }
 
 const skillHomeCache = () =>
-  homeCacheFor(skillHomeCaches, window.openbot.skills.list, () => new MarketplaceHomeCache<MarketplaceSkillSummary>());
+  homeCacheFor(skillHomeCaches, skillsPort().skills.list, () => new MarketplaceHomeCache<MarketplaceSkillSummary>());
 const agentHomeCache = () =>
   homeCacheFor(
     agentHomeCaches,
-    window.openbot.marketplaceAgents.list,
+    skillsPort().marketplaceAgents.list,
     () => new MarketplaceHomeCache<MarketplaceAgentSummary>(),
   );
 
@@ -290,7 +292,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   function openPluginUrl(url: string) {
     const safe = safeBrowserUrl(url);
     if (!safe) return;
-    void window.openbot.openUrl(safe).catch(() => setError("Could not open the link."));
+    void appPort()
+      .openUrl(safe)
+      .catch(() => setError("Could not open the link."));
   }
 
   /**
@@ -314,7 +318,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     plugin.apps.some((app) => Boolean(heldApp(app))) || plugin.skills.some((skill) => installedById().has(skill.id));
 
   async function loadHostMcpServers(serverId: string) {
-    const configs = await run(() => window.openbot.agent.listMcpServers(serverId));
+    const configs = await run(() => skillsPort().agent.listMcpServers(serverId));
     if (configs) setHostMcpServers(configs);
   }
 
@@ -340,7 +344,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   async function testPluginApp(config: McpServerConfig) {
     const serverId = props.pluginServerId;
     if (!serverId) throw new Error("Select a local server to connect this app.");
-    return window.openbot.agent.testMcpServer({ config }, serverId);
+    return skillsPort().agent.testMcpServer({ config }, serverId);
   }
 
   /**
@@ -369,7 +373,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       try {
         for (const skill of plugin.skills) {
           const held = installedById().has(skill.id);
-          await window.openbot.skills.install({ agentId, skillId: skill.id, versionId: skill.versionId });
+          await skillsPort().skills.install({ agentId, skillId: skill.id, versionId: skill.versionId });
           if (!held) added.push(skill.id);
         }
         for (const app of plugin.apps) {
@@ -384,7 +388,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
             await undoSkills(agentId, added);
             return false;
           }
-          setHostMcpServers(await window.openbot.agent.saveMcpServer({ config: connected }, serverId));
+          setHostMcpServers(await skillsPort().agent.saveMcpServer({ config: connected }, serverId));
         }
       } catch (error) {
         await undoSkills(agentId, added);
@@ -400,7 +404,10 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
 
   /** Takes back only what this attempt installed. A skill the agent already had is the user's. */
   async function undoSkills(agentId: string, skillIds: readonly string[]) {
-    for (const skillId of skillIds) await window.openbot.skills.uninstall({ agentId, skillId }).catch(() => undefined);
+    for (const skillId of skillIds)
+      await skillsPort()
+        .skills.uninstall({ agentId, skillId })
+        .catch(() => undefined);
   }
 
   /**
@@ -445,7 +452,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       const config = heldApp(app);
       if (!config) continue;
       try {
-        setHostMcpServers(await window.openbot.agent.removeMcpServer({ mcpServerId: config.id }, serverId));
+        setHostMcpServers(await skillsPort().agent.removeMcpServer({ mcpServerId: config.id }, serverId));
       } catch (cause) {
         failures.push(`${app.name}: ${marketplaceErrorMessage(cause)}`);
       }
@@ -454,7 +461,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       for (const skill of plugin.skills) {
         if (!installedById().has(skill.id)) continue;
         try {
-          await window.openbot.skills.uninstall({ agentId, skillId: skill.id });
+          await skillsPort().skills.uninstall({ agentId, skillId: skill.id });
         } catch (cause) {
           failures.push(`${skill.slug}: ${marketplaceErrorMessage(cause)}`);
         }
@@ -567,7 +574,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setMarket((state) => {
       state.installedLoad = "loading";
     });
-    const values = await run(() => window.openbot.skills.listInstalled(agentId));
+    const values = await run(() => skillsPort().skills.listInstalled(agentId));
     if (request !== installedRequest || !props.open || market.browse.targetAgentId !== agentId) return;
     if (!values) {
       setMarket((state) => {
@@ -584,7 +591,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
 
   async function loadMine() {
     setLoading(true);
-    const values = await run(() => window.openbot.skills.listMine());
+    const values = await run(() => skillsPort().skills.listMine());
     if (values) {
       setMarket((state) => {
         state.submissions = values;
@@ -663,7 +670,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setMarket((state) => {
       state.detail = { kind: "loading" };
     });
-    const value = await run(() => window.openbot.skills.get(skill.id));
+    const value = await run(() => skillsPort().skills.get(skill.id));
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
@@ -688,7 +695,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setMarket((state) => {
       state.detail = { kind: "loading" };
     });
-    const value = await run(() => window.openbot.skills.get(skillId));
+    const value = await run(() => skillsPort().skills.get(skillId));
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
@@ -728,7 +735,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     }
     const analytics = desktopAnalytics.scope();
     setBusy(skill.id);
-    const result = await run(() => window.openbot.skills.install({ agentId, skillId: skill.id, replaceModified }));
+    const result = await run(() => skillsPort().skills.install({ agentId, skillId: skill.id, replaceModified }));
     analytics.track("marketplace_action", {
       entity: "skill",
       action,
@@ -740,7 +747,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   async function choosePackage(skillId?: string) {
-    const value = await run(() => window.openbot.skills.choosePackage());
+    const value = await run(() => skillsPort().skills.choosePackage());
     if (!value) return;
     const category = skillId
       ? (market.submissions.find((item) => item.skillId === skillId)?.category ?? "other")
@@ -766,7 +773,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     const icon = snapshot(market.publication.icon);
     setBusy("publish");
     const created = await run(() =>
-      window.openbot.skills.submit({
+      skillsPort().skills.submit({
         draftId: value.draftId,
         showCreatorAvatar: true,
         category,
@@ -929,7 +936,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                           refreshVersion={skillRefreshVersion()}
                           homeCache={skillHomeCache()}
                           list={async (query) => {
-                            const page = await window.openbot.skills.list(query);
+                            const page = await skillsPort().skills.list(query);
                             return { items: page.skills, nextCursor: page.nextCursor };
                           }}
                           icon={(skill) => <SkillIcon skill={skill} />}
@@ -1384,7 +1391,7 @@ function AgentMarketplacePanel(props: {
 
   async function loadMine() {
     setLoading(true);
-    const values = await run(() => window.openbot.marketplaceAgents.listMine());
+    const values = await run(() => skillsPort().marketplaceAgents.listMine());
     if (values) {
       setMarket((state) => {
         state.submissions = values;
@@ -1400,7 +1407,7 @@ function AgentMarketplacePanel(props: {
     props.onEnterDetail(agent.name, closeAgent);
     const request = ++detailRequest;
     setLoading(true);
-    const value = await run(() => window.openbot.marketplaceAgents.get(agent.id));
+    const value = await run(() => skillsPort().marketplaceAgents.get(agent.id));
     analytics.track("marketplace_action", {
       entity: "agent",
       action: "view",
@@ -1433,7 +1440,7 @@ function AgentMarketplacePanel(props: {
     const analytics = desktopAnalytics.scope();
     setBusy(updating ? `update:${agent.id}` : agent.id);
     const value = await run(() =>
-      window.openbot.marketplaceAgents.install({
+      skillsPort().marketplaceAgents.install({
         listingId: agent.id,
         ...(installation ? { agentId: installation.id } : {}),
         timezone,
@@ -1483,7 +1490,7 @@ function AgentMarketplacePanel(props: {
   async function refreshPublicationPreview(agentId: string) {
     const request = ++publicationRequest;
     setBusy("publish");
-    const value = await run(() => window.openbot.marketplaceAgents.preview(agentId));
+    const value = await run(() => skillsPort().marketplaceAgents.preview(agentId));
     if (request !== publicationRequest) return;
     setMarket((state) => {
       state.publication.preview = value ?? null;
@@ -1508,7 +1515,7 @@ function AgentMarketplacePanel(props: {
     const listingId = market.publication.listingId;
     setBusy("submit");
     const result = await run(() =>
-      window.openbot.marketplaceAgents.submit({
+      skillsPort().marketplaceAgents.submit({
         agentId: value.agentId,
         category: market.publication.category,
         showCreatorAvatar: true,
@@ -1542,7 +1549,7 @@ function AgentMarketplacePanel(props: {
             refreshVersion={catalogRefresh()}
             homeCache={agentHomeCache()}
             list={async (query) => {
-              const page = await window.openbot.marketplaceAgents.list(query);
+              const page = await skillsPort().marketplaceAgents.list(query);
               return { items: page.agents, nextCursor: page.nextCursor };
             }}
             icon={(agent) => (

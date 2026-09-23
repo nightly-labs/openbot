@@ -14,6 +14,7 @@ import { useServerSelection } from "../servers/server-selection";
 import { useServerSwitch } from "../servers/server-switch";
 import { useServers } from "../servers/servers-context";
 import { useDynamicIsland } from "./dynamic-island-context";
+import { dynamicIslandPort } from "./dynamic-island-port";
 
 /**
  * Island bridge for the visible server: projects workspace state out to main and handles
@@ -105,7 +106,7 @@ export function DynamicIslandBridge() {
 
   onSettled(() => {
     if (platform.landingPreview) return;
-    return window.openbot.dynamicIsland.onAction((action) => {
+    return dynamicIslandPort().dynamicIsland.onAction((action) => {
       void handleDynamicIslandAction(action).catch((error) => {
         toast.error("Could not open this remote item", {
           description: errorMessage(error, "Could not open this item. Try again."),
@@ -169,7 +170,7 @@ export function DynamicIslandBridge() {
     if (action.type === "open-message") await openAgentMessage(action.agentId, action.messageId);
     if (action.type === "open-failure") {
       try {
-        await window.openbot.agent.acknowledgeFailedTurn({ agentId: action.agentId, turnId: action.turnId });
+        await dynamicIslandPort().agent.acknowledgeFailedTurn({ agentId: action.agentId, turnId: action.turnId });
       } catch (error) {
         appendUiError(action.agentId, error, "Acknowledge failed", action.serverId);
         return;

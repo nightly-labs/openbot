@@ -1,5 +1,6 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
+import { appPort } from "./app-port";
 import type { AppProps } from "./app-providers";
 import { createSimpleContext } from "./simple-context";
 
@@ -35,7 +36,7 @@ const Platform = createSimpleContext({
       const handleFocus = () => flush(() => setAppFocused(true));
       window.addEventListener("blur", handleBlur);
       window.addEventListener("focus", handleFocus);
-      void window.openbot
+      void appPort()
         .getAppInfo()
         .then((info) => {
           infoFromHost = true;

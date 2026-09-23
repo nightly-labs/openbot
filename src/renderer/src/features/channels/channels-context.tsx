@@ -13,6 +13,7 @@ import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { mergeChannelPage } from "./channel-page-merge";
 import { readChannelSelection, writeChannelSelection } from "./channel-selection";
+import { channelsPort } from "./channels-port";
 
 interface ChannelsState {
   channels: ChannelSummary[];
@@ -126,9 +127,9 @@ const Channels = createSimpleContext({
       const account = accountKey();
       const selected = selectedOverride === undefined ? state.selectedId : selectedOverride;
       try {
-        const channels = await window.openbot.agent.listChannels();
+        const channels = await channelsPort().agent.listChannels();
         const selectedExists = selected !== null && channels.some((channel) => channel.id === selected);
-        const page = selectedExists ? await window.openbot.agent.readChannel({ channelId: selected }) : null;
+        const page = selectedExists ? await channelsPort().agent.readChannel({ channelId: selected }) : null;
         if (disposed || account !== accountKey() || id !== refreshId || selected !== state.selectedId) return;
         setState((state) => {
           state.channels = channels;
@@ -161,7 +162,7 @@ const Channels = createSimpleContext({
         ) {
           readThrough.set(selected, page.throughSequence);
           try {
-            await window.openbot.agent.channelCommand({
+            await channelsPort().agent.channelCommand({
               type: "read",
               channelId: selected,
               throughSequence: page.throughSequence,
@@ -236,7 +237,7 @@ const Channels = createSimpleContext({
         }),
       );
       try {
-        await window.openbot.agent.channelCommand(attempt);
+        await channelsPort().agent.channelCommand(attempt);
         if (disposed || account !== accountKey()) return false;
         failedCommand = null;
         // Only creation closes the editor. Settings save on every field, so closing on a save
@@ -280,7 +281,7 @@ const Channels = createSimpleContext({
       const account = accountKey();
       if (!channelId || !beforeSequence) return;
       try {
-        const older = await window.openbot.agent.readChannel({ channelId, beforeSequence });
+        const older = await channelsPort().agent.readChannel({ channelId, beforeSequence });
         if (!disposed && account === accountKey() && state.selectedId === channelId)
           setState((state) => {
             const page = state.page;

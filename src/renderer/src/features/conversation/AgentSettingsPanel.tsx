@@ -7,11 +7,13 @@ import SharedAgentSettingsPanel, {
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { skillsPort } from "../../skills-port";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./AgentSkillsModal";
+import { conversationPort } from "./conversation-port";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
@@ -79,24 +81,24 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.skills.reopenAfterMarketplace = false;
       });
       if (!props.remoteClient) {
-        void window.openbot.agent
-          .listTables()
+        void conversationPort()
+          .agent.listTables()
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {
               state.tables.count = items.length;
             });
           });
-        void window.openbot.agent
-          .listMemories(agentId)
+        void conversationPort()
+          .agent.listMemories(agentId)
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {
               state.memories.count = items.length;
             });
           });
-        void window.openbot.agent
-          .listRoutines(agentId)
+        void conversationPort()
+          .agent.listRoutines(agentId)
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {
@@ -118,8 +120,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     try {
       const items =
         skillsMode() === "readonly"
-          ? await window.openbot.agent.listInstalledSkills(agentId)
-          : await window.openbot.skills.listInstalled(agentId);
+          ? await skillsPort().agent.listInstalledSkills(agentId)
+          : await skillsPort().skills.listInstalled(agentId);
       setDraft((state) => {
         state.skills.count = assignedSkillCount(items);
       });

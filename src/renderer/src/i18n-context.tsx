@@ -9,6 +9,7 @@ import {
   type ParentProps,
   useContext,
 } from "solid-js";
+import { appPort } from "./app-port";
 
 export interface I18nValue {
   language: () => AppLanguage;
@@ -59,7 +60,7 @@ function createI18nValue(): I18nValue {
     const request = ++latestRequest;
     pending += 1;
     setLanguage(next);
-    void window.openbot
+    void appPort()
       .setAppLanguagePreference({ language: next })
       .then((preference) => {
         confirmed = preference.language;
@@ -74,7 +75,7 @@ function createI18nValue(): I18nValue {
   }
 
   onSettled(() => {
-    void window.openbot
+    void appPort()
       .getAppLanguagePreference()
       .then((preference) => {
         // A choice made before the read answered is newer than the saved value it reports, which
@@ -84,7 +85,7 @@ function createI18nValue(): I18nValue {
       .catch(() => undefined);
     // The main process is the owner, so what it sends is confirmed by definition - including the
     // echo of a change made in this window.
-    return window.openbot.onAppLanguagePreference((preference) => confirm(preference.language));
+    return appPort().onAppLanguagePreference((preference) => confirm(preference.language));
   });
 
   return { language, locale, t, changeLanguage };

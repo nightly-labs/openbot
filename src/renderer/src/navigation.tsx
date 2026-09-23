@@ -2,6 +2,7 @@ import type { AgentMessage } from "@openbot/ui/data";
 import { createSignal } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { toAgentMessage } from "./app-message-projection";
+import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { useChannels } from "./features/channels/channels-context";
 import { useConversation } from "./features/conversation/conversation-context";
@@ -101,7 +102,7 @@ const Navigation = createSimpleContext({
     async function searchGlobalMessages(query: string): Promise<Array<{ agentId: string; message: AgentMessage }>> {
       const analytics = desktopAnalytics.scope();
       try {
-        const page = await window.openbot.agent.searchConversationMessages({ query, limit: 100 });
+        const page = await appPort().agent.searchConversationMessages({ query, limit: 100 });
         analytics.track("search_action", { scope: "global", result: "succeeded", result_count: page.total });
         return page.results.map((result) => ({
           agentId: result.agentId,
@@ -130,7 +131,7 @@ const Navigation = createSimpleContext({
           let readBoundary = page.messages.at(-1)?.id ?? messageId;
           try {
             if (!scopeIsCurrent()) return;
-            const latestPage = await window.openbot.agent.readConversationPage({
+            const latestPage = await appPort().agent.readConversationPage({
               agentId,
               anchor: { type: "latest" },
               limit: 1,

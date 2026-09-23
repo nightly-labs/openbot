@@ -3,10 +3,12 @@ import { toast } from "@openbot/ui";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
+import { appPort } from "./app-port";
 import type { ProviderCodeLoginApi } from "./components/provider-code-login-api";
 import { useAgents } from "./features/agents/agents-context";
 import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
 import { useServers } from "./features/servers/servers-context";
+import { providersPort } from "./providers-port";
 import { createSimpleContext } from "./simple-context";
 
 /**
@@ -30,7 +32,7 @@ const Providers = createSimpleContext({
       const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
       return row?.cliSource === "system" ? (row.version ?? null) : null;
     }
-    const runtimes = createProviderRuntimeStore(window.openbot.providerRuntimes, {
+    const runtimes = createProviderRuntimeStore(providersPort().providerRuntimes, {
       systemCliVersion,
       isLocalServer: () => activeServer()?.kind === "local",
     });
@@ -79,7 +81,7 @@ const Providers = createSimpleContext({
       if (descriptor.installGuideLink === null) {
         return Promise.reject(new Error(`${descriptor.displayName} is included with OpenBot.`));
       }
-      return window.openbot.openExternal(descriptor.installGuideLink);
+      return appPort().openExternal(descriptor.installGuideLink);
     }
 
     /**
@@ -92,7 +94,7 @@ const Providers = createSimpleContext({
       if (refreshingProviders()) return;
       const analytics = beginProviderConnection(provider);
       try {
-        const status = await window.openbot.connectProvider(provider);
+        const status = await providersPort().connectProvider(provider);
         flush(() => applyAgentStatus(status));
       } catch (error) {
         endFailedProviderConnection(provider, analytics);
@@ -140,7 +142,7 @@ const Providers = createSimpleContext({
         // Cancellation emits a terminal status. Finish it before the next attempt can wait.
         await codeLoginCancellation;
         if (generation !== codeLoginGeneration) return;
-        const started = await window.openbot.startProviderCodeLogin(provider);
+        const started = await providersPort().startProviderCodeLogin(provider);
         // A dialog the user closed while the provider was answering: the login was cancelled with
         // it, so there is nobody left to show a code to.
         if (generation !== codeLoginGeneration) return;
@@ -189,7 +191,7 @@ const Providers = createSimpleContext({
       setCodeLoginProvider(null);
       if (!provider) return;
       pendingProviderConnections.delete(provider);
-      codeLoginCancellation = window.openbot
+      codeLoginCancellation = providersPort()
         .cancelProviderCodeLogin(provider)
         .then((status) => {
           if (generation === codeLoginGeneration) flush(() => applyAgentStatus(status));
@@ -292,7 +294,7 @@ const Providers = createSimpleContext({
       const analytics = desktopAnalytics.scope();
       setRefreshingProviders(true);
       try {
-        const status = await window.openbot.refreshAgentProviders();
+        const status = await providersPort().refreshAgentProviders();
         flush(() => applyAgentStatus(status));
         analytics.track("provider_action", { action: "refresh", result: "succeeded" });
       } catch (error) {
@@ -324,7 +326,7 @@ const Providers = createSimpleContext({
       state: codeLoginState,
       start: (provider) => void startProviderCodeLogin(provider),
       cancel: cancelProviderCodeLogin,
-      openVerificationUrl: (url) => void window.openbot.openUrl(url),
+      openVerificationUrl: (url) => void appPort().openUrl(url),
     };
 
     return {

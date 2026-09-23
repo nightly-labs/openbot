@@ -3,6 +3,7 @@ import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, IDLE_DYNAMIC_ISLAND_PRESENTATION } f
 import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import { createSignal, onSettled, Show } from "solid-js";
+import { dynamicIslandPort } from "./dynamic-island-port";
 
 const DEFAULT_NOTCH_WIDTH = 192;
 const DEFAULT_NOTCH_HEIGHT = 32;
@@ -66,7 +67,7 @@ export function DynamicIslandSurface() {
   }
 
   function syncInteractive(): void {
-    void window.openbot.dynamicIsland.setInteractive({ interactive: pointerInside || focusInside });
+    void dynamicIslandPort().dynamicIsland.setInteractive({ interactive: pointerInside || focusInside });
   }
 
   function beginPointerInteraction(): void {
@@ -117,7 +118,7 @@ export function DynamicIslandSurface() {
   async function perform(action: DynamicIslandAction): Promise<void> {
     performHaptic();
     try {
-      await window.openbot.dynamicIsland.performAction(action);
+      await dynamicIslandPort().dynamicIsland.performAction(action);
     } catch {
       return;
     }
@@ -125,31 +126,35 @@ export function DynamicIslandSurface() {
     focusInside = false;
     setViewState("compact");
     applyQueuedPresentation();
-    await window.openbot.dynamicIsland.setInteractive({ interactive: false });
+    await dynamicIslandPort().dynamicIsland.setInteractive({ interactive: false });
   }
 
   function performHaptic(): void {
-    void window.openbot.dynamicIsland.performHaptic().catch(() => undefined);
+    void dynamicIslandPort()
+      .dynamicIsland.performHaptic()
+      .catch(() => undefined);
   }
 
   onSettled(() => {
-    void window.openbot.dynamicIsland
-      .getPresentation()
+    void dynamicIslandPort()
+      .dynamicIsland.getPresentation()
       .then(applyPresentation)
       .catch(() => undefined);
-    void window.openbot.dynamicIsland
-      .getPreference()
+    void dynamicIslandPort()
+      .dynamicIsland.getPreference()
       .then(applyPreference)
       .catch(() => undefined);
-    const stopPreference = window.openbot.dynamicIsland.onPreference(applyPreference);
-    const stopPresentation = window.openbot.dynamicIsland.onPresentation(applyPresentation);
-    const stopGeometry = window.openbot.dynamicIsland.onGeometry((next) => setNotchSize(next ?? DEFAULT_NOTCH_SIZE));
+    const stopPreference = dynamicIslandPort().dynamicIsland.onPreference(applyPreference);
+    const stopPresentation = dynamicIslandPort().dynamicIsland.onPresentation(applyPresentation);
+    const stopGeometry = dynamicIslandPort().dynamicIsland.onGeometry((next) =>
+      setNotchSize(next ?? DEFAULT_NOTCH_SIZE),
+    );
     const close = () => {
       pointerInside = false;
       focusInside = false;
       setViewState("compact");
       applyQueuedPresentation();
-      void window.openbot.dynamicIsland.setInteractive({ interactive: false });
+      void dynamicIslandPort().dynamicIsland.setInteractive({ interactive: false });
     };
     window.addEventListener("blur", close);
     return () => {

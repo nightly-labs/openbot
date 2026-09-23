@@ -17,6 +17,7 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Portal } from "@solidjs/web";
 import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
+import { conversationPort } from "./conversation-port";
 
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLButtonElement) => void }) {
@@ -79,11 +80,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
       onOpenWorkspace:
         server.kind === "local"
           ? () =>
-              void window.openbot.storage.openLocation({ agentId }).catch((error) =>
-                toast.error("Could not open the workspace folder", {
-                  description: errorMessage(error, "Try again."),
-                }),
-              )
+              void conversationPort()
+                .storage.openLocation({ agentId })
+                .catch((error) =>
+                  toast.error("Could not open the workspace folder", {
+                    description: errorMessage(error, "Try again."),
+                  }),
+                )
           : undefined,
       onPreviewFile: (file) => void previewAttachment(file),
       onShowMessage: (messageId) => openRoutineRunMessage(messageId),
@@ -225,7 +228,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 ? (activeBrowserTab()?.id ?? null)
                 : null
             }
-            liveViewRuntime={props.browserRuntime ?? window.openbot.browser}
+            liveViewRuntime={props.browserRuntime ?? conversationPort().browser}
             onBack={() => setActiveRightPanel("browser")}
             onEnterPip={props.runtime ? () => undefined : showBrowserPip}
           />

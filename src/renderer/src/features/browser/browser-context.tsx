@@ -8,6 +8,7 @@ import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSwitch } from "../servers/server-switch";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
+import { browserPort } from "./browser-port";
 import { activeTabAfterLoad, browserTabsAfterClose } from "./browser-tab-reconciliation";
 
 /**
@@ -62,12 +63,12 @@ const BrowserTabs = createSimpleContext({
       if (!supportsBrowser(server)) return Promise.resolve({ tabs: [], activeTabId: null });
       // Main answers this for a remote server too, and falls back to the tab list for a host
       // without `browser-navigation`, so the two server kinds read the same state here.
-      return window.openbot.browser.getDisplayState();
+      return browserPort().browser.getDisplayState();
     }
 
     function loadControlState(server: ServerSummary | undefined): Promise<BrowserControlState> {
       if (!supportsBrowser(server)) return Promise.resolve({ sessions: [] });
-      return window.openbot.browser.getControlState();
+      return browserPort().browser.getControlState();
     }
 
     /**
@@ -93,7 +94,7 @@ const BrowserTabs = createSimpleContext({
 
     function activateBrowserTab(tabId: string) {
       const analytics = desktopAnalytics.scope();
-      const operation = window.openbot.browser.activate(tabId);
+      const operation = browserPort().browser.activate(tabId);
       browserTabActivationOperations.set(tabId, operation);
       void operation
         .then(() => analytics.track("browser_action", { action: "activate", result: "succeeded" }))
@@ -119,7 +120,7 @@ const BrowserTabs = createSimpleContext({
         if (browserVisibilitySuspended() || !selectionIsCurrent() || !scopeIsCurrent()) {
           return;
         }
-        await window.openbot.browser.close(tabId);
+        await browserPort().browser.close(tabId);
         if (scopeIsCurrent()) {
           browserChangeRevision += 1;
           const next = browserTabsAfterClose(browserTabs(), tabId, activeBrowserTabId());

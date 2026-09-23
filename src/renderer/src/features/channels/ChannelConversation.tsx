@@ -52,6 +52,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { appPort } from "../../app-port";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
@@ -68,6 +69,7 @@ import { usePresence } from "../team/team-context";
 import { ChannelEditor } from "./ChannelEditor";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 import { useChannels } from "./channels-context";
+import { channelsPort } from "./channels-port";
 
 const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
@@ -194,7 +196,7 @@ export function ChannelConversation() {
   const [filePreview, setFilePreview] = createSignal<ChannelFilePreview | null>(null);
   const previewChannelAttachment = async (attachment: AttachmentSummary) => {
     if (!canPreviewAttachment(attachment)) {
-      void channels.perform(() => window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }));
+      void channels.perform(() => channelsPort().agent.openAttachment({ attachmentId: attachment.id, action: "open" }));
       return;
     }
     channels.closeEditor();
@@ -204,7 +206,7 @@ export function ChannelConversation() {
     });
   };
   const channelAttachmentAction = (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => {
-    void channels.perform(() => window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }));
+    void channels.perform(() => channelsPort().agent.openAttachment({ attachmentId: attachment.id, action }));
   };
   // The preview belongs to the channel it was opened from, and the settings panel takes the slot back.
   createEffect(
@@ -625,12 +627,12 @@ export function ChannelConversation() {
                               selectAgent(id);
                             }}
                             onOpenLink={(url) => {
-                              void window.openbot.openUrl(url);
+                              void appPort().openUrl(url);
                             }}
                             onPreview={(attachment) => void previewChannelAttachment(attachment)}
                             onDownloadAttachments={async (attachments) => {
                               await channels.perform(() =>
-                                window.openbot.agent.downloadAttachments({
+                                channelsPort().agent.downloadAttachments({
                                   attachments: attachments.map(({ id, name }) => ({ id, name })),
                                 }),
                               );
@@ -675,7 +677,7 @@ export function ChannelConversation() {
                                     page().channel.archived
                                       ? Promise.resolve(false)
                                       : channels.perform(() =>
-                                          window.openbot.agent.respondToPrompt({
+                                          channelsPort().agent.respondToPrompt({
                                             requestId: prompt().requestId,
                                             answers,
                                           }),
@@ -710,7 +712,7 @@ export function ChannelConversation() {
                         approval={approval()}
                         onApprove={() =>
                           channels.perform(() =>
-                            window.openbot.agent.respondToApproval({
+                            channelsPort().agent.respondToApproval({
                               requestId: approval().requestId,
                               decision: "accept",
                             }),
@@ -718,7 +720,7 @@ export function ChannelConversation() {
                         }
                         onReject={() =>
                           channels.perform(() =>
-                            window.openbot.agent.respondToApproval({
+                            channelsPort().agent.respondToApproval({
                               requestId: approval().requestId,
                               decision: "decline",
                             }),
@@ -750,7 +752,7 @@ export function ChannelConversation() {
                           previewStatus="idle"
                           onComplete={() =>
                             channels.perform(() =>
-                              window.openbot.agent.respondToBrowserTakeover({
+                              channelsPort().agent.respondToBrowserTakeover({
                                 requestId: request().requestId,
                                 decision: "complete",
                               }),
@@ -758,16 +760,16 @@ export function ChannelConversation() {
                           }
                           onCancel={() =>
                             channels.perform(() =>
-                              window.openbot.agent.respondToBrowserTakeover({
+                              channelsPort().agent.respondToBrowserTakeover({
                                 requestId: request().requestId,
                                 decision: "cancel",
                               }),
                             )
                           }
                           browserSecret={{
-                            loadPreview: window.openbot.browser.capturePreview,
+                            loadPreview: channelsPort().browser.capturePreview,
                             onRespond: async (input) => {
-                              await channels.perform(() => window.openbot.agent.respondToBrowserSecret(input));
+                              await channels.perform(() => channelsPort().agent.respondToBrowserSecret(input));
                             },
                           }}
                         />
@@ -874,7 +876,7 @@ export function ChannelConversation() {
                       onClick={() =>
                         void channels.perform(async () => {
                           const selectedId = channels.state.selectedId;
-                          const attachments = await window.openbot.agent.chooseAttachments({ filter: "all" });
+                          const attachments = await channelsPort().agent.chooseAttachments({ filter: "all" });
                           if (selectedId === channels.state.selectedId)
                             setComposer((state) => {
                               state.attachments = [...state.attachments, ...attachments];
@@ -909,7 +911,7 @@ export function ChannelConversation() {
                     maxWidth={() => settingsPanelMaxWidth(conversationPanel)}
                     onWidthChange={setPanelWidth}
                     onOpenLink={(url) => {
-                      void window.openbot.openUrl(url);
+                      void appPort().openUrl(url);
                     }}
                     /* A channel transcript has no agent workspace of its own, so a path in a
                        previewed file cannot be resolved here. Only attachments open in this slot. */
