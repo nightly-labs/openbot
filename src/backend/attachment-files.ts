@@ -6,7 +6,6 @@ import {
   mkdir,
   open,
   readdir,
-  readFile,
   realpath,
   rename,
   rm,
@@ -23,6 +22,7 @@ import type {
   AttachmentSummary,
   QueueDelivery,
 } from "@openbot/contracts/ipc";
+import { sha256File } from "./file-hash";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 const MAX_FILE_BYTES = ATTACHMENT_LIMITS.fileBytes;
@@ -204,7 +204,7 @@ export class AttachmentFiles {
           throw new Error("Attachments exceed the 250 MB total limit.");
         }
         prepared.push({
-          ...attachmentRecord(id, name, copied.size, targetPath, await sha256(targetPath)),
+          ...attachmentRecord(id, name, copied.size, targetPath, await sha256File(targetPath)),
           createdAt: new Date().toISOString(),
         });
       }
@@ -267,7 +267,7 @@ export class AttachmentFiles {
         if (copied.size > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
         total += copied.size;
         if (total > MAX_TOTAL_BYTES) throw new Error("Attachments exceed the 250 MB total limit.");
-        attachments.push(attachmentRecord(id, name, copied.size, join(finalRoot, name), await sha256(targetPath)));
+        attachments.push(attachmentRecord(id, name, copied.size, join(finalRoot, name), await sha256File(targetPath)));
       }
       await writeTransferManifest(temporaryRoot, {
         version: 2,
@@ -326,7 +326,7 @@ export class AttachmentFiles {
         copiedTotal += copied.size;
         if (copiedTotal > MAX_TOTAL_BYTES) throw new Error("Attachments exceed the 250 MB total limit.");
         const attachment: StoredGeneratedAttachment = {
-          ...attachmentRecord(entry.id, entry.name, copied.size, entry.targetPath, await sha256(entry.targetPath)),
+          ...attachmentRecord(entry.id, entry.name, copied.size, entry.targetPath, await sha256File(entry.targetPath)),
           ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
           ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
         };
@@ -369,7 +369,7 @@ export class AttachmentFiles {
       const stored = await stat(targetPath);
       if (stored.size > MAX_FILE_BYTES) throw new Error("Generated image exceeds the 100 MB limit.");
       const generatedAttachment: StoredGeneratedAttachment = {
-        ...attachmentRecord(id, name, stored.size, targetPath, await sha256(targetPath), input.mimeType),
+        ...attachmentRecord(id, name, stored.size, targetPath, await sha256File(targetPath), input.mimeType),
         ...(input.ownerAgentId ? { ownerAgentId: input.ownerAgentId } : {}),
         ...(input.ownerThreadId !== undefined ? { ownerThreadId: input.ownerThreadId } : {}),
       };
@@ -407,7 +407,7 @@ async function resolveManagedAttachment(
     if (!isWithin(canonicalRoot, canonicalPath)) return null;
     const metadata = await stat(canonicalPath);
     if (!metadata.isFile() || metadata.size !== attachment.size) return null;
-    if ((await sha256(canonicalPath)) !== attachment.sha256) return null;
+    if ((await sha256File(canonicalPath)) !== attachment.sha256) return null;
     return { path: canonicalPath, mimeType: attachment.mimeType, name: attachment.name };
   } catch {
     return null;
@@ -471,12 +471,6 @@ async function inspectSource(sourcePath: string): Promise<{ path: string; size: 
   if (!metadata.isFile()) throw new Error(`Only regular files can be attached: ${basename(path)}`);
   if (metadata.size > MAX_FILE_BYTES) throw new Error(`${basename(path)} exceeds the 100 MB limit.`);
   return { path, size: metadata.size };
-}
-
-async function sha256(path: string): Promise<string> {
-  return createHash("sha256")
-    .update(await readFile(path))
-    .digest("hex");
 }
 
 function sanitizeName(path: string): string {

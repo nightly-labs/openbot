@@ -10,7 +10,8 @@ import {
   parseGrokVersion,
   parseOpencodeVersion,
 } from "../backend/cli";
-import { assertSafeArchive, extractArchive, rejectNonRegularFiles, sha256File } from "./provider-runtime-archive";
+import { sha256File } from "../backend/file-hash";
+import { assertSafeArchive, extractArchive, rejectNonRegularFiles } from "./provider-runtime-archive";
 
 export type RuntimeTarget = "darwin-arm64" | "linux-x64" | "linux-arm64" | "win32-x64";
 
