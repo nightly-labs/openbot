@@ -1,7 +1,7 @@
+import type { ChatActionMarkerModel } from "@openbot/ui/data";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import type { ChatActionMarkerModel } from "../../data";
-import { ChatActionMarker } from "./ChatActionMarker";
 
 describe("ChatActionMarker routine history", () => {
   it("shows only the latest state until the user opens earlier states", async () => {

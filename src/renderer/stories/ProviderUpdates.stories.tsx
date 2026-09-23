@@ -1,11 +1,12 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import { Button, Checkbox, Heading, Text, Toaster } from "@openbot/ui";
+import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { type ProviderUpdate, providerUpdatesToAnnounce } from "@openbot/ui/features/provider-updates/provider-update";
 import { createEffect, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { expect, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ProviderPicker, type ProviderPickerOption } from "../src/components/ProviderPicker";
-import { Button, Checkbox, Heading, Text, Toaster } from "../src/components/ui";
-import { type ProviderUpdate, providerUpdatesToAnnounce } from "../src/features/provider-updates/provider-update";
+import { ProviderPicker } from "../src/components/ProviderPicker";
 import {
   dismissProviderUpdateToast,
   reportProviderUpdateToast,

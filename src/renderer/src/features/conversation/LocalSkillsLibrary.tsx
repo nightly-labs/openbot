@@ -1,9 +1,8 @@
 import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
+import { Button, Switch } from "@openbot/ui";
+import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
 import { createEffect, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { SkillPreview } from "../../components/SkillPreview";
-import { Button, Switch } from "../../components/ui";
-
-import { SkillGlyph } from "./SkillGlyph";
 
 export function LocalSkillsLibrary(props: {
   initialSkillId?: string;

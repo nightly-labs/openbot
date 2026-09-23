@@ -1,6 +1,6 @@
+import { createDigitRoll } from "@openbot/ui/digit-roll";
 import { createRoot, createSignal, flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createDigitRoll } from "./digit-roll";
 
 /*
  * An update reports every whole percent it downloads, which is faster than the roll the digits run.

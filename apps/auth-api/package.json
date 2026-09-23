@@ -37,7 +37,8 @@
     "fflate": "catalog:",
     "jose": "catalog:",
     "solid-js": "2.0.0-rc.0",
-    "yaml": "catalog:"
+    "yaml": "catalog:",
+    "@openbot/ui": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.52.1",

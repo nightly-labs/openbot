@@ -1,6 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
+import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo } from "solid-js";
-import { hasVisibleToasts } from "../../components/ui";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
@@ -36,8 +36,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const platform = usePlatform();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
-  const { appSettingsOpen, skillsMarketplaceOpen, setAgentAutoApprove, agentAutoApproves, generalSettings } =
-    useSettings();
+  const {
+    appSettingsOpen,
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    setAgentAutoApprove,
+    agentAutoApproves,
+    generalSettings,
+  } = useSettings();
   const {
     providerRuntimeStatuses,
     providerRuntimeDownloadsAvailable,
@@ -151,6 +157,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
 
   return (
     <Conversation
+      platform={platform.appInfo()?.platform}
+      onOpenMarketplace={() => setSkillsMarketplaceOpen(true)}
+      onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
       agentStatus={agentStatus()}
       accountUsage={auth.accountUsage()}
       providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}

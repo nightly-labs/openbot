@@ -1,6 +1,3 @@
-import { createEffect, createSignal } from "solid-js";
-import { expect, fireEvent, fn } from "storybook/test";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
   DEFAULT_FIRST_AGENT_DRAFT,
   FIRST_AGENT_SUGGESTIONS,
@@ -8,7 +5,10 @@ import {
   FirstAgentSetup,
   type FirstAgentSetupProps,
   type FirstAgentSuggestion,
-} from "../src/features/agents/FirstAgentSetup";
+} from "@openbot/ui/features/agents/FirstAgentSetup";
+import { createEffect, createSignal } from "solid-js";
+import { expect, fireEvent, fn } from "storybook/test";
+import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 function draftFromSuggestion(suggestion: FirstAgentSuggestion): FirstAgentDraft {
   return {

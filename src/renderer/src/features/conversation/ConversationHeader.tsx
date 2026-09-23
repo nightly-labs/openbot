@@ -1,14 +1,12 @@
+import { ConversationHeader as SharedConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
 import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
-import { createMemo, Show } from "solid-js";
-import { ProviderModelPicker } from "../../components/ProviderModelPicker";
-import { Button, toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import { createMemo } from "solid-js";
 import { useI18n } from "../../i18n-context";
-import { AgentAvatar } from "../agents/AgentAvatar";
-import { ComputerIcon, RemoteDesktopIcon } from "./ConversationIcons";
 
 /** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {
@@ -43,104 +41,59 @@ export function ConversationHeader() {
     };
   });
   return (
-    <header class="window-drag conversation-header">
-      <div class="conversation-heading-group">
-        <Show when={props.agent}>
-          {(agent) => (
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              class="conversation-title no-drag"
-              aria-label="View agent settings"
-              onPointerEnter={() => void loadAgentSettingsPanel()}
-              onFocus={() => void loadAgentSettingsPanel()}
-              onClick={() => setActiveRightPanel("settings")}
-            >
-              <AgentAvatar agent={agent()} />
-              <h1>{agent().name}</h1>
-            </Button>
-          )}
-        </Show>
-      </div>
-      <div class="conversation-header-actions no-drag">
-        <Show when={props.agent}>
-          <ProviderModelPicker
-            provider={settingsProvider()}
-            value={settingsModel()}
-            reasoningEffort={settingsReasoning()}
-            modelOptions={props.modelOptions}
-            agentStatus={props.agentStatus}
-            runtimeStatuses={props.providerRuntimeStatuses}
-            customProviders={props.customProviders}
-            onDownloadProvider={props.onDownloadProvider}
-            onCancelProviderDownload={props.onCancelProviderDownload}
-            onConnectProvider={props.onConnectProvider}
-            modelChangesDisabled={agentActivity() === "Working"}
-            disabledReason={
-              agentActivity() === "Working"
-                ? "Wait for the current work to finish before changing models."
-                : "Models are available after an agent CLI connects."
+    <SharedConversationHeader
+      agent={props.agent}
+      onSettingsIntent={() => void loadAgentSettingsPanel()}
+      onOpenSettings={() => setActiveRightPanel("settings")}
+      modelPicker={{
+        provider: settingsProvider(),
+        value: settingsModel(),
+        reasoningEffort: settingsReasoning(),
+        modelOptions: props.modelOptions,
+        agentStatus: props.agentStatus,
+        runtimeStatuses: props.providerRuntimeStatuses,
+        customProviders: props.customProviders,
+        onDownloadProvider: props.onDownloadProvider,
+        onCancelProviderDownload: props.onCancelProviderDownload,
+        onConnectProvider: props.onConnectProvider,
+        modelChangesDisabled: agentActivity() === "Working",
+        disabledReason:
+          agentActivity() === "Working"
+            ? "Wait for the current work to finish before changing models."
+            : "Models are available after an agent CLI connects.",
+        onChange: (model, provider) => void selectAndConfirmModel(model, provider),
+        onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
+        autoApprove: props.agentAutoApproves,
+        agentName: props.agent?.name,
+        autoApproveLocked: props.agentAutoApproveLocked,
+        onAutoApproveChange: changeAutoApprove(),
+      }}
+      remoteControl={
+        props.remoteDesktopEnabled !== false && props.server?.kind === "remote"
+          ? {
+              enabled: Boolean(props.remoteDesktopSessionActive || props.server.state === "online"),
+              active: Boolean(props.remoteDesktopSessionActive),
+              visible: Boolean(props.remoteDesktopVisible),
+              onOpen: (trigger) => {
+                if (props.server) void props.onOpenRemoteDesktop(props.server.id, trigger);
+              },
             }
-            onChange={(model, provider) => void selectAndConfirmModel(model, provider)}
-            onReasoningEffortChange={(effort) => void selectAndConfirmReasoning(effort)}
-            autoApprove={props.agentAutoApproves}
-            agentName={props.agent?.name}
-            autoApproveLocked={props.agentAutoApproveLocked}
-            onAutoApproveChange={changeAutoApprove()}
-          />
-        </Show>
-        <Show when={props.remoteDesktopEnabled !== false && props.server?.kind === "remote" ? props.server : undefined}>
-          {(server) => {
-            const enabled = () => props.remoteDesktopSessionActive || server().state === "online";
-            const label = () => (props.remoteDesktopSessionActive ? "Resume remote control" : "Open remote control");
-            return (
-              <Button
-                variant="ghost"
-                type="button"
-                class="header-panel-toggle remote-desktop-button"
-                aria-label={label()}
-                aria-expanded={props.remoteDesktopVisible ? "true" : "false"}
-                disabled={!enabled()}
-                onClick={(event) => void props.onOpenRemoteDesktop(server().id, event.currentTarget)}
-              >
-                <RemoteDesktopIcon />
-                <Show when={props.remoteDesktopSessionActive}>
-                  <span class="remote-desktop-button-dot" aria-hidden="true" />
-                </Show>
-              </Button>
-            );
-          }}
-        </Show>
-        <Show when={props.browserEnabled !== false}>
-          <Button
-            variant="ghost"
-            type="button"
-            class={[
-              "header-panel-toggle computer-button",
-              { "computer-button-agent-active": Boolean(actingBrowserControl()) },
-            ]}
-            aria-label={
-              actingBrowserControl()
-                ? `${browserControlAgent()?.name ?? "Agent"} is controlling the browser`
-                : screenOpen()
-                  ? "Hide computer"
-                  : "Open computer"
+          : undefined
+      }
+      browser={
+        props.browserEnabled !== false
+          ? {
+              acting: Boolean(actingBrowserControl()),
+              agentName: browserControlAgent()?.name,
+              open: screenOpen(),
+              disabled: props.browserVisibilitySuspended,
+              onToggle: () => {
+                if (screenOpen()) hideBrowserPanel();
+                else showBrowserPanel();
+              },
             }
-            aria-expanded={screenOpen() ? "true" : "false"}
-            disabled={props.browserVisibilitySuspended}
-            onClick={() => {
-              if (screenOpen()) hideBrowserPanel();
-              else showBrowserPanel();
-            }}
-          >
-            <ComputerIcon />
-            <Show when={actingBrowserControl()}>
-              <span class="computer-control-dot" aria-hidden="true" />
-            </Show>
-          </Button>
-        </Show>
-      </div>
-    </header>
+          : undefined
+      }
+    />
   );
 }

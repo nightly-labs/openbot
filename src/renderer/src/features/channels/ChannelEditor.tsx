@@ -1,7 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { Channel, ChannelDraft } from "@openbot/contracts/ipc";
-import { createEffect, createStore, For, Show } from "solid-js";
-import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "../../components/SettingsPanel";
 import {
   Button,
   buttonVariants,
@@ -13,10 +11,12 @@ import {
   Plus,
   Textarea,
   Tooltip,
-} from "../../components/ui";
-import { AgentAvatar } from "../agents/AgentAvatar";
+} from "@openbot/ui";
+import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
+import { createEffect, createStore, For, Show } from "solid-js";
 import { useAgents } from "../agents/agents-context";
-import { ChannelMemberRow } from "./ChannelMemberRow";
 import { useChannels } from "./channels-context";
 import { toggleChannelMember } from "./channels-draft";
 

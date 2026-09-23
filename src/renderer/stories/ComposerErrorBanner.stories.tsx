@@ -1,8 +1,8 @@
+import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
+import { ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import type { JSX } from "@solidjs/web";
 import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ComposerErrorBanner } from "../src/features/conversation/ComposerErrorBanner";
-import { ComposerUsageLimitNotice } from "../src/features/conversation/ComposerNotice";
 
 const meta = {
   title: "Conversation/Composer error banner",

@@ -1,13 +1,10 @@
 import type {
   AgentProviderId,
-  AppInfo,
   CustomProviderRestart,
   CustomProviderSummary,
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createSignal, Show } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import {
   AlertDialog,
   Button,
@@ -25,12 +22,14 @@ import {
   SettingsSection,
   SwitchField,
   Text,
-} from "../../components/ui";
+} from "@openbot/ui";
+import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
+import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
+import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { createSignal, Show } from "solid-js";
+import { ProviderPicker } from "../../components/ProviderPicker";
 import { useI18n } from "../../i18n-context";
-import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
-import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
-import type { GeneralSettingsValue } from "./app-settings";
 import { LanguageSelect } from "./LanguageSelect";
 import type { SettingsGeneralStore } from "./stores/general-store";
 
@@ -49,7 +48,6 @@ interface SettingsGeneralTabProps {
   store: SettingsGeneralStore;
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
-  platform: AppInfo["platform"] | undefined;
   /** The dialog element the Select popovers portal into, captured when this tab was created. */
   selectMount: HTMLElement | undefined;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -289,40 +287,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
           />
         </ItemGroup>
       </SettingsSection>
-
-      <Show when={props.platform === "darwin"}>
-        <SettingsSection title={i18n.t("settings.notch.title")}>
-          <ItemGroup class="settings-modal-card">
-            <SwitchField
-              checked={props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotch", checked)}
-              label={i18n.t("settings.notch.show.title")}
-              description={i18n.t("settings.notch.show.description")}
-            />
-            <SwitchField
-              checked={props.value.macBookNotchIdle}
-              disabled={!props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotchIdle", checked)}
-              label={i18n.t("settings.notch.idle.title")}
-              description={i18n.t("settings.notch.idle.description")}
-            />
-            <SwitchField
-              checked={props.value.macBookNotchAdditionalDisplays}
-              disabled={!props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotchAdditionalDisplays", checked)}
-              label={i18n.t("settings.notch.displays.title")}
-              description={i18n.t("settings.notch.displays.description")}
-            />
-            <SwitchField
-              checked={props.value.macBookNotchHaptics}
-              disabled={!props.value.macBookNotch}
-              onChange={(checked) => props.onUpdateSetting("macBookNotchHaptics", checked)}
-              label={i18n.t("settings.notch.haptics.title")}
-              description={i18n.t("settings.notch.haptics.description")}
-            />
-          </ItemGroup>
-        </SettingsSection>
-      </Show>
 
       <SettingsSection title={i18n.t("settings.privacy.title")}>
         <ItemGroup class="settings-modal-card">

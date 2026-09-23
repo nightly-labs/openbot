@@ -1,8 +1,11 @@
+import SharedAgentSettingsPanel, {
+  type AgentRuntimeSettings,
+} from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "../../preview/fixtures";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
-import AgentSettingsPanel, { type AgentRuntimeSettings } from "./AgentSettingsPanel";
+import AgentSettingsPanel from "./AgentSettingsPanel";
 import { AgentSkillsModal } from "./AgentSkillsModal";
 
 let mock: MockOpenBotControls | undefined;
@@ -13,6 +16,38 @@ afterEach(() => {
 });
 
 describe("AgentSettingsPanel", () => {
+  it("saves through callbacks without a desktop preload", async () => {
+    vi.stubGlobal("openbot", undefined);
+    const onUpdateAgent = vi.fn(async () => undefined);
+    try {
+      const view = render(() => (
+        <SharedAgentSettingsPanel
+          agent={STORY_AGENTS[0]}
+          runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
+          agentStatus={STORY_AGENT_STATUS}
+          modelOptions={STORY_MODELS}
+          working={false}
+          width={296}
+          maxWidth={() => 640}
+          onClose={vi.fn()}
+          onResize={vi.fn()}
+          onResizeEnd={vi.fn()}
+          onUpdateAgent={onUpdateAgent}
+          onUpdateRuntimeSettings={vi.fn(async () => true)}
+          onSetAgentAvatar={vi.fn(async () => undefined)}
+        />
+      ));
+      const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
+      await fireEvent.input(instructions, { target: { value: "Keep the shared form independent." } });
+      view.unmount();
+      expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, {
+        description: "Keep the shared form independent.",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("saves edited instructions while the field stays focused", async () => {
     vi.useFakeTimers();
     try {
@@ -452,7 +487,7 @@ describe("AgentSettingsPanel", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Agent model: GPT-5.6 Sol" }));
     const dialog = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(dialog).getByRole("tab", { name: /^Claude:/ }));
-    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" }));
+    await fireEvent.click(within(dialog).getByRole("option", { name: "Claude Sonnet 5" }));
 
     await waitFor(() =>
       expect(onUpdateRuntimeSettings).toHaveBeenCalledWith(

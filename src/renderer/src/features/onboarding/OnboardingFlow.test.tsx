@@ -7,11 +7,11 @@ import type {
   ProviderRuntimeStatus,
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import { Toaster, toast } from "@openbot/ui";
+import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProviderCodeLoginState } from "../../components/ProviderCodeLoginDialog";
-import { Toaster, toast } from "../../components/ui";
 import { STORY_AGENT_STATUS } from "../../preview/fixtures";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
 import { OnboardingFlow } from "./OnboardingFlow";

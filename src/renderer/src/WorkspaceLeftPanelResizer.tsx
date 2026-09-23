@@ -1,4 +1,5 @@
-import { PanelResizer, savePanelWidth } from "./components/PanelResizer";
+import { PanelResizer } from "@openbot/ui/components/PanelResizer";
+import { savePanelWidth } from "./components/panel-width-storage";
 import { useLayout } from "./layout";
 import {
   LEFT_PANEL_COLLAPSE_THRESHOLD,

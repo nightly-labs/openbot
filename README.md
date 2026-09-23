@@ -152,6 +152,10 @@ bun run dev
 `codex:doctor` checks the CLI version, App Server handshake, and ChatGPT login without starting a
 model turn. `bun run cua-driver:doctor` reports the Computer Use driver separately.
 
+In a new git worktree, run `bun run dev:bootstrap`. It copies the files that `.worktreeinclude`
+lists from the main checkout when they are missing, installs dependencies, migrates the local API,
+and seeds the isolated profile. Set it as the worktree setup command of your agent harness.
+
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
 The command deletes the app and test-client development profiles plus the legacy host profile,
@@ -202,6 +206,12 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 
 ## Commands
 
+The browser client is served at `/app` by the public web app. For local development, run
+`bun run dev:api --isolated` and open `/app` on the API URL printed by the supervisor. Use
+`bun run dev --isolated` when a desktop host is also needed.
+Use `bun run storybook` and **Web → Workspace → Connected** for shared UI test data.
+See [web client delivery](docs/web-client.md) for the release gate and focused checks.
+
 | Command | Purpose |
 | --- | --- |
 | `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
@@ -235,9 +245,10 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run build-storybook` | Build static Storybook. CI sets `OPENBOT_STORYBOOK_CHECK=true` to skip automatic prop documentation during its build check. |
 | `bun run dev:automation` | Drive the running dev app over CDP: `instances`, `pages`, `snapshot`, `screenshot`, `click`/`type` by accessible role. `--page=<target-id\|url-substring>` aims at any window, including embedded browser views; `--wait-for=<role>,<name>` settles on an accessible target instead of polling; mutations need `--allow-mutations` and a named instance (this worktree's record, `--instance=<id>` or `--port=`). |
 | `bun run dev:cpu` | Measure idle CPU on the running dev app, per process kind and per page. `--duration=<ms>` (default 60000), `--interval=<ms>` (default 5000), `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/cpu/`, and refused if it would leave that directory or pass through a symbolic link) and `--compare=<file>` for a before/after delta. Read-only. Take a baseline before a change and a second run after it: only the difference between two runs on the same machine is a result, because a dev build carries the Vite server and the source maps as well. |
+| `bun run dev:memory` | Measure the running dev app's memory once: resident memory per process kind (main, renderer, GPU, provider CLIs and their MCP servers), with the dev tooling kept out of the app total, plus JS heap and DOM counters per page. `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/memory/`) and `--heap-snapshot=<target-id\|url-substring>` to also write a V8 heap snapshot of one page to that directory. Read-only. |
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
 | `bun run typecheck` | Check all 11 projects in parallel with a separate incremental cache for each project in this worktree. |
-| `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
+| `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `@openbot/ui`, palette tokens instead of colour, size, radius and transition literals. Checks renderer and shared UI source. |
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |

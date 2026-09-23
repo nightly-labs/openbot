@@ -1,4 +1,5 @@
 import type { AccountUsage, AgentSummary, ApprovalAutomationPreference } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -14,8 +15,7 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
-import { toast } from "./components/ui";
-import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
+import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
 
 describe("OpenBot connected desktop shell", () => {
   it("opens the marketplace from skill settings and returns to skills", async () => {
@@ -408,6 +408,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(await screen.findByRole("switch", { name: "Share product analytics" }));
     await waitFor(() => expect(window.openbot.setAnalyticsPreference).toHaveBeenCalledWith({ enabled: false }));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "Dynamic Island" }));
     const notchSwitch = await screen.findByRole("switch", { name: "Show status in the MacBook notch" });
     expect(notchSwitch).toBeChecked();
     await fireEvent.click(notchSwitch);
@@ -417,6 +418,8 @@ describe("OpenBot connected desktop shell", () => {
         hapticsEnabled: true,
         idleVisible: true,
         additionalDisplaysEnabled: true,
+        widthPercent: 100,
+        heightPercent: 100,
       }),
     );
     expect(notchSwitch).not.toBeChecked();
@@ -643,10 +646,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(trigger);
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     expect(within(picker).getByText("0.144.1 (Codex CLI)")).toBeInTheDocument();
-    expect(within(picker).getByRole("option", { name: "GPT-5.6 Luna, default" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(within(picker).getByRole("option", { name: "GPT-5.6 Luna" })).toHaveAttribute("aria-selected", "true");
 
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     expect(window.openbot.agent.updateAgent).not.toHaveBeenCalled();
@@ -754,7 +754,7 @@ describe("OpenBot connected desktop shell", () => {
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5" }));
     expect(window.openbot.agent.updateAgent).toHaveBeenCalledOnce();
 
     await fireEvent.keyDown(picker, { key: "Escape" });

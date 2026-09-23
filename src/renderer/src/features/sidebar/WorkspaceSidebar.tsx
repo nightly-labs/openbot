@@ -1,10 +1,12 @@
+import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
+import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
+import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { createMemo } from "solid-js";
 import { useLayout } from "../../layout";
 import { DirectConversation } from "../../lazy-views";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
 import { useAgentActions } from "../agents/agent-actions";
-import { computeAgentAvatarMoods } from "../agents/agent-avatar-mood";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
@@ -13,8 +15,6 @@ import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
-import { Sidebar } from "./Sidebar";
-import { computeSidebarAgentStates } from "./sidebar-agent-states";
 import { useSidebar } from "./sidebar-context";
 
 /**

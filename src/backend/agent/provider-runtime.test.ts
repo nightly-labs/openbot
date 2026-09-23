@@ -28,7 +28,7 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
-import { isUsageLimitDiagnostic } from "./provider-runtime";
+import { isUsageLimitDiagnostic, PROVIDER_IDLE_RELEASE_MS } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -188,14 +188,25 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
     expect(availableOrder).toEqual(["claude", "grok", "codex"]);
 
-    // The CLI also reports gpt-reserve, gpt-5.5, gpt-5.4-mini and codex-auto-review, the models
-    // this product does not offer.
+    // Every model the CLI reports is offered, newest first. A name with no version goes last, and
+    // the CLI's order stays between models of one version.
     expect(
       service
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.id),
-    ).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.4", "gpt-5.3-codex-spark"]);
+    ).toEqual([
+      "gpt-6-luna",
+      "gpt-5.6-luna",
+      "gpt-5.6-terra",
+      "gpt-5.6-sol",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex-spark",
+      "gpt-reserve",
+      "codex-auto-review",
+    ]);
   });
   async function opencodeModelIds(storedKey: string | null, catalog?: string[]): Promise<string[]> {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
@@ -255,7 +266,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     // An agent that has chosen no model runs whatever comes first, and OpenCode reports the
     // services the user signed in to before its own. So the order carries four claims: Muse leads,
     // no billed model outranks a free one, OpenCode's own paid models outrank a third-party
-    // sign-in OpenBot cannot refresh, and the CLI's order survives inside one tier.
+    // sign-in OpenBot cannot refresh, and the newest version leads inside one tier.
     expect(
       await opencodeModelIds(null, [
         "openai/gpt-5.3-codex-spark",
@@ -266,9 +277,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       ]),
     ).toEqual([
       "opencode/muse-spark-1.3-contributor-free",
-      "opencode/big-pickle",
       "opencode/nemotron-3.5-lightning-free",
       "opencode/mimo-v2.5-free",
+      "opencode/big-pickle",
       "openai/gpt-5.3-codex-spark",
     ]);
   });
@@ -466,7 +477,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.name),
-    ).toEqual(["GPT-5.6 Sol", "GPT-6 Astra"]);
+    ).toEqual(["GPT-6 Astra", "GPT-5.6 Sol"]);
   });
 
   it("names a Claude model by the model, not by the pick Claude Code calls it", async () => {
@@ -493,7 +504,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "claude")
         .map((model) => model.name),
-    ).toEqual(["Claude Sonnet 5", "Claude Haiku 4.5", "Claude Fable 5.1 (1M context)", "Next"]);
+    ).toEqual(["Claude Fable 5.1 (1M context)", "Claude Sonnet 5", "Claude Haiku 4.5", "Next"]);
   });
 
   it("collects all ChatGPT pages and keeps the previous catalog when pagination fails", async () => {
@@ -518,7 +529,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
         .listModels()
         .filter((model) => model.provider === "codex")
         .map((model) => model.id),
-    ).toEqual(["gpt-5.6-sol", "gpt-6-astra"]);
+    ).toEqual(["gpt-6-astra", "gpt-5.6-sol"]);
     expect(client.requests).toContainEqual({
       method: "model/list",
       params: { limit: 100, includeHidden: true, cursor: "page-2" },
@@ -1525,6 +1536,50 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  it("reads Codex's nested error report and leaves an exhausted plan to the usage notice", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    const usageReadsBefore = client.requests.filter((request) => request.method === "account/rateLimits/read").length;
+    events.length = 0;
+
+    const report = (message: string, codexErrorInfo: unknown, willRetry: boolean) =>
+      client.emit("notification", {
+        method: "error",
+        params: {
+          error: { message, codexErrorInfo, additionalDetails: null, misalignment: null },
+          willRetry,
+          threadId: "thread-1",
+          turnId: "turn-1",
+        },
+      });
+    report("You've hit your usage limit. Try again at 10:34 AM.", "usageLimitExceeded", false);
+    report("Reconnecting... 1/5", { responseStreamDisconnected: { httpStatusCode: null } }, true);
+    report("The model endpoint rejected the request.", "badRequest", false);
+
+    await waitFor(() => events.some((event) => event.type === "error"));
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "The model endpoint rejected the request." }),
+    ]);
+    expect(client.requests.filter((request) => request.method === "account/rateLimits/read")).toHaveLength(
+      usageReadsBefore + 1,
+    );
+  });
+
   it("refuses to replace a CLI that is running a turn", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({
@@ -1953,5 +2008,51 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
     // Signed out, OpenCode keeps no client. A save must not read as a failure: the next spawn - the
     // next Connect press - reads the config.
     await expect(running.reloadOpenCodeConfig()).resolves.toBe("not-running");
+  });
+});
+
+describe.sequential("ProviderRuntime: idle release", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stops an idle provider process and resumes the same thread on the next message", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    const started = await startService(root, { provider: "codex", output: "DONE" });
+    service = started.service;
+    const running = service;
+    const first = started.client;
+    await service.sendMessage({ agentId: "chief", text: "First task." });
+    await waitFor(() => running.listQueue("chief").deliveries[0]?.status === "completed");
+    expect(first.requests.map((request) => request.method)).toContain("thread/start");
+    const session = started.store.activeProviderSession("chief")?.externalSessionId;
+    expect(session).toBeTruthy();
+
+    await vi.advanceTimersByTimeAsync(PROVIDER_IDLE_RELEASE_MS + 2 * 60_000);
+    await waitFor(() => !first.running);
+    const firstRequests = first.requests.length;
+    expect(service.getStatus().providers?.find((row) => row.id === "codex")?.state).toBe("available");
+    expect(service.getStatus().phase).toBe("ready");
+
+    // The fake hands out the same client object again, so only the requests after the restart count.
+    const afterRelease = () => first.requests.slice(firstRequests).map((request) => request.method);
+    await service.sendMessage({ agentId: "chief", text: "Second task." });
+    await waitFor(() => afterRelease().includes("turn/start"));
+    expect(started.clients.filter((made) => made.provider === "codex")).toHaveLength(2);
+    const resumed = first.requests.slice(firstRequests).find((request) => request.method === "thread/resume");
+    expect(getString(resumed?.params, "threadId")).toBe(session);
+    expect(afterRelease()).not.toContain("thread/start");
+  });
+
+  it("keeps a provider process that is running a turn", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    const started = await startService(root, { provider: "codex", output: "", autoComplete: false });
+    service = started.service;
+    const running = service;
+    await service.sendMessage({ agentId: "chief", text: "Keep working." });
+    await waitFor(async () => Boolean((await running.readConversation("chief")).activeTurnId));
+
+    await vi.advanceTimersByTimeAsync(PROVIDER_IDLE_RELEASE_MS + 2 * 60_000);
+    expect(started.client.running).toBe(true);
   });
 });

@@ -1,8 +1,8 @@
 import type { DirectMessage } from "@openbot/contracts/ipc";
+import { DirectConversation } from "@openbot/ui/features/conversation/DirectConversation";
 import { createEffect, createSignal } from "solid-js";
 import { expect, fireEvent, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { DirectConversation } from "../src/features/conversation/DirectConversation";
 import { STORY_DIRECT_SNAPSHOTS, STORY_PRESENCE } from "./fixtures";
 
 const member = STORY_PRESENCE.members[1];

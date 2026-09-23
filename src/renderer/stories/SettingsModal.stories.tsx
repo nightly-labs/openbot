@@ -8,12 +8,12 @@ import type {
   ProviderRuntimeSnapshot,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { Button, Heading, Text, Toaster, toast } from "@openbot/ui";
+import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
-import { DEFAULT_GENERAL_SETTINGS } from "../src/features/settings/app-settings";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import { createFakeCodeLogin } from "./code-login-fixture";
 import { createMockOpenBot } from "./mock-openbot";
@@ -465,6 +465,15 @@ export const Profile: Story = {
   play: async ({ userEvent }) => {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("tab", { name: "Profile" }));
+  },
+};
+
+export const DynamicIsland: Story = {
+  render: () => <SettingsModalStory initialOpen />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Dynamic Island" }));
+    await expect(body.findByRole("slider", { name: "Width" })).resolves.toBeEnabled();
   },
 };
 

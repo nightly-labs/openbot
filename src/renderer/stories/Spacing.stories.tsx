@@ -1,6 +1,6 @@
+import { Heading, Text } from "@openbot/ui";
 import { For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Heading, Text } from "../src/components/ui";
 
 const spaces = [2, 4, 6, 8, 12, 16, 24, 32] as const;
 

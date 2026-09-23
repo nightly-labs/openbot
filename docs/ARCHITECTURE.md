@@ -1,16 +1,17 @@
 # OpenBot architecture
 
-OpenBot is a Bun workspace with a desktop application, a mobile application, two Cloudflare Workers,
+OpenBot is a Bun workspace with desktop, browser, and mobile applications, two Cloudflare Workers,
 a self-hosted Signal service, and shared packages.
 
 ## Workspace map
 
 ```text
 apps/
-  auth-api/          Cloudflare Worker for public web, accounts, memberships, and connection tickets
+  auth-api/          Public web and /app browser entry, accounts, memberships, and connection tickets
   mobile/            Expo React Native client for remote team hosts
   site-router/       Cloudflare Worker that serves published sites from private R2 storage
 packages/
+  ui/                Shared SolidJS controls and primitive styles for desktop, web, and Storybook
   brand/             Shared logos, avatars, and design tokens
   contracts/         Process and network boundary types, limits, and pure validation
   logging/           ts-log Logger interface plus the redacting console/file implementation
@@ -47,7 +48,41 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
 - Electron main validates untrusted IPC input before it calls a service.
 - Provider code cannot write UI state. It sends events to `AgentService`, which writes SQLite
   projections before the main process sends changes to the renderer.
-- The auth API cannot import desktop implementation files.
+- The auth API server cannot import desktop implementation files. Browser-only route composition
+  can import renderer UI through the explicit preview and web aliases. These entry points do not
+  load Electron, preload, setup, or updater providers.
+
+## Browser client
+
+`apps/auth-api` serves `/app`. Its lazy route mounts the interactive client after browser startup.
+`src/renderer/src/features/web-client` owns the browser composition and its typed
+`WebWorkspaceRuntime` interface. It mounts the existing account login, server rail, sidebar,
+account dock, and full conversation view. `ConversationRuntime` routes host actions through
+the browser connection; its desktop default is the preload API. There is no separate web dashboard.
+Small screens switch between the same conversation and workspace components. The shared browser
+panel receives the web live-view runtime and hides unsupported native controls. `BrowserLiveView`
+accepts an explicit runtime; desktop and the existing preview still default to the preload-compatible
+API. The web Storybook runtime uses
+`preview/mock-openbot.ts` through `preview/mock-web-runtime.ts`.
+
+The browser runtime uses `packages/team-client` for the directory, authenticated WebRTC peer,
+Signal recovery, file transfers, and browser-view streams. The stream codec lives in contracts;
+the old main-process import re-exports that codec without changing its wire format. Account
+requests use a closed list of `/api/browser/*` operations. They cannot carry chat requests.
+Browser tickets and session termination require the same account-session hash that created the
+remote session. Existing bearer-token endpoints retain their behavior.
+
+Browser sign-in, account reads, and connection tickets are always available. No host or D1
+migration is needed. See [web client delivery](web-client.md) for the seven review scopes, local
+commands, and release checks.
+
+Browser chat pages, drafts, file bytes, and chat visibility preferences stay in memory. A protected
+cookie holds the account credential. Local storage holds account-scoped trusted host public keys
+and the shared file panel's width, not chat content. A Web Lock permits one live tab per account
+and host because the existing control plane reuses that credential's logical host session.
+Host switches discard the prior host's chat state. Temporary connection loss keeps drafts;
+uncertain sends require an explicit user check before another send. BroadcastChannel, account
+checks on focus, and signed session invalidation clear access when a session ends.
 
 MP3 and MOV attachments use the existing file attachment contract with no inline preview. Import
 copies and hashes the original bytes under the shared attachment limits; it does not run media
@@ -1128,3 +1163,39 @@ a form POST. Failure retains protection and falls back to takeover. A new docume
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+
+### Shared UI package
+
+`@openbot/ui` owns the existing SolidJS primitives and their primitive stylesheet. Desktop,
+web, and Storybook import this workspace directly. It has no dependency on the renderer,
+Electron, account sessions, or host connections. Import `@openbot/ui/styles.css` after brand
+tokens and include the package source in Tailwind scanning. App-specific styles remain in
+the application. The desktop TypeScript project includes the package source for CI checks.
+
+The package also owns prop-driven feature UI: the complete sidebar and its scoped interaction
+stores, account login and dock, server rail and invitation dialog, message rendering, composer
+editor, attachment cards, preview renderers, agent setup, and reusable settings panels. Feature
+exports use explicit subpaths such as `@openbot/ui/features/sidebar/Sidebar`. Shared display
+models live at `@openbot/ui/data`. Source files are moved, not copied or re-exported from the
+renderer. Tests remain in the renderer test harness and import the package directly.
+
+The browser panel and live canvas also live in this package. Their typed `BrowserViewRuntime`
+is required; the renderer supplies the desktop preload adapter or the web host adapter.
+Shared sidebar activity and avatar mood functions use caller-supplied state. The conversation
+stylesheet is exported as `@openbot/ui/features/conversation/conversation.css`; applications
+import it in the same cascade position as the former renderer stylesheet. This file is an ordered
+manifest of component styles in `features/conversation/styles/`. Preserve import order: later
+surface and responsive rules override earlier component rules.
+
+`AgentSettingsPanel` owns the form draft, ordered save queue, avatar editor, and model controls.
+Its renderer adapter owns persisted width and native memories, routines, skills, and tables,
+which it supplies as content slots. `ConversationHeader` owns the header controls; its renderer
+adapter owns context reads, capabilities, translations, and action error handling. Both shared
+components receive typed props and callbacks. The shared-package Biome override rejects
+application imports and direct desktop preload access. Boundary fixtures run with the focused
+`scripts/ui-foundation-check.test.ts` test.
+
+Desktop sidebar persistence stays in `sidebar-pins-storage.ts` and `sidebar-sections-storage.ts`.
+The main conversation controller, application contexts, and platform adapters stay in the
+renderer. Further extraction requires explicit runtime inputs for those dependencies. React
+Native uses brand tokens and contracts, not these DOM components.

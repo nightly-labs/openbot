@@ -14,8 +14,8 @@
  * a click outside cancel it, and nothing about it is dismissible while the removal is running.
  */
 
+import { AlertDialog, Blocks, Button, Puzzle, Text, Trash2 } from "@openbot/ui";
 import { For, Show } from "solid-js";
-import { AlertDialog, Blocks, Button, Puzzle, Text, Trash2 } from "../../components/ui";
 
 /** What an uninstall is about to take, as the page found it on this computer. */
 export interface PluginUninstallPlan {

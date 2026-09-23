@@ -63,6 +63,18 @@ const logger = createOpenBotLogger("provider-runtime");
 
 const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
+/** How long a provider CLI stays running with nothing to do before its process is stopped. */
+export const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
+const PROVIDER_IDLE_CHECK_MS = 60_000;
+
+/**
+ * True once a window of a kept reading has passed its reset time, so the reading is stale. Only
+ * then does a usage read start a released provider again. `resetsAt` is in seconds.
+ */
+function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
+  const now = Date.now() / 1_000;
+  return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
+}
 
 function withUsageReadTimeout<T>(promise: Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -257,18 +269,6 @@ const INITIAL_STATUS: AgentStatus = {
 };
 
 /**
- * Models a provider CLI lists that an OpenBot agent is not meant to run. `codex-auto-review` and
- * `gpt-reserve` are Codex picks for its own use -- a review pass and spare capacity -- and
- * `gpt-5.5` and `gpt-5.4-mini` are older models this product does not offer. Everything else the
- * CLI reports reaches the picker, the models it marks hidden included, so this list and
- * the stored-key drop in `#refreshModelCatalog` are the only things that keep a model out, and adding to
- * either is a product decision, not a guess about a flag.
- */
-const SUPPRESSED_MODEL_IDS: ReadonlyMap<AgentProvider, ReadonlySet<string>> = new Map([
-  ["codex", new Set(["gpt-reserve", "gpt-5.5", "gpt-5.4-mini", "codex-auto-review"])],
-]);
-
-/**
  * A model name the contract guards accept. `isAgentModelOption` bounds the name, and both the IPC
  * and the Team API list decoders reject the whole array when one option fails, so a name that is one
  * character too long does not shorten a label - it empties the model picker.
@@ -311,6 +311,7 @@ function isOpencodeModelUnusableWithStoredKey(id: string, name: string): boolean
  * family the stored key buys, and any `opencode/` model behind the user's own OpenCode sign-in --
  * and last the models behind a separate sign-in, whose token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
  * at all; it is the difference between a bad default and an unusable one.
+ * Inside one tier the newest version leads, which still keeps a free model first.
  */
 function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
   // Names, not ids, because the price is a naming convention and `isFreeOpencodeModel` is what
@@ -324,6 +325,27 @@ function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
 const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentModelOption) => number> = new Map([
   ["opencode", opencodeModelRank],
 ]);
+
+/** The first version number in a model name: `[5, 6]` for `GPT-5.6 Sol`, `null` for `gpt-reserve`. */
+function modelVersion(name: string): number[] | null {
+  const match = /\d+(?:\.\d+)*/u.exec(name);
+  return match ? match[0].split(".").map(Number) : null;
+}
+
+/**
+ * Newest version first, so the picker leads with the latest model. A name with no version goes
+ * last, and equal versions compare equal so the CLI's own order stays between them.
+ */
+function compareModelVersions(left: AgentModelOption, right: AgentModelOption): number {
+  const a = modelVersion(left.name);
+  const b = modelVersion(right.name);
+  if (!a || !b) return Number(!a) - Number(!b);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const difference = (b[index] ?? 0) - (a[index] ?? 0);
+    if (difference) return difference;
+  }
+  return 0;
+}
 
 /**
  * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
@@ -353,12 +375,20 @@ function claudeModelName(id: string): string | null {
 const FALLBACK_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
-    id: "gpt-5.6-luna",
-    name: "GPT-5.6 Luna",
+    id: "gpt-6-luna",
+    name: "GPT-6 Luna",
     description: "Fast and efficient for everyday agent work.",
     // `DEFAULT_REASONING_EFFORT`, not the `medium` the Codex CLI reports: this is the model a new
     // agent starts on, and the two have to say the same thing.
     defaultReasoningEffort: "low",
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+  {
+    provider: "codex",
+    id: "gpt-5.6-luna",
+    name: "GPT-5.6 Luna",
+    description: "Older fast and efficient model.",
+    defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
   {
@@ -375,6 +405,14 @@ const FALLBACK_MODELS: AgentModelOption[] = [
     name: "GPT-5.6 Sol",
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+  {
+    provider: "claude",
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    description: "Most capable Claude model for complex work.",
+    defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
   },
   {
@@ -455,6 +493,15 @@ export class ProviderRuntime implements ProviderPort {
   readonly #providerStarts = new Map<AgentProvider, Promise<void>>();
   readonly #providerConnectionCommands = new Map<AgentProvider, Promise<void>>();
   readonly #replacingCli = new Set<AgentProvider>();
+  /**
+   * Providers whose idle process was stopped to give its memory back. Each one keeps its status,
+   * account and models, so every view reads it as connected; `ensureProvider` starts it again.
+   */
+  readonly #released = new Set<AgentProvider>();
+  readonly #lastUsed = new Map<AgentProvider, number>();
+  /** The last usage each provider reported, shown for a released provider instead of starting it. */
+  readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
+  #idleCheck: NodeJS.Timeout | null = null;
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Promise<AgentStatus> | null = null;
   #codexLogin: PendingCodexLogin | null = null;
@@ -554,7 +601,44 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   clientFor(provider: AgentProvider): AgentClient | null {
-    return this.#clients.get(provider) ?? null;
+    const client = this.#clients.get(provider) ?? null;
+    if (client) this.#lastUsed.set(provider, Date.now());
+    return client;
+  }
+
+  /**
+   * Stops each provider process that ran no turn for `PROVIDER_IDLE_RELEASE_MS`. An idle CLI holds
+   * hundreds of megabytes, and every signed-in provider starts at launch whether an agent uses it
+   * or not. Its threads are unloaded, so the next turn resumes them on the process that replaces it.
+   */
+  async #releaseIdleProviders(): Promise<void> {
+    if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    const now = Date.now();
+    for (const [provider, client] of this.#clients) {
+      if (
+        this.#hooks.isProviderBusy(provider) ||
+        this.#providerStarts.has(provider) ||
+        this.#providerConnectionCommands.has(provider) ||
+        this.#replacingCli.has(provider) ||
+        this.#cliLogins.has(provider) ||
+        (provider === "codex" && this.#codexLogin !== null)
+      ) {
+        this.#lastUsed.set(provider, now);
+        continue;
+      }
+      const lastUsed = this.#lastUsed.get(provider);
+      if (lastUsed === undefined) {
+        this.#lastUsed.set(provider, now);
+        continue;
+      }
+      if (now - lastUsed < PROVIDER_IDLE_RELEASE_MS) continue;
+      // Out of the map before it stops, so #handleExit reads the exit as expected, not as a crash.
+      this.#clients.delete(provider);
+      this.#released.add(provider);
+      this.#conversation.unloadClientThreads(client);
+      logger.info("Stopped an idle provider CLI.", { provider });
+      await client.stop().catch(() => undefined);
+    }
   }
 
   listModels(): AgentModelOption[] {
@@ -598,6 +682,12 @@ export class ProviderRuntime implements ProviderPort {
         providers.map(async (provider) => {
           if (provider === "opencode") return;
           try {
+            const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
+            if (kept && !usageWindowHasReset(kept)) {
+              collected.set(provider, kept);
+              this.#emit({ type: "usage-changed", usage: { limits: [...collected.values()] } });
+              return;
+            }
             if (!this.#clients.has(provider)) await this.ensureProvider(provider);
             const client = this.#clients.get(provider);
             if (!client) return;
@@ -607,6 +697,7 @@ export class ProviderRuntime implements ProviderPort {
             const limit = usage.limits[0];
             if (!limit || (!limit.primary && !limit.secondary)) return;
             collected.set(provider, { ...limit, id: provider });
+            this.#lastUsage.set(provider, { ...limit, id: provider });
             this.#emit({
               type: "usage-changed",
               usage: { limits: [...collected.values()] },
@@ -626,6 +717,8 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   async start(): Promise<void> {
+    this.#idleCheck ??= setInterval(() => void this.#releaseIdleProviders(), PROVIDER_IDLE_CHECK_MS);
+    this.#idleCheck.unref?.();
     await this.#connect(
       "starting",
       BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id),
@@ -648,10 +741,14 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   async ensureProvider(provider: AgentProvider): Promise<void> {
+    this.#lastUsed.set(provider, Date.now());
     if (this.#clients.has(provider)) return;
     let start = this.#providerStarts.get(provider);
     if (!start) {
-      start = this.#connect("starting", [provider]).finally(() => {
+      // Waking a released provider is not a start: `onProvidersReady` is restart recovery, and it
+      // would settle the live deliveries of every other provider.
+      const wake = this.#released.has(provider);
+      start = this.#connect("starting", [provider], wake ? { notifyReady: false } : {}).finally(() => {
         this.#providerStarts.delete(provider);
       });
       this.#providerStarts.set(provider, start);
@@ -871,7 +968,7 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   clientForAgent(agent: AgentSummary): AgentClient | null {
-    return this.#clients.get(providerForAgent(agent)) ?? null;
+    return this.clientFor(providerForAgent(agent));
   }
 
   /** True while a managed runtime is installed and its previous client is replaced. */
@@ -880,7 +977,7 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   requireReadyClient(provider: AgentProvider): AgentClient {
-    const client = this.#clients.get(provider);
+    const client = this.clientFor(provider);
     if (!client || this.#status.phase !== "ready") {
       throw new Error(this.#status.message ?? `${providerLabel(provider)} CLI is not ready or signed in.`);
     }
@@ -944,6 +1041,9 @@ export class ProviderRuntime implements ProviderPort {
   dispose(): AgentClient[] {
     if (this.#restartTimer) clearTimeout(this.#restartTimer);
     this.#restartTimer = null;
+    if (this.#idleCheck) clearInterval(this.#idleCheck);
+    this.#idleCheck = null;
+    this.#released.clear();
     const pendingLogin = this.#codexLogin;
     this.#codexLogin = null;
     const cliLogins = [...this.#cliLogins.values()];
@@ -1146,6 +1246,7 @@ export class ProviderRuntime implements ProviderPort {
         const previousClient = this.#clients.get(provider);
         const previousCli = this.#cli.get(provider);
         const previousAccount = this.#accounts.get(provider);
+        this.#released.delete(provider);
         this.#clients.set(provider, client);
         this.#cli.set(provider, cli);
         this.#accounts.set(provider, account);
@@ -1264,7 +1365,7 @@ export class ProviderRuntime implements ProviderPort {
             message,
             email: null,
           };
-    const hasProvider = this.#clients.size > 0;
+    const hasProvider = this.#clients.size > 0 || this.#released.size > 0;
     this.#setStatus({
       phase: hasProvider ? "ready" : "blocked",
       providers: updateProviderStatus(this.#status.providers, provider, status),
@@ -1563,14 +1664,15 @@ export class ProviderRuntime implements ProviderPort {
     requestedProviders: readonly AgentProvider[],
     options: { preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean; notifyReady?: boolean } = {},
   ): Promise<void> {
-    const hadClients = this.#clients.size > 0;
+    const hadClients = this.#clients.size > 0 || this.#released.size > 0;
     const providerStatuses: AgentProviderStatus[] = structuredClone(
       this.#status.providers ?? INITIAL_STATUS.providers ?? [],
     );
     for (const provider of requestedProviders) {
       const current = this.#status.providers?.find((candidate) => candidate.id === provider);
       setProviderStatus(providerStatuses, provider, {
-        state: this.#clients.has(provider) ? "available" : "checking",
+        // A released provider is still connected: it only waits for a turn to start its process.
+        state: this.#clients.has(provider) || this.#released.has(provider) ? "available" : "checking",
         version: this.#cli.get(provider)?.version ?? null,
         message: null,
         email: this.#accounts.get(provider)?.email ?? null,
@@ -1663,9 +1765,15 @@ export class ProviderRuntime implements ProviderPort {
         }
       }),
     );
+    for (const provider of requestedProviders) this.#released.delete(provider);
     const failures = results.filter((message): message is string => message !== null);
     const finalProviderStatuses = structuredClone(this.#status.providers ?? providerStatuses);
 
+    if (this.#clients.size === 0 && this.#released.size > 0) {
+      // Every other provider is released, not gone: chat stays ready and starts one on the next turn.
+      this.#setStatus({ providers: finalProviderStatuses });
+      return;
+    }
     if (this.#clients.size === 0) {
       this.#setStatus({
         phase: "blocked",
@@ -1773,7 +1881,7 @@ export class ProviderRuntime implements ProviderPort {
       version: this.#cli.get(client.provider)?.version ?? null,
       message: this.#redactMcp(error.message),
     });
-    const anotherProviderIsReady = this.#clients.size > 0;
+    const anotherProviderIsReady = this.#clients.size > 0 || this.#released.size > 0;
 
     if (this.#restartAttempts >= 3) {
       this.#setStatus(
@@ -1831,7 +1939,6 @@ export class ProviderRuntime implements ProviderPort {
           const previous = this.#models.filter((model) => model.provider === provider);
           const client = this.#clients.get(provider);
           if (!client) return { provider, models: previous, fresh: false };
-          const suppressed = SUPPRESSED_MODEL_IDS.get(provider) ?? new Set<string>();
           // Read once per pass, not per model: a stored key cannot change inside one refresh, and
           // a model is unusable only because OpenBot is what put that key in the environment.
           const hasStoredKey = Boolean(this.#credentials.apiKey(provider));
@@ -1846,8 +1953,8 @@ export class ProviderRuntime implements ProviderPort {
                 decodeModelListResponse,
                 5_000,
               );
-              // Every model the CLI reports is offered apart from SUPPRESSED_MODEL_IDS, the ones it
-              // marks hidden included. A CLI hides a model it still accepts -- a new release such
+              // Every model the CLI reports is offered, the ones it marks hidden included; only the
+              // stored-key drop below keeps a model out. A CLI hides a model it still accepts -- a new release such
               // as `gpt-6-astra` is hidden until its own launch -- and this app has no way to tell
               // that apart from a model the account cannot use, so a hidden flag was the only
               // reason a working model was missing from the picker while the same CLI ran it
@@ -1856,7 +1963,7 @@ export class ProviderRuntime implements ProviderPort {
                 // The trimmed id is what is kept: `isAgentModel` allows no whitespace, so a padded
                 // id would fail the contract guard downstream and take the whole list with it.
                 const id = item.model?.trim();
-                if (!id || suppressed.has(id.toLowerCase())) continue;
+                if (!id) continue;
                 serverModels.set(id, { ...item, model: id });
               }
               cursor = client.provider === "codex" ? response.nextCursor : undefined;
@@ -1907,10 +2014,13 @@ export class ProviderRuntime implements ProviderPort {
                   : (fallback?.supportedReasoningEfforts ?? ["medium"]),
               });
             }
-            const rank = PREFERRED_MODEL_ORDER.get(client.provider);
-            if (!rank) return { provider, models, fresh: true };
-            // Sort is stable, so the CLI's own order still decides inside one tier.
-            return { provider, models: [...models].sort((left, right) => rank(left) - rank(right)), fresh: true };
+            const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
+            // Tier first, then newest first. Sort is stable, so the CLI's own order still decides
+            // between models of one version.
+            const sorted = [...models].sort(
+              (left, right) => rank(left) - rank(right) || compareModelVersions(left, right),
+            );
+            return { provider, models: sorted, fresh: true };
           } catch {
             return { provider, models: previous, fresh: false };
           }

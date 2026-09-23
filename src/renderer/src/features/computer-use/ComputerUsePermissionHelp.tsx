@@ -1,7 +1,7 @@
 import { type ComputerUsePermissionApp, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
+import { Button, FolderOpen, GripVertical, Monitor, MousePointer2 } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
-import { Button, FolderOpen, GripVertical, Monitor, MousePointer2 } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 
 /**
  * What the user has to do in the pane that just opened, and whether it worked.

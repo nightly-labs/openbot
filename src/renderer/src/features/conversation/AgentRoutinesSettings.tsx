@@ -1,14 +1,14 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
+import { Button, CirclePause, Clock3, Dialog, Input, Plus, Switch, Textarea } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
+import { errorMessage } from "@openbot/ui/error-message";
+import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
+import { RoutineScheduleEditor } from "@openbot/ui/features/conversation/RoutineScheduleEditor";
+import { defaultRoutineSchedule, routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
-import { createScrollFades } from "../../components/createScrollFades";
-import { SettingsBackIcon, SettingsForwardIcon } from "../../components/SettingsPanel";
-import { Button, CirclePause, Clock3, Dialog, Input, Plus, Switch, Textarea } from "../../components/ui";
-import { errorMessage } from "../../error-message";
-import { RoutineRunHistory } from "./RoutineRunHistory";
-import { RoutineScheduleEditor } from "./RoutineScheduleEditor";
-import { defaultRoutineSchedule, routineScheduleSummary } from "./routine-schedule-ui";
 import type { RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {

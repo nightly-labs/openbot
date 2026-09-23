@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -60,7 +60,12 @@
       "vitest": "4.1.10",
       "wrangler": "4.123.0",
       "yaml": "2.8.3",
-      "zod": "4.5.4"
+      "zod": "4.5.4",
+      "lucide-solid": "1.33.0",
+      "solid-sonner": "0.3.2",
+      "solid-recharts": "1.0.1",
+      "qrcode": "^1.5.4",
+      "@tanstack/virtual-core": "3.17.8"
     }
   },
   "main": "./out/main/index.js",
@@ -111,6 +116,7 @@
     "dev:seed": "tsx scripts/seed-dev-state.ts",
     "dev:automation": "bun scripts/dev-automation/cli.ts",
     "dev:cpu": "bun scripts/dev-automation/cli.ts cpu",
+    "dev:memory": "bun scripts/dev-automation/cli.ts memory",
     "dev:status": "bun scripts/dev-stack.ts status",
     "dev:verify": "bun scripts/dev-verify.ts",
     "dev:mobile": "bun scripts/dev-mobile.ts",
@@ -225,20 +231,21 @@
     "@solidjs/signals": "catalog:",
     "@solidjs/web": "catalog:",
     "@speed-highlight/core": "catalog:",
-    "@tanstack/virtual-core": "3.17.8",
+    "@tanstack/virtual-core": "catalog:",
     "class-variance-authority": "catalog:",
     "electron-updater": "6.8.9",
     "fflate": "catalog:",
     "jose": "catalog:",
-    "lucide-solid": "1.33.0",
+    "lucide-solid": "catalog:",
     "marked": "catalog:",
-    "qrcode": "^1.5.4",
+    "qrcode": "catalog:",
     "solid-js": "2.0.0-rc.0",
-    "solid-recharts": "1.0.1",
-    "solid-sonner": "0.3.2",
+    "solid-recharts": "catalog:",
+    "solid-sonner": "catalog:",
     "ws": "8.21.3",
     "yaml": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@openbot/ui": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",

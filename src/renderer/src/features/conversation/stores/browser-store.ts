@@ -3,6 +3,7 @@ import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-prot
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 import { serverSupportsCapability } from "../../servers/server-capabilities";
+import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps, ConversationTarget, RightPanelMode } from "../conversation-types";
 
 export interface BrowserTakeoverPreviewState {
@@ -143,8 +144,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       browserTakeoverPreviewKey = requestKey;
       const generation = ++browserTakeoverPreviewGeneration;
       setBrowserTakeoverPreview({ status: "loading", preview: null });
-      void window.openbot.browser
-        .capturePreview(tab.id)
+      void conversationRuntime(deps.props)
+        .browser.capturePreview(tab.id)
         .then((preview) => {
           if (browserTakeoverPreviewGeneration !== generation) return;
           setBrowserTakeoverPreview({ status: "ready", preview });
@@ -275,7 +276,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (currentTab) {
       if (closingBrowserTabIds.has(currentTab.id)) return;
       try {
-        await window.openbot.browser.navigate({ tabId: currentTab.id, url });
+        await conversationRuntime(deps.props).browser.navigate({ tabId: currentTab.id, url });
       } catch {
         deps.setComposerError("Could not open the address in this tab.", target);
       }
@@ -289,7 +290,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (pendingRequest) return pendingRequest.promise;
     const request = (async () => {
       try {
-        const tab = await window.openbot.browser.open({
+        const tab = await conversationRuntime(deps.props).browser.open({
           url,
           ownerThreadId: deps.props.agent?.threadId ?? null,
           ownerAgentId: deps.props.agent?.id ?? null,
@@ -366,7 +367,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
     try {
-      await window.openbot.browser.reload(tabId);
+      await conversationRuntime(deps.props).browser.reload(tabId);
       analytics.track("browser_action", { action: "reload", result: "succeeded" });
     } catch {
       deps.setComposerError("Could not reload the browser tab.", target);
@@ -389,7 +390,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const agentId = deps.props.agent?.id;
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
-      await window.openbot.browser.navigate({ tabId, direction });
+      await conversationRuntime(deps.props).browser.navigate({ tabId, direction });
     } catch {
       deps.setComposerError(`Could not navigate ${direction}.`, target);
     }

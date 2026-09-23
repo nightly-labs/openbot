@@ -20,7 +20,7 @@ import {
   trackAnalytics,
 } from "./app-test-harness";
 import { useServers } from "./features/servers/servers-context";
-import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
+import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
 import { useUsage } from "./features/usage/usage-context";
 import { TestResizeObserver } from "./setupTests";
 

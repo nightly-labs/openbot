@@ -11,13 +11,13 @@
  */
 
 import type { McpServerConfig, McpTestResult } from "@openbot/contracts/ipc";
+import { Button, Text } from "@openbot/ui";
+import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
+import type { MarketplacePluginApp } from "@openbot/ui/features/settings/marketplace-plugins";
+import type { McpKeyFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
-import { Button, Text } from "../src/components/ui";
-import type { McpConnectSubject } from "../src/features/settings/McpConnectShell";
 import { createPluginAppConfig } from "../src/features/settings/marketplace-plugin-catalog";
-import type { MarketplacePluginApp } from "../src/features/settings/marketplace-plugins";
-import type { McpKeyFlow } from "../src/features/settings/mcp-connect-auth";
 import { STORY_MARKETPLACE_PLUGINS } from "../src/preview/fixtures";
 
 function app(slug: string): MarketplacePluginApp {

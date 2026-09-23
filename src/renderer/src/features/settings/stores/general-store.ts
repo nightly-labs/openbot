@@ -6,8 +6,8 @@ import {
   type ProviderApiKeyStatus,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
+import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { createMemo, createSignal } from "solid-js";
-import type { ProviderPickerOption } from "../../../components/ProviderPicker";
 import { useI18n } from "../../../i18n-context";
 
 interface GeneralStoreProps {

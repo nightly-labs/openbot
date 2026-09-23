@@ -1,12 +1,8 @@
 import type { DynamicIslandAction, DynamicIslandPreference, DynamicIslandPresentation } from "@openbot/contracts/ipc";
 import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, IDLE_DYNAMIC_ISLAND_PRESENTATION } from "@openbot/contracts/ipc";
+import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
+import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import { createSignal, onSettled, Show } from "solid-js";
-import type {
-  DynamicIslandNotchSize,
-  DynamicIslandStateChangeReason,
-  DynamicIslandViewState,
-} from "../../components/ui";
-import { OpenBotDynamicIsland } from "./OpenBotDynamicIsland";
 
 const DEFAULT_NOTCH_WIDTH = 192;
 const DEFAULT_NOTCH_HEIGHT = 32;
@@ -181,6 +177,8 @@ export function DynamicIslandSurface() {
             state={viewState()}
             displayMode={displayMode}
             notchSize={displayMode === "notch" ? notchSize() : undefined}
+            widthPercent={preference().widthPercent}
+            heightPercent={preference().heightPercent}
             extendedHoverArea
             onStateChange={changeViewState}
             onAction={perform}

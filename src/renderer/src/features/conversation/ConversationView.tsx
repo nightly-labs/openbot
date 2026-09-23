@@ -1,13 +1,11 @@
+import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
 import { createEffect, Show } from "solid-js";
-import { useServers } from "../servers/servers-context";
-import { useUsage } from "../usage/usage-context";
 import { ConversationComposer } from "./ConversationComposer";
 import { ConversationHeader } from "./ConversationHeader";
 import { ConversationPanels } from "./ConversationPanels";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { ConversationViewScopeContext, createConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
-import { MessageSelectionActions } from "./SelectionActions";
 
 /** @internal Keeps file-drag state active while the pointer moves between conversation descendants. */
 export function isDragLeavingConversation(currentTarget: HTMLElement, relatedTarget: EventTarget | null): boolean {
@@ -16,8 +14,6 @@ export function isDragLeavingConversation(currentTarget: HTMLElement, relatedTar
 
 export function ConversationView(props: ConversationProps) {
   const scope = createConversationViewScope(props);
-  const servers = useServers();
-  const usage = useUsage();
   const {
     agentReady,
     browserPanelWidth,
@@ -74,16 +70,13 @@ export function ConversationView(props: ConversationProps) {
           <div class="attachment-drop-overlay">Drop files to attach</div>
         </Show>
         <ConversationHeader />
+        {props.notice}
 
         <ConversationTimeline />
 
         <ConversationComposer />
 
-        <ConversationPanels
-          onOpenUsage={(trigger) => {
-            usage.openUsage(servers.activeServerId(), trigger, props.agent?.id);
-          }}
-        />
+        <ConversationPanels onOpenUsage={props.onOpenUsage} />
       </main>
     </ConversationViewScopeContext>
   );

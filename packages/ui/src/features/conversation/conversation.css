@@ -1,0 +1,20 @@
+/* Import order preserves the conversation cascade. Keep later overrides after base rules. */
+@import "./styles/layout.css";
+@import "./styles/header-layout.css";
+@import "./styles/file-preview.css";
+@import "./styles/remote-desktop.css";
+@import "./styles/browser-panel.css";
+@import "./styles/agent-settings.css";
+@import "./styles/header-controls.css";
+@import "./styles/timeline.css";
+@import "./styles/messages.css";
+@import "./styles/message-content.css";
+@import "./styles/composer.css";
+@import "./styles/attachments.css";
+@import "./styles/queue.css";
+@import "./styles/panel-layout.css";
+@import "./styles/notices.css";
+@import "./styles/interaction-cards.css";
+@import "./styles/browser-takeover.css";
+@import "./styles/surface-overrides.css";
+@import "./styles/browser-previews.css";

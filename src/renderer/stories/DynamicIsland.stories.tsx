@@ -4,12 +4,12 @@ import type {
   DynamicIslandPresentation,
   DynamicIslandPromptItem,
 } from "@openbot/contracts/ipc";
+import type { DynamicIslandViewState } from "@openbot/ui";
+import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import type { DynamicIslandViewState } from "../src/components/ui";
-import { OpenBotDynamicIsland } from "../src/features/dynamic-island/OpenBotDynamicIsland";
 import { DynamicIslandDisplayComparison } from "./DynamicIslandDisplayComparison";
 import { STORY_AGENTS } from "./fixtures";
 

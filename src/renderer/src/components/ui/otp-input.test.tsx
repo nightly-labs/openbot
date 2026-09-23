@@ -1,7 +1,7 @@
+import { OtpInput, type OtpInputStatus } from "@openbot/ui/features/account/OtpInput";
 import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
-import { OtpInput, type OtpInputStatus } from "./otp-input";
 
 function renderOtp(options: { value?: string; status?: OtpInputStatus } = {}) {
   const onChange = vi.fn();
@@ -21,6 +21,13 @@ function renderOtp(options: { value?: string; status?: OtpInputStatus } = {}) {
 }
 
 describe("OtpInput", () => {
+  it("replaces an incorrect full code when another full code is pasted", async () => {
+    const { input, onChange, onComplete } = renderOtp({ value: "22222222", status: "error" });
+    await fireEvent.keyDown(input, { key: "End" });
+    await fireEvent.paste(input, { clipboardData: { getData: () => "ABCD-EFGH" } });
+    expect(onChange).toHaveBeenLastCalledWith("ABCDEFGH");
+    expect(onComplete).toHaveBeenCalledWith("ABCDEFGH");
+  });
   it("filters paste through the OpenBot alphabet", async () => {
     const { input, slots, onChange, onComplete } = renderOtp();
 

@@ -1,7 +1,7 @@
 import type { HostedSiteSummary, HostedSitesDesktopApi } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import { errorMessage } from "../../../error-message";
 
 interface HostedSitesStoreProps {
   open: boolean;

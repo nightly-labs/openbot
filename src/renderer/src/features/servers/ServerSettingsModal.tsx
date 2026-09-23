@@ -10,8 +10,6 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
-import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
-import { normalizeAvatarFile } from "../../avatar-image";
 import {
   Alert,
   AlertActions,
@@ -62,11 +60,13 @@ import {
   toast,
   UserRound,
   UsersRound,
-} from "../../components/ui";
-import { truncateMiddle } from "../../components/ui/utils";
-import { errorMessage } from "../../error-message";
-import { SaveBarDock, SettingsDialogShell } from "../settings/SettingsDialogShell";
-import { teamMemberName } from "../team/TeamPersonAvatar";
+} from "@openbot/ui";
+import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
+import { errorMessage } from "@openbot/ui/error-message";
+import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
+import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
+import { truncateMiddle } from "@openbot/ui/utils";
+import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";

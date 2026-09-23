@@ -1,7 +1,7 @@
+import { Badge, Heading, Text } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Badge, Heading, Text } from "../src/components/ui";
 
 const colors = [
   ["Canvas", "--openbot-bg-canvas"],

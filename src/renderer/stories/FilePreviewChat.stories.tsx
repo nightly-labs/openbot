@@ -1,10 +1,10 @@
+import { Bubble, BubbleContent } from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
+import { MessageBody } from "@openbot/ui/features/conversation/MessageRendering";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Bubble, BubbleContent } from "../src/components/ui";
-import type { AgentMessage } from "../src/data";
 import FilePreviewPanel from "../src/features/conversation/FilePreviewPanel";
-import { MessageBody } from "../src/features/conversation/MessageRendering";
 import { filePreviewForPath, WORKSPACE_FILE_PREVIEWS } from "./file-previews";
 import { STORY_AGENTS } from "./fixtures";
 

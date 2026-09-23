@@ -1,4 +1,3 @@
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
   Alert,
   AlertActions,
@@ -25,7 +24,8 @@ import {
   Spinner,
   Text,
   UserRound,
-} from "../src/components/ui";
+} from "@openbot/ui";
+import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const meta = {
   title: "Foundations/Surface",

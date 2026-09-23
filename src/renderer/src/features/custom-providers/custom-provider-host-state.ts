@@ -1,6 +1,6 @@
 import type { CustomProviderRestart, CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createStore } from "solid-js";
-import { errorMessage } from "../../error-message";
 import { customProviderRestartMessage } from "./custom-provider-restart";
 
 interface CustomProviderHostState {

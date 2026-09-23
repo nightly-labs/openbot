@@ -9,6 +9,7 @@ import {
   connectToDevApp,
   describeDevPages,
   devBrowserPages,
+  matchPages,
   openDevBrowser,
   readTargetId,
   resolveAutomationPort,
@@ -22,6 +23,7 @@ import {
   readDevInstanceRecords,
   selectDevInstance,
 } from "./instance-registry";
+import { profileMemory, writeHeapSnapshot } from "./memory-profile";
 import {
   clickByRole,
   parseAutomationRole,
@@ -45,6 +47,7 @@ const logger = createOpenBotLogger("dev-automation", (line) => process.stderr.wr
 const DEFAULT_TIMEOUT_MS = 10_000;
 const SCREENSHOT_ROOT = join(process.cwd(), ".openbot-build", "dev-automation");
 const CPU_ROOT = join(SCREENSHOT_ROOT, "cpu");
+const MEMORY_ROOT = join(SCREENSHOT_ROOT, "memory");
 const DEFAULT_CPU_DURATION_MS = 60_000;
 const MAX_CPU_DURATION_MS = 600_000;
 const DEFAULT_CPU_INTERVAL_MS = 5_000;
@@ -247,6 +250,42 @@ async function measureCpu(target: AutomationTarget): Promise<void> {
   process.stdout.write(`${JSON.stringify(document, null, 2)}\n`);
 }
 
+async function measureMemory(target: AutomationTarget): Promise<void> {
+  const label = flagValue("--label") ?? "run";
+  const out = flagValue("--out");
+  const outPath = out === null || out === "" ? null : resolveWritablePath(MEMORY_ROOT, out, ".json", "Memory reports");
+  const heapSelector = flagValue("--heap-snapshot");
+  if (heapSelector !== null && heapSelector.trim() === "") {
+    throw new Error("--heap-snapshot=<target-id|url-substring> cannot be empty.");
+  }
+  const browser = await openDevBrowser(target.port, logger, { ownerPid: target.pid });
+  let document: Awaited<ReturnType<typeof profileMemory>> & { heapSnapshot?: string };
+  try {
+    document = await profileMemory({ browser, rootPid: target.pid, label, logger });
+    if (heapSelector !== null) {
+      const [page, ...others] = await matchPages(devBrowserPages(browser), heapSelector, readTargetId);
+      if (!page) throw new Error("--heap-snapshot matched no page. List them with `dev:automation pages`.");
+      if (others.length > 0) throw new Error("--heap-snapshot matched more than one page. Pass a target id.");
+      const snapshotPath = resolveWritablePath(
+        MEMORY_ROOT,
+        `heap-${Date.now()}.heapsnapshot`,
+        ".heapsnapshot",
+        "Heap snapshots",
+      );
+      await writeHeapSnapshot(page, snapshotPath, logger);
+      document = { ...document, heapSnapshot: reportableScreenshotPath(snapshotPath, process.cwd()) };
+    }
+  } finally {
+    await browser.close();
+  }
+  if (outPath !== null) {
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, `${JSON.stringify(document, null, 2)}\n`);
+    logger.info(`wrote ${redactText(outPath)}`);
+  }
+  process.stdout.write(`${JSON.stringify(document, null, 2)}\n`);
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2];
   if (command === "instances") {
@@ -269,10 +308,11 @@ async function main(): Promise<void> {
     command !== "click" &&
     command !== "type" &&
     command !== "screenshot" &&
-    command !== "cpu"
+    command !== "cpu" &&
+    command !== "memory"
   ) {
     throw new Error(
-      "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot|cpu> [flags]",
+      "Usage: bun scripts/dev-automation/cli.ts <instances|pages|snapshot|click|type|screenshot|cpu|memory> [flags]",
     );
   }
   const target = resolveTarget(readDevInstanceRecords(), readService());
@@ -287,11 +327,15 @@ async function main(): Promise<void> {
     }
     return;
   }
-  // Read-only: it attaches CDP counters and runs `ps`, and changes nothing in
+  // Read-only: `cpu` and `memory` attach CDP counters and run `ps`, and change nothing in
   // the app. So it stays out of the mutation gate below and works against an
   // instance nobody named.
   if (command === "cpu") {
     await measureCpu(target);
+    return;
+  }
+  if (command === "memory") {
+    await measureMemory(target);
     return;
   }
   if (command === "click" || command === "type") {

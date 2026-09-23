@@ -6,6 +6,8 @@ import type {
   ConversationReadState,
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
+import type { AgentMessage } from "@openbot/ui/data";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
@@ -17,8 +19,6 @@ import {
   withoutAgent,
 } from "../../app-message-projection";
 import { createStoredMessage, updateStored } from "../../app-stored-values";
-import type { AgentMessage } from "../../data";
-import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
@@ -48,6 +48,15 @@ import {
   retainedAutoReadState,
 } from "./conversation-read-state";
 import { useDirectMessages } from "./direct-messages-context";
+
+const LATEST_PAGE_SIZE = 50;
+
+function trimToLatestPage(conversation: ConversationState): void {
+  if (conversation.messages.length <= LATEST_PAGE_SIZE) return;
+  conversation.messages = conversation.messages.slice(-LATEST_PAGE_SIZE);
+  conversation.references = {};
+  conversation.page = { hasOlder: true, olderCursor: null };
+}
 
 interface ConversationState {
   messages: AgentMessage[];
@@ -497,6 +506,9 @@ const Conversation = createSimpleContext({
           return;
         }
         conversation.messages = next;
+        // A snapshot carries the whole thread. An agent that is not open shows none of it, and
+        // opening it reads the latest page again, so only that page's worth stays in memory.
+        if (agentId !== activeAgentId()) trimToLatestPage(conversation);
       });
       const presentedRequestKey = presentedPromptResolutions()[agentId];
       const pendingPrompt = pendingPrompts()[agentId];
@@ -650,13 +662,8 @@ const Conversation = createSimpleContext({
 
     function pruneInactiveAgentHistory(agentId: string): void {
       const messages = conversations[agentId]?.messages;
-      if (!messages || messages.length <= 50) return;
-      updateConversation(agentId, (conversation) => {
-        if (conversation.messages.length <= 50) return;
-        conversation.messages = conversation.messages.slice(-50);
-        conversation.references = {};
-        conversation.page = { hasOlder: true, olderCursor: null };
-      });
+      if (!messages || messages.length <= LATEST_PAGE_SIZE) return;
+      updateConversation(agentId, trimToLatestPage);
     }
 
     async function loadLatestAgentMessages(agentId: string): Promise<void> {

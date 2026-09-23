@@ -1,4 +1,5 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
+import { RemoteCompatibilityScreen } from "@openbot/ui/features/remote-desktop/RemoteCompatibilityScreen";
 import { createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
@@ -9,7 +10,6 @@ import { useChannels } from "./features/channels/channels-context";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
-import { RemoteCompatibilityScreen } from "./features/remote-desktop/RemoteCompatibilityScreen";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { useServers } from "./features/servers/servers-context";
 import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";

@@ -1,6 +1,6 @@
 import type { UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
+import { presentUpdateStatus } from "@openbot/ui/features/updates/update-status";
 import { describe, expect, it } from "vitest";
-import { presentUpdateStatus } from "./update-status";
 
 function status(patch: Partial<UpdateStatus> = {}): UpdateStatus {
   return {

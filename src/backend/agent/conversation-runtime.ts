@@ -250,6 +250,13 @@ export class ConversationRuntime {
     this.#loadedThreads.delete(externalThreadId);
   }
 
+  /** Forgets the sessions one stopped process held, and leaves those of every other provider loaded. */
+  unloadClientThreads(client: AgentClient): void {
+    for (const [externalThreadId, owner] of this.#loadedThreads) {
+      if (owner === client) this.#loadedThreads.delete(externalThreadId);
+    }
+  }
+
   /**
    * Every provider session this agent holds: its own chat, and each channel thread it runs. The
    * developer instructions are written when a session loads, so a change of the profile or of the

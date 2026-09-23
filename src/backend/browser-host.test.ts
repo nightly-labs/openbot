@@ -537,11 +537,32 @@ describe("browser tab capacity", () => {
     await host.destroy();
     host = new BrowserHost(new BrowserWindow(), directory, statePath);
     await host.restore();
-    await vi.waitFor(() => expect(host.getDisplayState()).toEqual(before));
+    const summary = (state: typeof before) =>
+      state.tabs.map(({ id, url, ownerAgentId }) => ({ id, url, ownerAgentId }));
+    expect(summary(host.getDisplayState())).toEqual(summary(before));
     expect(host.activeTabId).toBe(before.activeTabId);
     await expect(host.open("https://www.google.com", "thread-c", "agent-c")).resolves.toMatchObject({
       ownerAgentId: "agent-c",
     });
+  });
+
+  it("loads only the active restored tab until another one is shown", async () => {
+    const tabs = ["a", "b", "c"].map((id) => ({
+      id: `tab-${id}`,
+      url: `https://example.com/${id}`,
+      ownerThreadId: null,
+      ownerAgentId: null,
+    }));
+    await writeFile(statePath, JSON.stringify({ version: 2, tabs, activeTabId: "tab-b" }));
+    await host.restore();
+    const title = (id: string) => host.listTabs().find((tab) => tab.id === id)?.title;
+    await vi.waitFor(() => expect(title("tab-b")).toBe("https://example.com/b"));
+    expect(title("tab-a")).toBe("example.com");
+    expect(title("tab-c")).toBe("example.com");
+
+    await host.activate("tab-c");
+    await vi.waitFor(() => expect(title("tab-c")).toBe("https://example.com/c"));
+    expect(title("tab-a")).toBe("example.com");
   });
 
   it("applies restored limits after resolving legacy owners", async () => {
