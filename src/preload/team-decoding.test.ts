@@ -1,8 +1,18 @@
 import type {
+  DirectConversationPage,
+  DirectConversationReadState,
+  DirectConversationSnapshot,
+  DirectMessage,
+  DirectThreadSummary,
   HostStatus,
+  InvitePreview,
   InviteSummary,
   RemoteDesktopConnectResult,
   RemoteDesktopSession,
+  ScopedDirectMessageEvent,
+  ScopedDirectTypingEvent,
+  ScopedTeamPresenceSnapshot,
+  ServerSummary,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -10,10 +20,23 @@ import type {
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
+  decodeDirectConversation,
+  decodeDirectConversationPage,
+  decodeDirectMessage,
+  decodeDirectReadState,
+  decodeDirectThreads,
   decodeHostStatus,
+  decodeInvitePreview,
   decodeInviteSummary,
+  decodeInviteUrl,
+  decodePendingInvite,
   decodeRemoteDesktopConnectResult,
   decodeRemoteDesktopSessions,
+  decodeScopedDirectMessage,
+  decodeScopedDirectTyping,
+  decodeScopedTeamPresence,
+  decodeServer,
+  decodeServers,
   decodeTeamInvites,
   decodeTeamMember,
   decodeTeamMembers,
@@ -91,6 +114,94 @@ const remoteSession = {
   grantExpiresAt: "2026-09-23T11:00:00.000Z",
 } satisfies RemoteDesktopSession;
 
+const localServer = {
+  notificationsMuted: false,
+  notificationsMutedUntil: null,
+  notificationLevel: "all",
+  id: "local",
+  name: "This computer",
+  kind: "local",
+  state: "online",
+  apiUrl: null,
+  remoteDesktopAvailable: false,
+  logoUrl: null,
+  role: null,
+  active: true,
+} satisfies ServerSummary;
+
+const remoteServer = {
+  ...localServer,
+  notificationsMuted: true,
+  notificationsMutedUntil: 1_790_000_000_000,
+  notificationLevel: "needs-me",
+  id: "server-1",
+  name: "Studio",
+  kind: "remote",
+  state: "incompatible",
+  apiUrl: "https://studio.example.test",
+  role: "member",
+  active: false,
+  compatibility: {
+    localAppVersion: "1.4.0",
+    hostAppVersion: null,
+    localProtocol: { minimum: 1, maximum: 3 },
+    hostProtocol: null,
+    negotiatedProtocol: null,
+    capabilities: ["direct-messages"],
+  },
+  issue: { code: "host_update_required", message: "The host must update.", retryable: false },
+  connectionSequence: 2,
+} satisfies ServerSummary;
+
+const invitePreview = {
+  serverId: "server-1",
+  serverName: "Studio",
+  apiHostname: "studio.example.test",
+  role: "member",
+  expiresAt: "2026-09-30T10:00:00.000Z",
+  emailBound: false,
+  permanent: true,
+} satisfies InvitePreview;
+
+const directMessage = {
+  id: "message-1",
+  threadId: "thread-1",
+  senderMemberId: "member-1",
+  recipientMemberId: "member-2",
+  text: "Hello",
+  createdAt: "2026-09-23T10:00:00.000Z",
+  sequence: 1,
+} satisfies DirectMessage;
+
+const readState = {
+  unreadCount: 1,
+  firstUnreadMessageId: "message-1",
+  throughSequence: 0,
+} satisfies DirectConversationReadState;
+
+const conversation = {
+  threadId: "thread-1",
+  otherMemberId: "member-2",
+  messages: [directMessage],
+  revision: 3,
+} satisfies DirectConversationSnapshot;
+
+const page = {
+  ...conversation,
+  pageInfo: { hasOlder: true, olderCursor: "cursor-1" },
+  readState,
+} satisfies DirectConversationPage;
+
+const directEvent = {
+  serverId: "server-1",
+  event: { type: "team-direct-message", message: directMessage, memberIds: ["member-1", "member-2"] },
+} satisfies ScopedDirectMessageEvent;
+
+const typingEvent = {
+  serverId: "server-1",
+  event: { type: "team-direct-typing", senderMemberId: "member-1", recipientMemberId: "member-2", typing: true },
+} satisfies ScopedDirectTypingEvent;
+
 describe("team decoders", () => {
   it.each([
     ["host status", decodeHostStatus, hostStatus],
@@ -116,6 +227,38 @@ describe("team decoders", () => {
         message: "The host must allow screen recording.",
       } satisfies RemoteDesktopConnectResult,
     ],
+    ["local server", decodeServer, localServer],
+    ["server list", decodeServers, [localServer, remoteServer]],
+    ["server without a connection issue", decodeServer, { ...remoteServer, compatibility: null, issue: null }],
+    ["invite preview", decodeInvitePreview, invitePreview],
+    ["invite link", decodeInviteUrl, "openbot://join/invite-1"],
+    ["pending invite", decodePendingInvite, "openbot://join/invite-1"],
+    ["missing pending invite", decodePendingInvite, null],
+    [
+      "server presence",
+      decodeScopedTeamPresence,
+      { serverId: "server-1", snapshot: presence } satisfies ScopedTeamPresenceSnapshot,
+    ],
+    [
+      "direct thread list",
+      decodeDirectThreads,
+      [
+        {
+          threadId: "thread-1",
+          otherMemberId: "member-2",
+          lastMessage: directMessage,
+          unreadCount: 0,
+          updatedAt: "2026-09-23T10:00:00.000Z",
+        },
+      ] satisfies DirectThreadSummary[],
+    ],
+    ["direct conversation", decodeDirectConversation, conversation],
+    ["direct conversation with a read state", decodeDirectConversation, { ...conversation, readState }],
+    ["direct conversation page", decodeDirectConversationPage, page],
+    ["direct message", decodeDirectMessage, directMessage],
+    ["direct read state", decodeDirectReadState, readState],
+    ["direct message event", decodeScopedDirectMessage, directEvent],
+    ["direct typing event", decodeScopedDirectTyping, typingEvent],
   ] as const)("keeps a valid %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(decode(value)).toEqual(value);
   });
@@ -140,6 +283,39 @@ describe("team decoders", () => {
       { status: "refused", errorCode: "busy", message: "No." },
     ],
     ["remote desktop connection with an unknown status", decodeRemoteDesktopConnectResult, { status: "pending" }],
+    ["server with an unknown state", decodeServers, [{ ...localServer, state: "asleep" }]],
+    ["server without a role", decodeServer, { ...localServer, role: undefined }],
+    [
+      "server with an unknown issue code",
+      decodeServer,
+      { ...remoteServer, issue: { ...remoteServer.issue, code: "x" } },
+    ],
+    [
+      "server with a malformed protocol range",
+      decodeServer,
+      { ...remoteServer, compatibility: { ...remoteServer.compatibility, localProtocol: { minimum: 1 } } },
+    ],
+    ["server with a text connection sequence", decodeServer, { ...remoteServer, connectionSequence: "2" }],
+    ["invite preview for an owner", decodeInvitePreview, { ...invitePreview, role: "owner" }],
+    ["invite link that is not text", decodeInviteUrl, 1],
+    ["pending invite that is not text", decodePendingInvite, undefined],
+    ["server presence without a server", decodeScopedTeamPresence, { snapshot: presence }],
+    ["direct thread without a last message", decodeDirectThreads, [{ threadId: "thread-1" }]],
+    ["direct conversation with a malformed read state", decodeDirectConversation, { ...conversation, readState: {} }],
+    ["direct conversation page without page info", decodeDirectConversationPage, conversation],
+    ["direct message without a sequence", decodeDirectMessage, { ...directMessage, sequence: undefined }],
+    ["direct read state without a sequence", decodeDirectReadState, { unreadCount: 0, firstUnreadMessageId: null }],
+    [
+      "direct message event with one member",
+      decodeScopedDirectMessage,
+      { ...directEvent, event: { ...directEvent.event, memberIds: ["member-1"] } },
+    ],
+    ["direct message event of another type", decodeScopedDirectMessage, typingEvent],
+    [
+      "direct typing event without a typing state",
+      decodeScopedDirectTyping,
+      { ...typingEvent, event: { ...typingEvent.event, typing: "yes" } },
+    ],
   ] as const)("rejects a %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(() => decode(value)).toThrow(/^Invalid /);
   });

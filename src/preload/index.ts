@@ -101,9 +101,6 @@ import {
   type RemoteDesktopTestStatus,
   type RequestChannel,
   type ResultOf,
-  type ScopedDirectMessageEvent,
-  type ScopedDirectTypingEvent,
-  type ScopedTeamPresenceSnapshot,
   type SharedTable,
   type SidebarLayoutSnapshot,
   SKILL_DESCRIPTION_MAX_LENGTH,
@@ -145,10 +142,23 @@ import {
 import { clipboardFiles } from "./clipboard-files";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
+  decodeDirectConversation,
+  decodeDirectConversationPage,
+  decodeDirectMessage,
+  decodeDirectReadState,
+  decodeDirectThreads,
   decodeHostStatus,
+  decodeInvitePreview,
   decodeInviteSummary,
+  decodeInviteUrl,
+  decodePendingInvite,
   decodeRemoteDesktopConnectResult,
   decodeRemoteDesktopSessions,
+  decodeScopedDirectMessage,
+  decodeScopedDirectTyping,
+  decodeScopedTeamPresence,
+  decodeServer,
+  decodeServers,
   decodeTeamInvites,
   decodeTeamMember,
   decodeTeamMembers,
@@ -1315,75 +1325,84 @@ const openbotApi: OpenBotDesktopApi = {
     exportDiagnostics: () => invokeRequest(IPC_CHANNELS.maintenanceExportDiagnostics, decodeExportResult),
   },
   servers: {
-    list: async () => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversList)),
-    select: async (serverId) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSelect, serverId)),
-    reorder: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversReorder, input)),
-    setMuted: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetMuted, input)),
+    list: async () => rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversList, decodeServers)),
+    select: async (serverId) =>
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSelect, decodeServers, serverId)),
+    reorder: async (input) =>
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversReorder, decodeServers, input)),
+    setMuted: async (input) =>
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSetMuted, decodeServers, input)),
     setNotificationLevel: async (input) =>
-      rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetNotificationLevel, input)),
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSetNotificationLevel, decodeServers, input)),
     join: async (input) => {
-      const server = await ipcRenderer.invoke(IPC_CHANNELS.serversJoin, input);
+      const server = await invokeRequest(IPC_CHANNELS.serversJoin, decodeServer, input);
       selectedServerId = server.id;
       return server;
     },
-    previewInvite: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversPreviewInvite, input),
-    takePendingInvite: () => ipcRenderer.invoke(IPC_CHANNELS.serversTakePendingInvite),
+    previewInvite: (input) => invokeRequest(IPC_CHANNELS.serversPreviewInvite, decodeInvitePreview, input),
+    takePendingInvite: () => invokeRequest(IPC_CHANNELS.serversTakePendingInvite, decodePendingInvite),
     login: async (input) => {
-      const server = await ipcRenderer.invoke(IPC_CHANNELS.serversLogin, input);
+      const server = await invokeRequest(IPC_CHANNELS.serversLogin, decodeServer, input);
       selectedServerId = server.id;
       return server;
     },
-    retryConnection: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversRetryConnection, serverId),
-    remove: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversRemove, serverId),
-    getPresence: () => ipcRenderer.invoke(IPC_CHANNELS.serversGetPresence),
-    getPresenceFor: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversGetPresenceFor, serverId),
-    refreshIdentity: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversRefreshIdentity, serverId),
-    listMembers: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversListMembers, serverId),
+    retryConnection: (serverId) => invokeRequest(IPC_CHANNELS.serversRetryConnection, decodeServer, serverId),
+    remove: (serverId) => invokeRequest(IPC_CHANNELS.serversRemove, decodeVoid, serverId),
+    getPresence: () => invokeRequest(IPC_CHANNELS.serversGetPresence, decodeTeamPresenceSnapshot),
+    getPresenceFor: (serverId) =>
+      invokeRequest(IPC_CHANNELS.serversGetPresenceFor, decodeTeamPresenceSnapshot, serverId),
+    refreshIdentity: (serverId) => invokeRequest(IPC_CHANNELS.serversRefreshIdentity, decodeServer, serverId),
+    listMembers: (serverId) => invokeRequest(IPC_CHANNELS.serversListMembers, decodeTeamMembers, serverId),
     updateMember: (serverId, input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversUpdateMember, { serverId, payload: input }),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversUpdateMember, input, decodeTeamMember),
     removeMember: (serverId, memberId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversRemoveMember, { serverId, payload: memberId }),
-    listInvites: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversListInvites, serverId),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversRemoveMember, memberId, decodeVoid),
+    listInvites: (serverId) => invokeRequest(IPC_CHANNELS.serversListInvites, decodeTeamInvites, serverId),
     revokeInvite: (serverId, inviteId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversRevokeInvite, { serverId, payload: inviteId }),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversRevokeInvite, inviteId, decodeVoid),
     createInvite: (serverId, input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversCreateInvite, { serverId, payload: input }),
-    setTyping: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSetTyping, input),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversCreateInvite, input, decodeInviteSummary),
+    setTyping: (input) => invokeRequest(IPC_CHANNELS.serversSetTyping, decodeVoid, input),
     onPresence: (listener, serverId) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedTeamPresenceSnapshot) => {
-        if (payload.serverId === (serverId ?? selectedServerId)) listener(payload.snapshot);
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        const scoped = decodeScopedTeamPresence(payload);
+        if (scoped.serverId === (serverId ?? selectedServerId)) listener(scoped.snapshot);
       };
       ipcRenderer.on(IPC_CHANNELS.serversPresence, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversPresence, handler);
     },
-    listDirectThreads: () => ipcRenderer.invoke(IPC_CHANNELS.serversListDirectThreads),
-    readDirectConversation: (memberId) => ipcRenderer.invoke(IPC_CHANNELS.serversReadDirectConversation, memberId),
-    readDirectConversationPage: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversReadDirectConversationPage, input),
-    sendDirectMessage: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSendDirectMessage, input),
-    markDirectRead: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversMarkDirectRead, input),
-    setDirectTyping: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSetDirectTyping, input),
+    listDirectThreads: () => invokeRequest(IPC_CHANNELS.serversListDirectThreads, decodeDirectThreads),
+    readDirectConversation: (memberId) =>
+      invokeRequest(IPC_CHANNELS.serversReadDirectConversation, decodeDirectConversation, memberId),
+    readDirectConversationPage: (input) =>
+      invokeRequest(IPC_CHANNELS.serversReadDirectConversationPage, decodeDirectConversationPage, input),
+    sendDirectMessage: (input) => invokeRequest(IPC_CHANNELS.serversSendDirectMessage, decodeDirectMessage, input),
+    markDirectRead: (input) => invokeRequest(IPC_CHANNELS.serversMarkDirectRead, decodeDirectReadState, input),
+    setDirectTyping: (input) => invokeRequest(IPC_CHANNELS.serversSetDirectTyping, decodeVoid, input),
     onDirectMessage: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedDirectMessageEvent) => {
-        if (payload.serverId === selectedServerId) listener(payload.event);
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        const scoped = decodeScopedDirectMessage(payload);
+        if (scoped.serverId === selectedServerId) listener(scoped.event);
       };
       ipcRenderer.on(IPC_CHANNELS.serversDirectMessage, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversDirectMessage, handler);
     },
     onDirectTyping: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedDirectTypingEvent) => {
-        if (payload.serverId === selectedServerId) listener(payload.event);
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        const scoped = decodeScopedDirectTyping(payload);
+        if (scoped.serverId === selectedServerId) listener(scoped.event);
       };
       ipcRenderer.on(IPC_CHANNELS.serversDirectTyping, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversDirectTyping, handler);
     },
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, servers: Parameters<typeof listener>[0]) =>
-        listener(rememberActiveServer(servers));
+      const handler = (_event: Electron.IpcRendererEvent, servers: unknown) =>
+        listener(rememberActiveServer(decodeServers(servers)));
       ipcRenderer.on(IPC_CHANNELS.serversEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversEvent, handler);
     },
     onInvite: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, inviteUrl: string) => listener(inviteUrl);
+      const handler = (_event: Electron.IpcRendererEvent, inviteUrl: unknown) => listener(decodeInviteUrl(inviteUrl));
       ipcRenderer.on(IPC_CHANNELS.serversInvite, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversInvite, handler);
     },

@@ -51,27 +51,9 @@ import type {
 } from "./ipc-storage";
 import type {
   CreateTeamInviteInput,
-  DirectConversationPage,
-  DirectConversationReadState,
-  DirectConversationSnapshot,
-  DirectMessage,
   DirectMessageRealtimeEvent,
-  DirectThreadSummary,
-  DirectTypingInput,
   DirectTypingRealtimeEvent,
-  InvitePreview,
   InviteSummary,
-  JoinServerInput,
-  LoginServerInput,
-  MarkDirectReadInput,
-  ReadDirectConversationPageInput,
-  ReorderServersInput,
-  SendDirectMessageInput,
-  ServerSummary,
-  SetServerMutedInput,
-  SetServerNotificationLevelInput,
-  SetTeamTypingInput,
-  TeamInviteSummary,
   TeamMemberSummary,
   TeamPresenceSnapshot,
   UpdateTeamMemberInput,
@@ -266,38 +248,38 @@ export interface DynamicIslandDesktopApi {
 }
 
 export interface ServersDesktopApi {
-  setMuted: (input: SetServerMutedInput) => Promise<ServerSummary[]>;
-  setNotificationLevel: (input: SetServerNotificationLevelInput) => Promise<ServerSummary[]>;
-  list: () => Promise<ServerSummary[]>;
-  select: (serverId: string) => Promise<ServerSummary[]>;
-  reorder: (input: ReorderServersInput) => Promise<ServerSummary[]>;
-  join: (input: JoinServerInput) => Promise<ServerSummary>;
-  previewInvite: (input: JoinServerInput) => Promise<InvitePreview>;
-  takePendingInvite: () => Promise<string | null>;
-  login: (input: LoginServerInput) => Promise<ServerSummary>;
-  retryConnection: (serverId: string) => Promise<ServerSummary>;
-  remove: (serverId: string) => Promise<void>;
-  getPresence: () => Promise<TeamPresenceSnapshot>;
-  getPresenceFor: (serverId: string) => Promise<TeamPresenceSnapshot>;
-  refreshIdentity: (serverId: string) => Promise<ServerSummary>;
-  listMembers: (serverId: string) => Promise<TeamMemberSummary[]>;
+  setMuted: Invoke<typeof IPC_ENDPOINTS.servers.setMuted>;
+  setNotificationLevel: Invoke<typeof IPC_ENDPOINTS.servers.setNotificationLevel>;
+  list: Invoke<typeof IPC_ENDPOINTS.servers.list>;
+  select: Invoke<typeof IPC_ENDPOINTS.servers.select>;
+  reorder: Invoke<typeof IPC_ENDPOINTS.servers.reorder>;
+  join: Invoke<typeof IPC_ENDPOINTS.servers.join>;
+  previewInvite: Invoke<typeof IPC_ENDPOINTS.servers.previewInvite>;
+  takePendingInvite: Invoke<typeof IPC_ENDPOINTS.servers.takePendingInvite>;
+  login: Invoke<typeof IPC_ENDPOINTS.servers.login>;
+  retryConnection: Invoke<typeof IPC_ENDPOINTS.servers.retryConnection>;
+  remove: Invoke<typeof IPC_ENDPOINTS.servers.remove>;
+  getPresence: Invoke<typeof IPC_ENDPOINTS.servers.getPresence>;
+  getPresenceFor: Invoke<typeof IPC_ENDPOINTS.servers.getPresenceFor>;
+  refreshIdentity: Invoke<typeof IPC_ENDPOINTS.servers.refreshIdentity>;
+  listMembers: Invoke<typeof IPC_ENDPOINTS.servers.listMembers>;
   updateMember: (serverId: string, input: UpdateTeamMemberInput) => Promise<TeamMemberSummary>;
   removeMember: (serverId: string, memberId: string) => Promise<void>;
-  listInvites: (serverId: string) => Promise<TeamInviteSummary[]>;
+  listInvites: Invoke<typeof IPC_ENDPOINTS.servers.listInvites>;
   revokeInvite: (serverId: string, inviteId: string) => Promise<void>;
   createInvite: (serverId: string, input: CreateTeamInviteInput) => Promise<InviteSummary>;
-  setTyping: (input: SetTeamTypingInput) => Promise<void>;
+  setTyping: Invoke<typeof IPC_ENDPOINTS.servers.setTyping>;
   onPresence: (listener: (snapshot: TeamPresenceSnapshot) => void, serverId?: string) => () => void;
-  listDirectThreads: () => Promise<DirectThreadSummary[]>;
-  readDirectConversation: (memberId: string) => Promise<DirectConversationSnapshot>;
-  readDirectConversationPage: (input: ReadDirectConversationPageInput) => Promise<DirectConversationPage>;
-  sendDirectMessage: (input: SendDirectMessageInput) => Promise<DirectMessage>;
-  markDirectRead: (input: MarkDirectReadInput) => Promise<DirectConversationReadState>;
-  setDirectTyping: (input: DirectTypingInput) => Promise<void>;
+  listDirectThreads: Invoke<typeof IPC_ENDPOINTS.servers.listDirectThreads>;
+  readDirectConversation: Invoke<typeof IPC_ENDPOINTS.servers.readDirectConversation>;
+  readDirectConversationPage: Invoke<typeof IPC_ENDPOINTS.servers.readDirectConversationPage>;
+  sendDirectMessage: Invoke<typeof IPC_ENDPOINTS.servers.sendDirectMessage>;
+  markDirectRead: Invoke<typeof IPC_ENDPOINTS.servers.markDirectRead>;
+  setDirectTyping: Invoke<typeof IPC_ENDPOINTS.servers.setDirectTyping>;
   onDirectMessage: (listener: (event: DirectMessageRealtimeEvent) => void) => () => void;
   onDirectTyping: (listener: (event: DirectTypingRealtimeEvent) => void) => () => void;
-  onEvent: (listener: (servers: ServerSummary[]) => void) => () => void;
-  onInvite: (listener: (inviteUrl: string) => void) => () => void;
+  onEvent: Subscribe<typeof IPC_ENDPOINTS.servers.event>;
+  onInvite: Subscribe<typeof IPC_ENDPOINTS.servers.invite>;
 }
 
 /**
