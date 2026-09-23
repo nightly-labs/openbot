@@ -1,4 +1,4 @@
-import { Button } from "@openbot/ui";
+import { Button, Lock } from "@openbot/ui";
 import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -46,6 +46,16 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               <h1>{agent().name}</h1>
             </Button>
           )}
+        </Show>
+        <Show when={props.agent?.access === "workspace"}>
+          <span
+            class="conversation-access-lock"
+            role="img"
+            aria-label="Workspace only (not enforced yet)"
+            title="Workspace only (not enforced yet)"
+          >
+            <Lock aria-hidden="true" />
+          </span>
         </Show>
       </div>
       <div class="conversation-header-actions no-drag">

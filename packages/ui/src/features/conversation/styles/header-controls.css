@@ -26,6 +26,17 @@
   letter-spacing: 0;
 }
 
+.conversation-access-lock {
+  display: inline-flex;
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+.conversation-access-lock svg {
+  width: 14px;
+  height: 14px;
+}
+
 .conversation-header-actions {
   display: flex;
   min-width: 0;

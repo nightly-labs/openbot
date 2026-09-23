@@ -16,6 +16,7 @@ import {
   type DownloadAttachmentsInput,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
+  isAgentAccess,
   isAgentModel,
   isAgentProvider,
   isAvatarHue,
@@ -463,6 +464,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.reasoningEffort !== undefined) {
     if (!isReasoningEffort(value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
     result.reasoningEffort = value.reasoningEffort;
+  }
+  if (value.access !== undefined) {
+    if (!isAgentAccess(value.access)) throw new Error("Invalid agent access.");
+    result.access = value.access;
   }
   if (value.avatarSeed !== undefined) {
     if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");

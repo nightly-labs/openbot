@@ -1,18 +1,22 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  AgentModelId,
-  AgentModelOption,
-  AgentProviderId,
-  AgentReasoningEffort,
-  AgentStatus,
-  AvatarHue,
-  AvatarImageInput,
-  CustomProviderSummary,
-  ProviderRuntimeStatus,
-  UpdateAgentInput,
+import {
+  AGENT_ACCESS_MODES,
+  type AgentAccess,
+  type AgentModelId,
+  type AgentModelOption,
+  type AgentProviderId,
+  type AgentReasoningEffort,
+  type AgentStatus,
+  type AvatarHue,
+  type AvatarImageInput,
+  type CustomProviderSummary,
+  DEFAULT_AGENT_ACCESS,
+  type ProviderRuntimeStatus,
+  type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import {
   Button,
+  ConfirmDialog,
   Input,
   Popover,
   Select,
@@ -52,6 +56,8 @@ export interface AgentSettingsPanelProps {
   agentStatus: AgentStatus;
   modelOptions: AgentModelOption[];
   working: boolean;
+  /** Access belongs to the computer that runs the agent, so a remote server hides the control. */
+  accessEditable?: boolean;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   /** The caller supplies providers available on the selected host. */
   customProviders?: readonly CustomProviderSummary[];
@@ -104,6 +110,9 @@ interface AgentSettingsDraft {
   dirty: Record<keyof AgentTextFields, boolean>;
   fields: AgentTextFields;
   notifications: boolean;
+  access: AgentAccess;
+  /** Widening to full access waits here for the confirmation. */
+  confirmingFullAccess: boolean;
   runtime: AgentRuntimeSettings;
   saveError: string | null;
 }
@@ -128,6 +137,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     dirty: { description: false, name: false, title: false },
     fields: { description: "", name: "", title: "" },
     notifications: true,
+    access: DEFAULT_AGENT_ACCESS,
+    confirmingFullAccess: false,
     runtime: { model: "gpt-5.6-luna", provider: props.agent.provider, reasoningEffort: "medium" },
     saveError: null,
   });
@@ -173,6 +184,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           agent.title,
           agent.description,
           String(agent.notifications),
+          agent.access ?? DEFAULT_AGENT_ACCESS,
           runtimeSettings.provider,
           runtimeSettings.model,
           runtimeSettings.reasoningEffort,
@@ -204,6 +216,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         if (!keep.title) state.fields.title = agent.title;
         if (!keep.description) state.fields.description = agent.description;
         state.notifications = agent.notifications;
+        state.access = agent.access ?? DEFAULT_AGENT_ACCESS;
+        if (agentChanged) state.confirmingFullAccess = false;
         state.runtime.provider = runtimeSettings.provider;
         state.runtime.model = runtimeSettings.model;
         state.runtime.reasoningEffort = runtimeSettings.reasoningEffort;
@@ -471,6 +485,20 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     if (props.agent.id === agentId && sameRuntimeSettings(draft.runtime, settings)) {
       setDraft((state) => {
         state.runtime.reasoningEffort = previousReasoning;
+      });
+    }
+  }
+
+  async function saveAccess(nextAccess: AgentAccess): Promise<void> {
+    const agentId = props.agent.id;
+    const previousAccess = draft.access;
+    setDraft((state) => {
+      state.access = nextAccess;
+    });
+    if (await saveAgentPatch({ access: nextAccess }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.access === nextAccess) {
+      setDraft((state) => {
+        state.access = previousAccess;
       });
     }
   }
@@ -765,11 +793,51 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 <span>Working directory</span>
                 <span>{props.agent.workspacePath ?? "Not available yet"}</span>
               </div>
+              <Show when={props.accessEditable}>
+                <div class="agent-settings-model-row">
+                  <span>Access</span>
+                  <Select<AgentAccess>
+                    class="agent-settings-reasoning-control"
+                    options={[...AGENT_ACCESS_MODES]}
+                    value={draft.access}
+                    onChange={(nextAccess) => {
+                      if (!nextAccess || nextAccess === draft.access) return;
+                      // Widening is the move that needs the warning. Narrowing is never something a
+                      // user needs protecting from, so it is written straight away.
+                      if (nextAccess === "full") {
+                        setDraft((state) => {
+                          state.confirmingFullAccess = true;
+                        });
+                      } else void saveAccess(nextAccess);
+                    }}
+                    itemComponent={(item) => (
+                      <SelectItem item={item.item}>{accessLabel(item.item.rawValue)}</SelectItem>
+                    )}
+                  >
+                    <SelectTrigger size="sm" class="agent-settings-reasoning-select" aria-label="Agent access">
+                      <SelectValue<AgentAccess>>
+                        {(state) => accessLabel(state.selectedOption() ?? DEFAULT_AGENT_ACCESS)}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent />
+                  </Select>
+                </div>
+              </Show>
               <p class="agent-settings-access-note">
-                The agent runs with full computer access from its workspace and the shared folder.{" "}
-                {draft.runtime.provider === "claude"
-                  ? "Claude acts without asking for approval, except for questions it puts to you."
-                  : "Depending on the provider, sensitive commands may ask for approval first."}
+                <Show
+                  when={draft.access === "workspace"}
+                  fallback={
+                    <>
+                      The agent runs with full computer access from its workspace and the shared folder.{" "}
+                      {draft.runtime.provider === "claude"
+                        ? "Claude acts without asking for approval, except for questions it puts to you."
+                        : "Depending on the provider, sensitive commands may ask for approval first."}
+                    </>
+                  }
+                >
+                  Workspace only limits writes to this agent's workspace and the shared folder. Reads and network stay
+                  available. Not enforced yet: this agent still has full access in this version.
+                </Show>
               </p>
             </div>
           </section>
@@ -798,6 +866,26 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
           </div>
         </SettingsPanelContent>
+        <ConfirmDialog
+          open={draft.confirmingFullAccess}
+          tone="default"
+          initialFocus="cancel"
+          title="Give this agent full access?"
+          description="The agent can then read, change and delete any file your user account can reach, run any command, and use the network. One misunderstood instruction or a malicious web page can reach your personal files."
+          cancelLabel="Keep workspace only"
+          confirmLabel="Allow full access"
+          onCancel={() =>
+            setDraft((state) => {
+              state.confirmingFullAccess = false;
+            })
+          }
+          onConfirm={() => {
+            setDraft((state) => {
+              state.confirmingFullAccess = false;
+            });
+            void saveAccess("full");
+          }}
+        />
       </Show>
       {props.children}
     </SettingsPanel>
@@ -811,4 +899,8 @@ function sameRuntimeSettings(current: AgentRuntimeSettings, settings: AgentRunti
     current.model === settings.model &&
     current.reasoningEffort === settings.reasoningEffort
   );
+}
+
+function accessLabel(access: AgentAccess) {
+  return access === "workspace" ? "Workspace only" : "Full access";
 }

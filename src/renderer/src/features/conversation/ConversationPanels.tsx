@@ -192,6 +192,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onAddFromMarketplace={props.server?.kind === "local" ? props.onOpenMarketplace : undefined}
               skillsMode={props.runtime ? "hidden" : props.server?.kind === "local" ? "mutable" : "readonly"}
               tablesVisible={props.server?.kind === "local"}
+              accessEditable={props.server?.kind === "local"}
               agents={props.agents}
               onCreateSkill={
                 props.server?.kind === "local" &&
