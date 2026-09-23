@@ -16,6 +16,29 @@ const delta = {
   },
 } satisfies ScopedAgentEvent;
 
+// Larger than the Team API limits: 100,000 characters for a command and 100 paths for a list.
+const largeApproval = {
+  serverId: "local",
+  event: {
+    type: "approval",
+    approval: {
+      requestId: 7,
+      agentId: "agent-1",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      kind: "permissions",
+      command: "x".repeat(100_001),
+      cwd: "/workspace",
+      reason: null,
+      grantRoot: null,
+      permissions: {
+        fileSystem: { read: [], write: Array.from({ length: 101 }, (_, index) => `/workspace/${index}`) },
+        network: false,
+      },
+    },
+  },
+} satisfies ScopedAgentEvent;
+
 describe("decodeScopedAgentEvent", () => {
   it.each([
     ["an event", delta],
@@ -31,6 +54,13 @@ describe("decodeScopedAgentEvent", () => {
     ["no server", { event: delta.event }],
     ["an unknown event type", { serverId: "local", event: { type: "made-up" } }],
     ["an event with a missing field", { serverId: "local", event: { ...delta.event, delta: undefined } }],
+    [
+      "an approval of an unknown kind",
+      {
+        serverId: "local",
+        event: { ...largeApproval.event, approval: { ...largeApproval.event.approval, kind: "network" } },
+      },
+    ],
     ["a bufferedLive that is not a boolean", { ...delta, bufferedLive: "yes" }],
     ["a value that is not a record", "event"],
   ])("rejects %s", (_name, value) => {
