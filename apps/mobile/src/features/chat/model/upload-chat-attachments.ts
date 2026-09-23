@@ -5,11 +5,13 @@ import type { ChatMessage } from "./chat-messages";
 export async function uploadChatAttachments<T extends RemoteFileUpload>(
   files: T[],
   actions: {
-    upload: (file: T) => Promise<{ id: string }>;
+    upload: (file: T, onProgress: (fraction: number) => void) => Promise<{ id: string }>;
     discard: (id: string) => Promise<void>;
     send: (ids: string[]) => Promise<string>;
     cancelled?: () => boolean;
     progress?: (completed: number) => void;
+    /** The sent fraction of the file uploading now, which is file number `completed`. */
+    fileProgress?: (fraction: number) => void;
   },
 ): Promise<string> {
   const ids: string[] = [];
@@ -17,7 +19,8 @@ export async function uploadChatAttachments<T extends RemoteFileUpload>(
     actions.progress?.(0);
     for (const file of files) {
       if (actions.cancelled?.()) throw new Error("Attachment upload cancelled.");
-      ids.push((await actions.upload(file)).id);
+      actions.fileProgress?.(0);
+      ids.push((await actions.upload(file, (fraction) => actions.fileProgress?.(fraction))).id);
       actions.progress?.(ids.length);
     }
     if (actions.cancelled?.()) throw new Error("Attachment upload cancelled.");

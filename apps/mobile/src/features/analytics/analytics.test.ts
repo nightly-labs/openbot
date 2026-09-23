@@ -355,6 +355,7 @@ it("instruments message commands without sending their contents or changing the 
     mutateSidebarLayout: async () => {},
     loadQueue: async (agentId) => ({ agentId, deliveries: [] }),
     canEditQueue: () => false,
+    attachmentSupport: () => ({ eml: true, media: true }),
     changeQueue: async () => {},
     interruptTurn: async () => {},
     editQueue: async (agentId) => ({ agentId, deliveries: [] }),

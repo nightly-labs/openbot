@@ -36,6 +36,7 @@ import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
 import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
+import { rememberImageDimensions } from "./attachment-preview";
 import { BrowserSecretCard } from "./browser-secret-card";
 import { ChatAttachmentPanel } from "./chat-attachment-panel";
 import { ChatQueueButton } from "./chat-queue-button";
@@ -71,7 +72,11 @@ export interface ChatViewProps {
     body: string,
     files: ChatAttachment[],
     replyToMessageId: string | null,
-    upload?: { cancelled: () => boolean; progress: (completed: number) => void },
+    upload?: {
+      cancelled: () => boolean;
+      progress: (completed: number) => void;
+      fileProgress: (fraction: number) => void;
+    },
   ) => Promise<string | null | ChatHistoryReceipt>;
   needsAction?: boolean;
   notice?: string;
@@ -113,7 +118,7 @@ export function ChatView({
   needsAction = false,
   notice,
 }: ChatViewProps) {
-  const { browserRequests, respondToBrowserSecret, respondToBrowserTakeover } = useMobileWorkspace();
+  const { browserRequests, respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport } = useMobileWorkspace();
   const isFocused = useIsFocused();
   const foregroundVisit = useAppForeground();
   const [conversationAnalytics] = useState(() => new MobileConversationAnalytics(mobileAnalytics));
@@ -143,9 +148,12 @@ export function ChatView({
   const sendingRef = useRef(false);
   const uploadCancelled = useRef(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  // The sent fraction of the file uploading now. The peer reports it once per whole percent.
+  const [fileProgress, setFileProgress] = useState(0);
+  const [uploadCancelRequested, setUploadCancelRequested] = useState(false);
   const [pendingInQueue, setPendingInQueue] = useState(false);
   const queryClient = useQueryClient();
-  const composerAttachments = useChatAttachments();
+  const composerAttachments = useChatAttachments([], undefined, () => attachmentSupport(target.serverId));
   const attachments = composerAttachments;
   const submittedFiles = useRef<ChatAttachment[]>([]);
   const [pendingMessage, setPendingMessage] = useState<PendingChatMessage | null>(null);
@@ -342,8 +350,12 @@ export function ChatView({
     setReplyTarget(null);
     const files = attachments.items;
     submittedFiles.current = files;
+    // The sending message draws these images before the host knows them, at their real shape.
+    for (const file of files) if (file.dimensions) rememberImageDimensions(file.id, file.dimensions);
     uploadCancelled.current = false;
+    setUploadCancelRequested(false);
     setUploadProgress(0);
+    setFileProgress(0);
     const localId = `local-message-${++sendSequence.current}`;
     setPendingMessage({
       message: {
@@ -373,6 +385,7 @@ export function ChatView({
         const serverId = await send(body, files, submittedReply?.id ?? null, {
           cancelled: () => uploadCancelled.current,
           progress: setUploadProgress,
+          fileProgress: setFileProgress,
         });
         if (serverId && typeof serverId === "object") {
           setHistoryReceipt(serverId);
@@ -393,13 +406,16 @@ export function ChatView({
         setReplyTarget((current) => current ?? submittedReply);
         setDraft((current) => (current ? `${body}\n${current}` : body));
         setSendRetryVersion((version) => version + 1);
-        setSendError({
-          agentId: target.id,
-          message: userErrorMessage(
-            error,
-            "Could not send the message. Check the conversation before you send it again.",
-          ),
-        });
+        // A cancelled upload is the user's own choice: the files and text are back in the
+        // composer, and no error is needed to explain it.
+        if (!uploadCancelled.current)
+          setSendError({
+            agentId: target.id,
+            message: userErrorMessage(
+              error,
+              "Could not send the message. Check the conversation before you send it again.",
+            ),
+          });
       } finally {
         sendingRef.current = false;
         setSending(false);
@@ -501,6 +517,20 @@ export function ChatView({
               onDismissStarter={() => setShowStarter(false)}
               onSelectStarter={sendMessage}
               onRetryHistory={fetchHistory}
+              upload={
+                sending && pendingMessage && !pendingInQueue && submittedFiles.current.length > 0
+                  ? {
+                      messageId: pendingMessage.message.id,
+                      completed: uploadProgress,
+                      current: fileProgress,
+                      cancelling: uploadCancelRequested,
+                      cancel: () => {
+                        uploadCancelled.current = true;
+                        setUploadCancelRequested(true);
+                      },
+                    }
+                  : null
+              }
             />
             <Animated.View
               style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
