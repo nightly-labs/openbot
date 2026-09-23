@@ -1303,6 +1303,42 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
   });
 
+  it("keeps Grok's failed tool call out of the provider error toast", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    const client = clients.get("grok");
+    if (!client) throw new Error("Grok did not start.");
+
+    // As reported in #692: an embedded-browser click that returned an error, which the agent reads
+    // as the tool's result and can retry.
+    client.emit(
+      "diagnostic",
+      "tool_error: tool_output_error tool_name='use_tool' effective_tool_name='openbot_browser__click' model_id='grok-4.7' error_kind='tool_output_error'",
+    );
+    client.emit("diagnostic", "ERROR grok: the model endpoint could not be reached");
+
+    await waitFor(() => events.some((event) => event.type === "error"));
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "ERROR grok: the model endpoint could not be reached" }),
+    ]);
+  });
+
   it.each([
     "Grok Build usage balance exhausted",
     "insufficient_quota",
