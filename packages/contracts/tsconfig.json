@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
     "types": ["vitest/globals"]
   },
   "include": ["src/**/*.ts", "vitest.config.ts"]

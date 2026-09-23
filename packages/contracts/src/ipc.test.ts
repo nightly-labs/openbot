@@ -805,31 +805,21 @@ describe("renderer-to-main boundary guards", () => {
   });
 
   it("validates the usage windows inside an account usage limit", () => {
-    const usage = {
-      limits: [
-        {
-          id: "codex",
-          primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: null },
-          secondary: null,
-        },
-      ],
+    const limit = {
+      id: "codex",
+      primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: null },
+      secondary: null,
     };
-    expect(isAccountUsage(usage)).toBe(true);
-    expect(isAccountUsage({ limits: [{ ...usage.limits[0], primary: { usedPercent: "25" } }] })).toBe(false);
+    expect(isAccountUsage({ limits: [limit] })).toBe(true);
+    expect(isAccountUsage({ limits: [{ ...limit, primary: { usedPercent: "25" } }] })).toBe(false);
     // A window that is numeric but not finite renders as "NaN% remaining"; the released Team v1
     // validator rejects these for the same payload, so this guard has to agree with it.
-    const window = usage.limits[0].primary;
-    expect(isAccountUsage({ limits: [{ ...usage.limits[0], primary: { ...window, usedPercent: Number.NaN } }] })).toBe(
+    const window = limit.primary;
+    expect(isAccountUsage({ limits: [{ ...limit, primary: { ...window, usedPercent: Number.NaN } }] })).toBe(false);
+    expect(isAccountUsage({ limits: [{ ...limit, primary: { ...window, windowDurationMins: -1 } }] })).toBe(false);
+    expect(isAccountUsage({ limits: [{ ...limit, primary: { ...window, resetsAt: Number.POSITIVE_INFINITY } }] })).toBe(
       false,
     );
-    expect(isAccountUsage({ limits: [{ ...usage.limits[0], primary: { ...window, windowDurationMins: -1 } }] })).toBe(
-      false,
-    );
-    expect(
-      isAccountUsage({
-        limits: [{ ...usage.limits[0], primary: { ...window, resetsAt: Number.POSITIVE_INFINITY } }],
-      }),
-    ).toBe(false);
   });
 
   it("validates every delivery inside a queue snapshot and a queued message receipt", () => {

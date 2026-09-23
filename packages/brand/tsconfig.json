@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
     "types": ["vitest/globals", "@testing-library/jest-dom"]
