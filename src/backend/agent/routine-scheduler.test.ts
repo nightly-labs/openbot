@@ -6,6 +6,7 @@ import type { AgentService } from "../agent-service";
 import {
   callOpenBotTool,
   createTestService,
+  expectOpenBotToolError,
   expectOpenBotToolFailure,
   FakeAgentClient,
   openBotToolPayload,
@@ -328,6 +329,19 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     );
     // A refused tool call is not a provider error toast.
     expect(errors).toEqual([]);
+
+    // A fault is not a request the model can correct, so it still fails as a provider error.
+    vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+      throw new Error("conversation persistence failed");
+    });
+    await expectOpenBotToolError(
+      client,
+      threadId,
+      "create_routine",
+      { name: "Faulted", instruction: "This must not be saved.", schedule: { kind: "daily", time: "09:00" } },
+      "conversation persistence failed",
+    );
+    expect(service.listRoutines("chief").map((routine) => routine.name)).not.toContain("Faulted");
   });
   it("creates folder-listening routines with short polling and rejects intervals below 3 minutes", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();

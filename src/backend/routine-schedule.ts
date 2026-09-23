@@ -32,12 +32,15 @@ interface CronSpec {
   exactTimes?: Set<string>;
 }
 
+/** A routine request the caller can correct. Other errors are faults. */
+export class RoutineInputError extends Error {}
+
 export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
-  if (!isRoutineSchedule(schedule)) throw new Error("The routine schedule is invalid.");
+  if (!isRoutineSchedule(schedule)) throw new RoutineInputError("The routine schedule is invalid.");
   validateTimezone(timezone);
   if (schedule.kind === "interval") {
     if (intervalMilliseconds(schedule.amount, schedule.unit) < MINIMUM_INTERVAL_MS) {
-      throw new Error(
+      throw new RoutineInputError(
         `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a daily, weekly, or cron schedule.`,
       );
     }
@@ -45,7 +48,7 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
   }
   if (schedule.kind === "advanced" && schedule.time.kind === "every") {
     if (intervalMilliseconds(schedule.time.amount, schedule.time.unit) < MINIMUM_INTERVAL_MS) {
-      throw new Error(
+      throw new RoutineInputError(
         `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a fixed time.`,
       );
     }
@@ -57,7 +60,7 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
   for (let index = 0; index < 200; index += 1) {
     const next = nextCronOccurrence(spec, timezone, previous);
     if (next.getTime() - previous.getTime() < MINIMUM_INTERVAL_MS) {
-      throw new Error(
+      throw new RoutineInputError(
         `Custom schedules must run no more often than every ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes.`,
       );
     }
@@ -70,7 +73,7 @@ export function nextRoutineOccurrence(schedule: RoutineSchedule, timezone: strin
   if (schedule.kind === "interval") {
     const duration = intervalMilliseconds(schedule.amount, schedule.unit);
     const anchor = Date.parse(schedule.anchorAt);
-    if (!Number.isFinite(anchor)) throw new Error("The routine interval anchor is invalid.");
+    if (!Number.isFinite(anchor)) throw new RoutineInputError("The routine interval anchor is invalid.");
     if (after.getTime() < anchor) return new Date(anchor);
     const elapsed = after.getTime() - anchor;
     return new Date(anchor + (Math.floor(elapsed / duration) + 1) * duration);
@@ -223,7 +226,7 @@ function nextCronOccurrence(spec: CronSpec, timezone: string, after: Date): Date
       }
     }
   }
-  throw new Error("The schedule has no occurrence within the next five years.");
+  throw new RoutineInputError("The schedule has no occurrence within the next five years.");
 }
 
 function zonedDateTimeCandidates(parts: CalendarParts, timezone: string): Date[] {
@@ -275,13 +278,13 @@ function validateTimezone(timezone: string): void {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
   } catch {
-    throw new Error("The routine timezone is invalid.");
+    throw new RoutineInputError("The routine timezone is invalid.");
   }
 }
 
 function parseCron(expression: string): CronSpec {
   const values = expression.trim().split(/\s+/);
-  if (values.length !== 5) throw new Error("Custom schedules must use five cron fields.");
+  if (values.length !== 5) throw new RoutineInputError("Custom schedules must use five cron fields.");
   return cronSpec(
     parseCronField(values[0], 0, 59, "minute"),
     parseCronField(values[1], 0, 23, "hour"),
@@ -303,7 +306,7 @@ function parseCronField(
   for (const segment of source.split(",")) {
     const [rangeSource, stepSource] = segment.split("/");
     const step = stepSource === undefined ? 1 : Number(stepSource);
-    if (!Number.isInteger(step) || step < 1) throw new Error(`The cron ${label} step is invalid.`);
+    if (!Number.isInteger(step) || step < 1) throw new RoutineInputError(`The cron ${label} step is invalid.`);
     let start: number;
     let end: number;
     if (rangeSource === "*") {
@@ -311,7 +314,7 @@ function parseCronField(
       end = maximum;
     } else if (rangeSource.includes("-")) {
       const pieces = rangeSource.split("-").map(Number);
-      if (pieces.length !== 2) throw new Error(`The cron ${label} range is invalid.`);
+      if (pieces.length !== 2) throw new RoutineInputError(`The cron ${label} range is invalid.`);
       [start, end] = pieces;
     } else {
       start = Number(rangeSource);
@@ -319,11 +322,11 @@ function parseCronField(
     }
     const allowedMaximum = sundayAlias ? 7 : maximum;
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < minimum || end > allowedMaximum || end < start) {
-      throw new Error(`The cron ${label} value is invalid.`);
+      throw new RoutineInputError(`The cron ${label} value is invalid.`);
     }
     for (let value = start; value <= end; value += step) result.add(sundayAlias && value === 7 ? 0 : value);
   }
-  if (result.size === 0) throw new Error(`The cron ${label} field is empty.`);
+  if (result.size === 0) throw new RoutineInputError(`The cron ${label} field is empty.`);
   return { values: [...result].sort((left, right) => left - right), wildcard };
 }
 
