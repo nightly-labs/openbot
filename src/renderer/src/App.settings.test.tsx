@@ -643,10 +643,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(trigger);
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     expect(within(picker).getByText("0.144.1 (Codex CLI)")).toBeInTheDocument();
-    expect(within(picker).getByRole("option", { name: "GPT-5.6 Luna, default" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(within(picker).getByRole("option", { name: "GPT-5.6 Luna" })).toHaveAttribute("aria-selected", "true");
 
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     expect(window.openbot.agent.updateAgent).not.toHaveBeenCalled();
@@ -754,7 +751,7 @@ describe("OpenBot connected desktop shell", () => {
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5" }));
     expect(window.openbot.agent.updateAgent).toHaveBeenCalledOnce();
 
     await fireEvent.keyDown(picker, { key: "Escape" });

@@ -179,6 +179,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
           this.provider === "codex"
             ? [
                 "gpt-reserve",
+                "gpt-6-luna",
                 "gpt-5.6-luna",
                 "gpt-5.6-terra",
                 "gpt-5.6-sol",
@@ -192,7 +193,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
               ? [{ model: "opencode/example-model" }]
               : this.provider === "grok"
                 ? ["grok-4.5", "grok-fast"].map((model) => ({ model }))
-                : ["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
+                : ["claude-fable-5", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
       };
     }
     if (method === "model/list" && this.modelList) result = this.modelList(params);
