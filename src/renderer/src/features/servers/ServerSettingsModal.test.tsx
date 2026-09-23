@@ -395,9 +395,10 @@ describe("ServerSettingsModal", () => {
 
   // `mcpServers` gates the tab and the panel together, so the prop is the whole feature gate: a
   // member of a remote server is never handed one and never sees a tab that would answer 403.
-  it("shows the MCP tab only when a caller supplies the list", async () => {
+  it("shows the MCP and Storage tabs only when a caller supplies them", async () => {
     render(() => <ServerSettingsModal {...props()} />);
     expect(screen.queryByRole("tab", { name: "MCP" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Storage" })).not.toBeInTheDocument();
   });
 
   // The list is read when the section opens, not when the dialog does, because most visits to this
@@ -422,6 +423,34 @@ describe("ServerSettingsModal", () => {
     await fireEvent.click(screen.getByRole("tab", { name: "General" }));
     await fireEvent.click(screen.getByRole("tab", { name: "MCP" }));
     await waitFor(() => expect(onMcpSectionShown).toHaveBeenCalledTimes(2));
+  });
+
+  // Storage is read for the server the dialog names, which need not be the selected one. Every
+  // member reads it; only an owner or admin is offered a clear, which reaches that same server.
+  it("reads a server's storage when the section opens and clears only for a manager", async () => {
+    const mock = createMockOpenBot();
+    vi.stubGlobal("openbot", mock.api);
+    const getUsage = vi.spyOn(mock.api.storage, "getUsage");
+    const clear = vi.spyOn(mock.api.storage, "clear");
+    const storage = { hostName: "Studio Team", onOpenAgent: vi.fn(), onShowMessage: vi.fn() };
+
+    const { unmount } = render(() => (
+      <ServerSettingsModal {...props({ server: remoteServer, storage: { ...storage, canManage: false } })} />
+    ));
+    expect(getUsage).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("tab", { name: "Storage" }));
+    await waitFor(() => expect(getUsage).toHaveBeenCalledWith({ scope: "host" }, "remote-1"));
+    expect(await screen.findByText("OpenBot on Studio Team")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Clean up" })).not.toBeInTheDocument();
+    unmount();
+
+    render(() => (
+      <ServerSettingsModal {...props({ server: remoteServer, storage: { ...storage, canManage: true } })} />
+    ));
+    await fireEvent.click(screen.getByRole("tab", { name: "Storage" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Clear Cached server files" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(clear).toHaveBeenCalledWith({ category: "caches" }, "remote-1"));
   });
 
   // MCP servers belong to this machine and are started by the agents on it, so they are manageable

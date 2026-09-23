@@ -44,6 +44,7 @@ import {
   decodeMcpTestResult,
   decodeOptionalAgentAnalytics,
   decodeOptionalHostAnalytics,
+  decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
   type FilePreview,
   type HostedSiteSummary,
@@ -1346,6 +1347,16 @@ const openbotApi: OpenBotDesktopApi = {
       ipcRenderer.on(IPC_CHANNELS.hostEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.hostEvent, handler);
     },
+  },
+  // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
+  // decoded in main before it reached this point.
+  storage: {
+    getUsage: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_CHANNELS.storageGetUsage, input, decodeOptionalStorageUsage),
+    deleteFile: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageDeleteFile, input, decodeVoid),
+    clear: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageClear, input, decodeVoid),
+    openFile: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageOpenFile, input, decodeVoid),
+    openLocation: (input) => ipcRenderer.invoke(IPC_CHANNELS.storageOpenLocation, input).then(decodeVoid),
   },
   remoteDesktop: {
     checkSetup: (serverId) =>

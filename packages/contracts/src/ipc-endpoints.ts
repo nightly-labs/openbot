@@ -324,6 +324,14 @@ export const IPC_ENDPOINTS = {
     setEnabled: request(IPC_CHANNELS.serversSetMcpServerEnabled),
     test: request(IPC_CHANNELS.serversTestMcpServer),
   },
+  // Bound against the storage service, not `AgentService`, so it is its own group.
+  storage: {
+    getUsage: request(IPC_CHANNELS.storageGetUsage),
+    deleteFile: request(IPC_CHANNELS.storageDeleteFile),
+    clear: request(IPC_CHANNELS.storageClear),
+    openFile: request(IPC_CHANNELS.storageOpenFile),
+    openLocation: request(IPC_CHANNELS.storageOpenLocation),
+  },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived
   // asks for; `openListing` is the same slug pushed to a window that was already there.

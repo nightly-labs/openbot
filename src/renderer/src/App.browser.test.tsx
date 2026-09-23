@@ -1651,4 +1651,37 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Close file preview" }));
     expect(screen.queryByRole("complementary", { name: "File preview" })).not.toBeInTheDocument();
   });
+
+  it("says that a deleted attached file is no longer available", async () => {
+    const deleted = attachment("att-deleted", "launch-metrics.pdf", "pdf");
+    vi.mocked(window.openbot.agent.readConversation).mockImplementation(async (agentId) => ({
+      agentId,
+      threadId: agentId === "chief" ? "thread-chief" : null,
+      activeTurnId: null,
+      revision: 1,
+      messages:
+        agentId === "chief"
+          ? [
+              {
+                id: "message-deleted-attachment",
+                author: "assistant",
+                text: `Here is @[${deleted.name}](attachment:${deleted.id}).`,
+                createdAt: "2026-08-24T12:16:00.000Z",
+                status: "completed",
+                attachments: [deleted],
+              },
+            ]
+          : [],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    }));
+    const fetch = vi.fn(async () => new Response("Not found", { status: 404 }));
+    vi.stubGlobal("fetch", fetch);
+
+    render(() => <App />);
+    await fireEvent.click(await screen.findByRole("button", { name: `Open attached file ${deleted.name}` }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(deleted.previewUrl));
+    expect(await screen.findByText("This file is no longer available.")).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "File preview" })).not.toBeInTheDocument();
+  });
 });

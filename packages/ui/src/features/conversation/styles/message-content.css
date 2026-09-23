@@ -1247,6 +1247,7 @@
   .message-file-reference,
   .composer-file-reference,
   .attachment-file-visual,
+  .files-file-visual,
   .composer-attachment-preview
 )[data-file-tone="source"] {
   --file-reference-color: var(--openbot-file-blue);
@@ -1257,6 +1258,7 @@
   .message-file-reference,
   .composer-file-reference,
   .attachment-file-visual,
+  .files-file-visual,
   .composer-attachment-preview
 )[data-file-tone="script"] {
   --file-reference-color: var(--openbot-file-yellow);
@@ -1267,6 +1269,7 @@
   .message-file-reference,
   .composer-file-reference,
   .attachment-file-visual,
+  .files-file-visual,
   .composer-attachment-preview
 )[data-file-tone="markup"] {
   --file-reference-color: var(--openbot-file-orange);
@@ -1277,6 +1280,7 @@
   .message-file-reference,
   .composer-file-reference,
   .attachment-file-visual,
+  .files-file-visual,
   .composer-attachment-preview
 )[data-file-tone="style"] {
   --file-reference-color: var(--openbot-file-teal);
@@ -1287,6 +1291,7 @@
   .message-file-reference,
   .composer-file-reference,
   .attachment-file-visual,
+  .files-file-visual,
   .composer-attachment-preview
 )[data-file-tone="data"] {
   --file-reference-color: var(--openbot-file-green);
@@ -1297,6 +1302,7 @@
   .message-file-reference,
   .composer-file-reference,
   .attachment-file-visual,
+  .files-file-visual,
   .composer-attachment-preview
 )[data-file-tone="document"] {
   --file-reference-color: var(--openbot-file-red);
@@ -1307,6 +1313,7 @@
   .message-file-reference,
   .composer-file-reference,
   .attachment-file-visual,
+  .files-file-visual,
   .composer-attachment-preview
 )[data-file-tone="media"] {
   --file-reference-color: var(--openbot-file-pink);

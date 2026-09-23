@@ -7,6 +7,7 @@ import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { createMemo } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import { serverHasStorage } from "../files/storage-usage";
 
 /** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {
@@ -25,6 +26,8 @@ export function ConversationHeader() {
     settingsProvider,
     settingsReasoning,
     showBrowserPanel,
+    filesOpen,
+    toggleFilesPanel,
   } = useConversationViewScope();
   const changeAutoApprove = createMemo(() => {
     const save = props.onSetAgentAutoApprove;
@@ -78,6 +81,12 @@ export function ConversationHeader() {
                 if (props.server) void props.onOpenRemoteDesktop(props.server.id, trigger);
               },
             }
+          : undefined
+      }
+      files={
+        // The web client has no storage methods, and a chat without a thread has no files to list.
+        !props.runtime && props.agent?.threadId && serverHasStorage(props.server)
+          ? { open: filesOpen(), onToggle: toggleFilesPanel }
           : undefined
       }
       browser={

@@ -23,6 +23,7 @@ import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
+import type { StorageUsageService } from "../../backend/storage-usage";
 import type { TeamChatStore } from "../../backend/team-chat-store";
 import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
@@ -112,6 +113,9 @@ export type TeamApiMcpServers = Pick<
   "listMcpServers" | "saveMcpServer" | "removeMcpServer" | "setMcpServerEnabled" | "testMcpServer"
 >;
 
+/** Its presence is what `#protocolSupport` advertises `storage-v1` on. */
+export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear">;
+
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;
 export type TeamApiSidebarLayout = Pick<
   SidebarLayoutStore,
@@ -163,6 +167,7 @@ export interface TeamApiOptions {
   mcpServers?: TeamApiMcpServers;
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
+  storage?: TeamApiStorage;
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;

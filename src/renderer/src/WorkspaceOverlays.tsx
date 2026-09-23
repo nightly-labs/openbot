@@ -5,12 +5,15 @@ import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
+import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
+import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
+import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 import { providerKeyApi } from "./features/settings/provider-key-api";
@@ -192,6 +195,9 @@ function JoinServer(props: AccountProps) {
 function ServerSettings() {
   const platform = usePlatform();
   const { hostStatus, setServerMuted, setServerNotificationLevel } = useServers();
+  const { selectAgent, selectGlobalSearchMessage } = useNavigation();
+  const { selectServer } = useServerSelection();
+  const { setPendingAgentSelection } = useServerSwitch();
   const { toolRuntimeStatuses } = useProviders();
   const {
     serverSettingsTarget,
@@ -225,6 +231,31 @@ function ServerSettings() {
    */
   const canUseMcp = (server: ServerSummary) =>
     server.kind === "local" || (serverSupportsCapability(server, MCP_SERVERS_CAPABILITY) && server.role !== "member");
+
+  /** A remote host without `storage-v1` has no Storage section at all. */
+  const storageOptions = (server: ServerSummary): ServerStorageOptions | undefined => {
+    if (!serverHasStorage(server)) return undefined;
+    // The workspace belongs to the selected server. For another server, the switch comes first and
+    // the agent is published for the scope it lands in; a message there opens as its agent's chat.
+    const openOnServer = (agentId: string, open: () => void) => {
+      setServerSettingsOpen(false);
+      if (server.active) return open();
+      void selectServer(server.id).then((selected) => {
+        if (selected) setPendingAgentSelection(agentId);
+      });
+    };
+    return {
+      hostName:
+        server.kind === "local"
+          ? platform.appInfo()?.platform === "darwin"
+            ? "This Mac"
+            : "This computer"
+          : server.name,
+      canManage: canManageStorage(server),
+      onOpenAgent: (agentId) => openOnServer(agentId, () => selectAgent(agentId)),
+      onShowMessage: (agentId, messageId) => openOnServer(agentId, () => selectGlobalSearchMessage(agentId, messageId)),
+    };
+  };
 
   return (
     <Show when={serverSettingsTarget()}>
@@ -263,6 +294,7 @@ function ServerSettings() {
             onRemoveMcpServer={removeMcpServer}
             onSetMcpServerEnabled={setMcpServerEnabled}
             onTestMcpServer={testMcpServer}
+            storage={storageOptions(server())}
           />
         </Loading>
       )}

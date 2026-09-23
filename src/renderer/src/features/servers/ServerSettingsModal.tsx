@@ -31,6 +31,7 @@ import {
   DropdownMenu,
   Ellipsis,
   Field,
+  HardDrive,
   Image,
   ImageRemoveButton,
   Input,
@@ -70,6 +71,7 @@ import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { truncateMiddle } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
+import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
@@ -122,9 +124,14 @@ export interface ServerSettingsModalProps {
    * because most visits to this dialog never reach that section.
    */
   onMcpSectionShown?: () => void;
+  /**
+   * The Storage section appears only when a caller supplies this: a remote host without
+   * `storage-v1` passes nothing. Every member reads it; `canManage` adds Clear and Delete.
+   */
+  storage?: ServerStorageOptions;
 }
 
-type Section = "general" | "members" | "desktop" | "mcp";
+type Section = "general" | "members" | "desktop" | "mcp" | "storage";
 type InviteMode = "link" | "email" | "perma";
 type InviteRole = Exclude<TeamRole, "owner">;
 
@@ -137,6 +144,10 @@ const sections: Record<Section, { title: string; description: string }> = {
   mcp: {
     title: "MCP",
     description: "Connect MCP servers and choose which ones this server’s agents can use.",
+  },
+  storage: {
+    title: "Storage",
+    description: "See what OpenBot keeps on this server’s disk, and free space.",
   },
 };
 
@@ -585,7 +596,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     orientation: "vertical" as const,
     activationMode: "automatic" as const,
     onChange(value: string) {
-      if (value === "general" || value === "members" || value === "desktop" || value === "mcp") setSection(value);
+      if (value === "general" || value === "members" || value === "desktop" || value === "mcp" || value === "storage")
+        setSection(value);
     },
   };
 
@@ -760,6 +772,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>MCP</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.storage}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="storage">
+                <HardDrive aria-hidden="true" />
+                <span>Storage</span>
+              </Tabs.Trigger>
+            </Show>
           </Tabs.List>
         }
       >
@@ -791,6 +809,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   Promise.resolve({ toolCount: 0, error: "This server cannot be tested here." })
                 }
               />
+            </Tabs.Content>
+          )}
+        </Show>
+        {/* Mounted only while selected, so the host is measured when the section opens. */}
+        <Show when={props.storage}>
+          {(storage) => (
+            <Tabs.Content value="storage" class="settings-modal-tab-panel server-settings-panel" data-tab="storage">
+              <ServerStoragePanel serverId={props.server.id} {...storage()} />
             </Tabs.Content>
           )}
         </Show>

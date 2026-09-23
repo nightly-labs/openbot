@@ -129,6 +129,14 @@
   --openbot-chart-series-claude: var(--openbot-provider-claude);
   --openbot-chart-series-grok: #6bc7d9;
   --openbot-chart-series-other: var(--openbot-text-muted);
+  /* The storage bar: four hues in this fixed order, then neutral app data. Validated with
+     node scripts/validate_palette.js "#3987e5,#d95926,#199e70,#9085e9" --mode dark --surface "#1a1a1a"
+     and again on #212121. */
+  --openbot-chart-storage-workspaces: #3987e5;
+  --openbot-chart-storage-files: #d95926;
+  --openbot-chart-storage-chats: #199e70;
+  --openbot-chart-storage-downloads: #9085e9;
+  --openbot-chart-storage-app: var(--openbot-text-dim);
   --openbot-logo-production: #d6adf2;
   --openbot-logo-eye: #040007;
   --openbot-logo-dev: var(--openbot-warning);

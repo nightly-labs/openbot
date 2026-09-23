@@ -46,6 +46,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     return agentId ? (deps.rightPanels()[agentId] ?? "none") : "none";
   });
   const settingsOpen = () => activeRightPanel() === "settings";
+  const filesOpen = () => activeRightPanel() === "files";
   const filePreviewOpen = () =>
     activeRightPanel() === "file-preview" && deps.sidebarFilePreview()?.ownerAgentId === deps.props.agent?.id;
 
@@ -56,6 +57,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
+  }
+
+  function toggleFilesPanel(): void {
+    setActiveRightPanel(filesOpen() ? "none" : "files");
   }
 
   function openRoutineSettings(routine: { routineId: string; name: string }): void {
@@ -230,6 +235,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
+    filesOpen,
+    toggleFilesPanel,
     filePreviewOpen,
     setActiveRightPanel,
     openRoutineSettings,

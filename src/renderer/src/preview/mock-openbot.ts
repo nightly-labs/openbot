@@ -122,6 +122,7 @@ import {
 import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { createMockChannels } from "./mock-channels";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
+import { createMockStorage } from "./mock-storage";
 
 type Listener<T> = (value: T) => void;
 
@@ -2170,6 +2171,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => hostListeners.delete(listener);
       },
     },
+    storage: createMockStorage(),
     remoteDesktop: {
       checkSetup: async () => ({
         platform: "darwin",

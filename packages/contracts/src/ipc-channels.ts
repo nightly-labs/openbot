@@ -234,6 +234,13 @@ export const IPC_CHANNELS = {
   serversRemoveMcpServer: "servers:mcp:remove",
   serversSetMcpServerEnabled: "servers:mcp:set-enabled",
   serversTestMcpServer: "servers:mcp:test",
+  // Storage and files of one host. Each names its server: the settings modal can be open for a
+  // server the user has not switched to.
+  storageGetUsage: "storage:get-usage",
+  storageDeleteFile: "storage:delete-file",
+  storageClear: "storage:clear",
+  storageOpenFile: "storage:open-file",
+  storageOpenLocation: "storage:open-location",
   // The plugin deep link. `openbot://plugins/<slug>` opens a listing and nothing more, so there is
   // no install channel beside these two: the user still presses Install inside the dialog and picks
   // an agent. The pair mirrors the invitation's, because it solves the same problem - a link can
