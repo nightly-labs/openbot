@@ -338,8 +338,7 @@ function parseCronField(
 }
 
 function parseTime(value: string): [number, number] {
-  const [hour, minute] = value.split(":").map(Number);
-  if (hour === undefined || minute === undefined) throw new RoutineInputError("The routine time is invalid.");
+  const [hour = Number.NaN, minute = Number.NaN] = value.split(":").map(Number);
   return [hour, minute];
 }
 
