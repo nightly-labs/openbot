@@ -117,7 +117,8 @@ jobs:
     # request that would not be read anyway.
     needs: authorize
     runs-on: [self-hosted]
-    timeout-minutes: 18
+    # 15 minutes for the review, 2 for the bridge retries, and the steps around them.
+    timeout-minutes: 20
 
     permissions:
       contents: read
@@ -831,33 +832,52 @@ jobs:
           # accept this override: a plugin server rejects it and Codex then refuses to start,
           # so the overrides are tried on `mcp list` first and dropped if that fails.
           mcp_args=()
-          if mcp_names=$(codex mcp list --json 2> /dev/null |
-            bun -e 'for (const server of JSON.parse(await Bun.stdin.text())) if (server.enabled) console.log(server.name)'); then
+          mcp_disabled=""
+          mcp_errors="$RUNNER_TEMP/norbiai-mcp-errors.txt"
+          if mcp_names=$(codex mcp list --json 2> "$mcp_errors" |
+            bun -e 'for (const server of JSON.parse(await Bun.stdin.text())) if (server.enabled) console.log(server.name)' 2>&1); then
             while IFS= read -r name; do
               case "$name" in
                 "" | *[!A-Za-z0-9_-]*) ;;
-                *) mcp_args+=(--config "mcp_servers.${name}.enabled=false") ;;
+                *)
+                  mcp_args+=(--config "mcp_servers.${name}.enabled=false")
+                  mcp_disabled="$mcp_disabled $name"
+                  ;;
               esac
             done <<< "$mcp_names"
+            echo "MCP servers to disable:${mcp_disabled:- none}"
+          else
+            echo "::notice title=NorbiAI kept MCP servers::Could not list them: $(head -1 "$mcp_errors") $(printf '%s' "$mcp_names" | head -1)"
           fi
-          if [ "${#mcp_args[@]}" -gt 0 ] && ! codex ${mcp_args[@]+"${mcp_args[@]}"} mcp list --json > /dev/null 2>&1; then
-            echo "::notice title=NorbiAI kept MCP servers::Codex rejected the overrides that disable them"
+          if [ "${#mcp_args[@]}" -gt 0 ] && ! mcp_check=$(codex ${mcp_args[@]+"${mcp_args[@]}"} mcp list --json 2>&1); then
+            echo "::notice title=NorbiAI kept MCP servers::Codex rejected the overrides: $(printf '%s' "$mcp_check" | head -1)"
             mcp_args=()
           fi
 
           set +e
-          : > "$last_message_file"
           review_started=$SECONDS
-          timeout 900 codex exec \
-            ${mcp_args[@]+"${mcp_args[@]}"} \
-            --ephemeral \
-            --sandbox danger-full-access \
-            --model "$MODEL" \
-            --config "model_reasoning_effort=\"${EFFORT}\"" \
-            --color never \
-            --output-last-message "$last_message_file" \
-            - < "$prompt_file" 2>&1 | tee "$live_file"
-          exit_code=${PIPESTATUS[0]}
+          # The runners share one bridge, which allows 5 browser turns at a time, and a
+          # cancelled run can keep its turn for a while. That refusal comes in seconds, so
+          # wait for a free turn instead of failing the review.
+          for attempt in 1 2 3; do
+            : > "$last_message_file"
+            timeout 900 codex exec \
+              ${mcp_args[@]+"${mcp_args[@]}"} \
+              --ephemeral \
+              --sandbox danger-full-access \
+              --model "$MODEL" \
+              --config "model_reasoning_effort=\"${EFFORT}\"" \
+              --color never \
+              --output-last-message "$last_message_file" \
+              - < "$prompt_file" 2>&1 | tee "$live_file"
+            exit_code=${PIPESTATUS[0]}
+            if [ "$exit_code" -eq 0 ] || [ "$attempt" -eq 3 ] ||
+              ! grep -q 'simultaneous browser turns' "$live_file"; then
+              break
+            fi
+            echo "::notice title=NorbiAI waiting for the bridge::All browser turns are busy. Attempt ${attempt} of 3 failed. Next attempt in 60 s."
+            sleep 60
+          done
           set -e
           # Recorded in the comment so the cost of a review can be followed without the logs.
           review_seconds=$(( SECONDS - review_started ))
