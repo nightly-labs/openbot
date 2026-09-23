@@ -85,6 +85,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "06a649d220a6858a9856ff36661fe20c47219216235507778924b1c3e7c4b5ca"
+    },
+    {
+      "slug": "composio",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "f3833ad73221b264a3611761dadaadfd978832c8431106ce92e6a7a45ee9b49c"
     }
   ]
 }

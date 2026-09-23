@@ -279,10 +279,17 @@ export function describeMcpError(error: unknown, config: McpServerConfig, timeou
   // Only a sign-in reaches this: without an `authProvider` the transport reports the raw 401 below.
   if (error instanceof UnauthorizedError) return "The server did not accept that sign-in.";
   const status = httpStatus(error);
-  if (status !== null) return `The server answered ${status}.`;
+  if (status !== null) return `The server answered ${status}.${statusAdvice(status)}`;
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("ENOENT")) return `Command not found: ${config.command}`;
   return redactMcpSecrets(message, config);
+}
+
+/** What the user can change. A link from a service such as Composio stops working when it is deleted. */
+function statusAdvice(status: number) {
+  if (status === 401 || status === 403) return " Check the API key or other credentials.";
+  if (status === 404 || status === 410) return " Check the URL. The link may be wrong, expired, or deleted.";
+  return "";
 }
 
 function httpStatus(error: unknown): number | null {

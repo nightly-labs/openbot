@@ -559,6 +559,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         size="md"
                         placeholder="Value"
                         aria-label={`Environment variable ${index + 1} value`}
+                        type="password"
+                        autocomplete="off"
+                        spellcheck={false}
                         value={pair().value}
                         disabled={disabled()}
                         onValueChange={(next) =>
@@ -706,6 +709,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                         size="md"
                         placeholder="Value"
                         aria-label={`Header ${index + 1} value`}
+                        type="password"
+                        autocomplete="off"
+                        spellcheck={false}
                         value={pair().value}
                         disabled={disabled()}
                         onValueChange={(next) =>

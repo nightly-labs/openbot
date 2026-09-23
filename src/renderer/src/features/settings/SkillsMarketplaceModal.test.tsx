@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-lib
 import { type ComponentProps, createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "../../analytics";
+import { MARKETPLACE_PLUGINS } from "./marketplace-plugin-catalog";
 import { SkillsMarketplaceModal } from "./SkillsMarketplaceModal";
 
 /** The install target is a listbox control, so a choice is a click on the trigger and on the option. */
@@ -1271,6 +1272,49 @@ describe("SkillsMarketplaceModal", () => {
       const sent = { key: "Authorization", value: "Bearer live-key" };
       expect(testMcpServer).toHaveBeenCalledWith({ config: expect.objectContaining({ headers: [sent] }) }, "local");
       expect(saveMcpServer).toHaveBeenCalledWith({ config: expect.objectContaining({ headers: [sent] }) }, "local");
+    });
+
+    it("connects to the user's own Composio link and refuses a link from another host", async () => {
+      const composio = MARKETPLACE_PLUGINS.find((listing) => listing.slug === "composio");
+      if (!composio) throw new Error("The catalog has no Composio listing.");
+      const saveMcpServer: OpenBotDesktopApi["agent"]["saveMcpServer"] = vi.fn(async (input) => [input.config]);
+      const testMcpServer: OpenBotDesktopApi["agent"]["testMcpServer"] = vi.fn(async () => ({
+        toolCount: 12,
+        error: null,
+      }));
+      window.openbot.agent = {
+        ...window.openbot.agent,
+        listMcpServers: vi.fn(async () => []),
+        saveMcpServer,
+        testMcpServer,
+      };
+      renderMarketplace({
+        open: true,
+        agents: [{ id: "writer", name: "Writer" }],
+        activeAgentId: "writer",
+        onOpenChange: vi.fn(),
+        plugins: [composio],
+        pluginServerId: "local",
+      });
+      fireEvent.click(screen.getByRole("tab", { name: "Plugins" }));
+      fireEvent.click(await screen.findByRole("button", { name: "View Composio details" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Install plugin" }));
+
+      const link = await screen.findByLabelText(/MCP URL/);
+      fireEvent.input(link, { target: { value: "https://example.com/mcp" } });
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+      expect(await screen.findByText("Enter an https link from composio.dev.")).toBeInTheDocument();
+      expect(testMcpServer).not.toHaveBeenCalled();
+
+      const url = "https://backend.composio.dev/v3/mcp/server-id?user_id=me";
+      fireEvent.input(link, { target: { value: url } });
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+
+      await waitFor(() => expect(saveMcpServer).toHaveBeenCalled());
+      expect(saveMcpServer).toHaveBeenCalledWith(
+        { config: expect.objectContaining({ name: "composio", url, headers: [] }) },
+        "local",
+      );
     });
 
     it("saves nothing when the connect dialog is closed", async () => {

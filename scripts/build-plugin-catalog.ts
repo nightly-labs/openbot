@@ -58,11 +58,13 @@ export interface PluginPrompt {
 export interface PluginAuthField {
   id: string;
   label: string;
+  url?: boolean;
   header?: string;
   env?: string;
   prefix?: string;
   placeholder?: string;
   hint?: string;
+  optional?: boolean;
 }
 
 export interface PluginLinkFlow {
@@ -325,6 +327,8 @@ function parseFlow(slug: string, value: unknown, transport: unknown): PluginAuth
     throw new Error(`Plugin ${slug} has an invalid auth flow.`);
   }
   const fields = value.fields.map((field) => parseField(slug, field, transport));
+  if (fields.filter((field) => field.url).length > 1) throw new Error(`Plugin ${slug} asks for more than one link.`);
+  if (fields.every((field) => field.optional)) throw new Error(`Plugin ${slug} auth needs a required field.`);
   const docsUrl = value.docsUrl;
   if (docsUrl !== undefined && docsUrl !== null && !isHttpsUrl(docsUrl)) {
     throw new Error(`Plugin ${slug} auth needs an https docsUrl.`);
@@ -346,7 +350,11 @@ function parseField(slug: string, value: unknown, transport: unknown): PluginAut
     throw new Error(`Plugin ${slug} has an invalid auth field.`);
   }
   const field: PluginAuthField = { id: value.id, label: value.label };
-  if (transport === "stdio") {
+  if (value.url === true) {
+    // The user's own link replaces the listing's address, which only a remote server has.
+    if (transport !== "http") throw new Error(`Plugin ${slug} link field needs an http server.`);
+    field.url = true;
+  } else if (transport === "stdio") {
     if (!isString(value.env) || !value.env) throw new Error(`Plugin ${slug} stdio field needs an env name.`);
     field.env = value.env;
   } else {
@@ -359,6 +367,10 @@ function parseField(slug: string, value: unknown, transport: unknown): PluginAut
       if (!isString(candidate)) throw new Error(`Plugin ${slug} has an invalid auth field.`);
       field[optional] = candidate;
     }
+  }
+  if (value.optional !== undefined) {
+    if (typeof value.optional !== "boolean") throw new Error(`Plugin ${slug} has an invalid auth field.`);
+    if (value.optional) field.optional = true;
   }
   return field;
 }
@@ -406,7 +418,9 @@ function checkCredentialFlows(slug: string, server: PluginServer, base: McpServe
         ? { ...base, env: flow.fields.map((field) => ({ key: field.env ?? "", value: `sample${field.prefix ?? ""}` })) }
         : {
             ...base,
-            headers: flow.fields.map((field) => ({ key: field.header ?? "", value: `sample${field.prefix ?? ""}` })),
+            headers: flow.fields
+              .filter((field) => !field.url)
+              .map((field) => ({ key: field.header ?? "", value: `sample${field.prefix ?? ""}` })),
           };
     const errors = mcpConfigErrors(normalizeMcpConfig(applied));
     const firstError = errors.name ?? errors.command ?? errors.url;
