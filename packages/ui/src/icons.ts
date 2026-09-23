@@ -56,6 +56,7 @@ export { default as MousePointer2 } from "lucide-solid/icons/mouse-pointer-2";
 export { default as OctagonX } from "lucide-solid/icons/octagon-x";
 export { default as Palette } from "lucide-solid/icons/palette";
 export { default as PanelRight } from "lucide-solid/icons/panel-right";
+export { default as PanelTop } from "lucide-solid/icons/panel-top";
 export { default as Pause } from "lucide-solid/icons/pause";
 export { default as Pencil } from "lucide-solid/icons/pencil";
 export { default as PencilLine } from "lucide-solid/icons/pencil-line";

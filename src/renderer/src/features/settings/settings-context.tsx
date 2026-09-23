@@ -91,6 +91,8 @@ const Settings = createSimpleContext({
       },
     );
 
+    let dynamicIslandSaveCount = 0;
+
     function updateGeneralSettings(value: GeneralSettingsValue): void {
       const previous = generalSettings();
       const turboMode = turboModePending() ? previous.turboMode : value.turboMode;
@@ -145,33 +147,46 @@ const Settings = createSimpleContext({
         previous.macBookNotch !== value.macBookNotch ||
         previous.macBookNotchHaptics !== value.macBookNotchHaptics ||
         previous.macBookNotchIdle !== value.macBookNotchIdle ||
-        previous.macBookNotchAdditionalDisplays !== value.macBookNotchAdditionalDisplays
+        previous.macBookNotchAdditionalDisplays !== value.macBookNotchAdditionalDisplays ||
+        previous.macBookNotchWidthPercent !== value.macBookNotchWidthPercent ||
+        previous.macBookNotchHeightPercent !== value.macBookNotchHeightPercent
       ) {
+        // A slider drag sends one save per step. Only the reply to the newest save may change the
+        // form, or an older reply would move the slider back while the user drags.
+        const save = ++dynamicIslandSaveCount;
         void window.openbot.dynamicIsland
           .setPreference({
             enabled: value.macBookNotch,
             hapticsEnabled: value.macBookNotchHaptics,
             idleVisible: value.macBookNotchIdle,
             additionalDisplaysEnabled: value.macBookNotchAdditionalDisplays,
+            widthPercent: value.macBookNotchWidthPercent,
+            heightPercent: value.macBookNotchHeightPercent,
           })
-          .then((preference) =>
+          .then((preference) => {
+            if (save !== dynamicIslandSaveCount) return;
             setGeneralSettings((current) => ({
               ...current,
               macBookNotch: preference.enabled,
               macBookNotchHaptics: preference.hapticsEnabled,
               macBookNotchIdle: preference.idleVisible,
               macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
-            })),
-          )
-          .catch(() =>
+              macBookNotchWidthPercent: preference.widthPercent,
+              macBookNotchHeightPercent: preference.heightPercent,
+            }));
+          })
+          .catch(() => {
+            if (save !== dynamicIslandSaveCount) return;
             setGeneralSettings((current) => ({
               ...current,
               macBookNotch: previous.macBookNotch,
               macBookNotchHaptics: previous.macBookNotchHaptics,
               macBookNotchIdle: previous.macBookNotchIdle,
               macBookNotchAdditionalDisplays: previous.macBookNotchAdditionalDisplays,
-            })),
-          );
+              macBookNotchWidthPercent: previous.macBookNotchWidthPercent,
+              macBookNotchHeightPercent: previous.macBookNotchHeightPercent,
+            }));
+          });
       }
     }
 
@@ -256,6 +271,8 @@ const Settings = createSimpleContext({
             macBookNotchHaptics: preference.hapticsEnabled,
             macBookNotchIdle: preference.idleVisible,
             macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
+            macBookNotchWidthPercent: preference.widthPercent,
+            macBookNotchHeightPercent: preference.heightPercent,
           })),
         )
         .catch(() => undefined);

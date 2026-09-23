@@ -408,6 +408,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(await screen.findByRole("switch", { name: "Share product analytics" }));
     await waitFor(() => expect(window.openbot.setAnalyticsPreference).toHaveBeenCalledWith({ enabled: false }));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "Dynamic Island" }));
     const notchSwitch = await screen.findByRole("switch", { name: "Show status in the MacBook notch" });
     expect(notchSwitch).toBeChecked();
     await fireEvent.click(notchSwitch);
@@ -417,6 +418,8 @@ describe("OpenBot connected desktop shell", () => {
         hapticsEnabled: true,
         idleVisible: true,
         additionalDisplaysEnabled: true,
+        widthPercent: 100,
+        heightPercent: 100,
       }),
     );
     expect(notchSwitch).not.toBeChecked();

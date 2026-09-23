@@ -441,6 +441,8 @@ export function installOpenbotStub(): void {
           hapticsEnabled: true,
           idleVisible: true,
           additionalDisplaysEnabled: true,
+          widthPercent: 100,
+          heightPercent: 100,
         }),
         setPreference: vi.fn(async (preference) => ({ ...preference })),
         publishPresentation: vi.fn().mockResolvedValue(undefined),

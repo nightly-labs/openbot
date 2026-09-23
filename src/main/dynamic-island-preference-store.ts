@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, type DynamicIslandPreference } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  DYNAMIC_ISLAND_SIZE_LIMITS,
+  type DynamicIslandPreference,
+  isDynamicIslandSizePercent,
+} from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
 export async function readDynamicIslandPreference(path: string): Promise<DynamicIslandPreference> {
@@ -18,7 +23,7 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
       };
     }
     if (
-      parsed.version !== 3 ||
+      (parsed.version !== 3 && parsed.version !== 4) ||
       !isBoolean(parsed.hapticsEnabled) ||
       !isBoolean(parsed.idleVisible) ||
       !isBoolean(parsed.additionalDisplaysEnabled)
@@ -30,6 +35,14 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
       hapticsEnabled: parsed.hapticsEnabled,
       idleVisible: parsed.idleVisible,
       additionalDisplaysEnabled: parsed.additionalDisplaysEnabled,
+      // Version 3 has no size. A size outside the limits resets only the size, so a bad value
+      // cannot make the island too small to find and does not discard the switches beside it.
+      widthPercent: isDynamicIslandSizePercent(parsed.widthPercent, DYNAMIC_ISLAND_SIZE_LIMITS.widthPercent)
+        ? parsed.widthPercent
+        : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent,
+      heightPercent: isDynamicIslandSizePercent(parsed.heightPercent, DYNAMIC_ISLAND_SIZE_LIMITS.heightPercent)
+        ? parsed.heightPercent
+        : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent,
     };
   } catch (error) {
     if (isMissing(error) || error instanceof SyntaxError) return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
@@ -43,7 +56,7 @@ export async function writeDynamicIslandPreference(
 ): Promise<DynamicIslandPreference> {
   const temporaryPath = `${path}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 3, ...preference })}\n`, {
+    await writeFile(temporaryPath, `${JSON.stringify({ version: 4, ...preference })}\n`, {
       encoding: "utf8",
       mode: 0o600,
     });
