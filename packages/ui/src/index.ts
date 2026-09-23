@@ -4,6 +4,7 @@ export * from "./bubble";
 export * from "./button";
 export * from "./checkbox";
 export * from "./complex";
+export * from "./confirm-dialog";
 export * from "./dynamic-island";
 export * from "./dynamic-island-identity";
 export * from "./form";

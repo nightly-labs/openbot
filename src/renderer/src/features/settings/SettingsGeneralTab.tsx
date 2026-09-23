@@ -6,8 +6,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  AlertDialog,
-  Button,
+  ConfirmDialog,
   Item,
   ItemActions,
   ItemContent,
@@ -83,7 +82,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
    */
   const [customSelected, setCustomSelected] = createSignal(false);
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
-  let cancelTurboButton: HTMLButtonElement | undefined;
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
@@ -229,47 +227,20 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <AlertDialog.Root
+      <ConfirmDialog
         open={confirmingTurbo()}
-        onOpenChange={(open) => {
-          if (!open) setConfirmingTurbo(false);
+        tone="default"
+        initialFocus="cancel"
+        title={i18n.t("settings.turbo.confirmTitle")}
+        description={i18n.t("settings.turbo.confirmDescription")}
+        cancelLabel={i18n.t("settings.turbo.confirmCancel")}
+        confirmLabel={i18n.t("settings.turbo.confirmAccept")}
+        onCancel={() => setConfirmingTurbo(false)}
+        onConfirm={() => {
+          setConfirmingTurbo(false);
+          props.onUpdateSetting("turboMode", true);
         }}
-      >
-        <AlertDialog.Portal>
-          <AlertDialog.Overlay class="approval-confirm-backdrop">
-            <AlertDialog.Content
-              class="approval-confirm-dialog"
-              onOpenAutoFocus={(event) => {
-                event.preventDefault();
-                cancelTurboButton?.focus({ preventScroll: true });
-              }}
-            >
-              <AlertDialog.Title>{i18n.t("settings.turbo.confirmTitle")}</AlertDialog.Title>
-              <AlertDialog.Description>{i18n.t("settings.turbo.confirmDescription")}</AlertDialog.Description>
-              <div class="approval-confirm-actions">
-                <Button
-                  ref={cancelTurboButton}
-                  variant="outline"
-                  type="button"
-                  onClick={() => setConfirmingTurbo(false)}
-                >
-                  {i18n.t("settings.turbo.confirmCancel")}
-                </Button>
-                <Button
-                  variant="default"
-                  type="button"
-                  onClick={() => {
-                    setConfirmingTurbo(false);
-                    props.onUpdateSetting("turboMode", true);
-                  }}
-                >
-                  {i18n.t("settings.turbo.confirmAccept")}
-                </Button>
-              </div>
-            </AlertDialog.Content>
-          </AlertDialog.Overlay>
-        </AlertDialog.Portal>
-      </AlertDialog.Root>
+      />
 
       <SettingsSection title={i18n.t("settings.notifications.title")}>
         <ItemGroup class="settings-modal-card">

@@ -1,6 +1,6 @@
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { InstalledSkill, QueueDelivery, QueueHold } from "@openbot/contracts/ipc";
-import { Button, Dialog } from "@openbot/ui";
+import { Button, ConfirmDialog } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
@@ -565,39 +565,20 @@ export function QueuePanel(props: QueuePanelProps) {
           {announcement()}
         </div>
       </section>
-      <Dialog.Root
+      <ConfirmDialog
         open={deleteHeldId() !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteHeldId(null);
+        onCancel={() => setDeleteHeldId(null)}
+        onConfirm={() => {
+          const id = deleteHeldId();
+          setDeleteHeldId(null);
+          if (id) requestCancel(id);
         }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay class="agent-memory-confirm-overlay" />
-          <Dialog.Content class="agent-memory-confirm-dialog">
-            <div class="agent-memory-confirm-content">
-              <Dialog.Title>Delete queued message?</Dialog.Title>
-              <Dialog.Description>
-                Another device is editing this message. The agent will not receive it.
-              </Dialog.Description>
-              <div class="agent-memory-confirm-actions">
-                <Button variant="ghost" onClick={() => setDeleteHeldId(null)}>
-                  Keep
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    const id = deleteHeldId();
-                    setDeleteHeldId(null);
-                    if (id) requestCancel(id);
-                  }}
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        title="Delete queued message?"
+        description="Another device is editing this message. The agent will not receive it."
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        initialFocus="cancel"
+      />
       <Show when={actionTooltip()}>
         {(current) => <AnchoredTooltip id={actionTooltipId} anchor={current().anchor} content={current().content} />}
       </Show>

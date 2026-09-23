@@ -163,7 +163,6 @@ describe("OnboardingFlow", () => {
   it("drops the endpoint's model from setup after the endpoint is removed", async () => {
     activeMock = createMockOpenBot();
     window.openbot = activeMock.api;
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     // A second endpoint stays behind, so the custom row keeps the choice and only the model of the
     // removed endpoint can explain an empty model in setup.
     const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>([
@@ -209,6 +208,8 @@ describe("OnboardingFlow", () => {
 
     await fireEvent.click(await view.findByRole("button", { name: "Manage 2 endpoints" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Delete Studio Local" }));
+    const confirmation = await screen.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    await fireEvent.click(within(confirmation).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onDeleteCustomProvider).toHaveBeenCalledWith("studio-local"));
     // The dialog stays open on what is left, so it is closed by hand before the step goes on.
     expect(await screen.findByRole("button", { name: "Delete House Router" })).toBeInTheDocument();

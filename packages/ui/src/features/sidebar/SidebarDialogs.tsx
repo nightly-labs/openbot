@@ -1,6 +1,6 @@
 /** The sidebar's agent, channel and section confirmations share one pending delete state. */
 
-import { AlertDialog, Button, Trash2 } from "@openbot/ui";
+import { ConfirmDialog } from "@openbot/ui";
 import { Show } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
@@ -18,162 +18,57 @@ export function SidebarDialogs() {
     props,
     sectionDeleteTarget,
   } = useSidebarScope();
-  let agentDeleteButton: HTMLButtonElement | undefined;
-  let channelDeleteButton: HTMLButtonElement | undefined;
-  let sectionDeleteButton: HTMLButtonElement | undefined;
+  const shared = {
+    confirmLabel: "Delete",
+    pendingLabel: "Deleting…",
+    onCancel: closeDelete,
+  };
+  // Each dialog unmounts with its target, so its text never shows an empty name while it closes.
   return (
     <>
-      <AlertDialog.Root
-        open={Boolean(deleteTarget())}
-        onOpenChange={(open) => {
-          if (!open && !deleting()) closeDelete();
-        }}
-      >
-        <Show when={deleteTarget()}>
-          {(agent) => (
-            <AlertDialog.Portal>
-              <AlertDialog.Overlay class="agent-delete-backdrop">
-                <AlertDialog.Content
-                  class="agent-delete-dialog"
-                  onOpenAutoFocus={(event) => {
-                    event.preventDefault();
-                    agentDeleteButton?.focus({ preventScroll: true });
-                  }}
-                >
-                  <AgentAvatar
-                    agent={agent()}
-                    style={{
-                      width: "44px",
-                      height: "44px",
-                      "margin-bottom": "15px",
-                    }}
-                  />
-                  <AlertDialog.Title>Delete {agent().name}?</AlertDialog.Title>
-                  <AlertDialog.Description>
-                    This removes the agent and its OpenBot conversation from the app. Its queue, memories, routines, and
-                    workspace are deleted. History stored separately by the connected CLI provider is not deleted.
-                  </AlertDialog.Description>
-                  <Show when={deleteError()}>{(message) => <p class="agent-delete-error">{message()}</p>}</Show>
-                  <div class="agent-delete-actions">
-                    <Button variant="outline" type="button" disabled={deleting()} onClick={closeDelete}>
-                      Cancel
-                    </Button>
-                    <Button
-                      ref={(element) => {
-                        agentDeleteButton = element;
-                      }}
-                      variant="destructive"
-                      type="button"
-                      class="agent-delete-confirm"
-                      disabled={deleting()}
-                      onClick={() => void confirmDelete()}
-                    >
-                      {deleting() ? "Deleting…" : "Delete"}
-                    </Button>
-                  </div>
-                </AlertDialog.Content>
-              </AlertDialog.Overlay>
-            </AlertDialog.Portal>
-          )}
-        </Show>
-      </AlertDialog.Root>
+      <Show when={deleteTarget()}>
+        {(agent) => (
+          <ConfirmDialog
+            {...shared}
+            open
+            pending={deleting()}
+            error={deleteError()}
+            media={<AgentAvatar agent={agent()} style={{ width: "44px", height: "44px" }} />}
+            title={`Delete ${agent().name}?`}
+            description="This removes the agent and its OpenBot conversation from the app. Its queue, memories, routines, and workspace are deleted. History stored separately by the connected CLI provider is not deleted."
+            onConfirm={confirmDelete}
+          />
+        )}
+      </Show>
 
-      <AlertDialog.Root
-        open={Boolean(channelDeleteTarget())}
-        onOpenChange={(open) => {
-          if (!open && !deleting()) closeDelete();
-        }}
-      >
-        <Show when={channelDeleteTarget()}>
-          {(channel) => (
-            <AlertDialog.Portal>
-              <AlertDialog.Overlay class="agent-delete-backdrop">
-                <AlertDialog.Content
-                  class="agent-delete-dialog"
-                  onOpenAutoFocus={(event) => {
-                    event.preventDefault();
-                    channelDeleteButton?.focus({ preventScroll: true });
-                  }}
-                >
-                  <ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />
-                  <AlertDialog.Title>Delete {channel().name}?</AlertDialog.Title>
-                  <AlertDialog.Description>
-                    This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore
-                    it. Member agents are kept.
-                  </AlertDialog.Description>
-                  <Show when={deleteError()}>{(message) => <p class="agent-delete-error">{message()}</p>}</Show>
-                  <div class="agent-delete-actions">
-                    <Button variant="outline" type="button" disabled={deleting()} onClick={closeDelete}>
-                      Cancel
-                    </Button>
-                    <Button
-                      ref={(element) => {
-                        channelDeleteButton = element;
-                      }}
-                      variant="destructive"
-                      type="button"
-                      class="agent-delete-confirm"
-                      disabled={deleting()}
-                      onClick={() => void confirmDelete()}
-                    >
-                      {deleting() ? "Deleting…" : "Delete"}
-                    </Button>
-                  </div>
-                </AlertDialog.Content>
-              </AlertDialog.Overlay>
-            </AlertDialog.Portal>
-          )}
-        </Show>
-      </AlertDialog.Root>
+      <Show when={channelDeleteTarget()}>
+        {(channel) => (
+          <ConfirmDialog
+            {...shared}
+            open
+            pending={deleting()}
+            error={deleteError()}
+            media={<ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />}
+            title={`Delete ${channel().name}?`}
+            description="This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore it. Member agents are kept."
+            onConfirm={confirmDelete}
+          />
+        )}
+      </Show>
 
-      <AlertDialog.Root
-        open={Boolean(sectionDeleteTarget())}
-        onOpenChange={(open) => {
-          if (!open && !deleting()) closeDelete();
-        }}
-      >
-        <Show when={sectionDeleteTarget()}>
-          {(section) => (
-            <AlertDialog.Portal>
-              <AlertDialog.Overlay class="agent-delete-backdrop">
-                <AlertDialog.Content
-                  class="agent-delete-dialog sidebar-section-delete-dialog"
-                  onOpenAutoFocus={(event) => {
-                    event.preventDefault();
-                    sectionDeleteButton?.focus({ preventScroll: true });
-                  }}
-                >
-                  <span class="sidebar-section-delete-icon" aria-hidden="true">
-                    <Trash2 class="size-5" />
-                  </span>
-                  <AlertDialog.Title>Delete {section().name}?</AlertDialog.Title>
-                  <AlertDialog.Description>
-                    Agents in this section will move to Unassigned. No agents will be deleted.
-                  </AlertDialog.Description>
-                  <Show when={deleteError()}>{(message) => <p class="agent-delete-error">{message()}</p>}</Show>
-                  <div class="agent-delete-actions">
-                    <Button variant="outline" type="button" disabled={deleting()} onClick={closeDelete}>
-                      Cancel
-                    </Button>
-                    <Button
-                      ref={(element) => {
-                        sectionDeleteButton = element;
-                      }}
-                      variant="destructive"
-                      type="button"
-                      class="agent-delete-confirm"
-                      disabled={deleting()}
-                      onClick={() => void confirmSectionDelete()}
-                    >
-                      {deleting() ? "Deleting…" : "Delete"}
-                    </Button>
-                  </div>
-                </AlertDialog.Content>
-              </AlertDialog.Overlay>
-            </AlertDialog.Portal>
-          )}
-        </Show>
-      </AlertDialog.Root>
+      <Show when={sectionDeleteTarget()}>
+        {(section) => (
+          <ConfirmDialog
+            {...shared}
+            open
+            pending={deleting()}
+            error={deleteError()}
+            title={`Delete ${section().name}?`}
+            description="Agents in this section will move to Unassigned. No agents will be deleted."
+            onConfirm={confirmSectionDelete}
+          />
+        )}
+      </Show>
     </>
   );
 }
