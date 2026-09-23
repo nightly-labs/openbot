@@ -699,7 +699,7 @@ function providerActionClass(action: ProviderAction) {
  */
 export function freeModelsReady(option: ProviderPickerOption): boolean {
   if (!option.freeModels || option.state === "error" || option.state === "outdated") return false;
-  return option.runtimeStatus ? option.runtimeStatus.phase === "ready" : option.state === "sign-in-required";
+  return option.runtimeStatus?.phase === "ready";
 }
 
 /**

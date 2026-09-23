@@ -1,7 +1,7 @@
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { ProviderPicker, type ProviderPickerOption } from "./ProviderPicker";
+import { freeModelsReady, ProviderPicker, type ProviderPickerOption } from "./ProviderPicker";
 
 /*
  * The two provider rows OpenBot treats differently.
@@ -63,6 +63,14 @@ describe("ProviderPicker", () => {
     expect(onSignInProvider).toHaveBeenCalledWith("opencode");
     // Claude asks for a sign-in only while it is signed out, which `not-installed` is not.
     expect(view.queryByRole("button", { name: "Sign in to Claude" })).toBeNull();
+  });
+
+  it("reads free models as ready only once the OpenCode runtime is on disk", () => {
+    const signedOut = { ...openCode, freeModels: true, state: "sign-in-required" as const };
+    // Setup must not continue on a runtime status that has not arrived: nothing would start it.
+    expect(freeModelsReady(signedOut)).toBe(false);
+    expect(freeModelsReady({ ...signedOut, runtimeStatus: runtime({ phase: "not-downloaded" }) })).toBe(false);
+    expect(freeModelsReady({ ...signedOut, runtimeStatus: runtime({}) })).toBe(true);
   });
 
   it("opens the OpenCode key dialog from Reconnect, with no second Sign in button", () => {
