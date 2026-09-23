@@ -4,8 +4,8 @@
  */
 
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { applyMcpFlow, type McpKeyFlow, mcpFlowComplete } from "@openbot/ui/features/settings/mcp-connect-auth";
 import { describe, expect, it } from "vitest";
-import { applyMcpFlow, type McpKeyFlow, mcpFlowComplete } from "./mcp-connect-auth";
 
 const HTTP: McpServerConfig = {
   id: "",

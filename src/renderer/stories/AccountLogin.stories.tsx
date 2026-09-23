@@ -1,8 +1,8 @@
 import type { CentralAuthState } from "@openbot/contracts/ipc";
+import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { createSignal } from "solid-js";
 import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AccountLogin } from "../src/features/account/AccountLogin";
 
 const signedOut: CentralAuthState = { status: "signed_out" };
 

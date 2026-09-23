@@ -1,6 +1,6 @@
+import { AttachmentCards, AttachmentDownloadAll } from "@openbot/ui/features/conversation/AttachmentCards";
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AttachmentCards, AttachmentDownloadAll } from "../src/features/conversation/AttachmentCards";
 import { STORY_ATTACHMENTS } from "./fixtures";
 
 const compactFile = {

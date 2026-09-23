@@ -1,10 +1,10 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import type { MessageCitation } from "@openbot/ui/data";
+import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import type { MessageCitation } from "../src/data";
-import { RichMessageText } from "../src/features/conversation/RichMessageText";
 import { STORY_AGENTS, STORY_ATTACHMENTS, STORY_INSTALLED_SKILLS } from "./fixtures";
 
 const args: Parameters<typeof RichMessageText>[0] = {

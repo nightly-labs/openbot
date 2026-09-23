@@ -1,5 +1,6 @@
 import { MCP_SERVERS_CAPABILITY, type McpServerConfig } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal } from "solid-js";
+import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps } from "../conversation-types";
 
 export interface McpServersStoreDeps {
@@ -34,8 +35,8 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
       setMcpServers([]);
       return;
     }
-    void window.openbot.agent
-      .listMcpServers(serverId)
+    void conversationRuntime(deps.props)
+      .agent.listMcpServers(serverId)
       .then((servers) => {
         if (current === request) setMcpServers(servers);
       })

@@ -17,9 +17,6 @@ import type {
 } from "@openbot/contracts/ipc";
 import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { createEffect, createSignal, Show } from "solid-js";
-import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
-import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import {
   Button,
   CircleArrowDown,
@@ -30,22 +27,25 @@ import {
   Tabs,
   Text,
   UserRound,
-} from "../../components/ui";
+} from "@openbot/ui";
+import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
+import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
+import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
+import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
+import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
+import { createSettingsMobileConnectStore } from "@openbot/ui/features/settings/stores/mobile-connect-store";
+import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
+import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores/updates-store";
+import { createEffect, createSignal, Show } from "solid-js";
+import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
-import type { GeneralSettingsValue } from "./app-settings";
-import { OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
-import { SaveBarDock, SettingsDialogShell } from "./SettingsDialogShell";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsHostedSitesTab } from "./SettingsHostedSitesTab";
-import { SettingsMobileConnectTab } from "./SettingsMobileConnectTab";
-import { SettingsProfileTab } from "./SettingsProfileTab";
-import { SettingsUpdatesTab } from "./SettingsUpdatesTab";
 import { createSettingsGeneralStore } from "./stores/general-store";
 import { createSettingsHostedSitesStore } from "./stores/hosted-sites-store";
-import { createSettingsMobileConnectStore } from "./stores/mobile-connect-store";
-import { createSettingsProfileStore } from "./stores/profile-store";
-import { createSettingsUpdatesStore } from "./stores/updates-store";
 
 export interface SettingsModalProps {
   open: boolean;

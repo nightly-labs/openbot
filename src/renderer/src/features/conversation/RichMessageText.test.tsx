@@ -1,9 +1,9 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
+import { DataTable } from "@openbot/ui/features/conversation/DataTable";
+import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
+import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DataTable } from "./DataTable";
-import { MarkdownFilePreview } from "./MarkdownFilePreview";
-import { RichMessageText } from "./RichMessageText";
 
 const previewCallbacks = {
   onSelectAgent: vi.fn(),

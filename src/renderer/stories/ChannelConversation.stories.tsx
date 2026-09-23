@@ -1,15 +1,15 @@
+import { ArrowUp, Button, Plus, X } from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
+import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
+import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import { UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import type { JSX } from "@solidjs/web";
 import { createStore, For, Show } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ArrowUp, Button, Plus, X } from "../src/components/ui";
-import type { AgentMessage } from "../src/data";
-import { ChannelActivityIndicator, type ChannelWorker } from "../src/features/channels/ChannelActivityIndicator";
-import { ChannelStoppedTasks } from "../src/features/channels/ChannelStoppedTasks";
-import { ChatMessageRow } from "../src/features/conversation/ChatMessageRow";
-import { ComposerEditor } from "../src/features/conversation/ComposerEditor";
-import { MessageActions } from "../src/features/conversation/MessageRendering";
-import { UnreadMessagesDivider } from "../src/features/conversation/UnreadMessages";
 import { STORY_AGENTS } from "./fixtures";
 
 /*

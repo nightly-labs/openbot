@@ -1,6 +1,6 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
-import { readPanelWidth } from "./components/PanelResizer";
+import { readPanelWidth } from "./components/panel-width-storage";
 import {
   CONVERSATION_MIN_WIDTH,
   LEFT_PANEL_COLLAPSED_STORAGE_KEY,

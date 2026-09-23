@@ -1,8 +1,8 @@
 import type { RemoteDesktopErrorCode, RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
+import { RemoteDesktopWorkspace } from "@openbot/ui/features/remote-desktop/RemoteDesktopWorkspace";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
-import { RemoteDesktopWorkspace } from "./RemoteDesktopWorkspace";
 
 const server: ServerSummary = {
   id: "remote-1",

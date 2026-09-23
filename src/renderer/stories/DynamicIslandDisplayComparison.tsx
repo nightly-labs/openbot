@@ -1,7 +1,7 @@
+import type { DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { BatteryFull, Bot, Wifi } from "lucide-solid";
 import { type Accessor, createSignal, untrack } from "solid-js";
-import type { DynamicIslandStateChangeReason, DynamicIslandViewState } from "../src/components/ui";
 
 export interface DynamicIslandStoryPreviewContext {
   displayMode: "notch" | "island";

@@ -1,7 +1,7 @@
 import type { AgentApproval } from "@openbot/contracts/ipc";
+import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ApprovalCard } from "../src/features/conversation/ConversationPrompts";
 
 const approval: AgentApproval = {
   requestId: "approval-story",

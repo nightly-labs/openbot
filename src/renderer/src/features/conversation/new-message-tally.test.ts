@@ -1,7 +1,12 @@
 import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
+import type { AgentMessage } from "@openbot/ui/data";
+import {
+  anchorNewMessages,
+  countableTimelineMessage,
+  type TimelineRow,
+  tallyNewMessages,
+} from "@openbot/ui/features/conversation/new-message-tally";
 import { describe, expect, it } from "vitest";
-import type { AgentMessage } from "../../data";
-import { anchorNewMessages, countableTimelineMessage, type TimelineRow, tallyNewMessages } from "./new-message-tally";
 
 const empty = { count: 0, anchorId: undefined };
 

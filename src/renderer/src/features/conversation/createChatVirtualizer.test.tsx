@@ -1,7 +1,10 @@
+import {
+  chatHistoryBoundaryReached,
+  createChatVirtualizer,
+} from "@openbot/ui/features/conversation/createChatVirtualizer";
 import { render, screen, waitFor } from "@solidjs/testing-library";
 import { createMemo, createSignal, For } from "solid-js";
 import { describe, expect, it } from "vitest";
-import { chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 
 describe("chat virtualizer", () => {
   it("renders an appended row without entering a refresh loop", async () => {

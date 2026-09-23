@@ -1,5 +1,5 @@
+import { Heading, Progress, RadialProgress, Text } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Heading, Progress, RadialProgress, Text } from "../src/components/ui";
 
 const meta = {
   title: "Foundations/Progress",

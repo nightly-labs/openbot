@@ -6,10 +6,10 @@ import type {
   TeamInviteSummary,
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
+import { Toaster } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Toaster } from "../../components/ui";
 import { createMockOpenBot } from "../../preview/mock-openbot";
 import { mcpToolRuntimeNote as note } from "./mcp-servers";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "./ServerSettingsModal";

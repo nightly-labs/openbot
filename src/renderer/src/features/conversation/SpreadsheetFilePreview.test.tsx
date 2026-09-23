@@ -1,7 +1,7 @@
+import { parseSpreadsheet, SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { parseSpreadsheet, SpreadsheetFilePreview } from "./SpreadsheetFilePreview";
 
 function workbook(): Uint8Array {
   return zipSync({

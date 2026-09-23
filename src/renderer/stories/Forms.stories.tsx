@@ -1,7 +1,7 @@
+import { Button, Field, Heading, Input, NativeSelect, Textarea } from "@openbot/ui";
 import { createSignal } from "solid-js";
 import { expect } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Button, Field, Heading, Input, NativeSelect, Textarea } from "../src/components/ui";
 
 const meta = {
   title: "Foundations/Forms",

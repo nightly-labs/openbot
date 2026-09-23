@@ -6,6 +6,8 @@ import type {
   ConversationReadState,
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
+import type { AgentMessage } from "@openbot/ui/data";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
@@ -17,8 +19,6 @@ import {
   withoutAgent,
 } from "../../app-message-projection";
 import { createStoredMessage, updateStored } from "../../app-stored-values";
-import type { AgentMessage } from "../../data";
-import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";

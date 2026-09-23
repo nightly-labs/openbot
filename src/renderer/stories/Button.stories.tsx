@@ -1,5 +1,5 @@
+import { Button, CopyButton, Heading, IconButton, Plus, Search, Text, Trash2 } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Button, CopyButton, Heading, IconButton, Plus, Search, Text, Trash2 } from "../src/components/ui";
 
 const meta = {
   title: "Foundations/Button",

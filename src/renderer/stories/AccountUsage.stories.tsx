@@ -1,7 +1,10 @@
+import { AccountUsageDetails } from "@openbot/ui/features/account/AccountUsageDetails";
+import {
+  type AccountUsageProviderRow,
+  accountUsageProviderRows,
+} from "@openbot/ui/features/account/account-usage-view";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AccountUsageDetails } from "../src/features/account/AccountUsageDetails";
-import { type AccountUsageProviderRow, accountUsageProviderRows } from "../src/features/account/account-usage-view";
 
 const mixedRows = accountUsageProviderRows({
   limits: [

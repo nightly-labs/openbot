@@ -1,6 +1,6 @@
+import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { JoinServerDialog } from "../src/features/servers/JoinServerDialog";
 
 const preview = {
   serverId: "00000000-0000-4000-8000-000000000000",

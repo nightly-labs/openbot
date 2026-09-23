@@ -1,5 +1,3 @@
-import type { JSX } from "@solidjs/web";
-import { createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import {
   AlertDialog,
   Badge,
@@ -26,7 +24,9 @@ import {
   Switch,
   Text,
   Trash2,
-} from "../../components/ui";
+} from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
+import { createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import {
   emptyMcpConfig,
   type McpServerConfig,

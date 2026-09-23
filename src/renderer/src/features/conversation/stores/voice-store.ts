@@ -1,10 +1,11 @@
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import { errorMessage } from "../../../error-message";
 import { appendVoiceTranscript, recordingToWav } from "../../../voice-recording";
 import { EMPTY_DRAFT } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
+import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 import { voiceCaptureError, voiceTranscriptionError } from "../voice-status";
 
@@ -74,7 +75,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     deps.setVoicePhase("preparing");
     deps.setVoiceModelProgress(0);
     try {
-      const modelStatus = await window.openbot.voice.prepareModel();
+      const modelStatus = await conversationRuntime(deps.props).voice.prepareModel();
       if (resources.voiceDisposed || resources.voiceRequestGeneration !== generation) return;
       if (modelStatus.phase !== "ready") {
         deps.setVoicePhase("idle");
@@ -118,7 +119,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     }
   }
 
-  const removeVoiceModelListener = window.openbot.voice.onModelStatus((status) => {
+  const removeVoiceModelListener = conversationRuntime(deps.props).voice.onModelStatus((status) => {
     if (deps.voicePhase() !== "preparing") return;
     deps.setVoiceModelProgress(status.progress);
   });
@@ -151,7 +152,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     try {
       if (chunks.length === 0) throw new Error("No speech was recorded.");
       const audio = await recordingToWav(new Blob(chunks, { type: mimeType }));
-      const result = await window.openbot.voice.transcribe({ audio });
+      const result = await conversationRuntime(deps.props).voice.transcribe({ audio });
       if (!result.text.trim()) throw new Error("No speech was detected.");
       analytics.track("voice_transcription", {
         result: "succeeded",

@@ -9,11 +9,11 @@
  * and the notification it leaves behind are watchable and not only described.
  */
 
+import { Toaster, toast } from "@openbot/ui";
+import { ProviderCodeLoginDialog, type ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ProviderCodeLoginDialog, type ProviderCodeLoginState } from "../src/components/ProviderCodeLoginDialog";
-import { Toaster, toast } from "../src/components/ui";
 
 const USER_CODE = "KTQ4-B62MX";
 const VERIFICATION_URL = "https://auth.openai.com/codex/device";

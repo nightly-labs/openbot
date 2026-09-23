@@ -6,10 +6,10 @@
  * server accepts; anything else is refused, so a refusal is a state the dialog reached.
  */
 
+import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
+import type { McpKeyFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { McpKeyDialog } from "../src/features/settings/McpKeyDialog";
-import type { McpKeyFlow } from "../src/features/settings/mcp-connect-auth";
 import {
   AAVE,
   CONNECT_GLOBALS,

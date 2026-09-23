@@ -1,4 +1,5 @@
 import type { AgentStatus, AgentSummary, ConversationPage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { Toaster, toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, Show } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -16,13 +17,12 @@ import {
   testConversationPage,
   testServer,
 } from "./app-test-harness";
-import { Toaster, toast } from "./components/ui";
 import { AGENT_SELECTION_STORAGE_KEY } from "./features/agents/agent-selection";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversation } from "./features/conversation/conversation-context";
 import { useServers } from "./features/servers/servers-context";
-import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
-import { SIDEBAR_COLLAPSED_STORAGE_KEY } from "./features/sidebar/sidebar-sections";
+import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
+import { SIDEBAR_COLLAPSED_STORAGE_KEY } from "./features/sidebar/sidebar-sections-storage";
 import { useLayout } from "./layout";
 import { useNavigation } from "./navigation";
 import { useProviders } from "./providers";

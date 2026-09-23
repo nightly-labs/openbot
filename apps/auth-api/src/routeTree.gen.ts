@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as AppPreviewRouteImport } from './routes/app-preview'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
@@ -30,6 +31,7 @@ import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
 import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as V1MeRouteImport } from './routes/v1/me'
+import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
 import { Route as PluginsIconSlugRouteImport } from './routes/plugins/icon/$slug'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
@@ -92,6 +94,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/app.lazy').then((d) => d.Route))
 const AppPreviewRoute = AppPreviewRouteImport.update({
   id: '/app-preview',
   path: '/app-preview',
@@ -191,6 +198,11 @@ const PluginsSlugRoute = PluginsSlugRouteImport.update({
 const V1MeRoute = V1MeRouteImport.update({
   id: '/v1/me',
   path: '/v1/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBrowserSplatRoute = ApiBrowserSplatRouteImport.update({
+  id: '/api/browser/$',
+  path: '/api/browser/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PluginsIconSlugRoute = PluginsIconSlugRouteImport.update({
@@ -497,6 +509,7 @@ const V2RemoteHostsHostIdMembersMembershipIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
   '/report-site': typeof ReportSiteRoute
@@ -517,6 +530,7 @@ export interface FileRoutesByFullPath {
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
+  '/api/browser/$': typeof ApiBrowserSplatRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
@@ -576,6 +590,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
   '/report-site': typeof ReportSiteRoute
@@ -596,6 +611,7 @@ export interface FileRoutesByTo {
   '/guides': typeof GuidesIndexRoute
   '/news': typeof NewsIndexRoute
   '/plugins': typeof PluginsIndexRoute
+  '/api/browser/$': typeof ApiBrowserSplatRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
@@ -656,6 +672,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
   '/report-site': typeof ReportSiteRoute
@@ -676,6 +693,7 @@ export interface FileRoutesById {
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
+  '/api/browser/$': typeof ApiBrowserSplatRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
@@ -737,6 +755,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/app'
     | '/app-preview'
     | '/join'
     | '/report-site'
@@ -757,6 +776,7 @@ export interface FileRouteTypes {
     | '/guides/'
     | '/news/'
     | '/plugins/'
+    | '/api/browser/$'
     | '/plugins/icon/$slug'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
@@ -816,6 +836,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app'
     | '/app-preview'
     | '/join'
     | '/report-site'
@@ -836,6 +857,7 @@ export interface FileRouteTypes {
     | '/guides'
     | '/news'
     | '/plugins'
+    | '/api/browser/$'
     | '/plugins/icon/$slug'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
@@ -895,6 +917,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/app'
     | '/app-preview'
     | '/join'
     | '/report-site'
@@ -915,6 +938,7 @@ export interface FileRouteTypes {
     | '/guides/'
     | '/news/'
     | '/plugins/'
+    | '/api/browser/$'
     | '/plugins/icon/$slug'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
@@ -975,6 +999,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRoute
   AppPreviewRoute: typeof AppPreviewRoute
   JoinRoute: typeof JoinRoute
   ReportSiteRoute: typeof ReportSiteRoute
@@ -995,6 +1020,7 @@ export interface RootRouteChildren {
   GuidesIndexRoute: typeof GuidesIndexRoute
   NewsIndexRoute: typeof NewsIndexRoute
   PluginsIndexRoute: typeof PluginsIndexRoute
+  ApiBrowserSplatRoute: typeof ApiBrowserSplatRoute
   PluginsIconSlugRoute: typeof PluginsIconSlugRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
@@ -1048,6 +1074,13 @@ declare module '@tanstack/solid-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app-preview': {
@@ -1188,6 +1221,13 @@ declare module '@tanstack/solid-router' {
       path: '/v1/me'
       fullPath: '/v1/me'
       preLoaderRoute: typeof V1MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/browser/$': {
+      id: '/api/browser/$'
+      path: '/api/browser/$'
+      fullPath: '/api/browser/$'
+      preLoaderRoute: typeof ApiBrowserSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plugins/icon/$slug': {
@@ -1692,6 +1732,7 @@ const V1MarketplaceAgentsAdminSubmissionsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRoute,
   AppPreviewRoute: AppPreviewRoute,
   JoinRoute: JoinRoute,
   ReportSiteRoute: ReportSiteRoute,
@@ -1713,6 +1754,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesIndexRoute: GuidesIndexRoute,
   NewsIndexRoute: NewsIndexRoute,
   PluginsIndexRoute: PluginsIndexRoute,
+  ApiBrowserSplatRoute: ApiBrowserSplatRoute,
   PluginsIconSlugRoute: PluginsIconSlugRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,

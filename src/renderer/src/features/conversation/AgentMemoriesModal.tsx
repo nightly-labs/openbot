@@ -1,10 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { MemoryEntry } from "@openbot/contracts/ipc";
+import { Button, Dialog, IconButton, Plus, Textarea, Trash2, X } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { createScrollFades } from "../../components/createScrollFades";
-import { Button, Dialog, IconButton, Plus, Textarea, Trash2, X } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import type { MemoriesPort } from "./memories-port";
 
 interface AgentMemoriesModalProps {

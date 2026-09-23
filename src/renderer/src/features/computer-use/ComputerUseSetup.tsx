@@ -1,5 +1,4 @@
 import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
-import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import {
   Alert,
   AlertActions,
@@ -24,8 +23,9 @@ import {
   SettingsSection,
   Skeleton,
   TriangleAlert,
-} from "../../components/ui";
-import { errorMessage } from "../../error-message";
+} from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 
 export interface ComputerUseSetupProps {
   /**

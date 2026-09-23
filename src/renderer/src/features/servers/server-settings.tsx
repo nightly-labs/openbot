@@ -7,9 +7,9 @@ import type {
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createSignal, flush } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { errorMessage } from "../../error-message";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "./servers-context";
 

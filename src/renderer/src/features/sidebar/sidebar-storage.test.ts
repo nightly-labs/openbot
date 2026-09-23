@@ -1,3 +1,4 @@
+import { normalizeSidebarPinnedItems, reownSidebarPinnedItems } from "@openbot/ui/features/sidebar/sidebar-pins";
 import { describe, expect, it, vi } from "vitest";
 import {
   normalizeSidebarPeopleOrder,
@@ -5,14 +6,8 @@ import {
   SIDEBAR_PEOPLE_ORDER_STORAGE_KEY,
   writeSidebarPeopleOrder,
 } from "./sidebar-people-order";
-import {
-  normalizeSidebarPinnedItems,
-  readSidebarPins,
-  reownSidebarPinnedItems,
-  SIDEBAR_PINS_STORAGE_KEY,
-  writeSidebarPins,
-} from "./sidebar-pins";
-import { readSidebarCollapsed, SIDEBAR_COLLAPSED_STORAGE_KEY, writeSidebarCollapsed } from "./sidebar-sections";
+import { readSidebarPins, SIDEBAR_PINS_STORAGE_KEY, writeSidebarPins } from "./sidebar-pins-storage";
+import { readSidebarCollapsed, SIDEBAR_COLLAPSED_STORAGE_KEY, writeSidebarCollapsed } from "./sidebar-sections-storage";
 
 describe("sidebar collapsed sections", () => {
   it("reads separate server lists and removes duplicates and invalid values", () => {

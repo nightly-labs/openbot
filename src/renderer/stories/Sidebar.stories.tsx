@@ -1,12 +1,12 @@
 import type { ChannelSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { AvatarMood } from "@openbot/ui/bloub-avatar";
+import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
+import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
+import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { createSignal, untrack } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import type { AvatarMood } from "../src/bloub-avatar";
-import { Sidebar } from "../src/features/sidebar/Sidebar";
-import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "../src/features/sidebar/sidebar-pins";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
-import type { SidebarAgentState } from "../src/features/sidebar/sidebar-types";
 import { STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
 
 const agentStates: Record<string, SidebarAgentState> = {

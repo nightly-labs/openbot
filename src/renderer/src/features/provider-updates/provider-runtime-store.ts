@@ -6,11 +6,11 @@ import {
   type ProviderRuntimeSnapshot,
   type ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
+import { type ProviderUpdate, providerUpdatesToAnnounce } from "@openbot/ui/features/provider-updates/provider-update";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
-import { errorMessage } from "../../error-message";
-import { type ProviderUpdate, providerUpdatesToAnnounce } from "./provider-update";
 import {
   dismissProviderUpdateToast,
   hideProviderUpdateToast,

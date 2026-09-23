@@ -108,7 +108,10 @@ async function serveLocalHostedSite(
 }
 
 function isEmailSignInStart(request: Request): boolean {
-  return request.method === "POST" && new URL(request.url).pathname === "/v1/auth/email/start";
+  return (
+    request.method === "POST" &&
+    ["/v1/auth/email/start", "/api/browser/email/start"].includes(new URL(request.url).pathname)
+  );
 }
 
 function isDailyRetentionRun(scheduledTime: number): boolean {

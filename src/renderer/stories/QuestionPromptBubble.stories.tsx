@@ -1,7 +1,4 @@
 import type { AgentPromptQuestion } from "@openbot/contracts/ipc";
-import { expect, fn, waitFor } from "storybook/test";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { QuestionPromptBubble, type QuestionPromptBubbleProps } from "../src/components/QuestionPromptBubble";
 import {
   ArrowUp,
   Bubble,
@@ -13,8 +10,11 @@ import {
   MessageFooter,
   Plus,
   Textarea,
-} from "../src/components/ui";
-import { AgentAvatar } from "../src/features/agents/AgentAvatar";
+} from "@openbot/ui";
+import { QuestionPromptBubble, type QuestionPromptBubbleProps } from "@openbot/ui/components/QuestionPromptBubble";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { expect, fn, waitFor } from "storybook/test";
+import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const singleQuestion: AgentPromptQuestion[] = [
   {

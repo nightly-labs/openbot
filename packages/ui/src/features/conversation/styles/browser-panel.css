@@ -1,0 +1,346 @@
+.browser-panel-header {
+  display: flex;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--openbot-border);
+  padding: 0 8px;
+}
+
+.browser-pip-controls-document,
+.browser-pip-controls-document body,
+.browser-pip-controls-document #root {
+  background: transparent;
+}
+
+.browser-pip-hover-controls {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 4px;
+  opacity: 0;
+  transition: opacity var(--openbot-duration-fast) ease;
+  -webkit-app-region: drag;
+}
+
+.browser-pip-hover-controls:hover,
+.browser-pip-hover-controls:focus-within,
+.browser-pip-window-hover .browser-pip-hover-controls {
+  opacity: 1;
+}
+
+.browser-pip-hover-button {
+  display: grid;
+  width: 20px;
+  height: 22px;
+  flex: 0 0 20px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  padding: 0;
+  background: var(--openbot-bg-overlay);
+  color: var(--openbot-text-secondary);
+  -webkit-app-region: no-drag;
+}
+
+.browser-pip-hover-button:hover {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
+.browser-pip-hover-button .browser-toolbar-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.browser-pip-hover-button:active {
+  transform: scale(0.96);
+  transition: transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.browser-tabs {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  align-items: flex-end;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.browser-tab-strip {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: flex-end;
+  gap: 3px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.browser-tab-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.browser-tab-wrap {
+  position: relative;
+  width: 148px;
+  height: 28px;
+  flex: 0 0 148px;
+  scroll-snap-align: nearest;
+}
+
+.browser-tab {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--openbot-radius-sm) var(--openbot-radius-sm) 0 0;
+  background: transparent;
+  padding: 0 25px 0 8px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: left;
+}
+
+.browser-tab-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-tab:hover,
+.browser-tab[data-selected] {
+  background: var(--openbot-border);
+  color: var(--openbot-text-primary);
+}
+
+.browser-tab-controlled {
+  z-index: 1;
+}
+
+.browser-tab-controlled .browser-tab {
+  background: var(--openbot-accent-soft);
+  box-shadow:
+    inset 0 0 0 1px var(--openbot-accent),
+    0 0 12px var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+}
+
+.browser-tab-controlled .browser-tab[data-selected] {
+  background: var(--openbot-accent-soft);
+  box-shadow:
+    inset 0 0 0 1px var(--openbot-accent),
+    0 0 16px var(--openbot-accent-soft);
+}
+
+.browser-tab-control {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  place-items: center;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-text);
+}
+
+.browser-tab-control-icon {
+  width: 12px;
+  height: 12px;
+  overflow: visible;
+  fill: currentColor;
+}
+
+.browser-tab-control-acting {
+  animation: browser-tab-control-glow 1.15s ease-in-out infinite;
+}
+
+.browser-tab-close {
+  position: absolute;
+  top: 6px;
+  right: 5px;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-xs);
+  background: transparent;
+  color: inherit;
+}
+
+.browser-tab-close:hover {
+  background: var(--openbot-border);
+}
+
+.browser-tab-close svg {
+  width: 11px;
+  height: 11px;
+}
+
+.browser-new-tab,
+.browser-toolbar-button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--openbot-text-muted);
+}
+
+.browser-new-tab {
+  width: 24px;
+  height: 28px;
+  flex: 0 0 24px;
+  border-radius: var(--openbot-radius-xs);
+  scroll-snap-align: nearest;
+}
+
+.browser-new-tab:hover,
+.browser-toolbar-button:hover:not(:disabled) {
+  background: var(--openbot-border);
+  color: var(--openbot-text-primary);
+}
+
+.browser-tab-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  outline: 0;
+}
+
+.browser-toolbar {
+  display: flex;
+  height: 39px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  border-bottom: 1px solid var(--openbot-hover);
+  padding: 0 8px;
+}
+
+.browser-toolbar-button {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  border-radius: var(--openbot-radius-sm);
+}
+
+.browser-toolbar-button:disabled {
+  color: var(--openbot-text-dim);
+  cursor: default;
+}
+
+.browser-toolbar-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.browser-address-bar {
+  min-width: 0;
+  flex: 1;
+  margin: 0 2px;
+}
+
+.browser-recording-status,
+.browser-diagnostic-status {
+  display: inline-flex;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--openbot-radius-sm);
+  padding: 0 5px;
+  font-size: var(--openbot-text-sm);
+  line-height: 1;
+}
+
+.browser-recording-status {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
+}
+
+.browser-diagnostic-status {
+  background: var(--openbot-warning-soft);
+  color: var(--openbot-warning);
+}
+
+.browser-recording-status svg,
+.browser-diagnostic-status svg {
+  width: 12px;
+  height: 12px;
+}
+
+.browser-address-bar input {
+  display: block;
+  width: 100%;
+  height: 27px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+  outline: 0;
+  background: var(--openbot-hover);
+  padding: 0 9px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-address-bar input:focus {
+  border-color: var(--openbot-text-dim);
+  background: var(--openbot-border);
+}
+
+.browser-address-bar input:focus-visible {
+  outline: none;
+}
+
+.browser-surface {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: var(--openbot-bg-canvas);
+}
+
+/* The live view of a host's tab. It fills the surface the native view would have covered. */
+.browser-live-view {
+  position: absolute;
+  inset: 0;
+}
+
+.browser-live-view canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.browser-empty-state {
+  display: grid;
+  height: 100%;
+  place-content: center;
+  gap: 5px;
+  color: var(--openbot-text-muted);
+  text-align: center;
+}
+
+.browser-empty-state strong {
+  font-size: var(--openbot-text-lg);
+  font-weight: 600;
+}
+
+.browser-empty-state span {
+  font-size: var(--openbot-text-sm);
+}

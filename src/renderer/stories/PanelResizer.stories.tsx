@@ -1,6 +1,6 @@
+import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { PanelResizer } from "../src/components/PanelResizer";
 
 const meta = {
   title: "Layout/PanelResizer",

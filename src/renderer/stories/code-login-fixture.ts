@@ -9,10 +9,10 @@
  */
 
 import { type AgentProviderId, agentProviderDescriptor } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { createSignal } from "solid-js";
-import type { ProviderCodeLoginState } from "../src/components/ProviderCodeLoginDialog";
 import type { ProviderCodeLoginApi } from "../src/components/provider-code-login-api";
-import { toast } from "../src/components/ui";
 
 export interface FakeCodeLoginOptions {
   /** Seconds the fake other device takes. 0 leaves the code on screen for as long as the story is open. */

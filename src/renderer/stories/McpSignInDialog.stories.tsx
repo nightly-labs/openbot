@@ -6,8 +6,8 @@
  * the stage behind it reports it - so the story shows the hand-off as well as the dialog.
  */
 
+import { McpSignInDialog } from "@openbot/ui/features/settings/McpSignInDialog";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { McpSignInDialog } from "../src/features/settings/McpSignInDialog";
 import {
   CONNECT_GLOBALS,
   CONNECT_OUTCOMES,

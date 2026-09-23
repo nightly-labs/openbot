@@ -3,7 +3,7 @@ import { Link } from "@tanstack/solid-router";
 import { onSettled } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
-import { Button } from "../ui/button";
+import { Button, ButtonLink } from "../ui/button";
 import { DownloadSection } from "./DownloadSection";
 import { HeroDownloadSelector } from "./HeroDownloadSelector";
 import { LandingAppPreview } from "./LandingAppPreview";
@@ -54,6 +54,9 @@ export function LandingPage() {
           >
             Contact
           </Button>
+          <ButtonLink to="/app" variant="secondary" size="sm" icon="arrow-right">
+            App
+          </ButtonLink>
           <Button href={OPENBOT_LINKS.download} variant="primary" size="sm" icon="download">
             Download
           </Button>

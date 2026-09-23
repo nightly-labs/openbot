@@ -1,4 +1,4 @@
-import type { AgentMessage, ChatActionMarkerModel, RoutineRunMarkerTransition } from "../../data";
+import type { AgentMessage, ChatActionMarkerModel, RoutineRunMarkerTransition } from "@openbot/ui/data";
 
 type RoutineRunMarker = Extract<ChatActionMarkerModel, { kind: "routine-run" }>;
 

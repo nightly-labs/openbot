@@ -1,9 +1,9 @@
 import type { HostStatus, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
-import { toast } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "./server-capabilities";
 

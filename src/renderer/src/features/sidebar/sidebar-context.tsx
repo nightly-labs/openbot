@@ -1,4 +1,10 @@
 import type { ServerSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import {
+  normalizeSidebarPinnedItems,
+  reownSidebarPinnedItems,
+  type SidebarPinnedItem,
+  sidebarPinnedItemKey,
+} from "@openbot/ui/features/sidebar/sidebar-pins";
 import { createMemo, createSignal } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
@@ -9,21 +15,9 @@ import {
   type SidebarPeopleOrderByServer,
   writeSidebarPeopleOrder,
 } from "./sidebar-people-order";
-import {
-  normalizeSidebarPinnedItems,
-  readSidebarPins,
-  reownSidebarPinnedItems,
-  type SidebarPinnedItem,
-  type SidebarPinsByServer,
-  sidebarPinnedItemKey,
-  writeSidebarPins,
-} from "./sidebar-pins";
-import {
-  defaultSidebarLayout,
-  readSidebarCollapsed,
-  type SidebarCollapsedByServer,
-  writeSidebarCollapsed,
-} from "./sidebar-sections";
+import { readSidebarPins, type SidebarPinsByServer, writeSidebarPins } from "./sidebar-pins-storage";
+import { defaultSidebarLayout } from "./sidebar-sections";
+import { readSidebarCollapsed, type SidebarCollapsedByServer, writeSidebarCollapsed } from "./sidebar-sections-storage";
 
 /**
  * The shape of the agent list: the host's own section layout, plus the three

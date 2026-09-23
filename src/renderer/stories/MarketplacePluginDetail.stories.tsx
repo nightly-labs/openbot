@@ -1,8 +1,8 @@
+import { MarketplacePluginDetail } from "@openbot/ui/features/settings/MarketplacePluginDetail";
+import type { MarketplacePluginDetail as PluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import { createSignal } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { MarketplacePluginDetail } from "../src/features/settings/MarketplacePluginDetail";
-import type { MarketplacePluginDetail as PluginDetail } from "../src/features/settings/marketplace-plugins";
 import { STORY_MARKETPLACE_PLUGIN_AAVE as aave, STORY_AGENT_SUMMARIES } from "../src/preview/fixtures";
 
 /** The install target list, as the modal passes it: the agents on this computer. */

@@ -1,9 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
-import { desktopAnalytics } from "../../analytics";
-import { createScrollFades } from "../../components/createScrollFades";
-import { SkillPreview } from "../../components/SkillPreview";
 import {
   Button,
   ChevronRight,
@@ -16,11 +12,15 @@ import {
   Switch,
   Trash2,
   X,
-} from "../../components/ui";
-import { errorMessage } from "../../error-message";
+} from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { errorMessage } from "@openbot/ui/error-message";
+import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
+import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibraryToolbar";
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { desktopAnalytics } from "../../analytics";
+import { SkillPreview } from "../../components/SkillPreview";
 import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
-import { SkillGlyph } from "./SkillGlyph";
-import { SkillLibraryToolbar } from "./SkillLibraryToolbar";
 
 export type AgentSkillsMode = "mutable" | "readonly" | "hidden";
 

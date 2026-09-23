@@ -1,7 +1,7 @@
+import type { AgentMessage } from "@openbot/ui/data";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createSignal } from "solid-js";
 import { formatMessageTime } from "./app-message-projection";
-import type { AgentMessage } from "./data";
-import { errorMessage } from "./error-message";
 import { agentConversationKey } from "./features/conversation/conversation-keys";
 import { createSimpleContext } from "./simple-context";
 

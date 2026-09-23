@@ -10,13 +10,13 @@ import type {
   SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
-import type { ProviderCodeLoginState } from "../../components/ProviderCodeLoginDialog";
-import { toast } from "../../components/ui";
-import { DEFAULT_GENERAL_SETTINGS } from "./app-settings";
 import { SettingsModal } from "./SettingsModal";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 
