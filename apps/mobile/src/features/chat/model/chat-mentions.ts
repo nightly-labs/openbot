@@ -76,7 +76,7 @@ export function plainMentionParts<T extends { id: string; name: string }>(body: 
   for (const match of body.matchAll(expression)) {
     if (match.index > 0 && /[\p{L}\p{N}_@]/u.test(body.charAt(match.index - 1))) continue;
     if (match.index > cursor) parts.push({ text: body.slice(cursor, match.index), agent: undefined });
-    parts.push({ text: match[0], agent: byName.get(match[0].slice(1).toLocaleLowerCase()) });
+    parts.push({ text: match[0], agent: byName.get((match[1] ?? "").toLocaleLowerCase()) });
     cursor = match.index + match[0].length;
   }
   if (cursor < body.length) parts.push({ text: body.slice(cursor), agent: undefined });

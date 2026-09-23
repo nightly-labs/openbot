@@ -89,7 +89,7 @@ export function ProfileSettingsScreen() {
     });
     if (result.canceled) return;
     const [asset] = result.assets;
-    if (!asset) return;
+    if (!asset) throw new Error("Could not open this photo. Try again.");
     const file = new File(asset.uri);
     const mime = isAvatarMimeType(file.type) ? file.type : asset.mimeType || "";
     if (!isAvatarMimeType(mime)) throw new Error("Choose a JPEG, PNG, or WebP photo.");

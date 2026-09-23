@@ -326,7 +326,8 @@ export function ChatMessageList({
   const canLoadOlder = hasCachedOlder || (online && hasOlder && !olderLoading);
   const loadPrevious = () => {
     if (hasCachedOlder) {
-      setBoundary({ firstId: visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)]?.id ?? null, headId });
+      const first = visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)];
+      if (first) setBoundary({ firstId: first.id, headId });
     } else if (canLoadOlder) onLoadOlder();
   };
   const playbackEligible = (message: VisibleMessage) =>
