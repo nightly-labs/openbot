@@ -13,6 +13,7 @@ import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./AgentSkillsModal";
+import { conversationPort } from "./conversation-port";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
@@ -80,24 +81,24 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.skills.reopenAfterMarketplace = false;
       });
       if (!props.remoteClient) {
-        void window.openbot.agent
-          .listTables()
+        void conversationPort()
+          .agent.listTables()
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {
               state.tables.count = items.length;
             });
           });
-        void window.openbot.agent
-          .listMemories(agentId)
+        void conversationPort()
+          .agent.listMemories(agentId)
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {
               state.memories.count = items.length;
             });
           });
-        void window.openbot.agent
-          .listRoutines(agentId)
+        void conversationPort()
+          .agent.listRoutines(agentId)
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {

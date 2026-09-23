@@ -1,6 +1,7 @@
 import { Button, PanelRight, X } from "@openbot/ui";
 import { render } from "@solidjs/web";
 import "../../styles.css";
+import { browserPort } from "./browser-port";
 
 function BrowserPictureInPictureControls() {
   return (
@@ -11,7 +12,7 @@ function BrowserPictureInPictureControls() {
         class="browser-pip-hover-button"
         aria-label="Reattach browser to right sidebar"
         title="Reattach browser"
-        onClick={() => void window.openbot.browser.dockPictureInPicture()}
+        onClick={() => void browserPort().browser.dockPictureInPicture()}
       >
         <PanelRight class="browser-toolbar-icon" />
       </Button>
@@ -21,7 +22,7 @@ function BrowserPictureInPictureControls() {
         class="browser-pip-hover-button"
         aria-label="Close browser popup"
         title="Close browser popup"
-        onClick={() => void window.openbot.browser.hidePictureInPicture()}
+        onClick={() => void browserPort().browser.hidePictureInPicture()}
       >
         <X class="browser-toolbar-icon" />
       </Button>

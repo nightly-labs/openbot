@@ -2,6 +2,7 @@ import type { BrowserDisplayState } from "@openbot/contracts/ipc";
 import { render } from "@solidjs/web";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
 import "../../styles.css";
+import { browserPort } from "./browser-port";
 
 function BrowserPictureInPicture() {
   const [state, setState] = createSignal<BrowserDisplayState>({ tabs: [], activeTabId: null });
@@ -17,7 +18,7 @@ function BrowserPictureInPicture() {
   const syncBounds = () => {
     if (!surface) return;
     const bounds = surface.getBoundingClientRect();
-    void window.openbot.browser.setVisible({
+    void browserPort().browser.setVisible({
       visible: true,
       target: "picture-in-picture",
       bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
@@ -32,13 +33,15 @@ function BrowserPictureInPicture() {
     });
   };
 
-  const removeDisplayState = window.openbot.browser.onDisplayState(applyState);
+  const removeDisplayState = browserPort().browser.onDisplayState(applyState);
 
   onSettled(() => {
     const requestedAtRevision = stateRevision;
-    void window.openbot.browser.getDisplayState().then((next) => {
-      if (stateRevision === requestedAtRevision) applyState(next);
-    });
+    void browserPort()
+      .browser.getDisplayState()
+      .then((next) => {
+        if (stateRevision === requestedAtRevision) applyState(next);
+      });
     const observer = new ResizeObserver(scheduleBoundsSync);
     if (surface) observer.observe(surface);
     window.addEventListener("resize", scheduleBoundsSync);
@@ -52,7 +55,7 @@ function BrowserPictureInPicture() {
   onCleanup(() => {
     if (boundsFrame !== undefined) cancelAnimationFrame(boundsFrame);
     removeDisplayState();
-    void window.openbot.browser.setVisible({ visible: false, target: "picture-in-picture" });
+    void browserPort().browser.setVisible({ visible: false, target: "picture-in-picture" });
   });
 
   return (

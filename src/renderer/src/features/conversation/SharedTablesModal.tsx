@@ -4,6 +4,7 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type { AgentProfile } from "@openbot/ui/data";
 import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { conversationPort } from "./conversation-port";
 
 interface SharedTablesModalProps {
   /** Resolves an owner id to a name. The owner can be an agent the user deleted, hence the lookup. */
@@ -35,7 +36,7 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      const next = await window.openbot.agent.listTables();
+      const next = await conversationPort().agent.listTables();
       setTables(next);
       props.onCountChange(next.length);
     } catch (caught) {
@@ -58,7 +59,7 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
     setDeletingName(table.name);
     setError(null);
     try {
-      await window.openbot.agent.deleteTable({ name: table.name });
+      await conversationPort().agent.deleteTable({ name: table.name });
       setConfirmName(null);
       await loadTables(false);
     } catch (caught) {

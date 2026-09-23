@@ -15,6 +15,7 @@ import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
+import { conversationPort } from "./conversation-port";
 import { preserveKnownDirectUnread } from "./conversation-read-state";
 
 /** Keep live messages and completed reads that arrived after the recovery page was read. */
@@ -125,7 +126,7 @@ const DirectMessages = createSimpleContext({
         return;
       }
       try {
-        const threads = await window.openbot.servers.listDirectThreads();
+        const threads = await conversationPort().servers.listDirectThreads();
         if (!scopeIsCurrent() || request !== directThreadsRequest) return;
         setDirectThreads(threads);
       } catch {
@@ -154,8 +155,8 @@ const DirectMessages = createSimpleContext({
       const previousMemberId = activeDirectMemberId();
       if (previousMemberId && previousMemberId !== memberId) {
         pruneInactiveDirectHistory(previousMemberId);
-        void window.openbot.servers
-          .setDirectTyping({ memberId: previousMemberId, typing: false })
+        void conversationPort()
+          .servers.setDirectTyping({ memberId: previousMemberId, typing: false })
           .catch(() => undefined);
       }
       setActiveDirectMemberId(memberId);
@@ -174,7 +175,7 @@ const DirectMessages = createSimpleContext({
       setDirectConversationError(null);
       const request = ++directConversationRequest;
       try {
-        const page = await window.openbot.servers.readDirectConversationPage({
+        const page = await conversationPort().servers.readDirectConversationPage({
           memberId,
           anchor: { type: "latest" },
           limit: 50,
@@ -208,7 +209,7 @@ const DirectMessages = createSimpleContext({
       setDirectOlderLoading((current) => ({ ...current, [memberId]: true }));
       setDirectOlderErrors((current) => ({ ...current, [memberId]: null }));
       try {
-        const page = await window.openbot.servers.readDirectConversationPage({
+        const page = await conversationPort().servers.readDirectConversationPage({
           memberId,
           anchor: { type: "before", cursor },
           limit: 50,
@@ -243,7 +244,7 @@ const DirectMessages = createSimpleContext({
     async function openDirectMessage(memberId: string, messageId: string): Promise<void> {
       const request = ++directConversationRequest;
       try {
-        const page = await window.openbot.servers.readDirectConversationPage({
+        const page = await conversationPort().servers.readDirectConversationPage({
           memberId,
           anchor: { type: "around", messageId },
           limit: 50,
@@ -270,7 +271,7 @@ const DirectMessages = createSimpleContext({
       const serverKind = activeServer()?.kind ?? "unknown";
       let message: DirectMessage;
       try {
-        message = await window.openbot.servers.sendDirectMessage({
+        message = await conversationPort().servers.sendDirectMessage({
           memberId,
           text,
           clientMessageId,
@@ -316,7 +317,7 @@ const DirectMessages = createSimpleContext({
         .catch(() => undefined)
         .then(async () => {
           if (!scopeIsCurrent()) return;
-          const readState = await window.openbot.servers.markDirectRead({
+          const readState = await conversationPort().servers.markDirectRead({
             memberId,
             throughSequence: boundary,
           });
@@ -364,7 +365,9 @@ const DirectMessages = createSimpleContext({
     function setDirectTyping(typing: boolean): void {
       const memberId = activeDirectMemberId();
       if (!memberId) return;
-      void window.openbot.servers.setDirectTyping({ memberId, typing }).catch(() => undefined);
+      void conversationPort()
+        .servers.setDirectTyping({ memberId, typing })
+        .catch(() => undefined);
     }
 
     function mergeDirectMessage(memberId: string, message: DirectMessage): void {
@@ -489,10 +492,10 @@ const DirectMessages = createSimpleContext({
 
     onSettled(() => {
       if (!peopleEnabled) return undefined;
-      const unsubscribeMessage = window.openbot.servers.onDirectMessage((event) =>
+      const unsubscribeMessage = conversationPort().servers.onDirectMessage((event) =>
         flush(() => handleDirectMessageEvent(event)),
       );
-      const unsubscribeTyping = window.openbot.servers.onDirectTyping((event) =>
+      const unsubscribeTyping = conversationPort().servers.onDirectTyping((event) =>
         flush(() => handleDirectTypingEvent(event)),
       );
       return () => {
