@@ -8,6 +8,10 @@ export const APPLE_APP_SITE_ASSOCIATION = {
         appID: "ZTRDTUL87R.app.openbot.desktop",
         paths: ["/join"],
       },
+      {
+        appID: "ZTRDTUL87R.run.openbot.mobile",
+        paths: ["/join"],
+      },
     ],
   },
 };

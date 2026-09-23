@@ -116,6 +116,7 @@ export function ServerConnection({
       ref={attach}
       active={active}
       directory={directory}
+      onMembershipChanged={onMembershipChanged}
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={(update) => {
         if (update.hostId !== hostId) return;

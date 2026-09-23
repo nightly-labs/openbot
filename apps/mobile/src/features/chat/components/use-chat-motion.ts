@@ -4,6 +4,7 @@ import { useKeyboardHandler } from "react-native-keyboard-controller";
 import type Animated from "react-native-reanimated";
 import {
   cancelAnimation,
+  Easing,
   ReduceMotion,
   useAnimatedReaction,
   useAnimatedRef,
@@ -43,36 +44,66 @@ export function useChatMotion(
   // between during an interactive dismissal. The composer reads this to size
   // itself, so a swipe drives the shape change frame by frame.
   const keyboardProgress = useSharedValue(0);
-  // Track actual frames and completion, not the iOS provider's start-only target.
-  // A render while the reply streams must not restore a dismissed keyboard's lift.
+  const keyboardDismissed = useSharedValue(false);
+  // Track opening and interactive frames. Once dismissal starts, finish the
+  // return independently so a missing completion cannot retain keyboard space.
   useKeyboardHandler(
     {
+      onStart: (event) => {
+        "worklet";
+        if (event.height > 0) {
+          cancelAnimation(keyboardHeight);
+          cancelAnimation(keyboardProgress);
+          keyboardDismissed.set(false);
+        } else {
+          // Complete the return from the destination event. An interrupted iOS
+          // dismissal can omit its final frame; subsequent drag frames must not
+          // cancel this animation and leave the composer above an absent keyboard.
+          keyboardDismissed.set(true);
+          const timing = {
+            duration: Math.max(0, event.duration),
+            easing: Easing.out(Easing.cubic),
+            reduceMotion: ReduceMotion.System,
+          };
+          keyboardHeight.set(withTiming(0, timing));
+          keyboardProgress.set(withTiming(0, timing));
+        }
+      },
       onMove: (event) => {
         "worklet";
-        keyboardHeight.set(event.height);
+        if (keyboardDismissed.get()) return;
+        keyboardHeight.set(event.progress === 0 ? 0 : event.height);
         keyboardProgress.set(event.progress);
       },
       onInteractive: (event) => {
         "worklet";
-        keyboardHeight.set(event.height);
+        if (keyboardDismissed.get()) return;
+        keyboardHeight.set(event.progress === 0 ? 0 : event.height);
         keyboardProgress.set(event.progress);
       },
       onEnd: (event) => {
         "worklet";
-        keyboardHeight.set(event.height);
-        keyboardProgress.set(event.progress);
+        if (event.height <= 0 || event.progress === 0) {
+          keyboardDismissed.set(true);
+          keyboardHeight.set(0);
+          keyboardProgress.set(0);
+        } else if (!keyboardDismissed.get()) {
+          keyboardHeight.set(event.height);
+          keyboardProgress.set(event.progress);
+        }
       },
     },
-    [keyboardHeight, keyboardProgress],
+    [keyboardHeight, keyboardProgress, keyboardDismissed],
   );
   useEffect(() => {
     // A native picker or interrupted dismissal can omit the controller's final frame.
     const subscription = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardDismissed.set(true);
       keyboardHeight.set(0);
       keyboardProgress.set(0);
     });
     return () => subscription.remove();
-  }, [keyboardHeight, keyboardProgress]);
+  }, [keyboardHeight, keyboardProgress, keyboardDismissed]);
   const composerStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, keyboardHeight.get() - keyboardOffset) }],
   }));
@@ -91,6 +122,7 @@ export function useChatMotion(
   const [responseVisible, setResponseVisible] = useState(true);
   const pending = useRef<{ baseline: string | null; first: boolean } | null>(null);
   const followLatest = useRef(true);
+  const [keyboardLiftBehavior, setKeyboardLiftBehavior] = useState<"whenAtEnd" | "never">("whenAtEnd");
   const pendingRequiredInput = useRef<{ id: string; contentRevision: number } | null>(null);
   const lastRequiredInputId = useRef(requiredInputId);
   const frame = useRef<number | null>(null);
@@ -295,7 +327,6 @@ export function useChatMotion(
     [scrollY],
   );
   const updateAtLatest = useCallback((visible: boolean) => {
-    if (visible) followLatest.current = true;
     setAtLatest(visible);
   }, []);
   useAnimatedReaction(
@@ -320,8 +351,11 @@ export function useChatMotion(
   const responseStyle = useAnimatedStyle(() => ({ opacity: responseOpacity.get() }));
 
   const needsSendPosition = useCallback(() => pending.current !== null, []);
+  const needsInitialPosition = useCallback(() => !measurements.current.initialized, []);
 
   function beginSend() {
+    followLatest.current = true;
+    setKeyboardLiftBehavior("whenAtEnd");
     const first = current.current.lastUserId === null;
     pending.current = { baseline: current.current.lastUserId, first };
     if (first) {
@@ -340,12 +374,29 @@ export function useChatMotion(
   }
   function onScrollBeginDrag() {
     followLatest.current = false;
+    setKeyboardLiftBehavior("never");
     pendingRequiredInput.current = null;
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    measurements.current.initialized = true;
+    revealed.set(true);
+    setHistoryVisible(true);
     cancelSend();
+  }
+  function onScrollEndDrag(event: { nativeEvent: Pick<NativeScrollEvent, "contentOffset"> }) {
+    // Only a user scroll can resume following. Keyboard dismissal can make the
+    // reply visible without the user choosing to return to it.
+    followLatest.current = chatContentIsVisible(
+      measurements.current.layout,
+      event.nativeEvent.contentOffset.y,
+      measurements.current.composer + Math.max(0, keyboardHeight.get() - keyboardOffset),
+    );
+    setKeyboardLiftBehavior(followLatest.current ? "whenAtEnd" : "never");
   }
   function scrollToLatest() {
     const m = measurements.current;
     followLatest.current = true;
+    setKeyboardLiftBehavior("whenAtEnd");
     ref.current?.scrollTo({ y: chatEndOffset(m.layout, m.inset), animated: !reducedMotion });
   }
 
@@ -359,6 +410,7 @@ export function useChatMotion(
     composerStyle,
     keyboardHeight,
     keyboardProgress,
+    keyboardLiftBehavior,
     blankSpace,
     historyStyle,
     firstMessageStyle,
@@ -372,8 +424,10 @@ export function useChatMotion(
     onContentInsetChange,
     onScroll,
     onScrollBeginDrag,
+    onScrollEndDrag,
     beginSend,
     needsSendPosition,
+    needsInitialPosition,
     cancelSend,
     scrollToLatest,
   };

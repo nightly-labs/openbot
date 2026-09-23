@@ -451,13 +451,16 @@ describe("RemoteControlPlane", () => {
     expect(database.prepare("SELECT ended_at FROM remote_sessions WHERE session_id = 'live-session'").get()).toEqual({
       ended_at: 1_000,
     });
-    expect(database.prepare("SELECT COUNT(*) AS count FROM remote_auth_events").get()).toEqual({ count: 1 });
+    expect(database.prepare("SELECT COUNT(*) AS count FROM remote_auth_events").get()).toEqual({ count: 2 });
     expect(database.prepare("SELECT auth_epoch FROM remote_hosts WHERE host_id = 'host-1'").get()).toEqual({
       auth_epoch: 2,
     });
-    expect(database.prepare("SELECT payload FROM remote_auth_events").get()).toEqual({
-      payload: JSON.stringify({ type: "remote-auth-changed", hostId: "host-1", authEpoch: 2 }),
-    });
+    expect(database.prepare("SELECT payload FROM remote_auth_events ORDER BY rowid").all()).toEqual([
+      { payload: JSON.stringify({ type: "remote-auth-changed", hostId: "host-1", authEpoch: 2 }) },
+      // The device that accepted the invitation has the server already. This is the notice that
+      // reaches the same account's other devices, so the join shows up there without a poll.
+      { payload: JSON.stringify({ type: "account-servers-changed", userId: "member" }) },
+    ]);
   });
 
   it("protects the owner and validates only an active resume session", async () => {
@@ -542,6 +545,9 @@ describe("RemoteControlPlane", () => {
       machineToken: registration.machineToken,
     });
     expect(metadataUpdate).toMatchObject({ authEpoch: registration.authEpoch, machineToken: null });
+    // Republishing a host this account already had rotates a credential and changes no server
+    // list, so none of these three registrations tells the owner's other devices anything.
+    expect(webhookBodies.filter((body) => body.includes("account-servers-changed"))).toEqual([]);
     const mobileHost = { hostId: "host-1", fingerprint: await sha256("public-key-a") };
     await expect(controlPlane.validateMobileConnectHost(owner.id, mobileHost)).resolves.toBeUndefined();
     await expect(controlPlane.validateMobileConnectHost("another-owner", mobileHost)).rejects.toMatchObject({
@@ -709,6 +715,9 @@ describe("RemoteControlPlane", () => {
     expect(
       database.prepare("SELECT status FROM remote_memberships WHERE membership_id = 'revoked-membership'").get(),
     ).toEqual({ status: "revoked" });
+    // The member who left, not the owner who owns the host: the server has to leave that account's
+    // list on every device it is signed in on.
+    expect(webhookBodies).toContain(JSON.stringify({ type: "account-servers-changed", userId: "revoked-member" }));
 
     database.prepare("INSERT INTO users(id) VALUES ('competing-owner')").run();
     const competingOwner = {
@@ -744,6 +753,15 @@ describe("RemoteControlPlane", () => {
         .prepare("SELECT COUNT(*) AS count FROM remote_memberships WHERE host_id = 'race-host' AND role = 'owner'")
         .get(),
     ).toEqual({ count: 1 });
+    // The one account that gained a server is told once, on the devices it is signed in on. The
+    // registration that lost the race gained nothing and tells its owner nothing.
+    expect(
+      webhookBodies.filter(
+        (body) =>
+          body === JSON.stringify({ type: "account-servers-changed", userId: "owner" }) ||
+          body === JSON.stringify({ type: "account-servers-changed", userId: "competing-owner" }),
+      ),
+    ).toHaveLength(1);
 
     const insertInvite = database.prepare(
       `INSERT INTO remote_invites(

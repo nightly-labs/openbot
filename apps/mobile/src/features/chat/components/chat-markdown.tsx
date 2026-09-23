@@ -16,7 +16,9 @@ import {
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { parseChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
+import { createReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
+import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
 interface MarkdownTokenByType {
   paragraph: Tokens.Paragraph;
@@ -399,6 +401,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   compact = false,
   streaming = false,
   animationEnabled = true,
+  playback,
   selectable = true,
   agents = [],
 }: {
@@ -407,17 +410,20 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   compact?: boolean;
   streaming?: boolean;
   animationEnabled?: boolean;
+  playback?: ReplyPlayback;
   selectable?: boolean;
   agents?: readonly MobileAgent[];
 }) {
   const reducedMotion = useReducedMotion();
   const { fontScale } = useWindowDimensions();
   const tokens = useMemo(() => parseChatMarkdown(body), [body]);
+  const reveal = useMemo(() => createReplyReveal(tokens), [tokens]);
+  const visibleTokens = useReplyPlayback(reveal, playback);
   const codeColor = useThemeColor("foreground");
   return (
     <StreamRevealProvider>
       <MarkdownBlocks
-        tokens={tokens}
+        tokens={visibleTokens}
         presentation={{
           selectable,
           type: compact ? "body-sm" : "body",
@@ -425,7 +431,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
           codeColor,
           agents,
           mentionOffset: 4 * fontScale,
-          animateTail: streaming && animationEnabled && !reducedMotion,
+          animateTail: (streaming || Boolean(playback?.enabled)) && animationEnabled && !reducedMotion,
         }}
       />
     </StreamRevealProvider>

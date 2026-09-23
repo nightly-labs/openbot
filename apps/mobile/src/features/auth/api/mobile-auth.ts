@@ -25,6 +25,7 @@ const MOBILE_AUTH_REQUEST_TIMEOUT_MS = 10_000;
 
 let mobileSessionStorageTail = Promise.resolve();
 let mobileProfileTail = Promise.resolve();
+let mobileConnectInFlight = false;
 
 export class MobileSessionExpiredError extends Error {
   constructor() {
@@ -42,6 +43,16 @@ export interface MobileSession {
 type MobileCredential = Pick<MobileSession, "apiUrl" | "sessionToken">;
 
 export async function redeemMobileConnectUrl(value: string): Promise<MobileSession> {
+  if (mobileConnectInFlight) throw new Error("Another connection is in progress. Wait for it to finish.");
+  mobileConnectInFlight = true;
+  try {
+    return await redeemMobileConnectSession(value);
+  } finally {
+    mobileConnectInFlight = false;
+  }
+}
+
+async function redeemMobileConnectSession(value: string): Promise<MobileSession> {
   void retryMobileSessionRevocations();
   const payload = parseMobileConnectUrl(value);
   if (!payload) {
@@ -51,7 +62,10 @@ export async function redeemMobileConnectUrl(value: string): Promise<MobileSessi
 
   // Do not consume a one-time ticket or overwrite a permanent legacy token before
   // its revocation is confirmed. Retry cleanup against the OLD account service.
-  await serializeMobileSessionStorage(() => readStoredSessionAndRevokeInvalid(true));
+  const current = await serializeMobileSessionStorage(() => readStoredSessionAndRevokeInvalid(true));
+  // A QR screen can still be finishing its animation after credentials are saved.
+  // Protect that handoff too, before its caller updates the React session context.
+  if (current) throw new Error("You are already signed in. Sign out before connecting another account.");
 
   let response: Response;
   let body: unknown;
