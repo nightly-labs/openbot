@@ -88,7 +88,8 @@ export function ProfileSettingsScreen() {
       quality: 0.3,
     });
     if (result.canceled) return;
-    const asset = result.assets[0];
+    const [asset] = result.assets;
+    if (!asset) return;
     const file = new File(asset.uri);
     const mime = isAvatarMimeType(file.type) ? file.type : asset.mimeType || "";
     if (!isAvatarMimeType(mime)) throw new Error("Choose a JPEG, PNG, or WebP photo.");

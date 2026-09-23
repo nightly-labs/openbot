@@ -3,6 +3,7 @@
   "compilerOptions": {
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
+    "noUncheckedIndexedAccess": true,
     "paths": {
       "@openbot/renderer-preview": ["./src/types/renderer-preview.d.ts"],
       "@openbot/renderer-web": ["./src/types/renderer-web.d.ts"]

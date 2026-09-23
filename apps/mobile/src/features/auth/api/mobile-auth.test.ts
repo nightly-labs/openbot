@@ -1,5 +1,5 @@
 import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveSessionValidation } from "../context/session-validation";
 import {
   listMobileAccountSessions,
@@ -429,6 +429,7 @@ it("lists account sessions and only disconnects other devices", async () => {
   native.fetch.mockResolvedValueOnce(Response.json({ sessions: [current] }));
   const [item] = await listMobileAccountSessions(session);
   expect(item).toEqual(current);
+  assert(item);
   await expect(revokeMobileAccountSession(session, item)).rejects.toThrow("Use Sign out");
   native.fetch.mockClear();
   await expect(revokeMobileAccountSession(session, { ...item, current: false, kind: "desktop" })).rejects.toThrow(

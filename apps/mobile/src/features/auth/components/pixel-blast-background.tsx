@@ -18,7 +18,7 @@ export function PixelBlastBackground({ active }: { active: boolean }) {
   const time = useSharedValue(INITIAL_TIME);
   const clicks = useSharedValue(Array.from({ length: 10 }, () => [0, 0, 0, 0]));
   const clickIndex = useSharedValue(0);
-  const brush = useSharedValue([0, 0, 0, 0]);
+  const brush = useSharedValue<[number, number, number, number]>([0, 0, 0, 0]);
   const direction = useSharedValue([0, 0]);
   const brandColor = String(useCSSVariable("--openbot-logo-production") ?? "#cdadec");
   const color = Array.from(Skia.Color(brandColor)).slice(0, 3);

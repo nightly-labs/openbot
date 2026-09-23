@@ -227,7 +227,7 @@ export class MobileConversationStore {
           });
         } else {
           const message = messages[index];
-          messages[index] = { ...message, text: message.text + text, status: "streaming" };
+          if (message) messages[index] = { ...message, text: message.text + text, status: "streaming" };
         }
       }
       if (added) {

@@ -38,7 +38,8 @@ export function useReplyPlayback(plan: ReturnType<typeof createReplyReveal>, pla
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       const words = currentPlan.current.words;
-      if (position >= words.length) {
+      const word = words[position];
+      if (word === undefined) {
         if (callbacks.current?.complete) {
           if (played) callbacks.current.onComplete();
           return;
@@ -48,7 +49,6 @@ export function useReplyPlayback(plan: ReturnType<typeof createReplyReveal>, pla
         timer = setTimeout(tick, 32);
         return;
       }
-      const word = words[position];
       position += 1;
       played = true;
       progress.set(id, position);

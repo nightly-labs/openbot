@@ -267,11 +267,14 @@ export function ChatMessageList({
     announcedPromptId.current = promptId;
     AccessibilityInfo.announceForAccessibility(`Input required. ${questionForm.question.question}`);
   }, [questionForm?.messageId, questionForm?.question]);
-  const [userForeground, themeForeground, themeMuted] = useCSSVariable([
+  const [userForegroundColor, themeForegroundColor, themeMutedColor] = useCSSVariable([
     "--openbot-text-on-light",
     "--openbot-text-primary",
     "--openbot-text-muted",
-  ]).map(String);
+  ]);
+  const userForeground = String(userForegroundColor);
+  const themeForeground = String(themeForegroundColor);
+  const themeMuted = String(themeMutedColor);
   const reducedMotion = useReducedMotion();
   const animateMessages = isFocused && online && appActive;
   const replyHaptics = useReplyHaptics(animateMessages && historyState === "ready" && motion.responseVisible);
@@ -323,7 +326,7 @@ export function ChatMessageList({
   const canLoadOlder = hasCachedOlder || (online && hasOlder && !olderLoading);
   const loadPrevious = () => {
     if (hasCachedOlder) {
-      setBoundary({ firstId: visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)].id, headId });
+      setBoundary({ firstId: visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)]?.id ?? null, headId });
     } else if (canLoadOlder) onLoadOlder();
   };
   const playbackEligible = (message: VisibleMessage) =>
