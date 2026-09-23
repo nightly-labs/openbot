@@ -1616,6 +1616,27 @@ textarea {
   line-height: 12px;
 }
 
+.agent-row-agent-status-routine {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-secondary);
+}
+
+.agent-row-agent-status-routine svg {
+  width: 10px;
+  height: 10px;
+}
+
+.agent-row-agent-status-routine-needs-attention {
+  color: var(--openbot-warning);
+}
+
+.agent-row-agent-status-routine-failed {
+  color: var(--openbot-danger);
+}
+
 .agent-row-agent-status-entering {
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
