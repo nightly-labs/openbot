@@ -507,6 +507,15 @@ async function main(): Promise<void> {
       throw new Error("Browser fill-mode status did not use the current panel bounds.");
     }
     await browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } });
+    // A mouse event is hit-tested by the browser process against the frame the view last presented.
+    // Under xvfb a tab that opened fast can still have none at this size when the click below goes
+    // out, and Chromium then drops the event with no pointer event at all. A capture is read from
+    // that presented frame, so the clicks wait for one.
+    const localContents = webContents.getFocusedWebContents();
+    await waitFor(async () => {
+      const size = (await localContents?.capturePage())?.getSize();
+      return size?.width === 800 && size.height === 600;
+    }, "the local tab's first frame");
     process.stdout.write("BrowserHost: local tab opened.\n");
     const first = await browser.snapshot(tab.id);
     const input = first.elements.find((element) => element.name === "Task");
