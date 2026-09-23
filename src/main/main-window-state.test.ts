@@ -11,6 +11,7 @@ import {
   presentMainWindow,
   readMainWindowBounds,
   resolveMainWindowBounds,
+  secondLaunchResponse,
   writeMainWindowBounds,
 } from "./main-window-state";
 
@@ -62,6 +63,16 @@ describe("main window state", () => {
     expect(window.restore).not.toHaveBeenCalled();
     expect(window.show).toHaveBeenCalledOnce();
     expect(window.focus).toHaveBeenCalledOnce();
+  });
+
+  it("answers a second launch with a window, even after the main window was closed or while quitting", () => {
+    const running = { sessionEnding: false, quitting: false, hasMainWindow: true, started: true };
+
+    expect(secondLaunchResponse(running)).toBe("present");
+    expect(secondLaunchResponse({ ...running, hasMainWindow: false })).toBe("reopen");
+    expect(secondLaunchResponse({ ...running, hasMainWindow: false, quitting: true })).toBe("relaunch");
+    expect(secondLaunchResponse({ ...running, hasMainWindow: false, started: false })).toBe("ignore");
+    expect(secondLaunchResponse({ ...running, quitting: true, sessionEnding: true })).toBe("ignore");
   });
 
   it("restores the last visible bounds", () => {
