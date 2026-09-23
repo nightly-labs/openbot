@@ -177,8 +177,17 @@ export function isDynamicIslandPreference(value: unknown): value is DynamicIslan
   );
 }
 
-export function isDynamicIslandSizePercent(value: unknown, limits: { min: number; max: number }): value is number {
-  return isNumber(value) && Number.isInteger(value) && value >= limits.min && value <= limits.max;
+export function isDynamicIslandSizePercent(
+  value: unknown,
+  limits: { min: number; max: number; step: number },
+): value is number {
+  return (
+    isNumber(value) &&
+    Number.isInteger(value) &&
+    value >= limits.min &&
+    value <= limits.max &&
+    (value - limits.min) % limits.step === 0
+  );
 }
 
 export function isDynamicIslandInteractive(value: unknown): value is SetDynamicIslandInteractiveInput {

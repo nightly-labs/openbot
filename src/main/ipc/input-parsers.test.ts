@@ -262,6 +262,16 @@ describe("app IPC input parsing", () => {
         heightPercent: 100,
       }),
     ).toThrowError("Dynamic Island preference is required.");
+    expect(() =>
+      parseDynamicIslandPreference({
+        enabled: true,
+        hapticsEnabled: true,
+        idleVisible: true,
+        additionalDisplaysEnabled: true,
+        widthPercent: 72,
+        heightPercent: 100,
+      }),
+    ).toThrowError("Dynamic Island preference is required.");
     expect(parseDynamicIslandInteractive({ interactive: false })).toEqual({ interactive: false });
     expect(parseDynamicIslandPresentation(presentation)).toEqual(presentation);
     const takeoverPresentation = {
