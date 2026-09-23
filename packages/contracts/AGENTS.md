@@ -51,10 +51,17 @@ takes one object per group, keyed by every request endpoint in it, so a channel 
 `TS2741`, a handler for an endpoint that does not exist is `TS2353`, and a group no registrar covers
 is `TS2741` at `src/main/index.ts`. `src/main/AGENTS.md` has the shape to copy.
 
-The preload is the link no type reaches. Its API object is shaped for the renderer — nested, renamed,
-decoding results — so nothing pairs a method with an endpoint, and a channel it never invokes is dead
-trust-boundary surface that compiles. `ipc-channel-coverage.test.ts` reads its source and asserts it
-invokes exactly the request endpoints and subscribes to exactly the event ones.
+A typed endpoint (`request<Payload, Result>()`, `event<Payload>()`) also sets the renderer signature.
+Declare its `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.name>` or
+`Subscribe<...>`. Then a payload or result change in `ipc-endpoints.ts` reaches the interface, the
+preload and the mock without a second edit. A server-scoped payload (`AgentIpcRequest<Input>`) becomes
+`(input: Input)`, or `()` for `AgentIpcRequest<null>`, because the preload adds the selected server. Write the signature by hand only when
+the method reshapes its arguments or reads preload state, or when the endpoint is still untyped.
+
+The preload is still the link no type pairs with an endpoint. Its API object is nested and renamed, so
+a channel it never invokes is dead trust-boundary surface that compiles.
+`ipc-channel-coverage.test.ts` reads its source and asserts it invokes exactly the request endpoints
+and subscribes to exactly the event ones.
 
 The mock needs no test. Both it and the preload bridge are annotated `: OpenBotDesktopApi`, so a
 missing method is `TS2741` and a method the interface never declared is `TS2353` — the type checker

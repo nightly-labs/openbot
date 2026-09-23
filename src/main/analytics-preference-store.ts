@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { AnalyticsPreference } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 const DEFAULT_PREFERENCE: AnalyticsPreference = { enabled: true };
 
@@ -13,7 +14,7 @@ export async function readAnalyticsPreference(path: string): Promise<AnalyticsPr
     }
     return { enabled: parsed.enabled };
   } catch (error) {
-    if (isMissing(error)) return { ...DEFAULT_PREFERENCE };
+    if (isMissingFileError(error)) return { ...DEFAULT_PREFERENCE };
     if (error instanceof SyntaxError) return { enabled: false };
     throw error;
   }
@@ -23,8 +24,4 @@ export async function writeAnalyticsPreference(path: string, enabled: boolean): 
   const preference = { enabled };
   await writeJsonFileAtomically(path, { version: 1, enabled });
   return preference;
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

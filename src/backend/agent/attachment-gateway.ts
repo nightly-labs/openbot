@@ -1,8 +1,8 @@
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute } from "node:path";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { sortConversationMessages } from "../conversation-snapshots";
 import type { GeneratedAttachmentSource, MailboxStore } from "../mailbox-store";
 import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePathFromInput } from "../workspace-paths";
 import type { ConversationRuntime } from "./conversation-runtime";

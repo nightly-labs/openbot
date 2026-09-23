@@ -29,6 +29,8 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(await screen.findByRole("button", { name: /^Skills/ }));
     const [addFromMarketplace] = await screen.findAllByRole("button", { name: "Add from marketplace" });
     assert(addFromMarketplace);
+    // The button stays disabled until the agent's skills load.
+    await waitFor(() => expect(addFromMarketplace).toBeEnabled());
     await fireEvent.click(addFromMarketplace);
     expect(await screen.findByRole("heading", { name: "Marketplace" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Close marketplace" }));

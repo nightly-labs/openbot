@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, parse, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { isMissingFileError } from "../src/backend/file-errors";
 import { type DevelopmentProfile, developmentUserDataName } from "../src/main/development-profile";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
 import { cleanupSeedOwnedTransfers } from "./seed-dev-state";
@@ -39,7 +40,7 @@ export async function resetDevelopmentState(appDataRoot: string, homeDirectory =
     try {
       await lstat(statePath);
     } catch (error) {
-      if (isMissing(error)) {
+      if (isMissingFileError(error)) {
         continue;
       }
       throw error;
@@ -71,10 +72,6 @@ async function main(): Promise<void> {
   // The downloaded provider CLIs are the computer's now, not this profile's, so a reset no longer
   // takes them. Say so: it used to cost a fresh download of every one of them.
   logger.info("Downloaded provider CLIs were not changed.");
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isMainModule(): boolean {

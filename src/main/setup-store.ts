@@ -8,6 +8,7 @@ import {
   type SaveSetupInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isMissingFileError } from "../backend/file-errors";
 
 interface StoredSetup {
   version: 2;
@@ -43,7 +44,7 @@ export async function readSetupState(path: string): Promise<AppSetupState> {
       preferredModel: isAgentModel(parsed.preferredModel) ? parsed.preferredModel : null,
     };
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return { ...EMPTY_SETUP };
+    if (isMissingFileError(error) || error instanceof SyntaxError) return { ...EMPTY_SETUP };
     throw error;
   }
 }
@@ -57,8 +58,4 @@ export async function writeSetupState(path: string, input: SaveSetupInput): Prom
   };
   await writeFile(path, `${JSON.stringify(stored)}\n`, { encoding: "utf8", mode: 0o600 });
   return { completed: true, ...input };
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

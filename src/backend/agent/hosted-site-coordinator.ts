@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
@@ -14,7 +15,6 @@ import { hostedSiteConversationEventItemType, hostedSiteConversationEventText } 
 import { isBoolean } from "@openbot/contracts/runtime-values";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { sortConversationMessages } from "../conversation-snapshots";
 import type { PendingHostedSiteTerminalEvent } from "../openbot-database";
 import { type AppServerRequest, type DynamicToolCallParams, isRecord, type RequestId } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";

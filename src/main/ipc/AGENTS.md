@@ -7,13 +7,19 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
 ## Adding an endpoint
 
 1. Add the wire value to `packages/contracts/src/ipc-channels.ts`.
-2. Add it to a group in `packages/contracts/src/ipc-endpoints.ts`, as `request(...)` or `event(...)`.
-3. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
+2. Add it to a group in `packages/contracts/src/ipc-endpoints.ts`, as `request<Payload, Result>()(...)`
+   or `event<Payload>()(...)`. Use `untypedRequest(...)` or `untypedEvent(...)` only in a group that
+   is not typed yet.
+3. Declare the `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.name>` (or
+   `Subscribe<...>` for an event).
+4. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
    change and the key to add.
-4. Add the handler here, the `invoke` in `src/preload/index.ts`, and the method in
+5. Add the handler here, the call in `src/preload/index.ts` (`invokeRequest(channel, decode, input)`,
+   or `invokeAgent` for a server-scoped payload), and the method in
    `src/renderer/src/preview/mock-openbot.ts`.
 
-Step 3 is the point. Every step but the preload announces itself, and the preload is what
+Step 4 is the point. Every step but steps 3 and 5 in the preload announces itself. A hand-written
+signature in step 3 compiles, so review must check that it uses `Invoke`. The preload is what
 `src/main/ipc-channel-coverage.test.ts` reads.
 
 A group is the unit one registrar covers in full, which is why a wire prefix can span several: the

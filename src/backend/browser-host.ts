@@ -74,6 +74,7 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
+import { isMissingFileError } from "./file-errors";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 import { withTimeout } from "./with-timeout";
@@ -2337,15 +2338,11 @@ async function readBrowserState(path: string): Promise<StoredBrowserStateV2> {
       tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
     };
   } catch (error) {
-    if (isMissingFile(error) || error instanceof SyntaxError) {
+    if (isMissingFileError(error) || error instanceof SyntaxError) {
       return { version: 2, activeTabId: null, tabs: [] };
     }
     throw error;
   }
-}
-
-function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isAllowedMainUrl(value: string): boolean {

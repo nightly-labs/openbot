@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 /** Missing settings use the product default; invalid settings always require approval. */
 export async function readApprovalAutomation(
@@ -20,12 +21,12 @@ export async function readApprovalAutomation(
   try {
     const contents = await readFile(path, "utf8").catch((error) => {
       // Keep the released file readable by older installations. Never write a migration to it.
-      if (isMissing(error) && legacyPath) return readFile(legacyPath, "utf8");
+      if (isMissingFileError(error) && legacyPath) return readFile(legacyPath, "utf8");
       throw error;
     });
     parsed = JSON.parse(contents);
   } catch (error) {
-    if (isMissing(error)) return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
+    if (isMissingFileError(error)) return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
     if (error instanceof SyntaxError) return { turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} };
     throw error;
   }
@@ -164,8 +165,4 @@ export class ApprovalAutomation {
       autoApproveOverrides: Object.fromEntries(overrides),
     };
   }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

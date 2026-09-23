@@ -6,6 +6,7 @@ import { dirname, join, parse, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type {
   AgentModelId,
   AgentProviderId,
@@ -39,7 +40,7 @@ import { ChannelMemoryStore } from "../src/backend/channel-memory-store";
 import { ChannelRoutineStore } from "../src/backend/channel-routine-store";
 import { ChannelStore } from "../src/backend/channel-store";
 import { resolveOpencodeCli } from "../src/backend/cli";
-import { sortConversationMessages } from "../src/backend/conversation-snapshots";
+import { isMissingFileError } from "../src/backend/file-errors";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName, readDevelopmentInstanceId } from "../src/main/development-profile";
@@ -336,7 +337,7 @@ export async function isDevelopmentProfileActive(profilePath: string): Promise<b
     const lock = await lstat(lockPath);
     if (!lock.isSymbolicLink()) return true;
   } catch (error) {
-    if (isMissing(error)) return false;
+    if (isMissingFileError(error)) return false;
     throw error;
   }
 
@@ -1426,7 +1427,7 @@ async function readSeedTransferDirectories(profilePath: string): Promise<string[
     if (!parsed.success) return [];
     return parsed.data.transferDirectories.filter((entry) => GENERATED_DIRECTORY_PATTERN.test(entry));
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return [];
+    if (isMissingFileError(error) || error instanceof SyntaxError) return [];
     throw error;
   }
 }
@@ -1513,13 +1514,9 @@ async function pathExists(path: string): Promise<boolean> {
     await lstat(path);
     return true;
   } catch (error) {
-    if (isMissing(error)) return false;
+    if (isMissingFileError(error)) return false;
     throw error;
   }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function errorMessage(error: unknown): string {

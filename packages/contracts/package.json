@@ -9,6 +9,7 @@
     "./attachment-references": "./src/attachment-references.ts",
     "./avatar-images": "./src/avatar-images.ts",
     "./chat-tag-references": "./src/chat-tag-references.ts",
+    "./conversation-order": "./src/conversation-order.ts",
     "./input-limits": "./src/input-limits.ts",
     "./invite-links": "./src/invite-links.ts",
     "./ipc": "./src/ipc.ts",

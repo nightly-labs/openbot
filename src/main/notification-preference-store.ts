@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { NotificationPreference } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 const DEFAULT_PREFERENCE: NotificationPreference = { desktopNotifications: true };
 
@@ -38,7 +39,7 @@ export class NotificationPreferenceStore {
         };
       }
     } catch (error) {
-      if (!isMissing(error) && !(error instanceof SyntaxError)) throw error;
+      if (!isMissingFileError(error) && !(error instanceof SyntaxError)) throw error;
     }
   }
 
@@ -74,8 +75,4 @@ export class NotificationPreferenceStore {
     await writeJsonFileAtomically(this.#path, { version: 1, ...stored });
     this.#stored = stored;
   }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
