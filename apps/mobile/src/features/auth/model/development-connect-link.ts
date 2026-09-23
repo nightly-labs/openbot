@@ -28,15 +28,13 @@ export function readDevelopmentConnectLink(value: string, development: boolean):
   return api.protocol === "http:" && isMobileConnectDevelopmentHost(api.hostname) ? link : null;
 }
 
-// Returns true when the link is a Mobile Connect link, accepted or not, so the
-// router never tries to open it as a screen.
-export function receiveMobileConnectLink(value: string, development: boolean): boolean {
-  if (!isMobileConnectLink(value)) return false;
+// Returns true when a development build queued the link for redemption. Any other
+// link, including a Mobile Connect link it rejects, keeps the confirmed incoming-link flow.
+export function acceptDevelopmentConnectLink(value: string, development: boolean): boolean {
   const link = readDevelopmentConnectLink(value, development);
-  if (link) {
-    pendingLink = link;
-    for (const listener of listeners) listener();
-  }
+  if (!link) return false;
+  pendingLink = link;
+  for (const listener of listeners) listener();
   return true;
 }
 

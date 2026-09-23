@@ -2,9 +2,9 @@ import { createMobileConnectUrl } from "@openbot/contracts/mobile-connect";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  acceptDevelopmentConnectLink,
   isSameMobileConnectTarget,
   readDevelopmentConnectLink,
-  receiveMobileConnectLink,
   takeMobileConnectLink,
 } from "./development-connect-link";
 
@@ -25,17 +25,17 @@ describe("development Mobile Connect links", () => {
   it("rejects a link that sends the ticket to a public account service", () => {
     const publicLink = createMobileConnectUrl({ apiUrl: "https://api.openbot.run", ticket, host });
     expect(readDevelopmentConnectLink(publicLink, true)).toBeNull();
-    expect(receiveMobileConnectLink(publicLink, true)).toBe(true);
+    expect(acceptDevelopmentConnectLink(publicLink, true)).toBe(false);
     expect(takeMobileConnectLink()).toBeNull();
   });
 
-  it("keeps every Mobile Connect link out of navigation and queues only accepted ones", () => {
-    expect(receiveMobileConnectLink(lanLink, false)).toBe(true);
+  it("queues only accepted links and leaves the rest to the confirmed incoming-link flow", () => {
+    expect(acceptDevelopmentConnectLink(lanLink, false)).toBe(false);
     expect(takeMobileConnectLink()).toBeNull();
-    expect(receiveMobileConnectLink(lanLink, true)).toBe(true);
+    expect(acceptDevelopmentConnectLink(lanLink, true)).toBe(true);
     expect(takeMobileConnectLink()).toBe(lanLink);
     expect(takeMobileConnectLink()).toBeNull();
-    expect(receiveMobileConnectLink("openbot://agents/1", true)).toBe(false);
+    expect(acceptDevelopmentConnectLink("openbot://agents/1", true)).toBe(false);
   });
 
   it("matches a stored session of the same account service and desktop", () => {
