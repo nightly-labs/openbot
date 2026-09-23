@@ -159,7 +159,12 @@ export function isSkillCategory(value: unknown): value is SkillCategory {
   return isOneOf(SKILL_CATEGORIES, value);
 }
 
-import { isOneOf } from "./runtime-values";
+/** A valid `location` or `problem` of an {@link InstalledSkill}. */
+export function isSkillNote(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= SKILL_DESCRIPTION_MAX_LENGTH;
+}
+
+import { isOneOf, isString } from "./runtime-values";
 
 export interface CreateLocalSkillInput {
   agentId: string;

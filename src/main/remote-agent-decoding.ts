@@ -2,6 +2,7 @@ import {
   decodeAgentAnalytics,
   decodeHostAnalytics,
   INSTALLED_SKILL_ORIGINS,
+  isSkillNote,
   SKILL_DESCRIPTION_MAX_LENGTH,
 } from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
@@ -166,10 +167,6 @@ export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] 
       ...(isSkillNote(skill.problem) ? { problem: skill.problem } : {}),
     };
   });
-}
-
-function isSkillNote(value: unknown): value is string {
-  return isString(value) && value.length > 0 && value.length <= SKILL_DESCRIPTION_MAX_LENGTH;
 }
 
 function optionalSkillDescription(value: unknown): string | undefined {

@@ -81,6 +81,7 @@ import {
   isSharedTable,
   isSidebarLayoutSnapshot,
   isSkillCategory,
+  isSkillNote,
   LOCAL_SERVER_ID,
   type MarketplaceAgentDetail,
   type MarketplaceAgentPage,
@@ -696,10 +697,6 @@ function decodeInstalledSkill(value: unknown): InstalledSkill {
     ...(isSkillNote(item.location) ? { location: item.location } : {}),
     ...(isSkillNote(item.problem) ? { problem: item.problem } : {}),
   };
-}
-
-function isSkillNote(value: unknown): value is string {
-  return isString(value) && value.length > 0 && value.length <= SKILL_DESCRIPTION_MAX_LENGTH;
 }
 
 function optionalSkillDescription(value: unknown): string | undefined {
