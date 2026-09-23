@@ -1525,6 +1525,50 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
+  it("reads Codex's nested error report and leaves an exhausted plan to the usage notice", async () => {
+    const { store, mailbox } = stores(root);
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    const client = clients.get("codex");
+    if (!client) throw new Error("The fake provider did not start.");
+    const usageReadsBefore = client.requests.filter((request) => request.method === "account/rateLimits/read").length;
+    events.length = 0;
+
+    const report = (message: string, codexErrorInfo: unknown, willRetry: boolean) =>
+      client.emit("notification", {
+        method: "error",
+        params: {
+          error: { message, codexErrorInfo, additionalDetails: null, misalignment: null },
+          willRetry,
+          threadId: "thread-1",
+          turnId: "turn-1",
+        },
+      });
+    report("You've hit your usage limit. Try again at 10:34 AM.", "usageLimitExceeded", false);
+    report("Reconnecting... 1/5", { responseStreamDisconnected: { httpStatusCode: null } }, true);
+    report("The model endpoint rejected the request.", "badRequest", false);
+
+    await waitFor(() => events.some((event) => event.type === "error"));
+    expect(events.filter((event) => event.type === "error")).toEqual([
+      expect.objectContaining({ message: "The model endpoint rejected the request." }),
+    ]);
+    expect(client.requests.filter((request) => request.method === "account/rateLimits/read")).toHaveLength(
+      usageReadsBefore + 1,
+    );
+  });
+
   it("refuses to replace a CLI that is running a turn", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({
