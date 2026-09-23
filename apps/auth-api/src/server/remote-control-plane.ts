@@ -84,7 +84,11 @@ interface TicketSignerConfig {
 type RemoteFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type RemoteAuthEvent =
   | { type: "remote-auth-changed"; hostId: string; authEpoch: number }
-  | { type: "remote-session-ended"; hostId: string; sessionId: string };
+  | { type: "remote-session-ended"; hostId: string; sessionId: string }
+  // Addressed to an account rather than to a host: the device that accepted an invitation already
+  // knows, and the user's other devices are the ones with a stale server list. Signal forwards it
+  // to every socket that account holds, and each of them re-reads `/v2/remote/hosts/` once.
+  | { type: "account-servers-changed"; userId: string };
 
 interface RemoteAuthEventRow {
   event_id: string;
@@ -281,6 +285,10 @@ export class RemoteControlPlane {
         )
         .bind(membershipId, user.id, now, now, hostId, user.id),
       this.#authEpochEventStatement(hostId, now, user.id),
+      // Only for a host this account did not have. Publishing an existing one again rotates its
+      // credential without changing anyone's server list, and this owner's other devices would
+      // re-read the account for nothing on every start of the host.
+      ...(existing ? [] : [this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now)]),
     ]);
     if (registration.some((result) => (result.meta.changes ?? 0) !== 1)) {
       throw new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
@@ -615,6 +623,7 @@ export class RemoteControlPlane {
       this.#database
         .prepare("UPDATE remote_sessions SET ended_at = ? WHERE host_id = ? AND user_id = ? AND ended_at IS NULL")
         .bind(now, invite.host_id, user.id),
+      this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now),
     ]);
     if ((accepted[2].meta.changes ?? 0) !== 1 || (accepted[3].meta.changes ?? 0) !== 1) {
       throw new RemoteControlPlaneError(409, "invite_already_used", "The invitation was already used.");
@@ -699,6 +708,9 @@ export class RemoteControlPlane {
         ),
       ),
       this.#authEpochEventStatement(input.hostId, now),
+      // The member whose membership this is, and not the owner who changed it: a revoked server
+      // has to leave that member's list on every device they are signed in on.
+      this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now),
     ]);
     await this.#flushAuthEvents();
   }

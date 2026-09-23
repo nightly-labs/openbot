@@ -77,8 +77,10 @@ Multi-page flows such as Settings stay inside ONE sheet. Register the outer `set
 Its `settings/_layout.tsx` owns a native `Stack`; detail routes use `presentation: "card"`,
 `headerBackButtonDisplayMode: "minimal"` and the same transparent header styling. `router.push`
 opens an inner page and `router.back` returns to the previous page without dismissing the sheet.
-Include secondary flows such as joining a server in this stack. Do not register each settings page
-as another modal. Use `initialRouteName: "index"` so direct entry into a detail page has a back route.
+Do not register each settings page as another modal. Use `initialRouteName: "index"` so direct
+entry into a detail page has a back route. `add-server` follows the same shape: its outer route is
+the sheet, `add-server/_layout.tsx` owns the stack, and the invitation scanner is the inner `scan`
+page rather than a full-screen modal over the sheet.
 
 All sheets require a stable viewport. Use fixed detents for standalone forms and nested
 navigators; do not use `fitToContents` or measure content to set the sheet height. Preserve the active
