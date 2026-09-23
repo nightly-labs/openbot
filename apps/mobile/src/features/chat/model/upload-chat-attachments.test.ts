@@ -7,20 +7,33 @@ const files = ["first.txt", "second.csv"].map((name) => ({ name, mimeType: "text
 describe("chat attachment send", () => {
   it.each([true, false])("associates uploads with one message (progress enabled: %s)", async (showProgress) => {
     const progress: number[] = [];
+    const fileProgress: number[] = [];
     const sent: string[][] = [];
     const result = await uploadChatAttachments(files, {
-      upload: async (file) => ({ id: file.name }),
+      upload: async (file, onProgress) => {
+        onProgress(0.5);
+        onProgress(1);
+        return { id: file.name };
+      },
       discard: async () => {},
       send: async (ids) => {
         sent.push(ids);
         return "message";
       },
-      ...(showProgress ? { cancelled: () => false, progress: (count: number) => progress.push(count) } : {}),
+      ...(showProgress
+        ? {
+            cancelled: () => false,
+            progress: (count: number) => progress.push(count),
+            fileProgress: (fraction: number) => fileProgress.push(fraction),
+          }
+        : {}),
     });
-    expect({ result, sent, progress }).toEqual({
+    expect({ result, sent, progress, fileProgress }).toEqual({
       result: "message",
       sent: [["first.txt", "second.csv"]],
       progress: showProgress ? [0, 1, 2] : [],
+      // Each file starts from zero, so the ring of the next file never begins where the last ended.
+      fileProgress: showProgress ? [0, 0.5, 1, 0, 0.5, 1] : [],
     });
   });
   it.each(["cancel", "failure"])(

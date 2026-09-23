@@ -10,6 +10,7 @@ import type {
   MacPermissionId,
   MarketplaceAgentQuery,
   MarketplaceSkillQuery,
+  NotificationPreference,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
   SaveSetupInput,
@@ -78,6 +79,13 @@ export function parseAppLanguagePreference(input: unknown): SetAppLanguagePrefer
 export function parseUpdatePreference(input: unknown): UpdatePreference {
   if (!isDynamicRecord(input) || !isBoolean(input.autoDownload)) throw new Error("Update preference is required.");
   return { autoDownload: input.autoDownload };
+}
+
+export function parseNotificationPreference(input: unknown): NotificationPreference {
+  if (!isDynamicRecord(input) || !isBoolean(input.desktopNotifications)) {
+    throw new Error("Notification preference is required.");
+  }
+  return { desktopNotifications: input.desktopNotifications };
 }
 
 export function parseDynamicIslandPreference(input: unknown): DynamicIslandPreference {

@@ -1,8 +1,7 @@
 import { GlassView } from "expo-glass-effect";
-import { Image } from "expo-image";
 import { useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
-import { ArrowUp, FileText, Plus, Reply, Square, X } from "lucide-react-native";
+import { ArrowUp, Plus, Reply, Square, X } from "lucide-react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -37,6 +36,9 @@ import { haptics } from "@/shared/lib/haptics";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
+import { attachmentTypeLabel, formatFileSize, shareLocalAttachment } from "./attachment-preview";
+import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
+import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
 import type { ChatAttachments } from "./use-chat-attachments";
 
 // The field grows to this many lines, then keeps its height and scrolls.
@@ -139,6 +141,9 @@ export function ChatComposer({
   const display = mentionDraft(draft);
   const displayText = display.text;
   const [cursor, setCursor] = useState(0);
+  // The file whose preview is open. An ID, not a copy: a removed file closes its own preview.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const previewItem = attachments.items.find((item) => item.id === previewId) ?? null;
   const query = mentionQuery(draft, cursor);
   const suggestions = query
     ? mentionAgents
@@ -567,39 +572,18 @@ export function ChatComposer({
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ gap: 8, paddingHorizontal: 8, paddingTop: 8 }}
                 >
-                  {attachments.items.map((item) => (
-                    <View key={item.id} className="size-28 overflow-hidden rounded-2xl bg-control p-3">
-                      {item.mimeType.startsWith("image/") ? (
-                        <Image
-                          source={item.uri ?? `data:${item.mimeType};base64,${item.base64}`}
-                          contentFit="cover"
-                          accessibilityLabel={item.name}
-                          style={{ position: "absolute", inset: 0 }}
-                        />
-                      ) : (
-                        <>
-                          <FileText color={String(foreground)} size={22} />
-                          <Typography.Paragraph numberOfLines={2} type="body-xs" className="mt-auto pr-6">
-                            {item.name}
-                          </Typography.Paragraph>
-                        </>
-                      )}
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove ${item.name}`}
-                        accessibilityState={{ disabled: sending }}
-                        disabled={sending}
-                        hitSlop={8}
-                        // A HeroUI icon button fills a quarter of the tile here. The
-                        // badge has to read as an overlay on the file, not a control
-                        // beside it, so it keeps its 44 pt target through hitSlop.
-                        className="absolute right-1.5 top-1.5 size-7 items-center justify-center rounded-full"
-                        style={{ backgroundColor: raised }}
-                        onPress={() => attachments.remove(item.id)}
-                      >
-                        <X color={String(foreground)} size={15} strokeWidth={2.4} />
-                      </Pressable>
-                    </View>
+                  {attachments.items.map((item, index) => (
+                    <ComposerAttachmentTile
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      count={attachments.items.length}
+                      disabled={sending || attachments.preparing}
+                      foreground={foreground}
+                      raised={raised}
+                      onPreview={() => setPreviewId(item.id)}
+                      onRemove={() => attachments.remove(item.id)}
+                    />
                   ))}
                 </ScrollView>
               ) : null}
@@ -814,6 +798,39 @@ export function ChatComposer({
           </Pressable>
         </Animated.View>
       </View>
+      <AttachmentPreviewSheet
+        preview={
+          previewItem
+            ? {
+                name: previewItem.name,
+                uri: localPreviewUri(previewItem),
+                type: attachmentTypeLabel(previewItem.name, previewItem.mimeType),
+                size: formatFileSize(previewItem.size),
+              }
+            : null
+        }
+        actions={
+          previewItem
+            ? [
+                ...(localPreviewUri(previewItem)
+                  ? []
+                  : [{ label: "Open", onPress: () => void shareLocalAttachment(previewItem) }]),
+                {
+                  label: "Replace",
+                  disabled: sending || attachments.preparing,
+                  onPress: () => void attachments.replace(previewItem.id),
+                },
+                {
+                  label: "Remove",
+                  variant: "danger-soft" as const,
+                  disabled: sending || attachments.preparing,
+                  onPress: () => attachments.remove(previewItem.id),
+                },
+              ]
+            : []
+        }
+        onClose={() => setPreviewId(null)}
+      />
     </View>
   );
 }

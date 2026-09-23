@@ -53,6 +53,7 @@ const Settings = createSimpleContext({
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
     let autoDownloadUpdatesChanged = false;
+    let desktopNotificationsChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
 
@@ -141,6 +142,17 @@ const Settings = createSimpleContext({
           )
           .catch(() =>
             setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: previous.autoDownloadUpdates })),
+          );
+      }
+      if (previous.desktopNotifications !== value.desktopNotifications) {
+        desktopNotificationsChanged = true;
+        void window.openbot.notifications
+          .setPreference({ desktopNotifications: value.desktopNotifications })
+          .then((preference) =>
+            setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications })),
+          )
+          .catch(() =>
+            setGeneralSettings((current) => ({ ...current, desktopNotifications: previous.desktopNotifications })),
           );
       }
       if (
@@ -262,6 +274,13 @@ const Settings = createSimpleContext({
           setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: preference.autoDownload }));
         })
         .catch(() => undefined);
+      void window.openbot.notifications
+        .getPreference()
+        .then((preference) => {
+          if (desktopNotificationsChanged) return;
+          setGeneralSettings((current) => ({ ...current, desktopNotifications: preference.desktopNotifications }));
+        })
+        .catch(() => undefined);
       void window.openbot.dynamicIsland
         .getPreference()
         .then((preference) =>
@@ -278,11 +297,16 @@ const Settings = createSimpleContext({
         .catch(() => undefined);
     });
 
+    const sendTestNotification = () => window.openbot.notifications.test();
+    const openNotificationSettings = () => window.openbot.notifications.openSettings();
+
     return {
       analyticsPreferenceLoaded,
       generalSettings,
       turboModePending,
       updateGeneralSettings,
+      sendTestNotification,
+      openNotificationSettings,
       setAgentAutoApprove,
       agentAutoApproves,
       appSettingsOpen,

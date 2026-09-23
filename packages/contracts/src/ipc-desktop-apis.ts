@@ -136,6 +136,7 @@ import type {
   SetMcpServerEnabledInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
   AcknowledgeFailedTurnInput,
   CancelQueuedMessageInput,
@@ -203,6 +204,8 @@ import type {
   ReorderServersInput,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerMutedInput,
+  SetServerNotificationLevelInput,
   SetTeamTypingInput,
   TeamInviteSummary,
   TeamMemberSummary,
@@ -346,6 +349,18 @@ export interface UpdateDesktopApi {
   onEvent: (listener: (status: UpdateStatus) => void) => () => void;
 }
 
+export interface NotificationsDesktopApi {
+  getPreference: () => Promise<NotificationPreference>;
+  setPreference: (input: NotificationPreference) => Promise<NotificationPreference>;
+  // Shows one OS notification now, even when the window has focus, so the user can check that the
+  // operating system lets OpenBot show them.
+  test: () => Promise<void>;
+  // Opens the operating system page where the user allows OpenBot notifications. It rejects on a
+  // system that has no such page.
+  openSettings: () => Promise<void>;
+  onOpened: (listener: (event: NotificationOpenedEvent) => void) => () => void;
+}
+
 export interface SetProviderApiKeyInput {
   provider: AgentProviderId;
   key: string;
@@ -412,7 +427,8 @@ export interface DynamicIslandDesktopApi {
 }
 
 export interface ServersDesktopApi {
-  setMuted: (input: { serverId: string; muted: boolean }) => Promise<ServerSummary[]>;
+  setMuted: (input: SetServerMutedInput) => Promise<ServerSummary[]>;
+  setNotificationLevel: (input: SetServerNotificationLevelInput) => Promise<ServerSummary[]>;
   list: () => Promise<ServerSummary[]>;
   select: (serverId: string) => Promise<ServerSummary[]>;
   reorder: (input: ReorderServersInput) => Promise<ServerSummary[]>;
@@ -601,6 +617,7 @@ export interface OpenBotDesktopApi {
   agent: AgentDesktopApi;
   browser: BrowserDesktopApi;
   update: UpdateDesktopApi;
+  notifications: NotificationsDesktopApi;
   maintenance: MaintenanceDesktopApi;
   servers: ServersDesktopApi;
   plugins: PluginsDesktopApi;

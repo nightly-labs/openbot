@@ -1881,14 +1881,29 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => updateListeners.delete(listener);
       },
     },
+    notifications: {
+      getPreference: async () => ({ desktopNotifications: true }),
+      setPreference: async (input) => ({ ...input }),
+      test: async () => undefined,
+      openSettings: async () => undefined,
+      onOpened: () => () => undefined,
+    },
     maintenance: {
       exportData: async () => ({ saved: true }),
       exportDiagnostics: async () => ({ saved: true }),
     },
     servers: {
-      setMuted: async ({ serverId, muted }) => {
+      setMuted: async ({ serverId, muted, durationMs }) => {
         if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
-        servers = servers.map((server) => (server.id === serverId ? { ...server, notificationsMuted: muted } : server));
+        const notificationsMutedUntil = muted && durationMs !== undefined ? Date.now() + durationMs : null;
+        servers = servers.map((server) =>
+          server.id === serverId ? { ...server, notificationsMuted: muted, notificationsMutedUntil } : server,
+        );
+        return clone(servers);
+      },
+      setNotificationLevel: async ({ serverId, level }) => {
+        if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+        servers = servers.map((server) => (server.id === serverId ? { ...server, notificationLevel: level } : server));
         return clone(servers);
       },
       list: async () => clone(servers),
@@ -1914,6 +1929,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           name: "Joined workspace",
           logoUrl: null,
           notificationsMuted: false,
+          notificationsMutedUntil: null,
+          notificationLevel: "all",
           kind: "remote",
           state: "online",
           apiUrl: input.inviteUrl,

@@ -165,6 +165,13 @@ export const IPC_ENDPOINTS = {
     setPreference: request(IPC_CHANNELS.updateSetPreference),
     event: event(IPC_CHANNELS.updateEvent),
   },
+  notifications: {
+    getPreference: request(IPC_CHANNELS.notificationsGetPreference),
+    setPreference: request(IPC_CHANNELS.notificationsSetPreference),
+    test: request(IPC_CHANNELS.notificationsTest),
+    openSettings: request(IPC_CHANNELS.notificationsOpenSettings),
+    openedEvent: event(IPC_CHANNELS.notificationsOpenedEvent),
+  },
   agent: {
     getStatus: request(IPC_CHANNELS.agentGetStatus),
     getAnalytics: request(IPC_CHANNELS.agentGetAnalytics),
@@ -279,6 +286,7 @@ export const IPC_ENDPOINTS = {
     select: request(IPC_CHANNELS.serversSelect),
     reorder: request(IPC_CHANNELS.serversReorder),
     setMuted: request(IPC_CHANNELS.serversSetMuted),
+    setNotificationLevel: request(IPC_CHANNELS.serversSetNotificationLevel),
     join: request(IPC_CHANNELS.serversJoin),
     previewInvite: request(IPC_CHANNELS.serversPreviewInvite),
     takePendingInvite: request(IPC_CHANNELS.serversTakePendingInvite),

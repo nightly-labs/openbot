@@ -86,6 +86,7 @@ import {
   type MarketplaceAgentSummary,
   type MarketplaceSkillDetail,
   type MarketplaceSkillPage,
+  type NotificationOpenedEvent,
   type OpenBotDesktopApi,
   type ProviderApiKeyState,
   type ProviderCodeLoginStart,
@@ -1217,6 +1218,17 @@ const openbotApi: OpenBotDesktopApi = {
       return () => ipcRenderer.removeListener(IPC_CHANNELS.updateEvent, handler);
     },
   },
+  notifications: {
+    getPreference: () => ipcRenderer.invoke(IPC_CHANNELS.notificationsGetPreference),
+    setPreference: (input) => ipcRenderer.invoke(IPC_CHANNELS.notificationsSetPreference, input),
+    test: () => ipcRenderer.invoke(IPC_CHANNELS.notificationsTest),
+    openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.notificationsOpenSettings),
+    onOpened: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, opened: NotificationOpenedEvent) => listener(opened);
+      ipcRenderer.on(IPC_CHANNELS.notificationsOpenedEvent, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.notificationsOpenedEvent, handler);
+    },
+  },
   maintenance: {
     exportData: () => ipcRenderer.invoke(IPC_CHANNELS.maintenanceExportData),
     exportDiagnostics: () => ipcRenderer.invoke(IPC_CHANNELS.maintenanceExportDiagnostics),
@@ -1226,6 +1238,8 @@ const openbotApi: OpenBotDesktopApi = {
     select: async (serverId) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSelect, serverId)),
     reorder: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversReorder, input)),
     setMuted: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetMuted, input)),
+    setNotificationLevel: async (input) =>
+      rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetNotificationLevel, input)),
     join: async (input) => {
       const server = await ipcRenderer.invoke(IPC_CHANNELS.serversJoin, input);
       selectedServerId = server.id;

@@ -100,7 +100,9 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
           .catch(() => setOlderError(true))
           .finally(() => setOlderLoading(false));
       }}
-      send={(body, files, replyToMessageId) => sender.send(body, files, replyToMessageId, channel?.members ?? [])}
+      send={(body, files, replyToMessageId, upload) =>
+        sender.send(body, files, replyToMessageId, channel?.members ?? [], upload)
+      }
       notice={channel?.archived ? "Deleted channel. Preview only." : undefined}
       needsAction={channelTasksNeedingAction(page?.tasks ?? []).length > 0 && !channel?.archived}
     />

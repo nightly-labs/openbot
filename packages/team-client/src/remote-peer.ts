@@ -107,8 +107,17 @@ export interface RemoteTeamConnectionUpdate {
   resync?: boolean;
 }
 
+/** How much of one upload command's file has been sent. */
+export interface RemoteUploadProgress {
+  commandId: string;
+  sent: number;
+  total: number;
+}
+
 export interface RemoteTeamPeerActions {
   onHostStreamData?: (data: string | ArrayBuffer) => void;
+  /** Hears upload progress, at most once per whole percent. Optional, and never affects the upload. */
+  onUploadProgress?: (progress: RemoteUploadProgress) => Promise<void>;
   onAccountProfileChanged?: () => Promise<void>;
   /** The account's server list changed on another device of this account. */
   onAccountServersChanged?: () => Promise<void>;
@@ -302,7 +311,13 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         await closePeer(actions.current.endSession);
         return { commandId: command.id, ok: true };
       }
-      const response = await request(command.method, command.path, command.body, command.upload);
+      let reported = -1;
+      const response = await request(command.method, command.path, command.body, command.upload, (sent, total) => {
+        const percent = total > 0 ? Math.floor((sent / total) * 100) : 100;
+        if (percent === reported) return;
+        reported = percent;
+        void actions.current.onUploadProgress?.({ commandId: command.id, sent, total })?.catch(() => undefined);
+      });
       return { commandId: command.id, ok: true, status: response.status, body: response.body };
     } catch (error) {
       const message = error instanceof Error ? error.message : "The remote operation failed.";
@@ -748,14 +763,27 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     await actions.current.onConnectionUpdate({ hostId: state.hostId, state: "online", message: null });
   }
 
-  async function request(method: string, path: string, body: TeamProtocolV2Json, upload?: RemoteFileUpload) {
+  async function request(
+    method: string,
+    path: string,
+    body: TeamProtocolV2Json,
+    upload?: RemoteFileUpload,
+    onUploadProgress?: (sent: number, total: number) => void,
+  ) {
     const state = peer;
     if (!state || !isPeerOnline(state)) {
       if (state && (method === "GET" || method === "HEAD")) state.needsResync = true;
       throw new Error("The selected server is offline.");
     }
-    const bodyTransferId = upload ? await files.upload(upload) : null;
-    if (peer !== state || !isPeerOnline(state)) throw new Error("The attachment connection changed.");
+    const delivery = upload && onUploadProgress ? trackUploadDelivery(state, onUploadProgress) : null;
+    let bodyTransferId: string | null = null;
+    try {
+      bodyTransferId = upload ? await files.upload(upload, delivery?.queued) : null;
+      if (peer !== state || !isPeerOnline(state)) throw new Error("The attachment connection changed.");
+    } catch (error) {
+      delivery?.stop();
+      throw error;
+    }
     // Validate before registering a pending promise. A rejected local payload must not leave
     // an unobserved promise to reject again on timeout or disconnection.
     const payloadBody = upload
@@ -802,7 +830,53 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       pendingRequests.delete(requestId);
       pending.reject(error instanceof Error ? error : new Error("The request could not be sent."));
     });
-    return result;
+    if (!delivery) return result;
+    return result.then(
+      (response) => {
+        // The host answers only once it holds every byte, so its answer completes the ring.
+        delivery.complete();
+        return response;
+      },
+      (error: unknown) => {
+        delivery.stop();
+        throw error;
+      },
+    );
+  }
+
+  /**
+   * Upload progress as bytes that have left the phone. A chunk counts once the data channel has
+   * sent it, not when it enters the channel's buffer: that buffer takes 4 MB before it pushes
+   * back, so a photo would read as done the moment it was queued, and then wait at 100 %.
+   */
+  function trackUploadDelivery(state: PeerState, onProgress: (sent: number, total: number) => void) {
+    let queued = 0;
+    let total = 0;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const stop = () => {
+      if (timer !== null) clearInterval(timer);
+      timer = null;
+    };
+    const report = () => {
+      const buffered = state.channels.files?.bufferedAmount ?? 0;
+      // The buffer also holds frame headers, so this can read a little low, never high.
+      onProgress(Math.max(0, Math.min(total, queued - buffered)), total);
+      if (buffered === 0 && queued >= total) stop();
+    };
+    return {
+      queued(sent: number, size: number) {
+        queued = sent;
+        total = size;
+        report();
+        // Chunks stop arriving while the buffer drains, so read it until it is empty.
+        timer ??= setInterval(report, 100);
+      },
+      complete() {
+        stop();
+        if (total > 0) onProgress(total, total);
+      },
+      stop,
+    };
   }
 
   async function sendEventAck(state: PeerState): Promise<void> {

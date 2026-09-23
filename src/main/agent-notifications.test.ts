@@ -23,36 +23,54 @@ const agent = {
   avatarUrl: null,
 } satisfies AgentSummary;
 
+const prompt: AgentEvent = {
+  type: "prompt",
+  agentId: "chief",
+  threadId: "thread-chief",
+  turnId: "turn-1",
+  requestId: 1,
+  questions: [],
+};
+
 describe("notificationForAgentEvent", () => {
   const translate = translateFor("en");
-  it("surfaces completed work and prompts for enabled agents", () => {
-    expect(notificationForAgentEvent(completed("completed"), [agent], translate)).toEqual({
+  const target = { agentId: "chief", threadId: "thread-chief" };
+
+  it("surfaces finished and failed work and prompts at the all level", () => {
+    expect(notificationForAgentEvent(completed("completed"), [agent], translate, "all")).toEqual({
       title: "Chief",
       body: "Finished working.",
-      silent: true,
+      ...target,
     });
-    expect(
-      notificationForAgentEvent(
-        {
-          type: "prompt",
-          agentId: "chief",
-          threadId: "thread-chief",
-          turnId: "turn-1",
-          requestId: 1,
-          questions: [],
-        },
-        [agent],
-        translate,
-      ),
-    ).toEqual({ title: "Chief", body: "Needs your input." });
+    expect(notificationForAgentEvent(completed("failed"), [agent], translate, "all")).toEqual({
+      title: "Chief",
+      body: "Stopped with an error.",
+      ...target,
+    });
+    expect(notificationForAgentEvent(prompt, [agent], translate, "all")).toEqual({
+      title: "Chief",
+      body: "Needs your input.",
+      ...target,
+    });
   });
 
-  it("ignores disabled agents, non-successful turns, and unrelated events", () => {
-    expect(notificationForAgentEvent(completed("failed"), [agent], translate)).toBeNull();
+  it("keeps only events that wait for the user at the needs-me level", () => {
+    expect(notificationForAgentEvent(prompt, [agent], translate, "needs-me")).toEqual({
+      title: "Chief",
+      body: "Needs your input.",
+      ...target,
+    });
+    expect(notificationForAgentEvent(completed("completed"), [agent], translate, "needs-me")).toBeNull();
+    expect(notificationForAgentEvent(completed("failed"), [agent], translate, "needs-me")).toBeNull();
+  });
+
+  it("stays quiet at the nothing level, for disabled agents, stopped turns, and unrelated events", () => {
+    expect(notificationForAgentEvent(prompt, [agent], translate, "nothing")).toBeNull();
     expect(
-      notificationForAgentEvent(completed("completed"), [{ ...agent, notifications: false }], translate),
+      notificationForAgentEvent(completed("completed"), [{ ...agent, notifications: false }], translate, "all"),
     ).toBeNull();
-    expect(notificationForAgentEvent({ type: "agents-changed", agents: [] }, [agent], translate)).toBeNull();
+    expect(notificationForAgentEvent(completed("interrupted"), [agent], translate, "all")).toBeNull();
+    expect(notificationForAgentEvent({ type: "agents-changed", agents: [] }, [agent], translate, "all")).toBeNull();
   });
 });
 

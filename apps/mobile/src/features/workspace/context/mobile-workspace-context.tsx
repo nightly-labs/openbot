@@ -22,7 +22,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  TEAM_CONVERSATION_UNREAD_CAPABILITY,
+  TEAM_EML_ATTACHMENTS_CAPABILITY,
+  TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -295,10 +299,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       body?: TeamProtocolV2Json,
       serverId = activeServerIdRef.current,
       upload?: RemoteFileUpload,
+      onUploadProgress?: (fraction: number) => void,
     ): Promise<T> => {
       const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error("The mobile transport is not ready.");
-      return client.request(method, path, decode, body, upload);
+      return client.request(method, path, decode, body, upload, onUploadProgress);
     },
     [],
   );
@@ -1025,6 +1030,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         ),
       canEditQueue: (serverId) =>
         serverCapabilities.current.get(serverId)?.includes(TEAM_QUEUE_EDIT_CAPABILITY) ?? false,
+      attachmentSupport: (serverId) => {
+        const capabilities = serverCapabilities.current.get(serverId) ?? [];
+        return {
+          eml: capabilities.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
+          media: capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
+        };
+      },
       editQueue: async (agentId, serverId, input) => {
         return request(
           "POST",
@@ -1052,7 +1064,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       loadConversation,
       loadOlderMessages,
-      uploadAttachment: async (agentId, input, targetServerId) => {
+      uploadAttachment: async (agentId, input, targetServerId, onProgress) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error("The agent is unavailable.");
         const query = new URLSearchParams({ name: input.name, mime: input.mimeType });
@@ -1066,6 +1078,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           undefined,
           serverId,
           input,
+          onProgress,
         );
       },
       downloadAttachment: (serverId, attachmentId) => {
