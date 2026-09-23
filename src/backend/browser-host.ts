@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { isIP } from "node:net";
 import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -524,10 +525,9 @@ export class BrowserHost {
     this.#requireToolTab(params, args.tabId);
     const tab = this.#requireTab(args.tabId);
     if (tab.secret) throw new Error("Authentication is already active.");
-    if (tab.hasSharedBrowsingContext)
-      throw new Error("Secure input is unavailable in tabs with shared popup contexts. Use takeover.");
     const url = new URL(currentTabUrl(tab));
     if (url.protocol !== "https:") throw new Error("Secure authentication requires HTTPS.");
+    this.#requireIsolatedFromConnectedTabs(tab, url.origin);
     if (args.method !== "password" && args.digits === 0) throw new Error("Authentication codes require 4–12 digits.");
     if (
       (args.method === "password" && args.targets.length !== 1) ||
@@ -567,6 +567,8 @@ export class BrowserHost {
         },
         submit: async (secret) => {
           if (tab.secret !== protection || protection.submitted) throw new Error("Authentication request expired.");
+          // A connected page can navigate to the secret's site while the card is open.
+          this.#requireIsolatedFromConnectedTabs(tab, url.origin);
           if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
             throw new Error("Enter the requested number of digits.");
           protection.submitted = true;
@@ -630,6 +632,35 @@ export class BrowserHost {
       this.#syncAttachedView();
       throw new Error("Secure authentication is unavailable. Use browser takeover.");
     }
+  }
+
+  /**
+   * Pages in one opener group can keep references to each other's documents, including a document
+   * that received a secret and was later replaced. The browser blocks that access between sites, so
+   * secure input is allowed in a connected tab only when no frame in another connected tab has the
+   * secret's site.
+   */
+  #requireIsolatedFromConnectedTabs(tab: InternalTab, origin: string): void {
+    if (!tab.hasSharedBrowsingContext) return;
+    const site = approximateSite(origin);
+    for (const connected of this.#connectedTabs(tab)) {
+      if (connected === tab || connected.contents.isDestroyed()) continue;
+      const origins = connected.contents.mainFrame.framesInSubtree.map((frame) => frame.origin);
+      if (origins.some((frameOrigin) => frameOrigin !== "null" && approximateSite(frameOrigin) === site))
+        throw new Error(
+          "Secure input is unavailable while a connected popup or opener tab shows the same site. Use takeover.",
+        );
+    }
+  }
+
+  #connectedTabs(tab: InternalTab): Set<InternalTab> {
+    const connected = new Set([tab]);
+    for (const current of connected) {
+      for (const candidate of this.#tabs.values()) {
+        if (candidate.openerTabId === current.id || candidate.id === current.openerTabId) connected.add(candidate);
+      }
+    }
+    return connected;
   }
 
   endTakeover(tabId: string): void {
@@ -2346,6 +2377,17 @@ function toPublicTab(tab: InternalTab): BrowserTab {
     ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
     ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
   };
+}
+
+/**
+ * Returns the last two host labels, or the whole host for an IP address. Without the public suffix
+ * list, this can join two sites (for example under `co.uk`) but never splits one site, so a match
+ * can only refuse secure input, not permit it.
+ */
+function approximateSite(origin: string): string {
+  const hostname = new URL(origin).hostname;
+  if (isIP(hostname.replace(/^\[|\]$/gu, "")) !== 0) return hostname;
+  return hostname.split(".").slice(-2).join(".");
 }
 
 function currentTabUrl(tab: InternalTab): string {

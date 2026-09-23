@@ -79,14 +79,20 @@ vi.mock("electron", async () => {
       return null;
     }
     focusedFrame: { executeJavaScript: () => Promise<unknown>; isDestroyed: () => boolean } | null = null;
-    mainFrame = {
-      async executeJavaScript() {
-        return false;
-      },
-      isDestroyed() {
-        return false;
-      },
-    };
+    mainFrame = (() => {
+      const contents = this;
+      return {
+        async executeJavaScript() {
+          return false;
+        },
+        isDestroyed() {
+          return false;
+        },
+        get framesInSubtree() {
+          return contents.url ? [{ origin: new URL(contents.url).origin }] : [];
+        },
+      };
+    })();
     navigationHistory = { clear() {}, canGoBack: () => false, canGoForward: () => false };
   }
   return {
@@ -373,31 +379,45 @@ describe("browser auth popups", () => {
     expect(host.activeTabId).toBe(opener.id);
   });
 
-  it("requires takeover for connected tabs even after the popup closes", async () => {
-    const { opener, outcome } = await popupRequest();
+  function prepareSecret(tabId: string) {
+    return host.prepareSecret({
+      namespace: "openbot_browser",
+      tool: "submit_secret",
+      threadId: "thread-a",
+      ownerAgentId: "agent-a",
+      turnId: "turn",
+      callId: "secret",
+      arguments: { tabId, method: "password", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
+    });
+  }
+
+  async function connectedPopup(url: string) {
+    const { opener, outcome } = await popupRequest(url);
     const native = new WebContentsView().webContents;
     Object.defineProperty(native, "opener", { value: {} });
+    Object.assign(native, { url });
     outcome.createWindow?.({ webContents: native });
     const popup = host.listTabs().find((tab) => tab.openerTabId === opener.id);
     if (!popup) throw new Error("Missing popup.");
-    const prepare = (tabId: string) =>
-      host.prepareSecret({
-        namespace: "openbot_browser",
-        tool: "submit_secret",
-        threadId: "thread-a",
-        ownerAgentId: "agent-a",
-        turnId: "turn",
-        callId: "secret",
-        arguments: { tabId, method: "password", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
-      });
-    await expect(prepare(popup.id)).rejects.toThrow("Use takeover");
-    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
-    await host.close(popup.id);
-    await host.reload(opener.id);
-    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    return { opener, popup, native };
+  }
+
+  it("requires takeover while a connected tab shows the secret's site", async () => {
+    const { opener, popup } = await connectedPopup("https://accounts.example.com/auth");
+    await expect(prepareSecret(popup.id)).rejects.toThrow("Use takeover");
+    await expect(prepareSecret(opener.id)).rejects.toThrow("Use takeover");
     expect(secretEntry).not.toHaveBeenCalled();
-    const independent = await host.open("https://example.com/independent-secret", "thread-a", "agent-a");
-    const prepared = await prepare(independent.id);
+    await host.close(popup.id);
+    const prepared = await prepareSecret(opener.id);
+    prepared.cancel();
+  });
+
+  it("allows secure input in a popup from another site until a connected tab reaches its site", async () => {
+    const { opener, popup } = await connectedPopup("https://appleid.apple.com/auth");
+    const prepared = await prepareSecret(popup.id);
+    await host.loadUrl(opener.id, "https://idmsa.apple.com/start");
+    await expect(prepared.submit("password")).rejects.toThrow("Use takeover");
+    expect(secretEntry).not.toHaveBeenCalled();
     prepared.cancel();
   });
 
