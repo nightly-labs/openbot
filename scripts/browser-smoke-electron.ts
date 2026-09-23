@@ -522,23 +522,12 @@ async function main(): Promise<void> {
       ref: input.ref,
       text: "runs locally",
     });
-    const currentSave = typed.elements.find((element) => element.name === "Save");
-    if (!currentSave) throw new Error("Save control disappeared after typing.");
-    await browser.act(tab.id, typed.revision, { type: "click", ref: currentSave.ref });
-    // A native click travels the input pipeline, not the snapshot channel, so the page can still be
-    // running the handler when the act call returns. Wait for the text the handler writes; a click
-    // that was not native never writes it, so the check keeps its meaning.
-    const clickDeadline = Date.now() + 5_000;
-    let result = await browser.snapshot(tab.id);
-    while (!result.text.includes("runs locally|input:true|click:true") && Date.now() < clickDeadline) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      result = await browser.snapshot(tab.id);
+    if (!typed.text.includes("runs locally|input:true")) {
+      throw new Error(`Browser input was not native: ${typed.text}`);
     }
-    if (!result.text.includes("runs locally|input:true|click:true")) {
-      const contents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
-      const pointerEvents = await contents?.executeJavaScript("JSON.stringify(window.smokePointerEvents)");
-      throw new Error(`Browser input was not native: ${result.text}; pointer events: ${pointerEvents}`);
-    }
+    const pageContents = webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/`);
+    if (!pageContents) throw new Error("The local tab's web contents were not available.");
+    await waitForMouseInput(browser, tab.id, pageContents);
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 
     await runDoubleClickScenario(browser, origin);
@@ -1646,9 +1635,10 @@ async function main(): Promise<void> {
     if (whatsappLive) await runWhatsAppLiveProbe(browser);
     await expectFailure(() => browser.act(tab.id, first.revision, { type: "click", ref: save.ref }));
 
-    const child = result.elements.find((element) => element.name === "Child");
+    const current = await browser.snapshot(tab.id);
+    const child = current.elements.find((element) => element.name === "Child");
     if (!child) throw new Error("Child-tab control is missing.");
-    await browser.act(tab.id, result.revision, { type: "click", ref: child.ref });
+    await browser.act(tab.id, current.revision, { type: "click", ref: child.ref });
     await waitForValue(() =>
       browser.listTabs().find((candidate) => candidate.id !== tab.id && candidate.url.includes("/child")),
     );
@@ -2054,6 +2044,48 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   })()`,
     true,
   );
+}
+
+/**
+ * Wait until the view actually delivers a mouse event to the page.
+ *
+ * A key event goes to the focused renderer, but a mouse event needs the view to be producing
+ * compositor frames, and under a virtual display it can take seconds to get there - an animation
+ * frame does not run at all until it does. Chromium drops every mouse event in the meantime and
+ * reports nothing: no error, no pointer event, just a click that never happened. Every scenario
+ * after this one clicks once and means it, so the waiting belongs here rather than in each of them.
+ *
+ * The probe is thrown away, so retrying it costs nothing and proves nothing about the product.
+ */
+async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  await contents.executeJavaScript(
+    `(() => {
+    const probe = document.createElement('button');
+    probe.id = 'smoke-input-probe';
+    probe.textContent = 'Input probe';
+    probe.style.cssText = 'position:fixed;left:8px;top:8px;z-index:2147483647';
+    probe.addEventListener('click', event => {
+      if (event.isTrusted) probe.dataset.clicked = 'true';
+    });
+    document.body.prepend(probe);
+  })()`,
+    true,
+  );
+  const deadline = Date.now() + 60_000;
+  let landed = false;
+  while (!landed && Date.now() < deadline) {
+    await callBrowserTool(browser, "click", {
+      tabId,
+      target: { kind: "role", role: "button", name: "Input probe", exact: true },
+    });
+    landed =
+      (await contents.executeJavaScript(
+        "document.getElementById('smoke-input-probe').dataset.clicked === 'true'",
+        true,
+      )) === true;
+  }
+  await contents.executeJavaScript("document.getElementById('smoke-input-probe').remove()", true);
+  if (!landed) throw new Error("The view never delivered a native mouse event to the page.");
 }
 
 async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {
