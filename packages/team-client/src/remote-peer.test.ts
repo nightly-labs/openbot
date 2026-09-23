@@ -17,6 +17,7 @@ import {
   createRemoteTeamPeer,
   type RemoteTeamCommand,
   type RemoteTeamConnectionUpdate,
+  type RemoteUploadProgress,
 } from "./remote-peer";
 import { createRemoteConnectionRecovery } from "./remote-recovery";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
@@ -227,6 +228,8 @@ describe("browser remote peer recovery", () => {
       if (payload === undefined) return;
       if (typeof payload !== "string") {
         chunks.push(...decodeTeamProtocolV2FileChunk(payload).bytes);
+        // Queued is not sent: the chunk still waits in the channel's buffer.
+        channel.bufferedAmount = payload.byteLength;
         return;
       }
       const frame = decodeTeamProtocolV2FileControlFrame(payload);
@@ -244,9 +247,14 @@ describe("browser remote peer recovery", () => {
         body: null,
         upload: { name: "photo.png", mimeType: "image/png", base64: btoa("hello") },
       });
-      expect({ result, bytes: chunks }).toEqual({
+      expect({ result, bytes: chunks, progress: network.uploadProgress }).toEqual({
         result: { commandId: "upload", ok: true, status: 200, body: summary },
         bytes: [...new TextEncoder().encode("hello")],
+        // Nothing counts as sent while it waits in the buffer; the host's answer completes it.
+        progress: [
+          { commandId: "upload", sent: 0, total: 5 },
+          { commandId: "upload", sent: 5, total: 5 },
+        ],
       });
     } finally {
       await network.runtime.dispose();
@@ -854,6 +862,7 @@ async function setupNetwork(
   const sockets: TestSocket[] = [];
   const connections: TestConnection[] = [];
   const updates: RemoteTeamConnectionUpdate[] = [];
+  const uploadProgress: RemoteUploadProgress[] = [];
   let bootstrapCount = 0;
   let currentHostId = "host";
   const slowRequest = deferred();
@@ -1041,6 +1050,9 @@ async function setupNetwork(
         };
       },
       endSession: options.endSession ?? (async () => {}),
+      onUploadProgress: async (progress) => {
+        uploadProgress.push(progress);
+      },
       onAccountProfileChanged: options.onAccountProfileChanged,
       onAccountServersChanged: options.onAccountServersChanged,
       onHostStreamData: options.onHostStreamData,
@@ -1058,6 +1070,7 @@ async function setupNetwork(
     sockets,
     connections,
     updates,
+    uploadProgress,
     connection,
     socket,
     bootstraps: () => bootstrapCount,

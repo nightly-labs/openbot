@@ -17,6 +17,7 @@ function controller(chatId: string): ChatQueueController {
     serverId,
     attachments: [],
     changeAttachments: async () => {},
+    attachmentSupport: () => ({ eml: true, media: true }),
     queued: [],
     deliveries: [],
     edit: null,

@@ -76,7 +76,13 @@ export const ATTACHMENT_FILE_EXTENSIONS = [
   ...CONTEXT_ATTACHMENT_EXTENSIONS,
 ] as const;
 
-export function supportedAttachmentExtensions(support: { eml: boolean; media: boolean }): string[] {
+/** What a host accepts beyond the base list. An older remote host rejects EML, MP3, and MOV. */
+export interface AttachmentSupport {
+  eml: boolean;
+  media: boolean;
+}
+
+export function supportedAttachmentExtensions(support: AttachmentSupport): string[] {
   return ATTACHMENT_FILE_EXTENSIONS.filter(
     (extension) =>
       (support.eml || extension !== "eml") &&
@@ -104,6 +110,18 @@ export function isSupportedAttachmentName(name: string): boolean {
   const basename = name.split(/[\\/]/u).at(-1)?.trim().toLowerCase() ?? "";
   const extension = attachmentFileExtension(basename);
   return EXTENSIONLESS_TEXT_FILES.has(basename) || (extension !== null && SUPPORTED_EXTENSIONS.has(extension));
+}
+
+/**
+ * The name check for a surface that picks files for one host, such as mobile. It accepts the same
+ * files as the desktop picker filter that `supportedAttachmentExtensions` builds for that host.
+ */
+export function isSupportedAttachmentNameFor(name: string, support: AttachmentSupport): boolean {
+  if (!isSupportedAttachmentName(name)) return false;
+  const extension = attachmentFileExtension(name);
+  if (extension === "eml") return support.eml;
+  if (MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)) return support.media;
+  return true;
 }
 
 /**

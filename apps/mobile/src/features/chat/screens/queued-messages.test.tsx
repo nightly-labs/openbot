@@ -229,6 +229,7 @@ function stubQueue(overrides: Partial<ChatQueueController> = {}): ChatQueueContr
     serverId: "host",
     attachments: [],
     changeAttachments: async () => {},
+    attachmentSupport: () => ({ eml: true, media: true }),
     queued,
     deliveries: queued,
     edit: null,

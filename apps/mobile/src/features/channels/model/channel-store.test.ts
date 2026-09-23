@@ -712,6 +712,49 @@ describe("channel data in the shared chat", () => {
     expect(discard).toHaveBeenCalledTimes(fail ? 1 : 0);
   });
 
+  it("reports each finished upload and stops before the next file when cancelled, reusing finished uploads", async () => {
+    const { store } = fixture(async () => [channel]);
+    const summary = {
+      name: "note.txt",
+      mimeType: "text/plain",
+      size: 1,
+      kind: "file" as const,
+      previewKind: "none" as const,
+      previewUrl: null,
+    };
+    const upload = vi
+      .spyOn(store, "upload")
+      .mockResolvedValueOnce({ ...summary, id: "upload-one" })
+      .mockResolvedValueOnce({ ...summary, id: "upload-two" });
+    const command = vi.spyOn(store, "command").mockResolvedValue(channel);
+    vi.spyOn(store, "discard").mockResolvedValue(undefined);
+    const sender = new ChannelSend(store, "host-one", channel.id, () => "send-one");
+    const file = { id: "file-one", name: "note.txt", mimeType: "text/plain", size: 1, base64: "eA==" };
+    const files = [file, { ...file, id: "file-two" }];
+    const progress: number[] = [];
+    let cancelled = false;
+    await expect(
+      sender.send("Files", files, null, channel.members, {
+        cancelled: () => cancelled,
+        progress: (completed) => {
+          progress.push(completed);
+          if (completed === 1) cancelled = true;
+        },
+      }),
+    ).rejects.toThrow("Attachment upload cancelled.");
+    expect(progress).toEqual([0, 1]);
+    expect(upload).toHaveBeenCalledOnce();
+    expect(command).not.toHaveBeenCalled();
+    cancelled = false;
+    await sender.send("Files", files, null, channel.members, { cancelled: () => cancelled, progress: () => {} });
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(command).toHaveBeenCalledWith(
+      "host-one",
+      expect.objectContaining({ attachmentDraftIds: ["upload-one", "upload-two"] }),
+      { waitForRefresh: true },
+    );
+  });
+
   it("retries an uncertain delivery with the same uploads and operation ID", async () => {
     const { store } = fixture(async () => [channel]);
     const upload = vi.spyOn(store, "upload").mockResolvedValue({

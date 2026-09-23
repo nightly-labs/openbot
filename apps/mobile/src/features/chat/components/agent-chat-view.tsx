@@ -112,7 +112,7 @@ export function MobileChatView({
       send={(body, files, replyToMessageId, upload) =>
         uploadChatAttachments(files, {
           ...upload,
-          upload: (file) => uploadAttachment(agent.id, file, agent.serverId),
+          upload: (file, onProgress) => uploadAttachment(agent.id, file, agent.serverId, onProgress),
           discard: (id) => discardAttachment(agent.id, id, agent.serverId),
           send: (ids) => sendMessage(agent.id, body, ids, replyToMessageId, agent.serverId),
         })

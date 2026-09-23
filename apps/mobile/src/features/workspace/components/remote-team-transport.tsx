@@ -8,6 +8,7 @@ import {
   type RemoteTeamCommand,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
+  type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -24,6 +25,8 @@ export interface RemoteTeamTransportRef {
     decode: (value: unknown) => T,
     body?: TeamProtocolV2Json,
     upload?: RemoteFileUpload,
+    /** Hears the fraction of the uploaded file sent so far, from 0 to 1. */
+    onUploadProgress?: (fraction: number) => void,
   ): Promise<T>;
 }
 
@@ -53,8 +56,13 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
     const mailbox = mailboxRef.current;
     useEffect(() => () => mailbox.dispose(), [mailbox]);
 
+    // Upload progress arrives from the web view by command ID, while the command is still pending.
+    const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
     const enqueue = useCallback(
-      (next: RemoteTeamCommandInput): Promise<RemoteTeamCommandResult> => {
+      (
+        next: RemoteTeamCommandInput,
+        onUploadProgress?: (fraction: number) => void,
+      ): Promise<RemoteTeamCommandResult> => {
         const id = Crypto.randomUUID();
         const command: RemoteTeamCommand =
           next.type === "connect"
@@ -62,7 +70,9 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
             : next.type === "request"
               ? { id, type: "request", method: next.method, path: next.path, body: next.body, upload: next.upload }
               : { id, type: "disconnect" };
-        return mailbox.send(command);
+        if (!onUploadProgress) return mailbox.send(command);
+        uploadListeners.current.set(id, onUploadProgress);
+        return mailbox.send(command).finally(() => uploadListeners.current.delete(id));
       },
       [mailbox],
     );
@@ -84,8 +94,9 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           decode: (value: unknown) => T,
           body: TeamProtocolV2Json = {},
           upload?: RemoteFileUpload,
+          onUploadProgress?: (fraction: number) => void,
         ): Promise<T> => {
-          const result = await enqueue({ type: "request", method, path, body, upload });
+          const result = await enqueue({ type: "request", method, path, body, upload }, onUploadProgress);
           if (!result.ok) throw new Error(result.error ?? "The server request failed.");
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError("The host did not accept this edit.");
@@ -124,6 +135,9 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
         endSession={(sessionId) => directory.endSession(sessionId)}
         getBootstrap={(hostId, clientPublicKey) => directory.createBootstrap(hostId, clientPublicKey)}
         onCommandResult={handleCommandResult}
+        onUploadProgress={async ({ commandId, sent, total }: RemoteUploadProgress) =>
+          uploadListeners.current.get(commandId)?.(total > 0 ? sent / total : 1)
+        }
         onAccountProfileChanged={refreshProfile}
         onAccountServersChanged={onMembershipChanged}
         onConnectionUpdate={async (update) => onConnectionUpdate(update)}
