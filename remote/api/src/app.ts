@@ -6,6 +6,7 @@ import { verifyWebhookSignature } from "./tokens";
 
 const authEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("account-profile-changed"), userId: z.string().min(1) }),
+  z.object({ type: z.literal("account-servers-changed"), userId: z.string().min(1) }),
   z.object({
     type: z.literal("remote-auth-changed"),
     hostId: z.string().min(1),
@@ -37,6 +38,7 @@ export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalServic
       }
       if (event.type === "remote-auth-changed") signal.revoke(event.hostId, event.authEpoch);
       else if (event.type === "account-profile-changed") signal.profileChanged(event.userId);
+      else if (event.type === "account-servers-changed") signal.serversChanged(event.userId);
       else signal.revokeSession(event.sessionId);
       return new Response(null, { status: 204 });
     })

@@ -87,10 +87,7 @@ function RootNavigator() {
             importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
           >
             {!loading && appearanceReady ? (
-              <View
-                className="flex-1"
-                onLayout={session || pathname === "/scan-qr-code" ? () => reportReady() : undefined}
-              >
+              <View className="flex-1" onLayout={session || pathname !== "/" ? () => reportReady() : undefined}>
                 <Stack
                   screenOptions={{
                     headerBackButtonDisplayMode: "minimal",
@@ -111,6 +108,7 @@ function RootNavigator() {
                       options={{ animation: "fade", gestureEnabled: false, headerShown: false }}
                     />
                   </Stack.Protected>
+                  <Stack.Screen name="incoming-link" options={{ headerShown: false }} />
                 </Stack>
               </View>
             ) : null}

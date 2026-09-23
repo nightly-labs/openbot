@@ -26,7 +26,6 @@ export default function SettingsLayout() {
       <Stack.Screen name="about" options={{ title: "About" }} />
       <Stack.Screen name="hidden-chats" options={{ title: "Hidden chats" }} />
       <Stack.Screen name="deleted-chats" options={{ title: "Deleted channels" }} />
-      <Stack.Screen name="add-server" options={{ title: "Join a server" }} />
     </Stack>
   );
 }

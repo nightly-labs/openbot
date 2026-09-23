@@ -196,6 +196,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     post({ type: "account-profile-changed", peerId: state.id });
     return;
   }
+  if (message.type === "account-servers-changed") {
+    post({ type: "account-servers-changed", peerId: state.id });
+    return;
+  }
   if (message.type === "error") {
     post({
       type: "peer-error",

@@ -32,6 +32,13 @@ describe("decodeSignalServerMessage", () => {
     });
   });
 
+  it("accepts a server list invalidation without naming the server", () => {
+    expect(decodeSignalServerMessage({ type: "account-servers-changed", version: 1 })).toEqual({
+      type: "account-servers-changed",
+      version: 1,
+    });
+  });
+
   it("accepts a peer joining", () => {
     expect(decodeSignalServerMessage(peerReady)).toMatchObject({
       type: "peer-ready",
