@@ -59,7 +59,8 @@ describe("bundled Codex resolution", () => {
       "C:\\Program Files\\OpenBot\\resources\\codex\\win\\x64\\bin\\codex.exe",
     );
     expect(bundledCodexExecutable("linux", "x64", "/resources")).toBe("/resources/codex/linux/x64/bin/codex");
-    expect(bundledCodexExecutable("linux", "arm64", "/resources")).toBeNull();
+    expect(bundledCodexExecutable("linux", "arm64", "/resources")).toBe("/resources/codex/linux/arm64/bin/codex");
+    expect(bundledCodexExecutable("win32", "arm64", "C:\\resources")).toBeNull();
     expect(bundledCodexExecutable("freebsd", "x64", "/resources")).toBeNull();
   });
 

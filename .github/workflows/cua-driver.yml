@@ -30,7 +30,7 @@ concurrency:
 jobs:
   install:
     # Every target, because each release job installs its own and a pin that resolves for one
-    # platform says nothing about the other two. The installer checks the archive digest, then each
+    # platform says nothing about the others. The installer checks the archive digest, then each
     # file's digest after extraction, so a download that answers is not by itself a pass.
     name: Install the pinned driver (${{ matrix.target }})
     runs-on: ubuntu-latest
@@ -48,6 +48,9 @@ jobs:
           - target: linux-x64
             platform: linux
             architecture: x64
+          - target: linux-arm64
+            platform: linux
+            architecture: arm64
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
