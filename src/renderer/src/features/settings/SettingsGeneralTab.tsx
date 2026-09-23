@@ -6,6 +6,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Button,
   ConfirmDialog,
   Item,
   ItemActions,
