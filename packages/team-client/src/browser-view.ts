@@ -22,6 +22,8 @@ interface View {
   streamId: string;
   sessionId: string;
   ready: boolean;
+  /** Set once the stream close and the session delete are sent, or the host ended the stream. */
+  released: boolean;
   frame: (frame: BrowserViewFrame) => void;
   ended: () => void;
 }
@@ -40,15 +42,23 @@ export function createRemoteBrowserView(
     view = null;
     current?.ended();
   }
+  /**
+   * Closes one view's stream and host session. A view can be detached before its handle closes it:
+   * `disconnect()` during the open handshake leaves both open on the host.
+   */
+  async function release(target: View) {
+    if (target.released) return;
+    target.released = true;
+    try {
+      await send(encodeRemoteDesktopSignalControl({ type: "close", streamId: target.streamId }));
+    } finally {
+      await request("DELETE", TEAM_API_ROUTES.browser.viewSession(target.sessionId));
+    }
+  }
   async function close() {
     const current = view;
     disconnect();
-    if (!current) return;
-    try {
-      await send(encodeRemoteDesktopSignalControl({ type: "close", streamId: current.streamId }));
-    } finally {
-      await request("DELETE", TEAM_API_ROUTES.browser.viewSession(current.sessionId));
-    }
+    if (current) await release(current);
   }
   return {
     disconnect,
@@ -61,6 +71,7 @@ export function createRemoteBrowserView(
           if (control.streamId !== current.streamId) return;
           if (control.type === "opened") current.ready = true;
           if (control.type === "close" || control.type === "error") {
+            current.released = true;
             disconnect();
             void request("DELETE", TEAM_API_ROUTES.browser.viewSession(current.sessionId)).catch(() => undefined);
           }
@@ -83,7 +94,14 @@ export function createRemoteBrowserView(
         await request("DELETE", TEAM_API_ROUTES.browser.viewSession(session.id));
         throw new Error("The browser view changed.");
       }
-      const next: View = { sessionId: session.id, streamId: crypto.randomUUID(), ready: false, frame, ended };
+      const next: View = {
+        sessionId: session.id,
+        streamId: crypto.randomUUID(),
+        ready: false,
+        released: false,
+        frame,
+        ended,
+      };
       view = next;
       const acksFrames = namesFrames();
       // The host keeps a frame's size only for a client that will say when that frame is on screen.
@@ -98,7 +116,8 @@ export function createRemoteBrowserView(
           }),
         );
       } catch (error) {
-        await close().catch(() => undefined);
+        if (view === next) disconnect();
+        await release(next).catch(() => undefined);
         throw error;
       }
       return {
@@ -115,7 +134,8 @@ export function createRemoteBrowserView(
           );
         },
         async close() {
-          if (view === next) await close();
+          if (view === next) disconnect();
+          await release(next);
         },
       };
     },

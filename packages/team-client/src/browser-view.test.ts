@@ -59,6 +59,29 @@ describe("remote browser view", () => {
     expect(send).not.toHaveBeenCalled();
     expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`);
   });
+  it("releases the host session of a view detached while its stream opens", async () => {
+    let opened: (() => void) | undefined;
+    const send = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            opened = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    const request = vi.fn().mockResolvedValue({ id: sessionId, tabId, streamPath: browserViewStreamPath(sessionId) });
+    const client = createRemoteBrowserView(send, request, () => false);
+    const opening = client.open(tabId, vi.fn(), vi.fn());
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+    client.disconnect();
+    opened?.();
+    const view = await opening;
+    await view.close();
+    const streamId = decodeRemoteDesktopSignalControl(send.mock.calls[0][0]).streamId;
+    expect(decodeRemoteDesktopSignalControl(send.mock.calls[1][0])).toEqual({ type: "close", streamId });
+    expect(request).toHaveBeenLastCalledWith("DELETE", `/v1/browser/view/sessions/${sessionId}`);
+  });
   it("names frames only to a host that advertises frame points", async () => {
     const opened = async (namesFrames: boolean) => {
       const send = vi.fn().mockResolvedValue(undefined);
