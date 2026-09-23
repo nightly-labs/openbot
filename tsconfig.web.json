@@ -4,7 +4,6 @@
     "target": "ES2022",
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
-    "noUncheckedIndexedAccess": true,
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": [

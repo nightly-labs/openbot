@@ -507,13 +507,12 @@ export class RemoteScreenGateway {
   }
 
   async handleHttp(request: IncomingMessage, response: ServerResponse, url: URL): Promise<void> {
-    const match =
+    const [, sessionId, route] =
       /^\/v1\/remote-screen\/sessions\/([A-Za-z0-9-]+)\/(viewer|authorize|viewer-state|moonlight(?:\/.*)?)$/.exec(
         url.pathname,
-      );
-    const session = match ? this.#sessions.get(match[1]) : null;
-    if (!session || !match) return sendText(response, 404, "Remote session not found.");
-    const route = match[2];
+      ) ?? [];
+    const session = sessionId === undefined ? null : this.#sessions.get(sessionId);
+    if (!session || route === undefined) return sendText(response, 404, "Remote session not found.");
     if (request.method === "GET" && route === "viewer") {
       if (!this.#runtimeState) return sendText(response, 503, "Moonlight runtime is unavailable.");
       return sendViewer(response, session.snapshot.id, session.streamerSlot, this.#runtimeState);
@@ -580,9 +579,9 @@ export class RemoteScreenGateway {
   }
 
   handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer, url: URL): void {
-    const match = /^\/v1\/remote-screen\/sessions\/([A-Za-z0-9-]+)\/stream$/.exec(url.pathname);
-    const session = match ? this.#sessions.get(match[1]) : null;
-    if (!session || !this.#viewerAuthorized(request, session) || !this.#runtimeState || !match) {
+    const [, sessionId] = /^\/v1\/remote-screen\/sessions\/([A-Za-z0-9-]+)\/stream$/.exec(url.pathname) ?? [];
+    const session = sessionId === undefined ? null : this.#sessions.get(sessionId);
+    if (!session || !this.#viewerAuthorized(request, session) || !this.#runtimeState) {
       socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;

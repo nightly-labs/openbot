@@ -58,7 +58,7 @@ function keyboardScroll() {
               scrollTo: (_ref: unknown, _x: number, y: number) => {
                 position.value = y;
               },
-              interpolate: (value: number, [start, end]: number[], [from, to]: number[]) =>
+              interpolate: (value: number, [start, end]: [number, number], [from, to]: [number, number]) =>
                 from + ((value - start) / (end - start)) * (to - from),
             };
           case "../../hooks":

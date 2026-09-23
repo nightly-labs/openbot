@@ -720,10 +720,12 @@ export class SunshineMoonlightRuntime {
       await this.#assertEmbeddedPermissions(baseUrl, user);
       hostIds.push(host.host_id);
     }
+    const [hostId] = hostIds;
+    if (hostId === undefined) throw new Error("Moonlight has no paired local host.");
     const apps = (
       await moonlightJson(
         baseUrl,
-        `/api/apps?host_id=${hostIds[0]}`,
+        `/api/apps?host_id=${hostId}`,
         moonlightAppsSchema,
         this.#moonlightHeader,
         {},
@@ -733,7 +735,7 @@ export class SunshineMoonlightRuntime {
     const desktop = apps.find((app) => app.title.toLowerCase() === "desktop") ?? apps[0];
     if (!desktop) throw new Error("Sunshine did not publish the Desktop application.");
     await writeFile(endpointPath, JSON.stringify({ port: this.#requireSunshineHttpPort() }), { mode: 0o600 });
-    return { hostId: hostIds[0], hostIds, desktopAppId: desktop.app_id };
+    return { hostId, hostIds, desktopAppId: desktop.app_id };
   }
 
   async #getSunshineDisplays(): Promise<RemoteDesktopDisplay[]> {
@@ -776,8 +778,9 @@ export class SunshineMoonlightRuntime {
         (pairing) =>
           pairing.name === this.#pairingName && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(pairing.address),
       );
-      if (matches.length > 1) throw new Error("Sunshine returned ambiguous local pairing requests.");
-      if (matches.length === 1) return matches[0].id;
+      const [match, ...others] = matches;
+      if (others.length > 0) throw new Error("Sunshine returned ambiguous local pairing requests.");
+      if (match) return match.id;
       await shortDelay();
     }
     throw new Error("Sunshine did not receive the expected local pairing request.");

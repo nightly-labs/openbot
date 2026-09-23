@@ -157,6 +157,7 @@ export class BrowserUploads {
         await mkdir(stagedDirectory, { mode: 0o700 });
         const stagedPath = join(stagedDirectory, basename(source.path));
         const expectedBytes = sizes[index];
+        if (expectedBytes === undefined) throw new Error("The upload size is missing.");
         if (expectedBytes === 0) {
           await writeFile(stagedPath, "", { flag: "wx", mode: 0o600 });
         } else {

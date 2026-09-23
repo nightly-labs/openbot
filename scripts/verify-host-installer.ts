@@ -34,7 +34,15 @@ export function verifyHostBom(text: string): void {
   const seen = new Set<string>();
   for (const line of text.trim().split("\n")) {
     const [path, modeText, uid, gid] = line.split("\t");
-    if (!expected.has(path) || seen.has(path) || uid !== "0" || gid !== "0" || !/^[0-7]+$/.test(modeText))
+    if (
+      path === undefined ||
+      modeText === undefined ||
+      !expected.has(path) ||
+      seen.has(path) ||
+      uid !== "0" ||
+      gid !== "0" ||
+      !/^[0-7]+$/.test(modeText)
+    )
       throw new Error("Unexpected payload path, type or ownership.");
     const mode = Number.parseInt(modeText, 8);
     const isFile = HOST_FILES.some((file) => `.${file}` === path);
@@ -86,7 +94,7 @@ export async function verifyHostPayload(expanded: string, version: string): Prom
     ["openbot-relaunch.sh", `${HOST_MANAGER_DIRECTORY}/openbot-relaunch.sh`],
     ["app.openbot.host-manager.plist", "/Library/LaunchDaemons/app.openbot.host-manager.plist"],
     ["app.openbot.desktop.relaunch.plist", "/Library/LaunchAgents/app.openbot.desktop.relaunch.plist"],
-  ]) {
+  ] as const) {
     if (
       (await readFile(join(root, destination), "utf8")) !==
       (await readFile(`build/macos/host-updates/${source}`, "utf8"))

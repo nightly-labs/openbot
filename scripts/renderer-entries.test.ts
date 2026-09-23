@@ -23,13 +23,15 @@ function read(path: string): string {
 // The HTML files the build is told to compile, in the order the config lists them.
 function configuredPages(): string[] {
   const config = read("electron.vite.config.ts");
-  return [...config.matchAll(/resolve\("(src\/renderer\/[\w-]+\.html)"\)/gu)].map((match) => match[1]);
+  return [...config.matchAll(/resolve\("(src\/renderer\/[\w-]+\.html)"\)/gu)].flatMap(([, page]) =>
+    page ? [page] : [],
+  );
 }
 
 // A page's entry modules, as written: `<script type="module" src="/src/...">`,
 // where the leading slash is the renderer root rather than the filesystem root.
 function entriesOf(page: string): string[] {
-  return [...read(page).matchAll(/<script[^>]+src="(\/[^"]+)"/gu)].map((match) => match[1]);
+  return [...read(page).matchAll(/<script[^>]+src="(\/[^"]+)"/gu)].flatMap(([, entry]) => (entry ? [entry] : []));
 }
 
 describe("renderer entry points", () => {

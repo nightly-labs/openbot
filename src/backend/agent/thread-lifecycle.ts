@@ -629,6 +629,7 @@ export class ThreadLifecycle {
     let split = rendered.length;
     while (split > 0) {
       const candidate = rendered[split - 1];
+      if (candidate === undefined) break;
       const tokens = estimateTokens(candidate);
       if (newestTokens + tokens > newestBudget) break;
       newest.unshift(candidate);

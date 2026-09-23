@@ -40,8 +40,7 @@ export class ManagedSkillService {
     const results = await Promise.allSettled(
       agents.map((agent) => syncTargets(agent.workspacePath, content, this.slug)),
     );
-    for (let index = 0; index < results.length; index += 1) {
-      const result = results[index];
+    for (const [index, result] of results.entries()) {
       if (result.status === "fulfilled") {
         this.reportResult(result.value);
       } else {

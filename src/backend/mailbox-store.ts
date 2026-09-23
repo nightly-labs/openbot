@@ -217,6 +217,7 @@ export class MailboxStore {
     const index = this.#state.drafts.findIndex((draft) => draft.id === id);
     if (index < 0) return;
     const [draft] = this.#state.drafts.splice(index, 1);
+    if (!draft) return;
     try {
       await this.#persist("attachment-draft.discarded");
     } catch (error) {

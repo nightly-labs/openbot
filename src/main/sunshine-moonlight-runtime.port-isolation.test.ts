@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import type { RemoteDesktopDisplay, RemoteDesktopIceServer } from "@openbot/contracts/ipc";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import {
@@ -355,6 +355,7 @@ function createHarness(stateDirectory: string): Harness {
         harness.iceUrl = options.env?.OPENBOT_ICE_HELPER_URL ?? "";
         harness.iceToken = options.env?.OPENBOT_ICE_HELPER_TOKEN ?? "";
         const configPath = args[args.indexOf("--config-path") + 1];
+        assert(configPath);
         harness.pairingName = moonlightConfigFileSchema.parse(
           JSON.parse(readFileSync(configPath, "utf8")),
         ).moonlight.pair_device_name;
