@@ -6,6 +6,9 @@ import { createStore, onSettled, Show } from "solid-js";
 import { WebWorkspace } from "./WebWorkspace";
 import type { WebRuntimeFactory } from "./web-client-context";
 
+/** A sign-in refusal that the login form already shows. */
+class SignInIssueShown extends Error {}
+
 interface BrowserAccount {
   id: string;
   email: string;
@@ -70,6 +73,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     const value = await response.json();
     if (!response.ok) {
       if (path === "email/start" || path === "email/verify") {
+        const retryAfterSeconds = Number.parseInt(response.headers.get("Retry-After") ?? "", 10);
         const issue = {
           code:
             isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.code)
@@ -79,10 +83,12 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
             isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.message)
               ? value.error.message
               : "Sign-in failed.",
+          ...(retryAfterSeconds ? { retryAfterSeconds } : {}),
         };
         setState((draft) => {
           draft.login = draft.login.status === "code_sent" ? { ...draft.login, issue } : { status: "error", issue };
         });
+        throw new SignInIssueShown();
       }
       throw new Error(
         isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.message)
@@ -91,6 +97,15 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       );
     }
     return value;
+  }
+  /** Like the desktop login, a server refusal is shown as the login issue, not also as a thrown error. */
+  async function signInRequest(path: "email/start" | "email/verify", body: Parameters<typeof request>[1]) {
+    try {
+      return await request(path, body);
+    } catch (error) {
+      if (error instanceof SignInIssueShown) return null;
+      throw error;
+    }
   }
   function accountFrom(value: unknown): BrowserAccount {
     if (
@@ -143,7 +158,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   }
   async function start(email: string) {
     if (Date.now() < state.resendAt) throw new Error("Wait before requesting another code.");
-    const value = await request("email/start", { email });
+    const value = await signInRequest("email/start", { email });
+    if (value === null) return;
     if (!isDynamicRecord(value) || !isString(value.challengeId) || typeof value.resendAt !== "number")
       throw new Error("The sign-in response is invalid.");
     const challengeId = value.challengeId;
@@ -161,7 +177,9 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     });
   }
   async function verify(challengeId: string, code: string) {
-    const account = accountFrom(await request("email/verify", { challengeId, code }));
+    const value = await signInRequest("email/verify", { challengeId, code });
+    if (value === null) return;
+    const account = accountFrom(value);
     sessionGeneration += 1;
     channel?.postMessage("session-changed");
     setState((draft) => {

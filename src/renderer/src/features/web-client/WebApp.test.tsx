@@ -105,6 +105,26 @@ describe("browser account UI", () => {
       expect.objectContaining({ body: JSON.stringify({ challengeId: "challenge", code: "3456-7892" }) }),
     );
   });
+  it("shows only the server's wait message when a code was sent recently", async () => {
+    const mock = setup();
+    mock.fetch.mockResolvedValueOnce(Response.json({}, { status: 401 }));
+    render(() => <WebApp createRuntime={createMockWebRuntime} />);
+    await fireEvent.input(await screen.findByRole("textbox", { name: "Email" }), {
+      target: { value: "test@example.test" },
+    });
+    mock.fetch.mockResolvedValueOnce(
+      Response.json(
+        { error: { code: "code_recently_sent", message: "Wait 48 seconds before requesting another code." } },
+        { status: 429, headers: { "Retry-After": "48" } },
+      ),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Send sign-in code" }));
+    expect(await screen.findByRole("button", { name: /^Try again in/ })).toBeDisabled();
+    expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+      "Wait 48 seconds before requesting another code.",
+    ]);
+  });
+
   it("restores the protected session and clears private UI when another tab signs out", async () => {
     const mock = setup();
     const app = render(() => <WebApp createRuntime={createMockWebRuntime} />);
