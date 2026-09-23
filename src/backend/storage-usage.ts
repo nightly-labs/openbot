@@ -4,7 +4,7 @@
 // deletes outside the cache and log folders the caller names.
 
 import type { Dirent } from "node:fs";
-import { lstat, readdir, realpath, rm, stat, statfs } from "node:fs/promises";
+import { lstat, readdir, realpath, rm, statfs } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -317,7 +317,7 @@ export class StorageUsageScanner {
     const measured: MeasuredFile[] = [];
     for (let index = 0; index < selected.length; index += STAT_BATCH) {
       const batch = selected.slice(index, index + STAT_BATCH);
-      const infos = await Promise.all(batch.map((file) => stat(file.stored.path).catch(() => null)));
+      const infos = await Promise.all(batch.map((file) => lstat(file.stored.path).catch(() => null)));
       batch.forEach((file, offset) => {
         const info = infos[offset];
         const available = info?.isFile() === true;
