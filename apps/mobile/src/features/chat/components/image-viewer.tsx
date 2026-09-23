@@ -1,14 +1,15 @@
 import { BlurView } from "expo-blur";
+import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Image } from "expo-image";
 import { useThemeColor } from "heroui-native/hooks";
 import { Check, Download, Share, X } from "lucide-react-native";
-import { type ReactNode, useEffect, useState } from "react";
-import { AccessibilityInfo, Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { useEffect, useState } from "react";
+import { AccessibilityInfo, Modal, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
-  cubicBezier,
   useAnimatedProps,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useReducedMotion,
@@ -38,6 +39,7 @@ import {
   rubberBandClamp,
   shouldDismiss,
 } from "../model/image-viewer-geometry";
+import { ChatGlassIconButton } from "./chat-glass-icon-button";
 
 // Out of the chat: just short of critically damped, so the picture arrives rather than stops.
 const OPEN_SPRING = { damping: 30, stiffness: 260, mass: 1 } as const;
@@ -53,7 +55,6 @@ const CORNER_RADIUS = 16;
 const BLUR_INTENSITY = 50;
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
-const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
 
 const PHASE_OPENING = 0;
 const PHASE_OPEN = 1;
@@ -124,7 +125,10 @@ export function ImageViewer({
   const reduced = useReducedMotion();
   const reduceTransparency = useReduceTransparency();
   const { theme } = useUniwind();
-  const foreground = String(useThemeColor("foreground"));
+  const [foreground, fallbackBackground] = useThemeColor(["foreground", "default"]);
+  // The same glass as the chat header's buttons. Without Liquid Glass, or with Reduce
+  // Transparency on, they fall back to the theme's solid control colour.
+  const liquidGlassAvailable = isLiquidGlassAvailable() && reduceTransparency === false;
   const vertical = Math.max(insets.top, insets.bottom) + INSET;
   const box = { x: INSET, y: vertical, width: Math.max(W - INSET * 2, 1), height: Math.max(H - vertical * 2, 1) };
   const fit = fitWithin(dimensions, box);
@@ -400,10 +404,15 @@ export function ImageViewer({
       height: cover.height,
     };
   });
-  const chromeStyle = useAnimatedStyle(() => ({ opacity: chrome.get() * clamp(t.get(), 0, 1) * fade.get() }));
-  const chromeProps = useAnimatedProps(() => ({
-    pointerEvents: chrome.get() > 0.5 ? ("box-none" as const) : ("none" as const),
-  }));
+  // Glass stops rendering under a parent with zero opacity, so the buttons are never faded from
+  // here. The worklets still decide when they show; React hears only when that flips.
+  const [chromeVisible, setChromeVisible] = useState(false);
+  useAnimatedReaction(
+    () => chrome.get() > 0.5 && t.get() > 0.5,
+    (visible, previous) => {
+      if (visible !== previous) scheduleOnRN(setChromeVisible, visible);
+    },
+  );
   const blurProps = useAnimatedProps(() => ({ intensity: backdrop.get() * BLUR_INTENSITY }));
   const fadeStyle = useAnimatedStyle(() => ({ opacity: backdrop.get() }));
 
@@ -462,23 +471,39 @@ export function ImageViewer({
             </Animated.View>
           </View>
         </GestureDetector>
-        <Animated.View style={[StyleSheet.absoluteFill, chromeStyle]} animatedProps={chromeProps}>
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <View
             pointerEvents="box-none"
             className="absolute inset-x-4 flex-row items-center justify-between"
             style={{ top: insets.top + 8 }}
           >
             {/* Close at the leading edge, where the platform puts the way out of a full-screen view. */}
-            <ViewerControl label="Close" onPress={requestClose}>
-              <X size={18} color={foreground} />
-            </ViewerControl>
+            <ChatGlassIconButton
+              accessibilityLabel="Close"
+              hidden={!chromeVisible}
+              fallbackBackground={fallbackBackground}
+              liquidGlassAvailable={liquidGlassAvailable}
+              onPress={requestClose}
+            >
+              <X size={22} color={String(foreground)} />
+            </ChatGlassIconButton>
             <View className="flex-row gap-2">
-              <ViewerControl label={`Share ${name}`} disabled={busy} onPress={onShare}>
-                <Share size={17} color={foreground} />
-              </ViewerControl>
-              <ViewerControl
-                label={saved ? "Saved to Photos" : `Save ${name} to Photos`}
+              <ChatGlassIconButton
+                accessibilityLabel={`Share ${name}`}
+                hidden={!chromeVisible}
+                disabled={busy}
+                fallbackBackground={fallbackBackground}
+                liquidGlassAvailable={liquidGlassAvailable}
+                onPress={onShare}
+              >
+                <Share size={20} color={String(foreground)} />
+              </ChatGlassIconButton>
+              <ChatGlassIconButton
+                accessibilityLabel={saved ? "Saved to Photos" : `Save ${name} to Photos`}
+                hidden={!chromeVisible}
                 disabled={busy || saved}
+                fallbackBackground={fallbackBackground}
+                liquidGlassAvailable={liquidGlassAvailable}
                 onPress={() =>
                   void onSave().then((done) => {
                     if (!done) return;
@@ -487,53 +512,16 @@ export function ImageViewer({
                   })
                 }
               >
-                {saved ? <Check size={18} color={foreground} /> : <Download size={17} color={foreground} />}
-              </ViewerControl>
+                {saved ? (
+                  <Check size={21} color={String(foreground)} />
+                ) : (
+                  <Download size={20} color={String(foreground)} />
+                )}
+              </ChatGlassIconButton>
             </View>
           </View>
-        </Animated.View>
+        </View>
       </GestureHandlerRootView>
     </Modal>
-  );
-}
-
-/** A round control over the photo, in the app's own surface and text colours. */
-function ViewerControl({
-  label,
-  disabled = false,
-  onPress,
-  children,
-}: {
-  label: string;
-  disabled?: boolean;
-  onPress: () => void;
-  children: ReactNode;
-}) {
-  const [pressed, setPressed] = useState(false);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      hitSlop={8}
-      pressRetentionOffset={16}
-      onPress={onPress}
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setPressed(false)}
-    >
-      <Animated.View
-        className="size-10 items-center justify-center rounded-full bg-background/80"
-        style={{
-          opacity: disabled ? 0.5 : 1,
-          transform: [{ scale: pressed ? 0.94 : 1 }],
-          transitionProperty: ["transform", "opacity"],
-          transitionDuration: 120,
-          transitionTimingFunction: PRESS_EASING,
-        }}
-      >
-        {children}
-      </Animated.View>
-    </Pressable>
   );
 }
