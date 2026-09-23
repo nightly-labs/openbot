@@ -14,6 +14,7 @@ import { useReducedMotion } from "react-native-reanimated";
 import { useUniwind, withUniwind } from "uniwind";
 
 import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
+import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
@@ -150,6 +151,7 @@ export default function RootLayout() {
               <BloubAnimationProvider>
                 <MobileSessionProvider>
                   <MobileAnalyticsLifecycle />
+                  {__DEV__ ? <DevelopmentConnectLinkHandler /> : null}
                   <AppLoadingOverlayProvider>
                     <RootNavigator />
                   </AppLoadingOverlayProvider>

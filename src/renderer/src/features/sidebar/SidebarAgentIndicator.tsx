@@ -1,9 +1,10 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
+import { Clock3, TriangleAlert, X } from "../../components/ui";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { SidebarAgentState } from "./sidebar-types";
+import type { SidebarAgentState, SidebarRoutinePhase } from "./sidebar-types";
 
 export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | undefined }) {
   const [entering, setEntering] = createSignal(false);
@@ -31,6 +32,7 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
           class={[
             "agent-row-agent-status",
             `agent-row-agent-status-${state().kind}`,
+            routinePhase(state()) ? `agent-row-agent-status-routine-${routinePhase(state())}` : "",
             { "agent-row-agent-status-entering": entering() },
           ]}
           aria-hidden="true"
@@ -38,6 +40,15 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
         >
           <Show when={state().kind === "working"}>
             <TypingDots class="agent-row-thinking-dots" />
+          </Show>
+          <Show when={routinePhase(state()) === "running" || routinePhase(state()) === "queued"}>
+            <Clock3 aria-hidden="true" />
+          </Show>
+          <Show when={routinePhase(state()) === "needs-attention"}>
+            <TriangleAlert aria-hidden="true" />
+          </Show>
+          <Show when={routinePhase(state()) === "failed"}>
+            <X aria-hidden="true" />
           </Show>
           <Show when={state().kind === "responded"}>
             <svg viewBox="0 0 12 12">
@@ -52,6 +63,10 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
       )}
     </Show>
   );
+}
+
+function routinePhase(state: SidebarAgentState): SidebarRoutinePhase | undefined {
+  return state.kind === "routine" ? state.phase : undefined;
 }
 
 export function SidebarPinnedAvatar(props: {
