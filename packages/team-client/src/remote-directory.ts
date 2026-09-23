@@ -1,5 +1,5 @@
 import { sha256 } from "@noble/hashes/sha2.js";
-import { createInviteUrl, parseInviteUrl } from "@openbot/contracts/invite-links";
+import { createInviteUrl, PERMANENT_INVITE_EXPIRES_AT_MS, parseInviteUrl } from "@openbot/contracts/invite-links";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -30,6 +30,8 @@ export interface RemoteTeamInvite {
   expiresAt: number;
   usedAt: number | null;
   revokedAt: number | null;
+  permanent: boolean;
+  useCount: number;
 }
 
 export interface RemoteTeamBootstrap {
@@ -45,6 +47,7 @@ export interface RemoteInvitePreview {
   role: "admin" | "member";
   expiresAt: number;
   emailBound: boolean;
+  permanent: boolean;
   devicePublicKey: string | null;
 }
 
@@ -155,9 +158,10 @@ export class RemoteTeamDirectoryClient {
 
   async createInvite(
     host: { hostId: string; devicePublicKey: string },
-    input: { role: "admin" | "member"; email?: string },
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
   ): Promise<{ inviteId: string; inviteUrl: string; expiresAt: number }> {
-    // Validate the URL before creating a one-use invitation.
+    if (input.permanent && input.email) throw new Error("Permanent invitations cannot be sent by email.");
+    // Validate the URL before creating an invitation.
     const payload = {
       apiUrl: new URL(this.#apiUrl).toString(),
       serverId: host.hostId,
@@ -347,6 +351,7 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
     role: value.role,
     expiresAt: value.expiresAt,
     emailBound: value.emailBound,
+    permanent: value.permanent === true || value.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS,
     devicePublicKey: value.devicePublicKey,
   };
 }
@@ -396,6 +401,9 @@ function decodeInvite(value: unknown): RemoteTeamInvite {
     expiresAt: value.expiresAt,
     usedAt: value.usedAt,
     revokedAt: value.revokedAt,
+    permanent: value.permanent === true || value.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS,
+    useCount:
+      isNumber(value.useCount) && Number.isSafeInteger(value.useCount) && value.useCount >= 0 ? value.useCount : 0,
   };
 }
 

@@ -24,6 +24,28 @@ describe("SignalService", () => {
     expect(tablet.closed).toBe(false);
   });
 
+  it("tells every device of the account that joined a server, and no one else", async () => {
+    const service = new SignalService(fakeTokens(), 8);
+    const desktop = socket("host");
+    const phone = socket("phone");
+    const otherAccount = socket("other");
+    await hello(service, desktop, "host-ticket", "host");
+    await hello(service, phone, "client-ticket", "client");
+    service.connect(otherAccount);
+    for (const peer of [desktop, phone, otherAccount]) peer.messages.length = 0;
+
+    // The desktop's own ticket carries the owner, the phone's carries the member who signed in.
+    service.serversChanged("owner-1");
+    service.serversChanged("user-1");
+
+    const event = JSON.stringify({ type: "account-servers-changed", version: 1 });
+    expect(desktop.messages).toEqual([event]);
+    expect(phone.messages).toEqual([event]);
+    expect(otherAccount.messages).toEqual([]);
+    expect(desktop.closed).toBe(false);
+    expect(phone.closed).toBe(false);
+  });
+
   it("does not close active WebRTC when a Signal socket reconnects", async () => {
     const service = new SignalService(fakeTokens(), 8);
     const host = socket("host");

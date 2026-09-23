@@ -976,6 +976,11 @@ export async function createApplicationServices({
       }),
     },
   );
+  // A server joined or revoked on another device of this account. Signal carries it to every socket
+  // the account holds, so the phone's join reaches this computer in the second it happens rather
+  // than at the next account check. The refresh itself belongs to the entry point, which owns the
+  // account check and its coalescing; this only forwards the notice to it.
+  teamWebRtcBridge.on("accountServersChanged", () => remoteServers.invalidateDirectory());
   teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => remoteServers.stop());
   await remoteServers.initialize();
   criticalActionTargets = { agents: service, remoteServers };
