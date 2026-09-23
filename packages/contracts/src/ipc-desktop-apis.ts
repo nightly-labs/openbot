@@ -4,19 +4,7 @@ import type { AccountUsage } from "./ipc-agent-status";
 import type { AgentSummary } from "./ipc-agents";
 import type { CentralAuthState } from "./ipc-app-auth";
 import type { AttachmentImportEvent } from "./ipc-attachments";
-import type {
-  BrowserBounds,
-  BrowserControlState,
-  BrowserDisplayState,
-  BrowserLiveViewEvent,
-  BrowserLiveViewInput,
-  BrowserNavigateInput,
-  BrowserOpenInput,
-  BrowserPictureInPictureEvent,
-  BrowserPreview,
-  BrowserTab,
-  BrowserVisibilityInput,
-} from "./ipc-browser";
+import type { BrowserBounds, BrowserLiveViewInput } from "./ipc-browser";
 import type {
   ConversationPage,
   ConversationReadState,
@@ -158,27 +146,27 @@ export interface MarketplaceAgentsDesktopApi {
 }
 
 export interface BrowserDesktopApi {
-  open: (input: BrowserOpenInput) => Promise<BrowserTab>;
-  activate: (tabId: string) => Promise<void>;
-  navigate: (input: BrowserNavigateInput) => Promise<void>;
-  reload: (tabId: string) => Promise<void>;
-  close: (tabId: string) => Promise<void>;
-  listTabs: () => Promise<BrowserTab[]>;
-  getDisplayState: () => Promise<BrowserDisplayState>;
-  getControlState: () => Promise<BrowserControlState>;
-  capturePreview: (tabId: string) => Promise<BrowserPreview>;
-  setVisible: (input: BrowserVisibilityInput) => Promise<void>;
+  open: Invoke<typeof IPC_ENDPOINTS.browser.open>;
+  activate: Invoke<typeof IPC_ENDPOINTS.browser.activate>;
+  navigate: Invoke<typeof IPC_ENDPOINTS.browser.navigate>;
+  reload: Invoke<typeof IPC_ENDPOINTS.browser.reload>;
+  close: Invoke<typeof IPC_ENDPOINTS.browser.close>;
+  listTabs: Invoke<typeof IPC_ENDPOINTS.browser.listTabs>;
+  getDisplayState: Invoke<typeof IPC_ENDPOINTS.browser.getDisplayState>;
+  getControlState: Invoke<typeof IPC_ENDPOINTS.browser.getControlState>;
+  capturePreview: Invoke<typeof IPC_ENDPOINTS.browser.capturePreview>;
+  setVisible: Invoke<typeof IPC_ENDPOINTS.browser.setVisible>;
   /** Starts a live view of a tab on the active remote server. A local tab is already on screen. */
-  startLiveView: (tabId: string) => Promise<void>;
-  stopLiveView: () => Promise<void>;
+  startLiveView: Invoke<typeof IPC_ENDPOINTS.browser.startLiveView>;
+  stopLiveView: Invoke<typeof IPC_ENDPOINTS.browser.stopLiveView>;
   sendLiveViewInput: (input: BrowserLiveViewInput) => Promise<void>;
-  onLiveViewEvent: (listener: (event: BrowserLiveViewEvent) => void) => () => void;
-  onDisplayState: (listener: (state: BrowserDisplayState) => void) => () => void;
+  onLiveViewEvent: Subscribe<typeof IPC_ENDPOINTS.browser.liveViewEvent>;
+  onDisplayState: Subscribe<typeof IPC_ENDPOINTS.browser.displayStateEvent>;
   openPictureInPicture: (bounds?: BrowserBounds) => Promise<BrowserBounds>;
-  closePictureInPicture: () => Promise<void>;
-  dockPictureInPicture: () => Promise<void>;
-  hidePictureInPicture: () => Promise<void>;
-  onPictureInPictureEvent: (listener: (event: BrowserPictureInPictureEvent) => void) => () => void;
+  closePictureInPicture: Invoke<typeof IPC_ENDPOINTS.browser.pictureInPictureClose>;
+  dockPictureInPicture: Invoke<typeof IPC_ENDPOINTS.browser.pictureInPictureDock>;
+  hidePictureInPicture: Invoke<typeof IPC_ENDPOINTS.browser.pictureInPictureHide>;
+  onPictureInPictureEvent: Subscribe<typeof IPC_ENDPOINTS.browser.pictureInPictureEvent>;
 }
 
 export interface CentralAuthDesktopApi {

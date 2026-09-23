@@ -106,7 +106,6 @@ import {
   SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
-  type UntypedRequestChannel,
   type VoiceModelStatus,
   type VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
@@ -139,6 +138,15 @@ import {
   decodeUpdatePreference,
   decodeUpdateStatus,
 } from "./app-decoding";
+import {
+  decodeBrowserBounds,
+  decodeBrowserControlState,
+  decodeBrowserDisplayState,
+  decodeBrowserLiveViewEvent,
+  decodeBrowserPictureInPictureEvent,
+  decodeBrowserTab,
+  decodeBrowserTabs,
+} from "./browser-decoding";
 import { clipboardFiles } from "./clipboard-files";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
@@ -183,19 +191,12 @@ function invokeRequest<Channel extends RequestChannel>(
   return ipcRenderer.invoke(channel, ...payload).then(decode);
 }
 
-// The second overload of each agent helper serves the endpoints that have no types yet.
 function invokeAgent<Channel extends AgentRequestChannel>(
   channel: Channel,
   payload: InnerPayloadOf<Channel>,
   decode: (value: unknown) => ResultOf<Channel>,
-): Promise<ResultOf<Channel>>;
-function invokeAgent<Result>(
-  channel: UntypedRequestChannel,
-  payload: unknown,
-  decode: (value: unknown) => Result,
-): Promise<Result>;
-function invokeAgent<Result>(channel: string, payload: unknown, decode: (value: unknown) => Result): Promise<Result> {
-  const request: AgentIpcRequest = { serverId: selectedServerId, payload };
+): Promise<ResultOf<Channel>> {
+  const request: AgentIpcRequest<InnerPayloadOf<Channel>> = { serverId: selectedServerId, payload };
   return ipcRenderer.invoke(channel, request).then(decode);
 }
 
@@ -204,20 +205,8 @@ function invokeAgentForServer<Channel extends AgentRequestChannel>(
   channel: Channel,
   payload: InnerPayloadOf<Channel>,
   decode: (value: unknown) => ResultOf<Channel>,
-): Promise<ResultOf<Channel>>;
-function invokeAgentForServer<Result>(
-  serverId: string,
-  channel: UntypedRequestChannel,
-  payload: unknown,
-  decode: (value: unknown) => Result,
-): Promise<Result>;
-function invokeAgentForServer<Result>(
-  serverId: string,
-  channel: string,
-  payload: unknown,
-  decode: (value: unknown) => Result,
-): Promise<Result> {
-  const request: AgentIpcRequest = { serverId, payload };
+): Promise<ResultOf<Channel>> {
+  const request: AgentIpcRequest<InnerPayloadOf<Channel>> = { serverId, payload };
   return ipcRenderer.invoke(channel, request).then(decode);
 }
 
@@ -1260,36 +1249,39 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   browser: {
-    open: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserOpen, input),
-    activate: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserActivate, tabId),
-    navigate: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserNavigate, input),
-    reload: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserReload, tabId),
-    close: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserClose, tabId),
-    listTabs: () => ipcRenderer.invoke(IPC_CHANNELS.browserListTabs),
-    getDisplayState: () => ipcRenderer.invoke(IPC_CHANNELS.browserGetDisplayState),
-    getControlState: () => ipcRenderer.invoke(IPC_CHANNELS.browserGetControlState),
-    capturePreview: (tabId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.browserCapturePreview, tabId).then(decodeBrowserPreviewFromMain),
-    setVisible: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSetVisible, input),
-    startLiveView: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserStartLiveView, tabId),
-    stopLiveView: () => ipcRenderer.invoke(IPC_CHANNELS.browserStopLiveView),
-    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input),
+    open: (input) => invokeRequest(IPC_CHANNELS.browserOpen, decodeBrowserTab, input),
+    activate: (tabId) => invokeRequest(IPC_CHANNELS.browserActivate, decodeVoid, tabId),
+    navigate: (input) => invokeRequest(IPC_CHANNELS.browserNavigate, decodeVoid, input),
+    reload: (tabId) => invokeRequest(IPC_CHANNELS.browserReload, decodeVoid, tabId),
+    close: (tabId) => invokeRequest(IPC_CHANNELS.browserClose, decodeVoid, tabId),
+    listTabs: () => invokeRequest(IPC_CHANNELS.browserListTabs, decodeBrowserTabs),
+    getDisplayState: () => invokeRequest(IPC_CHANNELS.browserGetDisplayState, decodeBrowserDisplayState),
+    getControlState: () => invokeRequest(IPC_CHANNELS.browserGetControlState, decodeBrowserControlState),
+    capturePreview: (tabId) => invokeRequest(IPC_CHANNELS.browserCapturePreview, decodeBrowserPreviewFromMain, tabId),
+    setVisible: (input) => invokeRequest(IPC_CHANNELS.browserSetVisible, decodeVoid, input),
+    startLiveView: (tabId) => invokeRequest(IPC_CHANNELS.browserStartLiveView, decodeVoid, tabId),
+    stopLiveView: () => invokeRequest(IPC_CHANNELS.browserStopLiveView, decodeVoid),
+    // Untyped: the renderer and wire input shapes differ on purpose. See `IPC_ENDPOINTS.browser`.
+    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input).then(decodeVoid),
     onLiveViewEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) => listener(event);
+      const handler = (_event: Electron.IpcRendererEvent, event: unknown) =>
+        listener(decodeBrowserLiveViewEvent(event));
       ipcRenderer.on(IPC_CHANNELS.browserLiveViewEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.browserLiveViewEvent, handler);
     },
     onDisplayState: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
+      const handler = (_event: Electron.IpcRendererEvent, state: unknown) => listener(decodeBrowserDisplayState(state));
       ipcRenderer.on(IPC_CHANNELS.browserDisplayStateEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.browserDisplayStateEvent, handler);
     },
-    openPictureInPicture: (bounds) => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureOpen, bounds),
-    closePictureInPicture: () => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureClose),
-    dockPictureInPicture: () => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureDock),
-    hidePictureInPicture: () => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureHide),
+    openPictureInPicture: (bounds) =>
+      invokeRequest(IPC_CHANNELS.browserPictureInPictureOpen, decodeBrowserBounds, bounds),
+    closePictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureClose, decodeVoid),
+    dockPictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureDock, decodeVoid),
+    hidePictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureHide, decodeVoid),
     onPictureInPictureEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) => listener(event);
+      const handler = (_event: Electron.IpcRendererEvent, event: unknown) =>
+        listener(decodeBrowserPictureInPictureEvent(event));
       ipcRenderer.on(IPC_CHANNELS.browserPictureInPictureEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.browserPictureInPictureEvent, handler);
     },

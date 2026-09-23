@@ -81,6 +81,18 @@ import type {
   OpenSharedFileInput,
   OpenWorkspaceFileInput,
 } from "./ipc-attachments";
+import type {
+  BrowserBounds,
+  BrowserControlState,
+  BrowserDisplayState,
+  BrowserLiveViewEvent,
+  BrowserNavigateInput,
+  BrowserOpenInput,
+  BrowserPictureInPictureEvent,
+  BrowserPreview,
+  BrowserTab,
+  BrowserVisibilityInput,
+} from "./ipc-browser";
 import type { RespondToBrowserSecretInput } from "./ipc-browser-secret";
 import type {
   ChannelMemory,
@@ -247,9 +259,8 @@ declare const resultType: unique symbol;
 declare const untypedBrand: unique symbol;
 
 /**
- * The payload and result of an endpoint whose group is not typed yet. The main binder and the
- * preload accept anything for it, as they did before endpoints had types. It goes away when the last
- * group is typed.
+ * The payload and result of an endpoint that has no types. The main binder and the preload accept
+ * anything for it. Only `browser.sendLiveViewInput` uses it: see the comment at that endpoint.
  */
 export interface Untyped {
   readonly [untypedBrand]: true;
@@ -286,10 +297,6 @@ function event<Payload>(): <Channel extends string>(channel: Channel) => EventEn
 
 function untypedRequest<Channel extends string>(channel: Channel): RequestEndpoint<Channel, Untyped, Untyped> {
   return { kind: "request", channel };
-}
-
-function untypedEvent<Channel extends string>(channel: Channel): EventEndpoint<Channel, Untyped> {
-  return { kind: "event", channel };
 }
 
 export const IPC_ENDPOINTS = {
@@ -589,26 +596,28 @@ export const IPC_ENDPOINTS = {
     ),
   },
   browser: {
-    open: untypedRequest(IPC_CHANNELS.browserOpen),
-    activate: untypedRequest(IPC_CHANNELS.browserActivate),
-    navigate: untypedRequest(IPC_CHANNELS.browserNavigate),
-    reload: untypedRequest(IPC_CHANNELS.browserReload),
-    close: untypedRequest(IPC_CHANNELS.browserClose),
-    listTabs: untypedRequest(IPC_CHANNELS.browserListTabs),
-    getDisplayState: untypedRequest(IPC_CHANNELS.browserGetDisplayState),
-    getControlState: untypedRequest(IPC_CHANNELS.browserGetControlState),
-    capturePreview: untypedRequest(IPC_CHANNELS.browserCapturePreview),
-    setVisible: untypedRequest(IPC_CHANNELS.browserSetVisible),
-    startLiveView: untypedRequest(IPC_CHANNELS.browserStartLiveView),
-    stopLiveView: untypedRequest(IPC_CHANNELS.browserStopLiveView),
+    open: request<BrowserOpenInput, BrowserTab>()(IPC_CHANNELS.browserOpen),
+    activate: request<string, void>()(IPC_CHANNELS.browserActivate),
+    navigate: request<BrowserNavigateInput, void>()(IPC_CHANNELS.browserNavigate),
+    reload: request<string, void>()(IPC_CHANNELS.browserReload),
+    close: request<string, void>()(IPC_CHANNELS.browserClose),
+    listTabs: request<undefined, BrowserTab[]>()(IPC_CHANNELS.browserListTabs),
+    getDisplayState: request<undefined, BrowserDisplayState>()(IPC_CHANNELS.browserGetDisplayState),
+    getControlState: request<undefined, BrowserControlState>()(IPC_CHANNELS.browserGetControlState),
+    capturePreview: request<string, BrowserPreview>()(IPC_CHANNELS.browserCapturePreview),
+    setVisible: request<BrowserVisibilityInput, void>()(IPC_CHANNELS.browserSetVisible),
+    startLiveView: request<string, void>()(IPC_CHANNELS.browserStartLiveView),
+    stopLiveView: request<undefined, void>()(IPC_CHANNELS.browserStopLiveView),
+    // The one untyped endpoint. The renderer sends `BrowserLiveViewInput` and main reads the wire
+    // `BrowserViewInput`, which differ on purpose (see `ipc-browser.ts`); main's wire decoder fills the rest.
     sendLiveViewInput: untypedRequest(IPC_CHANNELS.browserSendLiveViewInput),
-    liveViewEvent: untypedEvent(IPC_CHANNELS.browserLiveViewEvent),
-    displayStateEvent: untypedEvent(IPC_CHANNELS.browserDisplayStateEvent),
-    pictureInPictureOpen: untypedRequest(IPC_CHANNELS.browserPictureInPictureOpen),
-    pictureInPictureClose: untypedRequest(IPC_CHANNELS.browserPictureInPictureClose),
-    pictureInPictureDock: untypedRequest(IPC_CHANNELS.browserPictureInPictureDock),
-    pictureInPictureHide: untypedRequest(IPC_CHANNELS.browserPictureInPictureHide),
-    pictureInPictureEvent: untypedEvent(IPC_CHANNELS.browserPictureInPictureEvent),
+    liveViewEvent: event<BrowserLiveViewEvent>()(IPC_CHANNELS.browserLiveViewEvent),
+    displayStateEvent: event<BrowserDisplayState>()(IPC_CHANNELS.browserDisplayStateEvent),
+    pictureInPictureOpen: request<BrowserBounds | undefined, BrowserBounds>()(IPC_CHANNELS.browserPictureInPictureOpen),
+    pictureInPictureClose: request<undefined, void>()(IPC_CHANNELS.browserPictureInPictureClose),
+    pictureInPictureDock: request<undefined, void>()(IPC_CHANNELS.browserPictureInPictureDock),
+    pictureInPictureHide: request<undefined, void>()(IPC_CHANNELS.browserPictureInPictureHide),
+    pictureInPictureEvent: event<BrowserPictureInPictureEvent>()(IPC_CHANNELS.browserPictureInPictureEvent),
   },
   servers: {
     list: request<undefined, ServerSummary[]>()(IPC_CHANNELS.serversList),
@@ -762,11 +771,6 @@ export type ResultOf<Channel extends RequestChannel> =
 export type EventPayloadOf<Channel extends EventChannel> =
   EventsByChannel[Channel] extends EventEndpoint<Channel, infer Payload> ? Payload : never;
 
-/** Request channels whose group is not typed yet. */
-export type UntypedRequestChannel = {
-  [Channel in RequestChannel]: [PayloadOf<Channel>] extends [Untyped] ? Channel : never;
-}[RequestChannel];
-
 /** Typed request channels whose payload is scoped to one server. */
 export type AgentRequestChannel = {
   [Channel in RequestChannel]: PayloadOf<Channel> extends AgentIpcRequest<unknown> ? Channel : never;
@@ -800,7 +804,5 @@ export type Invoke<Endpoint> =
 /** The `OpenBotDesktopApi` subscription to a typed event. It answers the unsubscribe call. */
 export type Subscribe<Endpoint> =
   Endpoint extends EventEndpoint<string, infer Payload>
-    ? [Payload] extends [Untyped]
-      ? never
-      : (listener: [Payload] extends [undefined] ? () => void : (payload: Payload) => void) => () => void
+    ? (listener: [Payload] extends [undefined] ? () => void : (payload: Payload) => void) => () => void
     : never;
