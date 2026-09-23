@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { dirname } from "node:path";
+import { constants, copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { developmentInstanceIdForWorktree } from "../src/main/development-profile";
 import { type DevelopmentEnvOutcome, ensureDevelopmentEnvFile } from "./development-secrets";
@@ -15,11 +16,21 @@ export type DevelopmentCommandRunner = (
 
 export const supportedBunVersion = "1.4.0";
 
-export function prepareDevelopmentEnvironment(
-  input: { projectRoot?: string; executable?: string; bunVersion?: string; run?: DevelopmentCommandRunner } = {},
-): DevelopmentEnvOutcome {
+export interface DevelopmentPreparationInput {
+  projectRoot?: string;
+  /** The main checkout that owns this worktree; read from git when omitted. */
+  mainCheckoutRoot?: string;
+  executable?: string;
+  bunVersion?: string;
+  run?: DevelopmentCommandRunner;
+}
+
+export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput = {}): DevelopmentEnvOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   assertSupportedBunVersion(input.bunVersion ?? process.versions.bun ?? "unknown");
+  // Before the env file, so a worktree reuses the main checkout's `.env.dev` identity.
+  const copied = copyWorktreeIncludes(projectRoot, input.mainCheckoutRoot ?? findMainCheckoutRoot(projectRoot));
+  for (const path of copied) process.stdout.write(`Copied ${path} from the main checkout.\n`);
   // Before `bun install`, because a fresh clone has no `.env.dev` and both dev services load one.
   // Only `.env.production` is still encrypted, so a fork needs no `.env.keys` to reach this point.
   const envFile = ensureDevelopmentEnvFile(projectRoot);
@@ -33,9 +44,7 @@ export function prepareDevelopmentEnvironment(
   return envFile;
 }
 
-export function prepareDevelopmentWorktree(
-  input: { projectRoot?: string; executable?: string; bunVersion?: string; run?: DevelopmentCommandRunner } = {},
-): DevelopmentEnvOutcome {
+export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = {}): DevelopmentEnvOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   const envFile = prepareDevelopmentEnvironment({ ...input, projectRoot });
   const executable = input.executable ?? process.execPath;
@@ -49,6 +58,43 @@ export function prepareDevelopmentWorktree(
   });
   run(executable, ["run", "marketplace:seed:local"], options);
   return envFile;
+}
+
+/**
+ * Copies each ignored file that `.worktreeinclude` lists from the main checkout, so a worktree made
+ * by any harness gets the local secrets without a manual copy. An existing file is never replaced.
+ * Lines are literal paths, not gitignore patterns.
+ */
+export function copyWorktreeIncludes(projectRoot: string, mainCheckoutRoot: string | undefined): string[] {
+  if (!mainCheckoutRoot || resolve(mainCheckoutRoot) === resolve(projectRoot)) return [];
+  const listPath = join(projectRoot, ".worktreeinclude");
+  if (!existsSync(listPath)) return [];
+
+  const copied: string[] = [];
+  for (const line of readFileSync(listPath, "utf8").split("\n")) {
+    const path = line.trim();
+    if (!path || path.startsWith("#")) continue;
+    const source = join(mainCheckoutRoot, path);
+    const target = join(projectRoot, path);
+    if (!existsSync(source) || existsSync(target)) continue;
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(source, target, constants.COPYFILE_EXCL);
+    copied.push(path);
+  }
+  return copied;
+}
+
+function findMainCheckoutRoot(projectRoot: string): string | undefined {
+  try {
+    const commonDir = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    }).trim();
+    return dirname(commonDir);
+  } catch {
+    // A source archive has no git metadata, so there is nothing to copy from.
+    return undefined;
+  }
 }
 
 export function assertSupportedBunVersion(version: string): void {
