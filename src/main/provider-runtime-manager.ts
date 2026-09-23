@@ -1183,9 +1183,7 @@ interface InstallRecord {
 
 async function writeInstallRecord(root: string, spec: RuntimeSpec): Promise<void> {
   const files: Record<string, string> = {};
-  for (const file of providerRuntimeDescriptor(spec.runtime).recordedFiles(spec)) {
-    files[file] = await sha256File(join(root, file));
-  }
+  for (const file of await installedFiles(root)) files[file] = await sha256File(join(root, file));
   const record: InstallRecord = {
     layoutVersion: 1,
     runtime: spec.runtime,
@@ -1196,7 +1194,11 @@ async function writeInstallRecord(root: string, spec: RuntimeSpec): Promise<void
   await writeFile(join(root, INSTALL_RECORD), `${JSON.stringify(record)}\n`);
 }
 
-/** Every file the descriptor lists must be in the record, with the hash it had when installed. */
+/**
+ * The install must hold exactly the files in the record, each with the hash it had when installed.
+ * A file added later counts as much as a changed one: Codex runs its bundled `zsh`, and a new
+ * release can bring files no list written today would name.
+ */
 async function verifyInstallRecord(root: string, spec: RuntimeSpec): Promise<void> {
   const record = JSON.parse(await readFile(join(root, INSTALL_RECORD), "utf8"));
   if (
@@ -1209,12 +1211,26 @@ async function verifyInstallRecord(root: string, spec: RuntimeSpec): Promise<voi
   ) {
     throw new Error("The runtime install record does not match.");
   }
-  for (const file of providerRuntimeDescriptor(spec.runtime).recordedFiles(spec)) {
+  const files = await installedFiles(root);
+  if (files.length !== Object.keys(record.files).length) throw new Error("Provider runtime checksum mismatch.");
+  for (const file of files) {
     const expected = record.files[file];
     if (!isString(expected) || (await sha256File(join(root, file))) !== expected) {
       throw new Error("Provider runtime checksum mismatch.");
     }
   }
+}
+
+/** Every file under `root` but the record, as `/`-separated paths. A link or special file fails. */
+async function installedFiles(root: string, prefix = ""): Promise<string[]> {
+  const files: string[] = [];
+  for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
+    const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) files.push(...(await installedFiles(root, path)));
+    else if (!entry.isFile()) throw new Error("The runtime contains a link or special file.");
+    else if (path !== INSTALL_RECORD) files.push(path);
+  }
+  return files;
 }
 
 async function digestMatches(path: string, digest: ArchiveDigest): Promise<boolean> {

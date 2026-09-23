@@ -85,8 +85,6 @@ export interface ProviderRuntimeDescriptor {
   stage(context: ProviderStageContext): Promise<void>;
   /** Check a pinned install against the lock, beyond the shared executable and `--version` checks. */
   verify(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Promise<void>;
-  /** The files `INSTALL_RECORD` hashes for an install from an upstream release. */
-  recordedFiles(spec: RuntimeSpec): string[];
   parseVersion(output: string): string;
 }
 
@@ -95,10 +93,6 @@ const CODEX_ARCHIVE_ROOTS = ["bin", "codex-package.json", "codex-path", "codex-r
 /** The lock's hash for a file of a pinned version; an upstream release's file has none to compare. */
 function pinnedHash(spec: RuntimeSpec, sha256: string): string | null {
   return spec.source === "lock" ? sha256 : null;
-}
-
-function exe(spec: RuntimeSpec, name: string): string {
-  return spec.target === "win32-x64" ? `${name}.exe` : name;
 }
 
 /**
@@ -162,13 +156,6 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         access(join(root, "codex-path", spec.target === "win32-x64" ? "rg.exe" : "rg")),
       ]);
     },
-    recordedFiles: (spec) => [
-      `bin/${spec.executableName}`,
-      `bin/${exe(spec, "codex-code-mode-host")}`,
-      `codex-path/${exe(spec, "rg")}`,
-      "codex-package.json",
-      "LICENSE",
-    ],
     parseVersion: parseCodexVersion,
   },
   claude: {
@@ -235,7 +222,6 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         throw new Error("Claude license checksum mismatch.");
       }
     },
-    recordedFiles: (spec) => [`bin/${spec.executableName}`, "LICENSE.md", "claude-package.json"],
     parseVersion: parseClaudeVersion,
   },
   opencode: {
@@ -307,7 +293,6 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         throw new Error("OpenCode license checksum mismatch.");
       }
     },
-    recordedFiles: (spec) => [`bin/${spec.executableName}`, "LICENSE", "opencode-package.json"],
     parseVersion: parseOpencodeVersion,
   },
   grok: {
@@ -362,7 +347,6 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         throw new Error("Grok notices checksum mismatch.");
       }
     },
-    recordedFiles: (spec) => [`bin/${spec.executableName}`, "LICENSE", "THIRD-PARTY-NOTICES", "grok-package.json"],
     parseVersion: parseGrokVersion,
   },
   bun: {
@@ -442,8 +426,6 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
       ]);
       if (bun.size !== bunx.size) throw new Error("The Bun package manager runner is missing or damaged.");
     },
-    // Bun stays on the lock, so no install of it writes a record. The list is here for the interface.
-    recordedFiles: (spec) => [`bin/${spec.executableName}`, `bin/${bunxExecutableName(spec.target)}`, "LICENSE.md"],
     parseVersion: parseBunVersion,
   },
 };

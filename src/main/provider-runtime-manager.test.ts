@@ -130,6 +130,13 @@ describe("ProviderRuntimeManager", () => {
     if (!executable) throw new Error("The managed Grok path is missing.");
     expect(executable).toBe(join(root, "grok", "darwin-arm64", "1.0.30", "bin", "grok"));
 
+    // A file added after install is not in the record, so the install is not used.
+    const added = join(root, "grok", "darwin-arm64", "1.0.30", "bin", "added");
+    await writeFile(added, "#!/bin/sh\n");
+    const extended = latestGrokManager(root, fixture);
+    expect((await extended.initialize()).providers.grok.phase).not.toBe("ready");
+    await rm(added);
+
     // A binary changed after install no longer matches its record, so it is not started.
     await writeFile(executable, "#!/bin/sh\necho 1.0.30\n# changed\n");
     const tampered = latestGrokManager(root, fixture);
