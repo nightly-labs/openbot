@@ -53,7 +53,7 @@ offers, in order of preference:
 | `vi.waitFor(() => expect(...))` | A spy or a fake reaching a count, where there is no domain event to hang off. |
 | `vi.useFakeTimers()` + `vi.advanceTimersByTime(n)` | A debounce, a retry backoff, a schedule. Advancing the clock is input, not waiting. |
 
-`test-deadlines.ts` is why `waitFor` reports before vitest does: `NODE_TEST_TIMEOUT_MS` is derived
+`test-deadlines.ts` is why `waitFor` reports before vitest does: `TEST_TIMEOUT_MS` is derived
 from `HARNESS_WAIT_TIMEOUT_MS` rather than written down twice, so a stalled wait fails with the
 condition rather than with vitest's generic "test timed out". Never raise a `vi.waitFor` timeout to
 make a test pass — a longer timeout is the sleep the `no-sleep-in-tests` rule rejected, one layer

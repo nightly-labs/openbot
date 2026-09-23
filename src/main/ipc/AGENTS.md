@@ -38,7 +38,7 @@ today needs the sender check too. `handleTrustedWithEvent` carries the overload,
 constructor when an endpoint actually wants it rather than before.
 
 `authorizedHandler` exists because every window of the app shares one origin, so the trusted-URL gate
-in `./trusted-ipc.ts` cannot tell the Dynamic Island overlay from the main renderer.
+in `../trusted-ipc.ts` cannot tell the Dynamic Island overlay from the main renderer.
 `dynamic-island-handlers.ts` is the only user today, and the ordering is the point: a caller already
 known to be rejected must not be handed a payload-validation error to read, and must not be what the
 decoder spends its allocations on.

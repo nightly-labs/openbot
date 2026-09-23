@@ -14,6 +14,7 @@ packages/
   ui/                Shared SolidJS controls and primitive styles for desktop, web, and Storybook
   brand/             Shared logos, avatars, and design tokens
   contracts/         Process and network boundary types, limits, and pure validation
+  i18n/              Message catalogs and the translate function for desktop and shared UI
   logging/           ts-log Logger interface plus the redacting console/file implementation
   team-client/       Shared team connection, recovery, and WebRTC framing code
   user-errors/       Shared user-facing error messages for desktop and mobile
@@ -26,6 +27,8 @@ src/
   preload/           Narrow typed bridge from Electron main to the renderer
   renderer/          SolidJS user interface
 scripts/             Development, smoke, release, and package verification entry points
+tools/               Biome GritQL rules, the UI foundation check, and the vitest sequencer
+.agents/skills/      Task instructions for coding agents, such as release and smoke checks
 ```
 
 The desktop application stays at the repository root. Its package metadata is also the release
@@ -359,6 +362,64 @@ one it falls back to until the pinned one arrives -- and collection keeps anythi
 month, so a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
 binary, never stops startup.
+
+### Managed provider updates
+
+The main process offers the version that the section above selects. The lock pins each provider
+for `darwin-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
+that it is not supported instead of offering a download. An older managed installation is display
+metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
+preload decoder. Cancellation and failure preserve the previous installation and its update offer.
+
+Settings starts the shared renderer runtime store. The store announces each provider that gains an
+offer as one notification, from an effect over both the runtime snapshot and the agent status,
+because the two arrive separately and either one can complete an offer. An explicit update opens
+the same notification; revisioned snapshots move it through progress, failure, retry, and
+completion. Only the crossing into "update available" is announced, so a dismissed notification
+stays dismissed until the offer changes. Closing the notification does not cancel the download,
+and later reports do not reopen it. A refusal that reaches neither the download nor the report it
+makes - an update started while a workspace on another computer is open - is put on that same
+notification with a Retry, because the user pressed a button and the outcome belongs on screen.
+Fresh provider downloads retain their existing flow. These actions apply only to the local desktop
+host.
+
+A CLI the user installed themselves is not managed, but it still gets the update offer.
+Each provider status row reports `cliSource`, and main passes the version of a `system` row to
+`ProviderRuntimeManager.setSystemVersion`, which compares it against the offered version exactly as
+it compares a managed installation. The row and the notification therefore use the one update offer,
+the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
+runs behind it, whoever owns the CLI: the download installs the managed copy and
+`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
+which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
+on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
+names the binary to run and the managed copy is not it. The owner comes from the last resolution of
+the binary, not from the client that runs it, so a provider that is signed out still reports its own
+install rather than reading as the managed copy. A failure keeps the reason the CLI gave, redacted,
+in one error that goes to the provider row and to the caller - and on, through the Team API, to the
+team's connected clients.
+
+Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
+other one, while the agent status beside it describes whichever server is open. The store therefore
+takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
+the same rule the provider row and the picker already follow. A server switch rebuilds that store,
+so the version a user closed the notification on is kept by the notification module, which outlives
+the switch: the offer is raised again on the way back only if the user never closed it.
+
+Replacing the CLI is not a start, on either path: `#activateProviderClient` swaps the client of a
+provider that has one, `#connect` connects one whose client is gone, and both skip
+`onProvidersReady` for the replacement, because
+that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
+running through the replacement, so a live turn would be recorded as `interrupted` - which
+`MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
+the replacement held back.
+
+The update replaces the binary under a running client. A provider that has an agent in a turn -
+a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
+`turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore refuses the
+command and tells the user to wait. No turn may start on that provider until the new client is ready: the drain
+scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
+delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
+failure as well as after a success.
 
 ## Agent communication policy
 
@@ -701,7 +762,7 @@ Changes to packaging, native modules, or Electron security also require the appl
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
 data and are manual because they can require local credentials.
 
-### Prompt-driven agent profiles
+## Prompt-driven agent profiles
 
 Users create and edit agent profiles by asking an agent in the normal desktop or mobile
 conversation. `openbot.create_agent` creates a persistent teammate with instructions and a first
@@ -809,76 +870,6 @@ Use them to compare click counts, not as a shared visit-to-click funnel breakdow
 The invitation-page funnel is separate: `join_page_action` with `action=view` followed by
 `action=download` or `action=open_app`.
 
-### Managed provider updates
-
-The main process offers provider versions pinned in `native-runtime.lock.json`. Each provider is
-pinned for `darwin-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
-that it is not supported instead of offering a download. An older managed installation is display
-metadata until the pinned runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
-preload decoder. Cancellation and failure preserve the previous installation and its update offer.
-
-Settings starts the shared renderer runtime store. The store announces each provider that gains an
-offer as one notification, from an effect over both the runtime snapshot and the agent status,
-because the two arrive separately and either one can complete an offer. An explicit update opens
-the same notification; revisioned snapshots move it through progress, failure, retry, and
-completion. Only the crossing into "update available" is announced, so a dismissed notification
-stays dismissed until the offer changes. Closing the notification does not cancel the download,
-and later reports do not reopen it. A refusal that reaches neither the download nor the report it
-makes - an update started while a workspace on another computer is open - is put on that same
-notification with a Retry, because the user pressed a button and the outcome belongs on screen.
-Fresh provider downloads retain their existing flow. These actions apply only to the local desktop
-host.
-
-A CLI the user installed themselves is not managed, but it is still compared against the lock.
-Each provider status row reports `cliSource`, and main passes the version of a `system` row to
-`ProviderRuntimeManager.setSystemVersion`, which compares it against the pinned version exactly as
-it compares a managed installation. The row and the notification therefore use the one update offer,
-the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
-runs behind it, whoever owns the CLI: the download installs the pinned managed copy and
-`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
-which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
-on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
-names the binary to run and the managed copy is not it. The owner comes from the last resolution of
-the binary, not from the client that runs it, so a provider that is signed out still reports its own
-install rather than reading as the managed copy. A failure keeps the reason the CLI gave, redacted,
-in one error that goes to the provider row and to the caller - and on, through the Team API, to the
-team's connected clients.
-
-Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
-other one, while the agent status beside it describes whichever server is open. The store therefore
-takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
-the same rule the provider row and the picker already follow. A server switch rebuilds that store,
-so the version a user closed the notification on is kept by the notification module, which outlives
-the switch: the offer is raised again on the way back only if the user never closed it.
-
-Replacing the CLI is not a start, on either path: `#activateProviderClient` swaps the client of a
-provider that has one, `#connect` connects one whose client is gone, and both skip
-`onProvidersReady` for the replacement, because
-that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
-running through the replacement, so a live turn would be recorded as `interrupted` - which
-`MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
-the replacement held back. The refusal record is written through one queue, because two providers
-can finish an update at once and the older snapshot must not be renamed over the newer one.
-
-The update replaces the binary under a running client. A provider that has an agent in a turn -
-a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
-`turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore refuses the
-command and tells the user to wait. No turn may start on that provider until the new client is ready: the drain
-scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
-delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
-failure as well as after a success.
-
-That updater decides for itself what the newest version is, and its release channel can name an
-older one than the lock: `grok update` can report success and leave the CLI where it was. The IPC
-handler therefore reports the version before and after the run to
-`ProviderRuntimeManager.noteSystemCliUpdate`. An update that finishes on the version it started on
-is the updater's answer: the manager records that pair of versions in `cli-update-refusals.json`
-beside the managed runtimes, and drops the offer from `availableVersion`, so the row and the
-notification stop offering an update that cannot happen. The record is kept against both the
-installed and the pinned version, so a new pinned version is a new offer, and so is a CLI the user
-moves by other means. The runtime store keeps the same answer in memory for the run that produced
-it, only to settle the notification before the next snapshot arrives.
-
 ## Agent usage analytics
 
 `AgentUsage` owns local numeric usage records, cumulative counter checkpoints, and activity counts.
@@ -906,7 +897,6 @@ come from SDK model usage; unknown or managed pricing is not treated as a list-p
 Unknown models, missing cache data, and unresolvable context or cache-write pricing stay unpriced.
 Tool and media fees are outside the estimate. Stored estimates retain their price basis.
 
-
 ### Host-wide Usage
 
 Desktop opens Usage from the server context menu. It keeps the previous workspace mounted and
@@ -929,7 +919,7 @@ The desktop chart adapts Zaidan's chart and interactive area composition. The pi
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
-### Storage and files
+## Storage and files
 
 Three surfaces show what a host keeps on disk: Server Settings > Storage (scope `host`), Agent
 settings > Files (scope `agent`) and the chat Files panel (scope `conversation`). They share
@@ -961,7 +951,7 @@ renderer hides those controls from a member. The wire carries no absolute paths,
 download files travel only as category totals. A host without the capability reads as null, and the
 surface asks for an update; a change is refused before any request.
 
-### OpenCode and ACP
+## OpenCode and ACP
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
@@ -1012,7 +1002,7 @@ sidebar references, and runtime events before encoding an older client's respons
 an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
 the v4 application codec when the peer advertises the `opencode` capability.
 
-### Desktop server notifications
+## Desktop server notifications
 
 Each desktop profile stores muted server IDs in `servers.json`. `RemoteServerStore` saves a
 mute change before publishing it. These preferences survive restart, re-login, and host-list
@@ -1154,7 +1144,7 @@ The shared package validator handles local and marketplace bundles. The existing
 
 The backend local skill tools derive the agent from the calling provider session. Main-process IPC validates local library inputs independently of sender validation. The renderer reads local previews through that bridge. The released Team API adapters are unchanged; local creation and revision are not exposed as remote operations.
 
-### Mobile chat queue
+## Mobile chat queue
 
 Mobile reads the host queue, applies `queue-changed` snapshots, and refreshes active queue
 queries on `queue-invalidated` events. Both events cancel earlier reads before they update the cache. It does not
@@ -1189,7 +1179,6 @@ a file in the share sheet. The thumbnail reads the attachment through the query 
 so a file already read in a message is not fetched again. The editor changes the text, removes the
 files the message already has, and adds new ones.
 
-
 ## Plugin distribution
 
 A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
@@ -1221,7 +1210,7 @@ grace. This counter contains no user data and is never sent to the host. Health 
 readiness remain false until agent initialization succeeds.
 See [multi-tenant hosting](multi-tenant-hosting.md) for installation, permissions, and acceptance.
 
-### Remote desktop permission checks and live tests
+## Remote desktop permission checks and live tests
 
 `RemoteScreenGateway` owns setup checks and live-test session ownership. The optional
 `remote-desktop-setup` Team API capability uses separate v4 adapter routes; released codecs remain unchanged.
@@ -1239,7 +1228,7 @@ Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishi
 
 A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
 
-### Secure browser authentication
+## Secure browser authentication
 
 `openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public
 secret-request metadata. The attention registry creates a fresh request ID and owns the pending
@@ -1262,7 +1251,7 @@ clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
 
-### Shared UI package
+## Shared UI package
 
 `@openbot/ui` owns the existing SolidJS primitives and their primitive stylesheet. Desktop,
 web, and Storybook import this workspace directly. It has no dependency on the renderer,
