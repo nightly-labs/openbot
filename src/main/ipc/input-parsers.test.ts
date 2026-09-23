@@ -4,8 +4,10 @@ import { parseRemoteDesktopSetupAction, parseRemoteDesktopTest } from "./server-
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { CUSTOM_PROVIDER_LIMITS } from "@openbot/contracts/ipc";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  agentRequest,
+  agentScope,
   parseAcknowledgeFailedTurn,
   parseAgentId,
   parseAgentRequest,
@@ -702,6 +704,24 @@ describe("agent IPC input parsing", () => {
     expect(() => parseBrowserTakeoverResponse({ requestId: "takeover-1", decision: "maybe" })).toThrowError(
       "Invalid browser takeover response.",
     );
+  });
+});
+
+describe("agent request envelope", () => {
+  it("checks the server scope before the inner decoder sees the payload", () => {
+    const decode = vi.fn((value: unknown) => requireString(value, "Table name"));
+
+    expect(() => agentRequest(decode)({ payload: "notes" })).toThrowError("serverId is required.");
+    expect(decode).not.toHaveBeenCalled();
+    expect(() => agentRequest(decode)({ serverId: "local", payload: 7 })).toThrowError("Table name is required.");
+    expect(agentRequest(decode)({ serverId: "local", payload: "notes" })).toEqual({
+      serverId: "local",
+      payload: "notes",
+    });
+  });
+
+  it("drops the payload of a request that carries only a scope", () => {
+    expect(agentScope({ serverId: "local", payload: { stray: true } })).toEqual({ serverId: "local", payload: null });
   });
 });
 

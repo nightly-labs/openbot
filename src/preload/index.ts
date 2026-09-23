@@ -4,6 +4,7 @@ import {
   type AgentMemory,
   type AgentModelOption,
   type AgentPublicationPreview,
+  type AgentRequestChannel,
   type AgentStatus,
   type AgentSubmission,
   type AgentSummary,
@@ -46,10 +47,12 @@ import {
   decodeOptionalHostAnalytics,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
+  type ExportResult,
   type FilePreview,
   type HostedSiteSummary,
   type ImportAttachmentsInput,
   INSTALLED_SKILL_ORIGINS,
+  type InnerPayloadOf,
   type InstalledSkill,
   IPC_CHANNELS,
   isAccountUsage,
@@ -91,12 +94,15 @@ import {
   type MarketplaceSkillPage,
   type NotificationOpenedEvent,
   type OpenBotDesktopApi,
+  type PayloadOf,
   type ProviderApiKeyState,
   type ProviderCodeLoginStart,
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
+  type RequestChannel,
+  type ResultOf,
   type ScopedAgentEvent,
   type ScopedDirectMessageEvent,
   type ScopedDirectTypingEvent,
@@ -106,7 +112,10 @@ import {
   SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
+  type UntypedRequestChannel,
   type UpdateStatus,
+  type VoiceModelStatus,
+  type VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -127,22 +136,81 @@ import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 const attachmentImportListeners = new Set<(event: AttachmentImportEvent) => void>();
 let selectedServerId: string = LOCAL_SERVER_ID;
 
-function invokeAgent<TResult>(
-  channel: string,
-  payload: unknown = null,
-  decoder: (value: unknown) => TResult,
-): Promise<TResult> {
-  return invokeAgentForServer(selectedServerId, channel, payload, decoder);
+// A typed endpoint fixes what the preload sends and what its decoder must return. An endpoint that
+// takes nothing takes no payload argument here.
+type PayloadArgs<Channel extends RequestChannel> = [PayloadOf<Channel>] extends [undefined]
+  ? []
+  : [payload: PayloadOf<Channel>];
+
+function invokeRequest<Channel extends RequestChannel>(
+  channel: Channel,
+  decode: (value: unknown) => ResultOf<Channel>,
+  ...payload: PayloadArgs<Channel>
+): Promise<ResultOf<Channel>> {
+  return ipcRenderer.invoke(channel, ...payload).then(decode);
 }
 
-function invokeAgentForServer<TResult>(
+// The second overload of each agent helper serves the endpoints that have no types yet.
+function invokeAgent<Channel extends AgentRequestChannel>(
+  channel: Channel,
+  payload: InnerPayloadOf<Channel>,
+  decode: (value: unknown) => ResultOf<Channel>,
+): Promise<ResultOf<Channel>>;
+function invokeAgent<Result>(
+  channel: UntypedRequestChannel,
+  payload: unknown,
+  decode: (value: unknown) => Result,
+): Promise<Result>;
+function invokeAgent<Result>(channel: string, payload: unknown, decode: (value: unknown) => Result): Promise<Result> {
+  const request: AgentIpcRequest = { serverId: selectedServerId, payload };
+  return ipcRenderer.invoke(channel, request).then(decode);
+}
+
+function invokeAgentForServer<Channel extends AgentRequestChannel>(
+  serverId: string,
+  channel: Channel,
+  payload: InnerPayloadOf<Channel>,
+  decode: (value: unknown) => ResultOf<Channel>,
+): Promise<ResultOf<Channel>>;
+function invokeAgentForServer<Result>(
+  serverId: string,
+  channel: UntypedRequestChannel,
+  payload: unknown,
+  decode: (value: unknown) => Result,
+): Promise<Result>;
+function invokeAgentForServer<Result>(
   serverId: string,
   channel: string,
   payload: unknown,
-  decoder: (value: unknown) => TResult,
-): Promise<TResult> {
+  decode: (value: unknown) => Result,
+): Promise<Result> {
   const request: AgentIpcRequest = { serverId, payload };
-  return ipcRenderer.invoke(channel, request).then(decoder);
+  return ipcRenderer.invoke(channel, request).then(decode);
+}
+
+const VOICE_MODEL_PHASES: readonly VoiceModelStatus["phase"][] = ["missing", "downloading", "ready", "error"];
+
+function decodeVoiceModelStatus(value: unknown): VoiceModelStatus {
+  const status = decodeRecord(value, "voice model status");
+  const { phase, progress } = status;
+  if (!isOneOf(VOICE_MODEL_PHASES, phase) || (progress !== null && !isNumber(progress))) {
+    throw new Error("Invalid voice model status.");
+  }
+  return { phase, progress, message: nullableString(status, "message") };
+}
+
+function decodeVoiceTranscriptionResult(value: unknown): VoiceTranscriptionResult {
+  return { text: requiredString(decodeRecord(value, "voice transcription"), "text") };
+}
+
+function decodeExportResult(value: unknown): ExportResult {
+  return { saved: requiredBoolean(decodeRecord(value, "export result"), "saved") };
+}
+
+// The slug is checked again on arrival rather than trusted because it came from main. It began life
+// in a URL a web page chose, and this is the last point before the renderer looks it up.
+function decodePendingListing(value: unknown): string | null {
+  return typeof value === "string" && isPluginSlug(value) ? value : null;
 }
 
 function decodeComputerUseState(value: unknown): ComputerUseState {
@@ -981,11 +1049,11 @@ const openbotApi: OpenBotDesktopApi = {
   },
   openUrl: (url) => ipcRenderer.invoke(IPC_CHANNELS.openUrl, url),
   voice: {
-    getModelStatus: () => ipcRenderer.invoke(IPC_CHANNELS.voiceGetModelStatus),
-    prepareModel: () => ipcRenderer.invoke(IPC_CHANNELS.voicePrepareModel),
-    transcribe: (input) => ipcRenderer.invoke(IPC_CHANNELS.voiceTranscribe, input),
+    getModelStatus: () => invokeRequest(IPC_CHANNELS.voiceGetModelStatus, decodeVoiceModelStatus),
+    prepareModel: () => invokeRequest(IPC_CHANNELS.voicePrepareModel, decodeVoiceModelStatus),
+    transcribe: (input) => invokeRequest(IPC_CHANNELS.voiceTranscribe, decodeVoiceTranscriptionResult, input),
     onModelStatus: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) => listener(status);
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) => listener(decodeVoiceModelStatus(status));
       ipcRenderer.on(IPC_CHANNELS.voiceModelStatus, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.voiceModelStatus, handler);
     },
@@ -1234,8 +1302,8 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   maintenance: {
-    exportData: () => ipcRenderer.invoke(IPC_CHANNELS.maintenanceExportData),
-    exportDiagnostics: () => ipcRenderer.invoke(IPC_CHANNELS.maintenanceExportDiagnostics),
+    exportData: () => invokeRequest(IPC_CHANNELS.maintenanceExportData, decodeExportResult),
+    exportDiagnostics: () => invokeRequest(IPC_CHANNELS.maintenanceExportDiagnostics, decodeExportResult),
   },
   servers: {
     list: async () => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversList)),
@@ -1312,12 +1380,7 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   plugins: {
-    // The slug is checked again on arrival rather than trusted because it came from main. It began
-    // life in a URL a web page chose, and this is the last point before the renderer looks it up.
-    takePendingListing: async () => {
-      const slug = await ipcRenderer.invoke(IPC_CHANNELS.pluginsTakePendingListing);
-      return typeof slug === "string" && isPluginSlug(slug) ? slug : null;
-    },
+    takePendingListing: () => invokeRequest(IPC_CHANNELS.pluginsTakePendingListing, decodePendingListing),
     onOpenListing: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, slug: unknown) => {
         if (typeof slug === "string" && isPluginSlug(slug)) listener(slug);

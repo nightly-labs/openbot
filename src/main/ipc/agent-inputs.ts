@@ -52,6 +52,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import type { PayloadDecoder } from "../trusted-ipc";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, requireString } from "./validation";
 
@@ -61,6 +62,19 @@ export function parseAgentRequest(value: unknown): AgentIpcRequest {
     serverId: requireString(value.serverId, "serverId"),
     payload: value.payload,
   };
+}
+
+/** Checks the server scope first, then decodes the payload inside it. */
+export function agentRequest<Payload>(decode: PayloadDecoder<Payload>): PayloadDecoder<AgentIpcRequest<Payload>> {
+  return (value) => {
+    const scoped = parseAgentRequest(value);
+    return { serverId: scoped.serverId, payload: decode(scoped.payload) };
+  };
+}
+
+/** Checks the server scope of a request that carries nothing else. The preload sends `null`. */
+export function agentScope(value: unknown): AgentIpcRequest<null> {
+  return { serverId: parseAgentRequest(value).serverId, payload: null };
 }
 
 export function parseAgentId(value: unknown): string {
