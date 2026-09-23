@@ -31,6 +31,7 @@ import { routineStatusForDelivery } from "./delivery-content";
 import {
   localTimezone,
   type OpenBotToolResponse,
+  openBotToolFailure,
   openBotToolResult,
   routineToolAgentId,
   routineToolArguments,
@@ -267,8 +268,21 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.listRuns(input.agentId, input.routineId, input.limit);
   }
 
-  /** The six `openbot` routine tools. Returns null when `tool` is not one of them. */
+  /**
+   * The six `openbot` routine tools. Returns null when `tool` is not one of them.
+   *
+   * A rejected call is a tool failure the model can read and correct, not a throw: a throw becomes a
+   * provider error toast, although the model's corrected retry then creates the routine.
+   */
   async handleTool(params: DynamicToolCallParams, senderAgentId: string): Promise<OpenBotToolResponse | null> {
+    try {
+      return await this.#handleTool(params, senderAgentId);
+    } catch (error) {
+      return openBotToolFailure(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async #handleTool(params: DynamicToolCallParams, senderAgentId: string): Promise<OpenBotToolResponse | null> {
     if (params.tool === "list_routines") {
       const args = routineToolArguments(params.arguments, ["agentId"]);
       const agentId = routineToolAgentId(args, senderAgentId);

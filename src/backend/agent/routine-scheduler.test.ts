@@ -1,12 +1,12 @@
 // @vitest-environment node
-import { routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
+import { type AgentEvent, routineConversationEvent, routineRunConversationEvent } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
 import {
   callOpenBotTool,
   createTestService,
-  expectOpenBotToolError,
+  expectOpenBotToolFailure,
   FakeAgentClient,
   openBotToolPayload,
   startAgentTestFixture,
@@ -257,6 +257,10 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       },
     });
     await service.initialize();
+    const errors: AgentEvent[] = [];
+    service.on("event", (event: AgentEvent) => {
+      if (event.type === "error") errors.push(event);
+    });
     await store.getOrCreate("design", "Design Studio", "Product design");
     await service.sendMessage({ agentId: "chief", text: "Validate routine requests." });
     await waitFor(() => Boolean(store.activeProviderSession("chief")));
@@ -265,8 +269,8 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
     if (!client || !threadId) throw new Error("The routine validation test thread did not start.");
 
-    await expectOpenBotToolError(client, threadId, "list_routines", { agentId: "missing" }, "Unknown agent");
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(client, threadId, "list_routines", { agentId: "missing" }, "Unknown agent");
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "create_routine",
@@ -277,7 +281,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       },
       "schedule is invalid",
     );
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "create_routine",
@@ -289,6 +293,16 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       },
       "active must be a boolean",
     );
+    expect(service.listRoutines("chief")).toEqual([]);
+
+    // The model corrects a refused request and retries; only the retry is saved.
+    const retried = await callOpenBotTool(client, threadId, "create_routine", {
+      name: "Morning summary",
+      instruction: "Summarize the inbox.",
+      schedule: { kind: "daily", time: "09:00" },
+    });
+    expect(openBotToolPayload(retried.result)).toMatchObject({ name: "Morning summary" });
+    expect(service.listRoutines("chief").map((routine) => routine.name)).toEqual(["Morning summary"]);
 
     const routine = service.createRoutine({
       agentId: "chief",
@@ -298,20 +312,22 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       timezone: "UTC",
       schedule: { kind: "daily", time: "09:00" },
     });
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "update_routine",
       { routineId: routine.id },
       "At least one routine update is required",
     );
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "update_routine",
       { agentId: "design", routineId: routine.id, active: false },
       "routine no longer exists",
     );
+    // A refused tool call is not a provider error toast.
+    expect(errors).toEqual([]);
   });
   it("creates folder-listening routines with short polling and rejects intervals below 3 minutes", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
@@ -349,7 +365,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     });
     expect(folderRoutine.instruction).toContain("/Users/kamicyrek/Desktop/OpenBot/INBOX");
 
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "create_routine",
@@ -360,7 +376,7 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
       },
       "at least 3 minutes",
     );
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "update_routine",
