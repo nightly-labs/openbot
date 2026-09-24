@@ -202,6 +202,12 @@ export interface ProviderHooks {
   onProvidersReady(): Promise<void>;
   /** The cleanup #handleExit used to inline: prompts, approvals, takeovers, compaction, browser. */
   onProviderLost(client: AgentClient): void;
+  /**
+   * Runs when the runtime stops a client it used for a reason other than an exit: an idle release,
+   * a sign-out that an account refresh found, or a new client for the same provider. `#handleExit`
+   * skips such a client, and it can never answer its pending prompts and approvals.
+   */
+  onClientStopped(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
@@ -621,6 +627,7 @@ export class ProviderRuntime implements ProviderPort {
       this.#clients.delete(provider);
       this.#released.add(provider);
       this.#conversation.unloadClientThreads(client);
+      this.#hooks.onClientStopped(client);
       logger.info("Stopped an idle provider CLI.", { provider });
       await client.stop().catch(() => undefined);
     }
@@ -1125,6 +1132,7 @@ export class ProviderRuntime implements ProviderPort {
           this.#clients.delete(provider);
           this.#cli.delete(provider);
           this.#accounts.delete(provider);
+          this.#hooks.onClientStopped(client);
           await client.stop().catch(() => undefined);
         } catch {
           // Keep a working client when an explicit account refresh is temporarily unavailable.
@@ -1290,7 +1298,10 @@ export class ProviderRuntime implements ProviderPort {
           throw error;
         }
 
-        if (previousClient && previousClient !== client) await previousClient.stop().catch(() => undefined);
+        if (previousClient && previousClient !== client) {
+          this.#hooks.onClientStopped(previousClient);
+          await previousClient.stop().catch(() => undefined);
+        }
         if (provider === "codex") void this.#refreshUsage(client).catch(() => undefined);
         if (notifyReady) await this.#hooks.onProvidersReady();
       });

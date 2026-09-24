@@ -16,6 +16,7 @@ import {
   createTestService,
   FakeAgentClient,
   fakeBrowser,
+  notification,
   openBotToolPayload,
   startAgentTestFixture,
   stopAgentTestFixture,
@@ -863,6 +864,8 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
         return client;
       },
     });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Need a legacy approval" });
     await waitFor(() => clients.get("codex")?.requests.some((request) => request.method === "turn/start"));
@@ -889,9 +892,66 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       params: { conversationId, turnId: "turn-legacy", reason: "Update the file." },
     });
     await service.stop();
+    expect(events).toContainEqual({ type: "agent-input-resolved", kind: "approval", requestId: 43, agentId: "chief" });
     await expect(service.respondToApproval({ requestId: 43, decision: "accept" })).rejects.toThrow(
       "This approval is no longer active.",
     );
+  });
+
+  it("reports each prompt and approval that a turn end clears", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Ask, then end the turn" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!client || !threadId || !turnId) throw new Error("The Codex turn did not start.");
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "turn-end-prompt",
+      params: {
+        threadId,
+        turnId,
+        callId: "turn-end-prompt",
+        namespace: "openbot",
+        tool: "ask_user",
+        arguments: { questions: [{ id: "scope", header: "Scope", question: "Which scope?" }] },
+      },
+    });
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "turn-end-approval",
+      params: { threadId, turnId, command: ["git", "status"], cwd: "/tmp/openbot", reason: "Inspect the worktree." },
+    });
+    await waitFor(() => events.some((event) => event.type === "approval"));
+
+    // A compaction turn ends the same way but sends no `turn-completed`, so a client relies on these events.
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+    );
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    expect(
+      events.flatMap((event) => (event.type === "agent-input-resolved" ? [[event.kind, event.requestId]] : [])),
+    ).toEqual([
+      ["prompt", "turn-end-prompt"],
+      ["approval", "turn-end-approval"],
+    ]);
   });
   it("answers every one of a granted agent's approvals without surfacing them", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
