@@ -13,7 +13,7 @@ import {
   routineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, assert, describe, expect, it } from "vitest";
 import { OpenBotDatabase } from "./openbot-database";
 
 const roots: string[] = [];
@@ -872,8 +872,10 @@ describe("OpenBotDatabase", () => {
     const agent = testAgent();
     database.replaceAgents("agents-import", [agent], "agents.imported");
     const snapshot = conversationSnapshot(agent, "Canonical reply");
+    const [reply] = snapshot.messages;
+    assert(reply);
     snapshot.messages.push({
-      ...snapshot.messages[0],
+      ...reply,
       id: "provisional-reply",
     });
     database.persistConversation(snapshot, "conversation.snapshot-updated");
@@ -901,8 +903,10 @@ describe("OpenBotDatabase", () => {
     });
     const running = conversationSnapshot(agent, "Working");
     running.activeTurnId = "turn-1";
+    const [message] = running.messages;
+    assert(message);
     running.messages[0] = {
-      ...running.messages[0],
+      ...message,
       turnId: "turn-1",
       status: "streaming",
       attachments: [
@@ -920,9 +924,11 @@ describe("OpenBotDatabase", () => {
     database.persistConversation(running, "response.delta-flushed");
     const completed = structuredClone(running);
     completed.activeTurnId = null;
-    completed.messages[0].status = "completed";
+    const [completedMessage] = completed.messages;
+    assert(completedMessage);
+    completedMessage.status = "completed";
     database.persistConversation(completed, "turn.completed", { turnId: "turn-1", status: "completed" });
-    database.saveThreadSummary(agent.threadId, completed.messages[0].id, "Saved context", 3);
+    database.saveThreadSummary(agent.threadId, completedMessage.id, "Saved context", 3);
 
     expect(snapshotEventCount(database, agent.threadId)).toBe(1);
     database.rebuildThreadProjection(agent.threadId);

@@ -120,7 +120,7 @@ export class AgentRoster {
             agent.updatedAt,
             index,
             JSON.stringify(agent),
-            sequences[0],
+            sequences[0] ?? 0,
           );
           if (agent.threadId) this.ensureThreadProjection(db, agent, sequences[0] ?? 0);
         });

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { UpdatePreference } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 const DEFAULT_PREFERENCE: UpdatePreference = { autoDownload: true };
 
@@ -13,7 +14,7 @@ export async function readUpdatePreference(path: string): Promise<UpdatePreferen
     }
     return { autoDownload: parsed.autoDownload };
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return { ...DEFAULT_PREFERENCE };
+    if (isMissingFileError(error) || error instanceof SyntaxError) return { ...DEFAULT_PREFERENCE };
     throw error;
   }
 }
@@ -38,8 +39,4 @@ async function replaceUpdatePreference(path: string, autoDownload: boolean): Pro
   const preference = { autoDownload };
   await writeJsonFileAtomically(path, { version: 1, autoDownload });
   return preference;
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

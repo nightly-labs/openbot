@@ -95,7 +95,7 @@ describe("ComputerUseHighlightController", () => {
     await tick;
 
     expect(place).not.toHaveBeenCalled();
-    expect(windows[0].showInactive).not.toHaveBeenCalled();
+    expect(windows[0]?.showInactive).not.toHaveBeenCalled();
     expect(controller.visible).toBe(false);
   });
 

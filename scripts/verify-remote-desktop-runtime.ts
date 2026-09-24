@@ -135,9 +135,9 @@ async function verifyChecksums(checksumRoot: string, fileName: string) {
     .trim()
     .split("\n")
     .map((line) => {
-      const match = /^([a-f0-9]{64}) {2}(.+)$/.exec(line);
-      if (!match) throw new Error(`Invalid runtime checksum line: ${line}`);
-      return { digest: match[1], name: match[2] };
+      const [, digest, name] = /^([a-f0-9]{64}) {2}(.+)$/.exec(line) ?? [];
+      if (digest === undefined || name === undefined) throw new Error(`Invalid runtime checksum line: ${line}`);
+      return { digest, name };
     });
   for (const { digest: expectedDigest, name } of entries) {
     const digest = createHash("sha256")

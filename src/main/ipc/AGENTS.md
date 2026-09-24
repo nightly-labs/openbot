@@ -7,13 +7,21 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
 ## Adding an endpoint
 
 1. Add the wire value to `packages/contracts/src/ipc-channels.ts`.
-2. Add it to a group in `packages/contracts/src/ipc-endpoints.ts`, as `request(...)` or `event(...)`.
-3. Commit, or wait for CI. The typecheck in the pre-commit hook and in CI names the file to change
-   and the key to add.
-4. Add the handler here, the `invoke` in `src/preload/index.ts`, and the method in
-   `src/renderer/src/preview/mock-openbot.ts`.
+2. Add it to a group in `packages/contracts/src/ipc-endpoints.ts`, as `request<Payload, Result>()(...)`
+   or `event<Payload>()(...)`. All endpoints are typed except `browser.sendLiveViewInput`: the
+   renderer sends `BrowserLiveViewInput` and main decodes the different wire `BrowserViewInput`. Do
+   not add another `untypedRequest(...)`.
+3. Declare the `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.name>` (or
+   `Subscribe<...>` for an event).
+4. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
+   change and the key to add.
+5. Add the handler here, the call in `src/preload/index.ts` (`invokeRequest(channel, decode, input)`,
+   or `invokeAgent` for a server-scoped payload), and the method in
+   `src/renderer/src/preview/mock-openbot.ts`. The decoder for the result or event comes from a
+   preload decoding module, such as `src/preload/team-decoding.ts`, or is `decodeVoid`.
 
-Step 3 is the point. Every step but the preload announces itself, and the preload is what
+Step 4 is the point. Every step but steps 3 and 5 in the preload announces itself. A hand-written
+signature in step 3 compiles, so review must check that it uses `Invoke`. The preload is what
 `src/main/ipc-channel-coverage.test.ts` reads.
 
 A group is the unit one registrar covers in full, which is why a wire prefix can span several: the
@@ -38,7 +46,7 @@ today needs the sender check too. `handleTrustedWithEvent` carries the overload,
 constructor when an endpoint actually wants it rather than before.
 
 `authorizedHandler` exists because every window of the app shares one origin, so the trusted-URL gate
-in `./trusted-ipc.ts` cannot tell the Dynamic Island overlay from the main renderer.
+in `../trusted-ipc.ts` cannot tell the Dynamic Island overlay from the main renderer.
 `dynamic-island-handlers.ts` is the only user today, and the ordering is the point: a caller already
 known to be rejected must not be handed a payload-validation error to read, and must not be what the
 decoder spends its allocations on.

@@ -245,6 +245,7 @@ export function createSidebarLayoutActions(deps: {
     const targetIndex = items.findIndex((item) => sidebarPinnedItemKey(item) === targetKey);
     if (sourceIndex < 0 || targetIndex < 0) return;
     const [source] = items.splice(sourceIndex, 1);
+    if (!source) return;
     items.splice(targetIndex, 0, source);
     props.onReorderPinned(items);
     const position = visiblePinnedKeys().indexOf(targetKey) + 1;
@@ -254,9 +255,9 @@ export function createSidebarLayoutActions(deps: {
   function movePinnedItem(key: string, direction: -1 | 1): void {
     const keys = visiblePinnedKeys();
     const index = keys.indexOf(key);
-    const targetIndex = index + direction;
-    if (index < 0 || targetIndex < 0 || targetIndex >= keys.length) return;
-    reorderPinnedItem(key, keys[targetIndex]);
+    const targetKey = keys[index + direction];
+    if (index < 0 || targetKey === undefined) return;
+    reorderPinnedItem(key, targetKey);
   }
 
   return {

@@ -11,7 +11,7 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
@@ -2258,6 +2258,7 @@ describe.sequential("AgentService: providers", () => {
     });
     service = agentService;
     const [draft] = await service.prepareAttachments([source]);
+    assert(draft);
 
     await service.sendMessage({
       agentId: "chief",

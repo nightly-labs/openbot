@@ -59,7 +59,7 @@ export class ThreadSummaries {
           INSERT INTO projection_thread_summaries
             (summary_id, thread_id, through_message_id, summary_text, estimated_tokens, created_at, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(summary.id, threadId, throughMessageId, text, estimatedTokens, summary.createdAt, sequences[0]);
+        `).run(summary.id, threadId, throughMessageId, text, estimatedTokens, summary.createdAt, sequences[0] ?? 0);
         return summary;
       },
     );

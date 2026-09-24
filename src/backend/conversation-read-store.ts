@@ -182,14 +182,14 @@ export class ConversationReadStore {
           )
           .get(threadId, throughMessageId)
       : undefined;
-    if (
-      boundary !== undefined &&
-      (!isDynamicRecord(boundary) || !isString(boundary.created_at) || !isNumber(boundary.ordinal))
-    ) {
-      throw new Error("The conversation read boundary is malformed.");
+    let boundaryKey: [createdAt: string, ordinal: number] | null = null;
+    if (boundary !== undefined) {
+      if (!isDynamicRecord(boundary) || !isString(boundary.created_at) || !isNumber(boundary.ordinal))
+        throw new Error("The conversation read boundary is malformed.");
+      boundaryKey = [boundary.created_at, boundary.ordinal];
     }
-    const afterBoundary = boundary ? `AND (created_at, ordinal, message_id) > (?, ?, ?)` : "";
-    const parameters = boundary ? [threadId, boundary.created_at, boundary.ordinal, throughMessageId] : [threadId];
+    const afterBoundary = boundaryKey ? `AND (created_at, ordinal, message_id) > (?, ?, ?)` : "";
+    const parameters = boundaryKey ? [threadId, ...boundaryKey, throughMessageId] : [threadId];
     const unreadFilter = `author != 'user'
       AND COALESCE(item_type, '') != 'commentary'
       AND COALESCE(item_type, '') != 'agent_attachment'

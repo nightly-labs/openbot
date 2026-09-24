@@ -8,6 +8,7 @@ import { createMockOpenBot } from "./mock-openbot";
 
 const localServer = STORY_SERVERS.find((server) => server.kind === "local") ?? STORY_SERVERS[0];
 const remoteServer = STORY_SERVERS.find((server) => server.kind === "remote") ?? STORY_SERVERS[1];
+if (!remoteServer) throw new Error("Story server fixtures need a remote server.");
 const denseMembers = Array.from({ length: 4 }, (_, group) =>
   STORY_PRESENCE.members.map((member, index) => ({
     ...member,

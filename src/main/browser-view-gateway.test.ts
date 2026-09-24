@@ -10,7 +10,7 @@ import {
   decodeBrowserViewFrame,
   encodeBrowserViewInput,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
 import type { BrowserViewportInput } from "../backend/browser-cdp";
@@ -59,7 +59,9 @@ describe("the live browser view on a host", () => {
     await vi.waitFor(() => expect(send).toBeDefined());
     send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
     await vi.waitFor(() => expect(frames).toHaveLength(1));
-    expect(decodeBrowserViewFrame(frames[0])).toMatchObject({ sequence: 1, width: 1200, height: 800 });
+    const [frame] = frames;
+    assert(frame);
+    expect(decodeBrowserViewFrame(frame)).toMatchObject({ sequence: 1, width: 1200, height: 800 });
 
     socket.send(
       encodeBrowserViewInput({

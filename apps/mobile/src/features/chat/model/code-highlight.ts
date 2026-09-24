@@ -102,7 +102,7 @@ const LANGUAGES: ShjLanguage[] = [
 ];
 
 export function codeLanguage(info = "") {
-  const name = info.trim().split(/\s+/u)[0].toLowerCase();
+  const name = (info.trim().split(/\s+/u)[0] ?? "").toLowerCase();
   const language = LANGUAGE_ALIASES[name] ?? LANGUAGES.find((item) => item === name) ?? "plain";
   return { language, label: language === "plain" && name ? name : (LANGUAGE_LABELS[language] ?? language) };
 }

@@ -1,7 +1,7 @@
 import { act, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import type { LayoutChangeEvent } from "react-native";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, assert, expect, it, vi } from "vitest";
 import { type ChatMotion, useChatMotion } from "./use-chat-motion";
 
 const native = vi.hoisted(() => {
@@ -80,6 +80,12 @@ function layout(height: number, y = 0): Pick<LayoutChangeEvent, "nativeEvent"> {
   return { nativeEvent: { layout: { height, y, x: 0, width: 390 } } };
 }
 
+function keyboard(name: "onStart" | "onMove" | "onInteractive" | "onEnd") {
+  const handler = native.keyboard[name];
+  assert(handler);
+  return handler;
+}
+
 it("keeps replies visible and does not scroll after keyboard dismissal, including an interrupted final frame", async () => {
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
     const id = ++native.nextFrame;
@@ -115,15 +121,15 @@ it("keeps replies visible and does not scroll after keyboard dismissal, includin
   await flush();
   native.scrollTo.mockClear();
 
-  native.keyboard.onStart({ height: 300, progress: 1 });
-  native.keyboard.onMove({ height: 300, progress: 1 });
-  native.keyboard.onEnd({ height: 300, progress: 1 });
+  keyboard("onStart")({ height: 300, progress: 1 });
+  keyboard("onMove")({ height: 300, progress: 1 });
+  keyboard("onEnd")({ height: 300, progress: 1 });
   await flush();
   expect(motion.atLatest).toBe(false);
 
-  native.keyboard.onInteractive({ height: 150, progress: 0.5 });
+  keyboard("onInteractive")({ height: 150, progress: 0.5 });
   // Dismissal can finish without an onMove frame at height zero.
-  native.keyboard.onEnd({ height: 0, progress: 0 });
+  keyboard("onEnd")({ height: 0, progress: 0 });
   await flush();
   expect(motion.atLatest).toBe(true);
 
@@ -137,16 +143,16 @@ it("keeps replies visible and does not scroll after keyboard dismissal, includin
   expect(native.scrollTo).not.toHaveBeenCalled();
 
   // The user can open the keyboard again while the agent is replying.
-  native.keyboard.onStart({ height: 300, progress: 1 });
-  native.keyboard.onMove({ height: 300, progress: 1 });
+  keyboard("onStart")({ height: 300, progress: 1 });
+  keyboard("onMove")({ height: 300, progress: 1 });
   await flush();
   expect(motion.atLatest).toBe(false);
 
   // Native dismissal can arrive without any controller completion frame.
   native.hidden();
   // A queued frame from the dismissed keyboard must not lift the composer again.
-  native.keyboard.onMove({ height: 300, progress: 1 });
-  native.keyboard.onEnd({ height: 300, progress: 1 });
+  keyboard("onMove")({ height: 300, progress: 1 });
+  keyboard("onEnd")({ height: 300, progress: 1 });
   expect(motion.keyboardHeight.get()).toBe(0);
   expect(motion.keyboardProgress.get()).toBe(0);
   await act(() => root.render(<Chat />));
@@ -154,25 +160,25 @@ it("keeps replies visible and does not scroll after keyboard dismissal, includin
   expect(motion.atLatest).toBe(true);
   expect(native.scrollTo).not.toHaveBeenCalled();
 
-  native.keyboard.onStart({ height: 300, progress: 1 });
-  native.keyboard.onMove({ height: 300, progress: 1 });
+  keyboard("onStart")({ height: 300, progress: 1 });
+  keyboard("onMove")({ height: 300, progress: 1 });
   expect(motion.keyboardHeight.get()).toBe(300);
   // A dismissal start must settle the composer even if scrolling interrupts
   // delivery of the controller's final move/end and RN's did-hide notification.
-  native.keyboard.onStart({ height: 0, progress: 0, duration: 250 });
-  native.keyboard.onInteractive({ height: 280, progress: 0.93 });
-  native.keyboard.onMove({ height: 300, progress: 1 });
+  keyboard("onStart")({ height: 0, progress: 0, duration: 250 });
+  keyboard("onInteractive")({ height: 280, progress: 0.93 });
+  keyboard("onMove")({ height: 300, progress: 1 });
   expect(motion.keyboardHeight.get()).toBe(0);
   expect(motion.keyboardProgress.get()).toBe(0);
-  native.keyboard.onEnd({ height: 300, progress: 0 });
+  keyboard("onEnd")({ height: 300, progress: 0 });
   expect(motion.keyboardHeight.get()).toBe(0);
   await flush();
   expect(motion.atLatest).toBe(true);
 
   // Sending, dragging, then dismissing the keyboard must preserve manual control,
   // even if the larger viewport makes the current reply visible again.
-  native.keyboard.onStart({ height: 300, progress: 1 });
-  native.keyboard.onMove({ height: 300, progress: 1 });
+  keyboard("onStart")({ height: 300, progress: 1 });
+  keyboard("onMove")({ height: 300, progress: 1 });
   await act(() => {
     motion?.beginSend();
     motion?.onScrollBeginDrag();

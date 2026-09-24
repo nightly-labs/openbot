@@ -22,7 +22,7 @@ import { MCP_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
-import { parseAgentRequest } from "./agent-inputs";
+import { agentRequest, agentScope } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { parseRemoveMcpServer, parseSaveMcpServer, parseSetMcpServerEnabled, parseTestMcpServer } from "./mcp-inputs";
 import { routeToServer } from "./route-to-server";
@@ -133,7 +133,7 @@ export function mcpServerIpcHandlers({
 
   return {
     mcpServers: {
-      list: payloadHandler(parseAgentRequest, (scoped) =>
+      list: payloadHandler(agentScope, (scoped) =>
         routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => service.listMcpServers(),
           // The one read route, and the only one the host answers to a GET.
@@ -143,8 +143,8 @@ export function mcpServerIpcHandlers({
           },
         }),
       ),
-      save: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseSaveMcpServer(scoped.payload);
+      save: payloadHandler(agentRequest(parseSaveMcpServer), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => {
             startToolRuntimes();
@@ -153,15 +153,15 @@ export function mcpServerIpcHandlers({
           remote: (serverId) => remoteList(serverId, MCP_ROUTES.save, parsed),
         });
       }),
-      remove: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseRemoveMcpServer(scoped.payload);
+      remove: payloadHandler(agentRequest(parseRemoveMcpServer), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => service.removeMcpServer(parsed),
           remote: (serverId) => remoteList(serverId, MCP_ROUTES.remove, parsed),
         });
       }),
-      setEnabled: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseSetMcpServerEnabled(scoped.payload);
+      setEnabled: payloadHandler(agentRequest(parseSetMcpServerEnabled), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => {
             if (parsed.enabled) startToolRuntimes();
@@ -172,8 +172,8 @@ export function mcpServerIpcHandlers({
       }),
       // The machine that holds the configuration is the machine that must make the connection, so a
       // test against a remote server runs on that host and not here.
-      test: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseTestMcpServer(scoped.payload);
+      test: payloadHandler(agentRequest(parseTestMcpServer), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer<McpTestResult>(scoped.serverId, {
           // Interactive: the user pressed Test and is in front of the browser a sign-in opens. The
           // remote branch below carries no such flag; the route it reaches spends the host's stored

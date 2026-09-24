@@ -576,7 +576,8 @@ export function createWebWorkspace(props: {
       return false;
     }
     setState((draft) => {
-      draft.conversations[id].sending = true;
+      const conversation = draft.conversations[id];
+      if (conversation) conversation.sending = true;
       draft.error = null;
     });
     try {
@@ -589,6 +590,7 @@ export function createWebWorkspace(props: {
       if (current !== generation || disposed) return false;
       setState((draft) => {
         const value = draft.conversations[id];
+        if (!value) return;
         value.draft = "";
         value.attachments = [];
       });
@@ -601,14 +603,16 @@ export function createWebWorkspace(props: {
     } catch {
       if (current !== generation || disposed) return false;
       setState((draft) => {
-        draft.conversations[id].uncertain = true;
+        const conversation = draft.conversations[id];
+        if (conversation) conversation.uncertain = true;
         draft.error = "Message delivery is not confirmed. Refresh and check the conversation before sending again.";
       });
       return false;
     } finally {
       if (current === generation && !disposed)
         setState((draft) => {
-          draft.conversations[id].sending = false;
+          const conversation = draft.conversations[id];
+          if (conversation) conversation.sending = false;
         });
     }
   }
@@ -790,14 +794,16 @@ export function createWebWorkspace(props: {
       const id = selectedId;
       if (id)
         setState((draft) => {
-          draft.conversations[id].draft = text;
+          const conversation = draft.conversations[id];
+          if (conversation) conversation.draft = text;
         });
     },
     acknowledgeSend() {
       const id = selectedId;
       if (id)
         setState((draft) => {
-          draft.conversations[id].uncertain = false;
+          const conversation = draft.conversations[id];
+          if (conversation) conversation.uncertain = false;
         });
     },
     async upload(file: File) {
@@ -815,8 +821,13 @@ export function createWebWorkspace(props: {
         try {
           const attachment = await runtime.upload(file);
           if (current !== generation || disposed) return;
+          // The agent was removed during the upload, so the host must not keep the file.
+          if (!state.conversations[id]) {
+            await runtime.discard(attachment.id);
+            return;
+          }
           setState((draft) => {
-            draft.conversations[id].attachments.push(attachment);
+            draft.conversations[id]?.attachments.push(attachment);
           });
         } finally {
           if (!disposed)
@@ -862,9 +873,9 @@ export function createWebWorkspace(props: {
         await runtime.discard(attachmentId);
         if (current === generation && !disposed)
           setState((draft) => {
-            draft.conversations[id].attachments = draft.conversations[id].attachments.filter(
-              (item) => item.id !== attachmentId,
-            );
+            const conversation = draft.conversations[id];
+            if (conversation)
+              conversation.attachments = conversation.attachments.filter((item) => item.id !== attachmentId);
           });
       });
     },

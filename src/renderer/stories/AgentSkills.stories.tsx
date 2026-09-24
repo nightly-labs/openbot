@@ -3,8 +3,10 @@ import { onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
-import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_INSTALLED_SKILLS, STORY_MODELS } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_INSTALLED_SKILLS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
+
+const storyAgent = STORY_AGENT;
 
 function AgentSkillsStory(props: {
   skills: InstalledSkill[];
@@ -65,11 +67,11 @@ function AgentSkillsStory(props: {
         onCreateSkill={fn()}
         onTrySkill={fn()}
         onOpenUsage={fn()}
-        agent={STORY_AGENTS[0]}
+        agent={storyAgent}
         runtimeSettings={{
-          provider: STORY_AGENTS[0].provider,
-          model: STORY_AGENTS[0].model,
-          reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+          provider: storyAgent.provider,
+          model: storyAgent.model,
+          reasoningEffort: storyAgent.reasoningEffort,
         }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -98,11 +100,11 @@ const meta = {
   title: "Settings/Agent Skills",
   component: AgentSettingsPanel,
   args: {
-    agent: STORY_AGENTS[0],
+    agent: storyAgent,
     runtimeSettings: {
-      provider: STORY_AGENTS[0].provider,
-      model: STORY_AGENTS[0].model,
-      reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+      provider: storyAgent.provider,
+      model: storyAgent.model,
+      reasoningEffort: storyAgent.reasoningEffort,
     },
     agentStatus: STORY_AGENT_STATUS,
     modelOptions: STORY_MODELS,

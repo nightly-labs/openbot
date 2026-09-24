@@ -158,7 +158,7 @@ export class ProviderSessions {
           session.createdAt,
           session.updatedAt,
           session.resumeCursor,
-          sequences[0],
+          sequences[0] ?? 0,
         );
         return session;
       },
@@ -183,7 +183,7 @@ export class ProviderSessions {
           `UPDATE projection_provider_sessions
            SET state = 'inactive', updated_at = ?, last_event_sequence = ?
            WHERE thread_id = ? AND state = 'active'`,
-        ).run(new Date().toISOString(), sequences[0], threadId);
+        ).run(new Date().toISOString(), sequences[0] ?? 0, threadId);
         return null;
       },
     );
@@ -204,7 +204,7 @@ export class ProviderSessions {
         db.prepare(
           `UPDATE projection_provider_sessions
            SET model = ?, effort = ?, updated_at = ?, last_event_sequence = ? WHERE id = ?`,
-        ).run(model, effort, new Date().toISOString(), sequences[0], sessionId);
+        ).run(model, effort, new Date().toISOString(), sequences[0] ?? 0, sessionId);
         return null;
       },
     );

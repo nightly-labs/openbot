@@ -24,11 +24,11 @@ class FakeBridge extends TeamWebRtcBridge {
   readonly sent: Array<{ peerId: string; channel: string; data: string | ArrayBuffer }> = [];
   readonly disconnectedPeers: string[] = [];
 
-  async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
+  override async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
     this.sent.push({ peerId, channel, data });
   }
 
-  async disconnectPeer(peerId: string): Promise<void> {
+  override async disconnectPeer(peerId: string): Promise<void> {
     this.disconnectedPeers.push(peerId);
   }
 }
@@ -267,7 +267,7 @@ class ResumingBridge extends TeamWebRtcBridge {
   #transferId = "";
   #disconnected = false;
 
-  async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
+  override async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
     if (channel !== "files") return;
     if (isString(data)) {
       const frame = decodeTeamProtocolV2FileControlFrame(data);
@@ -342,7 +342,7 @@ class SlowFinalAcknowledgementBridge extends TeamWebRtcBridge {
   transferId = "";
   #received = 0;
 
-  async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
+  override async send(peerId: string, channel: string, data: string | ArrayBuffer): Promise<void> {
     if (channel !== "files") return;
     if (isString(data)) {
       const frame = decodeTeamProtocolV2FileControlFrame(data);

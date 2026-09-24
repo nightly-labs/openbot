@@ -19,7 +19,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import {
   createAgents,
   createTeamApiFixture,
@@ -99,9 +99,11 @@ describe("TeamApiServer conversations", () => {
         },
       ],
     };
+    const [chief] = localAgents;
+    assert(chief);
     const createAgent = vi.fn(
       async (input: CreateAgentInput): Promise<AgentSummary> => ({
-        ...localAgents[0],
+        ...chief,
         id: "trip-planner",
         name: input.name,
         title: "",

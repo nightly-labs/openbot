@@ -1,5 +1,5 @@
 import type { AgentEvent, ConversationMessage, ConversationPage } from "@openbot/contracts/ipc";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { indexChatMessages, projectChatMessages } from "../../chat/model/chat-messages";
 import { reduceAgentActivity } from "./agent-activity";
 import { decodeConversationPage } from "./conversation";
@@ -67,10 +67,12 @@ describe("mobile conversation windows", () => {
     expect(store.get("agent")).toBe(current);
     expect(notify).not.toHaveBeenCalled();
     const updated = page(["recent", "reply"], 2);
-    updated.messages[1].text = "Updated reply";
+    const reply = updated.messages[1];
+    assert(reply);
+    reply.text = "Updated reply";
     store.applyPage(updated);
     expect(store.get("agent")?.messages[0]).toBe(current?.messages[0]);
-    expect(store.get("agent")?.messages[1].text).toBe("Updated reply");
+    expect(store.get("agent")?.messages[1]?.text).toBe("Updated reply");
     expect(notify).toHaveBeenCalledTimes(1);
     close();
   });
@@ -311,11 +313,13 @@ describe("mobile conversation windows", () => {
       references: {},
       pageInfo: { hasOlder: true, olderCursor: "older" },
     };
+    const answer = messages[2];
+    assert(answer);
     store.applyPage(page);
     store.applyPage({
       ...page,
       revision: 2,
-      messages: [messages[2]],
+      messages: [answer],
       pageInfo: { hasOlder: true, olderCursor: "at-r1" },
     });
     expect(store.get("agent")?.messages.map((item) => item.id)).toEqual(["q1", "q2", "r1"]);

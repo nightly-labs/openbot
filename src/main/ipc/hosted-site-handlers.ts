@@ -30,7 +30,7 @@ export function hostedSiteIpcHandlers({
       }),
       publish: payloadHandler(parsePublishHostedSite, (site) => hostedSites.publish(site)),
       replace: payloadHandler(parseReplaceHostedSite, (site) => hostedSites.replace(site)),
-      delete: payloadHandler(parseDeleteHostedSite, (siteId) => hostedSites.delete(siteId)),
+      delete: payloadHandler(parseDeleteHostedSite, ({ siteId }) => hostedSites.delete(siteId)),
     },
   };
 }

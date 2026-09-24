@@ -37,7 +37,9 @@ const artifacts = Object.fromEntries(
     metadataEntries.map(async (entry, index) => {
       if (entry.inputDigest !== inputDigest)
         throw new Error(`The ${entry.target} build used a different input digest.`);
-      const metadataDirectory = dirname(resolve(metadataPaths[index]));
+      const metadataPath = metadataPaths[index];
+      if (metadataPath === undefined) throw new Error(`The ${entry.target} metadata path is missing.`);
+      const metadataDirectory = dirname(resolve(metadataPath));
       const sbomSha256 = createHash("sha256")
         .update(await readFile(join(metadataDirectory, entry.sbomAsset)))
         .digest("hex");

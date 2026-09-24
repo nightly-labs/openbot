@@ -129,7 +129,8 @@ function review({ review = "", reads = false, error, description = "", inlineLim
   );
   const calls = Number(readFileSync(join(temp, "calls"), "utf8"));
   const prompt = readFileSync(join(temp, "prompt-1.txt"), "utf8");
-  const published = existsSync(outputs.review_file) ? readFileSync(outputs.review_file, "utf8") : "";
+  const reviewFile = outputs.review_file;
+  const published = reviewFile && existsSync(reviewFile) ? readFileSync(reviewFile, "utf8") : "";
   return { outputs, calls, prompt, published };
 }
 

@@ -2,11 +2,15 @@ import SharedAgentSettingsPanel, {
   type AgentRuntimeSettings,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "../../preview/fixtures";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
 import AgentSettingsPanel from "./AgentSettingsPanel";
 import { AgentSkillsModal } from "./AgentSkillsModal";
+
+const [firstAgent, secondAgent] = STORY_AGENTS;
+assert(firstAgent);
+assert(secondAgent);
 
 let mock: MockOpenBotControls | undefined;
 
@@ -22,7 +26,7 @@ describe("AgentSettingsPanel", () => {
     try {
       const view = render(() => (
         <SharedAgentSettingsPanel
-          agent={STORY_AGENTS[0]}
+          agent={firstAgent}
           runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
           agentStatus={STORY_AGENT_STATUS}
           modelOptions={STORY_MODELS}
@@ -40,7 +44,7 @@ describe("AgentSettingsPanel", () => {
       const instructions = await screen.findByRole("textbox", { name: "Agent instructions" });
       await fireEvent.input(instructions, { target: { value: "Keep the shared form independent." } });
       view.unmount();
-      expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, {
+      expect(onUpdateAgent).toHaveBeenCalledWith(firstAgent.id, {
         description: "Keep the shared form independent.",
       });
     } finally {
@@ -57,7 +61,7 @@ describe("AgentSettingsPanel", () => {
       render(() => (
         <AgentSettingsPanel
           onOpenUsage={vi.fn()}
-          agent={STORY_AGENTS[0]}
+          agent={firstAgent}
           runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
           agentStatus={STORY_AGENT_STATUS}
           modelOptions={STORY_MODELS}
@@ -77,7 +81,7 @@ describe("AgentSettingsPanel", () => {
       await vi.advanceTimersByTimeAsync(500);
 
       expect(instructions).toHaveFocus();
-      expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, {
+      expect(onUpdateAgent).toHaveBeenCalledWith(firstAgent.id, {
         description: "Use the reviewed release instructions.",
       });
     } finally {
@@ -92,7 +96,7 @@ describe("AgentSettingsPanel", () => {
     const view = render(() => (
       <AgentSettingsPanel
         onOpenUsage={vi.fn()}
-        agent={STORY_AGENTS[0]}
+        agent={firstAgent}
         runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -110,7 +114,7 @@ describe("AgentSettingsPanel", () => {
     await fireEvent.input(instructions, { target: { value: "Keep this instruction when the panel closes." } });
     view.unmount();
 
-    expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, {
+    expect(onUpdateAgent).toHaveBeenCalledWith(firstAgent.id, {
       description: "Keep this instruction when the panel closes.",
     });
   });
@@ -131,7 +135,7 @@ describe("AgentSettingsPanel", () => {
       render(() => (
         <AgentSettingsPanel
           onOpenUsage={vi.fn()}
-          agent={STORY_AGENTS[0]}
+          agent={firstAgent}
           runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
           agentStatus={STORY_AGENT_STATUS}
           modelOptions={STORY_MODELS}
@@ -154,7 +158,7 @@ describe("AgentSettingsPanel", () => {
 
       finishFirstSave();
       await vi.waitFor(() => expect(onUpdateAgent).toHaveBeenCalledTimes(2));
-      expect(onUpdateAgent).toHaveBeenLastCalledWith(STORY_AGENTS[0].id, {
+      expect(onUpdateAgent).toHaveBeenLastCalledWith(firstAgent.id, {
         description: "Latest instruction",
       });
       expect(instructions).toHaveValue("Latest instruction");
@@ -170,7 +174,7 @@ describe("AgentSettingsPanel", () => {
     const getUsage = vi.spyOn(mock.api.storage, "getUsage");
     render(() => (
       <AgentSettingsPanel
-        agent={STORY_AGENTS[0]}
+        agent={firstAgent}
         runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -192,9 +196,9 @@ describe("AgentSettingsPanel", () => {
     ));
 
     await fireEvent.click(await screen.findByRole("button", { name: /^Files/u }));
-    expect(await screen.findByRole("region", { name: `Files of ${STORY_AGENTS[0].name}` })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: `Files of ${firstAgent.name}` })).toBeInTheDocument();
     expect(getUsage).toHaveBeenCalledOnce();
-    expect(getUsage).toHaveBeenCalledWith({ scope: "agent", agentId: STORY_AGENTS[0].id }, "local");
+    expect(getUsage).toHaveBeenCalledWith({ scope: "agent", agentId: firstAgent.id }, "local");
 
     await fireEvent.click(screen.getByRole("button", { name: "Back to settings" }));
     expect(await screen.findByRole("button", { name: /^Files/u })).toBeInTheDocument();
@@ -324,7 +328,8 @@ describe("AgentSettingsPanel", () => {
   it("updates a local revision explicitly and keeps the skill disabled", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
-    const skill = (await mock.api.skills.localList())[0];
+    const [skill] = await mock.api.skills.localList();
+    assert(skill);
     await mock.api.skills.localInstall({ agentId: "chief", skillId: skill.id, revision: 1 });
     await mock.api.skills.setEnabled({ agentId: "chief", skillId: skill.id, enabled: false });
     await mock.api.skills.localRevise({
@@ -497,7 +502,8 @@ describe("AgentSettingsPanel", () => {
   it("does not read this computer's library for a remote local skill", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
-    const skill = (await mock.api.skills.localList())[0];
+    const [skill] = await mock.api.skills.localList();
+    assert(skill);
     vi.spyOn(mock.api.agent, "listInstalledSkills").mockResolvedValue([
       {
         skillId: skill.id,
@@ -544,7 +550,7 @@ describe("AgentSettingsPanel", () => {
     render(() => (
       <AgentSettingsPanel
         onOpenUsage={onOpenUsage}
-        agent={{ ...STORY_AGENTS[0], provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "xhigh" }}
+        agent={{ ...firstAgent, provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "xhigh" }}
         runtimeSettings={runtimeSettings}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -565,7 +571,7 @@ describe("AgentSettingsPanel", () => {
 
     await waitFor(() =>
       expect(onUpdateRuntimeSettings).toHaveBeenCalledWith(
-        STORY_AGENTS[0].id,
+        firstAgent.id,
         { provider: "claude", model: "claude-sonnet-5", reasoningEffort: "high" },
         { provider: "claude", model: "claude-sonnet-5", reasoningEffort: "high" },
       ),
@@ -587,7 +593,7 @@ describe("AgentSettingsPanel", () => {
     const onUpdateAgent = vi.fn(async () => undefined);
     render(() => (
       <SharedAgentSettingsPanel
-        agent={{ ...STORY_AGENTS[0], access: "workspace" }}
+        agent={{ ...firstAgent, access: "workspace" }}
         accessEditable
         runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
         agentStatus={STORY_AGENT_STATUS}
@@ -619,7 +625,7 @@ describe("AgentSettingsPanel", () => {
     expect(onUpdateAgent).not.toHaveBeenCalled();
 
     await fireEvent.click(within(await chooseFullAccess()).getByRole("button", { name: "Allow full access" }));
-    await waitFor(() => expect(onUpdateAgent).toHaveBeenCalledWith(STORY_AGENTS[0].id, { access: "full" }));
+    await waitFor(() => expect(onUpdateAgent).toHaveBeenCalledWith(firstAgent.id, { access: "full" }));
     expect(screen.getByRole("button", { name: /Agent access/ })).toHaveTextContent("Full access");
   });
 
@@ -629,7 +635,7 @@ describe("AgentSettingsPanel", () => {
     render(() => (
       <AgentSettingsPanel
         onOpenUsage={vi.fn()}
-        agent={{ ...STORY_AGENTS[1], provider: "claude", model: "claude-sonnet-5", reasoningEffort: "high" }}
+        agent={{ ...secondAgent, provider: "claude", model: "claude-sonnet-5", reasoningEffort: "high" }}
         runtimeSettings={{ provider: "claude", model: "claude-sonnet-5", reasoningEffort: "high" }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}

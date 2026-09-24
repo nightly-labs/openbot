@@ -50,6 +50,7 @@ import {
 import type { TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
+import { rawDataBytes } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -749,12 +750,6 @@ export class TeamWebRtcHostPeer {
   #closeDesktopSockets(): void {
     for (const streamId of [...this.#desktopSockets.keys()]) this.#closeDesktopSocket(streamId);
   }
-}
-
-function rawDataBytes(data: Ws.RawData): Uint8Array {
-  if (Array.isArray(data)) return new Uint8Array(Buffer.concat(data));
-  if (data instanceof ArrayBuffer) return new Uint8Array(data.slice(0));
-  return new Uint8Array(Buffer.from(data.buffer, data.byteOffset, data.byteLength));
 }
 
 interface HttpRequestPayload {

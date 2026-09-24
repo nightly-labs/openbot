@@ -1,4 +1,4 @@
-import type { AgentEvent, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentSummary, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { expect, it, vi } from "vitest";
@@ -214,7 +214,7 @@ describe("OpenBot connected desktop shell", () => {
     const remote = testServer("remote-1", true);
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
     vi.mocked(window.openbot.servers.select).mockResolvedValueOnce([local, remote]);
-    let resolveAgents: ((agents: typeof AGENTS) => void) | undefined;
+    let resolveAgents: ((agents: AgentSummary[]) => void) | undefined;
     vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(
       new Promise((resolve) => {
         resolveAgents = resolve;
@@ -288,7 +288,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([local, remote]);
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    let resolveAgents: ((agents: typeof AGENTS) => void) | undefined;
+    let resolveAgents: ((agents: AgentSummary[]) => void) | undefined;
     vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(
       new Promise((resolve) => {
         resolveAgents = resolve;
@@ -318,8 +318,8 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.listAgents).toHaveBeenCalledTimes(2));
     rejectAgents?.(new Error("The host is not reachable."));
     // A later successful load is the barrier after the failed refresh.
-    let resolveOld: ((agents: typeof AGENTS) => void) | undefined;
-    const oldAgents = new Promise<typeof AGENTS>((resolve) => {
+    let resolveOld: ((agents: AgentSummary[]) => void) | undefined;
+    const oldAgents = new Promise<AgentSummary[]>((resolve) => {
       resolveOld = resolve;
     });
     vi.mocked(window.openbot.agent.listAgents).mockReturnValueOnce(oldAgents);

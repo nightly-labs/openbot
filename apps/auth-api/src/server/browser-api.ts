@@ -48,8 +48,9 @@ export function browserSessionToken(request: Request): string | null {
     .split(";")
     .map((part) => part.trim())
     .filter((part) => part.startsWith(`${COOKIE}=`));
-  if (values.length !== 1) return null;
-  const token = values[0].slice(COOKIE.length + 1);
+  const [value] = values;
+  if (values.length !== 1 || value === undefined) return null;
+  const token = value.slice(COOKIE.length + 1);
   return /^[A-Za-z0-9_-]{20,512}$/u.test(token) ? token : null;
 }
 
@@ -111,10 +112,10 @@ export async function handleBrowserApi(request: Request, services: BrowserApiSer
         await services.remote.startSession(user.id, requiredString(body, "hostId"), await sha256(token)),
         201,
       );
-    const sessionRoute = /^v2\/remote\/sessions\/([^/]+)\/(ticket|end)$/u.exec(path);
-    if (sessionRoute) {
-      const sessionId = decodeURIComponent(sessionRoute[1]);
-      if (sessionRoute[2] === "end") {
+    const [, encodedSessionId, sessionAction] = /^v2\/remote\/sessions\/([^/]+)\/(ticket|end)$/u.exec(path) ?? [];
+    if (encodedSessionId !== undefined) {
+      const sessionId = decodeURIComponent(encodedSessionId);
+      if (sessionAction === "end") {
         await services.remote.endSession(user.id, sessionId, await sha256(token));
         return json({ ended: true });
       }
