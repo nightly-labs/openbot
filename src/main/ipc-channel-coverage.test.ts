@@ -20,7 +20,8 @@
 // Verification is static because neither side can be imported: src/main/index.ts calls
 // app.setPath, app.enableSandbox and protocol.registerSchemesAsPrivileged at module scope and
 // does not export its registrations, and src/preload/index.ts calls contextBridge.exposeInMainWorld
-// at module scope and exports nothing. Reading the sources is safe here because a channel name is
+// at module scope and exports nothing. The decoders it imports live beside it in src/preload, so the
+// scan reads that whole directory. Reading the sources is safe here because a channel name is
 // never written as a literal on either side - every reference goes through IPC_CHANNELS. Two tests
 // below keep that true rather than assumed: one reads the channel argument of every known call and
 // rejects anything but a direct IPC_CHANNELS reference, so a string or a variable cannot slip an
@@ -38,7 +39,7 @@ const repositoryRoot = resolve(import.meta.dirname, "../..");
 // the scan reads only the channel position, so it does not care.
 const MAIN_SEND_CALLEES = ["sendToRenderer"];
 const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeRequest", "invokeAgent", "invokeAgentForServer"];
-const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once"];
+const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once", "listen", "subscribe"];
 const PRELOAD_UNSUBSCRIBE_CALLEES = ["ipcRenderer.removeListener", "ipcRenderer.off"];
 
 // IPC_ENDPOINTS says which kind each channel is; the scans below produce IPC_CHANNELS keys, so
@@ -61,13 +62,20 @@ const CHANNEL_ARGUMENT_POSITION: ReadonlyMap<string, number> = new Map(
   ),
 );
 
+// Main uses these two names for servers and stores that have nothing to do with IPC, so only the
+// preload scan reads them as channel calls.
+const PRELOAD_ONLY_CALLEES = ["listen", "subscribe"];
+
 const CHANNEL_REFERENCE = /^IPC_CHANNELS\.([A-Za-z0-9_]+)$/;
 
 const sources = new Map<string, string>();
 
 const mainSources = sourceFilesUnder("src/main");
-const PRELOAD_MODULE = "src/preload/index.ts";
-const preloadSources = [PRELOAD_MODULE];
+
+// The hidden WebRTC window has a preload of its own. It takes one MessagePort that main hands over
+// with webContents.postMessage, which is not an IPC endpoint, so the scan leaves it out.
+const WEBRTC_PRELOAD_MODULE = "src/preload/team-webrtc.ts";
+const preloadSources = sourceFilesUnder("src/preload").filter((file) => file !== WEBRTC_PRELOAD_MODULE);
 
 // The one module allowed to touch ipcMain, because it is the sender check.
 const TRUSTED_IPC_MODULE = "src/main/trusted-ipc.ts";
@@ -106,14 +114,19 @@ function decodeWrittenFromMain(value: unknown): Written | null {
 }
 `;
 
-// The preload's invoke helpers take the channel as a parameter and pass it on,
-// so the forwarding call names a variable by design. Their own call sites carry
-// the IPC_CHANNELS reference and are what the scan checks, which is why the
-// helpers are listed as callees above.
-const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = ["src/preload/index.ts: ipcRenderer.invoke(channel)"];
+// The preload's invoke and subscribe helpers take the channel as a parameter and
+// pass it on, so the forwarding call names a variable by design. Their own call
+// sites carry the IPC_CHANNELS reference and are what the scan checks, which is
+// why the helpers are listed as callees above.
+const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = [
+  "src/preload/index.ts: ipcRenderer.invoke(channel)",
+  "src/preload/index.ts: ipcRenderer.on(channel)",
+  "src/preload/index.ts: ipcRenderer.removeListener(channel)",
+  "src/preload/index.ts: listen(channel)",
+];
 
-const mainCalls = collectCalls(mainSources);
-const preloadCalls = collectCalls(preloadSources);
+const mainCalls = collectCalls(mainSources, PRELOAD_ONLY_CALLEES);
+const preloadCalls = collectCalls(preloadSources, []);
 
 const sent = channelsCalledBy(mainCalls, MAIN_SEND_CALLEES);
 const invoked = channelsCalledBy(preloadCalls, PRELOAD_INVOKE_CALLEES);
@@ -274,7 +287,8 @@ describe("IPC channel coverage", () => {
   // This catches the predicate-shaped recurrence, which is the shape that
   // actually diverged. A rule inlined into a decodeX body is still invisible here.
   it("declares no type predicate of its own in the preload", () => {
-    const declared = [...readSource(PRELOAD_MODULE).matchAll(/^function (\w+)\([^)]*\):\s*[\w.<>[\]|" ]+ is /gm)]
+    const declared = preloadSources
+      .flatMap((file) => [...readSource(file).matchAll(/^(?:export )?function (\w+)\([^)]*\):\s*[\w.<>[\]|" ]+ is /gm)])
       .map((match) => match[1])
       .sort();
 
@@ -409,11 +423,12 @@ function readSource(file: string): string {
 // whose channel is a variable or a string, and those are the calls that would
 // otherwise leave the trust boundary unscanned. A `function` keyword before the
 // name marks a declaration of the helper rather than a call to it.
-function collectCalls(files: readonly string[]): readonly ChannelCall[] {
+function collectCalls(files: readonly string[], skipped: readonly string[]): readonly ChannelCall[] {
   const calls: ChannelCall[] = [];
   for (const file of files) {
     const source = readSource(file);
     for (const [callee, position] of CHANNEL_ARGUMENT_POSITION) {
+      if (skipped.includes(callee)) continue;
       const pattern = new RegExp(`(?<![A-Za-z0-9_$.])${callee.replaceAll(".", "\\.")}\\s*\\(`, "g");
       for (const match of source.matchAll(pattern)) {
         if (/\bfunction\s*$/.test(source.slice(Math.max(0, match.index - 20), match.index))) continue;
