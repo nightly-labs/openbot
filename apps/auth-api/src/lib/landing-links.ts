@@ -24,6 +24,8 @@ export const OPENBOT_LINKS = {
   contributing: "https://github.com/nightly-labs/openbot/blob/main/CONTRIBUTING.md",
   codex: "https://learn.chatgpt.com/docs/app-server",
   claude: "https://code.claude.com/docs/en/overview",
+  grokBotOverview: "https://docs.x.ai/grok-bot/overview",
+  anthropicAgents: "https://www.anthropic.com/engineering/building-effective-agents",
 } as const;
 
 /**

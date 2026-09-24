@@ -24,6 +24,14 @@ export const GUIDES_COLLECTION: ContentCollection = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "what-are-ai-agents",
+      title: "What Are AI Agents? How They Work and When to Use Them",
+      description:
+        "What are AI agents, how do they work, and when are they useful? A practical guide to their tools, use cases, and limits.",
+      publishedAt: "2026-09-24",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "openbot-101",
       title: "OpenBot 101",
       description:

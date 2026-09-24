@@ -24,6 +24,14 @@ export const NEWS_COLLECTION: ContentCollection = {
   imageEyebrow: "OPENBOT · NEWS",
   articles: publishedFirst([
     {
+      slug: "openbot-vs-grokbot",
+      title: "OpenBot vs GrokBot: Local or Cloud Teammates?",
+      description:
+        "A practical comparison of OpenBot and Grok Bot: where agents work, which providers they use, and how their teams coordinate.",
+      publishedAt: "2026-09-24",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "introducing-openbot",
       title: "Introducing OpenBot: A Shared Workspace for AI Agents",
       description:
