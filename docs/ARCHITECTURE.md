@@ -926,10 +926,12 @@ no Import section and no Team API route. The format is `openbot-import.json` plu
 folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
 reads it; both are a product contract, so add only optional fields and raise `version` for a change
 of meaning. The renderer never names a path: `agent-import:choose` opens the dialog in main, and
-`AgentImportService` keeps the checked export under a single-use token. `stage` measures entries
-without inflating them and rejects paths that `isUnsafeArchivePath` in `skill-package.ts` refuses.
-`apply` creates each agent through `AgentService` and publishes skills through the local skill
-library; an agent whose step fails is deleted, and the others continue. No schema change is needed.
+`AgentImportService` keeps the checked export and its SHA-256 under a single-use token; `apply`
+refuses a file that changed. `stage` measures entries without inflating them and rejects paths that
+`isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` checks all
+skills of an agent, creates it through `AgentService` and publishes skills through the local skill
+library; an agent whose step fails is deleted with the skill revisions it published, and the others
+continue. No schema change is needed.
 
 ## Storage and files
 

@@ -196,9 +196,34 @@ describe("AgentImportService", () => {
     ],
     ["a path out of the folder", { "../escape.txt": encode("x") }, "unsafe file: ../escape.txt"],
     ["a nested archive", { "agents/research/files/old.zip": encode("x") }, "unsafe file"],
+    [
+      "a path on another drive",
+      { "agents/research/files/D:/escape.txt": encode("x") },
+      "unsafe file: agents/research/files/D:/escape.txt",
+    ],
   ])("rejects an export with %s", async (_label, extra, message) => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]), ...extra });
     await expect(service.stage(path)).rejects.toThrow(message);
+  });
+
+  it("imports an export that lists its folders as entries", async () => {
+    const path = await exportFile({
+      "openbot-import.json": manifest([manifestAgent("research", { files: "agents/research/files" })]),
+      "agents/research/files/": new Uint8Array(),
+      "agents/research/files/plan.md": encode("# Plan"),
+    });
+    const preview = await service.stage(path);
+    const result = await service.apply({ token: preview.token, keys: ["research"] });
+    expect(result.skipped).toEqual([]);
+    expect(await readFile(join(result.agents[0]?.workspacePath ?? "", "imported/plan.md"), "utf8")).toBe("# Plan");
+  });
+
+  it("rejects an export that changed after the preview", async () => {
+    const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) });
+    const preview = await service.stage(path);
+    await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]), "extra.txt": encode("x") });
+    await expect(service.apply({ token: preview.token, keys: ["research"] })).rejects.toThrow("changed");
+    expect(agents).toEqual([]);
   });
 
   it("rejects a manifest it cannot read", async () => {
@@ -248,9 +273,10 @@ describe("AgentImportService", () => {
   it("removes an agent whose skill fails and imports the others", async () => {
     const path = await exportFile({
       "openbot-import.json": manifest([
-        manifestAgent("broken", { skills: ["agents/broken/skills/bad"] }),
+        manifestAgent("broken", { skills: ["agents/broken/skills/good", "agents/broken/skills/bad"] }),
         manifestAgent("research"),
       ]),
+      "agents/broken/skills/good/SKILL.md": encode(SKILL),
       "agents/broken/skills/bad/SKILL.md": encode("No frontmatter."),
     });
     const preview = await service.stage(path);
@@ -260,6 +286,20 @@ describe("AgentImportService", () => {
       { key: "broken", name: "Broken", reason: "SKILL.md must begin with YAML frontmatter." },
     ]);
     expect(agents.map((agent) => agent.name)).toEqual(["Research"]);
+    expect(await library.list()).toEqual([]);
+  });
+
+  it("removes the skill revision a failed import published", async () => {
+    const files = {
+      "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
+      "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
+    };
+    const first = await service.stage(await exportFile(files, "first.zip"));
+    await service.apply({ token: first.token, keys: ["research"] });
+    installLocal.mockRejectedValueOnce(new Error("Install failed."));
+    const second = await service.stage(await exportFile(files, "second.zip"));
+    expect((await service.apply({ token: second.token, keys: ["research"] })).skipped).toHaveLength(1);
+    expect((await library.list()).map((skill) => skill.version)).toEqual([1]);
   });
 
   it("accepts a token once, and not after it is discarded", async () => {

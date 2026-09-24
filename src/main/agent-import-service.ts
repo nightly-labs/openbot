@@ -5,9 +5,9 @@
 // Each agent is created through the same services the user reaches by hand. When one step fails,
 // that agent is deleted and reported, and the other agents continue.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { AVATAR_MIME_TYPES, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -21,6 +21,7 @@ import {
   type CreateRoutineInput,
 } from "@openbot/contracts/ipc";
 import { unzipSync, zipSync } from "fflate";
+import { isPathInside } from "../backend/path-containment";
 import { AGENT_IMPORT_MANIFEST, decodeImportManifest, type ImportAgent } from "./agent-import-manifest";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
@@ -46,7 +47,7 @@ export interface AgentImportAgents {
 }
 
 export interface AgentImportSkills {
-  library(): Pick<LocalSkillLibrary, "list" | "create" | "revise">;
+  library(): Pick<LocalSkillLibrary, "list" | "create" | "revise" | "withdraw">;
   installLocal(input: { agentId: string; skillId: string; revision: number }): Promise<unknown>;
 }
 
@@ -56,6 +57,8 @@ interface StagedEntry {
 
 interface StagedImport {
   path: string;
+  /** The archive `apply` reads must be the one the preview checked. */
+  sha256: string;
   agents: ImportAgent[];
   wrapper: string;
   avatars: Map<string, AvatarImageInput>;
@@ -101,7 +104,7 @@ export class AgentImportService {
     }
 
     const token = randomUUID();
-    this.#staged = { token, value: { path, agents: manifest.agents, wrapper, avatars } };
+    this.#staged = { token, value: { path, sha256: sha256(bytes), agents: manifest.agents, wrapper, avatars } };
     return {
       token,
       sourceApp: manifest.sourceApp,
@@ -141,9 +144,9 @@ export class AgentImportService {
       throw new Error(`A server can have at most ${INPUT_LIMITS.agents} agents.`);
 
     // The archive is read again rather than held since `stage`: an export can be hundreds of MB.
-    // The file can change in between, so its limits are checked again.
+    // The file can change in between, so only the same bytes are accepted.
     const bytes = await readArchive(staged.path);
-    listEntries(bytes);
+    if (sha256(bytes) !== staged.sha256) throw new Error("The export changed after it was checked. Choose it again.");
     const imported: AgentSummary[] = [];
     const skipped: AgentImportSkipped[] = [];
     const warnings: string[] = [];
@@ -163,6 +166,18 @@ export class AgentImportService {
     source: ImportAgent,
     warnings: string[],
   ): Promise<AgentSummary> {
+    const prefix = `${staged.wrapper}agents/${source.key}/`;
+    const files = extract(bytes, (name) => name.startsWith(prefix));
+    const read = (path: string) =>
+      Object.entries(files)
+        .filter(([name]) => name.startsWith(`${staged.wrapper}${path}/`))
+        .map(([name, data]) => [name.slice(staged.wrapper.length + path.length + 1), data] as const);
+    // Every skill is checked before the agent exists, so a bad one publishes nothing.
+    const skills = source.skills.map((skill) => {
+      const skillFiles = read(skill);
+      return { files: skillFiles, slug: inspectArchive(zipSync(Object.fromEntries(skillFiles))).slug };
+    });
+
     let agent = await this.agents.createAgentProfile({
       name: source.name,
       ...(source.title ? { title: source.title } : {}),
@@ -170,29 +185,22 @@ export class AgentImportService {
       avatarSeed: `${source.key}-${randomUUID()}`,
       avatarHue: null,
     });
+    const published: Array<{ id: string; revision: number }> = [];
     try {
-      const prefix = `${staged.wrapper}agents/${source.key}/`;
-      const files = extract(bytes, (name) => name.startsWith(prefix));
-      const read = (path: string) =>
-        Object.entries(files)
-          .filter(([name]) => name.startsWith(`${staged.wrapper}${path}/`))
-          .map(([name, data]) => [name.slice(staged.wrapper.length + path.length + 1), data] as const);
-
       if (source.files) await writeTree(join(agent.workspacePath, IMPORTED_FILES), read(source.files));
-      for (const skill of source.skills) {
-        const skillFiles = read(skill);
-        const { slug } = inspectArchive(zipSync(Object.fromEntries(skillFiles)));
-        const folder = `${SKILL_STAGING}/${slug}`;
+      for (const skill of skills) {
+        const folder = `${SKILL_STAGING}/${skill.slug}`;
         const target = join(agent.workspacePath, ...folder.split("/"));
         try {
-          await writeTree(target, skillFiles);
+          await writeTree(target, skill.files);
           // An earlier import published this skill already: a new revision keeps one library entry.
           const library = this.skills.library();
-          const current = (await library.list()).find((candidate) => candidate.slug === slug);
-          const published = current
+          const current = (await library.list()).find((candidate) => candidate.slug === skill.slug);
+          const revision = current
             ? await library.revise(agent.id, current.id, current.version, folder)
             : await library.create(agent.id, folder);
-          await this.skills.installLocal({ agentId: agent.id, skillId: published.id, revision: published.version });
+          published.push({ id: revision.id, revision: revision.version });
+          await this.skills.installLocal({ agentId: agent.id, skillId: revision.id, revision: revision.version });
         } finally {
           await rm(target, { recursive: true, force: true });
         }
@@ -220,6 +228,12 @@ export class AgentImportService {
       return agent;
     } catch (error) {
       await this.agents.deleteAgent(agent.id).catch(() => undefined);
+      // A failed import leaves the shared library as it was.
+      for (const skill of published.reverse())
+        await this.skills
+          .library()
+          .withdraw(skill.id, skill.revision)
+          .catch(() => undefined);
       throw error;
     }
   }
@@ -240,9 +254,9 @@ function listEntries(bytes: Uint8Array): Map<string, StagedEntry> {
   try {
     unzipSync(bytes, {
       filter: (file) => {
-        if (file.name.endsWith("/")) return false;
         const name = file.name.replaceAll("\\", "/");
-        if (isUnsafeArchivePath(name)) throw new UnsafeEntry(name);
+        if (name.endsWith("/")) return false;
+        if (isUnsafeEntry(name)) throw new UnsafeEntry(name);
         expanded += file.originalSize;
         if (entries.size >= AGENT_IMPORT_LIMITS.files || expanded > AGENT_IMPORT_LIMITS.archiveBytes)
           throw new UnsafeEntry(null);
@@ -263,9 +277,20 @@ function listEntries(bytes: Uint8Array): Map<string, StagedEntry> {
   return entries;
 }
 
+/** Inflates the file entries `include` names. A directory entry is never inflated. */
 function extract(bytes: Uint8Array, include: (name: string) => boolean): Record<string, Uint8Array> {
-  const raw = unzipSync(bytes, { filter: (file) => include(file.name.replaceAll("\\", "/")) });
+  const raw = unzipSync(bytes, {
+    filter: (file) => {
+      const name = file.name.replaceAll("\\", "/");
+      return !name.endsWith("/") && include(name);
+    },
+  });
   return Object.fromEntries(Object.entries(raw).map(([name, data]) => [name.replaceAll("\\", "/"), data]));
+}
+
+/** A segment such as `D:` names another Windows drive, so `resolve` would leave the target folder. */
+function isUnsafeEntry(name: string): boolean {
+  return isUnsafeArchivePath(name) || name.split("/").some((part) => /^[a-z]:/iu.test(part));
 }
 
 class UnsafeEntry extends Error {
@@ -290,13 +315,16 @@ async function writeTree(root: string, files: ReadonlyArray<readonly [string, Ui
   const base = resolve(root);
   for (const [name, data] of files) {
     const target = resolve(base, name);
-    const inside = relative(base, target);
-    if (!inside || inside.startsWith("..") || isUnsafeArchivePath(inside.split(sep).join("/")))
+    if (isAbsolute(name) || isUnsafeEntry(name) || target === base || !isPathInside(base, target))
       throw new Error(`The export contains an unsafe file: ${name}`);
     await mkdir(dirname(target), { recursive: true });
     // `wx` refuses to replace a file, so an entry can never overwrite what is already there.
     await writeFile(target, data, { flag: "wx" });
   }
+}
+
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function avatarImage(bytes: Uint8Array | undefined): AvatarImageInput | null {
