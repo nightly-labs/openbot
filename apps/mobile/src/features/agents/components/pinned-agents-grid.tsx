@@ -15,7 +15,8 @@ import { useAgentContextMenu } from "@/features/agents/components/agent-context-
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
-import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
+import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
@@ -54,9 +55,8 @@ export function PinnedAgentsGrid({ agents, children }: PropsWithChildren<{ agent
 
 function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const [background, accent] = useThemeColor(["background", "accent"]);
-  const { unreadAgentIds } = useMobileWorkspace();
   const agentContextMenu = useAgentContextMenu(agent);
-  const isUnread = unreadAgentIds.includes(agent.id);
+  const isUnread = useAgentUnread(agent.id);
 
   return (
     <PinnedChatItem>

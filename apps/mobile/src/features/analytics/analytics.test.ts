@@ -2,6 +2,7 @@ import { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileChannelStore } from "../channels/model/channel-store";
 import { MobileConversationStore } from "../workspace/model/conversation-store";
+import { LiveWorkspaceStore } from "../workspace/model/live-workspace-store";
 import type { MobileWorkspaceContextValue } from "../workspace/model/workspace-types";
 import { MobileAnalytics, type MobileAnalyticsClient } from "./analytics-core";
 import { MobileConnectionAnalytics } from "./connection";
@@ -352,7 +353,6 @@ it("instruments message commands without sending their contents or changing the 
   };
   const sendMessage = vi.fn(async () => "message-receipt");
   const workspace: MobileWorkspaceContextValue = {
-    browserRequests: {},
     respondToBrowserTakeover: async () => undefined,
     respondToBrowserSecret: async () => undefined,
     sidebarByServer: {},
@@ -376,8 +376,7 @@ it("instruments message commands without sending their contents or changing the 
     hideChannel: () => true,
     unhideChannel: () => true,
     toggleChannelPin: () => "pinned",
-    unreadAgentIds: [],
-    activityByServer: {},
+    liveState: new LiveWorkspaceStore(),
     serverDirectoryState: "ready",
     serverDirectoryError: null,
     teamDirectory: new RemoteTeamDirectoryClient({ apiUrl: "https://example.com", token: "test", fetch }),

@@ -30,6 +30,7 @@ import { ChannelHistoryRefreshError, MobileChannelStore } from "../../channels/m
 import { ChannelActionsScreen } from "../../channels/screens/channel-actions-screen";
 import { ChannelFormScreen } from "../../channels/screens/channel-form-screen";
 import { ChatHeader } from "../../chat/components/chat-header";
+import { LiveWorkspaceStore } from "../../workspace/model/live-workspace-store";
 import { saveAgentRecord } from "../../workspace/model/save-agent-record";
 import { mobileSidebarItems } from "../../workspace/model/sidebar-layout";
 import type { MobileAgent, MobileServer } from "../../workspace/model/workspace-types";
@@ -154,13 +155,12 @@ const workspace = {
   agents: [original],
   servers: [host],
   activeServer: host,
-  activityByServer: {},
+  liveState: new LiveWorkspaceStore(),
   pinnedAgentIds: [],
   pinnedChannelIds: [],
   hiddenAgents,
   hiddenChannelIds,
   unhideChannel: vi.fn((_id: string, _serverId: string) => true),
-  unreadAgentIds: [],
   createAgent: vi.fn(async (_input: CreateAgentInput) => {}),
   updateAgent: vi.fn(async (input: UpdateAgentInput, _serverId?: string) => {
     const [agent] = workspace.agents;
