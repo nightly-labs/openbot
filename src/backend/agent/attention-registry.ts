@@ -73,6 +73,7 @@ interface PendingApproval {
 }
 
 interface PendingBrowserTakeover {
+  client: AgentClient;
   secret?: PreparedBrowserSecret;
   submitting?: boolean;
   params: DynamicToolCallParams;
@@ -434,7 +435,7 @@ export class AttentionRegistry {
     this.#emit({ type: "approval", approval });
   }
 
-  surfaceBrowserTakeover(request: AppServerRequest): Promise<DynamicToolResult> {
+  surfaceBrowserTakeover(client: AgentClient, request: AppServerRequest): Promise<DynamicToolResult> {
     if (!isDynamicToolCall(request.params)) return Promise.resolve(browserTakeoverError());
     const params = request.params;
     const { threadId, turnId } = params;
@@ -467,7 +468,7 @@ export class AttentionRegistry {
       tabId,
     };
     return new Promise((resolve) => {
-      const pending: PendingBrowserTakeover = { params, request: takeover, resolve };
+      const pending: PendingBrowserTakeover = { client, params, request: takeover, resolve };
       this.#takeovers.set(requestId, pending);
       // The card is only shown once the tab has actually been handed over -- references invalidated,
       // diagnostics cleared, any recording stopped. Asking the user for control OpenBot then failed to
@@ -679,8 +680,10 @@ export class AttentionRegistry {
     }
   }
 
-  clearBrowserTakeovers(): void {
+  /** Cancels the takeovers of one lost provider client, or of all clients when none is given. */
+  clearBrowserTakeovers(client?: AgentClient): void {
     for (const [requestId, pending] of this.#takeovers) {
+      if (client && pending.client !== client) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
   }
