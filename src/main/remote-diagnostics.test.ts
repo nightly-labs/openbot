@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 /** Pipes chunks through one process stream into the log, as the runtimes do, and reads the file. */
-async function logOf(chunks: string[]): Promise<string> {
+async function logOf(chunks: Array<string | Buffer>): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "openbot-remote-diagnostics-"));
   roots.push(root);
   const stream = new PassThrough();
@@ -31,18 +31,35 @@ async function logOf(chunks: string[]): Promise<string> {
 
 describe("remote diagnostic log", () => {
   it("redacts a credential split across chunks and keeps a last line without a newline", async () => {
-    const log = await logOf(["starting stream api_key=sk-live-", "0123456789abcdef for owner@example.com\n", "fatal"]);
+    const name = Buffer.from("Zażółć\n");
+    const log = await logOf([
+      "starting stream api_key=sk-live-",
+      "0123456789abcdef for owner@example.com\n",
+      "pairing token 3f9a1c77b2e04d11\n",
+      name.subarray(0, 3),
+      name.subarray(3),
+      "fatal",
+    ]);
 
     expect(log).toContain("starting stream");
+    expect(log).toContain("Zażółć\n");
     expect(log).toContain("fatal\n");
     expect(log).not.toContain("0123456789abcdef");
     expect(log).not.toContain("owner@example.com");
+    expect(log).not.toContain("3f9a1c77b2e04d11");
   });
 
   it("drops the rest of an overlong line instead of writing it unredacted", async () => {
-    const log = await logOf(["x".repeat(8_010), "api_key=sk-live-", "0123456789abcdef\n", "next line\n"]);
+    const log = await logOf([
+      "x".repeat(8_010),
+      "api_key=sk-live-",
+      "0123456789abcdef\n",
+      `${"a ".repeat(3_987)}X-OpenBot-Remote-0123456789abcdef\n`,
+      "next line\n",
+    ]);
 
     expect(log).not.toContain("0123456789abcdef");
+    expect(log).not.toContain("X-OpenBot-Remote-");
     expect(log).toContain("next line\n");
   });
 });
