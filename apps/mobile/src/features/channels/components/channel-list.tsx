@@ -1,10 +1,12 @@
 import { type MenuComponentRef, MenuView } from "@expo/ui/community/menu";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
+import { userErrorMessage } from "@openbot/user-errors";
 import * as Clipboard from "expo-clipboard";
+import * as Crypto from "expo-crypto";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { memo, useRef } from "react";
-import { View } from "react-native";
+import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
@@ -31,14 +33,17 @@ export const ChannelListRow = memo(function ChannelListRow({
   agents: ReadonlyMap<string, MobileAgent>;
   pinned?: boolean;
 }) {
-  const { pinnedAgentIds, pinnedChannelIds, hideChannel, servers } = useMobileWorkspace();
+  const { pinnedAgentIds, pinnedChannelIds, hideChannel, servers, channelStore } = useMobileWorkspace();
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const { theme } = useUniwind();
   const menu = useRef<MenuComponentRef>(null);
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = pinnedChannelIds.includes(channel.id);
   const canPin = canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id);
-  const disconnected = !servers.some((server) => server.id === serverId && server.state === "online");
+  const server = servers.find((candidate) => candidate.id === serverId);
+  const disconnected = server?.state !== "online";
+  const canDelete = !disconnected && server?.role !== "member" && !channel.archived;
+  const deleting = useRef(false);
   const togglePin = (withHaptic = true) => {
     toggleChannelPinAnimated(channel, serverId, { haptic: withHaptic });
   };
@@ -47,6 +52,34 @@ export const ChannelListRow = memo(function ChannelListRow({
   };
   const info = () =>
     router.push({ pathname: "/channel-info/[channelId]", params: { channelId: channel.id, serverId } });
+  const remove = () =>
+    Alert.alert(
+      `Delete ${channel.name}?`,
+      "This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore it. Agents are kept.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            if (deleting.current) return;
+            deleting.current = true;
+            channelStore
+              .command(serverId, { type: "archive", operationId: Crypto.randomUUID(), channelId: channel.id })
+              .then(() => haptics.notification())
+              .catch((cause: unknown) =>
+                Alert.alert(
+                  "Could not delete channel",
+                  userErrorMessage(cause, "Could not delete this channel. Try again."),
+                ),
+              )
+              .finally(() => {
+                deleting.current = false;
+              });
+          },
+        },
+      ],
+    );
   const copyId = () => {
     void Clipboard.setStringAsync(channel.id).then(() => haptics.notification());
   };
@@ -148,6 +181,11 @@ export const ChannelListRow = memo(function ChannelListRow({
           <Link.MenuAction icon="doc.on.doc" onPress={copyId}>
             Copy ID
           </Link.MenuAction>
+          {canDelete ? (
+            <Link.MenuAction destructive icon="trash" onPress={remove}>
+              Delete
+            </Link.MenuAction>
+          ) : null}
         </Link.Menu>
       ) : null}
     </Link>
@@ -163,6 +201,7 @@ export const ChannelListRow = memo(function ChannelListRow({
         { id: "hide", title: "Hide" },
         { id: "info", title: "Info" },
         { id: "copy", title: "Copy ID" },
+        { id: "delete", title: "Delete", attributes: { destructive: true, hidden: !canDelete } },
       ]}
       onPressAction={({ nativeEvent }) => {
         sectionMenu.onAction(nativeEvent.event);
@@ -170,6 +209,7 @@ export const ChannelListRow = memo(function ChannelListRow({
         if (nativeEvent.event === "hide") hide();
         if (nativeEvent.event === "info") info();
         if (nativeEvent.event === "copy") copyId();
+        if (nativeEvent.event === "delete") remove();
       }}
     >
       {link}

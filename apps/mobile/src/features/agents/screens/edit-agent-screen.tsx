@@ -22,7 +22,17 @@ type AgentEdits = Pick<
   "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "provider" | "model" | "reasoningEffort"
 >;
 
-type AgentPage = "info" | "appearance" | "usage" | "memories" | "routines" | "runtime" | "memory" | "routine";
+type AgentPage =
+  | "info"
+  | "appearance"
+  | "usage"
+  | "memories"
+  | "skills"
+  | "files"
+  | "routines"
+  | "runtime"
+  | "memory"
+  | "routine";
 
 export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
   const { agentId, serverId } = useLocalSearchParams<{ agentId: string; serverId?: string }>();
@@ -73,7 +83,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
     (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort);
   const valid =
     page !== "info" ||
-    (Boolean(name.trim() && description.trim()) &&
+    (Boolean(name.trim()) &&
       name.length <= INPUT_LIMITS.agentName &&
       title.length <= INPUT_LIMITS.agentTitle &&
       description.length <= INPUT_LIMITS.agentDescription);
@@ -172,6 +182,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
           <SheetFormField
             label="Title"
             appearance="soft"
+            placeholder="Describe what your agent does"
             maxLength={INPUT_LIMITS.agentTitle}
             value={title}
             editable={!saving}
@@ -180,6 +191,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
           <SheetFormField
             label="Instructions"
             appearance="soft"
+            placeholder="What this agent is for"
             multiline
             maxLength={INPUT_LIMITS.agentDescription}
             value={description}
@@ -225,13 +237,14 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
           onChange={change}
         />
       ) : null}
-      {page === "usage" || page === "memories" || page === "routines" || page === "memory" || page === "routine" ? (
+      {page === "usage" ||
+      page === "memories" ||
+      page === "skills" ||
+      page === "files" ||
+      page === "routines" ||
+      page === "memory" ||
+      page === "routine" ? (
         <AgentInformation agent={agent} available={available} section={page} />
-      ) : null}
-      {!valid ? (
-        <Typography.Paragraph accessibilityRole="alert">
-          Enter a name and instructions within the character limits.
-        </Typography.Paragraph>
       ) : null}
       {!available ? (
         <Typography.Paragraph>
@@ -273,6 +286,26 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
               }
             >
               <Typography.Paragraph>Memories</Typography.Paragraph>
+            </SettingsRow>
+            <SettingsRow
+              onPress={() =>
+                router.push({
+                  pathname: "/agent-info/[agentId]/skills",
+                  params: { agentId: agent.id, serverId: agent.serverId },
+                })
+              }
+            >
+              <Typography.Paragraph>Skills</Typography.Paragraph>
+            </SettingsRow>
+            <SettingsRow
+              onPress={() =>
+                router.push({
+                  pathname: "/agent-info/[agentId]/files",
+                  params: { agentId: agent.id, serverId: agent.serverId },
+                })
+              }
+            >
+              <Typography.Paragraph>Files</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
               onPress={() =>

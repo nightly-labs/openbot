@@ -15,14 +15,21 @@ export function createWorkspacePreferences(
 ) {
   const scope = remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]));
   const key = (hostId: string) => `openbot.workspace.v1.${scope}.${remoteHostFingerprint(hostId)}`;
+  // This store is the only writer of its keys, so a value read or written once stays current. Mobile
+  // reads preferences for each delivered message, and each storage read is a synchronous Keychain call.
+  const cache = new Map<string, RemoteWorkspacePreferences>();
   return {
     read(hostId: string): RemoteWorkspacePreferences {
+      const cached = cache.get(hostId);
+      if (cached) return cached;
       const stored = storage.get(key(hostId));
-      if (!stored) return { hidden: [], pinned: [] };
-      return decodePreferences(JSON.parse(stored));
+      const value = stored ? decodePreferences(JSON.parse(stored)) : { hidden: [], pinned: [] };
+      cache.set(hostId, value);
+      return value;
     },
     write(hostId: string, value: RemoteWorkspacePreferences): void {
       storage.set(key(hostId), JSON.stringify({ version: 1, ...value }));
+      cache.set(hostId, value);
     },
   };
 }

@@ -197,7 +197,7 @@ it.each(["foreground", "manual"])(
         for (const listener of native.listeners) listener("active");
       });
     } else await act(async () => current.refreshServer(host.hostId));
-    expect(current.activityByServer[host.hostId]).toEqual({
+    expect(current.liveState.get().activityByServer[host.hostId]).toEqual({
       working: { turnId: "running-turn", phase: "working", detail: null },
       waiting: { turnId: "waiting-turn", phase: "waiting", detail: null },
     });
@@ -218,7 +218,7 @@ it.each(["foreground", "manual"])(
       },
     };
     await act(async () => disconnect());
-    expect(current.activityByServer[host.hostId]).toEqual({});
+    expect(current.liveState.get().activityByServer[host.hostId]).toEqual({});
   },
 );
 

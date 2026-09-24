@@ -919,6 +919,25 @@ The desktop chart adapts Zaidan's chart and interactive area composition. The pi
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
+## Agent import
+
+Server Settings > Import moves agents from a `.zip` export into the local host only; a remote host has
+no Import section and no Team API route. The format is `openbot-import.json` plus `agents/<key>/`
+folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
+reads it; both are a product contract, so add only optional fields and raise `version` for a change
+of meaning. The renderer never names a path: `agent-import:choose` opens the dialog in main, and
+`AgentImportService` keeps the checked export and its SHA-256 under a single-use token; `apply`
+refuses a file that changed. `stage` measures entries without inflating them and rejects paths that
+`isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` checks all
+skills of an agent, creates it through `AgentService` and publishes skills through the local skill
+library; an agent whose step fails is deleted with the skill revisions it published, and the others
+continue. An optional `channels` list carries Grok Bot group chats. After the agents, each selected
+channel is created through `ChannelService.command` as the local user (`host.channelActor()`), with
+the members and lead mapped to the new agent ids; a channel needs one imported member, and one whose
+memory step fails is deleted. Step 1 offers two ways to add the export agent: its Grok Bot link, or the skill set up by hand.
+`agent-import:read-skill` and `agent-import:save-skill` give that skill from the app's resources
+(`extraResources` in `electron-builder.yml`); main opens the save dialog, so the renderer names no path. No schema change is needed.
+
 ## Storage and files
 
 Three surfaces show what a host keeps on disk: Server Settings > Storage (scope `host`), Agent

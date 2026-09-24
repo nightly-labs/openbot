@@ -130,6 +130,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "opencode-auth" &&
     input !== "feedback" &&
     input !== "message" &&
+    input !== "grok-bot-export" &&
     input !== "mac-screen-recording"
   ) {
     throw new Error("Unknown external destination.");
