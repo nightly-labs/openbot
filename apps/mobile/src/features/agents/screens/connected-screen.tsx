@@ -256,7 +256,7 @@ export function ConnectedScreen() {
           removeClippedSubviews={false}
           className="flex-1 bg-background"
           alwaysBounceVertical={false}
-          contentContainerClassName={items.length > 0 ? "pb-safe-offset-8 pt-3" : "grow pb-safe-offset-8 pt-3"}
+          contentContainerClassName={items.length > 0 ? "pb-safe-offset-4" : "grow pb-safe-offset-4"}
           // Keep the native header inset even when short content cannot scroll or bounce.
           contentInsetAdjustmentBehavior="always"
           data={items}

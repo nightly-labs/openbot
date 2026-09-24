@@ -12,8 +12,8 @@
   --color-grouped-secondary: var(--openbot-text-grouped-secondary);
   --color-grouped-border: var(--openbot-border-grouped);
   --radius-grouped: var(--openbot-radius-grouped);
-  --color-canvas: var(--openbot-bg-canvas);
-  --color-sidebar: var(--openbot-bg-sidebar);
+  --color-canvas: var(--openbot-bg-native-canvas);
+  --color-sidebar: var(--openbot-bg-native-sidebar);
   --color-control: var(--openbot-bg-control);
   --color-control-active: var(--openbot-bg-control-active);
   --color-raised: var(--openbot-bg-surface-raised);
@@ -50,8 +50,13 @@
   :root {
     color-scheme: light dark;
 
+    /* uniwind reads theme values only from @variant blocks, so a plain :root alias
+     * loses to HeroUI's own near-black dark --background. */
+    @variant dark {
+      --background: var(--openbot-bg-native-canvas);
+    }
+
     /* HeroUI consumes these aliases; OpenBot tokens remain the source of truth. */
-    --background: var(--openbot-bg-canvas);
     --foreground: var(--openbot-text-primary);
     --surface: var(--openbot-bg-surface);
     --surface-foreground: var(--openbot-text-primary);
