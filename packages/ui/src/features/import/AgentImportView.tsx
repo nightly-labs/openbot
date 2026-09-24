@@ -1,4 +1,9 @@
-import type { AgentImportPreview, AgentImportPreviewAgent, AgentImportResult } from "@openbot/contracts/ipc";
+import type {
+  AgentImportPreview,
+  AgentImportPreviewAgent,
+  AgentImportPreviewChannel,
+  AgentImportResult,
+} from "@openbot/contracts/ipc";
 import {
   Button,
   Checkbox,
@@ -9,6 +14,7 @@ import {
   ExternalLink,
   File,
   FolderOpen,
+  Hash,
   Info,
   SlidingTabs,
   Tooltip,
@@ -48,7 +54,7 @@ export interface AgentImportViewProps {
   onOpenExportAgent: () => void;
   onSaveExportSkill: () => void;
   onChoose: () => void;
-  onImport: (keys: string[]) => void;
+  onImport: (keys: string[], channelKeys: string[]) => void;
   onCancel: () => void;
   /** Done on the result: the import is over, so the settings it ran in close. */
   onDone: () => void;
@@ -234,7 +240,7 @@ function ImportReview(props: {
   error?: string | null;
   now?: Date;
   onChoose: () => void;
-  onImport: (keys: string[]) => void;
+  onImport: (keys: string[], channelKeys: string[]) => void;
   onCancel: () => void;
 }) {
   const headingId = `agent-import-${createUniqueId()}`;
@@ -253,6 +259,25 @@ function ImportReview(props: {
     else next.add(key);
     setExcluded(next);
   };
+  // A channel imports with the members that are selected, and needs at least one of them.
+  const [excludedChannels, setExcludedChannels] = createSignal<ReadonlySet<string>>(new Set());
+  const agentsByKey = createMemo(() => new Map(props.preview.agents.map((agent) => [agent.key, agent])));
+  const selectedMembers = (channel: AgentImportPreviewChannel) =>
+    channel.memberKeys.filter((key) => !excluded().has(key));
+  const importable = (channel: AgentImportPreviewChannel) => selectedMembers(channel).length > 0;
+  const selectedChannels = createMemo(() =>
+    props.preview.channels.filter((channel) => importable(channel) && !excludedChannels().has(channel.key)),
+  );
+  const toggleChannel = (key: string, include: boolean) => {
+    const next = new Set(excludedChannels());
+    if (include) next.delete(key);
+    else next.add(key);
+    setExcludedChannels(next);
+  };
+  const importLabel = () =>
+    selectedChannels().length > 0
+      ? `Import ${countLabel(selected().length, "agent")} and ${countLabel(selectedChannels().length, "channel")}`
+      : `Import ${countLabel(selected().length, "agent")}`;
 
   return (
     <>
@@ -328,6 +353,56 @@ function ImportReview(props: {
         </ul>
       </section>
 
+      <Show when={props.preview.channels.length > 0}>
+        <section class="storage-section" aria-labelledby={`${headingId}-channels`}>
+          <div class="storage-section-heading-row">
+            <h3 id={`${headingId}-channels`} class="storage-section-heading">
+              Channels
+            </h3>
+            <span class="storage-section-aside">
+              {selectedChannels().length} of {props.preview.channels.length} selected
+            </span>
+          </div>
+          <ul class="storage-rows">
+            <For each={props.preview.channels}>
+              {(channel) => (
+                <li>
+                  <label class="storage-row agent-import-row" for={`${headingId}-channel-${channel.key}`}>
+                    <Checkbox
+                      id={`${headingId}-channel-${channel.key}`}
+                      checked={importable(channel) && !excludedChannels().has(channel.key)}
+                      disabled={props.importing || !importable(channel)}
+                      aria-label={`Import ${channel.name}`}
+                      onChange={(event) => toggleChannel(channel.key, event.currentTarget.checked)}
+                    />
+                    <span class="agent-import-members" aria-hidden="true">
+                      <For each={channel.memberKeys.slice(0, 3)}>
+                        {(key) => (
+                          <AgentAvatar
+                            seed={key}
+                            url={agentsByKey().get(key)?.avatarUrl ?? null}
+                            class="agent-import-member-avatar"
+                          />
+                        )}
+                      </For>
+                    </span>
+                    <span class="storage-row-copy">
+                      <span class="storage-row-title">{channel.name}</span>
+                      <span class="storage-row-meta">{channelContentsLabel(channel)}</span>
+                      <ChannelMemberNote
+                        channel={channel}
+                        selectedMembers={selectedMembers(channel)}
+                        agentsByKey={agentsByKey()}
+                      />
+                    </span>
+                  </label>
+                </li>
+              )}
+            </For>
+          </ul>
+        </section>
+      </Show>
+
       <div class="agent-import-actions">
         <Button type="button" variant="ghost" disabled={props.importing} onClick={() => props.onCancel()}>
           Cancel
@@ -337,12 +412,38 @@ function ImportReview(props: {
           disabled={selected().length === 0 || props.reading}
           loading={props.importing}
           loadingLabel="Importing…"
-          onClick={() => props.onImport(selected().map((agent) => agent.key))}
+          onClick={() =>
+            props.onImport(
+              selected().map((agent) => agent.key),
+              selectedChannels().map((channel) => channel.key),
+            )
+          }
         >
-          Import {countLabel(selected().length, "agent")}
+          {importLabel()}
         </Button>
       </div>
     </>
+  );
+}
+
+/** Which members stay out: an agent that is not selected is not in the channel after import. */
+function ChannelMemberNote(props: {
+  channel: AgentImportPreviewChannel;
+  selectedMembers: string[];
+  agentsByKey: ReadonlyMap<string, AgentImportPreviewAgent>;
+}) {
+  const missing = () =>
+    props.channel.memberKeys
+      .filter((key) => !props.selectedMembers.includes(key))
+      .map((key) => props.agentsByKey.get(key)?.name ?? key);
+  return (
+    <Show when={missing().length > 0}>
+      <span class="agent-import-row-note">
+        {props.selectedMembers.length === 0
+          ? "Select at least one of its agents to import it."
+          : `Imports without ${missing().join(", ")}.`}
+      </span>
+    </Show>
   );
 }
 
@@ -367,6 +468,14 @@ function ImportResult(props: {
   onDone: () => void;
 }) {
   const headingId = `agent-import-${createUniqueId()}`;
+  const notImported = () => props.result.skipped.length + props.result.skippedChannels.length;
+  const notImportedLabel = () =>
+    [
+      props.result.skipped.length > 0 ? countLabel(props.result.skipped.length, "agent") : null,
+      props.result.skippedChannels.length > 0 ? countLabel(props.result.skippedChannels.length, "channel") : null,
+    ]
+      .filter(Boolean)
+      .join(" and ");
   return (
     <>
       <section class="storage-summary" aria-labelledby={`${headingId}-summary`}>
@@ -377,14 +486,16 @@ function ImportResult(props: {
           <Show when={props.result.agents.length > 0}>
             <CircleCheck class="agent-import-done-icon" aria-hidden="true" />
           </Show>
-          {countLabel(props.result.agents.length, "agent")} imported
+          {props.result.channels.length > 0
+            ? `${countLabel(props.result.agents.length, "agent")} and ${countLabel(props.result.channels.length, "channel")} imported`
+            : `${countLabel(props.result.agents.length, "agent")} imported`}
         </p>
-        <Show when={props.result.skipped.length > 0}>
-          <p class="storage-summary-caption">{countLabel(props.result.skipped.length, "agent")} did not import.</p>
+        <Show when={notImported() > 0}>
+          <p class="storage-summary-caption">{notImportedLabel()} did not import.</p>
         </Show>
       </section>
 
-      <Show when={props.result.agents.length > 0}>
+      <Show when={props.result.agents.length + props.result.channels.length > 0}>
         <section class="storage-section" aria-labelledby={`${headingId}-imported`}>
           <h3 id={`${headingId}-imported`} class="storage-section-heading">
             Imported
@@ -412,17 +523,28 @@ function ImportResult(props: {
                 </li>
               )}
             </For>
+            <For each={props.result.channels}>
+              {(channel) => (
+                <li class="storage-row agent-import-row">
+                  <Hash class="agent-import-channel-icon" aria-hidden="true" />
+                  <span class="storage-row-copy">
+                    <span class="storage-row-title">{channel.name}</span>
+                    <span class="storage-row-meta">Channel</span>
+                  </span>
+                </li>
+              )}
+            </For>
           </ul>
         </section>
       </Show>
 
-      <Show when={props.result.skipped.length > 0}>
+      <Show when={notImported() > 0}>
         <section class="storage-section" aria-labelledby={`${headingId}-skipped`}>
           <h3 id={`${headingId}-skipped`} class="storage-section-heading">
             Not imported
           </h3>
           <ul class="storage-rows">
-            <For each={props.result.skipped}>
+            <For each={[...props.result.skipped, ...props.result.skippedChannels]}>
               {(entry) => (
                 <li class="storage-row agent-import-row">
                   <TriangleAlert class="storage-message-icon agent-import-skipped-icon" aria-hidden="true" />
@@ -484,6 +606,14 @@ function contentsLabel(agent: AgentImportPreviewAgent): string {
   ];
   if (agent.fileCount > 0) parts.push(countLabel(agent.fileCount, "file"));
   return parts.join(" · ");
+}
+
+function channelContentsLabel(channel: AgentImportPreviewChannel): string {
+  return [
+    countLabel(channel.memberKeys.length, "agent"),
+    countLabel(channel.routineCount, "routine"),
+    countLabel(channel.memoryCount, "memory", "memories"),
+  ].join(" · ");
 }
 
 function countLabel(count: number, singular: string, plural = `${singular}s`): string {

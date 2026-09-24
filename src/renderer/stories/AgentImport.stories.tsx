@@ -38,6 +38,8 @@ const viewArgs = (overrides: Partial<ViewArgs> = {}): ViewArgs => ({
 const RESULT: AgentImportResult = {
   agents: STORY_AGENT_SUMMARIES.slice(0, 2),
   skipped: [],
+  channels: [{ id: "channel-pipeline", name: "Pipeline review" }],
+  skippedChannels: [],
   warnings: [],
 };
 
@@ -97,9 +99,15 @@ export const Review: Story = {
     return <Stage args={viewArgs({ phase: "review", preview: AGENT_IMPORT_PREVIEW, onImport })} />;
   },
   play: async ({ canvas }) => {
+    await expect(canvas.getByRole("button", { name: "Import 3 agents and 2 channels" })).toBeEnabled();
     await userEvent.click(canvas.getByRole("checkbox", { name: "Import Sales Outbound" }));
-    await expect(canvas.getByText("2 of 3 selected")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Import 2 agents" })).toBeEnabled();
+    await userEvent.click(canvas.getByRole("checkbox", { name: "Import Research" }));
+    await expect(canvas.getByText("1 of 3 selected")).toBeVisible();
+    // A channel keeps the members that stay selected, and needs one of them.
+    await expect(canvas.getByRole("checkbox", { name: "Import Pipeline review" })).toBeDisabled();
+    await expect(canvas.getByText("Select at least one of its agents to import it.")).toBeVisible();
+    await expect(canvas.getByText("Imports without Research, Sales Outbound.")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Import 1 agent and 1 channel" })).toBeEnabled();
   },
 };
 
@@ -137,6 +145,8 @@ export const PartlyDone: Story = {
         result: {
           agents: STORY_AGENT_SUMMARIES.slice(0, 1),
           skipped: [{ key: "inbox", name: "Inbox Triage", reason: "SKILL.md must begin with YAML frontmatter." }],
+          channels: [],
+          skippedChannels: [{ key: "desk", name: "Front desk", reason: "None of its agents were imported." }],
           warnings: ["Research: routine “Hourly price check” is skipped. The schedule runs too often."],
         },
       })}

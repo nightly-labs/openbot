@@ -2181,14 +2181,46 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     storage: createMockStorage(),
     agentImport: {
       choose: async () => clone(AGENT_IMPORT_PREVIEW),
-      apply: async ({ token, keys }) => {
+      apply: async ({ token, keys, channelKeys }) => {
         if (token !== AGENT_IMPORT_PREVIEW.token) throw new Error("The export is no longer open. Choose it again.");
-        const imported = AGENT_IMPORT_PREVIEW.agents
-          .filter((agent) => keys.includes(agent.key))
-          .map((agent) => createAgentSummary({ name: agent.name, title: agent.title, description: agent.description }));
+        const selected = AGENT_IMPORT_PREVIEW.agents.filter((agent) => keys.includes(agent.key));
+        const imported = selected.map((agent) =>
+          createAgentSummary({ name: agent.name, title: agent.title, description: agent.description }),
+        );
         agents = [...agents, ...imported];
         emitAgentEvent({ type: "agents-changed", agents });
-        return clone({ agents: imported, skipped: [], warnings: [] });
+        // Channels follow the main process: the members that imported, and at least one of them.
+        const agentIds = new Map(selected.map((agent, index) => [agent.key, imported[index]?.id ?? ""]));
+        const channels = [];
+        const skippedChannels = [];
+        for (const source of AGENT_IMPORT_PREVIEW.channels.filter((channel) => channelKeys.includes(channel.key))) {
+          const members = source.memberKeys.flatMap((key) => {
+            const agentId = agentIds.get(key);
+            return agentId ? [{ agentId }] : [];
+          });
+          if (members.length === 0) {
+            skippedChannels.push({
+              key: source.key,
+              name: source.name,
+              reason: "None of its agents were imported.",
+            });
+            continue;
+          }
+          const channel = await api.agent.channelCommand({
+            type: "save",
+            operationId: crypto.randomUUID(),
+            channelId: crypto.randomUUID(),
+            draft: {
+              name: source.name,
+              title: source.title,
+              instructions: "",
+              members,
+              leadAgentId: source.leadKey ? (agentIds.get(source.leadKey) ?? null) : null,
+            },
+          });
+          channels.push({ id: channel.id, name: channel.name });
+        }
+        return clone({ agents: imported, skipped: [], channels, skippedChannels, warnings: [] });
       },
       discard: async () => undefined,
       readSkill: async () => AGENT_IMPORT_SKILL,

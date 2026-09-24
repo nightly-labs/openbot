@@ -48,6 +48,26 @@ export const AGENT_IMPORT_PREVIEW: AgentImportPreview = {
       nameExists: true,
     },
   ],
+  channels: [
+    {
+      key: "pipeline",
+      name: "Pipeline review",
+      title: "Weekly deal review",
+      memberKeys: ["research", "sales"],
+      leadKey: "sales",
+      memoryCount: 4,
+      routineCount: 1,
+    },
+    {
+      key: "desk",
+      name: "Front desk",
+      title: "",
+      memberKeys: ["research", "inbox", "sales"],
+      leadKey: null,
+      memoryCount: 0,
+      routineCount: 0,
+    },
+  ],
   warnings: [],
 };
 

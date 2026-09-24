@@ -93,7 +93,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
     }
   };
 
-  const apply = async (keys: string[]) => {
+  const apply = async (keys: string[], channelKeys: string[]) => {
     const preview = state.preview;
     if (!preview) return;
     setState((draft) => {
@@ -101,7 +101,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
       draft.error = null;
     });
     try {
-      const result = await window.openbot.agentImport.apply({ token: preview.token, keys });
+      const result = await window.openbot.agentImport.apply({ token: preview.token, keys, channelKeys });
       show({ phase: "done", error: null, preview: null, result });
     } catch (error) {
       // The token is spent either way, so the user chooses the export again.
@@ -126,7 +126,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
       onOpenExportAgent={() => void window.openbot.openExternal("grok-bot-export")}
       onSaveExportSkill={() => void saveSkill()}
       onChoose={() => void choose()}
-      onImport={(keys) => void apply(keys)}
+      onImport={(keys, channelKeys) => void apply(keys, channelKeys)}
       onCancel={reset}
       onDone={() => {
         reset();

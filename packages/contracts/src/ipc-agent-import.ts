@@ -2,8 +2,8 @@
  * Agent import: agents exported from another app as one `.zip`, read by the local host.
  *
  * The main process reads and checks the archive, keeps it under a token, and answers a preview.
- * The renderer never receives a path or the archive bytes: it names the token and the agents to
- * import. Import goes to the local host only.
+ * The renderer never receives a path or the archive bytes: it names the token and the agents and
+ * channels to import. Import goes to the local host only.
  */
 
 import { INPUT_LIMITS } from "./input-limits";
@@ -17,6 +17,8 @@ export const AGENT_IMPORT_LIMITS = {
   /** One key names one agent in the archive: lowercase letters, digits and hyphens. */
   key: 64,
   sourceApp: 64,
+  /** Group chats in one export. Each becomes a channel. */
+  channels: 100,
   message: 500,
   warnings: 200,
 } as const;
@@ -37,17 +39,31 @@ export interface AgentImportPreviewAgent {
   nameExists: boolean;
 }
 
+/** A group chat in the export. Its members are agent keys of the same export. */
+export interface AgentImportPreviewChannel {
+  key: string;
+  name: string;
+  title: string;
+  memberKeys: string[];
+  /** One of `memberKeys`, or null when the group chat has no lead. */
+  leadKey: string | null;
+  memoryCount: number;
+  routineCount: number;
+}
+
 export interface AgentImportPreview {
   token: string;
   sourceApp: string;
   exportedAt: string | null;
   agents: AgentImportPreviewAgent[];
+  channels: AgentImportPreviewChannel[];
   warnings: string[];
 }
 
 export interface ApplyAgentImportInput {
   token: string;
   keys: string[];
+  channelKeys: string[];
 }
 
 export interface AgentImportSkipped {
@@ -59,7 +75,15 @@ export interface AgentImportSkipped {
 export interface AgentImportResult {
   agents: AgentSummary[];
   skipped: AgentImportSkipped[];
+  channels: AgentImportChannel[];
+  skippedChannels: AgentImportSkipped[];
   warnings: string[];
+}
+
+/** A channel the import created. */
+export interface AgentImportChannel {
+  id: string;
+  name: string;
 }
 
 function invalid(label: string): never {
@@ -101,7 +125,52 @@ export function parseApplyAgentImportInput(value: unknown): ApplyAgentImportInpu
     new Set(input.keys).size !== input.keys.length
   )
     invalid("agent selection");
-  return { token: input.token, keys: input.keys };
+  if (!isKeyList(input.channelKeys, AGENT_IMPORT_LIMITS.channels)) invalid("channel selection");
+  return { token: input.token, keys: input.keys, channelKeys: input.channelKeys };
+}
+
+function isKeyList(value: unknown, maximum: number): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= maximum &&
+    value.every(isAgentImportKey) &&
+    new Set(value).size === value.length
+  );
+}
+
+function decodePreviewChannel(value: unknown): AgentImportPreviewChannel {
+  const channel = record(value, "imported channel");
+  if (
+    !isAgentImportKey(channel.key) ||
+    !isBoundedString(channel.name, INPUT_LIMITS.agentName) ||
+    !isBoundedString(channel.title, INPUT_LIMITS.agentTitle) ||
+    !isKeyList(channel.memberKeys, INPUT_LIMITS.agents) ||
+    (channel.leadKey !== null && !(isString(channel.leadKey) && channel.memberKeys.includes(channel.leadKey)))
+  )
+    invalid("imported channel");
+  return {
+    key: channel.key,
+    name: channel.name,
+    title: channel.title,
+    memberKeys: channel.memberKeys,
+    leadKey: channel.leadKey,
+    memoryCount: count(channel.memoryCount, "imported channel"),
+    routineCount: count(channel.routineCount, "imported channel"),
+  };
+}
+
+function decodeSkipped(value: unknown, label: string): AgentImportSkipped[] {
+  if (!Array.isArray(value)) invalid("import result");
+  return value.map((item): AgentImportSkipped => {
+    const entry = record(item, label);
+    if (
+      !isAgentImportKey(entry.key) ||
+      !isBoundedString(entry.name, INPUT_LIMITS.agentName) ||
+      !isBoundedString(entry.reason, AGENT_IMPORT_LIMITS.message)
+    )
+      invalid(label);
+    return { key: entry.key, name: entry.name, reason: entry.reason };
+  });
 }
 
 function decodePreviewAgent(value: unknown): AgentImportPreviewAgent {
@@ -138,7 +207,9 @@ export function decodeAgentImportPreview(value: unknown): AgentImportPreview | n
     !isBoundedString(preview.sourceApp, AGENT_IMPORT_LIMITS.sourceApp) ||
     !isNullableBoundedString(preview.exportedAt, 64) ||
     !Array.isArray(preview.agents) ||
-    preview.agents.length > INPUT_LIMITS.agents
+    preview.agents.length > INPUT_LIMITS.agents ||
+    !Array.isArray(preview.channels) ||
+    preview.channels.length > AGENT_IMPORT_LIMITS.channels
   )
     invalid("import preview");
   return {
@@ -146,6 +217,7 @@ export function decodeAgentImportPreview(value: unknown): AgentImportPreview | n
     sourceApp: preview.sourceApp,
     exportedAt: preview.exportedAt,
     agents: preview.agents.map(decodePreviewAgent),
+    channels: preview.channels.map(decodePreviewChannel),
     warnings: messages(preview.warnings, "import warnings"),
   };
 }
@@ -153,16 +225,17 @@ export function decodeAgentImportPreview(value: unknown): AgentImportPreview | n
 export function decodeAgentImportResult(value: unknown): AgentImportResult {
   const result = record(value, "import result");
   if (!Array.isArray(result.agents) || !result.agents.every(isAgentSummary)) invalid("import result");
-  if (!Array.isArray(result.skipped)) invalid("import result");
-  const skipped = result.skipped.map((item): AgentImportSkipped => {
-    const entry = record(item, "skipped agent");
-    if (
-      !isAgentImportKey(entry.key) ||
-      !isBoundedString(entry.name, INPUT_LIMITS.agentName) ||
-      !isBoundedString(entry.reason, AGENT_IMPORT_LIMITS.message)
-    )
-      invalid("skipped agent");
-    return { key: entry.key, name: entry.name, reason: entry.reason };
+  if (!Array.isArray(result.channels)) invalid("import result");
+  const channels = result.channels.map((item): AgentImportChannel => {
+    const entry = record(item, "imported channel");
+    if (!isIdentifier(entry.id) || !isBoundedString(entry.name, INPUT_LIMITS.agentName)) invalid("imported channel");
+    return { id: entry.id, name: entry.name };
   });
-  return { agents: result.agents, skipped, warnings: messages(result.warnings, "import warnings") };
+  return {
+    agents: result.agents,
+    skipped: decodeSkipped(result.skipped, "skipped agent"),
+    channels,
+    skippedChannels: decodeSkipped(result.skippedChannels, "skipped channel"),
+    warnings: messages(result.warnings, "import warnings"),
+  };
 }

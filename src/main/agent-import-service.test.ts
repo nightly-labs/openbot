@@ -4,6 +4,9 @@ import { join } from "node:path";
 import {
   type AgentSummary,
   type AvatarImageInput,
+  type Channel,
+  type CreateChannelMemoryInput,
+  type CreateChannelRoutineInput,
   type CreateRoutineInput,
   decodeAgentImportPreview,
 } from "@openbot/contracts/ipc";
@@ -21,6 +24,10 @@ let agents: AgentSummary[];
 let routines: CreateRoutineInput[];
 let memories: Array<{ agentId: string; text: string }>;
 let avatars: Map<string, AvatarImageInput | null>;
+let channels: Channel[];
+let channelMemories: CreateChannelMemoryInput[];
+let channelRoutines: CreateChannelRoutineInput[];
+let failChannelMemory: boolean;
 let installLocal: Mock<(input: { agentId: string; skillId: string; revision: number }) => Promise<void>>;
 let library: LocalSkillLibrary;
 let service: AgentImportService;
@@ -55,7 +62,10 @@ async function exportFile(files: Record<string, Uint8Array>, name = "export.zip"
   return path;
 }
 
-function manifest(agentList: ReturnType<typeof manifestAgent>[], extra: { version?: number } = {}): Uint8Array {
+function manifest(
+  agentList: ReturnType<typeof manifestAgent>[],
+  extra: { version?: number; channels?: unknown[] } = {},
+): Uint8Array {
   return encode({
     format: "openbot-agent-import",
     version: 1,
@@ -71,6 +81,10 @@ beforeEach(async () => {
   routines = [];
   memories = [];
   avatars = new Map();
+  channels = [];
+  channelMemories = [];
+  channelRoutines = [];
+  failChannelMemory = false;
   installLocal = vi.fn(async () => undefined);
   library = new LocalSkillLibrary(join(root, "library"), () => agents);
   service = new AgentImportService(
@@ -113,8 +127,31 @@ beforeEach(async () => {
       deleteAgent: async (agentId) => {
         agents = agents.filter((agent) => agent.id !== agentId);
       },
+      channels: {
+        command: async (command) => {
+          if (command.type !== "save") throw new Error("Unexpected channel command.");
+          const channel: Channel = {
+            ...command.draft,
+            id: command.channelId,
+            archived: false,
+            revision: 1,
+            createdAt: "2026-09-24T10:00:00.000Z",
+          };
+          channels.push(channel);
+          return channel;
+        },
+      },
+      createChannelMemory: (input) => {
+        if (failChannelMemory) throw new Error("A channel can have up to 32 memories.");
+        channelMemories.push(input);
+      },
+      createChannelRoutine: (input) => channelRoutines.push(input),
+      deleteChannel: async (channelId) => {
+        channels = channels.filter((channel) => channel.id !== channelId);
+      },
     },
     { library: () => library, installLocal },
+    () => ({ id: "local", name: "You" }),
     () => "Europe/Warsaw",
   );
 });
@@ -162,7 +199,7 @@ describe("AgentImportService", () => {
       }),
     ]);
 
-    const result = await service.apply({ token: preview.token, keys: ["research"] });
+    const result = await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] });
     expect(result.skipped).toEqual([]);
     const [agent] = result.agents;
     expect(agent).toMatchObject({ name: "Research", title: "Analyst", description: "You are research." });
@@ -184,7 +221,7 @@ describe("AgentImportService", () => {
       await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) }, "b.zip"),
     );
     expect(first.agents[0]?.nameExists).toBe(false);
-    await service.apply({ token: first.token, keys: ["research"] });
+    await service.apply({ token: first.token, keys: ["research"], channelKeys: [] });
 
     const again = await service.stage(
       await exportFile(
@@ -200,6 +237,131 @@ describe("AgentImportService", () => {
     expect(again.warnings).toEqual([]);
   });
 
+  describe("group chats", () => {
+    const desk = (overrides: { key?: string; members?: string[]; lead?: string | null } = {}) => ({
+      key: "desk",
+      name: "Tennis desk",
+      title: "Match previews",
+      instructions: "Agree on one pick per match.",
+      members: ["gauff", "iga", "wta"],
+      lead: "iga",
+      memories: ["The user bets in EUR."],
+      routines: [{ name: "Daily pick", instruction: "Post today's pick.", schedule: { kind: "daily", time: "09:00" } }],
+      ...overrides,
+    });
+    const agentsOf = (channel: Channel | undefined) =>
+      channel?.members.map((member) => agents.find((agent) => agent.id === member.agentId)?.name);
+    const nameOf = (agentId: string | null | undefined) => agents.find((agent) => agent.id === agentId)?.name;
+    const exportWith = (channelList: unknown[], name = "export.zip") =>
+      exportFile(
+        {
+          "openbot-import.json": manifest([manifestAgent("gauff"), manifestAgent("iga"), manifestAgent("wta")], {
+            channels: channelList,
+          }),
+        },
+        name,
+      );
+
+    it("imports a group chat as a channel with its lead, memories and routines", async () => {
+      const preview = await service.stage(await exportWith([desk()]));
+      expect(decodeAgentImportPreview(preview)?.channels).toEqual([
+        {
+          key: "desk",
+          name: "Tennis desk",
+          title: "Match previews",
+          memberKeys: ["gauff", "iga", "wta"],
+          leadKey: "iga",
+          memoryCount: 1,
+          routineCount: 1,
+        },
+      ]);
+
+      const result = await service.apply({
+        token: preview.token,
+        keys: ["gauff", "iga", "wta"],
+        channelKeys: ["desk"],
+      });
+      expect(result.skippedChannels).toEqual([]);
+      const [channel] = channels;
+      expect(result.channels).toEqual([{ id: channel?.id, name: "Tennis desk" }]);
+      expect(channel).toMatchObject({
+        name: "Tennis desk",
+        title: "Match previews",
+        instructions: "Agree on one pick per match.",
+      });
+      expect(agentsOf(channel)).toEqual(["Gauff", "Iga", "Wta"]);
+      expect(nameOf(channel?.leadAgentId)).toBe("Iga");
+      expect(channelMemories).toEqual([{ channelId: channel?.id, text: "The user bets in EUR." }]);
+      expect(channelRoutines).toEqual([
+        expect.objectContaining({
+          channelId: channel?.id,
+          name: "Daily pick",
+          timezone: "Europe/Warsaw",
+          active: true,
+        }),
+      ]);
+    });
+
+    it("imports a channel with the agents that imported, even one, and skips one with none", async () => {
+      const first = await service.stage(await exportWith([desk()], "first.zip"));
+      const result = await service.apply({ token: first.token, keys: ["gauff", "wta"], channelKeys: ["desk"] });
+      expect(agentsOf(channels[0])).toEqual(["Gauff", "Wta"]);
+      expect(channels[0]?.leadAgentId).toBeNull();
+      expect(result.warnings).toEqual([expect.stringContaining("its lead was not imported")]);
+
+      // A group chat with one other agent is still a channel, as OpenBot allows.
+      const second = await service.stage(
+        await exportWith([desk(), desk({ key: "pair", members: ["iga", "wta"], lead: null })], "second.zip"),
+      );
+      const alone = await service.apply({ token: second.token, keys: ["gauff"], channelKeys: ["desk", "pair"] });
+      expect(alone.channels).toEqual([{ id: channels[1]?.id, name: "Tennis desk" }]);
+      expect(agentsOf(channels[1])).toEqual(["Gauff"]);
+      expect(alone.skippedChannels).toEqual([
+        { key: "pair", name: "Tennis desk", reason: "None of its agents were imported." },
+      ]);
+      expect(channels).toHaveLength(2);
+    });
+
+    it("removes a channel whose step fails and keeps its agents", async () => {
+      failChannelMemory = true;
+      const preview = await service.stage(await exportWith([desk()]));
+      const result = await service.apply({
+        token: preview.token,
+        keys: ["gauff", "iga", "wta"],
+        channelKeys: ["desk"],
+      });
+      expect(result.agents).toHaveLength(3);
+      expect(result.skippedChannels).toEqual([
+        { key: "desk", name: "Tennis desk", reason: "A channel can have up to 32 memories." },
+      ]);
+      expect(channels).toEqual([]);
+    });
+
+    it("leaves out members that are not in the export and rejects a repeated key", async () => {
+      const preview = await service.stage(
+        await exportWith([
+          desk({ members: ["gauff", "ghost", "iga"], lead: "ghost" }),
+          desk({ key: "pair", members: ["wta", "ghost"], lead: null }),
+          desk({ key: "empty", members: ["ghost"], lead: null }),
+        ]),
+      );
+      expect(preview.channels.map((channel) => [channel.key, channel.memberKeys, channel.leadKey])).toEqual([
+        ["desk", ["gauff", "iga"], null],
+        ["pair", ["wta"], null],
+      ]);
+      expect(preview.warnings).toEqual([
+        "Tennis desk: members that are not agents in this export are left out.",
+        "Tennis desk: the lead is not a member, so the channel has no lead.",
+        "Tennis desk: members that are not agents in this export are left out.",
+        "Tennis desk: members that are not agents in this export are left out.",
+        "Tennis desk: the channel is skipped because none of its agents are in the export.",
+      ]);
+      await expect(service.stage(await exportWith([desk(), desk()], "twice.zip"))).rejects.toThrow(
+        'Two channels use the key "desk".',
+      );
+    });
+  });
+
   it("publishes a skill that an earlier import added as a new revision", async () => {
     const files = {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
@@ -207,7 +369,7 @@ describe("AgentImportService", () => {
     };
     for (const name of ["first.zip", "second.zip"]) {
       const preview = await service.stage(await exportFile(files, name));
-      expect((await service.apply({ token: preview.token, keys: ["research"] })).skipped).toEqual([]);
+      expect((await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] })).skipped).toEqual([]);
     }
     const skills = await library.list();
     expect(skills).toHaveLength(1);
@@ -239,7 +401,7 @@ describe("AgentImportService", () => {
       "agents/research/files/plan.md": encode("# Plan"),
     });
     const preview = await service.stage(path);
-    const result = await service.apply({ token: preview.token, keys: ["research"] });
+    const result = await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] });
     expect(result.skipped).toEqual([]);
     expect(await readFile(join(result.agents[0]?.workspacePath ?? "", "imported/plan.md"), "utf8")).toBe("# Plan");
   });
@@ -248,7 +410,9 @@ describe("AgentImportService", () => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) });
     const preview = await service.stage(path);
     await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]), "extra.txt": encode("x") });
-    await expect(service.apply({ token: preview.token, keys: ["research"] })).rejects.toThrow("changed");
+    await expect(service.apply({ token: preview.token, keys: ["research"], channelKeys: [] })).rejects.toThrow(
+      "changed",
+    );
     expect(agents).toEqual([]);
   });
 
@@ -291,7 +455,7 @@ describe("AgentImportService", () => {
     });
     const preview = await service.stage(path);
     expect(preview.warnings).toEqual([expect.stringContaining('routine "Broken" is skipped')]);
-    await service.apply({ token: preview.token, keys: ["research"] });
+    await service.apply({ token: preview.token, keys: ["research"], channelKeys: [] });
     expect(routines).toEqual([
       expect.objectContaining({
         name: "Every half hour",
@@ -311,7 +475,7 @@ describe("AgentImportService", () => {
       "agents/broken/skills/bad/SKILL.md": encode("No frontmatter."),
     });
     const preview = await service.stage(path);
-    const result = await service.apply({ token: preview.token, keys: ["broken", "research"] });
+    const result = await service.apply({ token: preview.token, keys: ["broken", "research"], channelKeys: [] });
     expect(result.agents.map((agent) => agent.name)).toEqual(["Research"]);
     expect(result.skipped).toEqual([
       { key: "broken", name: "Broken", reason: "SKILL.md must begin with YAML frontmatter." },
@@ -326,21 +490,25 @@ describe("AgentImportService", () => {
       "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
     };
     const first = await service.stage(await exportFile(files, "first.zip"));
-    await service.apply({ token: first.token, keys: ["research"] });
+    await service.apply({ token: first.token, keys: ["research"], channelKeys: [] });
     installLocal.mockRejectedValueOnce(new Error("Install failed."));
     const second = await service.stage(await exportFile(files, "second.zip"));
-    expect((await service.apply({ token: second.token, keys: ["research"] })).skipped).toHaveLength(1);
+    expect((await service.apply({ token: second.token, keys: ["research"], channelKeys: [] })).skipped).toHaveLength(1);
     expect((await library.list()).map((skill) => skill.version)).toEqual([1]);
   });
 
   it("accepts a token once, and not after it is discarded", async () => {
     const path = await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) });
     const used = await service.stage(path);
-    await service.apply({ token: used.token, keys: ["research"] });
-    await expect(service.apply({ token: used.token, keys: ["research"] })).rejects.toThrow("no longer open");
+    await service.apply({ token: used.token, keys: ["research"], channelKeys: [] });
+    await expect(service.apply({ token: used.token, keys: ["research"], channelKeys: [] })).rejects.toThrow(
+      "no longer open",
+    );
 
     const discarded = await service.stage(path);
     service.discard(discarded.token);
-    await expect(service.apply({ token: discarded.token, keys: ["research"] })).rejects.toThrow("no longer open");
+    await expect(service.apply({ token: discarded.token, keys: ["research"], channelKeys: [] })).rejects.toThrow(
+      "no longer open",
+    );
   });
 });

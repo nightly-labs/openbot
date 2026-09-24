@@ -43,8 +43,13 @@ beforeEach(async () => {
       createMemory: vi.fn(),
       setAvatar: vi.fn(),
       deleteAgent: vi.fn(),
+      channels: { command: vi.fn() },
+      createChannelMemory: vi.fn(),
+      createChannelRoutine: vi.fn(),
+      deleteChannel: vi.fn(),
     },
     { library: vi.fn(), installLocal: vi.fn() },
+    () => ({ id: "local", name: "You" }),
   );
   registerIpcGroup(
     "agentImport",
@@ -57,6 +62,20 @@ afterEach(async () => {
 });
 
 describe("agentImportIpcHandlers", () => {
+  it("refuses a channel selection it cannot read before the import starts", async () => {
+    const apply = async (payload: { channelKeys?: string[] }) =>
+      bound.get(IPC_ENDPOINTS.agentImport.apply.channel)?.(TRUSTED_EVENT, {
+        token: "token-1",
+        keys: ["research"],
+        ...payload,
+      });
+    await expect(apply({})).rejects.toThrow("Invalid channel selection.");
+    await expect(apply({ channelKeys: ["Not A Key"] })).rejects.toThrow("Invalid channel selection.");
+    await expect(apply({ channelKeys: ["desk", "desk"] })).rejects.toThrow("Invalid channel selection.");
+    // A readable selection reaches the service, which finds no open export.
+    await expect(apply({ channelKeys: ["desk"] })).rejects.toThrow("The export is no longer open.");
+  });
+
   it("answers the export skill's text", async () => {
     await expect(bound.get(IPC_ENDPOINTS.agentImport.readSkill.channel)?.(TRUSTED_EVENT)).resolves.toBe(SKILL);
   });

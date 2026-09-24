@@ -334,3 +334,30 @@ label.agent-import-row:has(input:disabled) {
 .agent-import-name-tooltip.ui-tooltip {
   z-index: calc(var(--openbot-layer-dialog) + 1);
 }
+
+/* A channel row shows up to three of its members, overlapped, where an agent row has one avatar. */
+.agent-import-members {
+  display: flex;
+  flex: none;
+  width: 44px;
+}
+
+.agent-import-member-avatar {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: var(--openbot-radius-pill);
+  box-shadow: 0 0 0 2px var(--openbot-bg-grouped);
+}
+
+.agent-import-member-avatar + .agent-import-member-avatar {
+  margin-left: -11px;
+}
+
+.agent-import-channel-icon {
+  width: 28px;
+  height: var(--openbot-icon-md);
+  flex: none;
+  color: var(--openbot-text-secondary);
+  stroke-width: var(--openbot-icon-stroke);
+}

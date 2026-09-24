@@ -3,7 +3,8 @@
 // `stage` reads only the manifest and the avatars and measures the other entries without
 // inflating them, so a large export previews quickly. `apply` inflates one agent at a time.
 // Each agent is created through the same services the user reaches by hand. When one step fails,
-// that agent is deleted and reported, and the other agents continue.
+// that agent is deleted and reported, and the other agents continue. Group chats become channels
+// after the agents, with the members that imported; a channel needs at least one, as in OpenBot.
 
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -12,17 +13,29 @@ import { AVATAR_MIME_TYPES, isValidAvatarImage } from "@openbot/contracts/avatar
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_IMPORT_LIMITS,
+  type AgentImportChannel,
   type AgentImportPreview,
   type AgentImportResult,
   type AgentImportSkipped,
   type AgentSummary,
   type ApplyAgentImportInput,
   type AvatarImageInput,
+  type Channel,
+  type ChannelCommand,
+  type ChannelDraft,
+  type CreateChannelMemoryInput,
+  type CreateChannelRoutineInput,
   type CreateRoutineInput,
+  isChannelDraft,
 } from "@openbot/contracts/ipc";
 import { unzipSync, zipSync } from "fflate";
 import { isPathInside } from "../backend/path-containment";
-import { AGENT_IMPORT_MANIFEST, decodeImportManifest, type ImportAgent } from "./agent-import-manifest";
+import {
+  AGENT_IMPORT_MANIFEST,
+  decodeImportManifest,
+  type ImportAgent,
+  type ImportChannel,
+} from "./agent-import-manifest";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
 
@@ -44,6 +57,16 @@ export interface AgentImportAgents {
   createMemory(input: { agentId: string; text: string }): unknown;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<AgentSummary>;
   deleteAgent(agentId: string): Promise<void>;
+  channels: { command(command: ChannelCommand, actor: ChannelActor): Promise<Channel> };
+  createChannelMemory(input: CreateChannelMemoryInput): unknown;
+  createChannelRoutine(input: CreateChannelRoutineInput): unknown;
+  deleteChannel(channelId: string): Promise<void>;
+}
+
+/** Who creates an imported channel: the local user, as when they create one by hand. */
+export interface ChannelActor {
+  id: string;
+  name: string;
 }
 
 export interface AgentImportSkills {
@@ -60,6 +83,7 @@ interface StagedImport {
   /** The archive `apply` reads must be the one the preview checked. */
   sha256: string;
   agents: ImportAgent[];
+  channels: ImportChannel[];
   wrapper: string;
   avatars: Map<string, AvatarImageInput>;
 }
@@ -70,6 +94,7 @@ export class AgentImportService {
   constructor(
     private readonly agents: AgentImportAgents,
     private readonly skills: AgentImportSkills,
+    private readonly channelActor: () => ChannelActor,
     private readonly timezone: () => string = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   ) {}
 
@@ -102,7 +127,10 @@ export class AgentImportService {
     }
 
     const token = randomUUID();
-    this.#staged = { token, value: { path, sha256: sha256(bytes), agents: manifest.agents, wrapper, avatars } };
+    this.#staged = {
+      token,
+      value: { path, sha256: sha256(bytes), agents: manifest.agents, channels: manifest.channels, wrapper, avatars },
+    };
     return {
       token,
       sourceApp: manifest.sourceApp,
@@ -124,6 +152,15 @@ export class AgentImportService {
           nameExists: existing.has(agent.name.toLowerCase()),
         };
       }),
+      channels: manifest.channels.map((channel) => ({
+        key: channel.key,
+        name: channel.name,
+        title: channel.title,
+        memberKeys: channel.members,
+        leadKey: channel.lead,
+        memoryCount: channel.memories.length,
+        routineCount: channel.routines.length,
+      })),
       warnings: bounded(warnings),
     };
   }
@@ -139,6 +176,9 @@ export class AgentImportService {
     const selected = staged.agents.filter((agent) => input.keys.includes(agent.key));
     if (selected.length !== input.keys.length)
       throw new Error("The selection names an agent that is not in the export.");
+    const selectedChannels = staged.channels.filter((channel) => input.channelKeys.includes(channel.key));
+    if (selectedChannels.length !== input.channelKeys.length)
+      throw new Error("The selection names a channel that is not in the export.");
     if (this.agents.listAgents().length + selected.length > INPUT_LIMITS.agents)
       throw new Error(`A server can have at most ${INPUT_LIMITS.agents} agents.`);
 
@@ -149,14 +189,73 @@ export class AgentImportService {
     const imported: AgentSummary[] = [];
     const skipped: AgentImportSkipped[] = [];
     const warnings: string[] = [];
+    const agentIds = new Map<string, string>();
     for (const agent of selected) {
       try {
-        imported.push(await this.importAgent(bytes, staged, agent, warnings));
+        const summary = await this.importAgent(bytes, staged, agent, warnings);
+        imported.push(summary);
+        agentIds.set(agent.key, summary.id);
       } catch (error) {
         skipped.push({ key: agent.key, name: agent.name, reason: message(error) });
       }
     }
-    return { agents: imported, skipped, warnings: bounded(warnings) };
+    const channels: AgentImportChannel[] = [];
+    const skippedChannels: AgentImportSkipped[] = [];
+    for (const channel of selectedChannels) {
+      try {
+        channels.push(await this.importChannel(channel, agentIds, warnings));
+      } catch (error) {
+        skippedChannels.push({ key: channel.key, name: channel.name, reason: message(error) });
+      }
+    }
+    return { agents: imported, skipped, channels, skippedChannels, warnings: bounded(warnings) };
+  }
+
+  private async importChannel(
+    source: ImportChannel,
+    agentIds: ReadonlyMap<string, string>,
+    warnings: string[],
+  ): Promise<AgentImportChannel> {
+    const members = source.members.flatMap((key) => {
+      const agentId = agentIds.get(key);
+      return agentId ? [{ agentId }] : [];
+    });
+    if (members.length === 0) throw new Error("None of its agents were imported.");
+    const leadAgentId = source.lead ? (agentIds.get(source.lead) ?? null) : null;
+    if (source.lead && !leadAgentId) warnings.push(`${source.name}: its lead was not imported, so it has no lead.`);
+    const draft: ChannelDraft = {
+      name: source.name,
+      title: source.title,
+      instructions: source.instructions,
+      members,
+      leadAgentId,
+    };
+    if (!isChannelDraft(draft)) throw new Error("The channel is invalid.");
+    const channel = await this.agents.channels.command(
+      { type: "save", operationId: randomUUID(), channelId: randomUUID(), draft },
+      this.channelActor(),
+    );
+    try {
+      for (const text of source.memories) this.agents.createChannelMemory({ channelId: channel.id, text });
+      for (const routine of source.routines) {
+        try {
+          this.agents.createChannelRoutine({
+            channelId: channel.id,
+            name: routine.name,
+            instruction: routine.instruction,
+            active: routine.active,
+            timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : this.timezone(),
+            schedule: routine.schedule,
+          });
+        } catch (error) {
+          warnings.push(`${source.name}: routine "${routine.name}" is skipped. ${message(error)}`);
+        }
+      }
+      return { id: channel.id, name: channel.name };
+    } catch (error) {
+      await this.agents.deleteChannel(channel.id).catch(() => undefined);
+      throw error;
+    }
   }
 
   private async importAgent(

@@ -1,6 +1,6 @@
 ---
 name: openbot-export
-description: Export the user's Grok Bot agents into one .zip file that OpenBot imports, with instructions, avatars, skills, routines, memories, and optional workspace files. Use when the user asks to export, move, or migrate their agents to OpenBot.
+description: Export the user's Grok Bot agents into one .zip file that OpenBot imports, with instructions, avatars, skills, routines, memories, group chats, and optional workspace files. Use when the user asks to export, move, or migrate their agents to OpenBot.
 example-prompt: Export my agents for OpenBot
 ---
 
@@ -24,16 +24,24 @@ file when the manifest is invalid, so follow the format below exactly.
    of the agent list and out of `openbot-import.json`, even when the user asks for all agents. Also
    leave this skill (`openbot-export`) out of every agent's skills.
 
+   Also list every group chat, where several agents talk together. OpenBot imports a group chat as a
+   channel. For each group chat, collect:
+   - name, one-line topic (title), and its shared instructions;
+   - the agents in it, and the lead agent if it has one;
+   - scheduled tasks of the group chat, as for agents;
+   - its messages: read them only to write memories (step 3).
+
    If you cannot read a part, tell the user what you could not export. Do not guess its contents.
 
-2. **Ask about files.** Show the list of agents and the total size of their workspace files. Ask:
-   "Include workspace files? (yes / no)". Also ask whether to export all agents or only some. Wait
-   for the answer before you continue.
+2. **Ask about files.** Show the list of agents, the group chats, and the total size of the
+   workspace files. Ask: "Include workspace files? (yes / no)". Also ask whether to export all agents
+   and group chats or only some. Wait for the answer before you continue. Export every group chat,
+   including one with only one other agent. Leave one out only when none of its agents are exported.
 
 3. **Write memories.** From each agent's chats, write at most 50 short facts that the agent must
    keep: user preferences, names, recurring tasks, decisions, and open work. One fact per memory,
    500 characters or fewer, written as a statement ("The user reports in EUR."). Do not copy
-   whole messages. Do not include secrets.
+   whole messages. Do not include secrets. For each group chat, write at most 32 facts the same way.
 
 4. **Remove secrets.** Do not export `.env` files, private keys, API keys, tokens, passwords, or
    cookies, in files or in instructions. Replace a secret in instructions with
@@ -48,8 +56,9 @@ file when the manifest is invalid, so follow the format below exactly.
    `~/Downloads/openbot-export-<YYYY-MM-DD>.zip`. The rename replaces an older export with the
    same name in one step, so OpenBot never reads a half-written file.
 
-7. **Tell the user**, only after the rename, the path, the number of agents, and anything you left out. Tell them to open
-   OpenBot, go to **Server settings → Import**, and choose the file.
+7. **Tell the user**, only after the rename, the path, the number of agents and group chats, and
+   anything you left out. Tell them to open OpenBot, go to **Server settings → Import**, and choose
+   the file.
 
 ## Format
 
@@ -92,9 +101,31 @@ agent must start with `agents/<key>/`.
       "memories": ["The user reports in EUR.", "Competitors to watch: Acme, Globex."],
       "files": "agents/research/files"
     }
+  ],
+  "channels": [
+    {
+      "key": "market-desk",
+      "name": "Market desk",
+      "title": "Weekly competitor review",
+      "instructions": "Research finds the news, Sales says what it means for open deals.",
+      "members": ["research", "sales-outbound"],
+      "lead": "research",
+      "routines": [
+        {
+          "name": "Friday review",
+          "instruction": "Review this week's competitor news and agree on three actions.",
+          "active": true,
+          "timezone": "Europe/Warsaw",
+          "schedule": { "kind": "weekly", "weekday": 5, "time": "15:00" }
+        }
+      ],
+      "memories": ["The user wants actions, not summaries."]
+    }
   ]
 }
 ```
+
+`channels` is optional. Leave it out, or use `[]`, when there are no group chats.
 
 Field rules:
 
@@ -108,6 +139,21 @@ Field rules:
 | `routines` | Up to 64. `name` is 80 characters or fewer. `instruction` is the prompt that runs. `timezone` is an IANA name, such as `America/New_York`. |
 | `memories` | Up to 64 strings, 500 characters or fewer each. |
 | `files` | Folder path or `null`. OpenBot copies it to `imported/` in the agent's workspace. |
+
+Channel field rules:
+
+| Field | Rule |
+| --- | --- |
+| `key` | Required. The same rules as an agent key, and unique among the channels. |
+| `name` | Required. 80 characters or fewer. |
+| `title` | Optional. 120 characters or fewer. |
+| `instructions` | Optional. The group chat's shared instructions, 2,000 characters or fewer. |
+| `members` | Required. The `key` of each agent in the group chat. Use only agents in this export, at least one. Count every agent in the group chat, including the agent it is named after. Never the agent that runs this skill. |
+| `lead` | Optional. The `key` of one member, or `null`. |
+| `routines` | Up to 64, in the same shape as agent routines. |
+| `memories` | Up to 32 strings, 500 characters or fewer each. |
+
+A channel has no folder in the archive. Up to 100 channels.
 
 The whole archive must be 500 MB and 5,000 files or fewer.
 
@@ -137,5 +183,8 @@ with an invalid schedule and tells the user; the rest of the agent still imports
 - [ ] Each skill folder has `SKILL.md` with frontmatter.
 - [ ] The agent that runs this skill is not in `openbot-import.json`.
 - [ ] No agent has an `openbot-export` skill folder.
+- [ ] Every group chat is in `channels`, unless none of its agents are exported.
+- [ ] Each channel has at least one `members` entry, each member is an agent `key` in this export, and
+      `lead` is one of the members or `null`.
 - [ ] No secrets, `.env` files, keys, nested archives, `.git`, or `node_modules`.
 - [ ] Workspace files are included only if the user said yes.

@@ -827,10 +827,6 @@ export async function createApplicationServices({
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
   const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);
-  const agentImport = new AgentImportService(service, {
-    library: () => skills.requireLocalLibrary(),
-    installLocal: (input) => skills.installLocal(input),
-  });
   const teamStore = new TeamStore(
     join(app.getPath("userData"), TEAM_FILE_V2),
     join(app.getPath("userData"), TEAM_FILE),
@@ -939,6 +935,15 @@ export async function createApplicationServices({
       return Promise.resolve(iceServers);
     },
   });
+  // Imported channels are created by the local user, as when they create one by hand.
+  const agentImport = new AgentImportService(
+    service,
+    {
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    () => host.channelActor(),
+  );
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => host.shutdown());
   const signedInState = centralAuth.getState();
   if (signedInState.status === "signed_in") {
