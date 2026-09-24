@@ -25,6 +25,7 @@ import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agen
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
+import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 
@@ -103,12 +104,12 @@ export function AgentListRow({
 }: AgentListRowProps) {
   const { theme } = useUniwind();
   const [background] = useThemeColor(["background"]);
-  const { unreadAgentIds, pinnedAgentIds, pinnedChannelIds } = useMobileWorkspace();
+  const { pinnedAgentIds, pinnedChannelIds } = useMobileWorkspace();
   const { startAgentNavigationAnimated, toggleAgentPinAnimated, transition } = useAgentPinTransition();
   const editMenu = useRef<MenuComponentRef>(null);
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const agentContextMenu = useAgentContextMenu(agent);
-  const isUnread = unreadAgentIds.includes(agent.id);
+  const isUnread = useAgentUnread(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const avatar = (
     <AgentPinAvatar agentId={agent.id} location={avatarLocation} size={54}>

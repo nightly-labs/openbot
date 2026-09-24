@@ -223,6 +223,10 @@ describe("remote connection recovery", () => {
       }),
     ).toEqual(["other-server", "new-reply"]);
   });
+  it("returns the current unread list when a read refresh changes nothing", () => {
+    const current = ["other-server", "unread"];
+    expect(mergeRemoteUnreadIds(current, { unread: { unreadCount: 2 }, read: { unreadCount: 0 } })).toBe(current);
+  });
   it("shows five attempts ten seconds apart, then a two-minute cooldown before restarting at one", async () => {
     vi.useFakeTimers();
     let desktopOnline = false;

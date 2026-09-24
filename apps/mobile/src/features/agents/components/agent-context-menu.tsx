@@ -5,25 +5,18 @@ import { useRef } from "react";
 import { Alert } from "react-native";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
+import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { haptics } from "@/shared/lib/haptics";
 
 export function useAgentContextMenu(agent: MobileAgent) {
-  const {
-    deleteAgent,
-    duplicateAgent,
-    hideAgent,
-    markAgentRead,
-    markAgentUnread,
-    pinnedAgentIds,
-    pinnedChannelIds,
-    unreadAgentIds,
-  } = useMobileWorkspace();
+  const { deleteAgent, duplicateAgent, hideAgent, markAgentRead, markAgentUnread, pinnedAgentIds, pinnedChannelIds } =
+    useMobileWorkspace();
   const { toggleAgentPinAnimated } = useAgentPinTransition();
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const isPinned = pinnedAgentIds.includes(agent.id);
-  const isUnread = unreadAgentIds.includes(agent.id);
+  const isUnread = useAgentUnread(agent.id);
   const actionPending = useRef(false);
 
   async function runAgentAction(action: "delete" | "duplicate"): Promise<void> {

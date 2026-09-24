@@ -273,14 +273,19 @@ export function createRemoteReadRefresh() {
   };
 }
 
-/** Merge one server/page's read state without clearing unrelated cached unread IDs. */
+/**
+ * Merge one server/page's read state without clearing unrelated cached unread IDs. An unchanged
+ * result returns `current`, so a state setter does not notify consumers for a read refresh that
+ * changed nothing.
+ */
 export function mergeRemoteUnreadIds(current: string[], reads: Record<string, { unreadCount: number }>): string[] {
-  return [
+  const next = [
     ...current.filter((id) => !(id in reads)),
     ...Object.entries(reads)
       .filter(([, state]) => state.unreadCount > 0)
       .map(([id]) => id),
   ];
+  return next.length === current.length && next.every((id, index) => id === current[index]) ? current : next;
 }
 
 /** Only conversations cached for agents in this server need recovery. */
