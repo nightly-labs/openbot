@@ -8,7 +8,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { constants } from "node:fs";
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
@@ -24,7 +24,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress, slugifyTeamServerName } from "@openbot/contracts/validation";
-import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { writeFileAtomically, writeJsonFileAtomically } from "../backend/atomic-json-file";
 
 const scrypt = promisify(scryptCallback);
 const INVITE_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -608,10 +608,7 @@ export class TeamStore {
     }
     const version = randomUUID();
     const target = join(this.#logoRoot, `${version}.${avatarFileExtension(image.mimeType)}`);
-    const temporary = `${target}.tmp`;
-    await mkdir(this.#logoRoot, { recursive: true, mode: 0o700 });
-    await writeFile(temporary, image.bytes, { mode: 0o600 });
-    await rename(temporary, target);
+    await writeFileAtomically(target, image.bytes, { createDirectory: true });
     return { version, mimeType: image.mimeType };
   }
 

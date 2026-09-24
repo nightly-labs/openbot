@@ -8,6 +8,7 @@ import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { errorMessage } from "@openbot/ui/error-message";
 import { desktopAnalytics } from "../../../analytics";
+import { writeClipboardText } from "../../../clipboard";
 import type { StoredQueueEdit } from "../composer-draft";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
@@ -80,18 +81,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
     const agentId = deps.props.agent?.id;
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const input = document.createElement("textarea");
-        input.value = text;
-        input.style.position = "fixed";
-        input.style.opacity = "0";
-        document.body.append(input);
-        input.select();
-        document.execCommand("copy");
-        input.remove();
-      }
+      await writeClipboardText(text);
       deps.setCopiedMessageId(message.id);
       window.setTimeout(() => {
         if (deps.copiedMessageId() === message.id) deps.setCopiedMessageId(null);

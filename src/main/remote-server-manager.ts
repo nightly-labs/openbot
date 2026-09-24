@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { basename } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
@@ -44,6 +45,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
+import { contentDispositionFileName } from "./content-disposition";
 import { decodeAgentSummary, decodeDraftAttachment, decodeDuplicateAgentResultFromHost } from "./remote-agent-decoding";
 import {
   decodeConversationPageFromHost,
@@ -995,11 +997,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }> {
     const server = this.#store.require(serverId);
     const response = await this.#client.fetch(server, new URL(TEAM_API_ROUTES.attachment(attachmentId), server.apiUrl));
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
     return {
       bytes: new Uint8Array(await response.arrayBuffer()),
-      name: encodedName ? decodeURIComponent(encodedName) : attachmentId,
+      name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
       mimeType: response.headers.get("content-type") ?? "application/octet-stream",
     };
   }
@@ -1012,11 +1012,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const url = new URL(TEAM_API_ROUTES.sharedFiles, server.apiUrl);
     url.searchParams.set("path", sharedPath);
     const response = await this.#client.fetch(server, url);
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
     return {
       bytes: new Uint8Array(await response.arrayBuffer()),
-      name: encodedName ? decodeURIComponent(encodedName) : "shared-file",
+      name: contentDispositionFileName(response.headers.get("content-disposition"), basename(sharedPath)),
     };
   }
 
@@ -1031,11 +1029,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     url.searchParams.set("botId", agentId);
     url.searchParams.set("path", workspacePath);
     const response = await this.#client.fetch(server, url);
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
     return {
       bytes: new Uint8Array(await response.arrayBuffer()),
-      name: encodedName ? decodeURIComponent(encodedName) : "workspace-file",
+      name: contentDispositionFileName(response.headers.get("content-disposition"), basename(workspacePath)),
     };
   }
 

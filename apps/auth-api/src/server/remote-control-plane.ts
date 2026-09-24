@@ -88,7 +88,9 @@ type RemoteAuthEvent =
   // Addressed to an account rather than to a host: the device that accepted an invitation already
   // knows, and the user's other devices are the ones with a stale server list. Signal forwards it
   // to every socket that account holds, and each of them re-reads `/v2/remote/hosts/` once.
-  | { type: "account-servers-changed"; userId: string };
+  | { type: "account-servers-changed"; userId: string }
+  // Addressed to an account: its other devices re-read the account profile.
+  | { type: "account-profile-changed"; userId: string };
 
 interface RemoteAuthEventRow {
   event_id: string;
@@ -977,11 +979,7 @@ export class RemoteControlPlane {
   }
 
   #authEventStatement(event: RemoteAuthEvent, now: number): D1PreparedStatement {
-    return this.#database
-      .prepare(
-        "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES (?, ?, ?, 0, ?)",
-      )
-      .bind(crypto.randomUUID(), JSON.stringify(event), now, now);
+    return authEventStatement(this.#database, event, now);
   }
 
   #authEpochEventStatement(hostId: string, now: number, ownerUserId?: string): D1PreparedStatement {
@@ -1013,12 +1011,17 @@ export async function notifyAccountProfileChanged(
 ): Promise<void> {
   if (!bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || !bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim()) return;
   const now = Date.now();
-  await bindings.DB.prepare(
-    "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES (?, ?, ?, 0, ?)",
-  )
-    .bind(crypto.randomUUID(), JSON.stringify({ type: "account-profile-changed", userId }), now, now)
-    .run();
+  await authEventStatement(bindings.DB, { type: "account-profile-changed", userId }, now).run();
   waitUntil(deliverPendingRemoteAuthEvents(bindings, now, fetcher));
+}
+
+/** Queues one event for Signal. `remote/api` decodes each event type with its own schema. */
+function authEventStatement(database: D1Database, event: RemoteAuthEvent, now: number): D1PreparedStatement {
+  return database
+    .prepare(
+      "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES (?, ?, ?, 0, ?)",
+    )
+    .bind(crypto.randomUUID(), JSON.stringify(event), now, now);
 }
 
 export async function deliverPendingRemoteAuthEvents(

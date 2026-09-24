@@ -53,6 +53,7 @@ import {
   untrack,
 } from "solid-js";
 import { appPort } from "../../app-port";
+import { writeClipboardText } from "../../clipboard";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
@@ -362,7 +363,12 @@ export function ChannelConversation() {
     );
     if (!text) return;
     setOpenMoreMessageId(null);
-    await navigator.clipboard.writeText(text);
+    try {
+      await writeClipboardText(text);
+    } catch {
+      // The copy button does not show "Copied", which tells the reader the copy failed.
+      return;
+    }
     setCopiedMessageId(message.id);
     window.setTimeout(() => {
       if (copiedMessageId() === message.id) setCopiedMessageId(null);

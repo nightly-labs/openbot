@@ -674,7 +674,7 @@ describe("remote server order", () => {
       return new Response(bytes, {
         status: 200,
         headers: {
-          "Content-Disposition": `attachment; filename*=UTF-8''${url.pathname.includes("workspace") ? "page.tsx" : "report.csv"}`,
+          "Content-Disposition": `attachment; filename*=UTF-8''${url.pathname.includes("workspace") ? "page%E0%A4%A.tsx" : "report.csv"}`,
         },
       });
     });
@@ -698,6 +698,7 @@ describe("remote server order", () => {
         bytes,
         name: "report.csv",
       });
+      // A name that is not valid percent-encoding does not fail a download that has its bytes.
       await expect(manager.downloadWorkspaceFile("chief", "app/page.tsx", serverId)).resolves.toEqual({
         bytes,
         name: "page.tsx",

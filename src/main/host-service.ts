@@ -83,7 +83,11 @@ interface HostServiceOptions {
   mailbox: ForwardedApiOptions["mailbox"];
   browser: ForwardedApiOptions["browser"];
   chat?: TeamChatStore;
-  allowLocalDevelopmentInvites?: boolean;
+  /**
+   * A local development host keeps its members and invitations in its own team file and never reads
+   * or writes them in the account directory.
+   */
+  localDevelopmentHost?: boolean;
   logDirectory?: string;
   removeLegacyRemoteDesktopCredential?: () => Promise<void>;
   getSignedInUser: () => CentralAuthUser;
@@ -148,8 +152,8 @@ interface HostServiceOptions {
 }
 
 export class HostService extends EventEmitter<HostEvents> {
-  readonly #options: Required<Pick<HostServiceOptions, "allowLocalDevelopmentInvites">> &
-    Omit<HostServiceOptions, "allowLocalDevelopmentInvites">;
+  readonly #options: Required<Pick<HostServiceOptions, "localDevelopmentHost">> &
+    Omit<HostServiceOptions, "localDevelopmentHost">;
   readonly #api: TeamApiServer;
   readonly #remoteScreen: RemoteScreenGateway;
   readonly #browserView: BrowserViewGateway;
@@ -166,7 +170,7 @@ export class HostService extends EventEmitter<HostEvents> {
     super();
     this.#options = {
       ...options,
-      allowLocalDevelopmentInvites: options.allowLocalDevelopmentInvites ?? false,
+      localDevelopmentHost: options.localDevelopmentHost ?? false,
     };
     this.#status = initialHostStatus(options.store.getIdentity(), options.unattended ?? false);
     const logDirectory = options.logDirectory;
@@ -570,7 +574,7 @@ export class HostService extends EventEmitter<HostEvents> {
         devicePublicKey: identity.publicKey,
       });
       if (await this.#cancelSupersededStart(generation)) return this.getStatus();
-      if (this.#options.listRemoteMembers) {
+      if (this.#usesAccountDirectory() && this.#options.listRemoteMembers) {
         await this.#options.store.syncRemoteDirectory(
           identity.serverId,
           await this.#options.listRemoteMembers(identity.serverId),
@@ -649,13 +653,11 @@ export class HostService extends EventEmitter<HostEvents> {
     try {
       authenticated = await this.#options.store.login(username, password);
     } catch {
-      // Publishing this host reconciles its members against the control plane, and the technical
-      // client is never in that list -- it is password-only, owned by no account -- so the
-      // reconciliation disables it. `login` skips a disabled member and `acceptInvite` refuses a
-      // username that already exists, so once the developer had published the host, every later
-      // `bun run dev:test-client` died at startup with "This username is already in use." and only
-      // editing the profile by hand brought it back. Replacing the member is what makes publishing
-      // a state the dev stack can leave: it is a fixture, and nothing outside this file reads it.
+      // Before a development host kept its members in its own team file, publishing reconciled them
+      // against the control plane, and that disabled the technical client -- it is password-only,
+      // owned by no account. `login` skips a disabled member and `acceptInvite` refuses a username
+      // that already exists, so a profile published then fails here. Replacing the member lets such
+      // a profile recover: it is a fixture, and nothing outside this file reads it.
       const existing = this.#options.store.listMembers().find((member) => member.username === username);
       if (existing && existing.role !== "owner") await this.#options.store.removeMember(existing.id);
       const invite = await this.#options.store.createInvite("member");
@@ -699,7 +701,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   listMembers(): TeamMemberSummary[] | Promise<TeamMemberSummary[]> {
     const hostId = this.#options.store.getIdentity()?.serverId;
-    if (hostId && this.#options.listRemoteMembers) {
+    if (hostId && this.#usesAccountDirectory() && this.#options.listRemoteMembers) {
       return this.#options.listRemoteMembers(hostId).then(async (members) => {
         // An account switch while the directory loaded makes this list the previous
         // account's. Answer with the now-active host's own members rather than failing a
@@ -827,6 +829,7 @@ export class HostService extends EventEmitter<HostEvents> {
     const hostId = this.#options.store.getIdentity()?.serverId;
     if (
       hostId &&
+      this.#usesAccountDirectory() &&
       this.#options.updateRemoteMember &&
       this.#options.removeRemoteMember &&
       this.#options.listRemoteMembers
@@ -877,7 +880,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   async removeMember(memberId: string): Promise<void> {
     const hostId = this.#options.store.getIdentity()?.serverId;
-    if (hostId && this.#options.removeRemoteMember) {
+    if (hostId && this.#usesAccountDirectory() && this.#options.removeRemoteMember) {
       await this.#options.removeRemoteMember(hostId, memberId);
       if (this.#options.listRemoteMembers) {
         await this.#options.store.syncRemoteDirectory(hostId, await this.#options.listRemoteMembers(hostId));
@@ -902,12 +905,16 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   /**
-   * Where invitations live: the account directory, or `null` for this machine's own team file. A
-   * local development host keeps them in its file, so listing and revoking read where creating wrote.
+   * Whether members and invitations live in the account directory. A local development host keeps
+   * them in its own team file, so every read and write of them goes where the others went.
    */
+  #usesAccountDirectory(): boolean {
+    return !this.#options.localDevelopmentHost;
+  }
+
+  /** The account directory that holds invitations, or `null` for this machine's own team file. */
   #remoteInviteApiUrl(): string | null {
-    if (this.#options.allowLocalDevelopmentInvites) return null;
-    return this.#options.remoteControlPlaneUrl || null;
+    return this.#usesAccountDirectory() ? this.#options.remoteControlPlaneUrl || null : null;
   }
 
   revokeInvite(inviteId: string): Promise<void> {
@@ -977,7 +984,7 @@ export class HostService extends EventEmitter<HostEvents> {
         fingerprint: identity.fingerprint,
         token: invite.token,
       },
-      { allowLocalDevelopmentApiUrl: this.#options.allowLocalDevelopmentInvites },
+      { allowLocalDevelopmentApiUrl: this.#options.localDevelopmentHost },
     );
     const result: InviteSummary = {
       id: invite.id,

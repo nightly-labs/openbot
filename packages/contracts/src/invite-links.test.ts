@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   createInviteUrl,
   createOpenBotInviteUrl,
+  inviteUseCount,
   isCanonicalInviteUrl,
   isNeverExpiringInvite,
+  isPermanentInvite,
   isValidRemoteApiUrl,
+  PERMANENT_INVITE_EXPIRES_AT_MS,
   parseInviteUrl,
   permanentInviteExpiresAt,
   toOpenBotInviteUrl,
@@ -83,5 +86,16 @@ describe("OpenBot invite links", () => {
     expect(isNeverExpiringInvite(permanentInviteExpiresAt())).toBe(true);
     expect(isNeverExpiringInvite(new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString())).toBe(false);
     expect(isNeverExpiringInvite("not-a-date")).toBe(false);
+  });
+
+  it("decodes an invitation without the permanent flag or a valid count as an older sender meant it", () => {
+    const tomorrow = Date.now() + 24 * 60 * 60 * 1_000;
+    expect(isPermanentInvite(undefined, PERMANENT_INVITE_EXPIRES_AT_MS)).toBe(true);
+    expect(isPermanentInvite(undefined, permanentInviteExpiresAt())).toBe(true);
+    expect(isPermanentInvite(true, tomorrow)).toBe(true);
+    expect(isPermanentInvite(false, tomorrow)).toBe(false);
+    expect(isPermanentInvite(undefined, new Date(tomorrow).toISOString())).toBe(false);
+    expect([undefined, -1, 1.5, "2"].map(inviteUseCount)).toEqual([0, 0, 0, 0]);
+    expect(inviteUseCount(3)).toBe(3);
   });
 });
