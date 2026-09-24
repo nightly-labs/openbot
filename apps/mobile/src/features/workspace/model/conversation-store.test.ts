@@ -458,4 +458,32 @@ describe("mobile conversation windows", () => {
     const current = reduceAgentActivity({}, delta(1, "first"));
     expect(reduceAgentActivity(current, delta(2, "second"))).toBe(current);
   });
+
+  it("does not update workspace activity for events that change no activity", () => {
+    const progress: AgentEvent = {
+      type: "turn-progress",
+      agentId: "agent",
+      threadId: "thread",
+      turnId: "turn",
+      detail: "Reading",
+    };
+    const working = reduceAgentActivity({}, progress);
+    expect(reduceAgentActivity(working, { ...progress })).toBe(working);
+    expect(
+      reduceAgentActivity(working, {
+        type: "runtime-snapshot",
+        snapshot: {
+          agents: [],
+          activeTurns: [{ agentId: "agent", threadId: "thread", turnId: "turn" }],
+          work: [],
+          latestMessages: [],
+          attentionComplete: true,
+          pendingPrompts: [],
+          pendingApprovals: [],
+          pendingBrowserTakeovers: [],
+          failedTurns: [],
+        },
+      }),
+    ).toBe(working);
+  });
 });

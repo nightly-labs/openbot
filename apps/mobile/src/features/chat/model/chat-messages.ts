@@ -72,13 +72,37 @@ export function presentChatMessages(
   const result = visible.map((message) => {
     // Keep the local image mounted until the caller caches the final attachment IDs.
     if (pending?.serverId === message.id) return pending.message;
-    return aliases.has(message.id) ? { ...message, id: aliases.get(message.id) ?? message.id } : message;
+    const alias = aliases.get(message.id);
+    if (alias === undefined) return message;
+    let aliased = aliasedMessages.get(message);
+    if (aliased?.id !== alias) {
+      aliased = { ...message, id: alias };
+      aliasedMessages.set(message, aliased);
+    }
+    return aliased;
   });
   if (pending && !messages.some((message) => message.id === pending.serverId)) result.push(pending.message);
   return result;
 }
 
 const projectedBubbles = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
+const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
+
+/** Reuse the item projected from the same host message, so memoized rows skip unchanged items. */
+function projectedMarker(
+  cache: WeakMap<ConversationMessage, ChatMessage>,
+  message: ConversationMessage,
+  project: () => ChatMessage,
+) {
+  let item = cache.get(message);
+  if (!item) {
+    item = project();
+    cache.set(message, item);
+  }
+  return item;
+}
 
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
   const result: ChatMessage[] = [];
@@ -86,13 +110,28 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   for (const message of sortConversationMessages([...messages])) {
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
-      result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
+      const { exchange } = message;
+      result.push(
+        projectedMarker(projectedExchanges, message, () => ({
+          id: `exchange:${message.id}`,
+          kind: "exchange",
+          exchange,
+        })),
+      );
       // Match desktop: exchanges have markers, not another agent's text bubble.
       // Incoming attachments remain visible below their marker.
       if (message.exchange.direction !== "incoming" || !message.attachments?.length) continue;
     }
     if (message.questionPrompt) {
-      result.push({ id: message.id, kind: "question", turnId: message.turnId, prompt: message.questionPrompt });
+      const prompt = message.questionPrompt;
+      result.push(
+        projectedMarker(projectedQuestions, message, () => ({
+          id: message.id,
+          kind: "question",
+          turnId: message.turnId,
+          prompt,
+        })),
+      );
       continue;
     }
     // A generation has no text or attachment until its image arrives, and it still needs its placeholder.

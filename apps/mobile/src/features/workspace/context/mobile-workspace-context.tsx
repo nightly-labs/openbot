@@ -58,7 +58,7 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
-import { useQueryClient } from "@tanstack/react-query";
+import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
@@ -124,6 +124,7 @@ type RemoteAgent = Pick<
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
 > &
   Partial<Pick<AgentSummary, "provider" | "model" | "reasoningEffort" | "avatarUrl">>;
+const NO_IDS: string[] = [];
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -209,10 +210,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [preferences, setPreferences] = useState<Record<string, RemoteWorkspacePreferences>>({});
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
-  const hiddenAgentIds = (activeServerId ? preferences[activeServerId]?.hidden : null) ?? [];
-  const pinnedAgentIds = (activeServerId ? preferences[activeServerId]?.pinned : null) ?? [];
-  const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? [];
-  const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? [];
+  const hiddenAgentIds = (activeServerId ? preferences[activeServerId]?.hidden : null) ?? NO_IDS;
+  const pinnedAgentIds = (activeServerId ? preferences[activeServerId]?.pinned : null) ?? NO_IDS;
+  const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? NO_IDS;
+  const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? NO_IDS;
   const readWrites = useRef(new Map<string, Promise<void>>());
   const [browserRequests, setBrowserRequests] = useState<Record<string, BrowserTakeoverRequest[]>>({});
   const [unreadAgentIds, setUnreadAgentIds] = useState<string[]>([]);
@@ -356,17 +357,30 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, summaries: RemoteAgent[]) => {
       try {
         const saved = reconcileAgentPins(preferenceStore, serverId, summaries);
-        setPreferences((current) => ({ ...current, [serverId]: saved }));
+        // agents-changed arrives for each delivered message. Keep unchanged preferences and agents,
+        // so the workspace context does not notify every consumer for each message.
+        setPreferences((current) => {
+          const next = replaceEqualDeep(current[serverId], saved);
+          return next === current[serverId] ? current : { ...current, [serverId]: next };
+        });
       } catch {
         Alert.alert("Could not save chat preferences", "Your previous preferences have been kept. Please try again.");
       }
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
       serverAgentIds.current.set(serverId, knownIds);
-      setAgents((current) => [
-        ...current.filter((agent) => agent.serverId !== serverId),
-        ...summaries.map((agent) => projectAgent(serverId, agent)),
-      ]);
+      setAgents((current) => {
+        const previous = new Map(
+          current.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent]),
+        );
+        const next = [
+          ...current.filter((agent) => agent.serverId !== serverId),
+          ...summaries.map((agent) => replaceEqualDeep(previous.get(agent.id), projectAgent(serverId, agent))),
+        ];
+        return next.length === current.length && next.every((agent, index) => agent === current[index])
+          ? current
+          : next;
+      });
     },
     [preferenceStore],
   );
@@ -518,14 +532,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
       if (event.type === "runtime-snapshot") {
-        setBrowserRequests((current) => ({
-          ...current,
-          [serverId]: reconcilePendingRequests(
-            current[serverId] ?? [],
-            event.snapshot.pendingBrowserTakeovers,
-            event.snapshot.attentionComplete,
-          ),
-        }));
+        setBrowserRequests((current) => {
+          const next = replaceEqualDeep(
+            current[serverId],
+            reconcilePendingRequests(
+              current[serverId] ?? [],
+              event.snapshot.pendingBrowserTakeovers,
+              event.snapshot.attentionComplete,
+            ),
+          );
+          return next === current[serverId] ? current : { ...current, [serverId]: next };
+        });
       } else if (event.type === "browser-takeover-requested") {
         setBrowserRequests((current) => ({
           ...current,
