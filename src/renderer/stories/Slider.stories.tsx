@@ -1,6 +1,5 @@
 import { Heading, SliderField } from "@openbot/ui";
 import { createSignal } from "solid-js";
-import { expect, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const meta = {
@@ -43,13 +42,5 @@ export const Gallery: Story = {
         </div>
       </main>
     );
-  },
-  play: async ({ canvasElement, userEvent }) => {
-    const canvas = within(canvasElement);
-    const slider = canvas.getByRole("slider", { name: "Width" });
-    slider.focus();
-    await userEvent.keyboard("{ArrowRight}");
-    await expect(slider).toHaveAttribute("aria-valuetext", "105%");
-    await expect(canvas.findByText("Saved: 105%")).resolves.toBeInTheDocument();
   },
 };

@@ -222,12 +222,9 @@ export function checkUiFoundation(
   const debtBudgets = [
     ["hand-rolled composite ARIA roles", manualCompositeCount, 0],
     // Biome rejects the *ByTestId queries, but a GritQL rule cannot see a JSX attribute in
-    // the product tree, so root AGENTS.md rules this out in prose alone. The five that exist
-    // are not dead weight: three are read by play functions in src/renderer/stories, where
-    // the test rules relax by design. So this freezes the count rather than demanding zero -
-    // a new hook has to replace an old one, and the accessible-name route is the only way to
-    // reach an element the sixth time.
-    ["data-testid hooks in renderer markup", matches(testHookSource, /data-testid\s*=/gu), 5],
+    // the product tree, so this count is the only guard against a hook in markup. Reach an
+    // element by its accessible name instead.
+    ["data-testid hooks in renderer markup", matches(testHookSource, /data-testid\s*=/gu), 0],
     ["colour literals outside the palette", colorLiteralCount, 0],
     ["untokenized font-size", matches(legacyStyles, /font-size:(?!\s*(?:var\(|inherit\b))\s*[^;]+/gu), 0],
     [

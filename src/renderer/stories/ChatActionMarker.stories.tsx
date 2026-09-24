@@ -2,7 +2,7 @@ import { Heading, Text } from "@openbot/ui";
 import type { AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { createSignal } from "solid-js";
-import { expect, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AgentSkillsModal } from "../src/features/conversation/AgentSkillsModal";
 
@@ -103,13 +103,6 @@ export const AllStates: Story = {
       </section>
     </main>
   ),
-  play: async ({ canvas, userEvent }) => {
-    onOpenRoutine.mockClear();
-    const [routineButton] = canvas.getAllByRole("button", { name: "Open routine Morning brief" });
-    if (!routineButton) throw new Error("Routine button is missing.");
-    await userEvent.click(routineButton);
-    await expect(onOpenRoutine).toHaveBeenCalledWith({ routineId: "routine-1", name: "Morning brief" });
-  },
 };
 
 export const CompactAndUnavailable: Story = {
@@ -170,9 +163,6 @@ export const AgentRecipientsMenu: Story = {
       </section>
     </main>
   ),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /3 agents/ }));
-  },
 };
 
 export const ReducedMotion: Story = {
@@ -220,10 +210,6 @@ export const RoutineRunSummary: Story = {
       </section>
     </main>
   ),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Show history for Morning brief" }));
-    await expect(canvas.getByRole("list", { name: "Earlier routine states" })).toBeVisible();
-  },
 };
 
 const timestamp = "2026-09-01T08:00:00.000Z";

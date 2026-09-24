@@ -8,7 +8,7 @@ import { MessageActions } from "@openbot/ui/features/conversation/MessageRenderi
 import { UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import type { JSX } from "@solidjs/web";
 import { createStore, For, Show } from "solid-js";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
@@ -158,21 +158,6 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
       ]}
     />
   ),
-  play: async ({ canvas }) => {
-    const chiefMessages = await canvas.findAllByRole("article", { name: `Message from ${chief.name}` });
-    await expect(chiefMessages).toHaveLength(2);
-    const [firstChiefMessage, secondChiefMessage] = chiefMessages;
-    if (!firstChiefMessage || !secondChiefMessage) throw new Error("Chief messages are missing.");
-    await expect(within(firstChiefMessage).getByText("11:12 PM")).toBeInTheDocument();
-    await expect(within(secondChiefMessage).queryByText("11:13 PM")).not.toBeInTheDocument();
-    const ownMessage = await canvas.findByRole("article", { name: "Message from You" });
-    await expect(within(ownMessage).getByText("12:59 PM")).toBeInTheDocument();
-    // The label after the colon shifts on every turn, the way it does in the agent chat, so the
-    // announcement is matched on its subject.
-    await expect(
-      await canvas.findByRole("status", { name: new RegExp(`^${chief.name} and ${sales.name} are working: `) }),
-    ).toBeInTheDocument();
-  },
 };
 
 /** One agent at work: the sentence has to read for a single name too. */

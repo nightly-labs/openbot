@@ -1,5 +1,5 @@
 import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const preview = {
@@ -50,15 +50,6 @@ export const EmailBoundInvite: Story = {
   },
 };
 
-export const InviteReady: Story = {
-  play: async ({ args: storyArgs, userEvent }) => {
-    const body = within(document.body);
-    await expect(body.findByText("Studio host")).resolves.toBeTruthy();
-    await userEvent.click(body.getByRole("button", { name: "Connect" }));
-    await expect(storyArgs.onJoin).toHaveBeenCalledWith({ inviteUrl: args.inviteUrl });
-  },
-};
-
 export const EmptyInvite: Story = {
   args: { inviteUrl: "" },
 };
@@ -70,23 +61,11 @@ export const ErrorState: Story = {
       throw new Error("The OpenBot invitation link is invalid.");
     },
   },
-  play: async ({ userEvent }) => {
-    const body = within(document.body);
-    await userEvent.type(body.getByRole("textbox", { name: "Invite link" }), "https://openbot.run/join?bad");
-    await userEvent.click(body.getByRole("button", { name: "Review invite" }));
-    await expect(body.getByRole("alert")).toHaveTextContent("The OpenBot invitation link is invalid.");
-  },
 };
 
 export const Joining: Story = {
   args: {
     onJoin: () => new Promise<void>(() => undefined),
-  },
-  play: async ({ userEvent }) => {
-    const body = within(document.body);
-    await expect(body.findByText("Studio host")).resolves.toBeTruthy();
-    await userEvent.click(body.getByRole("button", { name: "Connect" }));
-    await expect(body.getByRole("button", { name: "Connecting…" })).toBeDisabled();
   },
 };
 
@@ -95,12 +74,6 @@ export const JoinError: Story = {
     onJoin: async () => {
       throw new Error("OpenBot could not connect to this host.");
     },
-  },
-  play: async ({ userEvent }) => {
-    const body = within(document.body);
-    await expect(body.findByText("Studio host")).resolves.toBeTruthy();
-    await userEvent.click(body.getByRole("button", { name: "Connect" }));
-    await expect(body.getByRole("alert")).toHaveTextContent("OpenBot could not connect to this host.");
   },
 };
 

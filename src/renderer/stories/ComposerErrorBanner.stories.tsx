@@ -1,7 +1,7 @@
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import { ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import type { JSX } from "@solidjs/web";
-import { expect, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const meta = {
@@ -35,11 +35,6 @@ export const ProviderError: Story = {
       <ComposerErrorBanner {...args} />
     </ComposerStack>
   ),
-  play: async ({ args, canvas, userEvent }) => {
-    await expect(canvas.getByRole("alert")).toHaveTextContent("The model endpoint refused the request.");
-    await userEvent.click(canvas.getByRole("button", { name: "Dismiss error" }));
-    await expect(args.onDismiss).toHaveBeenCalled();
-  },
 };
 
 /**
@@ -57,9 +52,6 @@ export const DroppedTransport: Story = {
       <ComposerErrorBanner {...args} />
     </ComposerStack>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("alert")).toHaveTextContent(/Connection refused/u);
-  },
 };
 
 /**
@@ -96,8 +88,4 @@ export const BesideTheUsageLimit: Story = {
       <ComposerErrorBanner {...args} />
     </ComposerStack>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText("Usage limit reached")).toBeInTheDocument();
-    await expect(canvas.getByRole("alert")).toBeInTheDocument();
-  },
 };

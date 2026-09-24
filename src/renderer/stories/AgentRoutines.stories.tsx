@@ -1,6 +1,6 @@
 import type { Routine, RoutineRun } from "@openbot/contracts/ipc";
 import { onCleanup } from "solid-js";
-import { expect, fn, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AgentRoutinesSettings } from "../src/features/conversation/AgentRoutinesSettings";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
@@ -132,56 +132,10 @@ type Story = StoryObj<typeof meta>;
 
 export const RoutineList: Story = {
   render: () => <RoutinesStory />,
-  play: async ({ canvas }) => {
-    await expect(await canvas.findByRole("button", { name: /Morning brief/ })).toHaveTextContent("Weekdays at");
-  },
-};
-
-export const RoutineEditor: Story = {
-  render: () => <RoutinesStory />,
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Morning brief/ }));
-    await expect(canvas.getByRole("heading", { name: "Routine" })).toBeVisible();
-    await expect(canvas.getByDisplayValue("Morning brief")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Test run" })).toBeEnabled();
-    await expect(canvas.queryByRole("button", { name: "Add another" })).not.toBeInTheDocument();
-  },
 };
 
 export const EmptyDraft: Story = {
   render: () => <RoutinesStory routines={[]} />,
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: "Create Routine" }));
-    await expect(canvas.getByPlaceholderText("Morning brief")).toHaveValue("");
-    await userEvent.click(canvas.getByRole("button", { name: "Back to Routines" }));
-    await expect(canvas.getByText("No routines yet.")).toBeVisible();
-  },
-};
-
-export const UnsavedChangesConfirmation: Story = {
-  render: () => <RoutinesStory />,
-  play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Morning brief/ }));
-    await userEvent.clear(canvas.getByRole("textbox", { name: "Name" }));
-    await userEvent.type(canvas.getByRole("textbox", { name: "Name" }), "Changed morning brief");
-    await userEvent.click(canvas.getByRole("button", { name: "Back to Routines" }));
-    const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("alertdialog")).toHaveAccessibleName("Discard changes?");
-    await expect(body.getByRole("button", { name: "Keep editing" })).toBeInTheDocument();
-    await expect(body.getByRole("button", { name: "Discard changes" })).toBeInTheDocument();
-  },
-};
-
-export const OpenTimePicker: Story = {
-  render: () => <RoutinesStory />,
-  play: async ({ canvas, canvasElement, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Morning brief/ }));
-    await expect(canvas.getByRole("button", { name: "Days: Weekdays" })).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: "Time: 7 AM" }));
-    const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("textbox", { name: "Time hour" })).toHaveValue("7");
-    await expect(body.getByRole("textbox", { name: "Time minute" })).toHaveValue("00");
-  },
 };
 
 const runStatuses: RoutineRun["status"][] = [
@@ -214,47 +168,11 @@ export const RunHistoryStatuses: Story = {
       }))}
     />
   ),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Morning brief/ }));
-    for (const status of runStatuses) {
-      const label = status === "needs-attention" ? "Needs attention" : `${status[0]?.toUpperCase()}${status.slice(1)}`;
-      await expect(await canvas.findByRole("img", { name: label })).toBeVisible();
-    }
-  },
 };
 
 export const FullSidePanel: Story = {
   render: () => <FullSettingsPanelStory />,
   parameters: { layout: "fullscreen" },
-  play: async ({ canvas }) => {
-    await waitFor(() => expect(canvas.getByRole("button", { name: /Routines/ })).toHaveTextContent("2 configured"));
-    await expect(canvas.getByLabelText("Agent name")).toHaveValue("Chief");
-    await expect(canvas.getByRole("switch", { name: "Notifications" })).toBeChecked();
-  },
-};
-
-export const FullSidePanelRoutines: Story = {
-  render: () => <FullSettingsPanelStory />,
-  parameters: { layout: "fullscreen" },
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Routines/ }));
-    await expect(canvas.queryByRole("button", { name: "Edit agent avatar" })).not.toBeInTheDocument();
-    await expect(await canvas.findByRole("button", { name: /Morning brief/ })).toHaveTextContent("Weekdays at");
-    await expect(canvas.getByRole("button", { name: /Weekly planning/ })).toHaveTextContent("Paused");
-  },
-};
-
-export const FullSidePanelRoutineEditor: Story = {
-  render: () => <FullSettingsPanelStory />,
-  parameters: { layout: "fullscreen" },
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: /Routines/ }));
-    await userEvent.click(await canvas.findByRole("button", { name: /Morning brief/ }));
-    await expect(canvas.getByDisplayValue("Morning brief")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Test run" })).toBeEnabled();
-    await expect(await canvas.findByRole("img", { name: "Succeeded" })).toBeVisible();
-    await expect(canvas.getByRole("img", { name: "Needs attention" })).toBeVisible();
-  },
 };
 
 function storyRun(id: string, status: RoutineRun["status"], kind: RoutineRun["kind"], hoursAgo: number): RoutineRun {

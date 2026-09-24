@@ -79,13 +79,11 @@ describe("ui foundation check", () => {
         budget("untokenized font-size", 1),
         budget("untokenized border-radius", 1),
         budget("untokenized transition durations", 2),
-        // Six against a budget of five, because a non-zero budget only reports once the tree
-        // exceeds it: five in branches/TestHooks.tsx and the sixth in components/ui/Button.tsx.
-        // That sixth is the whole reason this budget reads its own source join rather than the
-        // one the composite scan uses - exempt components/ui and the count reads 5, meets the
-        // budget and says nothing. The hook in Bad.test.tsx is the other side: count test files
-        // and this reads 7.
-        budget("data-testid hooks in renderer markup", 6, 5),
+        // Six: five in branches/TestHooks.tsx and the sixth in components/ui/Button.tsx. That
+        // sixth is why this budget reads its own source join rather than the one the composite
+        // scan uses - exempt components/ui and the count reads 5. The hook in Bad.test.tsx is
+        // the other side: count test files and this reads 7.
+        budget("data-testid hooks in renderer markup", 6),
       ].sort(),
     );
   });

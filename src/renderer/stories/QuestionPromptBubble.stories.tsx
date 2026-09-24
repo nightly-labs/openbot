@@ -13,7 +13,7 @@ import {
 } from "@openbot/ui";
 import { QuestionPromptBubble, type QuestionPromptBubbleProps } from "@openbot/ui/components/QuestionPromptBubble";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
-import { expect, fn, waitFor } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const singleQuestion: AgentPromptQuestion[] = [
@@ -220,15 +220,6 @@ export const SingleQuestion: Story = {
   render: renderInChat,
 };
 
-export const SelectedAnswer: Story = {
-  render: renderInChat,
-  play: async ({ args, canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("radio", { name: /Send that reply/ }));
-    await expect(canvas.getByRole("radio", { name: /Send that reply/ })).toBeChecked();
-    await waitFor(() => expect(args.onSubmit).toHaveBeenCalledWith({ reply: ["Send that reply"] }));
-  },
-};
-
 export const MultipleQuestions: Story = {
   args: { questions: multipleQuestions },
   render: renderInChat,
@@ -237,32 +228,16 @@ export const MultipleQuestions: Story = {
 export const CustomAnswer: Story = {
   args: { questions: customQuestion },
   render: renderInChat,
-  play: async ({ canvas, userEvent }) => {
-    const input = canvas.getByRole("textbox", { name: /Custom answer/ });
-    await userEvent.type(input, "A short technical brief with risks and owners.");
-    await expect(input).toHaveFocus();
-  },
 };
 
 export const SecretAnswer: Story = {
   args: { questions: secretQuestion },
   render: renderInChat,
-  play: async ({ canvas }) => {
-    const input = canvas.getByLabelText(/Custom answer/);
-    await expect(input).toHaveAttribute("type", "password");
-    await expect(input).toHaveFocus();
-  },
 };
 
 export const Sending: Story = {
   args: { pending: true },
   render: renderInChat,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("status")).toHaveTextContent("Sending");
-    await expect(canvas.getByRole("button", { name: "Skip" })).toBeDisabled();
-    await expect(canvas.getByRole("button", { name: "Cancel questions" })).toBeDisabled();
-    for (const option of canvas.getAllByRole("radio")) await expect(option).toBeDisabled();
-  },
 };
 
 export const Empty: Story = {
@@ -280,40 +255,6 @@ export const Narrow: Story = {
       </div>
     ),
   ],
-};
-
-export const AutoAdvanceAndPreserveAnswers: Story = {
-  args: { questions: multipleQuestions },
-  render: renderInChat,
-  play: async ({ canvas, userEvent }) => {
-    const firstDraft = canvas.getByRole("textbox", { name: /Custom answer for: Which auth/ });
-    await userEvent.type(firstDraft, "Keep the existing session format.");
-    await userEvent.click(canvas.getByRole("radio", { name: /Session cookies/ }));
-    await waitFor(() => expect(canvas.getByRole("radio", { name: /Environment file/ })).toBeEnabled());
-    await userEvent.click(canvas.getByRole("radio", { name: /Environment file/ }));
-    await waitFor(() => expect(canvas.getByRole("radio", { name: /Gradual rollout/ })).toBeEnabled());
-
-    await userEvent.click(canvas.getByRole("button", { name: "Previous question" }));
-    await waitFor(() => expect(canvas.getByRole("radio", { name: /Environment file/ })).toBeEnabled());
-    await expect(canvas.getByRole("radio", { name: /Environment file/ })).toBeChecked();
-    await userEvent.click(canvas.getByRole("button", { name: "Previous question" }));
-    await waitFor(() => expect(canvas.getByRole("radio", { name: /Session cookies/ })).toBeEnabled());
-    await expect(canvas.getByRole("radio", { name: /Session cookies/ })).toBeChecked();
-    await expect(canvas.getByRole("textbox", { name: /Custom answer for: Which auth/ })).toHaveValue(
-      "Keep the existing session format.",
-    );
-  },
-};
-
-export const SkipAndCancel: Story = {
-  args: { questions: multipleQuestions },
-  render: renderInChat,
-  play: async ({ args, canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Skip" }));
-    await waitFor(() => expect(canvas.getByRole("button", { name: "Cancel questions" })).toBeEnabled());
-    await userEvent.click(canvas.getByRole("button", { name: "Cancel questions" }));
-    await waitFor(() => expect(args.onSubmit).toHaveBeenCalledWith({}));
-  },
 };
 
 export const PersistedAnswered: Story = {

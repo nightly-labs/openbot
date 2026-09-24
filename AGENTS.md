@@ -162,9 +162,8 @@ risks since the last release.
 - Assert behavior and data. Query accessible roles and names; use `toHaveFocus()` for focus.
   Do not assert markup, classes, layout, animation timing, or snapshots. Use exact text only for
   product contracts, error/security messages, serialized output, or localization keys.
-- Use Storybook for visual details. Do not add test IDs to avoid missing accessibility.
-  Story play functions can use them; renderer `data-testid` use must stay within the existing
-  `check:ui` budget of five. A new hook must replace an existing one.
+- Use Storybook for visual details only. Do not add story `play` functions: CI does not run them.
+  Do not add `data-testid` hooks; `check:ui` allows none.
 - `*.test.ts` uses Node; `*.test.tsx` uses JSX and jsdom; `*.dom.test.ts` uses DOM without a
   component. Keep pure logic in Node tests.
 

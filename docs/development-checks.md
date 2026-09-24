@@ -152,11 +152,11 @@ Biome rejects these patterns in tests: `toHaveClass`, `toHaveStyle`, `getCompute
 `querySelector("svg" | "img")`, `document.activeElement`, snapshots, `*ByTestId` queries,
 assertions reached through CSS classes, an awaited bare `setTimeout`, and `it.only`.
 Use `toHaveFocus()` to name the element whose focus matters. Storybook stories are the place for
-visual checks and play functions.
+visual checks. Stories have no `play` functions: CI only builds Storybook, so a play function never
+ran.
 
-GritQL cannot connect a test query to the product's `data-testid` attribute. `check:ui` checks the
-renderer attribute budget separately. The budget is five because existing story play functions
-use three of those hooks. It permits replacement, not growth.
+GritQL cannot connect a test query to the product's `data-testid` attribute. `check:ui` counts
+renderer `data-testid` attributes separately, with a budget of zero.
 
 `check:ui` also detects CSS classes that no component, story, or HTML entry point names. This found
 about 1,400 lines of unused CSS. A dynamic `prefix-${value}` counts as a use only inside a class

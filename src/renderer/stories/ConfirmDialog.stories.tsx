@@ -1,6 +1,6 @@
 import { Button, ConfirmDialog, type ConfirmDialogProps, Heading, UserAvatar } from "@openbot/ui";
 import { createSignal } from "solid-js";
-import { expect, fn, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 type DemoProps = Omit<ConfirmDialogProps, "open" | "onCancel"> & {
@@ -54,9 +54,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const nextFrame = () =>
-  new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-
 export const Destructive: Story = {};
 
 export const WithAvatar: Story = {
@@ -109,73 +106,4 @@ export const WithDetails: Story = {
 
 export const KeyboardFlow: Story = {
   args: { initiallyOpen: false },
-  play: async ({ args, canvas, userEvent }) => {
-    const body = within(document.body);
-    const trigger = canvas.getByRole("button", { name: "Delete folder" });
-    const openDialog = async () => {
-      await userEvent.click(trigger);
-      const dialog = await body.findByRole("alertdialog", { name: "Delete Research?" });
-      await waitFor(() => expect(within(dialog).getByRole("button", { name: "Delete" })).toHaveFocus());
-      return dialog;
-    };
-
-    const dialog = await openDialog();
-    const confirm = within(dialog).getByRole("button", { name: "Delete" });
-    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
-    await userEvent.tab({ shift: true });
-    await expect(cancel).toHaveFocus();
-    await userEvent.tab();
-    await expect(confirm).toHaveFocus();
-    await userEvent.tab({ shift: true });
-    await userEvent.keyboard("{Enter}");
-    await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
-    await expect(args.onCancel).toHaveBeenCalledOnce();
-    await nextFrame();
-    await expect(trigger).toHaveFocus();
-
-    await openDialog();
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
-    await expect(args.onCancel).toHaveBeenCalledTimes(2);
-    await expect(args.onConfirm).not.toHaveBeenCalled();
-
-    await openDialog();
-    await userEvent.keyboard("{Enter}");
-    await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
-    await expect(args.onConfirm).toHaveBeenCalledOnce();
-    await nextFrame();
-    await expect(trigger).toHaveFocus();
-  },
-};
-
-let finishDelete: (() => void) | undefined;
-
-export const AsyncConfirm: Story = {
-  args: {
-    initiallyOpen: false,
-    onConfirm: fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finishDelete = resolve;
-        }),
-    ),
-  },
-  play: async ({ args, canvas, userEvent }) => {
-    const body = within(document.body);
-    await userEvent.click(canvas.getByRole("button", { name: "Delete folder" }));
-    const dialog = await body.findByRole("alertdialog", { name: "Delete Research?" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
-
-    const pending = await within(dialog).findByRole("button", { name: "Deleting…" });
-    await expect(pending).toHaveAttribute("aria-busy", "true");
-    await expect(pending).toBeDisabled();
-    await expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
-    await userEvent.keyboard("{Escape}");
-    await expect(dialog).toBeInTheDocument();
-    await expect(args.onCancel).not.toHaveBeenCalled();
-
-    finishDelete?.();
-    await waitFor(() => expect(body.queryByRole("alertdialog")).not.toBeInTheDocument());
-    await expect(args.onConfirm).toHaveBeenCalledOnce();
-  },
 };

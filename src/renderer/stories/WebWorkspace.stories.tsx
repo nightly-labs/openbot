@@ -1,4 +1,3 @@
-import { expect } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { WebWorkspace } from "../src/features/web-client/WebWorkspace";
 import { createMockWebRuntime } from "../src/preview/mock-web-runtime";
@@ -24,8 +23,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Connected: Story = {
-  play: async ({ canvas }) => {
-    await expect(await canvas.findByRole("textbox", { name: "Message Chief" })).toBeVisible();
-  },
-};
+export const Connected: Story = {};

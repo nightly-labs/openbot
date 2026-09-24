@@ -1,6 +1,6 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
-import { fn, userEvent, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 
@@ -77,11 +77,4 @@ export const Cancelled: Story = {
 
 export const TabUnavailable: Story = {
   args: { tab: undefined, preview: null, previewStatus: "failed" },
-};
-
-export const Submitting: Story = {
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "I’m done" }));
-  },
 };

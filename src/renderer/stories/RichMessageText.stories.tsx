@@ -3,7 +3,7 @@ import { serializeChatTagReference } from "@openbot/contracts/chat-tag-reference
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { MessageCitation } from "@openbot/ui/data";
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
-import { expect, fn, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS, STORY_ATTACHMENTS, STORY_INSTALLED_SKILLS } from "./fixtures";
 
@@ -109,18 +109,6 @@ export const InlineCitations: Story = {
     body: "Transformers scale well with data and compute [1], though attention is quadratic in sequence length [2].",
     citations,
   },
-  play: async ({ canvas, userEvent }) => {
-    const marker = canvas.getByRole("link", {
-      name: "Open citation 1: Attention Is All You Need",
-    });
-    await expect(marker.getBoundingClientRect().width).toBe(16);
-    await expect(marker.getBoundingClientRect().height).toBe(16);
-    await expect(getComputedStyle(marker).color).toBe("rgba(255, 255, 255, 0.72)");
-    await userEvent.hover(marker);
-    await expect(within(document.body).findByRole("tooltip")).resolves.toBeInTheDocument();
-    await userEvent.click(marker);
-    await expect(canvas.getByRole("link", { name: "Open source 1: Attention Is All You Need" })).toBeInTheDocument();
-  },
 };
 
 export const CitationEdges: Story = {
@@ -145,29 +133,6 @@ export const CitationEdges: Story = {
       </p>
     </div>
   ),
-  play: async ({ canvas, userEvent }) => {
-    const first = canvas.getByRole("link", {
-      name: "Open citation 1: Attention Is All You Need",
-    });
-    await userEvent.hover(first);
-    const firstTooltip = await within(document.body).findByRole("tooltip");
-    await waitFor(() => expect(firstTooltip).toHaveAttribute("data-ready", "true"));
-    const firstBounds = firstTooltip.getBoundingClientRect();
-    await expect(firstTooltip).toHaveAttribute("data-placement", "bottom");
-    await expect(firstBounds.left).toBeGreaterThanOrEqual(8);
-    await expect(firstBounds.right).toBeLessThanOrEqual(window.innerWidth - 8);
-    await userEvent.unhover(first);
-
-    const second = canvas.getByRole("link", {
-      name: "Open citation 2: Efficient Transformers: A Survey",
-    });
-    await userEvent.hover(second);
-    const secondTooltip = await within(document.body).findByRole("tooltip");
-    await waitFor(() => expect(secondTooltip).toHaveAttribute("data-ready", "true"));
-    const secondBounds = secondTooltip.getBoundingClientRect();
-    await expect(secondBounds.left).toBeGreaterThanOrEqual(8);
-    await expect(secondBounds.right).toBeLessThanOrEqual(window.innerWidth - 8);
-  },
 };
 
 export const PlainText: Story = {
@@ -180,13 +145,6 @@ export const InlineFileReferences: Story = {
     attachments: STORY_ATTACHMENTS,
     onOpenAttachment: fn(),
   },
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const reference = canvas.getByRole("button", {
-      name: `Open attached file ${firstStoryAttachment.name}`,
-    });
-    await userEvent.click(reference);
-    await expect(storyArgs.onOpenAttachment).toHaveBeenCalledWith(firstStoryAttachment);
-  },
 };
 
 export const PlainFileReferences: Story = {
@@ -195,16 +153,6 @@ export const PlainFileReferences: Story = {
     attachments: [firstStoryAttachment],
     onOpenAttachment: fn(),
     onOpenSharedFile: fn(),
-  },
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const attached = canvas.getByRole("button", {
-      name: `Open attached file ${firstStoryAttachment.name}`,
-    });
-    const shared = canvas.getByRole("button", { name: "Open shared file brief.pdf" });
-    await expect(attached).toBeInTheDocument();
-    await expect(shared).toBeInTheDocument();
-    await userEvent.click(shared);
-    await expect(storyArgs.onOpenSharedFile).toHaveBeenCalledWith("~/OpenBot/Shared/brief.pdf");
   },
 };
 
@@ -219,26 +167,6 @@ export const LongFileReference: Story = {
       <RichMessageText {...storyArgs} />
     </section>
   ),
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const reference = canvas.getByRole("button", {
-      name: `Open attached file ${longAttachment.name}`,
-    });
-    const label = reference.querySelector<HTMLElement>(".inline-file-reference-name");
-    if (!label) throw new Error("The file reference label is missing");
-    await expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
-    const sampleBounds = canvas.getByLabelText("Long file reference sample").getBoundingClientRect();
-    await expect(reference.getBoundingClientRect().right).toBeLessThanOrEqual(sampleBounds.right);
-
-    await userEvent.hover(reference);
-    await expect(within(document.body).findByRole("tooltip")).resolves.toHaveTextContent(longAttachment.name);
-    await userEvent.unhover(reference);
-    reference.focus();
-    await expect(within(document.body).findByRole("tooltip")).resolves.toHaveTextContent(longAttachment.name);
-    await userEvent.keyboard("{Escape}");
-    await expect(within(document.body).queryByRole("tooltip")).not.toBeInTheDocument();
-    await userEvent.click(reference);
-    await expect(storyArgs.onOpenAttachment).toHaveBeenCalledWith(longAttachment);
-  },
 };
 
 export const FileReferenceTypes: Story = {
@@ -253,58 +181,6 @@ export const FileReferenceTypes: Story = {
       <RichMessageText {...storyArgs} />
     </p>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText("TS")).toBeInTheDocument();
-    await expect(canvas.getByText("JS")).toBeInTheDocument();
-    await expect(canvas.getByText("HTML")).toBeInTheDocument();
-    await expect(canvas.getByText("CSS")).toBeInTheDocument();
-    await expect(canvas.getByText("XLSX")).toBeInTheDocument();
-    await expect(canvas.getByText("PDF")).toBeInTheDocument();
-    await expect(canvas.getByText("PNG")).toBeInTheDocument();
-    await expect(canvas.getByText("CS")).toBeInTheDocument();
-    const references = canvas.getAllByRole("button", { name: /Open attached file/u });
-    await expect(references).toHaveLength(9);
-    await expect(references.map((reference) => reference.dataset.fileTone)).toEqual([
-      "source",
-      "script",
-      "markup",
-      "style",
-      "data",
-      "document",
-      "media",
-      "default",
-      "default",
-    ]);
-    const root = references[0]?.parentElement;
-    if (!root) throw new Error("The file reference story root is missing");
-    await expect(root.querySelectorAll(".attachment-reference-visual > svg")).toHaveLength(1);
-
-    const typeScriptReference = references[0];
-    if (!typeScriptReference) throw new Error("The TypeScript file reference is missing");
-    const typeScriptBadge = typeScriptReference.querySelector<HTMLElement>(".attachment-reference-visual");
-    if (!typeScriptBadge) throw new Error("The TypeScript badge is missing");
-    const htmlBadge = references[2]?.querySelector<HTMLElement>(".attachment-reference-visual");
-    const cssBadge = references[3]?.querySelector<HTMLElement>(".attachment-reference-visual");
-    if (!htmlBadge || !cssBadge) throw new Error("The long file type badges are missing");
-    await expect(typeScriptReference.getBoundingClientRect().height).toBe(22);
-    await expect(typeScriptBadge.getBoundingClientRect().width).toBe(16);
-    await expect(typeScriptBadge.getBoundingClientRect().height).toBe(16);
-    await expect(cssBadge.getBoundingClientRect().width).toBe(20);
-    await expect(htmlBadge.getBoundingClientRect().width).toBe(24);
-    await expect(
-      Array.from(root.querySelectorAll<HTMLElement>(".attachment-reference-visual[data-badge-length]")).every(
-        (badge) => {
-          const label = badge.querySelector<HTMLElement>("span");
-          return label !== null && label.getBoundingClientRect().width <= badge.getBoundingClientRect().width;
-        },
-      ),
-    ).toBe(true);
-    await expect(getComputedStyle(typeScriptReference).gap).toBe("4px");
-    await expect(getComputedStyle(typeScriptReference).padding).toBe("1px 6px 1px 3px");
-    typeScriptReference.focus();
-    await expect(getComputedStyle(typeScriptReference).outlineColor).toBe("rgb(116, 185, 255)");
-    await expect(getComputedStyle(typeScriptReference).boxShadow).toBe("none");
-  },
 };
 
 export const MixedReferencesStress: Story = {
@@ -320,13 +196,6 @@ export const MixedReferencesStress: Story = {
       <RichMessageText {...storyArgs} />
     </article>
   ),
-  play: async ({ canvas }) => {
-    const sample = canvas.getByLabelText("Mixed references stress sample");
-    await expect(sample.scrollWidth).toBeLessThanOrEqual(sample.clientWidth);
-    await expect(canvas.getAllByRole("button", { name: /Open attached file/u })).toHaveLength(3);
-    await expect(canvas.getByRole("button", { name: "Open agent Research" })).toBeInTheDocument();
-    await expect(canvas.getAllByRole("link", { name: /Open citation/u })).toHaveLength(2);
-  },
 };
 
 export const InlineAlignment: Story = {

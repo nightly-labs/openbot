@@ -1,6 +1,6 @@
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import type { CustomProviderDraft } from "@openbot/ui/features/custom-providers/custom-provider-form";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const localEndpoint: CustomProviderDraft = {
@@ -57,32 +57,6 @@ export const DialogErrors: Story = {
 
 export const DialogSubmits: Story = {
   args: { draft: localEndpoint },
-  play: async ({ args: storyArgs, userEvent }) => {
-    const body = within(document.body);
-    await userEvent.click(body.getByRole("button", { name: "Submit" }));
-    await expect(storyArgs.onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "studio-local", apiKey: "story-placeholder-not-a-key" }),
-    );
-  },
-};
-
-export const DialogRefusesAnEmptyForm: Story = {
-  play: async ({ args: storyArgs, userEvent }) => {
-    const body = within(document.body);
-    await userEvent.click(body.getByRole("button", { name: "Submit" }));
-    await expect(body.findByText("Enter a provider ID.")).resolves.toBeTruthy();
-    await expect(storyArgs.onSubmit).not.toHaveBeenCalled();
-  },
-};
-
-export const DialogAddsRows: Story = {
-  args: { draft: localEndpoint },
-  play: async ({ userEvent }) => {
-    const body = within(document.body);
-    await userEvent.click(body.getByRole("button", { name: "Add model" }));
-    await expect(body.findByRole("textbox", { name: "Model 3 ID" })).resolves.toBeTruthy();
-    await userEvent.click(body.getByRole("button", { name: "Remove model 3" }));
-  },
 };
 
 export const DialogBusy: Story = {

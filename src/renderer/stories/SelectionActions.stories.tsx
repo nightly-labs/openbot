@@ -1,6 +1,6 @@
 import { type MessageTextSelection, SelectionActionsBar } from "@openbot/ui/features/conversation/SelectionActions";
 import { createSignal, onSettled, Show } from "solid-js";
-import { expect, fn, userEvent, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 function SelectionActionsDemo(props: {
@@ -60,64 +60,9 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const CustomInstruction: Story = {
-  play: async ({ canvasElement }) => {
-    const page = within(canvasElement.ownerDocument.body);
-    await selectionActionsReady(page);
-    const toolbar = page.getByRole("toolbar", { name: "Actions for selected text" });
-    const input = await page.findByRole("textbox", { name: "Describe edits" });
-    const initialWidth = toolbar.getBoundingClientRect().width;
-    await userEvent.type(input, "M");
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    expect(Math.abs(toolbar.getBoundingClientRect().width - initialWidth)).toBeLessThan(1);
-    await userEvent.type(input, "ake this friendlier");
-    await expect(page.getByRole("button", { name: "Send edit instruction" })).toBeVisible();
-  },
-};
-
-export const Expanded: Story = {
-  play: async ({ canvasElement }) => {
-    const page = within(canvasElement.ownerDocument.body);
-    await selectionActionsReady(page);
-    await userEvent.click(await page.findByRole("button", { name: "Show more actions" }));
-    await waitFor(() => expect(page.getByRole("button", { name: "Grammar" })).toBeVisible());
-  },
-};
-
-export const Sending: Story = {
-  args: {
-    onSend: () => new Promise<boolean>(() => undefined),
-  },
-  play: async ({ canvasElement }) => {
-    const page = within(canvasElement.ownerDocument.body);
-    await selectionActionsReady(page);
-    await userEvent.click(await page.findByRole("button", { name: "Improve" }));
-    await expect(page.getByRole("status")).toHaveTextContent("Sending…");
-  },
-};
-
-export const SendError: Story = {
-  args: {
-    onSend: fn().mockResolvedValue(false),
-  },
-  play: async ({ canvasElement }) => {
-    const page = within(canvasElement.ownerDocument.body);
-    await selectionActionsReady(page);
-    await userEvent.click(await page.findByRole("button", { name: "Improve" }));
-    await expect(page.findByRole("alert")).resolves.toHaveTextContent("Couldn’t send");
-  },
-};
-
 export const Narrow: Story = {
   args: { width: "280px" },
   parameters: {
     viewport: { defaultViewport: "mobile2" },
   },
 };
-
-async function selectionActionsReady(page: ReturnType<typeof within>): Promise<void> {
-  const toolbar = await page.findByRole("toolbar", { name: "Actions for selected text" });
-  const layer = toolbar.closest(".selection-actions-layer");
-  if (!layer) throw new Error("Selection actions layer is missing");
-  await waitFor(() => expect(layer).toHaveAttribute("data-ready", "true"));
-}

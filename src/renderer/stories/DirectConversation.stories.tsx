@@ -1,7 +1,7 @@
 import type { DirectMessage } from "@openbot/contracts/ipc";
 import { DirectConversation } from "@openbot/ui/features/conversation/DirectConversation";
 import { createEffect, createSignal } from "solid-js";
-import { expect, fireEvent, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_DIRECT_SNAPSHOTS, STORY_PRESENCE } from "./fixtures";
 
@@ -89,45 +89,6 @@ function StatefulDirectConversation(props: { args: Parameters<typeof DirectConve
   );
 }
 
-/*
- * The pill that counts what arrived below the reader. The snapshot lives in a signal, because the
- * count is a function of arrival: the play function has to append to a thread the reader is
- * already scrolled away from.
- */
-const directPillBaseSnapshot = {
-  ...memberSnapshot,
-  revision: 2,
-  messages: unreadDirectMessages,
-  readState: { unreadCount: 0, firstUnreadMessageId: null, throughSequence: 24 },
-};
-
-function directPillArrival(index: number, own: boolean): DirectMessage {
-  return {
-    id: `direct-pill-arrival-${index}`,
-    threadId: "direct-alice",
-    senderMemberId: own ? "member-self" : member.id,
-    recipientMemberId: own ? member.id : "member-self",
-    text: `Arrived while the reader was scrolled up (${index}).`,
-    createdAt: `2026-08-19T10:${String(index).padStart(2, "0")}:00.000Z`,
-    sequence: unreadDirectMessages.length + index,
-  };
-}
-
-const [directPillSnapshot, setDirectPillSnapshot] =
-  createSignal<Parameters<typeof DirectConversation>[0]["snapshot"]>(directPillBaseSnapshot);
-
-function appendDirectPillMessage(index: number, own: boolean): void {
-  setDirectPillSnapshot((current) =>
-    current
-      ? {
-          ...current,
-          revision: (current.revision ?? 0) + 1,
-          messages: [...current.messages, directPillArrival(index, own)],
-        }
-      : current,
-  );
-}
-
 const meta = {
   title: "Team/DirectConversation",
   component: DirectConversation,
@@ -138,14 +99,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Conversation: Story = {
-  play: async ({ canvas, userEvent }) => {
-    const input = canvas.getByRole("textbox", { name: "Message Alice Chen" });
-    await userEvent.type(input, "I’ll review it now.");
-    await userEvent.click(canvas.getByRole("button", { name: "Send direct message" }));
-    await expect(input).toHaveValue("");
-  },
-};
+export const Conversation: Story = {};
 
 export const UnreadMessages: Story = {
   render: (storyArgs) => <StatefulDirectConversation args={storyArgs} />,
@@ -176,62 +130,6 @@ export const ScrollToLatest: Story = {
         throughSequence: 24,
       },
     },
-  },
-  play: async ({ canvas, canvasElement }) => {
-    const scrollElement = canvasElement.querySelector<HTMLElement>(".direct-message-list");
-    if (!scrollElement) throw new Error("Direct message scroll element is missing.");
-    Object.defineProperties(scrollElement, {
-      clientHeight: { configurable: true, value: 600 },
-      scrollHeight: { configurable: true, value: 1_200 },
-    });
-    scrollElement.scrollTop = 0;
-    scrollElement.dispatchEvent(new Event("scroll"));
-    await expect(canvas.findByRole("button", { name: "Scroll to latest message" })).resolves.toBeVisible();
-  },
-};
-
-export const NewMessagesPill: Story = {
-  name: "New messages pill",
-  render: (storyArgs) => (
-    <StatefulDirectConversation
-      args={{
-        ...storyArgs,
-        get snapshot() {
-          return directPillSnapshot();
-        },
-      }}
-    />
-  ),
-  args: { snapshot: directPillBaseSnapshot },
-  play: async ({ canvas, canvasElement }) => {
-    setDirectPillSnapshot(directPillBaseSnapshot);
-    const scrollElement = canvasElement.querySelector<HTMLElement>(".direct-message-list");
-    if (!scrollElement) throw new Error("Direct message scroll element is missing.");
-    Object.defineProperties(scrollElement, {
-      clientHeight: { configurable: true, value: 600 },
-      scrollHeight: { configurable: true, value: 1_200 },
-    });
-    scrollElement.scrollTop = 0;
-    scrollElement.dispatchEvent(new Event("scroll"));
-    await expect(canvas.findByRole("button", { name: "Scroll to latest message" })).resolves.toBeVisible();
-
-    appendDirectPillMessage(1, false);
-    await expect(canvas.findByRole("button", { name: "Jump to 1 new message" })).resolves.toBeVisible();
-
-    // The reader's own message is not news to them.
-    appendDirectPillMessage(2, true);
-    await expect(canvas.findByRole("button", { name: "Jump to 1 new message" })).resolves.toBeVisible();
-
-    appendDirectPillMessage(3, false);
-    await expect(canvas.findByRole("button", { name: "Jump to 2 new messages" })).resolves.toBeVisible();
-
-    fireEvent.click(await canvas.findByRole("button", { name: "Dismiss new message count" }));
-    await expect(canvas.findByRole("button", { name: "Scroll to latest message" })).resolves.toBeVisible();
-    expect(scrollElement.scrollTop).toBe(0);
-
-    // A dismissed count comes back with the next arrival, from zero.
-    appendDirectPillMessage(4, false);
-    await expect(canvas.findByRole("button", { name: "Jump to 1 new message" })).resolves.toBeVisible();
   },
 };
 

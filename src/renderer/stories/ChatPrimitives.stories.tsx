@@ -20,7 +20,7 @@ import { ChoiceCard } from "@openbot/ui/features/conversation/ConversationPrompt
 import { MessageActions, MessageBody } from "@openbot/ui/features/conversation/MessageRendering";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Show } from "solid-js";
-import { expect, fn, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { toAgentMessage } from "../src/app-message-projection";
 import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
@@ -388,34 +388,11 @@ export const MessageComposition: Story = {
 export const IntegratedMessages: Story = {
   name: "Integrated messages",
   render: () => <PrototypeThread />,
-  play: async ({ canvas, userEvent }) => {
-    onPrototypeReply.mockClear();
-    const message = canvas.getByLabelText("Assistant at 10:05");
-    const toolbar = within(message).getByRole("toolbar", { name: "Agent message actions" });
-    const addReaction = within(toolbar).getByRole("button", { name: "Add reaction" });
-    addReaction.focus();
-    await waitFor(() => expect(toolbar).toBeVisible());
-
-    await userEvent.click(addReaction);
-    const picker = await within(message).findByRole("menu", { name: "Add reaction" });
-    await userEvent.click(within(picker).getByRole("menuitemradio", { name: "React with 🎉" }));
-    await expect(within(message).findByRole("button", { name: "Remove reaction 🎉" })).resolves.toBeVisible();
-
-    const reply = within(toolbar).getByRole("button", { name: "Reply to Agent message" });
-    reply.focus();
-    await waitFor(() => expect(toolbar).toBeVisible());
-    await userEvent.keyboard("{Enter}");
-    await expect(onPrototypeReply).toHaveBeenCalledTimes(1);
-  },
 };
 
 export const NarrowConversation: Story = {
   name: "Integrated messages narrow",
   render: () => <PrototypeThread narrow />,
-  play: async ({ canvas }) => {
-    const stage = canvas.getByRole("region", { name: "Integrated chat example" });
-    await expect(stage.scrollWidth).toBeLessThanOrEqual(stage.clientWidth);
-  },
 };
 
 export const MessageDates: Story = {

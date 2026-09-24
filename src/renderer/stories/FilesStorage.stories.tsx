@@ -7,7 +7,7 @@ import { FileList } from "@openbot/ui/features/files/FileList";
 import { StorageOverview } from "@openbot/ui/features/files/StorageOverview";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createSignal, Show } from "solid-js";
-import { expect, fn, userEvent, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
   FILES_AGENT_USAGE,
@@ -71,43 +71,12 @@ function OverviewStage(props: { args: OverviewArgs; narrow?: boolean }) {
 export const StorageReady: Story = {
   name: "Storage: Ready",
   render: () => <OverviewStage args={overviewArgs()} />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("img", { name: /^Storage by type: Agent workspaces 3\.6 GB/u })).toBeVisible();
-    await expect(canvas.getByRole("list", { name: "Storage by type" })).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: /^All files/u }));
-    const all = await canvas.findByRole("region", { name: "All files on This Mac" });
-    await expect(within(all).getByRole("heading", { name: "Today" })).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: "Back to storage" }));
-    await expect(await canvas.findByRole("heading", { name: "Largest chats" })).toBeVisible();
-  },
-};
-
-export const StorageClearConfirm: Story = {
-  name: "Storage: Clear confirm",
-  render: () => <OverviewStage args={overviewArgs()} />,
-  play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Clear Cached server files" }));
-    const body = within(document.body);
-    const dialog = await body.findByRole("alertdialog", { name: "Clear cached server files?" });
-    // The dialog fades in; wait for the animation to end.
-    await waitFor(() => expect(dialog).toBeVisible());
-  },
 };
 
 // A member of a remote server reads the same page, without Clean up and without Delete.
 export const StorageMember: Story = {
   name: "Storage: Member",
   render: () => <OverviewStage args={{ ...overviewArgs(), hostName: "Studio server", canManage: false }} />,
-  play: async ({ canvas }) => {
-    await expect(canvas.queryByRole("heading", { name: "Clean up" })).toBeNull();
-    await userEvent.click(canvas.getByRole("button", { name: /^All files/u }));
-    await userEvent.click(await canvas.findByRole("button", { name: "More actions for release-notes-v4.md" }));
-    const body = within(document.body);
-    await expect(await body.findByRole("menuitem", { name: "Open" })).toBeVisible();
-    await expect(body.queryByRole("menuitem", { name: "Delete" })).toBeNull();
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(body.queryByRole("menu")).toBeNull());
-  },
 };
 
 export const StorageScanning: Story = {
@@ -125,10 +94,6 @@ export const StorageScanning: Story = {
       }}
     />
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("progressbar", { name: "Measuring storage" })).toBeVisible();
-    await expect(canvas.getByRole("button", { name: /Measuring/u })).toBeDisabled();
-  },
 };
 
 export const StorageEmpty: Story = {
@@ -235,12 +200,6 @@ function ServerSettingsStage(props: { args: OverviewArgs }) {
 export const StorageInServerSettings: Story = {
   name: "Storage: Server settings, this Mac",
   render: () => <ServerSettingsStage args={overviewArgs()} />,
-  play: async () => {
-    const body = within(document.body);
-    const dialog = await body.findByRole("dialog", { name: "Storage" });
-    await expect(within(dialog).getByRole("tab", { name: "Storage" })).toHaveAttribute("aria-selected", "true");
-    await expect(within(dialog).getByRole("img", { name: /^Storage by type/u })).toBeInTheDocument();
-  },
 };
 
 export const StorageInRemoteServerSettings: Story = {
@@ -321,22 +280,11 @@ function AgentFilesStory(props: { initiallyOpen: boolean; loading?: boolean; emp
 export const AgentFilesLink: Story = {
   name: "Agent files: Settings row",
   render: () => <AgentFilesStory initiallyOpen={false} />,
-  play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /^Files/u }));
-    await expect(await canvas.findByRole("region", { name: "Files of Chief" })).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: "Back to settings" }));
-    await expect(await canvas.findByRole("button", { name: /^Files/u })).toBeVisible();
-  },
 };
 
 export const AgentFilesReady: Story = {
   name: "Agent files: Ready",
   render: () => <AgentFilesStory initiallyOpen />,
-  play: async ({ canvas }) => {
-    // The settings detail slides in; wait for the animation to end.
-    await waitFor(() => expect(canvas.getByRole("button", { name: "Open workspace folder" })).toBeVisible());
-    await expect(canvas.getByRole("heading", { name: "Chats by size" })).toBeVisible();
-  },
 };
 
 export const AgentFilesEmpty: Story = {
@@ -372,18 +320,7 @@ function ConversationStage(props: Partial<Parameters<typeof ConversationFilesPan
 
 export const ConversationReady: Story = {
   name: "Chat files: Ready",
-  render: () => {
-    const onFileAction = fn(async () => undefined);
-    return <ConversationStage onFileAction={onFileAction} />;
-  },
-  play: async ({ canvas }) => {
-    const panel = canvas.getByRole("complementary", { name: "Files in Launch plan and release notes" });
-    await expect(within(panel).getByRole("heading", { name: "Today" })).toBeVisible();
-    await userEvent.click(within(panel).getByRole("button", { name: "More actions for release-notes-v4.md" }));
-    await expect(await within(document.body).findByRole("menuitem", { name: "Show in chat" })).toBeVisible();
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(within(document.body).queryByRole("menu")).toBeNull());
-  },
+  render: () => <ConversationStage />,
 };
 
 export const ConversationEmpty: Story = {
@@ -432,13 +369,6 @@ function ListStage(props: Partial<Parameters<typeof FileList>[0]>) {
 export const ListFilters: Story = {
   name: "File list: Search and filters",
   render: () => <ListStage />,
-  play: async ({ canvas }) => {
-    const images = canvas.getByRole("button", { name: /^Images/u });
-    await userEvent.click(images);
-    await expect(images).toHaveAttribute("aria-pressed", "true");
-    await userEvent.type(canvas.getByRole("searchbox", { name: "Search files" }), "moodboard");
-    await expect(canvas.getAllByRole("button", { name: /^Preview moodboard/u })).toHaveLength(3);
-  },
 };
 
 export const ListLargestFirst: Story = {
@@ -449,24 +379,6 @@ export const ListLargestFirst: Story = {
 export const ListNoMatch: Story = {
   name: "File list: No match",
   render: () => <ListStage initialQuery={{ search: "invoice-2019" }} />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText("No matching files")).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: "Clear filters" }));
-    await expect(canvas.getByRole("searchbox", { name: "Search files" })).toHaveValue("");
-  },
-};
-
-export const ListDeleteConfirm: Story = {
-  name: "File list: Delete confirm",
-  render: () => <ListStage />,
-  play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "More actions for release-notes-v4.md" }));
-    const body = within(document.body);
-    await userEvent.click(await body.findByRole("menuitem", { name: "Delete" }));
-    const dialog = await body.findByRole("alertdialog", { name: "Delete this file?" });
-    // The dialog fades in; wait for the animation to end.
-    await waitFor(() => expect(dialog).toBeVisible());
-  },
 };
 
 export const ListLoading: Story = {

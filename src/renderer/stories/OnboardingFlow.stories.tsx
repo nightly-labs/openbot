@@ -2,7 +2,7 @@ import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contr
 import type { AgentProviderId, AgentStatus, AppSetupState, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { Toaster, toast } from "@openbot/ui";
 import { createSignal, onCleanup } from "solid-js";
-import { expect, fn, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { OnboardingFlow } from "../src/features/onboarding/OnboardingFlow";
 import { providerKeyApi } from "../src/features/settings/provider-key-api";
@@ -345,11 +345,6 @@ export const Initial: Story = {};
 /** The row that adds a self-described endpoint. OpenCode is installed, so the row offers Add. */
 export const AddCustomProvider: Story = {
   args: { agentStatus: openCodeInstalledAgentStatus },
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: "Add custom provider" }));
-    const body = within(document.body);
-    await expect(body.findByRole("heading", { name: "Custom provider" })).resolves.toBeTruthy();
-  },
 };
 
 /** The endpoint is refused, so the form stays with the values, including the key the user typed. */
@@ -359,20 +354,6 @@ export const CustomProviderSaveFails: Story = {
     onAddCustomProvider: fn(async () => {
       throw new Error("House Router refused the API key.");
     }),
-  },
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole("button", { name: "Add custom provider" }));
-    const body = within(document.body);
-    // A required field appends an aria-hidden asterisk to its label, so its name is not an exact match.
-    await userEvent.type(await body.findByLabelText(/^Provider ID/), "house-router");
-    await userEvent.type(body.getByLabelText(/^Display name/), "House Router");
-    await userEvent.type(body.getByLabelText(/^Base URL/), "https://models.example.com/v1");
-    await userEvent.type(body.getByLabelText("Model 1 ID"), "glm-5-air");
-    await userEvent.type(body.getByLabelText("Model 1 display name"), "GLM 5 Air");
-    await userEvent.click(body.getByRole("button", { name: "Submit" }));
-
-    await expect(body.findByText("House Router refused the API key.")).resolves.toBeTruthy();
-    await expect(body.getByLabelText(/^Provider ID/)).toHaveValue("house-router");
   },
 };
 
@@ -397,23 +378,6 @@ export const NoProvidersConnected: Story = {
     onConnectProvider: fn(),
     onRefreshProviders: fn(),
   },
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const providers = canvas.getByRole("radiogroup", { name: "Default provider" });
-    await expect(within(providers).getByRole("radio", { name: /ChatGPT/ })).not.toBeChecked();
-    await expect(within(providers).getByRole("radio", { name: /Claude/ })).toBeEnabled();
-    await expect(within(providers).getByRole("radio", { name: /Grok/ })).toBeEnabled();
-
-    await userEvent.click(canvas.getByRole("button", { name: "Connect ChatGPT" }));
-    await userEvent.click(canvas.getByRole("button", { name: "Connect Claude" }));
-    await userEvent.click(canvas.getByRole("button", { name: "Connect Grok" }));
-    await userEvent.click(canvas.getByRole("button", { name: "Refresh providers" }));
-
-    await expect(storyArgs.onConnectProvider).toHaveBeenCalledWith("codex");
-    await expect(storyArgs.onConnectProvider).toHaveBeenCalledWith("claude");
-    await expect(storyArgs.onConnectProvider).toHaveBeenCalledWith("grok");
-    await expect(storyArgs.onRefreshProviders).toHaveBeenCalledOnce();
-    await expect(canvas.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
-  },
 };
 
 /**
@@ -428,12 +392,6 @@ export const SignInWithCode: Story = {
     onRefreshProviders: fn(),
     codeLogin: createFakeCodeLogin({ finishAfterMs: 0 }),
   },
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "More actions for ChatGPT" }));
-    const body = within(document.body);
-    await userEvent.click(await body.findByRole("menuitem", { name: "Log in with code" }));
-    await expect(await body.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
-  },
 };
 
 export const RefreshingProviders: Story = {
@@ -442,17 +400,6 @@ export const RefreshingProviders: Story = {
     refreshingProviders: true,
     onConnectProvider: fn(),
     onRefreshProviders: fn(),
-  },
-  play: async ({ canvas }) => {
-    const providers = canvas.getByRole("radiogroup", { name: "Default provider" });
-    await expect(canvas.getByRole("button", { name: "Checking providers" })).toBeDisabled();
-    await expect(canvas.queryByRole("button", { name: /^Install / })).not.toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: "Connect ChatGPT" })).toBeDisabled();
-    await expect(canvas.getByRole("button", { name: "Connect Claude" })).toBeDisabled();
-    await expect(canvas.getByRole("button", { name: "Connect Grok" })).toBeDisabled();
-    await expect(within(providers).getByRole("radio", { name: /ChatGPT/ })).toBeEnabled();
-    await expect(within(providers).getByRole("radio", { name: /Claude/ })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Connect" })).toBeEnabled();
   },
 };
 
@@ -485,12 +432,6 @@ export const ConnectingChatGPT: Story = {
     onConnectProvider: fn(),
     onRefreshProviders: fn(),
   },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Connect Claude" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Refresh providers" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Connect" })).toBeEnabled();
-  },
 };
 
 export const ConnectingClaude: Story = {
@@ -504,12 +445,6 @@ export const ConnectingClaude: Story = {
     onConnectProvider: fn(),
     onRefreshProviders: fn(),
   },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: "Restart Claude" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Refresh providers" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Connect" })).toBeEnabled();
-  },
 };
 
 export const ConnectingBoth: Story = {
@@ -517,11 +452,6 @@ export const ConnectingBoth: Story = {
     agentStatus: bothConnectingAgentStatus,
     onConnectProvider: fn(),
     onRefreshProviders: fn(),
-  },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Restart Claude" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Refresh providers" })).toBeEnabled();
   },
 };
 
@@ -532,15 +462,6 @@ export const RefreshResettingConnections: Story = {
     onRefreshProviders: fn(),
   },
   render: (storyArgs) => <RefreshResettingFlow args={storyArgs} />,
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    await expect(canvas.getByRole("button", { name: "Restart ChatGPT" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Restart Claude" })).toBeEnabled();
-    await userEvent.click(canvas.getByRole("button", { name: "Refresh providers" }));
-    await waitFor(() => expect(canvas.getByRole("button", { name: "Connect ChatGPT" })).toBeEnabled());
-    await expect(canvas.getByRole("button", { name: "Connect Claude" })).toBeEnabled();
-    await expect(storyArgs.onRefreshProviders).toHaveBeenCalledOnce();
-    await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
-  },
 };
 
 export const ConnectedWithReconnect: Story = {
@@ -548,13 +469,6 @@ export const ConnectedWithReconnect: Story = {
     agentStatus: STORY_AGENT_STATUS,
     onConnectProvider: fn(),
     onRefreshProviders: fn(),
-  },
-  play: async ({ canvas }) => {
-    const providers = canvas.getByRole("radiogroup", { name: "Default provider" });
-    await expect(within(providers).getByRole("radio", { name: /ChatGPT/ })).toBeChecked();
-    await expect(canvas.getByRole("button", { name: "Reconnect ChatGPT" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Reconnect Claude" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: "Next" })).toBeEnabled();
   },
 };
 

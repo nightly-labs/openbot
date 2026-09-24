@@ -1,7 +1,7 @@
 import { MarketplacePluginDetail } from "@openbot/ui/features/settings/MarketplacePluginDetail";
 import type { MarketplacePluginDetail as PluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import { createSignal } from "solid-js";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_MARKETPLACE_PLUGIN_AAVE as aave, STORY_AGENT_SUMMARIES } from "../src/preview/fixtures";
 
@@ -68,35 +68,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The spies the interaction story asserts on. Held here so `play` and `render` see the same ones. */
-const defaultSpies = { install: fn(), copyLink: fn(), runPrompt: fn(), uninstall: fn() };
-
 export const Default: Story = {
-  render: () => (
-    <PluginDetailStory
-      onInstall={defaultSpies.install}
-      onCopyLink={defaultSpies.copyLink}
-      onRunPrompt={defaultSpies.runPrompt}
-    />
-  ),
-  play: async ({ userEvent }) => {
-    defaultSpies.install.mockClear();
-    defaultSpies.copyLink.mockClear();
-    defaultSpies.runPrompt.mockClear();
-    const body = within(document.body);
-    await expect(await body.findByRole("region", { name: "Aave details" })).toBeVisible();
-
-    await userEvent.click(await body.findByRole("button", { name: "Copy link" }));
-    await expect(defaultSpies.copyLink).toHaveBeenCalled();
-
-    await userEvent.click(await body.findByRole("button", { name: "Install plugin" }));
-    await expect(defaultSpies.install).toHaveBeenCalled();
-
-    const [first] = aave.prompts;
-    if (!first) throw new Error("The Aave fixture must carry at least one example prompt.");
-    await userEvent.click(await body.findByRole("button", { name: `Ask Aave: ${first.text}` }));
-    await expect(defaultSpies.runPrompt).toHaveBeenCalledWith(first);
-  },
+  render: () => <PluginDetailStory />,
 };
 
 /** No agent on this computer yet: the target reads "No local agents" and the install waits. */
@@ -106,13 +79,7 @@ export const NoAgents: Story = {
 
 /** Already on this computer: the one control offers the way back out instead of the install. */
 export const Installed: Story = {
-  render: () => <PluginDetailStory installed onUninstall={defaultSpies.uninstall} />,
-  play: async ({ userEvent }) => {
-    defaultSpies.uninstall.mockClear();
-    const body = within(document.body);
-    await userEvent.click(await body.findByRole("button", { name: "Uninstall plugin" }));
-    await expect(defaultSpies.uninstall).toHaveBeenCalled();
-  },
+  render: () => <PluginDetailStory installed />,
 };
 
 /**
@@ -121,11 +88,6 @@ export const Installed: Story = {
  */
 export const PartlyInstalled: Story = {
   render: () => <PluginDetailStory removable />,
-  play: async () => {
-    const body = within(document.body);
-    await expect(await body.findByRole("button", { name: "Install plugin" })).toBeVisible();
-    await expect(await body.findByRole("button", { name: "Uninstall plugin" })).toBeVisible();
-  },
 };
 
 export const Installing: Story = {
@@ -175,6 +137,5 @@ export const LongContent: Story = {
 
 export const Narrow: Story = {
   ...Default,
-  play: undefined,
   globals: { viewport: { value: "marketplaceNarrow", isRotated: false } },
 };

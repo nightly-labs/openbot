@@ -458,7 +458,7 @@ export function AccountDock(props: AccountDockProps) {
             <span title={props.account.email}>{props.account.email}</span>
             <Show when={!props.remoteClient && props.appInfo}>
               {(info) => (
-                <span class="sr-only" data-testid="app-version">
+                <span class="sr-only">
                   Version {info().version} · {info().platform}
                 </span>
               )}
@@ -517,7 +517,7 @@ export function AccountDock(props: AccountDockProps) {
               <span title={props.account.email}>{props.account.email}</span>
               <Show when={!props.remoteClient && props.appInfo}>
                 {(info) => (
-                  <span class="sr-only" data-testid="app-version">
+                  <span class="sr-only">
                     Version {info().version} · {info().platform}
                   </span>
                 )}
