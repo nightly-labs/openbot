@@ -325,9 +325,9 @@ function ImportReview(props: {
           <For each={props.preview.agents}>
             {(agent) => (
               <li>
-                <label class="storage-row agent-import-row" for={`${headingId}-${agent.key}`}>
+                <label class="storage-row agent-import-row" for={`${headingId}-agent-${agent.key}`}>
                   <Checkbox
-                    id={`${headingId}-${agent.key}`}
+                    id={`${headingId}-agent-${agent.key}`}
                     checked={!excluded().has(agent.key)}
                     disabled={props.importing}
                     aria-label={`Import ${agent.name}`}
