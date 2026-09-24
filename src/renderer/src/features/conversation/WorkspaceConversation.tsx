@@ -59,6 +59,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const {
     activeQueue,
     activeRoutineIds,
+    activeRoutines,
     pendingPrompts,
     pendingApprovals,
     activeTurns,
@@ -171,6 +172,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       agent={activeAgent()}
       agents={agentList()}
       availableRoutineIds={activeRoutineIds()}
+      routines={activeRoutines()}
       modelOptions={modelOptions()}
       messages={activeMessages()}
       messageReferences={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.references ?? {}) : {}}

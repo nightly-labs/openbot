@@ -1,0 +1,111 @@
+/* Chat action card: the shell of a chat record the person can act on. Variants add a body. */
+
+/* Keyboard focus is a muted ring: an accent ring looks like a selection here. The same weight as
+ * the accent outline rule in auth.css, which loads earlier. */
+.chat-action-card :is(button, input, textarea):focus-visible {
+  outline: 0;
+}
+
+.chat-action-card .ui-button:focus-visible {
+  box-shadow: 0 0 0 1px var(--openbot-text-muted);
+}
+
+.chat-action-card.conversation-interaction-card {
+  min-width: min(100%, 320px);
+}
+
+.chat-action-card {
+  display: grid;
+  width: fit-content;
+  max-width: min(100%, 520px);
+  gap: var(--openbot-space-3);
+}
+
+.chat-action-card-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.chat-action-card-icon {
+  display: inline-flex;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+}
+
+.chat-action-card-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.chat-action-card-heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-action-card-eyebrow {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.chat-action-card-title {
+  overflow: hidden;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-lg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-action-card-open svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.chat-action-card-footer {
+  display: flex;
+  min-height: var(--openbot-leading-md);
+  align-items: center;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.chat-action-card-footer:empty {
+  display: none;
+}
+
+.chat-action-card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.chat-action-card-status svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.chat-action-card-footer-action {
+  margin-left: auto;
+}
+
+.chat-action-card-error {
+  color: var(--openbot-danger-text);
+}
+
+.chat-action-card-removed .chat-action-card-title {
+  color: var(--openbot-text-muted);
+  text-decoration: line-through;
+}

@@ -148,7 +148,6 @@
 
 .agent-routine-active-toggle,
 .agent-routine-action-buttons,
-.agent-routine-inline-fields,
 .agent-routine-run-row {
   display: flex;
   align-items: center;
@@ -198,24 +197,6 @@
 .agent-routine-when,
 .agent-routine-history {
   margin-top: 24px;
-}
-
-.agent-routine-field {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: 5px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routine-inline-fields {
-  gap: 8px;
-}
-
-.agent-routine-advanced-fields {
-  display: grid;
-  gap: 9px;
 }
 
 .agent-routine-history {
@@ -364,95 +345,28 @@
   resize: none;
 }
 
-.agent-routine-when,
 .agent-routine-history {
   margin-top: 2px;
 }
 
-.agent-routine-when h3,
+.agent-routine-when {
+  margin-top: 0;
+}
+
+/* The schedule is a field between Name and Instruction, so its heading matches their labels. */
+.agent-routine-when h3 {
+  margin: 0 0 var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: inherit;
+  line-height: var(--openbot-leading-md);
+}
+
 .agent-routine-history h3 {
   margin: 0 0 8px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
-}
-
-.agent-routine-schedule-card {
-  overflow: hidden;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-lg);
-  background: transparent;
-}
-
-.agent-routine-schedule-summary {
-  display: flex;
-  width: 100%;
-  min-height: 50px;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 10px 14px;
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-  text-align: left;
-}
-
-.agent-routine-schedule-summary:hover,
-.agent-routine-schedule-summary:focus-visible {
-  background: var(--openbot-hover);
-  color: var(--openbot-text-primary);
-}
-
-.agent-routine-schedule-summary > svg {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 auto;
-}
-
-.agent-routine-schedule-controls {
-  display: grid;
-  gap: 11px;
-  border-top: 1px solid var(--openbot-border);
-  padding: 12px 14px 14px;
-}
-
-.agent-routine-schedule-fields,
-.agent-routine-advanced-fields {
-  display: grid;
-  gap: 10px;
-}
-
-.agent-routine-schedule-hint {
-  margin: 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routine-field {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: 5px;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
-
-.agent-routine-inline-fields {
-  display: flex;
-  align-items: end;
-  gap: 8px;
-}
-
-.agent-routine-frequency-field > .ui-select,
-.agent-routine-time-select {
-  width: 100%;
-}
-
-.agent-routine-time-select-content {
-  max-height: 320px;
 }
 
 .agent-routine-history {

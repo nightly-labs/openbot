@@ -174,11 +174,13 @@ export const UnsavedChangesConfirmation: Story = {
 
 export const OpenTimePicker: Story = {
   render: () => <RoutinesStory />,
-  play: async ({ canvas, userEvent }) => {
+  play: async ({ canvas, canvasElement, userEvent }) => {
     await userEvent.click(await canvas.findByRole("button", { name: /Morning brief/ }));
-    await userEvent.click(canvas.getByRole("button", { name: /On weekdays at 7:00 AM/ }));
-    await userEvent.click(canvas.getByRole("button", { name: /^Time/ }));
-    await expect(canvas.getByRole("button", { name: /^Time/ })).toHaveTextContent("7:00 AM");
+    await expect(canvas.getByRole("button", { name: "Days: Weekdays" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Time: 7 AM" }));
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByRole("textbox", { name: "Time hour" })).toHaveValue("7");
+    await expect(body.getByRole("textbox", { name: "Time minute" })).toHaveValue("00");
   },
 };
 

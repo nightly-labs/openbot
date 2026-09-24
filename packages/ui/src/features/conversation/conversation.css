@@ -5,6 +5,8 @@
 @import "./styles/remote-desktop.css";
 @import "./styles/browser-panel.css";
 @import "./styles/agent-settings.css";
+@import "./styles/routine-schedule.css";
+@import "./styles/chat-action-card.css";
 @import "./styles/header-controls.css";
 @import "./styles/timeline.css";
 @import "./styles/messages.css";

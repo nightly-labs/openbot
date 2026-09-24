@@ -1,3 +1,4 @@
+export { default as AlarmClock } from "lucide-solid/icons/alarm-clock";
 export { default as ArrowDown } from "lucide-solid/icons/arrow-down";
 export { default as ArrowLeft } from "lucide-solid/icons/arrow-left";
 export { default as ArrowRight } from "lucide-solid/icons/arrow-right";

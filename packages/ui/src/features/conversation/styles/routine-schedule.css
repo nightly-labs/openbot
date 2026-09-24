@@ -1,0 +1,553 @@
+/* Routine schedule row: the frequency and its values as one sentence of chips. */
+.routine-trigger-row,
+.routine-weekday-strip,
+.routine-calendar-days {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+/* Keyboard focus is a muted ring, as on the row box: accent rings look like a selection here. */
+.routine-schedule-picker,
+.routine-popover,
+.routine-chip-select-content {
+  --routine-focus-ring: 0 0 0 1px var(--openbot-text-muted);
+  /* A light item hides a ring that touches it, so the ring has a gap of the popover colour. */
+  --routine-focus-ring-on-selected: 0 0 0 2px var(--openbot-bg-control), 0 0 0 3px var(--openbot-text-muted);
+}
+
+/* The same weight as the accent outline rule in auth.css, which loads earlier. */
+:is(.routine-schedule-picker, .routine-popover, .routine-chip-select-content)
+:is(button, input, textarea):focus-visible {
+  outline: 0;
+}
+
+:is(.routine-schedule-picker, .routine-popover) .ui-button:focus-visible {
+  box-shadow: var(--routine-focus-ring);
+}
+
+.routine-schedule-picker {
+  display: grid;
+  min-width: 0;
+  gap: var(--openbot-space-1-5);
+}
+
+/* One line at every width. A narrow row shrinks its flexible chip, not the line count. */
+/* In a panel the row is a form field, so it has the box of the settings inputs around it. */
+.routine-trigger-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-shadow-popover-ambient);
+  padding: var(--openbot-space-1);
+  transition: border-color var(--openbot-duration-hover) ease;
+}
+
+.routine-trigger-row:focus-within {
+  border-color: var(--openbot-text-muted);
+}
+
+.routine-schedule-picker[data-density="card"] .routine-trigger-row {
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+.routine-trigger-icon {
+  display: inline-flex;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent);
+  color: var(--openbot-text-on-accent);
+}
+
+.routine-trigger-icon svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  stroke-width: 2;
+}
+
+.routine-schedule-picker[data-density="panel"] .routine-trigger-icon {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+}
+
+.routine-schedule-picker[data-density="card"] .routine-trigger-icon {
+  display: none;
+}
+
+.routine-trigger-chips {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  /* Clips a row that is narrower than its fixed chips, and keeps the focus ring visible. */
+  overflow: clip;
+  overflow-clip-margin: var(--openbot-space-1);
+}
+
+.routine-trigger-phrase {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.routine-trigger-phrase-flexible {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.routine-connector {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.routine-chip-select {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.routine-chip-select-flexible {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.routine-chip {
+  display: inline-flex;
+  height: var(--openbot-control-md);
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  outline: 0;
+  background: var(--openbot-bg-control-active);
+  padding: 0 var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.routine-chip-flexible {
+  flex-shrink: 1;
+}
+
+.routine-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The chips sit one padding inside the box, so the row is as tall as an input at every width. */
+.routine-schedule-picker[data-density="panel"] .routine-chip {
+  height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-xs);
+}
+
+.routine-schedule-picker[data-density="card"] .routine-chip {
+  height: var(--openbot-control-sm);
+  padding: 0 var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+}
+
+.routine-chip:focus-visible {
+  box-shadow: var(--routine-focus-ring);
+}
+
+.routine-chip:is([aria-expanded="true"], [data-expanded]) {
+  background: var(--openbot-bg-control-hover);
+  box-shadow: 0 0 0 1px var(--openbot-border-strong);
+}
+
+.routine-chip:disabled,
+.routine-chip[data-disabled] {
+  cursor: default;
+  background: transparent;
+  padding: 0;
+  color: var(--openbot-text-secondary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .routine-chip:hover:not(:disabled, [data-disabled]) {
+    background: var(--openbot-bg-control-hover);
+    box-shadow: 0 0 0 1px var(--openbot-border-strong);
+  }
+}
+
+.routine-chip-select-content {
+  min-width: 160px;
+}
+
+.routine-chip-select-content .ui-select-item {
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.routine-cron-input {
+  min-width: 0;
+  max-width: 220px;
+  flex: 1 1 180px;
+  font-family: var(--openbot-font-mono);
+}
+
+.routine-schedule-hint {
+  margin: 0;
+  padding-left: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.routine-schedule-picker[data-density="card"] .routine-schedule-hint {
+  padding-left: 0;
+}
+
+/* Popovers */
+.routine-popover {
+  z-index: var(--openbot-layer-popover);
+  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-2);
+}
+
+.routine-weekday-strip {
+  display: flex;
+  gap: var(--openbot-space-1);
+}
+
+.routine-day-item {
+  display: inline-flex;
+}
+
+.routine-day {
+  display: inline-flex;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--openbot-radius-pill);
+  padding: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.routine-day-item:has(:focus-visible) .routine-day {
+  box-shadow: var(--routine-focus-ring);
+}
+
+/* The strip is short, so an unselected day can look like a button. A month grid stays plain. */
+.routine-weekday-strip .routine-day {
+  background: var(--openbot-bg-control-active);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .routine-day:hover:not(:disabled, .routine-day-selected) {
+    background: var(--openbot-hover);
+    color: var(--openbot-text-primary);
+  }
+}
+
+.routine-day.routine-day-selected,
+.routine-day.routine-day-selected:hover {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-canvas);
+}
+
+.routine-day.routine-day-selected:focus-visible,
+.routine-day-item:has(:focus-visible) .routine-day.routine-day-selected {
+  box-shadow: var(--routine-focus-ring-on-selected);
+}
+
+/* Time */
+.routine-clock-input {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.routine-clock-segment.ui-input {
+  width: 48px;
+  height: var(--openbot-control-lg);
+  border: 0;
+  background: var(--openbot-bg-control-active);
+  padding: 0;
+  font-size: var(--openbot-text-lg);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.routine-clock-segment.ui-input:focus-visible {
+  box-shadow: var(--routine-focus-ring);
+}
+
+.routine-cron-input.ui-input:focus-visible {
+  border-color: var(--openbot-text-muted);
+  box-shadow: none;
+}
+
+.routine-clock-separator {
+  color: var(--openbot-text-muted);
+}
+
+.routine-segmented {
+  display: flex;
+  margin-left: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control-active);
+  padding: var(--openbot-space-0-5);
+}
+
+.routine-segmented-control {
+  display: inline-flex;
+  height: calc(var(--openbot-control-lg) - 2 * var(--openbot-space-0-5));
+  min-width: 44px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--openbot-radius-sm);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.routine-segmented-control label {
+  cursor: pointer;
+}
+
+.routine-segmented-control[data-checked] {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-bg-canvas);
+}
+
+.routine-segmented-item:has(:focus-visible) .routine-segmented-control {
+  box-shadow: var(--routine-focus-ring);
+}
+
+.routine-segmented-item:has(:focus-visible) .routine-segmented-control[data-checked] {
+  box-shadow:
+    0 0 0 2px var(--openbot-bg-control-active),
+    0 0 0 3px var(--openbot-text-muted);
+}
+
+/* Hours window: a two-option list and, for "Between hours", the times beside it. */
+.routine-window-menu {
+  display: grid;
+  width: 240px;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-1);
+}
+
+.routine-window-options {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+}
+
+.routine-window-repeat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-2) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+}
+
+.routine-window-repeat-label {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.routine-window-option-control {
+  display: flex;
+  min-height: var(--openbot-control-lg);
+  align-items: center;
+  gap: var(--openbot-space-2);
+  cursor: pointer;
+  border-radius: var(--openbot-radius-md);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.routine-window-option-control[data-checked] {
+  background: var(--openbot-hover);
+}
+
+.routine-window-option:has(:focus-visible) .routine-window-option-control {
+  box-shadow: var(--routine-focus-ring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .routine-window-option-control:hover {
+    background: var(--openbot-hover);
+  }
+}
+
+.routine-window-option-label {
+  flex: 1;
+  cursor: pointer;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.routine-window-option-check {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+}
+
+.routine-window-option-check svg {
+  width: 100%;
+  height: 100%;
+}
+
+.routine-window-range {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+  padding: var(--openbot-space-1) var(--openbot-space-3) var(--openbot-space-2);
+}
+
+.routine-window-range-times {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.routine-window-range-count {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+/* Calendar */
+.routine-calendar {
+  display: grid;
+  width: calc(7 * var(--openbot-control-md) + 6 * var(--openbot-space-0-5));
+  gap: var(--openbot-space-1);
+}
+
+.routine-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--openbot-space-1);
+}
+
+.routine-calendar-title {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.routine-calendar-weekdays,
+.routine-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, var(--openbot-control-md));
+  gap: var(--openbot-space-0-5);
+}
+
+.routine-calendar-weekdays span {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-align: center;
+}
+
+.routine-calendar-day:focus-visible {
+  box-shadow: var(--routine-focus-ring);
+}
+
+.routine-calendar-day[aria-current="date"]:not(.routine-day-selected) {
+  color: var(--openbot-accent-text);
+}
+
+.routine-calendar-day:disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+
+/* Chat card */
+/*
+ * As wide as its content, as a message is: the row sets the width, and a narrow chat shrinks it.
+ * The minimum keeps the card still while most edits change the chips. It needs the second class
+ * because interaction-cards.css loads later and resets `min-width`.
+ */
+/*
+ * The row takes the most space that still shows every label whole. RoutineSchedulePicker sets
+ * `data-fit` from the labels and the width, so a short row keeps its room in a narrow panel.
+ * Each step keeps the rules of the steps before it.
+ */
+.routine-schedule-picker:not([data-fit="roomy"]) .routine-trigger-chips {
+  gap: var(--openbot-space-1-5);
+}
+
+.routine-schedule-picker:not([data-fit="roomy"]) .routine-trigger-phrase {
+  gap: var(--openbot-space-1);
+}
+
+.routine-schedule-picker:not([data-fit="roomy"]) .routine-connector {
+  font-size: var(--openbot-text-md);
+}
+
+.routine-schedule-picker[data-density="panel"]:not([data-fit="roomy"]) .routine-trigger-row {
+  gap: var(--openbot-space-1-5);
+}
+
+.routine-schedule-picker[data-density="panel"]:not([data-fit="roomy"]) .routine-trigger-icon svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.routine-schedule-picker[data-density="panel"]:not([data-fit="roomy"]) .routine-chip {
+  gap: var(--openbot-space-1);
+  padding: 0 var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+}
+
+.routine-schedule-picker[data-density="panel"]:is([data-fit="tight"], [data-fit="minimal"])
+  .routine-connector-optional {
+  display: none;
+}
+
+.routine-schedule-picker[data-density="panel"]:is([data-fit="tight"], [data-fit="minimal"])
+  :is(.routine-trigger-row, .routine-trigger-chips) {
+  gap: var(--openbot-space-1);
+}
+
+.routine-schedule-picker[data-density="panel"]:is([data-fit="tight"], [data-fit="minimal"]) .routine-trigger-icon {
+  width: var(--openbot-control-xs);
+  height: var(--openbot-control-xs);
+  align-self: center;
+}
+
+.routine-schedule-picker[data-density="panel"]:is([data-fit="tight"], [data-fit="minimal"]) .routine-chip {
+  padding: 0 var(--openbot-space-1-5);
+}
+
+/* The value chips then cut their labels short, and the frequency and time chips stay whole. */
+.routine-schedule-picker[data-fit="minimal"] :is(.routine-trigger-icon, .routine-connector) {
+  display: none;
+}
+
+.routine-schedule-picker[data-fit="minimal"] .routine-trigger-chips {
+  gap: var(--openbot-space-1);
+}
