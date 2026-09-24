@@ -13,12 +13,14 @@ import type {
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
+  InstalledSkill,
   QueueSnapshot,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  StorageUsage,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -129,6 +131,12 @@ export interface MobileWorkspaceContextValue {
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  /** Null when the host does not advertise `installed-skills`. */
+  loadAgentSkills: (agentId: string, serverId: string) => Promise<InstalledSkill[] | null>;
+  /** Null when the host does not advertise `storage-v1`. */
+  loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
+  /** Owners and admins only; the host refuses a member. */
+  deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   loadOlderMessages: (agentId: string) => Promise<void>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;

@@ -221,6 +221,7 @@ function ChannelForm({
           <SheetFormField
             label="Title"
             appearance="soft"
+            placeholder="Describe what this channel does"
             value={draft.title}
             onChangeText={(title) => setEdits((current) => ({ ...current, title }))}
             editable={!disabled}
@@ -229,6 +230,7 @@ function ChannelForm({
           <SheetFormField
             label="Instructions"
             appearance="soft"
+            placeholder="What will this channel work on?"
             multiline
             value={draft.instructions}
             onChangeText={(instructions) => setEdits((current) => ({ ...current, instructions }))}

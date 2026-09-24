@@ -2,8 +2,11 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   type AgentEvent,
   type AgentSummary,
+  assertStorageUsageScope,
   type BrowserTakeoverRequest,
   type CreateAgentInput,
+  decodeInstalledSkills,
+  decodeStorageUsage,
   isAgentMemory,
   isAgentModel,
   isAgentModelOption,
@@ -15,6 +18,7 @@ import {
   isRoutine,
   isSidebarLayoutSnapshot,
   type SidebarLayoutSnapshot,
+  STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -24,8 +28,10 @@ import {
   TEAM_CONVERSATION_UNREAD_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
+  TEAM_SEMANTIC_TAGS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -943,6 +949,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           serverCapabilities.current.get(serverId) ?? [],
           input,
         );
+      },
+      // A host too old to know the route answers 404, so ask its advertised capabilities first.
+      loadAgentSkills: async (agentId, serverId) =>
+        serverCapabilities.current.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
+          ? request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills, undefined, serverId)
+          : null,
+      loadAgentStorage: async (agentId, serverId, force = false) => {
+        if (!serverCapabilities.current.get(serverId)?.includes(STORAGE_CAPABILITY)) return null;
+        const input = { scope: "agent" as const, agentId, ...(force ? { force: true } : {}) };
+        return assertStorageUsageScope(
+          await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
+          input,
+        );
+      },
+      deleteStoredFile: async (fileId, serverId) => {
+        if (!serverCapabilities.current.get(serverId)?.includes(STORAGE_CAPABILITY))
+          throw new Error("This host does not support file management. Update OpenBot on the host.");
+        await request("POST", STORAGE_ROUTES.deleteFile, ignoreResponse, { fileId }, serverId);
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
