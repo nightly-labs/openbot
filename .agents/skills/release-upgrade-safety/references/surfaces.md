@@ -145,7 +145,7 @@ untouched — they already spell the agent `agent` on both sides.
 
 ## IPC channel list and its mirrors
 
-`packages/contracts/src/ipc-channels.ts` declares every channel. Per the table in
+`packages/contracts/src/ipc-endpoints.ts` declares every channel. Per the table in
 `packages/contracts/AGENTS.md`:
 
 | Mirror | What it is |
@@ -173,7 +173,7 @@ untouched — they already spell the agent `agent` on both sides.
 Two deploy paths, both ordered migrations-then-deploy. Neither one covers the other, and the
 deploy-race reasoning in gate E only holds while *both* keep that order.
 
-`auth:*` channels in `packages/contracts/src/ipc-channels.ts` are the desktop side of this contract.
+`auth:*` channels in `packages/contracts/src/ipc-endpoints.ts` are the desktop side of this contract.
 
 ## Updater and packaging
 

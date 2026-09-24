@@ -13,6 +13,7 @@ import type {
   BrowserEnvironment,
   BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
+  BrowserPreview,
   BrowserTab,
   BrowserViewport,
 } from "@openbot/contracts/ipc";
@@ -191,4 +192,30 @@ function controlSession(session: DynamicRecord): BrowserControlSession {
     phase,
     startedAt: requiredString(session, "startedAt"),
   };
+}
+
+// A `FromMain` decoder has a same-shaped `FromHost` twin in `src/main/remote-host-decoding.ts` and
+// its four wire-area siblings, and is deliberately not the same function: this side is checking what
+// the main process sent the renderer, which is a trusted sender, while that side is checking a remote
+// team server, which is not. The suffix is there so a later reader does not merge them onto whichever
+// is looser. `src/main/ipc-channel-coverage.test.ts` checks the two sets name for name, so dropping a
+// suffix or deleting one half is a red test rather than a comment nobody read.
+export function decodeBrowserPreviewFromMain(value: unknown): BrowserPreview {
+  const preview = decodeRecord(value, "browser preview");
+  const dataUrl = requiredString(preview, "dataUrl");
+  const width = requiredNumber(preview, "width");
+  const height = requiredNumber(preview, "height");
+  if (
+    dataUrl.length > 2_000_000 ||
+    !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(dataUrl) ||
+    !Number.isSafeInteger(width) ||
+    width <= 0 ||
+    width > 960 ||
+    !Number.isSafeInteger(height) ||
+    height <= 0 ||
+    height > 600
+  ) {
+    throw new Error("Invalid browser preview.");
+  }
+  return { dataUrl, width, height };
 }

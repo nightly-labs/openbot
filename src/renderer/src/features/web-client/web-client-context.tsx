@@ -15,6 +15,7 @@ import type {
   SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
+import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import type { SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
 import { createMemo, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
@@ -159,10 +160,23 @@ export function createWebWorkspace(props: {
       event(id, event) {
         if (disposed || id !== hostId) return;
         if (event.type === "runtime-snapshot") {
+          const { attentionComplete } = event.snapshot;
           setState((draft) => {
-            draft.approvals = event.snapshot.pendingApprovals;
-            draft.prompts = event.snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" }));
-            draft.takeovers = event.snapshot.pendingBrowserTakeovers;
+            draft.approvals = reconcilePendingRequests(
+              draft.approvals,
+              event.snapshot.pendingApprovals,
+              attentionComplete,
+            );
+            draft.prompts = reconcilePendingRequests(
+              draft.prompts,
+              event.snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" as const })),
+              attentionComplete,
+            );
+            draft.takeovers = reconcilePendingRequests(
+              draft.takeovers,
+              event.snapshot.pendingBrowserTakeovers,
+              attentionComplete,
+            );
           });
         } else if (event.type === "prompt") {
           setState((draft) => {

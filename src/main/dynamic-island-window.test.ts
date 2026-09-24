@@ -8,7 +8,7 @@ import {
   type DynamicIslandAction,
   type DynamicIslandPreference,
   type DynamicIslandPresentation,
-  IPC_CHANNELS,
+  IPC_ENDPOINTS,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
@@ -240,7 +240,7 @@ describe("dynamic island window geometry", () => {
     displays = [display({ id: 1, bounds: { x: 0, y: 0, width: 1800, height: 1169 } })];
     await controller.reconcileWindow();
     expect(loadWindow).toHaveBeenCalledOnce();
-    expect(windows[0]?.webContents.send).toHaveBeenCalledWith(IPC_CHANNELS.dynamicIslandGeometry, {
+    expect(windows[0]?.webContents.send).toHaveBeenCalledWith(IPC_ENDPOINTS.dynamicIsland.geometry.channel, {
       width: 220,
       height: 38,
     });
@@ -252,7 +252,7 @@ describe("dynamic island window geometry", () => {
     displays = [display({ id: 1, bounds: { x: 0, y: 0, width: 2560, height: 1440 } })];
     await controller.reconcileWindow();
     expect(loadWindow).toHaveBeenCalledOnce();
-    expect(windows[0]?.webContents.send).toHaveBeenLastCalledWith(IPC_CHANNELS.dynamicIslandGeometry, null);
+    expect(windows[0]?.webContents.send).toHaveBeenLastCalledWith(IPC_ENDPOINTS.dynamicIsland.geometry.channel, null);
   });
 
   it("retries a skipped geometry update after the overlay renderer reloads", async () => {
@@ -286,7 +286,7 @@ describe("dynamic island window geometry", () => {
 
     window.webContents.isLoadingMainFrame.mockReturnValue(false);
     window.webContents.emit("did-finish-load");
-    expect(window.webContents.send).toHaveBeenCalledWith(IPC_CHANNELS.dynamicIslandGeometry, {
+    expect(window.webContents.send).toHaveBeenCalledWith(IPC_ENDPOINTS.dynamicIsland.geometry.channel, {
       width: 220,
       height: 38,
     });
@@ -670,7 +670,7 @@ describe("dynamic island window geometry", () => {
     await expect(controller.performAction(action)).resolves.toBeUndefined();
     expect(presentMainWindow).toHaveBeenCalledTimes(2);
     expect(presentMainWindow).toHaveBeenCalledWith(mainWindow);
-    expect(mainWindow.webContents.send).toHaveBeenCalledWith(IPC_CHANNELS.dynamicIslandAction, action);
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(IPC_ENDPOINTS.dynamicIsland.action.channel, action);
   });
 
   it("accepts every overlay renderer and rejects unrelated senders", () => {

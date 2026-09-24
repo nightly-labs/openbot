@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { expect, it, vi } from "vitest";
 
 const bridge = vi.hoisted(() => {
@@ -28,7 +28,8 @@ vi.mock("electron", () => ({
 import "./index";
 
 const send = (payload: unknown) => {
-  for (const handler of bridge.listeners.get(IPC_CHANNELS.computerUseHighlightPlacement) ?? []) handler(null, payload);
+  for (const handler of bridge.listeners.get(IPC_ENDPOINTS.computerUse.highlightPlacement.channel) ?? [])
+    handler(null, payload);
 };
 
 const placement = {

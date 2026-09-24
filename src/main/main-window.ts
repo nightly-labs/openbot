@@ -13,7 +13,7 @@ import { join } from "node:path";
 import {
   type AgentEvent,
   type ComputerUseHighlightPlacement,
-  IPC_CHANNELS,
+  IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type MacPermissionId,
 } from "@openbot/contracts/ipc";
@@ -486,7 +486,7 @@ export function sendComputerUseHighlightPlacement(
   window: BrowserWindow,
   placement: ComputerUseHighlightPlacement,
 ): void {
-  sendToRenderer(window, IPC_CHANNELS.computerUseHighlightPlacement, placement);
+  sendToRenderer(window, IPC_ENDPOINTS.computerUse.highlightPlacement, placement);
 }
 
 export function showMainWindow(window: BrowserWindow): void {
@@ -540,7 +540,7 @@ export function configureApplicationMenu(service: AgentService, updater: UpdateS
             click: (_item, focusedWindow) => {
               const candidate = focusedWindow ?? BrowserWindow.getFocusedWindow();
               if (!(candidate instanceof BrowserWindow)) return;
-              sendToRenderer(candidate, IPC_CHANNELS.openSettings);
+              sendToRenderer(candidate, IPC_ENDPOINTS.app.openSettings);
             },
           },
           { type: "separator" },

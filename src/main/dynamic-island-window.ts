@@ -9,7 +9,7 @@ import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   dynamicIslandCompactHeight,
   IDLE_DYNAMIC_ISLAND_PRESENTATION,
-  IPC_CHANNELS,
+  IPC_ENDPOINTS,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
@@ -115,7 +115,7 @@ export class DynamicIslandWindowController {
     if (isDeepStrictEqual(this.#presentation, presentation)) return;
     this.#presentation = presentation;
     for (const window of this.#windows.values()) {
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPresentation, presentation);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, presentation);
     }
   }
 
@@ -176,7 +176,7 @@ export class DynamicIslandWindowController {
       if (existing) return existing;
       const pending = this.#ensureMainWindow().then(async (window) => {
         await this.#options.performCriticalAction(action);
-        sendToRenderer(window, IPC_CHANNELS.dynamicIslandAction, action);
+        sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action);
       });
       this.#criticalActions.set(key, pending);
       try {
@@ -188,7 +188,7 @@ export class DynamicIslandWindowController {
     }
     const window = await this.#ensureMainWindow();
     this.#options.presentMainWindow(window);
-    if (action.type !== "open-app" && !sendToRenderer(window, IPC_CHANNELS.dynamicIslandAction, action)) {
+    if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
       throw new Error("The OpenBot window is temporarily unavailable.");
     }
   }
@@ -241,7 +241,7 @@ export class DynamicIslandWindowController {
           false,
         );
         if (notchSizeChanged(this.#notchSizes.get(display.id), notchSize)) {
-          if (sendToRenderer(current, IPC_CHANNELS.dynamicIslandGeometry, notchSize ?? null)) {
+          if (sendToRenderer(current, IPC_ENDPOINTS.dynamicIsland.geometry, notchSize ?? null)) {
             this.#rememberNotchSize(display.id, notchSize);
           }
         }
@@ -276,10 +276,10 @@ export class DynamicIslandWindowController {
     window.webContents.on("did-finish-load", () => {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const currentDisplay = this.#options.getDisplays().find((candidate) => candidate.id === display.id) ?? display;
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPresentation, this.#presentation);
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPreference, this.#preference);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, this.#presentation);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.preference, this.#preference);
       const notchSize = notchSizeForDisplay(currentDisplay);
-      if (sendToRenderer(window, IPC_CHANNELS.dynamicIslandGeometry, notchSize ?? null)) {
+      if (sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.geometry, notchSize ?? null)) {
         this.#rememberNotchSize(display.id, notchSize);
       }
     });
@@ -313,7 +313,7 @@ export class DynamicIslandWindowController {
 
   private publishPreference(): void {
     for (const window of this.#windows.values()) {
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPreference, this.#preference);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.preference, this.#preference);
     }
   }
 

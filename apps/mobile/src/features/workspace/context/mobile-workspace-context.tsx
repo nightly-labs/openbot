@@ -41,6 +41,7 @@ import {
   readAgentAnalytics,
 } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import {
   deleteAgent,
   discardAttachmentDraft,
@@ -513,14 +514,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (event.type === "runtime-snapshot") {
         setBrowserRequests((current) => ({
           ...current,
-          [serverId]: event.snapshot.attentionComplete
-            ? event.snapshot.pendingBrowserTakeovers
-            : [
-                ...(current[serverId] ?? []).filter(
-                  (item) => !event.snapshot.pendingBrowserTakeovers.some((next) => next.requestId === item.requestId),
-                ),
-                ...event.snapshot.pendingBrowserTakeovers,
-              ],
+          [serverId]: reconcilePendingRequests(
+            current[serverId] ?? [],
+            event.snapshot.pendingBrowserTakeovers,
+            event.snapshot.attentionComplete,
+          ),
         }));
       } else if (event.type === "browser-takeover-requested") {
         setBrowserRequests((current) => ({
