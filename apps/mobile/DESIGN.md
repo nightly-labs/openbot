@@ -169,7 +169,7 @@ maps them to utilities. Do not copy these hex values into components.
 
 | Role | Utility | Light | Dark |
 | --- | --- | --- | --- |
-| Sheet background | `bg-sheet` | `#fcfcfc` | `#121212` |
+| Sheet background | `bg-sheet` | `#fcfcfc` | `#141414` |
 | Group background | `bg-grouped` | `#f2f2f2` | `#212121` |
 | Supporting text | `text-grouped-secondary` | `#69696e` | `#96969b` |
 | Inset separator | `bg-grouped-border` | `#dddddf` | `#333335` |
