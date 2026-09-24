@@ -1,4 +1,4 @@
-import type { AgentApproval, AgentEvent, QueueSnapshot } from "@openbot/contracts/ipc";
+import type { AgentApproval, AgentEvent, QueueSnapshot, RoutineFields } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAnsweredPrompts } from "./answered-prompts";
@@ -12,6 +12,8 @@ import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
+/** `current` is false while a new list loads. */
+type RoutineSnapshot = { routines: RoutineFields[]; current: boolean };
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;
 
 /**
@@ -38,7 +40,7 @@ type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-reques
  *   reads `liveMessages`, to tell a resolution the user has seen from one main
  *   has already persisted. It moves to `conversation` with that state.
  *
- * `completedTurnByAgent` and `routineIdsByConversation` used to survive a switch
+ * `completedTurnByAgent` and `routinesByConversation` used to survive a switch
  * because nobody cleared them; they now die with the scope, which is the
  * teardown the old list of setters kept forgetting. `completedTurnByAgent` had
  * grown for the life of the process.
@@ -68,9 +70,9 @@ const Turns = createSimpleContext({
     >(seed?.turnProgress ?? {});
     const [failedTurns, setFailedTurns] = createSignal<Record<string, string | undefined>>(seed?.failedTurns ?? {});
     const [queues, setQueues] = createSignal<Record<string, QueueSnapshot>>(seed?.queues ?? {});
-    const [routineIdsByConversation, setRoutineIdsByConversation] = createSignal<Record<string, string[] | undefined>>(
-      {},
-    );
+    const [routinesByConversation, setRoutinesByConversation] = createSignal<
+      Record<string, RoutineSnapshot | undefined>
+    >({});
     const {
       presentedPromptResolutions,
       setPresentedPromptResolutions,
@@ -91,12 +93,15 @@ const Turns = createSimpleContext({
       const key = agentConversationKey(serverId, agentId);
       const request = (routineSnapshotRequests.get(key) ?? 0) + 1;
       routineSnapshotRequests.set(key, request);
-      setRoutineIdsByConversation((current) => ({ ...current, [key]: undefined }));
+      setRoutinesByConversation((current) => {
+        const snapshot = current[key];
+        return snapshot ? { ...current, [key]: { ...snapshot, current: false } } : current;
+      });
       void turnsPort()
         .agent.listRoutines(agentId)
         .then((routines) => {
           if (routineSnapshotRequests.get(key) !== request) return;
-          setRoutineIdsByConversation((current) => ({ ...current, [key]: routines.map((routine) => routine.id) }));
+          setRoutinesByConversation((current) => ({ ...current, [key]: { routines, current: true } }));
         })
         .catch(() => undefined);
     }
@@ -341,10 +346,17 @@ const Turns = createSimpleContext({
       const agent = activeAgent();
       return agent ? queues()[agent.id] : undefined;
     });
-    const activeRoutineIds = createMemo(() => {
+    const activeRoutineSnapshot = createMemo(() => {
       const agent = activeAgent();
-      return agent ? routineIdsByConversation()[agentConversationKey(activeServerId(), agent.id)] : undefined;
+      return agent ? routinesByConversation()[agentConversationKey(activeServerId(), agent.id)] : undefined;
     });
+    // A routine link opens only a routine the newest list has; a deleted one must not open.
+    const activeRoutineIds = createMemo(() => {
+      const snapshot = activeRoutineSnapshot();
+      return snapshot?.current ? snapshot.routines.map((routine) => routine.id) : undefined;
+    });
+    // A chat card keeps the last list while a new one loads, so it does not blink.
+    const activeRoutines = createMemo(() => activeRoutineSnapshot()?.routines);
 
     /**
      * The seed is `dynamicIslandCoordinator.serverState(serverId)`, which is
@@ -360,7 +372,7 @@ const Turns = createSimpleContext({
       setFailedTurns,
       queues,
       setQueues,
-      routineIdsByConversation,
+      routinesByConversation,
       pendingPrompts,
       setPendingPrompts,
       presentedPromptResolutions,
@@ -373,6 +385,7 @@ const Turns = createSimpleContext({
       queueSnapshotRequests,
       activeQueue,
       activeRoutineIds,
+      activeRoutines,
       refreshRoutineIds,
       answerPrompt,
       respondToApproval,

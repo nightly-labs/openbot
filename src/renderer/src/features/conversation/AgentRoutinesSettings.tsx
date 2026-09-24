@@ -5,8 +5,19 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
 import { errorMessage } from "@openbot/ui/error-message";
 import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
-import { RoutineScheduleEditor } from "@openbot/ui/features/conversation/RoutineScheduleEditor";
-import { defaultRoutineSchedule, routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
+import { RoutineSchedulePicker } from "@openbot/ui/features/conversation/RoutineSchedulePicker";
+import {
+  ROUTINE_EVERY_DAY,
+  type RoutineScheduleDraft,
+  routineDraftSummary,
+} from "@openbot/ui/features/conversation/routine-schedule-draft";
+import {
+  ROUTINE_SAVED_DRAFT_KINDS,
+  routineDraftProblem,
+  routineScheduleFromDraft,
+  routineScheduleToDraft,
+} from "@openbot/ui/features/conversation/routine-schedule-saved";
+import { routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import type { RoutinesPort } from "./routines-port";
@@ -28,8 +39,12 @@ interface RoutineDraft {
   name: string;
   instruction: string;
   active: boolean;
+  /** Saved as it is until the user changes a chip, so a rename keeps a schedule the chips cannot show. */
   schedule: RoutineSchedule;
+  scheduleDraft: RoutineScheduleDraft;
 }
+
+const NEW_ROUTINE_SCHEDULE: RoutineScheduleDraft = { kind: "daily", days: ROUTINE_EVERY_DAY, time: "09:00" };
 
 interface AgentRoutinesSettingsProps {
   /** Names the owner and owns every call. A channel passes `channelRoutinesPort` here. */
@@ -53,26 +68,35 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const [testing, setTesting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [confirmDelete, setConfirmDelete] = createSignal(false);
-  const [scheduleExpanded, setScheduleExpanded] = createSignal(false);
   const [pendingExit, setPendingExit] = createSignal<PendingRoutineExit | null>(null);
   const scrollFades = createScrollFades();
   let draftRevision = 0;
+  // The saved routine the open draft started from. A field that still matches it is unedited.
+  let draftBase: RoutineFields | null = null;
 
   onCleanup(scrollFades.stop);
 
+  // Only the newest list applies: an older response can arrive after a save and undo it.
+  let listRequest = 0;
+
   async function loadRoutines(): Promise<void> {
+    const request = ++listRequest;
     try {
       const next = await props.port.list();
+      if (request !== listRequest) return;
       setRoutines(next);
       setRoutinesLoaded(true);
       props.onCountChange(next.length);
-      const selected = draft();
-      if (selected?.id && !next.some((routine) => routine.id === selected.id)) closeEditor();
+      const selectedId = draft()?.id;
+      const selected = selectedId ? next.find((routine) => routine.id === selectedId) : undefined;
+      if (selectedId && !selected) closeEditor();
+      if (selected) refreshDraft(selected);
     } catch (caught) {
+      if (request !== listRequest) return;
       setRoutinesLoaded(false);
       setError(errorMessage(caught, "Could not load routines."));
     } finally {
-      setLoading(false);
+      if (request === listRequest) setLoading(false);
     }
   }
 
@@ -122,15 +146,41 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   );
 
   createEffect(
-    () => [draft(), routines().length, runs().length, loading(), scheduleExpanded(), confirmDelete(), error()] as const,
+    () => [draft(), routines().length, runs().length, loading(), confirmDelete(), error()] as const,
     () => {
       scrollFades.remeasure();
     },
   );
 
+  /**
+   * Takes a change saved elsewhere, such as from a chat card, into each field the person did not
+   * edit here. Without it, the next Save would write the old values back.
+   */
+  function refreshDraft(routine: RoutineFields): void {
+    const base = draftBase;
+    draftBase = routine;
+    if (base?.id !== routine.id) return;
+    setDraft((current) => {
+      if (current?.id !== routine.id) return current;
+      const scheduleEdited = JSON.stringify(current.schedule) !== JSON.stringify(base.trigger.schedule);
+      return {
+        ...current,
+        name: current.name === base.name ? routine.name : current.name,
+        instruction: current.instruction === base.instruction ? routine.instruction : current.instruction,
+        active: current.active === base.active ? routine.active : current.active,
+        ...(scheduleEdited
+          ? {}
+          : {
+              schedule: structuredClone(routine.trigger.schedule),
+              scheduleDraft: routineScheduleToDraft(routine.trigger.schedule),
+            }),
+      };
+    });
+  }
+
   function openRoutine(routine: RoutineFields): void {
+    draftBase = routine;
     setConfirmDelete(false);
-    setScheduleExpanded(false);
     setError(null);
     draftRevision = 0;
     setDirty(false);
@@ -140,13 +190,14 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       instruction: routine.instruction,
       active: routine.active,
       schedule: structuredClone(routine.trigger.schedule),
+      scheduleDraft: routineScheduleToDraft(routine.trigger.schedule),
     });
     void loadRuns(routine.id);
   }
 
   function createDraft(): void {
+    draftBase = null;
     setConfirmDelete(false);
-    setScheduleExpanded(false);
     setRuns([]);
     setError(null);
     draftRevision = 0;
@@ -156,18 +207,19 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       name: "",
       instruction: "",
       active: true,
-      schedule: defaultRoutineSchedule("daily"),
+      schedule: routineScheduleFromDraft(NEW_ROUTINE_SCHEDULE),
+      scheduleDraft: NEW_ROUTINE_SCHEDULE,
     });
   }
 
   function closeEditor(): void {
+    draftBase = null;
     setDraft(null);
     setRuns([]);
     setError(null);
     draftRevision = 0;
     setDirty(false);
     setConfirmDelete(false);
-    setScheduleExpanded(false);
     setPendingExit(null);
   }
 
@@ -260,6 +312,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         return next;
       });
       setDraft((latest) => (latest && latest.id === current.id ? { ...latest, id: saved.id } : latest));
+      if (draft()?.id === current.id) draftBase = saved;
       if (draftRevision === savingRevision) setDirty(false);
       if (!current.id) void loadRuns(saved.id);
       trackRoutineAction(analytics, action, current.schedule, startedAt, "succeeded");
@@ -382,9 +435,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                           </span>
                           <span>
                             <strong>{routine.name}</strong>
-                            <small>
-                              {routine.active ? routineScheduleSummary(routine.trigger.schedule) : "Paused"}
-                            </small>
+                            <small>{routine.active ? routineListSummary(routine.trigger.schedule) : "Paused"}</small>
                           </span>
                         </Button>
                       )}
@@ -464,6 +515,20 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   onValueChange={(name) => changeDraft((value) => ({ ...value, name }))}
                 />
               </label>
+              <section class="agent-routine-when" aria-labelledby="agent-routine-when-heading">
+                <h3 id="agent-routine-when-heading">When to run</h3>
+                <RoutineSchedulePicker
+                  schedule={current().scheduleDraft}
+                  kinds={ROUTINE_SAVED_DRAFT_KINDS}
+                  onChange={(scheduleDraft) =>
+                    changeDraft((value) => ({
+                      ...value,
+                      schedule: routineScheduleFromDraft(scheduleDraft),
+                      scheduleDraft,
+                    }))
+                  }
+                />
+              </section>
               <label class="settings-field agent-routine-instruction-field">
                 <span>Instruction</span>
                 <Textarea
@@ -473,13 +538,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   onValueChange={(instruction) => changeDraft((value) => ({ ...value, instruction }))}
                 />
               </label>
-
-              <RoutineScheduleEditor
-                schedule={current().schedule}
-                expanded={scheduleExpanded()}
-                onExpandedChange={setScheduleExpanded}
-                onChange={(schedule) => changeDraft((value) => ({ ...value, schedule }))}
-              />
 
               <RoutineRunHistory runs={runs()} onOpenRun={props.onOpenRun ? requestOpenRun : undefined} />
             </div>
@@ -507,8 +565,18 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   );
 }
 
+/**
+ * The list row reads the schedule as the chips do. A schedule the chips show only as cron, such
+ * as an interval, keeps its own summary: "Every 15 minutes", not the cron text.
+ */
+function routineListSummary(schedule: RoutineSchedule): string {
+  const draft = routineScheduleToDraft(schedule);
+  if (draft.kind === "custom") return routineScheduleSummary(schedule);
+  return routineDraftSummary(draft);
+}
+
 function validDraft(draft: RoutineDraft): boolean {
-  return Boolean(draft.name.trim() && draft.instruction.trim());
+  return Boolean(draft.name.trim() && draft.instruction.trim()) && routineDraftProblem(draft.scheduleDraft) === null;
 }
 
 function isBlankNewDraft(draft: RoutineDraft): boolean {

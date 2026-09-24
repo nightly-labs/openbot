@@ -560,6 +560,10 @@ export function createConversationViewScope(props: ConversationProps) {
     });
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      // An open popover, such as a routine chip or the model picker, closes on this key from a
+      // document listener that runs after this one. Closing the panel under it too discards the
+      // edit the person was making.
+      if (event.target instanceof Element && event.target.closest('[role="dialog"]')) return;
       if (browserExpandedOpen() && !props.globalOverlayOpen) {
         event.preventDefault();
         setActiveRightPanel("browser");

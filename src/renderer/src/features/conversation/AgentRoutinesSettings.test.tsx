@@ -1,4 +1,4 @@
-import type { Routine, RoutineRun } from "@openbot/contracts/ipc";
+import type { Routine, RoutineFields, RoutineRun } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -218,11 +218,12 @@ describe("AgentRoutinesSettings", () => {
 
     await screen.findByText("No routines yet.");
     await fireEvent.click(screen.getByRole("button", { name: "Create Routine" }));
-    await fireEvent.click(screen.getByRole("button", { name: /On every day at/ }));
-    const scheduleType = screen.getByRole("button", { name: /^Frequency/ });
-    await fireEvent.pointerDown(scheduleType, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "Weekdays" }));
-    expect(scheduleType).toHaveTextContent("Weekdays");
+    expect(screen.getByRole("button", { name: "Frequency Daily" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Days: Every day" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Saturday" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Sunday" }));
+    await fireEvent.keyDown(screen.getByRole("button", { name: "Sunday" }), { key: "Escape" });
+    expect(await screen.findByRole("button", { name: "Days: Weekdays" })).toBeInTheDocument();
     await fireEvent.input(screen.getByRole("textbox", { name: "Name" }), {
       target: { value: "Morning brief" },
     });
@@ -297,21 +298,19 @@ describe("AgentRoutinesSettings", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Test run" })).toBeEnabled());
   });
 
-  it("offers 96 quarter-hour values and saves a selected time", async () => {
+  it("saves a typed time", async () => {
     const mock = setupOpenBot({ routines: { chief: [routine] } });
     const updateRoutine = vi.spyOn(mock.api.agent, "updateRoutine");
     render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
     await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
-    await fireEvent.click(screen.getByRole("button", { name: /On weekdays at 7:00 AM/ }));
-    const timePicker = screen.getByRole("button", { name: /^Time/ });
-    await fireEvent.pointerDown(timePicker, { pointerType: "mouse", button: 0 });
+    await fireEvent.click(screen.getByRole("button", { name: "Time: 7 AM" }));
+    const minute = await screen.findByRole("textbox", { name: "Time minute" });
+    await fireEvent.input(minute, { target: { value: "15" } });
+    await fireEvent.blur(minute);
+    await fireEvent.keyDown(minute, { key: "Escape" });
 
-    expect(screen.getAllByRole("option")).toHaveLength(96);
-    expect(screen.getByRole("option", { name: "12:00 AM" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "11:45 PM" })).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("option", { name: "7:15 AM" }));
-
+    expect(await screen.findByRole("button", { name: "Time: 7:15 AM" })).toBeInTheDocument();
     expect(updateRoutine).not.toHaveBeenCalled();
     await fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
@@ -321,7 +320,7 @@ describe("AgentRoutinesSettings", () => {
     );
   });
 
-  it("keeps a non-grid API time as the current picker option", async () => {
+  it("shows a time that is not on a quarter hour", async () => {
     const customTimeRoutine: Routine = {
       ...routine,
       trigger: { ...routine.trigger, schedule: { kind: "weekdays", time: "07:07" } },
@@ -329,27 +328,89 @@ describe("AgentRoutinesSettings", () => {
     setupOpenBot({ routines: { chief: [customTimeRoutine] } });
     render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
-    await fireEvent.click(screen.getByRole("button", { name: /On weekdays at 7:07 AM/ }));
-    const timePicker = screen.getByRole("button", { name: /^Time/ });
-    expect(timePicker).toHaveTextContent("7:07 AM");
-    await fireEvent.pointerDown(timePicker, { pointerType: "mouse", button: 0 });
-
-    expect(screen.getAllByRole("option")).toHaveLength(97);
-    expect(screen.getByRole("option", { name: "7:07 AM" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Weekdays at 7:07 AM/ })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: /Morning brief/ }));
+    expect(screen.getByRole("button", { name: "Time: 7:07 AM" })).toBeInTheDocument();
   });
 
-  it("opens the time picker from the keyboard", async () => {
-    setupOpenBot({ routines: { chief: [routine] } });
+  it("keeps a schedule the chips cannot show when only the name changes", async () => {
+    const intervalRoutine: Routine = {
+      ...routine,
+      trigger: {
+        ...routine.trigger,
+        schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T12:00:00.000Z" },
+      },
+    };
+    const mock = setupOpenBot({ routines: { chief: [intervalRoutine] } });
+    const updateRoutine = vi.spyOn(mock.api.agent, "updateRoutine");
     render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /Morning brief/ }));
-    await fireEvent.click(screen.getByRole("button", { name: /On weekdays at 7:00 AM/ }));
-    const timePicker = screen.getByRole("button", { name: /^Time/ });
-    timePicker.focus();
-    await fireEvent.keyDown(timePicker, { key: "Enter" });
+    await fireEvent.click(await screen.findByRole("button", { name: /Every 15 minutes/ }));
+    expect(screen.getByRole("button", { name: "Frequency Custom" })).toBeInTheDocument();
+    await fireEvent.input(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Quick check" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(screen.getByRole("listbox")).toBeVisible();
-    expect(screen.getByRole("option", { name: "7:00 AM" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(updateRoutine).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Quick check", schedule: intervalRoutine.trigger.schedule }),
+      ),
+    );
+  });
+
+  it("keeps a schedule saved from a chat card when a rename is saved here", async () => {
+    const mock = setupOpenBot({ routines: { chief: [routine] } });
+    const updateRoutine = vi.spyOn(mock.api.agent, "updateRoutine");
+    render(() => <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={vi.fn()} />);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /Weekdays at 7:00 AM/ }));
+    await fireEvent.input(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Quick check" } });
+    await mock.api.agent.updateRoutine({
+      agentId: "chief",
+      routineId: routine.id,
+      name: routine.name,
+      instruction: routine.instruction,
+      active: routine.active,
+      schedule: { kind: "daily", time: "08:30" },
+    });
+    expect(await screen.findByRole("button", { name: "Time: 8:30 AM" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(updateRoutine).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: "Quick check", schedule: { kind: "daily", time: "08:30" } }),
+      ),
+    );
+  });
+
+  it("ignores a routine list that arrives after a newer one", async () => {
+    setupOpenBot({ routines: { chief: [routine] } });
+    const lists: ((routines: RoutineFields[]) => void)[] = [];
+    let reload = () => {};
+    const port = {
+      ...agentRoutinesPort("chief"),
+      list: () => new Promise<RoutineFields[]>((resolve) => lists.push(resolve)),
+      subscribe: (next: () => void) => {
+        reload = next;
+        return () => {};
+      },
+    };
+    render(() => <AgentRoutinesSettings port={port} onCountChange={vi.fn()} />);
+    lists[0]?.([routine]);
+    await fireEvent.click(await screen.findByRole("button", { name: /Weekdays at 7:00 AM/ }));
+
+    reload();
+    reload();
+    const moved: Routine = {
+      ...routine,
+      trigger: { ...routine.trigger, schedule: { kind: "daily", time: "08:30" } },
+      updatedAt: "2026-08-25T13:00:00.000Z",
+    };
+    lists[2]?.([moved]);
+    expect(await screen.findByRole("button", { name: "Time: 8:30 AM" })).toBeInTheDocument();
+    lists[1]?.([routine]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(screen.getByRole("button", { name: "Time: 8:30 AM" })).toBeInTheDocument();
   });
 });

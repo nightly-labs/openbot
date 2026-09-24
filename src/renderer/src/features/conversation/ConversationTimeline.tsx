@@ -9,12 +9,13 @@ import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/Conversat
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
-import { createMemo, For, Loading, lazy, Show, untrack } from "solid-js";
+import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
+import { RoutineChatCard } from "./RoutineChatCard";
 
 /** A message that renders only an action marker, with no bubble of its own. */
 function markerOnlyMessage(message: AgentMessage): boolean {
@@ -115,6 +116,32 @@ export function ConversationTimeline() {
     setVirtualRootElement,
   } = useConversationViewScope();
   const runtime = conversationRuntime(props);
+  /**
+   * An agent's record of a routine it created or changed is a card whose schedule the person can
+   * change. Only a record from an agent turn has a `turnId`. A change the person made in the app
+   * keeps the plain marker, so an edit on a card does not add a second card that replaces it. A
+   * deleted routine also keeps the plain marker, because its schedule is not known.
+   */
+  const routineCardMarker = (message: AgentMessage | undefined, marker: ChatActionMarkerModel | undefined) =>
+    message?.turnId && marker?.kind === "routine-lifecycle" ? marker : undefined;
+  // "Show latest" moves focus to this card. The list mounts it only after the scroll.
+  const [routineCardFocus, setRoutineCardFocus] = createSignal<string | null>(null);
+  // The newest agent record of each routine is the one card that still edits it.
+  const latestRoutineMessageIds = createMemo(() => {
+    const latest = new Map<string, string>();
+    for (const message of timelineMessages()) {
+      const marker = routineCardMarker(message, message.actionMarker);
+      if (marker) latest.set(marker.routineId, message.id);
+    }
+    return latest;
+  });
+  const routineCard = (message: AgentMessage | undefined, marker: ChatActionMarkerModel) => {
+    const agentId = props.agent?.id;
+    const cardMarker = routineCardMarker(message, marker);
+    if (!cardMarker || cardMarker.action === "deleted" || !agentId) return undefined;
+    const routine = props.routines?.find((candidate) => candidate.id === cardMarker.routineId);
+    return routine && { action: cardMarker.action, routine, agentId };
+  };
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
@@ -266,16 +293,47 @@ export function ConversationTimeline() {
                       >
                         <Show when={message()?.actionMarker ?? initialActionMarker}>
                           {(marker) => (
-                            <ChatActionMarker
-                              onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
-                              marker={marker()}
-                              agents={props.agents}
-                              announce={animateEntrance}
-                              routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
-                              onSelectAgent={props.onSelectAgent}
-                              onOpenRoutine={openRoutineSettings}
-                              onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                            />
+                            <Show
+                              when={routineCard(message() ?? initialMessage, marker())}
+                              fallback={
+                                <ChatActionMarker
+                                  onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
+                                  marker={marker()}
+                                  agents={props.agents}
+                                  announce={animateEntrance}
+                                  routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
+                                  onSelectAgent={props.onSelectAgent}
+                                  onOpenRoutine={openRoutineSettings}
+                                  onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                />
+                              }
+                            >
+                              {(card) => {
+                                const latestMessageId = () => latestRoutineMessageIds().get(card().routine.id);
+                                const rowMessageId = () => message()?.id ?? initialMessage.id;
+                                return (
+                                  <RoutineChatCard
+                                    action={card().action}
+                                    routine={card().routine}
+                                    agentId={card().agentId}
+                                    latest={latestMessageId() === rowMessageId()}
+                                    onOpenRoutine={openRoutineSettings}
+                                    onShowLatest={
+                                      props.onOpenSearchMessage
+                                        ? () => {
+                                            const messageId = latestMessageId();
+                                            if (!messageId) return;
+                                            setRoutineCardFocus(messageId);
+                                            void props.onOpenSearchMessage?.(messageId);
+                                          }
+                                        : undefined
+                                    }
+                                    focusRequested={routineCardFocus() === rowMessageId()}
+                                    onFocusHandled={() => setRoutineCardFocus(null)}
+                                  />
+                                );
+                              }}
+                            </Show>
                           )}
                         </Show>
                         <Show

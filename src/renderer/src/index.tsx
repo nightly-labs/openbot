@@ -1,3 +1,4 @@
+import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import { render } from "@solidjs/web";
 import { App } from "./App";
 import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUseHighlightSurface";
@@ -10,6 +11,8 @@ const root = document.getElementById("root");
 if (!root) {
   throw new Error("Renderer root element was not found.");
 }
+
+installPointerFocusGuard();
 
 const surface = new URLSearchParams(window.location.search).get("surface");
 render(() => {

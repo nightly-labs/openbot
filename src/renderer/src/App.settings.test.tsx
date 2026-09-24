@@ -926,6 +926,19 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
+  it("closes only the open popover when Escape is pressed in agent settings", async () => {
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
+    const settings = await screen.findByRole("complementary", { name: "Agent settings" });
+    await fireEvent.click(within(settings).getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+
+    await fireEvent.keyDown(within(settings).getByRole("dialog", { name: "Choose agent model" }), { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Choose agent model" })).not.toBeInTheDocument());
+    expect(screen.getByRole("complementary", { name: "Agent settings" })).toBeInTheDocument();
+  });
+
   it("keeps provider choices separate for each agent profile", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });

@@ -1,4 +1,10 @@
-import type { AgentStatus, AgentSummary, ConversationPage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type {
+  AgentStatus,
+  AgentSummary,
+  ConversationPage,
+  ConversationSnapshot,
+  Routine,
+} from "@openbot/contracts/ipc";
 import { Toaster, toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal, Show } from "solid-js";
@@ -27,6 +33,37 @@ import { useLayout } from "./layout";
 import { useNavigation } from "./navigation";
 import { useProviders } from "./providers";
 
+const morningBrief: Routine = {
+  id: "routine-1",
+  agentId: "chief",
+  name: "Morning brief",
+  instruction: "Summarize the overnight changes.",
+  active: true,
+  timezone: "UTC",
+  trigger: {
+    id: "trigger-1",
+    routineId: "routine-1",
+    schedule: { kind: "weekdays", time: "07:00" },
+    nextRunAt: "2026-08-26T07:00:00.000Z",
+    createdAt: "2026-08-25T12:00:00.000Z",
+    updatedAt: "2026-08-25T12:05:00.000Z",
+  },
+  createdAt: "2026-08-25T12:00:00.000Z",
+  updatedAt: "2026-08-25T12:05:00.000Z",
+};
+
+/** A routine record in the chat. Only a record from an agent turn has a `turnId`. */
+const routineEvent = (id: string, action: "created" | "updated", createdAt: string, turnId?: string) => ({
+  id,
+  ...(turnId ? { turnId } : {}),
+  author: "system" as const,
+  source: "system" as const,
+  text: morningBrief.name,
+  createdAt,
+  status: "completed" as const,
+  itemType: `routine-event:${action}:${morningBrief.id}`,
+});
+
 describe("OpenBot connected desktop shell", () => {
   beforeEach(() => {
     installOpenbotStub();
@@ -35,6 +72,41 @@ describe("OpenBot connected desktop shell", () => {
   // The toast store is module-global, so a notification outlives the render that raised it.
   afterEach(() => {
     toast.dismiss();
+  });
+
+  it("keeps the agent's routine card live after a change the person made in the app", async () => {
+    vi.mocked(window.openbot.agent.listRoutines).mockResolvedValue([morningBrief]);
+    vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(
+      testConversationPage("chief", [
+        routineEvent("routine-created", "created", "2026-08-25T12:00:00.000Z", "turn-1"),
+        routineEvent("routine-updated", "updated", "2026-08-25T12:05:00.000Z"),
+      ]),
+    );
+    render(() => <App />);
+
+    const card = await screen.findByRole("article", { name: "Morning brief" });
+    expect(card).toHaveTextContent("Created routine");
+    expect(within(card).getByRole("button", { name: "Days: Weekdays" })).toBeEnabled();
+    expect(screen.getAllByRole("article", { name: "Morning brief" })).toHaveLength(1);
+    expect(screen.getByText("Updated routine")).toBeInTheDocument();
+  });
+
+  it("moves focus to the latest card of a routine from Show latest", async () => {
+    vi.mocked(window.openbot.agent.listRoutines).mockResolvedValue([morningBrief]);
+    vi.mocked(window.openbot.agent.readConversationPage).mockResolvedValue(
+      testConversationPage("chief", [
+        routineEvent("routine-created", "created", "2026-08-25T12:00:00.000Z", "turn-1"),
+        routineEvent("routine-updated", "updated", "2026-08-25T12:05:00.000Z", "turn-2"),
+      ]),
+    );
+    render(() => <App />);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Show latest" }));
+    const latest = screen.getAllByRole("article", { name: "Morning brief" }).at(-1);
+    expect(latest).toHaveTextContent("Updated routine");
+    await waitFor(() =>
+      expect(within(latest ?? document.body).getByRole("button", { name: "Open routine Morning brief" })).toHaveFocus(),
+    );
   });
 
   it("restores the selected agent after the app remounts", async () => {

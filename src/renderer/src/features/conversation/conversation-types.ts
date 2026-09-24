@@ -13,6 +13,7 @@ import type {
   FilePreview,
   ProviderRuntimeStatus,
   QueueSnapshot,
+  RoutineFields,
   ServerSummary,
   TeamPresenceSnapshot,
   UpdateAgentInput,
@@ -70,6 +71,8 @@ export interface ConversationProps {
   agent: AgentProfile | undefined;
   agents: AgentProfile[];
   availableRoutineIds?: readonly string[];
+  /** The agent's routines, for the chat card of a routine the agent created or changed. */
+  routines?: readonly RoutineFields[];
   modelOptions: AgentModelOption[];
   messages: AgentMessage[];
   messageReferences?: Record<string, AgentMessage>;
