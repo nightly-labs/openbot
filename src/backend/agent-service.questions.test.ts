@@ -80,7 +80,7 @@ describe.sequential("AgentService: questions", () => {
     expect(previewAfterCompletion).not.toContain("Which scope should we use?");
   });
 
-  it("keeps prompts from a healthy provider active when another provider exits", async () => {
+  it("keeps prompts and approvals from a healthy provider active when another provider exits", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
@@ -149,9 +149,27 @@ describe.sequential("AgentService: questions", () => {
       },
     });
     await waitFor(() => events.filter((event) => event.type === "prompt").length === 2);
+    for (const [client, threadId, turnId, requestId] of [
+      [codexClient, codexThreadId, codexTurn.turnId, "codex-provider-approval"],
+      [claudeClient, claudeThreadId, claudeTurn.turnId, "claude-provider-approval"],
+    ] as const) {
+      client.emit("request", {
+        method: "item/commandExecution/requestApproval",
+        id: requestId,
+        params: { threadId, turnId, command: ["git", "status"], cwd: root, reason: "Inspect the worktree." },
+      });
+    }
+    await waitFor(() => events.filter((event) => event.type === "approval").length === 2);
 
     codexClient.emit("exit", new Error("Codex exited."));
     await waitFor(() => events.some((event) => event.type === "error" && event.code === "codex_exited"));
+    // Remote clients drop a request only on its resolved event: a partial runtime snapshot keeps it.
+    expect(
+      events.flatMap((event) => (event.type === "agent-input-resolved" ? [[event.kind, event.requestId]] : [])),
+    ).toEqual([
+      ["prompt", "codex-provider-prompt"],
+      ["approval", "codex-provider-approval"],
+    ]);
     expect(
       (await service.readConversation("chief")).messages.find(
         (message) => message.questionPrompt?.requestId === "codex-provider-prompt",
@@ -165,5 +183,10 @@ describe.sequential("AgentService: questions", () => {
 
     await service.respondToPrompt({ requestId: "claude-provider-prompt", answers: { claude: ["Still active"] } });
     expect(claudeClient.responses.find((response) => response.id === "claude-provider-prompt")).toBeDefined();
+    await service.respondToApproval({ requestId: "claude-provider-approval", decision: "accept" });
+    expect(claudeClient.responses.find((response) => response.id === "claude-provider-approval")).toEqual({
+      id: "claude-provider-approval",
+      result: { decision: "accept" },
+    });
   });
 });

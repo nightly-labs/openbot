@@ -348,7 +348,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#compaction.dispose();
           this.#attention.clearPrompts(client);
           this.#attention.clearBrowserTakeovers();
-          this.#attention.clearApprovals();
+          this.#attention.clearApprovals(client);
           this.#browser.clearControls();
         },
         isStopping: () => this.#stopping,
