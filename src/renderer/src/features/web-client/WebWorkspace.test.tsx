@@ -466,10 +466,10 @@ describe("web workspace state", () => {
   it("keeps approvals that a partial runtime snapshot leaves out", async () => {
     const app = harness();
     const workspace = await connected(app);
-    const approval = (requestId: string) => ({
+    const approval = (requestId: string, agentId: string) => ({
       requestId,
-      agentId: "chief",
-      threadId: "thread-chief",
+      agentId,
+      threadId: `thread-${agentId}`,
       turnId: "turn-one",
       kind: "command" as const,
       command: "pwd",
@@ -493,8 +493,9 @@ describe("web workspace state", () => {
         failedTurns: [],
       },
     });
-    app.events().event("host", { type: "approval", approval: approval("left-out") });
-    app.events().event("host", snapshot(false, [approval("listed")]));
+    app.events().event("host", { type: "approval", approval: approval("left-out", "scout") });
+    app.events().event("host", { type: "approval", approval: approval("cleared", "chief") });
+    app.events().event("host", snapshot(false, [approval("listed", "chief")]));
     await waitFor(() =>
       expect(workspace.state.approvals.map((item) => item.requestId)).toEqual(["left-out", "listed"]),
     );
