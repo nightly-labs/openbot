@@ -189,4 +189,65 @@ describe.sequential("AgentService: questions", () => {
       result: { decision: "accept" },
     });
   });
+
+  it("expires the requests of a provider that an account refresh finds signed out", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, "DONE", false);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Ask before the sign-out" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!client || !threadId || !turnId) throw new Error("The Codex turn did not start.");
+    client.emit("request", {
+      method: "item/tool/call",
+      id: "signed-out-prompt",
+      params: {
+        threadId,
+        turnId,
+        callId: "signed-out-prompt",
+        namespace: "openbot",
+        tool: "ask_user",
+        arguments: { questions: [{ id: "scope", header: "Scope", question: "Which scope?" }] },
+      },
+    });
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "signed-out-approval",
+      params: { threadId, turnId, command: ["git", "status"], cwd: root, reason: "Inspect the worktree." },
+    });
+    await waitFor(() => events.some((event) => event.type === "approval"));
+
+    client.accountSignedIn = false;
+    await service.refreshProviders();
+    expect(client.running).toBe(false);
+    expect(
+      events.flatMap((event) => (event.type === "agent-input-resolved" ? [[event.kind, event.requestId]] : [])),
+    ).toEqual([
+      ["prompt", "signed-out-prompt"],
+      ["approval", "signed-out-approval"],
+    ]);
+    expect(
+      (await service.readConversation("chief")).messages.find(
+        (message) => message.questionPrompt?.requestId === "signed-out-prompt",
+      )?.questionPrompt?.resolution,
+    ).toEqual({ status: "expired" });
+    await expect(service.respondToApproval({ requestId: "signed-out-approval", decision: "accept" })).rejects.toThrow(
+      "This approval is no longer active.",
+    );
+  });
 });

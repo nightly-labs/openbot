@@ -640,11 +640,7 @@ export class AttentionRegistry {
     for (const [requestId, pending] of this.#prompts) {
       const pendingThreadId = getString(pending.params, "threadId");
       const pendingTurnId = getString(pending.params, "turnId");
-      if (pendingThreadId === threadId && pendingTurnId === turnId) {
-        this.#resolvePersistedPrompt(pending, { status: "expired" });
-        this.#prompts.delete(requestId);
-        this.#emitInputResolved("prompt", requestId, pending.agentId);
-      }
+      if (pendingThreadId === threadId && pendingTurnId === turnId) this.#expirePrompt(requestId, pending);
     }
     for (const [requestId, pending] of this.#approvals) {
       const pendingThreadId = getString(pending.params, "threadId") ?? getString(pending.params, "conversationId");
@@ -665,9 +661,21 @@ export class AttentionRegistry {
   clearPrompts(client?: AgentClient): void {
     for (const [requestId, pending] of this.#prompts) {
       if (client && pending.client !== client) continue;
+      this.#expirePrompt(requestId, pending);
+    }
+  }
+
+  /**
+   * A failed write must not stop the clear: the remaining requests would stay, and the provider
+   * paths that clear a stopped client would fail after the client is gone.
+   */
+  #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {
+    this.#prompts.delete(requestId);
+    this.#emitInputResolved("prompt", requestId, pending.agentId);
+    try {
       this.#resolvePersistedPrompt(pending, { status: "expired" });
-      this.#prompts.delete(requestId);
-      this.#emitInputResolved("prompt", requestId, pending.agentId);
+    } catch (error) {
+      this.#emitError("prompt_persistence_failed", error, pending.agentId);
     }
   }
 
