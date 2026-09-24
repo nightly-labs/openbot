@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@openbot/contracts/ipc";
+import type { AgentEvent, BrowserTab } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -7,12 +7,32 @@ import {
   createFakeClaude,
   createTestService,
   FakeAgentClient,
+  fakeBrowser,
   notification,
   startAgentTestFixture,
   stopAgentTestFixture,
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+
+function ownedTab(id: string, ownerThreadId: string, ownerAgentId: string): BrowserTab {
+  return { id, title: "Sign in", url: "https://example.com/login", loading: false, ownerThreadId, ownerAgentId };
+}
+
+function takeoverRequest(id: string, threadId: string, turnId: string, tabId: string) {
+  return {
+    method: "item/tool/call",
+    id,
+    params: {
+      threadId,
+      turnId,
+      callId: id,
+      namespace: "openbot_browser",
+      tool: "request_takeover",
+      arguments: { tabId, reason: "Sign in." },
+    },
+  };
+}
 
 let root: string;
 let service: AgentService | null = null;
@@ -80,13 +100,15 @@ describe.sequential("AgentService: questions", () => {
     expect(previewAfterCompletion).not.toContain("Which scope should we use?");
   });
 
-  it("keeps prompts and approvals from a healthy provider active when another provider exits", async () => {
+  it("keeps prompts, approvals and takeovers from a healthy provider active when another provider exits", async () => {
     process.env.OPENBOT_CLAUDE_PATH = await createFakeClaude(root);
     const clients = new Map<AgentProvider, FakeAgentClient>();
+    const tabs: BrowserTab[] = [];
     const { store, mailbox } = stores(root);
     service = createTestService({
       store,
       mailbox,
+      browser: fakeBrowser(tabs),
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);
@@ -160,6 +182,12 @@ describe.sequential("AgentService: questions", () => {
       });
     }
     await waitFor(() => events.filter((event) => event.type === "approval").length === 2);
+    tabs.push(ownedTab("claude-tab", claudeTurn.threadId, claudeAgent.id));
+    claudeClient.emit(
+      "request",
+      takeoverRequest("claude-provider-takeover", claudeThreadId, claudeTurn.turnId, "claude-tab"),
+    );
+    await waitFor(() => events.some((event) => event.type === "browser-takeover-requested"));
 
     codexClient.emit("exit", new Error("Codex exited."));
     await waitFor(() => events.some((event) => event.type === "error" && event.code === "codex_exited"));
@@ -169,6 +197,9 @@ describe.sequential("AgentService: questions", () => {
     ).toEqual([
       ["prompt", "codex-provider-prompt"],
       ["approval", "codex-provider-approval"],
+    ]);
+    expect(service.getRuntimeSnapshot().pendingBrowserTakeovers.map((takeover) => takeover.requestId)).toEqual([
+      "claude-provider-takeover",
     ]);
     expect(
       (await service.readConversation("chief")).messages.find(
@@ -192,10 +223,12 @@ describe.sequential("AgentService: questions", () => {
 
   it("expires the requests of a provider that an account refresh finds signed out", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
+    const tabs: BrowserTab[] = [];
     const { store, mailbox } = stores(root);
     service = createTestService({
       store,
       mailbox,
+      browser: fakeBrowser(tabs),
       preferredProvider: "codex",
       clientFactory: (provider) => {
         const client = new FakeAgentClient(provider, "DONE", false);
@@ -211,8 +244,13 @@ describe.sequential("AgentService: questions", () => {
 
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
-    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
-    if (!client || !threadId || !turnId) throw new Error("The Codex turn did not start.");
+    const started = events.find((event) => event.type === "turn-started");
+    const turnId = started?.turnId;
+    if (!client || !threadId || !turnId || started?.type !== "turn-started") {
+      throw new Error("The Codex turn did not start.");
+    }
+    tabs.push(ownedTab("signed-out-tab", started.threadId, "chief"));
+    client.emit("request", takeoverRequest("signed-out-takeover", threadId, turnId, "signed-out-tab"));
     client.emit("request", {
       method: "item/tool/call",
       id: "signed-out-prompt",
@@ -230,11 +268,23 @@ describe.sequential("AgentService: questions", () => {
       id: "signed-out-approval",
       params: { threadId, turnId, command: ["git", "status"], cwd: root, reason: "Inspect the worktree." },
     });
-    await waitFor(() => events.some((event) => event.type === "approval"));
+    await waitFor(
+      () =>
+        events.some((event) => event.type === "approval") &&
+        events.some((event) => event.type === "browser-takeover-requested"),
+    );
 
     client.accountSignedIn = false;
     await service.refreshProviders();
     expect(client.running).toBe(false);
+    expect(events).toContainEqual({
+      type: "browser-takeover-resolved",
+      requestId: "signed-out-takeover",
+      agentId: "chief",
+    });
+    expect(service.getRuntimeSnapshot().pendingBrowserTakeovers).toEqual([]);
+    // The stopped process has nothing to answer.
+    expect(client.responses.some((response) => response.id === "signed-out-takeover")).toBe(false);
     expect(
       events.flatMap((event) => (event.type === "agent-input-resolved" ? [[event.kind, event.requestId]] : [])),
     ).toEqual([
