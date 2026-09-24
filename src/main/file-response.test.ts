@@ -16,6 +16,7 @@ describe("fileResponse", () => {
 
     expect(response.headers.get("Content-Type")).toBe("image/png");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("Content-Length")).toBe(String(bytes.length));
     expect(Buffer.from(await response.arrayBuffer()).equals(bytes)).toBe(true);
   });
 

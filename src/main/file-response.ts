@@ -36,5 +36,6 @@ export async function fileResponse(path: string, headers: Record<string, string>
     },
     cancel: () => file.close(),
   });
-  return new Response(body, { headers });
+  // A buffer body gave the length. A media element needs it to show a duration.
+  return new Response(body, { headers: { ...headers, "Content-Length": String(stats.size) } });
 }
