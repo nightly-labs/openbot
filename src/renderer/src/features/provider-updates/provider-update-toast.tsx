@@ -60,8 +60,8 @@ function ProviderUpdatePercent(props: { percent: number }): JSX.Element {
 }
 
 /**
- * One line naming the state, and - while the update runs - the bar reporting it, in the row the
- * action button holds otherwise, so the box the user pressed Update on answers in the same place.
+ * One line naming the state, and - while the update runs - the bar reporting it on a line under it,
+ * so the box the user pressed Update on answers in the same place.
  * "Setting up" has no measurable end, so its bar is indeterminate and the percentage goes away
  * rather than sitting at a number that has stopped moving.
  */
