@@ -41,7 +41,7 @@
     "@openbot/ui": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.52.1",
+    "@cloudflare/vite-plugin": "1.56.0",
     "@cloudflare/workers-types": "catalog:",
     "@solidjs/testing-library": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
