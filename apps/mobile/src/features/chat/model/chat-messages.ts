@@ -104,10 +104,34 @@ function projectedMarker(
   return item;
 }
 
+/** The order of the last sorted transcript, and the fields that decided it. */
+let lastOrder: { key: string; ids: string[] } | null = null;
+
+/**
+ * The sort reads only these fields. A streamed chunk changes only text and status, so the order of
+ * the previous frame applies and the transcript is not sorted again.
+ */
+function sortedConversationMessages(messages: readonly ConversationMessage[]) {
+  const key = messages
+    .map(
+      (message) =>
+        `${message.id}\u0000${message.turnId ?? ""}\u0000${message.createdAt}\u0000${message.author}\u0000${message.itemType ?? ""}\u0000${message.exchange?.direction ?? ""}`,
+    )
+    .join("\u0001");
+  if (lastOrder?.key === key) {
+    const byId = new Map(messages.map((message) => [message.id, message]));
+    const ordered = lastOrder.ids.flatMap((id) => byId.get(id) ?? []);
+    if (byId.size === messages.length && ordered.length === messages.length) return ordered;
+  }
+  const sorted = sortConversationMessages([...messages]);
+  lastOrder = { key, ids: sorted.map((message) => message.id) };
+  return sorted;
+}
+
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
-  for (const message of sortConversationMessages([...messages])) {
+  for (const message of sortedConversationMessages(messages)) {
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       const { exchange } = message;

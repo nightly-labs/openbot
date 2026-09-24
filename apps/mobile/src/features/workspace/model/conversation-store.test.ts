@@ -54,6 +54,15 @@ describe("generated images in mobile history", () => {
       expect.objectContaining({ id: "image", streaming: true, imageGeneration }),
     ]);
   });
+
+  it("keeps the transcript order while a reply streams and sorts again when the order can change", () => {
+    const later = { ...message("later"), createdAt: "2026-09-10T10:05:00Z" };
+    const earlier = { ...message("earlier"), createdAt: "2026-09-10T10:01:00Z" };
+    const ids = (messages: ConversationMessage[]) => projectChatMessages(messages).map((item) => item.id);
+    expect(ids([later, earlier])).toEqual(["earlier", "later"]);
+    expect(ids([{ ...later, text: "later, streamed" }, earlier])).toEqual(["earlier", "later"]);
+    expect(ids([later, { ...earlier, createdAt: "2026-09-10T10:09:00Z" }])).toEqual(["later", "earlier"]);
+  });
 });
 
 describe("mobile conversation windows", () => {
