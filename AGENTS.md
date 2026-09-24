@@ -149,6 +149,9 @@ risks since the last release.
 - Keep tests minimal. Do not add a regression test by default. Add a test only when a bug can lose
   user data, break a released protocol, weaken the trust boundary, or leak a secret, or when the
   same bug came back.
+- A database migration always needs tests: data-preservation fixtures for every affected released
+  schema, plus the failure and rollback cases that [src/backend/AGENTS.md](src/backend/AGENTS.md)
+  lists.
 - Highly prefer E2E tests as the sole testing mechanism. Use them to verify complex features work.
   At the end of E2E tests, produce a verifiable and repeatable artifact, such as a JSON report or a
   screenshot under `.openbot-build/`.

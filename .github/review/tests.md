@@ -34,5 +34,6 @@ Report a finding when the diff:
 
 Do not report a missing test unless you can name the concrete regression it would catch, and that
 regression can lose user data, break a released protocol, weaken the trust boundary, or leak a
-secret. `AGENTS.md` does not ask for a regression test by default. A thin test at one of those
+secret. `AGENTS.md` does not ask for a regression test by default. A database migration is the
+exception: it always needs tests, and `contracts-and-migrations.md` lists them. A thin test at one of those
 seams is not a finding for being thin.
