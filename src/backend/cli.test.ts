@@ -21,6 +21,7 @@ import {
   resolveCodexCli,
   resolveGrokCli,
   resolveOpencodeCli,
+  runInLoginShell,
   windowsFallbackPaths,
 } from "./cli";
 
@@ -161,6 +162,15 @@ describe("login shell discovery", () => {
     expect(loginShellCommand("linux", {})).toEqual({ command: "/bin/sh", args: ["-lc"] });
     expect(loginShellCommand("linux", { SHELL: "  " })).toEqual({ command: "/bin/sh", args: ["-lc"] });
     expect(loginShellCommand("linux", { SHELL: "/bin/sh" })).toEqual({ command: "/bin/sh", args: ["-lc"] });
+  });
+
+  it("runs the shell in a process group of its own", async () => {
+    // An interactive bash in OpenBot's group stops the whole group with SIGTTIN when another
+    // lookup holds the terminal (#766).
+    const shell = { command: "/bin/sh", args: ["-c"] };
+    const [pid, group] = (await runInLoginShell('echo "$$ $(ps -o pgid= -p $$)"', shell)).trim().split(/\s+/u);
+    expect(group).toBe(pid);
+    await expect(runInLoginShell("exit 3", shell)).rejects.toThrow("code 3");
   });
 });
 

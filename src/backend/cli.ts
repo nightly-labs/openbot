@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -355,12 +355,8 @@ async function collectCandidates(command: AgentProviderId, configuredPath: strin
     }
     candidates.push(...windowsFallbackPaths(command));
   } else {
-    const loginShell = loginShellCommand();
     try {
-      const { stdout } = await execFileAsync(loginShell.command, [...loginShell.args, `command -v ${command}`], {
-        timeout: 5_000,
-        maxBuffer: 64 * 1024,
-      });
+      const stdout = await runInLoginShell(`command -v ${command}`);
       if (stdout.trim()) candidates.push(stdout.trim());
     } catch {
       // Packaged apps often start with a restricted PATH; known locations are checked next.
@@ -420,6 +416,68 @@ export function loginShellCommand(
   const preferred = environment.SHELL?.trim();
   if (!preferred) return { command: "/bin/sh", args: ["-lc"] };
   return { command: preferred, args: preferred.endsWith("/sh") ? ["-lc"] : ["-lic"] };
+}
+
+const LOGIN_SHELL_TIMEOUT_MS = 5_000;
+const LOGIN_SHELL_MAX_OUTPUT_BYTES = 64 * 1024;
+
+/**
+ * Runs one script in the user's login shell and returns what it printed.
+ *
+ * The shell starts in a session of its own, with no controlling terminal. An interactive bash that
+ * finds the terminal held by another process group sends SIGTTIN to its own group, and without a
+ * session of its own that group is OpenBot's. An OpenBot started from a terminal then stopped as soon
+ * as two lookups overlapped, and only SIGKILL could end it (#766). With no terminal, the shell turns
+ * job control off instead. `execFile` cannot do this: it does not pass `detached` on to `spawn`.
+ *
+ * A failed start, a non-zero exit, a signal, the timeout and too much output all reject, as
+ * `execFile` did, so each caller keeps its fallback.
+ */
+export function runInLoginShell(script: string, shell = loginShellCommand()): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(shell.command, [...shell.args, script], {
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let failure: Error | null = null;
+    // The whole group, so that nothing the user's profile started outlives the lookup. The pipes are
+    // closed too, as `execFile` did: a process outside the group can still hold them, and `close`
+    // waits for every holder.
+    const stop = (error: Error) => {
+      if (failure) return;
+      failure = error;
+      child.stdout.destroy();
+      child.stderr.destroy();
+      try {
+        if (child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
+      } catch {
+        // The group has already exited.
+      }
+    };
+    const timer = setTimeout(
+      () => stop(new Error(`The login shell did not finish in ${LOGIN_SHELL_TIMEOUT_MS / 1000} seconds.`)),
+      LOGIN_SHELL_TIMEOUT_MS,
+    );
+    child.stdout.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > LOGIN_SHELL_MAX_OUTPUT_BYTES) stop(new Error("The login shell printed too much output."));
+      else chunks.push(chunk);
+    });
+    // Drained and dropped: an interactive shell with no terminal reports that job control is off.
+    child.stderr.resume();
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("close", (code, signal) => {
+      clearTimeout(timer);
+      if (failure) reject(failure);
+      else if (code !== 0) reject(new Error(`The login shell exited with ${signal ?? `code ${code}`}.`));
+      else resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+  });
 }
 
 export function posixFallbackPaths(command: AgentProviderId, userHome = homedir()): string[] {
