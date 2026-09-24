@@ -14,6 +14,4 @@ The result is a square 512 by 512 pixel image that OpenBot shows as your avatar.
 5. Call `openbot.update_profile` with your own agent id from `agent_profile` and `avatarPath` set to the prepared file. Do not send `name`, `title`, `description`, `avatarSeed`, or `avatarHue`.
 6. Call `openbot.attach_files_to_response` with the prepared file, then answer in one short sentence.
 
-If you have no image generation tool, do not draw the image with code. Tell the user that your provider cannot generate images, and stop.
-
 If a step fails, tell the user what failed in one sentence. Do not report the avatar as set unless `openbot.update_profile` succeeded.
