@@ -183,6 +183,45 @@ it.each([0, 1])("opens the agent chat from author control %i", async (control) =
   expect(within(conversation).getByRole("heading", { name: "Chief", level: 1 })).toBeVisible();
 });
 
+it("reports a message copy that the clipboard refuses", async () => {
+  const writeText = vi.fn().mockRejectedValue(new DOMException("Document is not focused.", "NotAllowedError"));
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => false) });
+  const read = window.openbot.agent.readChannel;
+  vi.spyOn(window.openbot.agent, "readChannel").mockImplementation(async (input) => ({
+    ...(await read(input)),
+    messages: [
+      {
+        id: "reply",
+        channelId: input.channelId,
+        sequence: 1,
+        author: { kind: "agent", id: "chief", name: "Chief" },
+        taskId: null,
+        superseded: false,
+        message: {
+          id: "reply",
+          author: "assistant",
+          text: "The report is ready.",
+          createdAt: new Date().toISOString(),
+          status: "completed",
+        },
+      },
+    ],
+  }));
+  try {
+    const chat = await openSavedChannel();
+    await fireEvent.pointerDown(await within(chat).findByRole("button", { name: "More message actions" }), {
+      button: 0,
+    });
+    await fireEvent.pointerUp(screen.getByRole("menuitem", { name: "Copy" }), { button: 0 });
+
+    expect(await within(chat).findByRole("alert")).toHaveTextContent("Could not copy the message.");
+    expect(writeText).toHaveBeenCalledWith("The report is ready.");
+  } finally {
+    Reflect.deleteProperty(document, "execCommand");
+  }
+});
+
 it.each(["owner", "admin", "member"] as const)("limits remote channel deletion for %s", async (role) => {
   vi.mocked(window.openbot.servers.list).mockResolvedValue([
     {

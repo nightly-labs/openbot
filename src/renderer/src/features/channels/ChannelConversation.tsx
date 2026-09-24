@@ -164,10 +164,12 @@ export function ChannelConversation() {
     reply: string | null;
     attachments: DraftAttachment[];
   }>({ text: "", reply: null, attachments: [] });
+  const [copyError, setCopyError] = createSignal<string | null>(null);
   createEffect(
     () => channels.state.selectedId,
     () => {
       resetPanel();
+      setCopyError(null);
       setPanel((state) => {
         state.memories.count = 0;
         state.routines.count = 0;
@@ -363,10 +365,11 @@ export function ChannelConversation() {
     );
     if (!text) return;
     setOpenMoreMessageId(null);
+    setCopyError(null);
     try {
       await writeClipboardText(text);
     } catch {
-      // The copy button does not show "Copied", which tells the reader the copy failed.
+      setCopyError("Could not copy the message.");
       return;
     }
     setCopiedMessageId(message.id);
@@ -486,6 +489,7 @@ export function ChannelConversation() {
           </Button>
         </p>
       </Show>
+      <Show when={copyError()}>{(message) => <p role="alert">{message()}</p>}</Show>
 
       <Show when={channels.state.page} fallback={<p>Loading channel…</p>}>
         {(page) => (
