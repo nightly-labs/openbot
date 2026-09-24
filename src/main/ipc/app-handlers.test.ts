@@ -29,7 +29,7 @@ describe("external destinations", () => {
   it("sends the agent import guide to the Grok Bot export listing", () => {
     // The Import tab tells the user to install this agent. A wrong address installs some other agent
     // with access to their Grok Bot data.
-    expect(EXTERNAL_DESTINATIONS["grok-bot-export"]).toBe("https://x.ai/bot/SeMqhg9bPD4Qd_8i7I-vN");
+    expect(EXTERNAL_DESTINATIONS["grok-bot-export"]).toBe("https://x.ai/bot/jj5KlgQtJtskec5vhDUjr");
     expect(parseExternalDestination("grok-bot-export")).toBe("grok-bot-export");
   });
 
