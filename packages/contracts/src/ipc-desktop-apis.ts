@@ -382,6 +382,8 @@ export interface AgentImportDesktopApi {
   choose: Invoke<typeof IPC_ENDPOINTS.agentImport.choose>;
   apply: Invoke<typeof IPC_ENDPOINTS.agentImport.apply>;
   discard: Invoke<typeof IPC_ENDPOINTS.agentImport.discard>;
+  readSkill: Invoke<typeof IPC_ENDPOINTS.agentImport.readSkill>;
+  saveSkill: Invoke<typeof IPC_ENDPOINTS.agentImport.saveSkill>;
 }
 
 export interface OpenBotDesktopApi {

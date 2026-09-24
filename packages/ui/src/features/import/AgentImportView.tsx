@@ -5,8 +5,11 @@ import {
   ChevronRight,
   CircleCheck,
   CopyButton,
+  Download,
   ExternalLink,
+  File,
   FolderOpen,
+  SlidingTabs,
   TriangleAlert,
   Upload,
 } from "@openbot/ui";
@@ -24,13 +27,24 @@ export type AgentImportPhase = "idle" | "reading" | "review" | "importing" | "do
 /** What the user says to the export agent. It is also the copy button's value. */
 export const AGENT_IMPORT_PROMPT = "Export my agents for OpenBot";
 
+/**
+ * How the user gets the export agent into Grok Bot. `agent`: install the ready one from its link.
+ * `skill`: create a new agent there and add the export skill by hand.
+ */
+export type AgentImportSetup = "agent" | "skill";
+
 export interface AgentImportViewProps {
   phase: AgentImportPhase;
   error?: string | null;
   preview?: AgentImportPreview | null;
   result?: AgentImportResult | null;
   now?: Date;
+  setup: AgentImportSetup;
+  /** The export skill's text, or null while it loads or when it could not be read. */
+  exportSkill: string | null;
+  onSetupChange: (setup: AgentImportSetup) => void;
   onOpenExportAgent: () => void;
+  onSaveExportSkill: () => void;
   onChoose: () => void;
   onImport: (keys: string[]) => void;
   onCancel: () => void;
@@ -69,7 +83,11 @@ export function AgentImportView(props: AgentImportViewProps) {
         <ImportGuide
           reading={props.phase === "reading"}
           error={props.error}
+          setup={props.setup}
+          exportSkill={props.exportSkill}
+          onSetupChange={props.onSetupChange}
           onOpenExportAgent={props.onOpenExportAgent}
+          onSaveExportSkill={props.onSaveExportSkill}
           onChoose={props.onChoose}
         />
       </Show>
@@ -80,7 +98,11 @@ export function AgentImportView(props: AgentImportViewProps) {
 function ImportGuide(props: {
   reading: boolean;
   error?: string | null;
+  setup: AgentImportSetup;
+  exportSkill: string | null;
+  onSetupChange: (setup: AgentImportSetup) => void;
   onOpenExportAgent: () => void;
+  onSaveExportSkill: () => void;
   onChoose: () => void;
 }) {
   const headingId = `agent-import-${createUniqueId()}`;
@@ -91,8 +113,8 @@ function ImportGuide(props: {
           Move your agents from Grok Bot
         </h3>
         <p class="agent-import-lede">
-          An export agent in Grok Bot packs your agents into one .zip file. OpenBot reads it on this computer and
-          uploads nothing.
+          An export agent in Grok Bot packs names, instructions, avatars, skills, routines, memories, and the files you
+          include into one .zip file.
         </p>
       </header>
 
@@ -107,16 +129,56 @@ function ImportGuide(props: {
           </span>
           <div class="agent-import-step-body">
             <p class="agent-import-step-title">Add the export agent to Grok Bot</p>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              class="agent-import-link"
-              onClick={() => props.onOpenExportAgent()}
+            <SlidingTabs.Root
+              class="agent-import-setup"
+              value={props.setup}
+              onChange={(value) => props.onSetupChange(value === "skill" ? "skill" : "agent")}
             >
-              Open the export agent
-              <ExternalLink aria-hidden="true" />
-            </Button>
+              <SlidingTabs.List aria-label="How to add the export agent">
+                <SlidingTabs.Trigger value="agent">Install the agent</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="skill">Set it up yourself</SlidingTabs.Trigger>
+              </SlidingTabs.List>
+              <SlidingTabs.ContentSlot>
+                <SlidingTabs.Content value="agent" class="agent-import-setup-panel">
+                  <div class="agent-import-card">
+                    <AgentAvatar seed="openbot-export" class="storage-row-avatar" />
+                    <span class="agent-import-card-copy">
+                      <span class="agent-import-card-name">OpenBot export</span>
+                      <span class="agent-import-card-meta">Grok Bot agent · has the export skill</span>
+                    </span>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenExportAgent()}>
+                      <ExternalLink aria-hidden="true" />
+                      Open the export agent
+                    </Button>
+                  </div>
+                  <p class="agent-import-step-note">
+                    Install the ready agent from its Grok Bot page. The export leaves it out.
+                  </p>
+                </SlidingTabs.Content>
+                <SlidingTabs.Content value="skill" class="agent-import-setup-panel">
+                  <div class="agent-import-card">
+                    <File class="agent-import-card-icon" aria-hidden="true" />
+                    <span class="agent-import-card-copy">
+                      <span class="agent-import-card-name">SKILL.md</span>
+                      <span class="agent-import-card-meta">
+                        openbot-export
+                        <Show when={props.exportSkill}>
+                          {(text) => <> · {formatFileSize(new TextEncoder().encode(text()).byteLength)}</>}
+                        </Show>
+                      </span>
+                    </span>
+                    <CopyButton value={props.exportSkill} label="Copy" copiedLabel="Skill copied" />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onSaveExportSkill()}>
+                      <Download aria-hidden="true" />
+                      Save file…
+                    </Button>
+                  </div>
+                  <p class="agent-import-step-note">
+                    Add this skill to a new agent in Grok Bot, used only for the export. The export leaves it out.
+                  </p>
+                </SlidingTabs.Content>
+              </SlidingTabs.ContentSlot>
+            </SlidingTabs.Root>
           </div>
         </li>
         <li class="agent-import-step">
@@ -157,11 +219,6 @@ function ImportGuide(props: {
           </div>
         </li>
       </ol>
-
-      <p class="agent-import-footnote">
-        Names, instructions, avatars, skills, routines, memories, and the files you include move to OpenBot. Chat
-        history stays in Grok Bot. The export keeps its important facts as memories.
-      </p>
     </section>
   );
 }

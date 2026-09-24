@@ -86,7 +86,7 @@ import {
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
-import { AGENT_IMPORT_PREVIEW } from "../../stories/agent-import-fixtures";
+import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { filePreviewForPath } from "../../stories/file-previews";
 import {
@@ -2191,6 +2191,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone({ agents: imported, skipped: [], warnings: [] });
       },
       discard: async () => undefined,
+      readSkill: async () => AGENT_IMPORT_SKILL,
+      saveSkill: async () => ({ saved: true }),
     },
     remoteDesktop: {
       checkSetup: async () => ({

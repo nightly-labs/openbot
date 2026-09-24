@@ -647,6 +647,10 @@ export const IPC_ENDPOINTS = {
     choose: request<undefined, AgentImportPreview | null>()("agent-import:choose"),
     apply: request<ApplyAgentImportInput, AgentImportResult>()("agent-import:apply"),
     discard: request<string, void>()("agent-import:discard"),
+    // The export skill for a user who sets up the export agent in Grok Bot by hand. Main reads it
+    // from the app's resources, and `saveSkill` asks where to write it.
+    readSkill: request<undefined, string>()("agent-import:read-skill"),
+    saveSkill: request<undefined, ExportResult>()("agent-import:save-skill"),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived

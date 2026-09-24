@@ -52,3 +52,12 @@ export const AGENT_IMPORT_WARNINGS = [
   "Research: routine “Hourly price check” is skipped because its name, text, or schedule is invalid.",
   "Sales Outbound: an agent with this name already exists. The import adds a second one.",
 ];
+
+/** The start of the export skill, as `agentImport.readSkill` answers it. */
+export const AGENT_IMPORT_SKILL = `---
+name: openbot-export
+description: Export the user's Grok Bot agents into one .zip file that OpenBot imports.
+---
+
+# Export agents for OpenBot
+`;

@@ -1076,6 +1076,8 @@ export function installOpenbotStub(): void {
       choose: notStubbed("agentImport.choose"),
       apply: notStubbed("agentImport.apply"),
       discard: notStubbed("agentImport.discard"),
+      readSkill: notStubbed("agentImport.readSkill"),
+      saveSkill: notStubbed("agentImport.saveSkill"),
     },
     // The custom providers context lists on mount, so every harnessed mount reaches this group.
     customProviders: {

@@ -1,7 +1,23 @@
 import type { AgentImportPreview, AgentImportResult } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
-import { type AgentImportPhase, AgentImportView } from "@openbot/ui/features/import/AgentImportView";
-import { createStore, onSettled } from "solid-js";
+import {
+  type AgentImportPhase,
+  type AgentImportSetup,
+  AgentImportView,
+} from "@openbot/ui/features/import/AgentImportView";
+import { createSignal, createStore, onSettled } from "solid-js";
+
+/** The way into Grok Bot this viewer chose last, so a user who set up the skill starts there. */
+const SETUP_STORAGE_KEY = "openbot.agent-import.setup";
+
+function readSetup(): AgentImportSetup {
+  try {
+    return window.localStorage.getItem(SETUP_STORAGE_KEY) === "skill" ? "skill" : "agent";
+  } catch {
+    return "agent";
+  }
+}
 
 export interface ServerImportOptions {
   onOpenAgent: (agentId: string) => void;
@@ -31,6 +47,33 @@ export function ServerImportPanel(props: ServerImportOptions) {
     if (token) void window.openbot.agentImport.discard(token).catch(() => undefined);
   };
   onSettled(() => release);
+
+  const [setup, setSetup] = createSignal(readSetup());
+  const changeSetup = (next: AgentImportSetup) => {
+    setSetup(next);
+    try {
+      window.localStorage.setItem(SETUP_STORAGE_KEY, next);
+    } catch {
+      // The choice is a convenience. Without storage, the panel opens on the default again.
+    }
+  };
+
+  // Read once: the skill ships with the app and does not change while it runs.
+  const [exportSkill, setExportSkill] = createSignal<string | null>(null);
+  onSettled(() => {
+    void window.openbot.agentImport
+      .readSkill()
+      .then(setExportSkill)
+      .catch(() => setExportSkill(null));
+  });
+
+  const saveSkill = async () => {
+    try {
+      await window.openbot.agentImport.saveSkill();
+    } catch (error) {
+      toast.error("The skill was not saved", { description: errorMessage(error, "Try again.") });
+    }
+  };
 
   const choose = async () => {
     const open = state.preview;
@@ -75,7 +118,11 @@ export function ServerImportPanel(props: ServerImportOptions) {
       error={state.error}
       preview={state.preview}
       result={state.result}
+      setup={setup()}
+      exportSkill={exportSkill()}
+      onSetupChange={changeSetup}
       onOpenExportAgent={() => void window.openbot.openExternal("grok-bot-export")}
+      onSaveExportSkill={() => void saveSkill()}
       onChoose={() => void choose()}
       onImport={(keys) => void apply(keys)}
       onCancel={reset}

@@ -931,7 +931,9 @@ refuses a file that changed. `stage` measures entries without inflating them and
 `isUnsafeArchivePath` in `skill-package.ts` refuses or that name a Windows drive. `apply` checks all
 skills of an agent, creates it through `AgentService` and publishes skills through the local skill
 library; an agent whose step fails is deleted with the skill revisions it published, and the others
-continue. No schema change is needed.
+continue. Step 1 offers two ways to add the export agent: its Grok Bot link, or the skill set up by hand.
+`agent-import:read-skill` and `agent-import:save-skill` give that skill from the app's resources
+(`extraResources` in `electron-builder.yml`); main opens the save dialog, so the renderer names no path. No schema change is needed.
 
 ## Storage and files
 

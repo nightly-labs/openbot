@@ -5,7 +5,7 @@ import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialo
 import { createSignal } from "solid-js";
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_WARNINGS } from "./agent-import-fixtures";
+import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL, AGENT_IMPORT_WARNINGS } from "./agent-import-fixtures";
 import { FILES_NOW } from "./files-fixtures";
 import { STORY_AGENT_SUMMARIES } from "./fixtures";
 
@@ -22,7 +22,11 @@ type ViewArgs = Parameters<typeof AgentImportView>[0];
 const viewArgs = (overrides: Partial<ViewArgs> = {}): ViewArgs => ({
   phase: "idle",
   now: FILES_NOW,
+  setup: "agent",
+  exportSkill: AGENT_IMPORT_SKILL,
+  onSetupChange: fn(),
   onOpenExportAgent: fn(),
+  onSaveExportSkill: fn(),
   onChoose: fn(),
   onImport: fn(),
   onCancel: fn(),
@@ -52,6 +56,20 @@ export const Intro: Story = {
   play: async ({ canvas }) => {
     await expect(canvas.getByRole("button", { name: "Open the export agent" })).toBeVisible();
     await expect(canvas.getByRole("button", { name: /^Choose export file/u })).toBeEnabled();
+  },
+};
+
+export const SetUpYourself: Story = {
+  name: "Import: Set up the skill yourself",
+  render: () => {
+    const [setup, setSetup] = createSignal<ViewArgs["setup"]>("agent");
+    const onSaveExportSkill = fn();
+    return <Stage args={viewArgs({ setup: setup(), onSetupChange: setSetup, onSaveExportSkill })} />;
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole("tab", { name: "Set it up yourself" }));
+    await expect(canvas.getByRole("button", { name: "Copy" })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: /^Save file/u })).toBeVisible();
   },
 };
 

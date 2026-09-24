@@ -1,7 +1,9 @@
 // Agent import into the local host. The file dialog opens here, so the renderer never names a path.
 
+import { copyFile, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { parseApplyAgentImportInput } from "@openbot/contracts/ipc";
-import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
 import type { AgentImportService } from "../agent-import-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { stringPayload } from "./validation";
@@ -9,11 +11,14 @@ import { stringPayload } from "./validation";
 export interface AgentImportIpcDependencies {
   agentImport: AgentImportService;
   getMainWindow: () => BrowserWindow | null;
+  /** The export skill a user adds to Grok Bot by hand. It ships in the app's resources. */
+  exportSkillPath: string;
 }
 
 export function agentImportIpcHandlers({
   agentImport,
   getMainWindow,
+  exportSkillPath,
 }: AgentImportIpcDependencies): Pick<IpcGroupHandlers, "agentImport"> {
   return {
     agentImport: {
@@ -31,6 +36,21 @@ export function agentImportIpcHandlers({
       }),
       apply: payloadHandler(parseApplyAgentImportInput, (input) => agentImport.apply(input)),
       discard: payloadHandler(stringPayload("token"), (token) => agentImport.discard(token)),
+      readSkill: handler(() => readFile(exportSkillPath, "utf8")),
+      saveSkill: handler(async () => {
+        const mainWindow = getMainWindow();
+        const options: SaveDialogOptions = {
+          title: "Save the export skill",
+          defaultPath: join(app.getPath("downloads"), "SKILL.md"),
+          filters: [{ name: "Markdown", extensions: ["md"] }],
+        };
+        const result = mainWindow
+          ? await dialog.showSaveDialog(mainWindow, options)
+          : await dialog.showSaveDialog(options);
+        if (result.canceled || !result.filePath) return { saved: false };
+        await copyFile(exportSkillPath, result.filePath);
+        return { saved: true };
+      }),
     },
   };
 }
